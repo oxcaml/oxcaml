@@ -1,18 +1,18 @@
-let $camlDeep_try_with__immstring11 = "Deep_try_with.E2" in
-let $camlDeep_try_with__immstring6 = "Deep_try_with.E1" in
+let $camlDeep_try_with__immstring12 = "Deep_try_with.E2" in
+let $camlDeep_try_with__immstring7 = "Deep_try_with.E1" in
 apply ccall noalloc
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
-    let $camlDeep_try_with__E153 =
+    let $camlDeep_try_with__E154 =
       Block immutable_unique
-      248 ($camlDeep_try_with__immstring6, Pccall)
+      248 ($camlDeep_try_with__immstring7, Pccall)
     in
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
-         let $camlDeep_try_with__E255 =
+         let $camlDeep_try_with__E256 =
            Block immutable_unique
-           248 ($camlDeep_try_with__immstring11, Pccall_1)
+           248 ($camlDeep_try_with__immstring12, Pccall_1)
          in
          ((let try_region = %begin_try_region () in
            let try_ghost_region = %begin_try_ghost_region () in
@@ -24,13 +24,13 @@ apply ccall noalloc
                 | 0 -> k (0, 1)
                 | 1 -> k3)
                where k3 =
-                 let Popaque_1 = %opaque ($camlDeep_try_with__E153) in
+                 let Popaque_1 = %opaque ($camlDeep_try_with__E154) in
                  cont k2 (Popaque_1))
               where k2 (Popaque) =
                 let `exn` = Popaque in
                 let `unit` = %end_try_region (try_region_1) in
                 let unit_1 = %end_try_ghost_region (try_ghost_region_1) in
-                let prim = %phys_eq (`exn`, $camlDeep_try_with__E153) in
+                let prim = %phys_eq (`exn`, $camlDeep_try_with__E154) in
                 (switch prim
                    | 0 -> k1 (`exn`)
                    | 1 -> k2
@@ -41,13 +41,13 @@ apply ccall noalloc
                          | 0 -> k (2, 3)
                          | 1 -> k2)
                         where k2 =
-                          let Popaque_2 = %opaque ($camlDeep_try_with__E255)
+                          let Popaque_2 = %opaque ($camlDeep_try_with__E256)
                           in
                           cont k1 (Popaque_2))))
              where k1 (`exn` : val) =
                let `unit` = %end_try_region (try_region) in
                let unit_1 = %end_try_ghost_region (try_ghost_region) in
-               let prim = %phys_eq (`exn`, $camlDeep_try_with__E255) in
+               let prim = %phys_eq (`exn`, $camlDeep_try_with__E256) in
                switch prim
                  | 0 -> error pop(reraise error) (`exn`)
                  | 1 -> k (4, 5))
@@ -55,6 +55,6 @@ apply ccall noalloc
               let int_add = %int_barith.add (x, y) in
               let Popaque = %opaque (int_add) in
               let $camlDeep_try_with =
-                Block 0 ($camlDeep_try_with__E153, $camlDeep_try_with__E255)
+                Block 0 ($camlDeep_try_with__E154, $camlDeep_try_with__E256)
               in
               cont done ($camlDeep_try_with)))

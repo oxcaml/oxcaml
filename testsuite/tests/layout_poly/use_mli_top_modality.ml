@@ -5,6 +5,10 @@
  ocamlc.byte;
  module = "mli_with_static_default.mli";
  ocamlc.byte;
+ (* Load the dependencies via -Ix so that a cmx is guaranteed to be available
+    and they keep the [Static] staticity recorded in their cmis, allowing them
+    to be rebound at [@ static] below. *)
+ flags = "-nocwd -Ix .";
  module = "use_mli_top_modality.ml";
  ocamlc.byte;
  check-ocamlc.byte-output;

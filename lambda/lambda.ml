@@ -192,7 +192,9 @@ type primitive =
   | Pwith_stack
   | Pwith_stack_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -2569,7 +2571,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     (* Aborts in bytecode, unboxed in native code *)
     None
   | Pwith_stack | Pwith_stack_preemptible
-  | Presume | Pperform | Preperform
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
@@ -2770,7 +2773,8 @@ let primitive_can_raise prim =
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
   | Pwith_stack | Pwith_stack_preemptible
-  | Pperform | Presume
+  | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
@@ -3210,7 +3214,8 @@ let primitive_result_layout (p : primitive) =
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
   | Pwith_stack | Pwith_stack_preemptible
-  | Presume | Pperform | Preperform ->
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null

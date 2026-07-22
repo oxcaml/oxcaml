@@ -64,7 +64,7 @@ let flambda = @flambda@
 let flambda2 = @flambda2@
 
 let ocamlc_default_flags =
-  "-alert -unsafe_multidomain -alert -do_not_spawn_domains"
+  "-alert -unsafe_multidomain -alert -do_not_spawn_domains -alert -unsafe_effects"
 let ocamlopt_default_flags = ocamlc_default_flags
 
 let flat_float_array = @flat_float_array@

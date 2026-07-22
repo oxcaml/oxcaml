@@ -599,7 +599,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             Prim (Ccall "caml_array_of_uniform_array", [block]))
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
-    | Presume -> context_switch Resume ~arity:3
+    | Pcontinue -> context_switch Continue ~arity:2
+    | Pdiscontinue -> context_switch Discontinue ~arity:2
+    | Pdiscontinue_with_backtrace ->
+      context_switch Discontinue_with_backtrace ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
     | Preperform -> context_switch Reperform ~arity:3
@@ -1126,8 +1129,18 @@ and comp_binary_scalar_intrinsic : type a.
           | _ -> prim Subint)
         |> sign_extend taggable
       | Mul -> prim Mulint |> sign_extend taggable
-      | Div (Safe | Unsafe) -> prim Divint |> sign_extend taggable
-      | Mod (Safe | Unsafe) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_div",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_mod",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
       | And -> prim Andint
       | Or -> prim Orint
       | Xor -> prim Xorint)
@@ -1141,8 +1154,10 @@ and comp_binary_scalar_intrinsic : type a.
       | Add -> c "add"
       | Sub -> c "sub"
       | Mul -> c "mul"
-      | Div (Safe | Unsafe) -> c "div"
-      | Mod (Safe | Unsafe) -> c "mod"
+      | Div ((Safe | Unsafe), Signed) -> c "div"
+      | Mod ((Safe | Unsafe), Signed) -> c "mod"
+      | Div ((Safe | Unsafe), Unsigned) -> c "unsigned_div"
+      | Mod ((Safe | Unsafe), Unsigned) -> c "unsigned_mod"
       | And -> c "and"
       | Or -> c "or"
       | Xor -> c "xor"))

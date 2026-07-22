@@ -200,12 +200,18 @@ val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allow
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
-type unsupported_stack_allocation =
+type always_heap_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
+
+type always_static_allocation =
+  | Constant
+  | Src_pos
+  | Unboxed_unit
+  | Unboxed_bool
 
 type existential_binding =
   | Bind_already_bound
@@ -297,6 +303,8 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
+  | Mixed_record_atomic_access of Longident.t
+  | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -363,7 +371,8 @@ type error =
   | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Unsupported_stack_allocation of unsupported_stack_allocation
+  | Always_heap_allocation of always_heap_allocation
+  | Always_static_allocation of always_static_allocation
   | Not_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }

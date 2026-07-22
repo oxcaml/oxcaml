@@ -53,6 +53,8 @@ let runtime_flags env backend c_files =
 
 let toplevel_default_flags =
   "-noinit -no-version -noprompt \
-   -alert -unsafe_multidomain -alert -do_not_spawn_domains"
+   -alert -unsafe_multidomain \
+   -alert -do_not_spawn_domains \
+   -alert -unsafe_effects"
 
 let ocamlobjinfo_default_flags = "-null-crc"

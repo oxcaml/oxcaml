@@ -211,6 +211,7 @@
   ;; TYPING
   ident
   path
+  current_unit
   jkind
   scalar
   primitive

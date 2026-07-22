@@ -56,7 +56,8 @@ module IR : sig
           loc : Lambda.scoped_location;
           exn_continuation : exn_continuation option;
           region : Ident.t option;
-          ghost_region : Ident.t option
+          ghost_region : Ident.t option;
+          alloc_region : Ident.t
         }
 
   type apply_kind =
@@ -79,6 +80,7 @@ module IR : sig
       mode : Lambda.locality_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
+      alloc_region : Ident.t;
       args_arity : [`Complex] Flambda_arity.t;
       return_arity : [`Unarized] Flambda_arity.t
     }
@@ -368,6 +370,7 @@ module Function_decls : sig
       calling_convention:calling_convention ->
       return_continuation:Continuation.t ->
       exn_continuation:IR.exn_continuation ->
+      my_alloc_region:Ident.t ->
       my_region:Ident.t option ->
       my_ghost_region:Ident.t option ->
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
@@ -403,6 +406,8 @@ module Function_decls : sig
     val my_region : t -> Ident.t option
 
     val my_ghost_region : t -> Ident.t option
+
+    val my_alloc_region : t -> Ident.t
 
     val body : t -> Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t
 
