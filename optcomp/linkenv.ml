@@ -33,6 +33,10 @@ module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
 type error =
   | File_not_found of filepath
+  | Companion_object_file_not_found_via_manifest of
+      { object_filename : filepath;
+        requested_filename : filepath
+      }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
@@ -241,6 +245,14 @@ open Format_doc
 let report_error ppf = function
   | File_not_found name ->
     fprintf ppf "Cannot find file %a" Location.Doc.quoted_filename name
+  | Companion_object_file_not_found_via_manifest
+      { object_filename; requested_filename } ->
+    fprintf ppf
+      "@[<hov>Cannot find file %a,@ the object file accompanying %a:@ the \
+       latter was resolved through a manifest entry (see -I-manifest),@ so its \
+       object file must be listed as a separate manifest entry@]"
+      Location.Doc.quoted_filename object_filename Location.Doc.quoted_filename
+      requested_filename
   | Not_an_object_file name ->
     fprintf ppf "The file %a is not a compilation unit description"
       Location.Doc.quoted_filename name
