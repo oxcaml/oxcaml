@@ -1515,7 +1515,16 @@ let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
   in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
-let rec transl_local_instance ~(gm : Global_module.t) ~chain
+let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
+    ~find_impl_by_name ~param_map ~module_map ~k =
+  if Global_module.is_complete gm
+  then
+    let cu = Compilation_unit.of_complete_global_exn gm in
+    k (Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)) module_map
+  else transl_local_instance ~gm ~chain ~find_impl_by_name ~param_map
+         ~module_map ~k
+
+and transl_local_instance ~(gm : Global_module.t) ~chain
     ~find_impl_by_name ~param_map ~module_map ~k =
   match Global_module.Map.find_opt gm module_map with
   | Some id -> k (Lvar id) module_map
@@ -1546,13 +1555,6 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
           Global_module.print gm
     | Mb_instantiating_functor { mb_runtime_params; _ } -> mb_runtime_params
   in
-  let resolve_param (global : Global_module.t) =
-    match Global_module.find_in_parameter_map global param_map with
-    | Some id -> id
-    | None ->
-        Misc.fatal_errorf_doc "bind_local_instance: %a not in param_map"
-          Global_module.print global
-  in
   let arg_params args =
     List.map (fun (a : _ Global_module.Argument.t) -> a.param) args
     |> Global_module.Parameter_name.Set.of_list
@@ -1564,7 +1566,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
       gm.visible_args
     |> Global_module.Parameter_name.Map.of_list
   in
-  let process_one (rp : Lambda.runtime_param) module_map ~k =
+  let transl_runtime_param (rp : Lambda.runtime_param) module_map ~k =
     match rp with
     | Rp_main_module_block inner_gm ->
         let inner_gm =
@@ -1581,13 +1583,13 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
             "bind_local_instance: %a's hidden_args are not a subset of %a's"
             Global_module.print inner_gm
             Global_module.print gm;
-        transl_local_instance ~gm:inner_gm ~chain
+        transl_maybe_local_instance ~gm:inner_gm ~chain
           ~find_impl_by_name ~param_map ~module_map
           ~k
     | Rp_argument_block global ->
         (match Global_module.find_in_parameter_map global visible_arg_map with
          | Some arg_value ->
-             transl_local_instance ~gm:arg_value ~chain
+             transl_maybe_local_instance ~gm:arg_value ~chain
                ~find_impl_by_name ~param_map ~module_map
                ~k:(fun main_block module_map ->
                  let arg_block =
@@ -1605,11 +1607,21 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                  "bind_local_instance: %a should have %a as a hidden_arg"
                  Global_module.print gm
                  Global_module.print global;
-             k (Lvar (resolve_param global)) module_map)
+             let id =
+               match
+                 Global_module.find_in_parameter_map global param_map
+               with
+               | Some id -> id
+               | None ->
+                   Misc.fatal_errorf_doc
+                     "bind_local_instance: %a not in param_map"
+                     Global_module.print global
+             in
+             k (Lvar id) module_map)
     | Rp_unit ->
         k lambda_unit module_map
   in
-  Stdlib.List.fold_left_map_cont process_one runtime_params module_map
+  Stdlib.List.fold_left_map_cont transl_runtime_param runtime_params module_map
     ~k:(fun ap_args module_map ->
       let func =
         Lprim
@@ -1666,6 +1678,11 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   let body, required_globals =
     Stdlib.List.fold_left_map_cont
       (fun gm module_map ~k ->
+        if Global_module.is_complete gm
+        then
+          Misc.fatal_errorf_doc
+            "transl_functorization_make: bundled module %a is complete"
+            Global_module.print gm;
         transl_local_instance ~gm ~chain:[]
           ~find_impl_by_name ~param_map ~module_map ~k)
       modules
