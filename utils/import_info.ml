@@ -77,6 +77,9 @@ let crc t =
 
 let has_name t ~name:name' = CU.Name.equal (name t) name'
 
+let excluded_by_no_crc t =
+  Misc.Stdlib.String.Set.mem (CU.Name.to_string (name t)) !Clflags.no_crc
+
 let dummy = Intf (Alias CU.Name.dummy)
 
 let print_intf ppf = function
