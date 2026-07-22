@@ -597,8 +597,8 @@ val check_no_open_quotations :
   Location.t -> t -> no_open_quotations_context -> unit
 val stage : t -> stage
 
-val mark_toplevel_in_quotations : scope:int -> t -> t
-val path_is_toplevel_in_quotations : t -> Path.t -> bool
+val mark_persistent_in_quotations : scope:int -> t -> t
+val path_is_persistent_in_quotations : t -> Path.t -> bool
 
 (* Initialize the cache of in-core module interfaces. *)
 val reset_cache: preserve_persistent_env:bool -> unit

@@ -84,7 +84,7 @@ val restore_global_level: int -> unit
 
 val create_scope : unit -> int
 
-val mark_toplevel_in_quotations : Env.t -> Env.t
+val mark_persistent_in_quotations : Env.t -> Env.t
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr

@@ -96,7 +96,7 @@ let f (x : <[($('a), $('b)) Either.t]> expr)
 val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
-(* non-top-level type constructor -- locally abstract type *)
+(* non-persistent type constructor -- locally abstract type *)
 let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
 [%%expect {|
 Line 1, characters 36-50:
@@ -324,13 +324,13 @@ val f :
   <[(module Map.OrderedType with type t = $('a)) -> unit]> expr ->
   (module Map.OrderedType with type t = 'a eval) -> unit = <fun>
 |}]
-(* non-top-level package type -- generative functor *)
+(* non-persistent package type -- generative functor *)
 module S () = struct
   module type T = sig
     type s
   end
 end
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 let _ = <[
   (* It is illegal to write [S()] in a type, so we have an intermediate [Z]. *)
   let module Z = S () in
@@ -505,7 +505,7 @@ end
 module QuoteKinded : sig type t end
 module QuoteKindedParam : sig type 'a t end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 (* CR quoted-kinds jbachurski: None of the types on [x] should reduce and hence all tests
    with annotated results should error. *)

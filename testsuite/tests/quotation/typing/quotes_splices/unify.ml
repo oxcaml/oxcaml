@@ -56,7 +56,7 @@ module NonInst1 : sig type 'a t type 'a t' end
 module Inst2 : sig type t end
 module NonInst2 : sig type 'a t end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 
 (** [unify]ing a variable under quotes/splices -- flexibility checks **)
