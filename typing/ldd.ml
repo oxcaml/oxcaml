@@ -126,11 +126,18 @@ module Make (V : Ordered) = struct
 
     let[@inline] stable_hash (x : V.t) : int = Hashtbl.seeded_hash 0 x
 
-    (* Keep rigid ids strictly above any non-rigid ids. We choose the top half
-       of the *positive* int range, so rigid ids stay positive and satisfy the
-       invariant used by [inline_solved_vars] to avoid descending under
-       rigids. *)
-    let rigid_var_start = 1 lsl (Sys.word_size - 3)
+    (* Keep rigid ids strictly above any non-rigid ids, and keep them
+       positive so they satisfy the invariant used by [inline_solved_vars]
+       to avoid descending under rigids.
+
+       The base must be word-size-independent and fit comfortably in 32-bit
+       [int]s: rigid ids are marshaled into cmi files (via solver state
+       stored in kinds), and a 32-bit runtime such as js_of_ocaml (used by
+       the browser playground toplevel) must be able to both read those
+       cmis and recompute identical ids. Hash collisions are already
+       handled below by bucketing and comparing names, so the smaller hash
+       space only affects collision frequency, not correctness. *)
+    let rigid_var_start = 1 lsl 29
 
     let[@inline] rigid_id (name : V.t) : int =
       let h = stable_hash name land (rigid_var_start - 1) in
