@@ -1051,13 +1051,19 @@ and is_useful_head_of_kind_naked_immediate
     (consts : Target_ocaml_int.Set.t Or_unknown.t) env
     (head : TG.head_of_kind_naked_immediate) =
   let module I = Target_ocaml_int in
-  match consts, head with
-  | Unknown, Naked_immediates set -> is_useful_set (module I.Set) env set
-  | Known consts, Naked_immediates set ->
+  let descr = TG.Head_of_kind_naked_immediate.descr head in
+  (* If we know that this is the is_int or the get_tag of another variable, then
+     the type is maybe useful because we could eliminate the corresponding
+     primitive. *)
+  (not (TG.Relation.Map.is_empty descr.inverse_relations))
+  ||
+  match consts, descr.naked_immediates with
+  | Unknown, Known set -> is_useful_set (module I.Set) env set
+  | Known consts, Known set ->
     (* The type is useful as long as we can eliminate at least one of the
        constructors. *)
     not (I.Set.subset consts set)
-  | (Known _ | Unknown), (Is_null _ | Is_int _ | Get_tag _) -> false
+  | (Known _ | Unknown), Unknown -> false
 
 and is_useful_head_of_kind_naked_float32 env head =
   is_useful_set
