@@ -274,6 +274,9 @@ let reg_x reg =
     Misc.fatal_errorf "reg_x: expected integer register, got %a" Printreg.reg
       reg
 
+let gp_x_dwarf_encoding (op : gp_x) : int =
+  match op with Ast.Operand.Reg r -> Ast.Reg.gp_encoding r
+
 let reg_w reg =
   let index = reg_index reg in
   match reg.typ with

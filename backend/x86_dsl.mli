@@ -216,6 +216,8 @@ module I : sig
 
   val test : arg -> arg -> unit
 
+  val ud2 : unit -> unit
+
   val xchg : arg -> arg -> unit
 
   val xor : arg -> arg -> unit

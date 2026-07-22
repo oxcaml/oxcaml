@@ -128,7 +128,15 @@ module F = struct
             output ^ ".output" ))
         run
     in
-    let deps = List.filter_map dependency_of_task tasks in
+    let deps =
+      List.filter_map dependency_of_task tasks
+      @
+      if List.exists (function C _ -> true | _ -> false) tasks
+      then
+        [ "(glob_files %{project_root}/runtime/caml/*.h)";
+          "%{project_root}/runtime/caml/domain_state.tbl" ]
+      else []
+    in
     let targets =
       List.filter_map target_of_task tasks
       @ match run_args with None -> [] | Some (_, output) -> [output ^ ".exe"]

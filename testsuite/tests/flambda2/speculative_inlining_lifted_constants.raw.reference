@@ -1,0 +1,40 @@
+let $camlSpeculative_inlining_lifted_constants__first_const = Block 0 () in
+(let code size(8)
+       f_0 (x)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of val * val ] =
+   let next_depth = rec_info (succ my_depth) in
+   let Pmakeblock = %block.[`0`] (x, x) in
+   cont k1 (Pmakeblock)
+ in
+ let code size(6)
+       v1_1 (param : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 of imm tagged * imm tagged ] =
+   let next_depth = rec_info (succ my_depth) in
+   let f = %project_value_slot.[v1].[f] (my_closure) in
+   let one = %project_value_slot.[v1].[one] (my_closure) in
+   apply direct(f_0)
+     (f : _ -> [ 0 of imm tagged * imm tagged ]) (one) -> k1 * k2
+ in
+ let f = closure f_0 @f in
+ let zero = %opaque (0) in
+ apply direct(f_0)
+   (f : _ -> [ 0 of imm tagged * imm tagged ]) (zero) -> k1 * error
+   where k1 (v0 : [ 0 of imm tagged * imm tagged ]) =
+     let one = %opaque (1) in
+     let v1 = closure v1_1 @v1 with { f = f; one = one } in
+     let Pmakeblock = %block.[`0`] (f, zero, v0, one, v1) in
+     cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
+    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
+    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
+    let $camlSpeculative_inlining_lifted_constants =
+      Block 0 (field_0, field_1, field_2, field_3, field_4)
+    in
+    cont done ($camlSpeculative_inlining_lifted_constants)

@@ -165,9 +165,9 @@ let extra_args_for_const_ctor_of_variant
 (* *************************** *)
 
 let compute_extra_arg_for_number kind unboxer epa rewrite_id ~typing_env_at_use
-    ~machine_width arg_being_unboxed : U.decision =
+    arg_being_unboxed : U.decision =
   let extra_arg, _new_arg_being_unboxed =
-    unbox_arg (unboxer machine_width) ~typing_env_at_use arg_being_unboxed
+    unbox_arg unboxer ~typing_env_at_use arg_being_unboxed
   in
   let epa = Extra_param_and_args.update_param_args epa rewrite_id extra_arg in
   Unbox (Number (kind, epa))
@@ -175,7 +175,7 @@ let compute_extra_arg_for_number kind unboxer epa rewrite_id ~typing_env_at_use
 (* Helpers for the block case *)
 (* ************************** *)
 
-let access_kind_and_dummy_const machine_width tag shape fields index :
+let access_kind_and_poison_const machine_width tag shape fields index :
     P.Block_access_kind.t * _ =
   let size =
     Or_unknown.Known
@@ -188,10 +188,10 @@ let access_kind_and_dummy_const machine_width tag shape fields index :
           tag = Known (Option.get (Tag.Scannable.of_tag tag));
           field_kind = Any_value
         },
-      Const.const_zero machine_width )
+      Const.const_poison K.value "variant_unboxing_field" )
   | Float_record ->
     ( Naked_floats { size },
-      Const.naked_float Numeric_types.Float_by_bit_pattern.zero )
+      Const.const_poison K.naked_float "variant_unboxing_float_record" )
   | Scannable (Mixed_record shape) ->
     let field_kind, const =
       if index < K.Mixed_block_shape.value_prefix_size shape
@@ -210,9 +210,9 @@ let access_kind_and_dummy_const machine_width tag shape fields index :
           (K.Mixed_block_shape.flat_suffix shape).(flat_suffix_index)
         in
         ( P.Mixed_block_access_field_kind.Flat_suffix field_kind,
-          Const.of_int_of_kind machine_width
+          Const.const_poison
             (K.Flat_suffix_element.kind field_kind)
-            0 )
+            "variant_unboxing_mixed_block_field" )
     in
     let tag = Or_unknown.Known (Option.get (Tag.Scannable.of_tag tag)) in
     Mixed { tag; size; shape; field_kind }, const
@@ -264,33 +264,33 @@ and compute_extra_args_for_one_decision_and_use_aux ~(pass : U.pass) rewrite_id
           ~non_const_ctors_with_sizes_at_use:non_const_ctors_with_sizes))
   | Unbox (Number (Naked_float32, epa)) ->
     compute_extra_arg_for_number Naked_float32 Unboxers.Float32.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_float, epa)) ->
     compute_extra_arg_for_number Naked_float Unboxers.Float.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number ((Naked_int8 | Naked_int16), _epa)) ->
     U.Do_not_unbox U.Not_beneficial
   | Unbox (Number (Naked_int32, epa)) ->
     compute_extra_arg_for_number Naked_int32 Unboxers.Int32.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_int64, epa)) ->
     compute_extra_arg_for_number Naked_int64 Unboxers.Int64.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_nativeint, epa)) ->
     compute_extra_arg_for_number Naked_nativeint Unboxers.Nativeint.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_immediate, epa)) ->
     compute_extra_arg_for_number Naked_immediate Unboxers.Immediate.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_vec128, epa)) ->
     compute_extra_arg_for_number Naked_vec128 Unboxers.Vec128.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_vec256, epa)) ->
     compute_extra_arg_for_number Naked_vec256 Unboxers.Vec256.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
   | Unbox (Number (Naked_vec512, epa)) ->
     compute_extra_arg_for_number Naked_vec512 Unboxers.Vec512.unboxer epa
-      rewrite_id ~typing_env_at_use ~machine_width arg_being_unboxed
+      rewrite_id ~typing_env_at_use arg_being_unboxed
 
 and compute_extra_args_for_block ~pass rewrite_id ~typing_env_at_use
     ~machine_width arg_being_unboxed tag (shape : K.Block_shape.t) fields :
@@ -300,7 +300,7 @@ and compute_extra_args_for_block ~pass rewrite_id ~typing_env_at_use
       (fun field_nth ({ epa; decision; kind } : U.field_decision) :
            (_ * U.field_decision) ->
         let bak, poison_const =
-          access_kind_and_dummy_const machine_width tag shape fields
+          access_kind_and_poison_const machine_width tag shape fields
             (Target_ocaml_int.to_int field_nth)
         in
         let unboxer =
@@ -330,9 +330,7 @@ and compute_extra_args_for_closure ~pass rewrite_id ~typing_env_at_use
     Value_slot.Map.mapi
       (fun var ({ epa; decision; kind } : U.field_decision) : U.field_decision
          ->
-        let unboxer =
-          Unboxers.Closure_field.unboxer machine_width function_slot var
-        in
+        let unboxer = Unboxers.Closure_field.unboxer function_slot var in
         let new_extra_arg, new_arg_being_unboxed =
           unbox_arg unboxer ~typing_env_at_use arg_being_unboxed
         in
@@ -409,7 +407,7 @@ and compute_extra_args_for_variant ~pass rewrite_id ~typing_env_at_use
             (fun (new_decisions, field_nth)
                  ({ epa; decision; kind } : U.field_decision) ->
               let bak, poison_const =
-                access_kind_and_dummy_const machine_width
+                access_kind_and_poison_const machine_width
                   (Tag.Scannable.to_tag tag_decision)
                   shape block_fields
                   (Target_ocaml_int.to_int field_nth)

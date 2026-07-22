@@ -1,6 +1,6 @@
 (let $camlTests15__immstring13 = "tests15.ml" in
  let $camlTests15__const_block15 =
-   Block 0 ($camlTests15__immstring13, 10, 52)
+   Block 0 ($camlTests15__immstring13, 18, 52)
  in
  let $camlTests15__Pmakeblock18 =
    Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block15)
@@ -53,8 +53,8 @@
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let prim = %num_conv.[`tagged_imm`].[`int8`] (120) in
-   let prim_1 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+   let prim = %num_conv.[tagged_imm].[int8] (120) in
+   let prim_1 = %num_conv.[tagged_imm].[`nativeint`] (i) in
    let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim_1, prim) in
    cont k1 (Pbytessetu)
  in

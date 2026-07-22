@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -83,8 +79,8 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtss2sd %xmm0, %xmm0, %xmm0

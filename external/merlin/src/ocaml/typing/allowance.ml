@@ -22,6 +22,8 @@ type right_only = disallowed * allowed
 
 type both = allowed * allowed
 
+type neither = disallowed * disallowed
+
 type 'a pos = 'b * 'c constraint 'a = 'b * 'c
 
 type 'a neg = 'c * 'b constraint 'a = 'b * 'c

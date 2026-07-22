@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -198,11 +194,11 @@ bytes_safe_get_int32:
   xorq  $-1, %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
-  jae   .L123
+  jae   .L0
   movslq (%rax,%rbx), %rax
   ret
-.L123:
-  movq  camlTOP18__block602@GOTPCREL(%rip), %rax
+.L0:
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -420,5 +416,19 @@ buf_length:
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx
   leaq  1(%rbx,%rbx), %rax
+  ret
+|}]
+
+
+(* CR ttebbi: unnecessary int tag untag sequence*)
+let u8_to_int_unsafe_set (x : bytes) (y : Uint8_u.t) =
+  Bytes.unsafe_set x 0 (Uint8_u.to_int y)
+[%%expect_asm X86_64{|
+u8_to_int_unsafe_set:
+  leaq  1(%rbx,%rbx), %rbx
+  andl  $511, %ebx
+  sarq  $1, %rbx
+  movb  %bl, (%rax)
+  movl  $1, %eax
   ret
 |}]

@@ -129,15 +129,14 @@ let compilerlibs_archive archive =
   append Ocaml_variables.libraries [archive] ::
   List.map add_compiler_subdir compilerlibs_subdirs
 
-let runtime_suffix = if Config.runtime5 then "" else "4"
-
-let debugger = [add_compiler_subdir ("debugger" ^ runtime_suffix)]
+let debugger = [add_compiler_subdir "debugger"]
 
 let extension_universe_lib name =
   make_library_modifier name [compiler_subdir ["otherlibs"; name]]
 
 let make_fexpr_dump pass = [
   append Ocaml_variables.fexpr_dump_files [pass ^ ".fl"];
+  append Ocaml_variables.ocamlopt_flags ["-dcanonical-ids"];
   append Ocaml_variables.ocamlopt_flags ["-dfexpr-annot-after="^pass];
 ]
 

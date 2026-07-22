@@ -51,6 +51,10 @@ type name_out_of_scope_warning =
   | Name of string
   | Fields of { record_form : string ; fields : string list }
 
+type type_declaration_usage_warning =
+  | Declaration
+  | Alias
+
 type t =
   | Comment_start                           (*  1 *)
   | Comment_not_end                         (*  2 *)
@@ -59,7 +63,7 @@ type t =
   | Ignored_partial_application             (*  5 *)
   | Labels_omitted of string list           (*  6 *)
   | Method_override of string list          (*  7 *)
-  | Partial_match of string                 (*  8 *)
+  | Partial_match of Format_doc.t           (*  8 *)
   | Missing_record_field_pattern of { form : string ; unbound : string } (* 9 *)
   | Non_unit_statement                      (* 10 *)
   | Redundant_case                          (* 11 *)
@@ -86,7 +90,7 @@ type t =
      was turned into a hard error *)
   | Unused_value_declaration of string      (* 32 *)
   | Unused_open of string                   (* 33 *)
-  | Unused_type_declaration of string       (* 34 *)
+  | Unused_type_declaration of string * type_declaration_usage_warning (* 34 *)
   | Unused_for_index of string              (* 35 *)
   | Unused_ancestor of string               (* 36 *)
   | Unused_constructor of string * constructor_usage_warning (* 37 *)
@@ -129,14 +133,16 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
+  | Degraded_to_partial_match               (* 74 *)
+  | Unnecessarily_partial_tuple_pattern     (* 75 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
-  | Overridden_kind_modifier of string      (* 185 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
-  | Unnecessarily_partial_tuple_pattern     (* 189 *)
+  (* 189 was [Unnecessarily_partial_tuple_pattern], now upstream as 75 *)
   | Probe_name_too_long of string           (* 190 *)
   | Unused_kind_declaration of string       (* 191 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
@@ -147,7 +153,7 @@ type t =
   | Modal_axis_specified_twice of
     { axis : string;
       overriden_by : string;
-    } (* 213 *)
+    }                                       (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
@@ -234,13 +240,14 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
-  | Overridden_kind_modifier _ -> 185
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
-  | Unerasable_position_argument -> 188
-  | Unnecessarily_partial_tuple_pattern -> 189
+  | Degraded_to_partial_match -> 74
+  | Unnecessarily_partial_tuple_pattern -> 75
+  | Unerasable_position_argument -> 188 (* 189 is now upstream as 75 *)
   | Probe_name_too_long _ -> 190
   | Unused_kind_declaration _ -> 191
   | Zero_alloc_all_hidden_arrow _ -> 198
@@ -598,6 +605,21 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
+  { number = 74;
+    names = ["degraded-to-partial-match"];
+    description = "A pattern-matching is compiled as partial \
+                   even if it appears to be total.";
+    since = since 5 3 };
+  { number = 75;
+    names = ["unnecessarily-partial-tuple-pattern"];
+    description = "A tuple pattern ends in .. but fully matches its expected \
+                   type.";
+    since = since 5 4 };
+  { number = 182;
+    names = ["untagged-external-small-int-return"];
+    description = "An external declaration returns an (int8[@untagged]) or \
+                   an (int16[@untagged])";
+    since = since 5 2 };
   { number = 183;
     names = ["redundant-kind-modifier"];
     (* CR layouts-scannable: As more axes are added, this description (and
@@ -611,10 +633,6 @@ let descriptions = [
        the following description) should be updated in tandem. *)
     description = "A nullability or separability axis annotation appears on \
                    a non-value, non-any layout.";
-    since = since 5 2 };
-  { number = 185;
-    names = ["overridden-kind-modifier"];
-    description = "A kind modifier is present but overridden later.";
     since = since 5 2 };
   { number = 186;
     names = ["unmutated-mutable"];
@@ -630,11 +648,7 @@ let descriptions = [
     names = ["unerasable-position-argument"];
     description = "Unerasable position argument.";
     since = since 5 1 };
-  { number = 189;
-    names = ["unnecessarily-partial-tuple-pattern"];
-    description = "A tuple pattern ends in .. but fully matches its expected \
-                   type.";
-    since = since 5 1 };
+  (* 189 was [unnecessarily-partial-tuple-pattern], now upstream as 75 *)
   { number = 190;
     names = ["probe-name-too-long"];
     description = "Probe name must be at most 100 characters long.";
@@ -1008,7 +1022,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-183..185"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..184"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1017,374 +1031,480 @@ let () = ignore @@ parse_options true defaults_warn_error
 let () =
   List.iter (set_alert ~error:false ~enable:false) default_disabled_alerts
 
+module Fmt = Format_doc
+module Style = Misc.Style
+let msg = Fmt.doc_printf
+let comma_inline_list = Fmt.(pp_print_list ~pp_sep:comma Style.inline_code)
+let space_inline_list ppf l =
+  let pp_sep = Fmt.pp_print_space in
+  Fmt.fprintf ppf "@[%a@]" (Fmt.pp_print_list ~pp_sep Style.inline_code) l
+let expand ppf s = if s = "" then () else Fmt.fprintf ppf "@ %s" s
+
 let message = function
   | Comment_start ->
-      "this `(*' is the start of a comment.\n\
-       Hint: Did you forget spaces when writing the infix operator `( * )'?"
-  | Comment_not_end -> "this is not the end of a comment."
+      msg
+        "this %a is the start of a comment.@ \
+         %t: Did you forget spaces when writing the infix operator %a?"
+        Style.inline_code "(*"
+        Style.hint
+        Style.inline_code "( * )"
+  | Comment_not_end -> msg "this is not the end of a comment."
   | Fragile_match "" ->
-      "this pattern-matching is fragile."
+      msg "this pattern-matching is fragile."
   | Fragile_match s ->
-      "this pattern-matching is fragile.\n\
-       It will remain exhaustive when constructors are added to type " ^ s ^ "."
+      msg "this pattern-matching is fragile.@ \
+           It will remain exhaustive when constructors are added to type %a."
+        Style.inline_code s
   | Ignored_partial_application ->
-      "this function application is partial,\n\
-       maybe some arguments are missing."
+      msg "this function application is partial,@ \
+           maybe@ some@ arguments@ are@ missing."
   | Labels_omitted [] -> assert false
   | Labels_omitted [l] ->
-     "label " ^ l ^ " was omitted in the application of this function."
+      msg "label %a@ was omitted@ in@ the@ application@ of@ this@ function."
+        Style.inline_code l
   | Labels_omitted ls ->
-     "labels " ^ String.concat ", " ls ^
-       " were omitted in the application of this function."
+      msg "labels %a@ were omitted@ in@ the@ application@ of@ this@ function."
+        comma_inline_list ls
   | Method_override [lab] ->
-      "the method " ^ lab ^ " is overridden."
+      msg "the method %a is overridden."
+        Style.inline_code lab
   | Method_override (cname :: slist) ->
-      String.concat " "
-        ("the following methods are overridden by the class"
-         :: cname  :: ":\n " :: slist)
+      msg "the following methods are overridden@ by@ the@ class@ %a:@;<1 2>%a"
+        Style.inline_code cname
+        space_inline_list slist
   | Method_override [] -> assert false
-  | Partial_match "" -> "this pattern-matching is not exhaustive."
-  | Partial_match s ->
-      "this pattern-matching is not exhaustive.\n\
-       Here is an example of a case that is not matched:\n" ^ s
+  | Partial_match doc ->
+      if doc = Format_doc.Doc.empty then
+        msg "this pattern-matching is not exhaustive."
+     else
+      msg "this pattern-matching is not exhaustive.@ \
+           @[Here is an example of a case that is not matched:@;<1 2>%a@]"
+        Format_doc.pp_doc doc
   | Missing_record_field_pattern { form ; unbound } ->
-      "the following labels are not bound in this " ^ form ^ " pattern:\n" ^
-      unbound ^
-      "\nEither bind these labels explicitly or add '; _' to the pattern."
+      msg "the following labels are not bound@ in@ this@ \
+           %s@ pattern:@;<1 2>%a.@ \
+           @[Either bind these labels explicitly or add %a to the pattern.@]"
+        form
+        Style.inline_code unbound
+        Style.inline_code "; _"
   | Non_unit_statement ->
-      "this expression should have type unit."
-  | Redundant_case -> "this match case is unused."
-  | Redundant_subpat -> "this sub-pattern is unused."
+      msg "this expression should have type unit."
+  | Redundant_case -> msg "this match case is unused."
+  | Redundant_subpat -> msg "this sub-pattern is unused."
   | Instance_variable_override [lab] ->
-      "the instance variable " ^ lab ^ " is overridden."
+      msg "the instance variable %a is overridden."
+        Style.inline_code lab
   | Instance_variable_override (cname :: slist) ->
-      String.concat " "
-        ("the following instance variables are overridden by the class"
-         :: cname  :: ":\n " :: slist)
+      msg
+        "the following instance variables@ are overridden@ \
+         by the class %a:@;<1 2>%a"
+        Style.inline_code cname
+        space_inline_list slist
   | Instance_variable_override [] -> assert false
   | Illegal_backslash ->
-    "illegal backslash escape in string.\n\
-    Hint: Single backslashes \\ are reserved for escape sequences\n\
-    (\\n, \\r, ...). Did you check the list of OCaml escape sequences?\n\
-    To get a backslash character, escape it with a second backslash: \\\\."
+      msg "illegal backslash escape in string.@ \
+           %t: Single backslashes %a are reserved for escape sequences@ \
+           (%a, %a, ...).@ Did you check the list of OCaml escape sequences?@ \
+           To get a backslash character, escape it with a second backslash: %a."
+        Style.hint
+        Style.inline_code {|\|}
+        Style.inline_code {|\n|}
+        Style.inline_code {|\r|}
+        Style.inline_code {|\\|}
   | Implicit_public_methods l ->
-      "the following private methods were made public implicitly:\n "
-      ^ String.concat " " l ^ "."
-  | Unerasable_optional_argument -> "this optional argument cannot be erased."
-  | Undeclared_virtual_method m -> "the virtual method "^m^" is not declared."
-  | Not_principal msg ->
-      Format_doc.asprintf "%a is not principal."
-        Format_doc.pp_doc msg
-  | Non_principal_labels s -> s^" without principality."
-  | Ignored_extra_argument -> "this argument will not be used by the function."
+      msg
+        "the following private methods@ were@ made@ public@ \
+         implicitly:@;<1 2>%a."
+        space_inline_list l
+  | Unerasable_optional_argument ->
+      msg "this optional argument cannot be erased."
+  | Undeclared_virtual_method m ->
+      msg "the virtual method %a is not declared."
+        Style.inline_code m
+  | Not_principal emsg ->
+      msg "%a@ is@ not@ principal." Fmt.pp_doc emsg
+  | Non_principal_labels s -> msg "%s without principality." s
+  | Ignored_extra_argument ->
+      msg "this argument will not be used by the function."
   | Nonreturning_statement ->
-      "this statement never returns (or has an unsound type.)"
-  | Preprocessor s -> s
+      msg "this statement never returns (or has an unsound type.)"
+  | Preprocessor s -> msg "%s" s
   | Useless_record_with s ->
-      "all the fields are explicitly listed in this " ^ s ^ ":\n\
-       the 'with' clause is useless."
+      msg "all the fields are explicitly listed in this %s:@ \
+           the %a clause is useless."
+        s
+        Style.inline_code "with"
   | Bad_module_name (modname) ->
-      "bad source file name: \"" ^ modname ^ "\" is not a valid module name."
+      msg "bad source file name: %a is not a valid module name."
+        Style.inline_code modname
   | All_clauses_guarded ->
-      "this pattern-matching is not exhaustive.\n\
-       All clauses in this pattern-matching are guarded."
+      msg "this pattern-matching is not exhaustive.@ \
+           All clauses in this pattern-matching are guarded."
   | Unused_var { name = v; mutated = false }
   | Unused_var_strict { name = v; mutated = false } ->
-    "unused variable " ^ v ^ "."
+      msg "unused variable %a."
+        Style.inline_code v
   | Unused_var { name = v; mutated = true }
   | Unused_var_strict { name = v; mutated = true } ->
-    "variable " ^ v ^ " was mutated but never used."
+      msg "variable %a was mutated but never used."
+        Style.inline_code v
   | Wildcard_arg_to_constant_constr ->
-     "wildcard pattern given as argument to a constant constructor"
+      msg "wildcard pattern given as argument to a constant constructor"
   | Eol_in_string ->
-     "unescaped end-of-line in a string constant\n\
-      (non-portable behavior before OCaml 5.2)"
+      msg "unescaped end-of-line in a string constant@ \
+           (non-portable behavior before OCaml 5.2)"
   | Duplicate_definitions (kind, cname, tc1, tc2) ->
-      Printf.sprintf "the %s %s is defined in both types %s and %s."
-        kind cname tc1 tc2
-  | Unused_value_declaration v -> "unused value " ^ v ^ "."
-  | Unused_open s -> "unused open " ^ s ^ "."
-  | Unused_open_bang s -> "unused open! " ^ s ^ "."
-  | Unused_type_declaration s -> "unused type " ^ s ^ "."
-  | Unused_for_index s -> "unused for-loop index " ^ s ^ "."
-  | Unused_ancestor s -> "unused ancestor variable " ^ s ^ "."
-  | Unused_constructor (s, Unused) -> "unused constructor " ^ s ^ "."
+      msg "the %s %a is defined in both types %a and %a."
+        kind
+        Style.inline_code cname
+        Style.inline_code tc1
+        Style.inline_code tc2
+  | Unused_value_declaration v ->
+      msg "unused value %a." Style.inline_code v
+  | Unused_open s -> msg "unused open %a." Style.inline_code s
+  | Unused_open_bang s -> msg "unused open! %a." Style.inline_code s
+  | Unused_type_declaration (s, Declaration) ->
+      msg "unused type %a." Style.inline_code s
+  | Unused_type_declaration (s, Alias) ->
+      msg "unused type alias %a." Style.inline_code s
+  | Unused_for_index s -> msg "unused for-loop index %a." Style.inline_code s
+  | Unused_ancestor s -> msg "unused ancestor variable %a." Style.inline_code s
+  | Unused_constructor (s, Unused) ->
+      msg "unused constructor %a." Style.inline_code s
   | Unused_constructor (s, Not_constructed) ->
-      "constructor " ^ s ^
-      " is never used to build values.\n\
-        (However, this constructor appears in patterns.)"
-  | Unused_constructor (s, Only_exported_private) ->
-      "constructor " ^ s ^
-      " is never used to build values.\n\
-        Its type is exported as a private type."
-  | Unused_extension (s, is_exception, complaint) ->
-     let kind =
-       if is_exception then "exception" else "extension constructor" in
-     let name = kind ^ " " ^ s in
-     begin match complaint with
-       | Unused -> "unused " ^ name
-       | Not_constructed ->
-          name ^
-          " is never used to build values.\n\
+      msg "constructor %a is never used to build values.@ \
            (However, this constructor appears in patterns.)"
-       | Only_exported_private ->
-          name ^
-          " is never used to build values.\n\
-            It is exported or rebound as a private extension."
-     end
+        Style.inline_code s
+  | Unused_constructor (s, Only_exported_private) ->
+      msg "constructor %a is never used to build values.@ \
+           Its type is exported as a private type."
+        Style.inline_code s
+  | Unused_extension (s, is_exception, complaint) ->
+      let kind =
+        if is_exception then "exception" else "extension constructor" in
+      begin match complaint with
+      | Unused -> msg "unused %s %a" kind Style.inline_code s
+      | Not_constructed ->
+          msg
+            "%s %a is never used@ to@ build@ values.@ \
+             (However, this constructor appears in patterns.)"
+            kind Style.inline_code s
+      | Only_exported_private ->
+          msg
+            "%s %a is never used@ to@ build@ values.@ \
+             It is exported or rebound as a private extension."
+            kind Style.inline_code s
+      end
   | Unused_rec_flag ->
-      "unused rec flag."
+      msg "unused rec flag."
   | Name_out_of_scope (ty, Name nm) ->
-      nm ^ " was selected from type " ^ ty ^
-      ".\nIt is not visible in the current scope, and will not \n\
-       be selected if the type becomes unknown."
+      msg "%a was selected from type %a.@ \
+           @[It is not visible in the current scope,@ and@ will@ not@ \
+           be@ selected@ if the type becomes unknown@]."
+        Style.inline_code nm
+        Style.inline_code ty
   | Name_out_of_scope (ty, Fields { record_form ; fields }) ->
-      "this " ^ record_form ^ " of type "^ ty ^" contains fields that are \n\
-       not visible in the current scope: "
-      ^ String.concat " " fields ^ ".\n\
-       They will not be selected if the type becomes unknown."
+      msg "this %s of type %a@ contains@ fields@ that@ are@ \
+           not@ visible in the current scope:@;<1 2>%a.@ \
+           @[They will not be selected@ if the type@ becomes@ unknown.@]"
+        record_form
+        Style.inline_code ty
+        space_inline_list fields
   | Ambiguous_name ([s], tl, false, expansion) ->
-      s ^ " belongs to several types: " ^ String.concat " " tl ^
-      "\nThe first one was selected. Please disambiguate if this is wrong."
-      ^ expansion
+      msg "%a belongs to several types:@;<1 2>%a.@ \
+           The first one was selected.@ \
+           @[Please disambiguate@ if@ this@ is wrong.%a@]"
+        Style.inline_code s
+        space_inline_list tl
+        expand expansion
   | Ambiguous_name (_, _, false, _ ) -> assert false
   | Ambiguous_name (_slist, tl, true, expansion) ->
-      "these field labels belong to several types: " ^
-      String.concat " " tl ^
-      "\nThe first one was selected. Please disambiguate if this is wrong."
-      ^ expansion
+      msg "these field labels belong to several types:@;<1 2>%a.@ \
+           @[The first one was selected.@ \
+           Please disambiguate@ if@ this@ is@ wrong.%a@]"
+        space_inline_list tl
+        expand expansion
   | Disambiguated_name s ->
-      "this use of " ^ s ^ " relies on type-directed disambiguation,\n\
-       it will not compile with OCaml 4.00 or earlier."
+      msg "this use of %a@ relies@ on@ type-directed@ disambiguation,@ \
+           @[it@ will@ not@ compile@ with@ OCaml@ 4.00@ or@ earlier.@]"
+        Style.inline_code s
   | Nonoptional_label s ->
-      "the label " ^ s ^ " is not optional."
+      msg "the label %a is not optional."
+        Style.inline_code s
   | Open_shadow_identifier (kind, s) ->
-      Printf.sprintf
-        "this open statement shadows the %s identifier %s (which is later used)"
-        kind s
+      msg
+        "this open statement shadows@ the@ %s identifier@ %a@ \
+         (which is later used)"
+        kind Style.inline_code s
   | Open_shadow_label_constructor (kind, s) ->
-      Printf.sprintf
-        "this open statement shadows the %s %s (which is later used)"
-        kind s
+      msg
+        "this open statement shadows@ the@ %s %a@ (which is later used)"
+        kind Style.inline_code s
   | Bad_env_variable (var, s) ->
-      Printf.sprintf "illegal environment variable %s : %s" var s
+      msg "illegal environment variable %a : %s"
+        Style.inline_code var
+        s
   | Attribute_payload (a, s) ->
-      Printf.sprintf "illegal payload for attribute '%s'.\n%s" a s
+      msg "illegal payload for attribute %a.@ %s"
+        Style.inline_code a
+        s
   | Eliminated_optional_arguments sl ->
-      Printf.sprintf "implicit elimination of optional argument%s %s"
+      msg "implicit elimination@ of optional argument%s@ %a"
         (if List.length sl = 1 then "" else "s")
-        (String.concat ", " sl)
+        comma_inline_list sl
   | No_cmi_file(name, None) ->
-      "no cmi file was found in path for module " ^ name
-  | No_cmi_file(name, Some msg) ->
-      Printf.sprintf
-        "no valid cmi file was found in path for module %s. %s"
-        name msg
+      msg "no cmi file was found@ in path for module %a"
+        Style.inline_code name
+  | No_cmi_file(name, Some wmsg) ->
+      msg
+        "no valid cmi file was found@ in path for module %a.@ %s"
+        Style.inline_code name
+        wmsg
   | Unexpected_docstring unattached ->
-      if unattached then "unattached documentation comment (ignored)"
-      else "ambiguous documentation comment"
+      if unattached then msg "unattached documentation comment (ignored)"
+      else msg "ambiguous documentation comment"
   | Wrong_tailcall_expectation b ->
-      Printf.sprintf "expected %s"
+      msg "expected %s"
         (if b then "tailcall" else "non-tailcall")
   | Fragile_literal_pattern ->
       let[@manual.ref "ss:warn52"] ref_manual = [ 13; 5; 3 ] in
-      Format.asprintf
-        "Code should not depend on the actual values of\n\
-         this constructor's arguments. They are only for information\n\
-         and may change in future versions. %a"
-        (Format_doc.compat Misc.print_see_manual) ref_manual
+      msg
+        "Code should not depend@ on@ the@ actual@ values of@ \
+         this@ constructor's arguments.@ @[They are only for@ information@ \
+         and@ may@ change@ in@ future versions.@ %a@]"
+        Misc.print_see_manual ref_manual
   | Unreachable_case ->
-      "this match case is unreachable.\n\
-       Consider replacing it with a refutation case '<pat> -> .'"
+      msg "this match case is unreachable.@ \
+           Consider replacing it with a refutation case %a"
+        Style.inline_code "<pat> -> ."
   | Misplaced_attribute attr_name ->
-      Printf.sprintf "the %S attribute cannot appear in this context" attr_name
+      msg "the %a attribute cannot appear in this context"
+        Style.inline_code attr_name
   | Duplicated_attribute attr_name ->
-      Printf.sprintf "the %S attribute is used more than once on this \
-          expression"
-        attr_name
+      msg "the %a attribute is used more than once@ on@ this@ \
+           expression"
+        Style.inline_code attr_name
   | Inlining_impossible reason ->
-      Printf.sprintf "Cannot inline: %s" reason
+      msg "Cannot inline:@ %s" reason
   | Ambiguous_var_in_pattern_guard vars ->
       let[@manual.ref "ss:warn57"] ref_manual = [ 13; 5; 4 ] in
       let vars = List.sort String.compare vars in
       let vars_explanation =
-        let in_different_places =
-          "in different places in different or-pattern alternatives"
-        in
         match vars with
         | [] -> assert false
-        | [x] -> "variable " ^ x ^ " appears " ^ in_different_places
+        | [x] ->
+            Fmt.dprintf
+              "variable %a appears in@ different@ places@ in@ \
+               different@ or-pattern@ alternatives."
+              Style.inline_code x
         | _::_ ->
-            let vars = String.concat ", " vars in
-            "variables " ^ vars ^ " appear " ^ in_different_places
+            Fmt.dprintf
+              "variables %a appear in@ different@ places@ in@ \
+               different@ or-pattern@ alternatives."
+              comma_inline_list vars
       in
-      Format.asprintf
-        "Ambiguous or-pattern variables under guard;\n\
-         %s.\n\
-         Only the first match will be used to evaluate the guard expression.\n\
-         %a"
-        vars_explanation (Format_doc.compat Misc.print_see_manual) ref_manual
+      msg
+        "Ambiguous or-pattern variables under@ guard;@ \
+         %t@ \
+         @[Only the first match will be used to evaluate@ \
+         the@ guard@ expression.@ %a@]"
+        vars_explanation
+        Misc.print_see_manual ref_manual
   | No_cmx_file { missing_extension; module_name } ->
-      Printf.sprintf
-        "no %s file was found in path for module %s, \
-         and its interface was not compiled with -opaque"
-        missing_extension module_name
+      msg
+        "no %s file was found@ in@ path@ for@ module@ %a,@ \
+         and@ its@ interface@ was@ not@ compiled@ with %a"
+        missing_extension
+        Style.inline_code module_name
+        Style.inline_code "-opaque"
   | Flambda_assignment_to_non_mutable_value ->
-      "A potential assignment to a non-mutable value was detected \n\
-        in this source file.  Such assignments may generate incorrect code \n\
-        when using Flambda."
-  | Unused_module s -> "unused module " ^ s ^ "."
+      msg
+        "A potential@ assignment@ to@ a@ non-mutable@ value@ was@ detected@ \
+         in@ this@ source@ file.@ \
+         Such@ assignments@ may@ generate@ incorrect@ code@ \
+         when@ using@ Flambda."
+  | Unused_module s -> msg "unused module %a." Style.inline_code s
   | Unboxable_type_in_prim_decl t ->
-      Printf.sprintf
-        "This primitive declaration uses type %s, whose representation\n\
-         may be either boxed or unboxed. Without an annotation to indicate\n\
-         which representation is intended, the boxed representation has been\n\
-         selected by default. This default choice may change in future\n\
-         versions of the compiler, breaking the primitive implementation.\n\
-         You should explicitly annotate the declaration of %s\n\
-         with [@@boxed] or [@@unboxed], so that its external interface\n\
-         remains stable in the future." t t
+      msg
+        "This primitive declaration uses type %a,@ whose@ representation@ \
+         may be either boxed or unboxed.@ Without@ an@ annotation@ to@ \
+         indicate@ which@ representation@ is@ intended,@ the@ boxed@ \
+         representation@ has@ been@ selected@ by@ default.@ This@ default@ \
+         choice@ may@ change@ in@ future@ versions@ of@ the@ compiler,@ \
+         breaking@ the@ primitive@ implementation.@ You@ should@ explicitly@ \
+         annotate@ the@ declaration@ of@ %a@ with@ %a@ or@ %a,@ so@ that@ its@ \
+         external@ interface@ remains@ stable@ in@ the future."
+        Style.inline_code t
+        Style.inline_code t
+        Style.inline_code "[@@boxed]"
+        Style.inline_code "[@@unboxed]"
   | Constraint_on_gadt ->
-      "Type constraints do not apply to GADT cases of variant types."
+      msg "Type constraints do not apply to@ GADT@ cases@ of@ variant types."
   | Erroneous_printed_signature s ->
-      "The printed interface differs from the inferred interface.\n\
-       The inferred interface contained items which could not be printed\n\
-       properly due to name collisions between identifiers."
-     ^ s
-     ^ "\nBeware that this warning is purely informational and will not catch\n\
-        all instances of erroneous printed interface."
+      msg
+        "The printed@ interface@ differs@ from@ the@ inferred@ interface.@ \
+         The@ inferred@ interface@ contained@ items@ which@ could@ not@ be@ \
+         printed@ properly@ due@ to@ name@ collisions@ between@ identifiers.@ \
+         %s@ \
+         Beware@ that@ this@ warning@ is@ purely@ informational@ and@ will@ \
+         not@ catch@ all@ instances@ of@ erroneous@ printed@ interface."
+        s
   | Unsafe_array_syntax_without_parsing ->
-     "option -unsafe used with a preprocessor returning a syntax tree"
+      msg "option@ %a@ used with a preprocessor returning@ a@ syntax tree"
+        Style.inline_code "-unsafe"
   | Redefining_unit name ->
-      Printf.sprintf
-        "This type declaration is defining a new '()' constructor\n\
-         which shadows the existing one.\n\
-         Hint: Did you mean 'type %s = unit'?" name
-  | Unused_functor_parameter s -> "unused functor parameter " ^ s ^ "."
+      let def ppf name = Fmt.fprintf ppf "type %s = unit" name in
+      msg
+        "This type declaration is@ defining@ a new %a constructor@ \
+         which@ shadows@ the@ existing@ one.@ \
+         %t: Did you mean %a?"
+        Style.inline_code "()"
+        Style.hint
+        (Style.as_inline_code def) name
+  | Unused_functor_parameter s ->
+      msg "unused functor parameter %a." Style.inline_code s
   | Match_on_mutable_state_prevent_uncurry ->
-    "This pattern depends on mutable state.\n\
-     It prevents the remaining arguments from being uncurried, which will \
-     cause additional closure allocations."
+      msg
+        "This pattern depends on@ mutable@ state.@ It prevents@ the@ \
+         remaining@ arguments@ from@ being@ uncurried,@ which will@ cause@ \
+         additional@ closure@ allocations."
   | Unused_field { form; field; complaint = Unused } ->
-      "unused " ^ form ^ " field " ^ field ^ "."
+      msg "unused %s field %a." form Style.inline_code field
   | Unused_field { form; field; complaint = Not_read } ->
-      form ^ " field " ^ field ^
-      " is never read.\n\
-        (However, this field is used to build or mutate values.)"
+      msg "%s field %a is never read.@ \
+           (However, this field is used to build or mutate values.)"
+        form Style.inline_code field
   | Unused_field { form; field; complaint = Not_mutated } ->
-      "mutable " ^ form ^ " field " ^ field ^
-      " is never mutated."
+      msg "mutable %s field %a is never mutated."
+        form Style.inline_code field
   | Missing_mli ->
-    "Cannot find interface file."
+      msg "Cannot find interface file."
   | Unused_tmc_attribute ->
-      "This function is marked @tail_mod_cons\n\
-       but is never applied in TMC position."
+      msg "This function is marked %a@ \
+           but is never applied in TMC position."
+        Style.inline_code "@tail_mod_cons"
   | Tmc_breaks_tailcall ->
-      "This call\n\
-       is in tail-modulo-cons position in a TMC function,\n\
-       but the function called is not itself specialized for TMC,\n\
-       so the call will not be transformed into a tail call.\n\
-       Please either mark the called function with the [@tail_mod_cons]\n\
-       attribute, or mark this call with the [@tailcall false] attribute\n\
-       to make its non-tailness explicit."
+      msg "This call@ is@ in@ tail-modulo-cons@ position@ in@ a@ TMC@ \
+           function,@ but@ the@ function@ called@ is@ not@ itself@ \
+           specialized@ for@ TMC,@ so@ the@ call@ will@ not@ be@ transformed@ \
+           into@ a@ tail@ call.@ \
+           @[Please@ either@ mark@ the@ called@ function@ with@ the %a@ \
+           attribute,@ or@ mark@ this@ call@ with@ the@ %a@ attribute@ to@ \
+           make@ its@ non-tailness@ explicit.@]"
+        Style.inline_code "[@tail_mod_cons]"
+        Style.inline_code "[@tailcall false]"
   | Generative_application_expects_unit ->
-      "A generative functor\n\
-       should be applied to '()'; using '(struct end)' is deprecated."
+      msg "A generative functor@ \
+           should be applied@ to@ %a;@ using@ %a@ is deprecated."
+        Style.inline_code "()"
+        Style.inline_code "(struct end)"
+  | Untagged_external_small_int_return ->
+      msg "Using %a or %a on C stub returns is not@ \
+           recommended since %a does not perform a sign-extension.@ Use@ \
+           %a or %a instead."
+        Style.inline_code "(int8[@untagged])"
+        Style.inline_code "(int16[@untagged])"
+        Style.inline_code "[@untagged]"
+        Style.inline_code "(int8[@unboxed])"
+        Style.inline_code "(int16[@unboxed])"
+  | Degraded_to_partial_match ->
+      let[@manual.ref "ss:warn74"] ref_manual = [ 13; 5; 5 ] in
+      msg
+        "This pattern-matching@ is@ compiled@ as@ partial,@ even@ if@ it@ \
+         appears@ to@ be@ total.@ It@ may@ generate@ a@ %a@ exception.@ This@ \
+         typically@ occurs@ due@ to@ complex@ matches@ on@ mutable@ fields.@ %a"
+        Style.inline_code "Match_failure"
+        Misc.print_see_manual ref_manual
   | Redundant_kind_modifier abbrev ->
-      "This kind modifier is already implied by the kind \"" ^ abbrev ^ "\"."
+      msg "This kind modifier, or a stronger one,@ \
+           is already implied by the kind %a."
+        Style.inline_code abbrev
   | Ignored_kind_modifier (abbrev, modifiers) ->
-      Printf.sprintf
-      "The kind modifier(s) \"%s\" have no effect on the kind \"%s\"."
-      (String.concat " " modifiers) abbrev
-  | Overridden_kind_modifier overridden_by ->
-      "This kind modifier is overridden by \"" ^ overridden_by ^ "\" later."
-  | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
-  | Incompatible_with_upstream (Non_value_sort layout) ->
-      Printf.sprintf
-      "External declaration here is not upstream compatible. \n\
-       The only types with non-value layouts allowed are float#, \n\
-       int32#, int64#, and nativeint#. Unknown type with layout \n\
-       %s encountered."
-      layout
-  | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      Printf.sprintf
-      "[@unboxed] attribute must be added to external declaration \n\
-       argument type with layout %s for upstream compatibility."
-      layout
-  | Incompatible_with_upstream Immediate_void_variant ->
-      "This variant is immediate \n\
-       because all its constructors have all-void arguments, but after \n\
-       erasure for upstream compatibility, void is no longer zero-width, \n\
-       so it won't be immediate."
-  | Incompatible_with_upstream Separability_check ->
-      "This type relies on OxCaml's extended separability checking \n\
-       and would not be accepted by upstream OCaml."
+      msg "The kind modifier(s) %a have no effect on the kind %a."
+        Style.inline_code (String.concat " " modifiers) Style.inline_code abbrev
   | Incompatible_with_upstream Unpacked_attribute ->
-      "[@unpacked] is not supported by upstream OCaml."
-  | Unerasable_position_argument -> "this position argument cannot be erased."
+      msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
-      "This tuple pattern\n\
-       unnecessarily ends in '..', as it explicitly matches all components\n\
-       of its expected type."
+      msg
+        "This tuple pattern@ unnecessarily@ ends in %a,@ as@ it@ explicitly@ \
+         matches@ all@ components@ of@ its@ expected@ type."
+        Style.inline_code ".."
+  | Unmutated_mutable v ->
+      msg "mutable variable %a was never mutated." Style.inline_code v
+  | Incompatible_with_upstream (Non_value_sort layout) ->
+      msg "External declaration here is not upstream compatible.@ \
+           @[The only types with non-value layouts allowed are@ \
+           float#, int32#, int64#, and nativeint#.@ \
+           Unknown type with layout@ %s encountered.@]" layout
+  | Incompatible_with_upstream (Unboxed_attribute layout) ->
+      msg "%a attribute must be added@ to@ external@ declaration@ \
+           argument type with layout %s for upstream compatibility."
+        Style.inline_code "[@unboxed]" layout
+  | Incompatible_with_upstream Immediate_void_variant ->
+      msg "This variant is immediate@ \
+           because all its constructors have all-void arguments,@ \
+           @[but after erasure for upstream compatibility,@ \
+           void is no longer zero-width,@ so it won't be immediate.@]"
+  | Incompatible_with_upstream Separability_check ->
+      msg "This type relies on OxCaml's extended separability checking@ \
+           and would not be accepted by upstream OCaml."
+  | Unerasable_position_argument ->
+      msg "this position argument cannot be erased."
   | Probe_name_too_long name ->
-      Printf.sprintf
-        "This probe name is too long: `%s'. \
-         Probe names must be at most 100 characters long." name
+      msg "This probe name is too long: %a.@ \
+           Probe names must be at most 100 characters long."
+        Style.inline_code name
   | Unused_kind_declaration s ->
-      "unused kind " ^ s ^ "."
+      msg "unused kind %a." Style.inline_code s
   | Zero_alloc_all_hidden_arrow s ->
-      Printf.sprintf
-      "The type of this item is an\n\
-       alias of a function type, but the [@@@zero_alloc %s] attribute for\n\
-       this signature does not apply to it because its type is not\n\
-       syntactically a function type. If it should be checked, use an\n\
-       explicit zero_alloc attribute with an arity. If not, use an explicit\n\
-       zero_alloc ignore attribute." s
+      msg "The type of this item is an@ alias of a function type,@ \
+           but the %a attribute for@ this signature does not apply to it@ \
+           because its type is not syntactically a function type.@ \
+           @[If it should be checked, use an explicit zero_alloc attribute@ \
+           with an arity.@ If not, use an explicit zero_alloc ignore \
+           attribute.@]"
+        Style.inline_code (Printf.sprintf "[@@@zero_alloc %s]" s)
   | Unchecked_zero_alloc_attribute ->
-      Printf.sprintf "the zero_alloc attribute cannot be checked.\n\
-      The function it is attached to was optimized away. \n\
-      You can try to mark this function as [@inline never] \n\
-      or move the attribute to the relevant callers of this function."
+      msg "the zero_alloc attribute cannot be checked.@ \
+           @[The function it is attached to was optimized away.@ \
+           You can try to mark this function as %a@ \
+           or move the attribute to the relevant callers of this function.@]"
+        Style.inline_code "[@inline never]"
   | Unboxing_impossible ->
-      Printf.sprintf
-        "This [@unboxed] attribute cannot be used.\n\
-         The type of this value does not allow unboxing."
+      msg "This %a attribute cannot be used.@ \
+           The type of this value does not allow unboxing."
+        Style.inline_code "[@unboxed]"
   | Mod_by_top modifier ->
-      Printf.sprintf
-        "%s is the top-most modifier.\n\
-         Modifying by a top element is a no-op."
-        modifier
+      msg "%s is the top-most modifier.@ \
+           Modifying by a top element is a no-op." modifier
   | Modal_axis_specified_twice {axis; overriden_by} ->
-    Printf.sprintf
-      "This %s is overriden by %s later."
-      axis overriden_by
+      msg "This %s is overridden by %s later." axis overriden_by
   | Atomic_float_record_boxed ->
-    Printf.sprintf
-      "This record contains atomic\n\
-       float fields, which prevents the float record optimization. The\n\
-       fields of this record will be boxed instead of being\n\
-       represented as a flat float array."
+      msg "This record contains atomic float fields,@ \
+           which prevents the float record optimization.@ \
+           @[The fields of this record will be boxed instead of being@ \
+           represented as a flat float array.@]"
   | Implied_attribute { implying; implied } ->
-    Printf.sprintf
-      "attribute [@%s] is unused because it is implied by [@%s]"
-      implied implying
+      msg "attribute %a is unused because it is implied by %a"
+        Style.inline_code (Printf.sprintf "[@%s]" implied)
+        Style.inline_code (Printf.sprintf "[@%s]" implying)
   | Use_during_borrowing ->
-      "This value is used while being borrowed."
+      msg "This value is used while being borrowed."
   | Useless_lpoly ->
-      "This binding has no layout variables, so \"poly_\" has no effect. \
-       Consider using a regular \"let\" instead."
+      msg "This binding has no layout variables, so poly_ has no effect. \
+           Consider using a regular let instead."
   | Lpoly_in_letrec ->
-      "\"poly_\" has no effect in recursive bindings, which do not support \
-       layout polymorphism. Consider using a regular \"let rec\" instead."
+      msg "poly_ has no effect in recursive bindings, which do not support \
+           layout polymorphism. Consider using a regular let rec instead."
 ;;
 
 let nerrors = ref 0
 
 type reporting_information =
   { id : string
-  ; message : string
+  ; message : Fmt.doc
   ; is_error : bool
-  ; sub_locs : (loc * string) list;
+  ; sub_locs : (loc * Fmt.doc) list;
   }
 
 let id_name w =
@@ -1413,7 +1533,7 @@ let report_alert (alert : alert) =
   | true ->
       let is_error = alert_is_error alert in
       if is_error then incr nerrors;
-      let message = Misc.normalise_eol alert.message in
+      let message = msg "%s" (Misc.normalise_eol alert.message) in
        (* Reduce \r\n to \n:
            - Prevents any \r characters being printed on Unix when processing
              Windows sources
@@ -1423,8 +1543,8 @@ let report_alert (alert : alert) =
       let sub_locs =
         if not alert.def.loc_ghost && not alert.use.loc_ghost then
           [
-            alert.def, "Definition";
-            alert.use, "Expected signature";
+            alert.def, msg "Definition";
+            alert.use, msg "Expected signature";
           ]
         else
           []

@@ -145,6 +145,16 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
     Misc.fatal_errorf "Bad kind %a for [memory_chunk_of_kind]"
       Flambda_kind.With_subkind.print kind
 
+let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
+  match memory_chunk_of_kind kind with
+  | Word_val -> Word_int
+  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_code_pointer
+    | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+    | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+    | Fivetwelve_aligned ) as mem ->
+    mem
+
 let machtype_of_kinded_parameter p = Bound_parameter.kind p |> machtype_of_kind
 
 let param_machtype_of_kinded_parameter bp : _ To_cmm_env.param_type =
@@ -187,7 +197,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
 
 let name env name = name0 env name
 
-let const ~dbg cst =
+let rec const ~dbg cst =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
     targetint ~dbg (Target_ocaml_int.to_targetint Sixty_four i)
@@ -225,6 +235,9 @@ let const ~dbg cst =
     vec512 ~dbg { word0; word1; word2; word3; word4; word5; word6; word7 }
   | Naked_nativeint t -> targetint ~dbg t
   | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
+  | Poison (kind, name) ->
+    const ~dbg
+      (Reg_width_const.of_int_of_kind Sixty_four kind (String.hash name))
 
 let simple ?consider_inlining_effectful_expressions ~dbg env res s =
   Simple.pattern_match s
@@ -247,7 +260,7 @@ let name_static res name =
     ~symbol:(fun s ->
       `Static_data [symbol_address (To_cmm_result.symbol res s)])
 
-let const_static cst : Cmm.data_item list =
+let rec const_static cst : Cmm.data_item list =
   match Reg_width_const.descr cst with
   | Naked_immediate i ->
     [cint (nativeint_of_targetint (Target_ocaml_int.to_targetint Sixty_four i))]
@@ -300,6 +313,9 @@ let const_static cst : Cmm.data_item list =
     in
     [cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 }]
   | Null -> [cint 0n]
+  | Poison (kind, name) ->
+    const_static
+      (Reg_width_const.of_int_of_kind Sixty_four kind (String.hash name))
 
 let simple_static res s =
   Simple.pattern_match s
@@ -445,23 +461,20 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
   in
   let cmm =
     let must_use_setfield : Lambda.immediate_or_pointer option =
-      (* The 4 GC does not need to see static field updates, but the 5 GC must,
-         due to differences in how global roots are handled. *)
-      if not Config.runtime5
-      then None
-      else
-        match kind with
-        | Pointer -> Some Pointer
-        | Immediate ->
-          (* See [caml_initialize]; we can avoid this function in this case. *)
-          None
-        | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_float
-        | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
-          (* The GC never sees these fields, so we can avoid using
-             [caml_initialize]. This is important as it significantly reduces
-             the complexity of the statically-allocated inconstant unboxed int32
-             array case, which otherwise would have to use 64-bit writes. *)
-          None
+      (* The GC must see static field updates, due to differences in how global
+         roots are handled. *)
+      match kind with
+      | Pointer -> Some Pointer
+      | Immediate ->
+        (* See [caml_initialize]; we can avoid this function in this case. *)
+        None
+      | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_float
+      | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512 ->
+        (* The GC never sees these fields, so we can avoid using
+           [caml_initialize]. This is important as it significantly reduces the
+           complexity of the statically-allocated inconstant unboxed int32 array
+           case, which otherwise would have to use 64-bit writes. *)
+        None
     in
     match must_use_setfield with
     | Some imm_or_ptr ->

@@ -144,21 +144,21 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
         num_fields fields_length;
     fields
 
-let check_float_array_optimisation_enabled name =
+let check_float_array_optimisation_enabled dbg name =
   if not (Flambda_features.flat_float_array ())
   then
     Misc.fatal_errorf
-      "[%s] is not expected when the float array optimisation is disabled" name
-      ()
+      "%a: [%s] is not expected when the float array optimisation is disabled"
+      Debuginfo.print_compact dbg name ()
 
 type converted_array_kind =
   | Array_kind of P.Array_kind.t
   | Float_array_opt_dynamic
 
-let convert_array_kind (kind : L.array_kind) : converted_array_kind =
+let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
+    check_float_array_optimisation_enabled dbg "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Array_kind Values
   | Pgcignorableaddrarray -> Array_kind Gc_ignorable_values
@@ -178,7 +178,7 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -188,7 +188,7 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         P.Array_kind.t =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -204,9 +204,12 @@ let convert_array_kind (kind : L.array_kind) : converted_array_kind =
         Unboxed_product (List.map convert_kind kinds)
     in
     Array_kind (Unboxed_product (List.map convert_kind kinds))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind: Punspecializedarray"
 
-let convert_array_kind_for_length kind : P.Array_kind_for_length.t =
-  match convert_array_kind kind with
+let convert_array_kind_for_length dbg kind : P.Array_kind_for_length.t =
+  match convert_array_kind dbg kind with
   | Array_kind array_kind -> Array_kind array_kind
   | Float_array_opt_dynamic -> Float_array_opt_dynamic
 
@@ -239,17 +242,11 @@ type converted_array_ref_kind =
   | Array_ref_kind of Array_ref_kind.t
   | Float_array_opt_dynamic_ref of L.locality_mode
 
-let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
-    =
+let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
+    converted_array_ref_kind =
   match kind with
   | Pgenarray_ref mode ->
-    (* CR mshinwell: We can't check this because of the translations of
-       primitives for Obj.size, Obj.field and Obj.set_field, which can be used
-       both on arrays and blocks. We should probably propagate the "%obj_..."
-       primitives which these functions use all the way to the middle end. Then
-       this check could be reinstated for all normal cases.
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_ref";
     Float_array_opt_dynamic_ref mode
   | Paddrarray_ref -> Array_ref_kind (No_float_array_opt Values)
   | Pgcignorableaddrarray_ref ->
@@ -282,7 +279,7 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable -> Values
       | Pproduct_scannable kinds ->
         Unboxed_product (List.map convert_kind kinds)
@@ -293,7 +290,7 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -310,6 +307,10 @@ let convert_array_ref_kind (kind : L.array_ref_kind) : converted_array_ref_kind
     in
     Array_ref_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_ref _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_ref_kind: \
+       Punspecializedarray_ref"
 
 let rec convert_unboxed_product_array_ref_kind
     (kind : Array_ref_kind.no_float_array_opt) : P.Array_kind.t =
@@ -354,9 +355,9 @@ let convert_array_ref_kind_to_array_kind (array_ref_kind : Array_ref_kind.t) :
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds))
 
-let convert_array_ref_kind_for_length array_ref_kind : P.Array_kind_for_length.t
-    =
-  match convert_array_ref_kind array_ref_kind with
+let convert_array_ref_kind_for_length dbg array_ref_kind :
+    P.Array_kind_for_length.t =
+  match convert_array_ref_kind dbg array_ref_kind with
   | Float_array_opt_dynamic_ref _ -> Float_array_opt_dynamic
   | Array_ref_kind array_ref_kind -> (
     match array_ref_kind with
@@ -384,7 +385,6 @@ let convert_array_ref_kind_for_length array_ref_kind : P.Array_kind_for_length.t
 
 module Array_set_kind = struct
   type no_float_array_opt =
-    | Immediates
     | Values of P.Init_or_assign.t
     | Gc_ignorable_values
     | Naked_floats
@@ -409,13 +409,11 @@ type converted_array_set_kind =
   | Array_set_kind of Array_set_kind.t
   | Float_array_opt_dynamic_set of Alloc_mode.For_assignments.t
 
-let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
-    =
+let convert_array_set_kind dbg (kind : L.array_set_kind) :
+    converted_array_set_kind =
   match kind with
   | Pgenarray_set mode ->
-    (* CR mshinwell: see CR in [convert_array_ref_kind] above
-
-       check_float_array_optimisation_enabled (); *)
+    check_float_array_optimisation_enabled dbg "Pgenarray_set";
     Float_array_opt_dynamic_set (Alloc_mode.For_assignments.from_lambda mode)
   | Paddrarray_set mode ->
     Array_set_kind
@@ -423,7 +421,7 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
          (Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))))
   | Pgcignorableaddrarray_set ->
     Array_set_kind (No_float_array_opt Gc_ignorable_values)
-  | Pintarray_set -> Array_set_kind (No_float_array_opt Immediates)
+  | Pintarray_set -> Array_set_kind (No_float_array_opt Gc_ignorable_values)
   | Pfloatarray_set -> Array_set_kind Naked_floats_to_be_unboxed
   | Punboxedfloatarray_set Unboxed_float64 ->
     Array_set_kind (No_float_array_opt Naked_floats)
@@ -451,7 +449,7 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
       match kind with
-      | Pint_scannable -> Immediates
+      | Pint_scannable -> Gc_ignorable_values
       | Paddr_scannable ->
         Values (Assignment (Alloc_mode.For_assignments.from_lambda mode))
       | Pproduct_scannable kinds ->
@@ -463,7 +461,7 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     let rec convert_kind (kind : L.ignorable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
       match kind with
-      | Pint_ignorable -> Immediates
+      | Pint_ignorable -> Gc_ignorable_values
       | Punboxedfloat_ignorable Unboxed_float32 -> Naked_float32s
       | Punboxedfloat_ignorable Unboxed_float64 -> Naked_floats
       | Punboxedvector_ignorable Unboxed_vec128 -> Naked_vec128s
@@ -480,11 +478,14 @@ let convert_array_set_kind (kind : L.array_set_kind) : converted_array_set_kind
     in
     Array_set_kind
       (No_float_array_opt (Unboxed_product (List.map convert_kind kinds)))
+  | Punspecializedarray_set _ ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_set_kind: \
+       Punspecializedarray_set"
 
 let rec convert_unboxed_product_array_set_kind
     (kind : Array_set_kind.no_float_array_opt) : P.Array_kind.t =
   match kind with
-  | Immediates -> Immediates
   | Gc_ignorable_values -> Gc_ignorable_values
   | Values _init_or_assign -> Values
   | Naked_floats -> Naked_floats
@@ -507,7 +508,6 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
   | Naked_floats_to_be_unboxed -> Naked_floats
   | No_float_array_opt nfo -> (
     match nfo with
-    | Immediates -> Immediates
     | Gc_ignorable_values -> Gc_ignorable_values
     | Values _ -> Values
     | Naked_floats -> Naked_floats
@@ -524,14 +524,13 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
 
-let convert_array_set_kind_for_length array_set_kind : P.Array_kind_for_length.t
-    =
-  match convert_array_set_kind array_set_kind with
+let convert_array_set_kind_for_length dbg array_set_kind :
+    P.Array_kind_for_length.t =
+  match convert_array_set_kind dbg array_set_kind with
   | Float_array_opt_dynamic_set _ -> Float_array_opt_dynamic
   | Array_set_kind Naked_floats_to_be_unboxed -> Array_kind Naked_floats
   | Array_set_kind (No_float_array_opt nfo) -> (
     match nfo with
-    | Immediates -> Array_kind Immediates
     | Gc_ignorable_values -> Array_kind Gc_ignorable_values
     | Values _ -> Array_kind Values
     | Naked_floats -> Array_kind Naked_floats
@@ -554,11 +553,11 @@ type converted_duplicate_array_kind =
   | Duplicate_array_kind of P.Duplicate_array_kind.t
   | Float_array_opt_dynamic
 
-let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
+let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     converted_duplicate_array_kind =
   match kind with
   | Pgenarray ->
-    check_float_array_optimisation_enabled "Pgenarray";
+    check_float_array_optimisation_enabled dbg "Pgenarray";
     Float_array_opt_dynamic
   | Paddrarray -> Duplicate_array_kind Values
   | Pgcignorableaddrarray -> Duplicate_array_kind Values
@@ -589,6 +588,10 @@ let convert_array_kind_to_duplicate_array_kind (kind : L.array_kind) :
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
        unimplemented"
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
+       Punspecializedarray"
 
 let convert_field_read_semantics (sem : L.field_read_semantics) : Mutability.t =
   match sem with Reads_agree -> Immutable | Reads_vary -> Mutable
@@ -1418,7 +1421,6 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
     let rec unarize_kind (array_set_kind : Array_set_kind.no_float_array_opt) :
         Array_set_kind.t list =
       match array_set_kind with
-      | Immediates -> [Array_set_kind.No_float_array_opt Immediates]
       | Values init_or_assign ->
         [Array_set_kind.No_float_array_opt (Values init_or_assign)]
       | Gc_ignorable_values ->
@@ -1463,12 +1465,11 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
                array_set_kind ~new_values:[new_value])
            (List.combine indexes (List.combine unarized new_values))) ]
   | No_float_array_opt
-      (( Immediates | Gc_ignorable_values | Values _ | Naked_floats
-       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
-       | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) -> (
+      (( Gc_ignorable_values | Values _ | Naked_floats | Naked_float32s
+       | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as
+       nfo) -> (
     match nfo with
-    | Immediates -> normal_case Immediates new_values
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
     | Gc_ignorable_values -> normal_case Gc_ignorable_values new_values
     | Naked_floats -> normal_case Naked_floats new_values
@@ -1490,9 +1491,9 @@ let array_set_unsafe ~machine_width dbg ~array ~index array_kind array_set_kind
     ~new_values
   |> H.maybe_create_unboxed_product
 
-let[@inline always] match_on_array_ref_kind ~array array_ref_kind f :
+let[@inline always] match_on_array_ref_kind dbg ~array array_ref_kind f :
     H.expr_primitive =
-  match convert_array_ref_kind array_ref_kind with
+  match convert_array_ref_kind dbg array_ref_kind with
   | Array_ref_kind array_ref_kind ->
     let array_kind = convert_array_ref_kind_to_array_kind array_ref_kind in
     f array_kind array_ref_kind
@@ -1509,9 +1510,9 @@ let[@inline always] match_on_array_ref_kind ~array array_ref_kind f :
            a singleton. *)
         [K.With_subkind.any_value] )
 
-let[@inline always] match_on_array_set_kind ~array array_set_kind f :
+let[@inline always] match_on_array_set_kind dbg ~array array_set_kind f :
     H.expr_primitive =
-  match convert_array_set_kind array_set_kind with
+  match convert_array_set_kind dbg array_set_kind with
   | Array_set_kind array_set_kind ->
     let array_kind = convert_array_set_kind_to_array_kind array_set_kind in
     f array_kind array_set_kind
@@ -2042,7 +2043,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pmakearray (lambda_array_kind, mutability, mode), _ -> (
     let args = List.flatten args in
     let mode = Alloc_mode.For_allocations.from_lambda mode ~current_region in
-    let array_kind = convert_array_kind lambda_array_kind in
+    let array_kind = convert_array_kind dbg lambda_array_kind in
     let mutability = Mutability.from_lambda mutability in
     match array_kind with
     | Array_kind array_kind ->
@@ -2057,6 +2058,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
+        | Punspecializedarray ->
+          Misc.fatal_error
+            "Lambda_to_flambda_primitives: Pmakearray Punspecializedarray"
       in
       [Variadic (Make_array (array_kind, mutability, mode), args)]
     | Float_array_opt_dynamic -> (
@@ -2133,7 +2137,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             }
         | Constructor_mixed _ ->
           (* CR layouts v5.9: support this *)
-          Misc.fatal_error "Mixed blocks extensible variants are not supported")
+          Misc.fatal_error "Mixed blocks extensible variants are not supported"
+        | Constructor_variable ->
+          Misc.fatal_error "convert_lprim: Pduprecord: variable representation")
       | Record_inlined (Extension _, _, _)
       | Record_inlined
           ( Ordinary _,
@@ -2143,6 +2149,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"
           Printlambda.primitive prim
+      | Record_dummy _ ->
+        Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
+      | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+        Misc.fatal_error "convert_lprim: Pduprecord: variable representation"
     in
     [Unary (Duplicate_block { kind }, arg)]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]
@@ -2373,7 +2383,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [Ternary (Array_set (array_kind, array_set_kind), Prim obj, field, value)]
   | Parraylength kind, [[arg]] -> (
-    let array_kind = convert_array_kind_for_length kind in
+    let array_kind = convert_array_kind_for_length dbg kind in
     let prim : H.expr_primitive = Unary (Array_length array_kind, arg) in
     match array_kind with
     | Array_kind
@@ -2394,7 +2404,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [Binary (Int_arith (Tagged_immediate, Div), Prim prim, Simple divisor)])
   | Pduparray (kind, mutability), [[arg]] -> (
     let duplicate_array_kind =
-      convert_array_kind_to_duplicate_array_kind kind
+      convert_array_kind_to_duplicate_array_kind dbg kind
     in
     let source_mutability = Mutability.Immutable in
     let destination_mutability = Mutability.from_lambda mutability in
@@ -2715,28 +2725,32 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (* For this and the following cases we will end up relying on the backend to
        CSE the two accesses to the array's header word in the [Pgenarray]
        case. *)
-    [ match_on_array_ref_kind ~array array_ref_kind
+    [ match_on_array_ref_kind dbg ~array array_ref_kind
         (array_load_unsafe ~machine_width ~array ~mut
            ~index:(convert_index_to_tagged_int ~index ~index_kind)
            ~current_region) ]
   | Parrayrefs (array_ref_kind, index_kind, mut), [[array]; [index]] ->
-    let array_length_kind = convert_array_ref_kind_for_length array_ref_kind in
+    let array_length_kind =
+      convert_array_ref_kind_for_length dbg array_ref_kind
+    in
     [ check_array_access ~dbg ~array array_length_kind ~index ~index_kind
         ~machine_width
-        (match_on_array_ref_kind ~array array_ref_kind
+        (match_on_array_ref_kind dbg ~array array_ref_kind
            (array_load_unsafe ~machine_width ~array ~mut
               ~index:(convert_index_to_tagged_int ~index ~index_kind)
               ~current_region)) ]
   | Parraysetu (array_set_kind, index_kind), [[array]; [index]; new_values] ->
-    [ match_on_array_set_kind ~array array_set_kind
+    [ match_on_array_set_kind dbg ~array array_set_kind
         (array_set_unsafe ~machine_width dbg ~array
            ~index:(convert_index_to_tagged_int ~index ~index_kind)
            ~new_values) ]
   | Parraysets (array_set_kind, index_kind), [[array]; [index]; new_values] ->
-    let array_length_kind = convert_array_set_kind_for_length array_set_kind in
+    let array_length_kind =
+      convert_array_set_kind_for_length dbg array_set_kind
+    in
     [ check_array_access ~dbg ~array array_length_kind ~index ~index_kind
         ~machine_width
-        (match_on_array_set_kind ~array array_set_kind
+        (match_on_array_set_kind dbg ~array array_set_kind
            (array_set_unsafe ~machine_width dbg ~array
               ~index:(convert_index_to_tagged_int ~index ~index_kind)
               ~new_values)) ]
@@ -2809,16 +2823,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
                   - 1))) ]
       | Ostype_unix ->
         [ Simple
-            (Simple.const_bool machine_width (String.equal Sys.os_type "Unix"))
-        ]
+            (Simple.const_bool machine_width
+               (String.equal Config.target_os_type "Unix")) ]
       | Ostype_win32 ->
         [ Simple
-            (Simple.const_bool machine_width (String.equal Sys.os_type "Win32"))
-        ]
+            (Simple.const_bool machine_width
+               (String.equal Config.target_os_type "Win32")) ]
       | Ostype_cygwin ->
         [ Simple
             (Simple.const_bool machine_width
-               (String.equal Sys.os_type "Cygwin")) ]
+               (String.equal Config.target_os_type "Cygwin")) ]
       (* CR-someday gyorsh: replace string comparisons with dedicated types for
          [arch] and [os_type]. *)
       | Arch_amd64 ->
@@ -2832,7 +2846,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)
-      | Runtime5 -> [Simple (Simple.const_bool machine_width Config.runtime5)]))
+      | Runtime5 -> [Simple (Simple.const_bool machine_width true)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
@@ -2985,11 +2999,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let access_size = vec_accessor_width ~aligned size in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring
         ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
-  | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
-      [[array]; [index]] ) ->
-    check_float_array_optimisation_enabled "Pfloat_array_load_vec";
-    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
-        ~boxed ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index ]
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] )
   | ( Punboxed_float_array_load_vec { size; unsafe; index_kind; mode; boxed },
@@ -3035,12 +3044,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
         ~boxed ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index ]
-  | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
-      [[array]; [index]; [new_value]] ) ->
-    check_float_array_optimisation_enabled "Pfloat_array_set_vec";
-    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
-        ~vec_kind:(vec_kind size) Naked_floats array ~index_kind index new_value
-    ]
   | ( Pfloatarray_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] )
   | ( Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed },
@@ -3208,6 +3211,26 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_convertion.convert_primitive: The first argument to Pset_ptr \
        should be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
+  | Pget_ext_ptr (layout, mut), [[idx]] ->
+    needs_64_bit_target prim dbg;
+    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
+    let reads =
+      List.map2
+        (fun kind offset ->
+          H.Binary (Read_offset (kind, mut), null_base, Prim offset))
+        kinds offsets
+    in
+    [H.maybe_create_unboxed_product reads]
+  | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
+    needs_64_bit_target prim dbg;
+    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
+    write_offset Into_block_or_off_heap layout mode ~machine_width
+      ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3234,7 +3257,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
@@ -3249,28 +3272,30 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
       | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
-      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pint_array_load_vec _
+      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+      | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+      | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
+            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+            | Punspecializedarray_ref _ ),
             _,
             _ )
       | Patomic_load_field _ | Ppoke _ | Pphys_equal _
       | Pscalar (Binary _)
-      | Pget_idx _ | Pset_ptr _ ),
+      | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -3285,26 +3310,27 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
+            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+            | Punspecializedarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
       | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
       | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
-      | Pfloat_array_set_vec _ | Pint_array_set_vec _
-      | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
-      | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-      | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
-      | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
-      | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
-      | Patomic_lor_field | Pset_idx _ ),
+      | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+      | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+      | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+      | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+      | Patomic_set_field _ | Patomic_exchange_field _ | Patomic_fetch_add_field
+      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+      | Patomic_lxor_field | Patomic_lor_field | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]
@@ -3332,7 +3358,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Pignore | Psequand | Psequor | Pbytes_of_string | Pbytes_to_string
       | Parray_of_iarray | Parray_to_iarray | Pwith_stack | Pwith_stack_bind
-      | Pperform | Presume | Preperform ),
+      | Pwith_stack_preemptible | Pwith_stack_bind_preemptible | Pperform
+      | Presume | Preperform ),
       _ ) ->
     Misc.fatal_errorf
       "[%a] should have been removed by [Lambda_to_flambda.transform_primitive]"

@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -64,18 +60,18 @@ div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L118
+  je    .L1
   cmpq  $-1, %rcx
-  je    .L111
+  je    .L0
   movq  %rdi, %rax
   cqto
   idivq %rcx
   ret
-.L111:
+.L0:
   xorl  %eax, %eax
   subq  %rdi, %rax
   ret
-.L118:
+.L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -102,33 +98,33 @@ unsigned_div:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L115
+  jge   .L1
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rcx
   movabsq $-9223372036854775808, %rax
   subq  %rax, %rdi
   cmpq  %rcx, %rdi
-  jge   .L109
+  jge   .L0
   xorl  %eax, %eax
   ret
-.L109:
+.L0:
   movl  $1, %eax
   ret
-.L115:
+.L1:
   testq %rcx, %rcx
-  je    .L141
+  je    .L5
   movq  %rdi, %rbx
   shrq  $1, %rbx
   cmpq  $-1, %rcx
-  je    .L123
+  je    .L2
   movq  %rbx, %rax
   cqto
   idivq %rcx
-  jmp   .L126
-.L123:
+  jmp   .L3
+.L2:
   xorl  %eax, %eax
   subq  %rbx, %rax
-.L126:
+.L3:
   salq  $1, %rax
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rbx
@@ -139,12 +135,12 @@ unsigned_div:
   subq  %rsi, %rdi
   subq  %rdx, %rdi
   cmpq  %rbx, %rdi
-  jge   .L134
+  jge   .L4
   ret
-.L134:
+.L4:
   incq  %rax
   ret
-.L141:
+.L5:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -157,17 +153,17 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L117
+  je    .L1
   cmpq  $-1, %rcx
-  je    .L111
+  je    .L0
   cqto
   idivq %rcx
   movq  %rdx, %rax
   ret
-.L111:
+.L0:
   xorl  %eax, %eax
   ret
-.L117:
+.L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -182,7 +178,7 @@ unsigned_rem:
   movq  %rax, %rdi
   movq  %rbx, %rcx
   cmpq  $0, %rcx
-  jge   .L118
+  jge   .L1
   movabsq $-9223372036854775808, %rbx
   movq  %rcx, %rax
   subq  %rbx, %rax
@@ -190,27 +186,27 @@ unsigned_rem:
   movq  %rdi, %rbx
   subq  %rsi, %rbx
   cmpq  %rax, %rbx
-  jge   .L112
+  jge   .L0
   xorl  %ebx, %ebx
-  jmp   .L148
-.L112:
+  jmp   .L5
+.L0:
   movl  $1, %ebx
-  jmp   .L148
-.L118:
+  jmp   .L5
+.L1:
   testq %rcx, %rcx
-  je    .L144
+  je    .L4
   movq  %rdi, %rax
   shrq  $1, %rax
   cmpq  $-1, %rcx
-  je    .L126
+  je    .L2
   cqto
   idivq %rcx
   movq  %rax, %rbx
-  jmp   .L129
-.L126:
+  jmp   .L3
+.L2:
   xorl  %ebx, %ebx
   subq  %rax, %rbx
-.L129:
+.L3:
   salq  $1, %rbx
   movabsq $-9223372036854775808, %rsi
   movq  %rcx, %rax
@@ -222,16 +218,16 @@ unsigned_rem:
   subq  %rsi, %rdx
   subq  %r8, %rdx
   cmpq  %rax, %rdx
-  jl    .L148
+  jl    .L5
   incq  %rbx
-  jmp   .L148
-.L144:
+  jmp   .L5
+.L4:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L148:
+.L5:
   imulq %rcx, %rbx
   movq  %rdi, %rax
   subq  %rbx, %rax
@@ -257,9 +253,9 @@ unsigned_rem_2:
   subq  %rdi, %rsi
   subq  %rcx, %rsi
   cmpq  %rdx, %rsi
-  jl    .L120
+  jl    .L0
   incq  %rbx
-.L120:
+.L0:
   salq  $1, %rbx
   subq  %rbx, %rax
   ret
@@ -285,10 +281,10 @@ let abs x = Int64_u.abs x
 abs:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L105
+  jl    .L0
   movq  %rbx, %rax
   ret
-.L105:
+.L0:
   xorl  %eax, %eax
   subq  %rbx, %rax
   ret
@@ -374,22 +370,22 @@ let unsigned_to_int x = Int64_u.unsigned_to_int x
 unsigned_to_int:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L112
+  jl    .L1
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L112
+  jg    .L1
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L115
-.L117:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-.L112:
+.L1:
   movl  $1, %eax
   ret
 |}]
@@ -409,8 +405,8 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -432,8 +428,8 @@ to_int32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L106
-.L108:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -458,8 +454,8 @@ to_nativeint:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -509,8 +505,8 @@ float_of_bits:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovq %rbx, %xmm0
@@ -585,10 +581,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jg    .L105
+  jg    .L0
   movq  %rdi, %rax
   ret
-.L105:
+.L0:
   ret
 |}]
 
@@ -599,10 +595,10 @@ max:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jl    .L105
+  jl    .L0
   movq  %rdi, %rax
   ret
-.L105:
+.L0:
   ret
 |}]
 
@@ -613,8 +609,8 @@ to_int64:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi

@@ -184,23 +184,6 @@ val fold_body_instructions :
    sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
 
-(** Printing *)
-
-val print_terminator : Format.formatter -> terminator instruction -> unit
-
-val print_basic : Format.formatter -> basic instruction -> unit
-
-val print_instruction' :
-  ?print_reg:(Format.formatter -> Reg.t -> unit) ->
-  Format.formatter ->
-  [`Basic of basic instruction | `Terminator of terminator instruction] ->
-  unit
-
-val print_instruction :
-  Format.formatter ->
-  [`Basic of basic instruction | `Terminator of terminator instruction] ->
-  unit
-
 (* CR-someday gyorsh: Current version of cfg is a half-way house in terms of its
    exception handling. It has a lot of redundancy and the result of the
    computation is not used.
@@ -234,10 +217,6 @@ val is_end_region : basic -> bool
 val set_stack_offset : 'a instruction -> int -> unit
 
 val set_live : 'a instruction -> Reg.Set.t -> unit
-
-val dump_basic : Format.formatter -> basic -> unit
-
-val dump_terminator : ?sep:string -> Format.formatter -> terminator -> unit
 
 val make_instruction :
   desc:'a ->

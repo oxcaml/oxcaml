@@ -1,4 +1,6 @@
-(* TEST *)
+(* TEST
+   flags = "-no-ikinds";
+*)
 
 module Kind_with_alert = struct
   kind_ k [@@alert kind_alert "foo"]

@@ -57,6 +57,19 @@ let typ_code_pointer = [| Code_pointer |]
 
 let typ_int128 = [| Int; Int |]
 
+let string_of_machtype_component (comp : machtype_component) =
+  match comp with
+  | Val -> "Val"
+  | Addr -> "Addr"
+  | Int -> "Int"
+  | Float -> "Float"
+  | Vec128 -> "Vec128"
+  | Vec256 -> "Vec256"
+  | Vec512 -> "Vec512"
+  | Float32 -> "Float32"
+  | Valx2 -> "Valx2"
+  | Code_pointer -> "Code_pointer"
+
 (** [machtype_component]s are partially ordered as follows:
 
     {v
@@ -102,9 +115,11 @@ let lub_component comp1 comp2 =
   | Code_pointer, (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512)
   | ( (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512),
       Code_pointer ) ->
-    Printf.eprintf "%d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
     (* Float unboxing code must be sure to avoid this case. *)
-    assert false
+    Misc.fatal_errorf
+      "Cmm.lub_component: unexpected machtype_component combination (%s, %s)"
+      (string_of_machtype_component comp1)
+      (string_of_machtype_component comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
@@ -134,8 +149,10 @@ let ge_component comp1 comp2 =
   | Code_pointer, (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512)
   | ( (Int | Addr | Val | Float | Float32 | Vec128 | Vec256 | Vec512),
       Code_pointer ) ->
-    Printf.eprintf "GE: %d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
-    assert false
+    Misc.fatal_errorf
+      "Cmm.ge_component: unexpected machtype_component combination (%s, %s)"
+      (string_of_machtype_component comp1)
+      (string_of_machtype_component comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_error "Unexpected machtype_component Valx2"
 

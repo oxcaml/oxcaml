@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
  readonly_files = "a1.ml a2.ml b.ml c_sub1.ml c_sub2.ml c_inter.ml";
  setup-ocamlc.byte-build-env;
  module = "a1.ml";

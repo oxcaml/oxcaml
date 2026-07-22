@@ -236,6 +236,7 @@ type t =
   { config : Mconfig.t;
     state : Mocaml.typer_state;
     raw_source : Msource.t;
+    inject_parsetree : Mreader.parsetree option;
     source : (Msource.t * Mreader.parsetree option) lazy_t;
     reader : Reader.t lazy_t;
     ppx : Ppx.t lazy_t;
@@ -255,6 +256,7 @@ type t =
   }
 
 let raw_source t = t.raw_source
+let typer_state t = t.state
 
 let input_config t = t.config
 let input_source t = fst (Lazy.force t.source)
@@ -299,7 +301,8 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
     ?(ppx_cache_hit = ref false) ?(reader_cache_hit = ref false)
     ?(document_overrides_cache_hit = ref false)
     ?(locate_overrides_cache_hit = ref false)
-    ?(typer_cache_stats = ref Mtyper.Miss) ?for_completion config raw_source =
+    ?(typer_cache_stats = ref Mtyper.Miss) ?for_completion ?inject_parsetree
+    config raw_source =
   let state =
     match state with
     | None -> Cache.get config
@@ -308,17 +311,21 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
   let source =
     timed_lazy pp_time
       (lazy
-        (match Mconfig.(config.ocaml.pp) with
-        | None -> (raw_source, None)
-        | Some { workdir; workval } -> (
-          let source = Msource.text raw_source in
-          match
-            Pparse.apply_pp ~workdir
-              ~filename:Mconfig.(config.query.filename)
-              ~source ~pp:workval
-          with
-          | `Source source -> (Msource.make source, None)
-          | (`Interface _ | `Implementation _) as ast -> (raw_source, Some ast))))
+        (match inject_parsetree with
+        | Some parsetree -> (raw_source, Some parsetree)
+        | None -> (
+          match Mconfig.(config.ocaml.pp) with
+          | None -> (raw_source, None)
+          | Some { workdir; workval } -> (
+            let source = Msource.text raw_source in
+            match
+              Pparse.apply_pp ~workdir
+                ~filename:Mconfig.(config.query.filename)
+                ~source ~pp:workval
+            with
+            | `Source source -> (Msource.make source, None)
+            | (`Interface _ | `Implementation _) as ast -> (raw_source, Some ast)
+            ))))
   in
   let reader =
     timed_lazy reader_time
@@ -344,14 +351,14 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
          (* When we loaded the configuration in Mocaml, we guessed whether we're working
             with an intf or impl file based on the suffix of the filename. But now we know
             based on the contents of the file, so we update the value we wrote before. *)
-         Env.get_unit_name ()
+         Env.get_current_unit ()
          |> Option.map
               ~f:
                 (Unit_info.modify_kind ~f:(fun _ ->
                      match result.parsetree with
                      | `Interface _ -> Intf
                      | `Implementation _ -> Impl))
-         |> Env.set_unit_name;
+         |> Option.iter ~f:Env.set_current_unit;
          { Reader.result; config; cache_version = version; cache_disabling }))
   in
   let ppx =
@@ -419,6 +426,7 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
   { config;
     state;
     raw_source;
+    inject_parsetree;
     source;
     reader;
     ppx;
@@ -439,10 +447,24 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
 
 let make config source = process (Mconfig.normalize config) source
 
+let make_with_parsetree ~state config raw_source parsetree =
+  (* Clear ppx to avoid re-running them on the already-ppx'd parsetree.
+     The parsetree is injected via the source tuple (raw_source, Some parsetree),
+     which causes the reader to skip parsing. With ppx=[], the ppx phase is a no-op. *)
+  let config =
+    Mconfig.{ config with ocaml = { config.ocaml with ppx = []; pp = None } }
+  in
+  let config = Mconfig.normalize config in
+  (* Pass the parsetree through the pp mechanism: when source has Some parsetree,
+     the reader uses it directly instead of parsing. *)
+  let source_with_tree = Msource.make (Msource.text raw_source) in
+  process config source_with_tree ~state ~inject_parsetree:parsetree
+
 let for_completion position
     { config;
       state;
       raw_source;
+      inject_parsetree;
       pp_time;
       reader_time;
       ppx_time;
@@ -451,7 +473,7 @@ let for_completion position
       _
     } =
   process config raw_source ~for_completion:position ~state ~pp_time
-    ~reader_time ~ppx_time ~typer_time ~error_time
+    ~reader_time ~ppx_time ~typer_time ~error_time ?inject_parsetree
 
 let timing_information t =
   [ ("pp", !(t.pp_time));

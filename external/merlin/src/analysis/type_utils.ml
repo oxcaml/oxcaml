@@ -113,11 +113,11 @@ module Printtyp = struct
   let expand_sig env mty = Env.with_cmis @@ fun () -> Mtype.scrape_alias env mty
 
   let verbose_type_scheme env ppf t =
-    Compat.type_scheme_for_merlin ppf (expand_type env t)
+    Out_type.Compat.type_scheme_for_merlin ppf (expand_type env t)
       ~print_non_value_jkind_on_type_variables:true
 
   let verbose_type_declaration ~print_non_value_inferred_jkind env id ppf t =
-    Compat.type_declaration_for_merlin id ppf (expand_type_decl env t)
+    Out_type.Compat.type_declaration_for_merlin id ppf (expand_type_decl env t)
       ~print_non_value_inferred_jkind
 
   let modtype = Compat.modtype
@@ -133,7 +133,7 @@ module Printtyp = struct
   let type_scheme env ppf ty =
     (select_by_verbosity
        ~default:
-         (Compat.type_scheme_for_merlin
+         (Out_type.Compat.type_scheme_for_merlin
             ~print_non_value_jkind_on_type_variables:false)
        ~verbose:(verbose_type_scheme env))
       ppf ty
@@ -141,7 +141,7 @@ module Printtyp = struct
   let type_declaration env id ppf =
     (select_by_verbosity
        ~default:
-         (Compat.type_declaration_for_merlin
+         (Out_type.Compat.type_declaration_for_merlin
             ~print_non_value_inferred_jkind:false)
        ~verbose:
          (verbose_type_declaration ~print_non_value_inferred_jkind:true env))

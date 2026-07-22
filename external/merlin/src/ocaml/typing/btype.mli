@@ -64,6 +64,19 @@ val generic_level: int
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
+val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
+        (* [with_new_pool ~level f] executes [f] and returns the nodes
+           that were created at level [level] and above *)
+val add_to_pool: level:int -> transient_expr -> unit
+        (* Add a type node to the pool associated to the level (which should
+           be the level of the type node).
+           Do nothing if [level = generic_level] or [level = lowest_level]. *)
+
+val newty3: level:int -> scope:int -> type_desc -> type_expr
+        (* Create a type with a fresh id *)
+val newty2: level:int -> type_desc -> type_expr
+        (* Create a type with a fresh id and no scope *)
+
 val newgenty: type_desc -> type_expr
         (* Create a generic type *)
 val newgenvar: ?name:string -> jkind_lr -> type_expr
@@ -85,10 +98,10 @@ val is_Tvar: type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
 val is_Tpoly: type_expr -> bool
-
+val is_poly_Tpoly: type_expr -> bool
 val dummy_method: label
 val type_kind_is_abstract: type_declaration -> bool
-val type_origin : type_declaration -> type_origin
+val type_origin: type_declaration -> type_origin
 
 (**** polymorphic variants ****)
 
@@ -320,10 +333,6 @@ val instance_variable_type : label -> class_signature -> type_expr
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
 
-(**** Type information getter ****)
-
-val cstr_type_path : constructor_description -> Path.t
-
 (* These modules exists here to resolve a dependency cycle: [Subst], [Predef],
    [Datarepr], and [Env] must not depend on [Jkind].  The portions intended for
    use outside of those modules are re-exported as [Jkind.With_bounds] and
@@ -451,6 +460,10 @@ module Jkind0 : sig
 
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
+
+      (** Value of types of this jkind can be scanned by the GC, but no other
+          scannable axis information about them is known. *)
+      val scannable : t
 
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
@@ -653,6 +666,8 @@ module Jkind0 : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
+      val scannable :
+        why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind
@@ -671,8 +686,9 @@ module Jkind0 : sig
         (type_expr * Mode.Modality.Const.t) list ->
         Jkind_types.Sort.t Jkind_types.Layout.t list ->
         jkind_l
-      val product_of_sorts :
-        why:Jkind_intf.History.product_creation_reason -> level:int -> int ->
+      val product_of_any :
+        why:Jkind_intf.History.product_creation_reason ->
+        int ->
         jkind_l
     end
 
@@ -685,6 +701,11 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+
+    val for_boxed_record_with_updates :
+      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
+      jkind_l
+
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the
@@ -695,6 +716,7 @@ module Jkind0 : sig
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
+
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->
@@ -709,6 +731,8 @@ module Jkind0 : sig
 
     val for_or_null_argument : Ident.t -> 'd jkind
     val for_variant_with_null_result : Path.t -> type_expr -> jkind_l
+
+    val for_effect_arg : Ident.t -> 'd jkind
 
     (** The jkind of a float. *)
     val for_float : Ident.t -> jkind_l

@@ -180,6 +180,9 @@ let mk_no_g f =
 let mk_i f =
   "-i", Arg.Unit f, " Print inferred interface"
 
+let mk_i_variance f =
+  "-i-variance", Arg.Unit f, " Print inferred variances"
+
 let mk_I f =
   "-I", Arg.String f, "<dir>  Add <dir> to the list of include directories"
 
@@ -496,6 +499,11 @@ let mk_o f =
 let mk_open f =
   "-open", Arg.String f, "<module>  Opens the module <module> before typing"
 
+let mk_open_cmi f =
+  "-open-cmi", Arg.String f,
+  "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
+  \    rather than looking up a module on the include path"
+
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"
 
@@ -522,6 +530,15 @@ let mk_pp f =
 let mk_ppx f =
   "-ppx", Arg.String f,
   "<command>  Pipe abstract syntax trees through preprocessor <command>"
+
+let mk_keywords f =
+  "-keywords", Arg.String f,
+  "<version+list>  set keywords following the <version+list> spec:\n
+  \                -<version> if present specifies the base set of keywords\n
+  \                  (if absent the current set of keywords is used)
+  \                -<list> is a \"+\"-separated list of keywords to add to\n
+  \                  the base set of keywords.
+  "
 
 let mk_plugin f =
   "-plugin", Arg.String f,
@@ -806,8 +823,8 @@ let mk_dump_into_file f =
 let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
-let mk_ikinds f =
-  "-ikinds", Arg.Unit f, " Enable ikinds-based kind checker (experimental)"
+let mk_no_ikinds f =
+  "-no-ikinds", Arg.Unit f, " Disable ikinds-based kind checker"
 
 let mk_ikinds_debug f =
   "-ikinds-debug", Arg.Unit f, " Enable ikinds debug logging"
@@ -881,6 +898,9 @@ let mk_dshape f =
   "-dshape", Arg.Unit f, " (undocumented)"
 ;;
 
+let mk_dmatchcomp f =
+  "-dmatchcomp", Arg.Unit f, " (undocumented)"
+
 let mk_drawlambda f =
   "-drawlambda", Arg.Unit f, " (undocumented)"
 
@@ -889,6 +909,12 @@ let mk_dno_unique_ids f =
 
 let mk_dunique_ids f =
   "-dunique-ids", Arg.Unit f, " (undocumented)"
+
+let mk_dno_canonical_ids f =
+  "-dno-canonical-ids", Arg.Unit f, " (undocumented)"
+
+let mk_dcanonical_ids f =
+  "-dcanonical-ids", Arg.Unit f, " (undocumented)"
 
 let mk_dno_locations f =
   "-dno-locations", Arg.Unit f, " (undocumented)"
@@ -972,6 +998,9 @@ let mk_dcse f =
 
 let mk_dlinear f =
   "-dlinear", Arg.Unit f, " (undocumented)"
+
+let mk_dparsetree_loc_ghost_invariants f =
+  "-dparsetree-loc-ghost-invariants", Arg.Unit f, " (undocumented)"
 
 let mk_dstartup f =
   "-dstartup", Arg.Unit f, " (undocumented)"
@@ -1111,7 +1140,8 @@ module type Common_options = sig
   val _locs : unit -> unit
   val _no_locs : unit -> unit
   val _alert : string -> unit
-  val _ikinds : unit -> unit
+  val _i_variance : unit -> unit
+  val _no_ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
@@ -1135,7 +1165,9 @@ module type Common_options = sig
   val _no_auto_include_otherlibs : unit -> unit
   val _nocwd : unit -> unit
   val _open : string -> unit
+  val _open_cmi : string -> unit
   val _ppx : string -> unit
+  val _keywords: string -> unit
   val _principal : unit -> unit
   val _no_principal : unit -> unit
   val _rectypes : unit -> unit
@@ -1171,15 +1203,19 @@ module type Core_options = sig
 
   val _dno_unique_ids : unit -> unit
   val _dunique_ids : unit -> unit
+  val _dno_canonical_ids : unit -> unit
+  val _dcanonical_ids : unit -> unit
   val _dno_locations : unit -> unit
   val _dlocations : unit -> unit
 
   val _dsource : unit -> unit
   val _dparsetree : unit -> unit
+  val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
   val _dtlambda : unit -> unit
   val _dslambda : unit -> unit
+  val _dmatchcomp : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -1208,6 +1244,7 @@ module type Compiler_options = sig
   val _no_g : unit -> unit
   val _stop_after : string -> unit
   val _i : unit -> unit
+  val _i_variance : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
   val _intf : string -> unit
@@ -1461,7 +1498,7 @@ struct
     mk_config_var F._config_var;
     mk_custom F._custom;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds F._ikinds;
+    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
@@ -1475,6 +1512,7 @@ struct
     mk_no_g F._no_g;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -1489,6 +1527,7 @@ struct
     mk_no_keep_docs F._no_keep_docs;
     mk_keep_locs F._keep_locs;
     mk_no_keep_locs F._no_keep_locs;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_linkall F._linkall;
     mk_requires_metaprogramming F._requires_metaprogramming;
@@ -1513,6 +1552,7 @@ struct
     mk_o F._o;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_output_complete_exe F._output_complete_exe;
@@ -1563,12 +1603,16 @@ struct
     mk_shape_format F._shape_format;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dmatchcomp F._dmatchcomp;
     mk_drawlambda F._drawlambda;
     mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
@@ -1601,6 +1645,7 @@ struct
     mk_locs F._locs;
     mk_no_locs F._no_locs;
     mk_alert F._alert;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -1614,7 +1659,7 @@ struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds F._ikinds;
+    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
@@ -1631,7 +1676,9 @@ struct
     mk_nocwd F._nocwd;
     mk_nopervasives F._nopervasives;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
+    mk_keywords F._keywords;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
     mk_rectypes F._rectypes;
@@ -1665,14 +1712,18 @@ struct
 
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
     mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
+    mk_dmatchcomp F._dmatchcomp;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1718,7 +1769,7 @@ struct
     mk_config_var F._config_var;
     mk_dtypes F._annot;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds F._ikinds;
+    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
@@ -1736,6 +1787,7 @@ struct
     mk_probes_optimized F._probes_optimized;
     mk_no_probes_optimized F._no_probes_optimized;
     mk_i F._i;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -1759,6 +1811,7 @@ struct
     mk_no_keep_docs F._no_keep_docs;
     mk_keep_locs F._keep_locs;
     mk_no_keep_locs F._no_keep_locs;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_linkall F._linkall;
     mk_requires_metaprogramming F._requires_metaprogramming;
@@ -1789,6 +1842,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_output_complete_obj F._output_complete_obj;
     mk_p F._p;
@@ -1842,14 +1896,18 @@ struct
     mk_match_context_rows F._match_context_rows;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dcanonical_ids F._dcanonical_ids;
     mk_dno_locations F._dno_locations;
     mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
     mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
+    mk_dmatchcomp F._dmatchcomp;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1911,6 +1969,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_locs F._no_locs;
     mk_alert F._alert;
     mk_compact F._compact;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -1930,6 +1989,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_inline_indirect_cost F._inline_indirect_cost;
     mk_inline_lifting_benefit F._inline_lifting_benefit;
     mk_inline_branch_factor F._inline_branch_factor;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
@@ -1938,7 +1998,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_ikinds F._ikinds;
+    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
@@ -1961,6 +2021,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_o3 F._o3;
     mk_o4 F._o4;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_ppx F._ppx;
     mk_principal F._principal;
     mk_no_principal F._no_principal;
@@ -1998,12 +2059,20 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_color F._color;
     mk_error_style F._error_style;
 
+    mk_dcanonical_ids F._dcanonical_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
+    mk_dno_unique_ids F._dno_unique_ids;
+    mk_dunique_ids F._dunique_ids;
+    mk_dno_locations F._dno_locations;
+    mk_dlocations F._dlocations;
     mk_dsource F._dsource;
     mk_dparsetree F._dparsetree;
+    mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
     mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
+    mk_dmatchcomp F._dmatchcomp;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2099,6 +2168,7 @@ struct
     mk_o4 F._o4;
     mk_opaque F._opaque;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
     mk_pack_byt F._pack;
     mk_parameter F._parameter;
@@ -2200,6 +2270,7 @@ struct
     mk_locs F._locs;
     mk_no_locs F._no_locs;
     mk_alert F._alert;
+    mk_i_variance F._i_variance;
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
@@ -2209,6 +2280,7 @@ struct
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_intf_suffix_2 F._intf_suffix;
+    mk_keywords F._keywords;
     mk_labels F._labels;
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
@@ -2226,6 +2298,7 @@ struct
     mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
     mk_nocwd F._nocwd;
     mk_open F._open;
+    mk_open_cmi F._open_cmi;
     mk_pp F._pp;
     mk_ppx F._ppx;
     mk_principal F._principal;
@@ -2312,14 +2385,15 @@ module Default = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
     let _alert = Warnings.parse_alert_option
-    let _ikinds = set Clflags.ikinds
+    let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
-    let _alias_deps = clear transparent_modules
+    let _alias_deps = clear no_alias_deps
     let _app_funct = set applicative_functors
+    let _i_variance = set print_variance
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
     let _no_locs = clear Clflags.locs
-    let _no_alias_deps = set transparent_modules
+    let _no_alias_deps = set no_alias_deps
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
     let _no_principal = clear principal
@@ -2343,7 +2417,8 @@ module Default = struct
     let _nostdlib = set no_std_include
     let _no_auto_include_otherlibs = set no_auto_include_otherlibs
     let _nocwd = set no_cwd
-    let _open s = open_modules := (s :: (!open_modules))
+    let _open s = open_args := Open s :: !open_args
+    let _open_cmi s = open_args := Open_cmi s :: !open_args
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
@@ -2380,18 +2455,23 @@ module Default = struct
     let _dparsetree = set dump_parsetree
     let _dtlambda = set dump_tlambda
     let _dslambda = set dump_slambda
+    let _dparsetree_loc_ghost_invariants = set parsetree_ghost_loc_invariant
     let _drawlambda = set dump_rawlambda
     let _dsource = set dump_source
     let _dtypedtree = set dump_typedtree
     let _dshape = set dump_shape
+    let _dmatchcomp = set dump_matchcomp
     let _dunique_ids = set unique_ids
     let _dno_unique_ids = clear unique_ids
+    let _dcanonical_ids = set canonical_ids
+    let _dno_canonical_ids = clear canonical_ids
     let _dlocations = set locations
     let _dno_locations = clear locations
     let _error_style =
       Misc.set_or_ignore error_style_reader.parse error_style
     let _nopervasives = set nopervasives
     let _ppx s = Compenv.first_ppx := (s :: (!Compenv.first_ppx))
+    let _keywords s = Clflags.keyword_edition := (Some s)
     let _unsafe = set unsafe
     let _warn_error s =
       Warnings.parse_options true s |> Option.iter Location.(prerr_alert none)
@@ -2703,6 +2783,7 @@ module Default = struct
     let _intf_suffix s = Config.interface_suffix := s
     let _pp s = Clflags.preprocessor := (Some s)
     let _ppx s = Clflags.all_ppx := (s :: (!Clflags.all_ppx))
+    let _keywords s = Clflags.keyword_edition := Some s
     let _thread = set Clflags.use_threads
     let _v () = Compenv.print_version_and_library "documentation generator"
     let _verbose = set Clflags.verbose

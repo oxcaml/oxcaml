@@ -1,24 +1,24 @@
-(lldb) breakpoint set -b Test_basic_dwarf.f_start
+(lldb) b Test_basic_dwarf.f_start
 (lldb) run
-(lldb) breakpoint set -b Test_basic_dwarf.f_unit
+(lldb) b Test_basic_dwarf.f_unit
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_bool
+(lldb) b Test_basic_dwarf.f_bool
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_int
+(lldb) b Test_basic_dwarf.f_int
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_char
+(lldb) b Test_basic_dwarf.f_char
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_float
+(lldb) b Test_basic_dwarf.f_float
 (lldb) c
 (lldb) c
 (lldb) c
@@ -29,83 +29,83 @@
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_float32
+(lldb) b Test_basic_dwarf.f_float32
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_int32
+(lldb) b Test_basic_dwarf.f_int32
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_int64
+(lldb) b Test_basic_dwarf.f_int64
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_nativeint
+(lldb) b Test_basic_dwarf.f_nativeint
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_int8
+(lldb) b Test_basic_dwarf.f_int8
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_int16
+(lldb) b Test_basic_dwarf.f_int16
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_string
+(lldb) b Test_basic_dwarf.f_string
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_bytes
+(lldb) b Test_basic_dwarf.f_bytes
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_array
+(lldb) b Test_basic_dwarf.f_array
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_list
+(lldb) b Test_basic_dwarf.f_list
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_option
+(lldb) b Test_basic_dwarf.f_option
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_lazy
+(lldb) b Test_basic_dwarf.f_lazy
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_exn
+(lldb) b Test_basic_dwarf.f_exn
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_float_array
+(lldb) b Test_basic_dwarf.f_float_array
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_basic_dwarf.f_poly
+(lldb) b Test_basic_dwarf.f_poly
 (lldb) c
 (lldb) c
 (lldb) c

@@ -34,32 +34,32 @@ type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
-let with_info ~backend ~tool_name ~source_file ~output_prefix
-      ~compilation_unit ~kind ~dump_ext k =
+let unit_info_from_cu_or_output_prefix ~source_file kind ~output_prefix
+    ~compilation_unit =
+  match compilation_unit with
+  | Exactly compilation_unit ->
+      Unit_info.make_with_known_compilation_unit ~source_file kind
+        output_prefix compilation_unit
+  | Inferred_from_output_prefix ->
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
+
+let with_info ~backend ~tool_name ~dump_ext unit_info k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
-  let target =
-    match compilation_unit with
-    | Exactly compilation_unit ->
-        Unit_info.make_with_known_compilation_unit ~source_file kind
-          output_prefix compilation_unit
-    | Inferred_from_output_prefix ->
-        let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
-        Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
-  in
-  let compilation_unit = Unit_info.modname target in
-  Env.set_unit_name (Some target);
+  let compilation_unit = Unit_info.modname unit_info in
+  Env.set_current_unit unit_info;
   let env = Compmisc.initial_env() in
-  let dump_file = String.concat "." [output_prefix; dump_ext] in
-  Compmisc.with_ppf_dump ~file_prefix:dump_file (fun ppf_dump ->
+  let dump_file = String.concat "." [Unit_info.prefix unit_info; dump_ext] in
+  Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
   k {
-    target;
+    target = unit_info;
     module_name = compilation_unit;
     env;
     ppf_dump;
     tool_name;
     backend;
-  })
+  }
 
 module Parse_result = struct
   type 'a t = { ast : 'a; info : info }
@@ -108,8 +108,13 @@ let typecheck_intf info ast =
           (Printtyp.printed_signature
              (Unit_info.original_source_file info.target))
           sg);
-  ignore (Includemod.signatures info.env ~mark:true
-    ~modes:Includemod.modes_unit sg sg);
+  let modes =
+    let modalities = tsg.Typedtree.sig_modalities in
+    let staticity = Typemod.staticity_of_modalities modalities in
+    let mode = Env.mode_unit ~staticity in
+    Includecore.Specific ((mode, None), mode)
+  in
+  ignore (Includemod.signatures info.env ~mark:true ~modes sg sg);
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -128,7 +133,10 @@ let emit_signature info alerts tsg =
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
     in
-    Env.save_signature ~alerts tsg.Typedtree.sig_type
+    let staticity =
+      Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
+    in
+    Env.save_signature ~alerts (tsg.Typedtree.sig_type, staticity)
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
   in

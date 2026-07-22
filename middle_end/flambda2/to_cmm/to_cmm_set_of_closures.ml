@@ -862,8 +862,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   translate_expr env res body
 
 let let_dynamic_set_of_closures env res ~body ~bound_vars
-    ~num_normal_occurrences_of_bound_vars set ~(translate_expr : translate_expr)
-    =
+    ~num_normal_occurrences_of_bound_vars set closure_alloc_mode
+    ~(translate_expr : translate_expr) =
   let layout = layout_for_set_of_closures env set in
   if layout.empty_env
   then
@@ -871,6 +871,5 @@ let let_dynamic_set_of_closures env res ~body ~bound_vars
       ~num_normal_occurrences_of_bound_vars
   else
     let_dynamic_set_of_closures0 env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars set layout
-      ~closure_alloc_mode:(Set_of_closures.alloc_mode set)
+      ~num_normal_occurrences_of_bound_vars set layout ~closure_alloc_mode
       ~translate_expr

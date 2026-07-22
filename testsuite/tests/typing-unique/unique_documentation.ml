@@ -34,22 +34,22 @@ let test () =
 Line 2, characters 6-9:
 2 |   let dup : t -> t * t @ aliased = function t -> t, t in
           ^^^
-Warning 26 [unused-var]: unused variable dup.
+Warning 26 [unused-var]: unused variable "dup".
 
 Line 3, characters 6-16:
 3 |   let delay_free : t @ unique -> (unit -> unit) @ once = function t -> fun () -> free t in
           ^^^^^^^^^^
-Warning 26 [unused-var]: unused variable delay_free.
+Warning 26 [unused-var]: unused variable "delay_free".
 
 Line 4, characters 6-11:
 4 |   let alias : 'a @ unique -> 'a @ aliased = fun x -> x in
           ^^^^^
-Warning 26 [unused-var]: unused variable alias.
+Warning 26 [unused-var]: unused variable "alias".
 
 Line 5, characters 6-15:
 5 |   let linearize : 'a @ many -> 'a @ once = fun x -> x in
           ^^^^^^^^^
-Warning 26 [unused-var]: unused variable linearize.
+Warning 26 [unused-var]: unused variable "linearize".
 
 val test : unit -> unit = <fun>
 |}]
@@ -133,7 +133,7 @@ let module_ret_unique =
 Line 3, characters 6-9:
 3 |   let use () = free (mk ()) in
           ^^^
-Warning 26 [unused-var]: unused variable use.
+Warning 26 [unused-var]: unused variable "use".
 
 val module_ret_unique : unit = ()
 |}]

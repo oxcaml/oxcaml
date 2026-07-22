@@ -20,7 +20,7 @@ let $camlTests12__first_const = Block 0 () in
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
    let map_foo =
-     %project_value_slot.[`fn[tests12.ml:25,2--70]`].[`map_foo`] (my_closure)
+     %project_value_slot.[`fn[tests12.ml:25,2--70]`].[map_foo] (my_closure)
    in
    let `fn[tests12.ml:25,52--67]` =
      closure `fn[tests12.ml:25,52--67]_2` @`fn[tests12.ml:25,52--67]`
@@ -51,7 +51,7 @@ let $camlTests12__first_const = Block 0 () in
          -> k1 * k2
          : [ 0 | 0 of val * val ] =
    let next_depth = rec_info (succ my_depth) in
-   let bar = %project_value_slot.[`map_foo`].[`bar`] (my_closure) in
+   let bar = %project_value_slot.[map_foo].[bar] (my_closure) in
    apply seq (0) -> k3 * k2
      where k3 (`*match*` : [ 0 | 0 of val * val ]) =
        ((let prim = %is_int (`*match*`) in

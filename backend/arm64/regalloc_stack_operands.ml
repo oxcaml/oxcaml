@@ -26,7 +26,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op
       (Specific
          ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
-         | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _
+         | Imulsubf | Inegmulsubf | Isqrtf | Ifar_alloc _ | Ifar_stackcheck _
          | Ishiftarith (_, _)
          | Ibswap _ | Isignext _ | Isimd _ ))
   | Op

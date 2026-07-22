@@ -9,7 +9,7 @@ and code rec loopify(never) size(10) newer_version_of(g_1)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let z_1 = %project_value_slot.[`g`].[`z`] ($camlToplevel_rec__g_3) in
+  let z_1 = %project_value_slot.[g].[z] ($camlToplevel_rec__g_3) in
   (let int_sub = %int_barith.sub (y, 1) in
    apply direct(f_0_1)
      ($camlToplevel_rec__f_2 ~ depth my_depth -> succ my_depth
@@ -24,7 +24,7 @@ and code rec loopify(never) size(10) newer_version_of(f_0)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let z_1 = %project_value_slot.[`f`].[`z`] ($camlToplevel_rec__f_2) in
+  let z_1 = %project_value_slot.[f].[z] ($camlToplevel_rec__f_2) in
   (let int_add = %int_barith.add (x, 1) in
    apply direct(g_1_1)
      ($camlToplevel_rec__g_3 ~ depth my_depth -> succ my_depth

@@ -36,6 +36,8 @@ type pinpoint_desc =
   | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Effect_match  (** A pattern match with effect cases *)
+  | Effect_try  (** A try-with expression with effect cases *)
   | Class  (** A class declaration *)
   | Object  (** An object declaration *)
   | Loop  (** A loop *)
@@ -74,6 +76,30 @@ type ('d0, 'd1) polarity =
   constraint 'd0 = _ * _ constraint 'd1 = _ * _
 [@@warning "-62"]
 
+(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
+   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
+   while [Modality] stays in place. *)
+type modality = Modality
+
+type containing =
+  | Tuple
+  | Record of string * modality
+  | Array of modality
+  | Constructor of string * modality
+  | Structure of structure_item * modality
+(* Some structure items (such as classes) don't have modalities. We gloss over
+     for simplicity. *)
+
+type contains =
+  { containing : containing;
+    contained : pinpoint
+  }
+
+type is_contained_by =
+  { containing : containing;
+    container : pinpoint
+  }
+
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
 printed. *)
@@ -103,6 +129,7 @@ type 'd const =
   | Escape_region : region -> (disallowed * 'r) const
   | Quoted_computation : ('l * disallowed) pos const
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
+  | Contained_by : is_contained_by -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
@@ -111,36 +138,13 @@ type closure_details =
     closed : pinpoint
   }
 
-(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
-   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
-   while [Modality] stays in place. *)
-type modality = Modality
-
-type containing =
-  | Tuple
-  | Record of string * modality
-  | Array of modality
-  | Constructor of string * modality
-  | Structure of structure_item * modality
-(* Some structure items (such as classes) don't have modalities. We gloss over
-     for simplicity. *)
-
-type contains =
-  { containing : containing;
-    contained : pinpoint
-  }
-
-type is_contained_by =
-  { containing : containing;
-    container : pinpoint
-  }
-
 type allocation_desc =
   | Unknown
   | Optional_argument
   | Function_coercion
   | Float_projection
   | Lpoly_captured_environment
+  | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
 
@@ -162,11 +166,10 @@ type 'd morph =
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
-  | Captured_by_partial_application : (disallowed * 'r) morph
-  | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
+  | Allocation : allocation -> ('l * 'r) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph

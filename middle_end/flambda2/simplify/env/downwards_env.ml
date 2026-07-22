@@ -241,7 +241,7 @@ let create ~round ~machine_width ~(resolver : resolver)
         Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.can_specialize;
+      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
       defined_variables_by_scope = [Lifted_cont_params.empty];
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0;
@@ -357,7 +357,7 @@ let enter_set_of_closures
     inlining_history_tracker;
     loopify_state = Loopify_state.do_not_loopify;
     replay_history = Replay_history.first_pass;
-    specialization_cost = Specialization_cost.can_specialize;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
     join_analysis = None;
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
@@ -522,9 +522,9 @@ let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
 
 let find_code_exn t id =
-  match Code_id.Map.find id t.all_code with
-  | code -> Code_or_metadata.create code
-  | exception Not_found ->
+  match Code_id.Map.find_or_null id t.all_code with
+  | This code -> Code_or_metadata.create code
+  | Null ->
     (* We might have already loaded the metadata, from another unit that
        references it. However we force loading of the corresponding .cmx to make
        sure that we will have access to the actual code (assuming the .cmx isn't
@@ -714,7 +714,7 @@ let enter_continuation_handler lifted_params t =
        we reset the `has_seen_a_non_liftable_continuation` when we enter a new
        continuation handler *)
     has_seen_a_non_liftable_continuation = false;
-    specialization_cost = Specialization_cost.can_specialize
+    specialization_cost = Specialization_cost.can_specialize ()
   }
 
 let variables_defined_in_current_continuation t =

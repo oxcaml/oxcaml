@@ -60,7 +60,8 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
   let new_cmis =
     Compilation_unit.Name.Map.map
       (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
-        { cmi with cmi_sign = Subst.Lazy.of_signature cmi.cmi_sign })
+        let sign, staticity = cmi.cmi_sign in
+        { cmi with cmi_sign = Subst.Lazy.of_signature sign, staticity })
       bundled_cmis
   in
   let bundled_cmxs : (Cmx_format.unit_infos_raw * string array) list =
@@ -73,11 +74,6 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
           Oxcaml_utils.File_sections.from_array
             (Array.map (fun s -> Marshal.from_string s 0) sections)
         in
-        let export_info =
-          Option.map
-            (Flambda2_cmx.Flambda_cmx_format.from_raw ~sections)
-            uir.uir_export_info
-        in
         let ui : Cmx_format.unit_infos =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
@@ -85,13 +81,15 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_arg_descr = uir.uir_arg_descr;
             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
-            ui_quoted_globals = uir.uir_quoted_globals |> Array.to_list;
+            ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
+            ui_quoted_cmx = uir.uir_quoted_cmx |> Array.to_list;
             ui_generic_fns = uir.uir_generic_fns;
-            ui_export_info = export_info;
+            ui_export_info = uir.uir_export_info;
             ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
-            ui_external_symbols = uir.uir_external_symbols |> Array.to_list
+            ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+            ui_file_sections = sections
           }
         in
         ui)
@@ -132,8 +130,15 @@ let eval (expr : 'a expr) =
   Clflags.dlcode := false;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Clflags.set_o3 ();
-  (* TODO: Set a bunch of flags to match the initial compile (like
-     nopervasives) *)
+  (* We need this in case the quote contains unused module aliases that point to
+     modules we don't have the CMI for. It's weird but it would compile if the
+     initial compile also had this set, and setting this doesn't hurt. *)
+  Clflags.no_alias_deps := true;
+  (* ensure Stdlib is linked during eval *)
+  Clflags.nopervasives := false;
+  Clflags.no_std_include := false;
+  (* TODO: Set a bunch of flags to match the initial compile; nopervasives is
+     false to ensure Stdlib is available *)
   Location.reset ();
   Env.reset_cache ~preserve_persistent_env:true;
   (* TODO: set commandline flags *)

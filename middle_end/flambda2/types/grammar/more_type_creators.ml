@@ -444,6 +444,10 @@ let type_for_const const =
   | Naked_vec256 n -> TG.this_naked_vec256 n
   | Naked_vec512 n -> TG.this_naked_vec512 n
   | Null -> TG.null
+  | Poison (kind, _) ->
+    (* CR ncourant: for now [Poison] has the conservative type "unknown"; but
+       should be tracked more precisely in the future. *)
+    unknown kind
 
 let kind_for_const const = TG.kind (type_for_const const)
 
@@ -602,7 +606,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
     in
     TG.create_from_head_value { non_null; is_null }
 
-let unknown_types_from_arity ~machine_width arity =
+let unknown_types_from_arity ?alloc_mode ~machine_width arity =
   List.map
-    (unknown_with_subkind ?alloc_mode:None ~machine_width)
+    (unknown_with_subkind ?alloc_mode ~machine_width)
     (Flambda_arity.unarized_components arity)

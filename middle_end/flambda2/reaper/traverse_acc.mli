@@ -246,3 +246,9 @@ val add_set_of_closures_dep :
 val deps : t -> all_constants:Name.t -> Graph.graph
 
 val sort_code_ids : t -> Code_id.t array
+
+val add_set_of_closures :
+  t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t -> unit
+
+val get_all_sets_of_closures :
+  t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list

@@ -1,15 +1,14 @@
 (* TEST
 {
-   runtime4;
-   skip;
-}{
-   runtime5;
    include unix;
    include runtime_events;
-   libunix;
-   { bytecode; }
-   { native; }
- }
+   hasunix;
+   {
+     bytecode;
+   }{
+     native;
+   }
+}
 *)
 
 (* Tests that [create_cursor]:

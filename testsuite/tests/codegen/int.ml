@@ -1,10 +1,6 @@
 (* TEST
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  only-default-codegen;
  expect.opt;
 *)
@@ -57,14 +53,14 @@ let div x y = x / y
 div:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L115
+  je    .L0
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rax,%rax), %rax
   ret
-.L115:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -110,14 +106,14 @@ let rem x y = x mod y
 rem:
   movq  %rbx, %rcx
   cmpq  $1, %rcx
-  je    .L115
+  je    .L0
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
   idivq %rcx
   leaq  1(%rdx,%rdx), %rax
   ret
-.L115:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -189,10 +185,10 @@ let abs x = abs x
 abs:
   movq  %rax, %rbx
   cmpq  $1, %rbx
-  jl    .L105
+  jl    .L0
   movq  %rbx, %rax
   ret
-.L105:
+.L0:
   movl  $2, %eax
   subq  %rbx, %rax
   ret
@@ -321,10 +317,10 @@ min:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jg    .L105
+  jg    .L0
   movq  %rdi, %rax
   ret
-.L105:
+.L0:
   ret
 |}]
 
@@ -335,10 +331,10 @@ max:
   movq  %rax, %rdi
   movq  %rbx, %rax
   cmpq  %rax, %rdi
-  jl    .L105
+  jl    .L0
   movq  %rdi, %rax
   ret
-.L105:
+.L0:
   ret
 |}]
 
@@ -369,10 +365,10 @@ collatz:
   movq  %rax, %rbx
   movl  $1, %eax
   cmpq  $3, %rbx
-  jg    .L110
-.L108:
+  jg    .L1
+.L0:
   ret
-.L110:
+.L1:
   addq  $2, %rax
   movq  %rbx, %rdi
   sarq  $1, %rdi
@@ -385,15 +381,15 @@ collatz:
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
-  jne   .L126
+  jne   .L2
   sarq  $1, %rdx
   leaq  1(%rdx,%rdx), %rbx
   cmpq  $3, %rbx
-  jg    .L110
-  jmp   .L108
-.L126:
+  jg    .L1
+  jmp   .L0
+.L2:
   leaq  (%rbx,%rbx,2), %rbx
   cmpq  $3, %rbx
-  jg    .L110
-  jmp   .L108
+  jg    .L1
+  jmp   .L0
 |}]

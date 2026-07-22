@@ -12,7 +12,7 @@ type t_void  : void
 type t_any_mod_separable : any mod separable;;
 type t_value_or_null : value_or_null;;
 
-type void_variant = VV of t_void
+type void_variant = VV of t_void [@immediate_all_void_constructor]
 type void_record = {vr_void : t_void; vr_int : int}
 type void_unboxed_record = { vur_void : t_void } [@@unboxed];;
 
@@ -25,7 +25,7 @@ type t_float64 : float64
 type t_void : void
 type t_any_mod_separable : any separable
 type t_value_or_null : value_or_null
-type void_variant = VV of t_void
+type void_variant = VV of t_void [@immediate_all_void_constructor]
 type void_record = { vr_void : t_void; vr_int : int; }
 type void_unboxed_record = { vur_void : t_void; } [@@unboxed]
 |}];;
@@ -259,7 +259,7 @@ let not_helloworld = id_for_imms "hello world";;
 Line 1, characters 33-46:
 1 | let not_helloworld = id_for_imms "hello world";;
                                      ^^^^^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "'a imm_id" = "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -362,7 +362,7 @@ and ('a : any) t4
 (* CR layouts v5: these tests should be updated to allow returning void, and
    moved to [basics_beta.ml]. *)
 
-type ('a : void) void5 = Void5  of 'a
+type ('a : void) void5 = Void5  of 'a [@immediate_all_void_constructor]
 
 let id5 : 'a void5 -> 'a void5 = function
   | Void5 x -> Void5 x
@@ -383,7 +383,7 @@ let id5 : 'a void5 -> 'a void5 = function
  * ;; *)
 
 [%%expect{|
-type ('a : void) void5 = Void5 of 'a
+type ('a : void) void5 = Void5 of 'a [@immediate_all_void_constructor]
 val id5 : ('a : void). 'a void5 -> 'a void5 = <fun>
 |}];;
 
@@ -397,7 +397,7 @@ Error: This type "int" should be an instance of type "('a : void)"
        The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
-         because of the definition of void5 at line 1, characters 0-37.
+         because of the definition of void5 at line 1, characters 0-71.
        Note: The layout of immediate is value non_pointer.
 |}];;
 
@@ -406,12 +406,12 @@ let h5' (x : int) = Void5 x
 Line 1, characters 26-27:
 1 | let h5' (x : int) = Void5 x
                               ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The value "x" has type "int" but an expression was expected of type
          "('a : void)"
        The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of void
-         because of the definition of void5 at line 1, characters 0-37.
+         because of the definition of void5 at line 1, characters 0-71.
        Note: The layout of immediate is value non_pointer.
 |}];;
 
@@ -516,7 +516,7 @@ Error: Polymorphic variant constructor argument types must have layout value.
 
 module M8_2 = struct
   type t = { v : t_void } [@@unboxed]
-  type result = V of t | I of int
+  type result = V of t [@immediate_all_void_constructor] | I of int
 
   let foo x =
     match x with
@@ -610,7 +610,7 @@ Error: Tuple element types must have layout value.
 |}];;
 
 module M9_3 = struct
-  type s = V of void_unboxed_record | I of int
+  type s = V of void_unboxed_record [@immediate_all_void_constructor] | I of int
 
   let foo x =
     match x with
@@ -621,7 +621,7 @@ end;;
 Line 7, characters 13-14:
 7 |     | V t -> t, 27
                  ^
-Error: This expression has type "void_unboxed_record"
+Error: The value "t" has type "void_unboxed_record"
        but an expression was expected of type "('a : value_or_null)"
        The layout of void_unboxed_record is void
          because of the definition of void_unboxed_record at line 12, characters 0-60.
@@ -704,8 +704,8 @@ end;;
 Line 5, characters 11-23:
 5 |   match 3, X.vr.vr_void with
                ^^^^^^^^^^^^
-Error: This expression has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
+Error: The field access "X.vr.vr_void" has type "t_void"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
@@ -828,7 +828,7 @@ end;;
 Line 2, characters 17-30:
 2 |   let foo x = VV (x # getvoid)
                      ^^^^^^^^^^^^^
-Error: This expression has type "('a : value)"
+Error: The method call "x#getvoid" has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -837,14 +837,14 @@ Error: This expression has type "('a : value)"
 |}];;
 
 module M11_3 = struct
-  type ('a : void) t = A of 'a
+  type ('a : void) t = A of 'a [@immediate_all_void_constructor]
 
   let foo o (A x) = o # usevoid x
 end;;
 [%%expect{|
 module M11_3 :
   sig
-    type ('a : void) t = A of 'a
+    type ('a : void) t = A of 'a [@immediate_all_void_constructor]
     val foo : ('a : void) 'b. < usevoid : 'a -> 'b; .. > -> 'a t -> 'b
   end
 |}];;
@@ -968,7 +968,7 @@ Error: This type "('a : value)" should be an instance of type "('b : void)"
 |}];;
 
 module M12_5 = struct
-  type ('a : void) t = A of 'a
+  type ('a : void) t = A of 'a [@immediate_all_void_constructor]
 
   class ['a] foo =
     object
@@ -983,11 +983,11 @@ Error: This type "('a : value)" should be an instance of type "('b : void)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with void
-         because of the definition of t at line 2, characters 2-30.
+         because of the definition of t at line 2, characters 2-64.
 |}];;
 
 module type S12_6 = sig
-  type ('a : void) t = A of 'a
+  type ('a : void) t = A of 'a [@immediate_all_void_constructor]
 
   class ['a] foo :
     'a t ->
@@ -1003,7 +1003,7 @@ Error: This type "('a : value)" should be an instance of type "('b : void)"
        The layout of 'a is value
          because it's a type argument to a class constructor.
        But the layout of 'a must overlap with void
-         because of the definition of t at line 2, characters 2-30.
+         because of the definition of t at line 2, characters 2-64.
 |}];;
 
 module type S12_7 = sig
@@ -1044,7 +1044,7 @@ let x13 (VV v) = lazy v;;
 Line 1, characters 22-23:
 1 | let x13 (VV v) = lazy v;;
                           ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1059,7 +1059,7 @@ let x13 v =
 Line 3, characters 17-18:
 3 |   | lazy v -> VV v
                      ^
-Error: This expression has type "('a : value)"
+Error: The value "v" has type "('a : value)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1086,7 +1086,7 @@ let x13 (VV v) = Some v;;
 Line 1, characters 22-23:
 1 | let x13 (VV v) = Some v;;
                           ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1102,7 +1102,7 @@ let x13 v =
 Line 3, characters 17-18:
 3 |   | Some v -> VV v
                      ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1129,7 +1129,7 @@ let x13 (VV v) = [v];;
 Line 1, characters 18-19:
 1 | let x13 (VV v) = [v];;
                       ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1145,7 +1145,7 @@ let x13 v =
 Line 3, characters 14-15:
 3 |   | [v] -> VV v
                   ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "v" has type "('a : value_or_null)"
        but an expression was expected of type "t_void"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
@@ -1362,7 +1362,7 @@ let f (x : t_void) =
 Line 2, characters 15-16:
 2 |   let g ?(x2 = x) () = () in
                    ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
@@ -1668,7 +1668,7 @@ end
 Line 8, characters 27-28:
 8 |   let g (x : t_void) = M.f x
                                ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.

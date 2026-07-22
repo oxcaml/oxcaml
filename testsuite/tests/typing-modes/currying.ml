@@ -20,8 +20,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 let apply2 x = g x x
 [%%expect{|
@@ -34,7 +34,7 @@ Line 1, characters 15-20:
                    ^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 let apply3_wrapped x = (g x x) x
 [%%expect{|
@@ -45,8 +45,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 let apply4 x = g x x x x
 [%%expect{|
@@ -55,7 +55,7 @@ Line 1, characters 15-20:
                    ^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 let apply4_wrapped x = (g x x) x x
 [%%expect{|
@@ -141,7 +141,7 @@ Line 2, characters 2-21:
       ^^^^^^^^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 let app42_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   (f ~a:(local_ ref 1)) 2 ~c:4
@@ -196,8 +196,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 let app42' (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(ref 1) 2 ~c:4
@@ -207,7 +207,7 @@ Line 2, characters 2-14:
       ^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 let app42'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   (f ~a:(ref 1)) 2 ~c:4
@@ -224,7 +224,7 @@ Line 2, characters 2-14:
       ^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 let app43'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   (f ~a:(ref 1)) 2
@@ -284,8 +284,8 @@ Line 5, characters 19-33:
                        ^^^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after a in the function's type should be applied separately.
+Hint: Try splitting the application in two. The arguments that come
+after a in the function's type should be applied separately.
 |}]
 let bug3 () =
   let foo : a:local_ string -> (b:local_ string -> (c:int -> unit)) =
@@ -313,7 +313,7 @@ Line 3, characters 9-26:
              ^^^^^^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 
 let () = overapp ~b:2 ~a:1 ~c:3 ~d:4
@@ -323,8 +323,8 @@ Line 1, characters 20-21:
                         ^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after this one in the function's type should be applied separately.
+Hint: Try splitting the application in two. The arguments that come
+after this one in the function's type should be applied separately.
 |}]
 
 let () = overapp ~c:1 ~b:2
@@ -334,8 +334,8 @@ Line 1, characters 25-26:
                              ^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after this one in the function's type should be applied separately.
+Hint: Try splitting the application in two. The arguments that come
+after this one in the function's type should be applied separately.
 |}]
 
 let () = overapp ~d:1 ~a:2
@@ -345,8 +345,8 @@ Line 1, characters 9-26:
              ^^^^^^^^^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after b in the function's type should be applied separately.
+Hint: Try splitting the application in two. The arguments that come
+after b in the function's type should be applied separately.
 |}]
 
 
@@ -358,8 +358,8 @@ Line 2, characters 11-25:
 2 |   fun f -> f ~foo:"hello"
                ^^^^^^^^^^^^^^
 Error: This value is "local" but is expected to be "global".
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* The fixed version. Note that in the printed type, local returning is implicit
@@ -384,8 +384,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument may make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument may make the value non-local
 |}]
 
 (* The above tests for the locality axis exhaust cases wrt
@@ -403,7 +403,7 @@ Line 3, characters 2-11:
       ^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling once values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 
 let _ =
@@ -415,7 +415,7 @@ Line 3, characters 2-11:
       ^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling once values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 
 let _ =
@@ -427,7 +427,7 @@ Line 3, characters 2-11:
       ^^^^^^^^^
 Error: This application is complete, but surplus arguments were provided afterwards.
        When passing or calling once values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+Hint: Try wrapping the marked application in parentheses.
 |}]
 
 let _ =

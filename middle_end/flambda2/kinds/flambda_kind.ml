@@ -335,6 +335,17 @@ module Mixed_block_shape = struct
     else
       Misc.Stdlib.Array.compare Flat_suffix_element0.compare flat_suffix1
         flat_suffix2
+
+  let from_prefix_size_and_suffix_elements prefix_size suffix =
+    let field_kinds =
+      Array.of_list
+      @@ List.init prefix_size (fun _ -> Value)
+      @ List.map Flat_suffix_element0.kind suffix
+    in
+    { value_prefix_size = prefix_size;
+      flat_suffix = Array.of_list suffix;
+      field_kinds
+    }
 end
 
 module Scannable_block_shape = struct
@@ -1091,6 +1102,9 @@ module With_subkind = struct
       | Parrayval (Punboxedvectorarray Unboxed_vec512) -> Unboxed_vec512_array
       | Parrayval (Pgcscannableproductarray _ | Pgcignorableproductarray _) ->
         Unboxed_product_array
+      | Parrayval Punspecializedarray ->
+        Misc.fatal_error
+          "Flambda_kind.from_lambda_value_kind: Punspecializedarray"
     in
     let nullable : Nullable.t =
       match vk.nullable with

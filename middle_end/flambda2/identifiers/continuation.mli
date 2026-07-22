@@ -44,6 +44,8 @@ val is_renamed_version_of : t -> t -> bool
 
 val name : t -> string
 
+val name_stamp : t -> int
+
 val sort : t -> Sort.t
 
 val export : t -> exported

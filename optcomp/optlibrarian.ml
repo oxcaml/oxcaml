@@ -38,15 +38,8 @@ end) : S = struct
       try Load_path.find name
       with Not_found -> raise (Error (File_not_found name))
     in
-    let info, crc = Compilenv.read_unit_info filename in
-    info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
-    (* There is no need to keep the approximation in the flambda library file,
-       since the compiler will go looking directly for flambda object files. The
-       linker, which is the only one that reads library files, does not need the
-       approximation. *)
-    info.ui_export_info <- None;
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
-      (info, crc) )
+      Compilenv.read_unit_info filename )
 
   let create_archive file_list lib_name =
     let archive_name = Filename.remove_extension lib_name ^ Backend.ext_lib in
@@ -82,23 +75,36 @@ end) : S = struct
           (fun i import ->
             Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
           cmxs;
-        let quoted_globals =
+        let quoted_cmi =
           List.fold_left
-            (fun globals (unit, _crc) ->
-              List.fold_left
-                (fun globals global ->
-                  Compilation_unit.Name.Set.add global globals)
-                globals unit.ui_quoted_globals)
+            (fun quoted_cmi (unit, _crc) ->
+              Compilation_unit.Name.Set.add_seq
+                (List.to_seq unit.ui_quoted_cmi)
+                quoted_cmi)
             Compilation_unit.Name.Set.empty descr_list
           |> Compilation_unit.Name.Set.elements |> Array.of_list
         in
-        let quoted_globals_index =
-          Compilation_unit.Name.Tbl.create (Array.length quoted_globals)
+        let quoted_cmx =
+          List.fold_left
+            (fun quoted_cmx (unit, _crc) ->
+              Compilation_unit.Set.add_seq
+                (List.to_seq unit.ui_quoted_cmx)
+                quoted_cmx)
+            Compilation_unit.Set.empty descr_list
+          |> Compilation_unit.Set.elements |> Array.of_list
+        in
+        let quoted_cmi_index =
+          Compilation_unit.Name.Tbl.create (Array.length quoted_cmi)
         in
         Array.iteri
-          (fun i global ->
-            Compilation_unit.Name.Tbl.add quoted_globals_index global i)
-          quoted_globals;
+          (fun i cu -> Compilation_unit.Name.Tbl.add quoted_cmi_index cu i)
+          quoted_cmi;
+        let quoted_cmx_index =
+          Compilation_unit.Tbl.create (Array.length quoted_cmx)
+        in
+        Array.iteri
+          (fun i cu -> Compilation_unit.Tbl.add quoted_cmx_index cu i)
+          quoted_cmx;
         let genfns = Generic_fns.Tbl.make () in
         let mk_bitmap arr ix entries ~find ~get_name =
           let module B = Misc.Bitmap in
@@ -115,7 +121,7 @@ end) : S = struct
               { li_name = unit.ui_unit;
                 li_crc = crc;
                 li_defines = unit.ui_defines;
-                li_force_link = unit.ui_force_link;
+                li_force_link = unit.ui_force_link || !Clflags.link_everything;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
                     ~find:Compilation_unit.Name.Tbl.find
@@ -123,10 +129,12 @@ end) : S = struct
                 li_imports_cmx =
                   mk_bitmap cmxs cmx_index unit.ui_imports_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
-                li_quoted_globals =
-                  mk_bitmap quoted_globals quoted_globals_index
-                    unit.ui_quoted_globals ~find:Compilation_unit.Name.Tbl.find
-                    ~get_name:Fun.id;
+                li_quoted_cmi =
+                  mk_bitmap quoted_cmi quoted_cmi_index unit.ui_quoted_cmi
+                    ~find:Compilation_unit.Name.Tbl.find ~get_name:Fun.id;
+                li_quoted_cmx =
+                  mk_bitmap quoted_cmx quoted_cmx_index unit.ui_quoted_cmx
+                    ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
                 li_external_symbols = Array.of_list unit.ui_external_symbols
               })
             descr_list
@@ -135,7 +143,8 @@ end) : S = struct
           { lib_units = units;
             lib_imports_cmi = cmis;
             lib_imports_cmx = cmxs;
-            lib_quoted_globals = quoted_globals;
+            lib_quoted_cmi = quoted_cmi;
+            lib_quoted_cmx = quoted_cmx;
             lib_generic_fns = Generic_fns.Tbl.entries genfns;
             lib_requires_metaprogramming =
               List.exists

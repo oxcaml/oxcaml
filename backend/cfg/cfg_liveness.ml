@@ -75,7 +75,8 @@ module Transfer :
     Result.ok
     @@
     match instr.desc with
-    | Never -> assert false
+    | Never ->
+      Misc.fatal_error "Cfg_liveness.terminator: unexpected Never terminator"
     | Tailcall_self _ ->
       (* CR-someday azewierzejew: If the stamps for the tail call DomainState
          argument and parameter were the same and Tailcall (Self _) had

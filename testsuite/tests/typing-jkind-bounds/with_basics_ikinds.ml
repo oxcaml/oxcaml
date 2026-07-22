@@ -1,5 +1,4 @@
 (* TEST
-    flags = "-ikinds";
     expect;
 *)
 
@@ -783,14 +782,10 @@ val foo : int t @ contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ contended) = use_uncontended t
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}, Principal{|
-Line 1, characters 48-49:
-1 | let foo (t : _ t @ contended) = use_uncontended t
-                                                    ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -959,14 +954,10 @@ val foo : int t -> unit = <fun>
 |}]
 
 let foo (t : _ t @ nonportable) = use_portable t
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 val foo : ('a : immutable_data). 'a t -> unit = <fun>
 |}, Principal{|
-Line 1, characters 47-48:
-1 | let foo (t : _ t @ nonportable) = use_portable t
-                                                   ^
-Error: This value is "nonportable" but is expected to be "portable".
+val foo : ('a : immutable_data). 'a t -> unit = <fun>
 |}]
 
 let foo (t : int t @ aliased) = use_unique t

@@ -116,6 +116,12 @@ module Layout : sig
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
+  (** Updates the nullability on the layout's scannable axis. *)
+  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
+
+  (** Updates the separability on the layout's scannable axis. *)
+  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
+
   module Debug_printers : sig
     val t :
       (Format.formatter -> 'sort -> unit) -> Format.formatter -> 'sort t -> unit
@@ -293,6 +299,7 @@ module Const : sig
      as uses of them for unused abstract kind warnings. *)
   val of_annotation :
     ?use_abstract_jkinds:bool ->
+    ?warn:bool ->
     context:('l * allowed) History.annotation_context ->
     Env.t ->
     Parsetree.jkind_annotation ->
@@ -306,6 +313,18 @@ module Builtin : sig
       But we cannot compile run-time manipulations of values of types with jkind
       [any]. *)
   val any : why:History.any_creation_reason -> 'd Types.jkind
+
+  (** Like [any], but with the given nullability on the scannable axis. *)
+  val any_with_nullability :
+    Jkind_axis.Nullability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
+
+  (** Like [any], but with the given separability on the scannable axis. *)
+  val any_with_separability :
+    Jkind_axis.Separability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
@@ -357,8 +376,8 @@ module Builtin : sig
       not mode-cross (and has kind [Not_best] accordingly), even though unboxed
       products generally should. This is useful when creating an initial jkind
       in Typedecl. *)
-  val product_of_sorts :
-    why:History.product_creation_reason -> level:int -> int -> Types.jkind_l
+  val product_of_any :
+    why:History.product_creation_reason -> int -> Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and
@@ -411,9 +430,13 @@ val of_sort_univar :
   'd Types.jkind
 
 (* [use_abstract_jkinds] controls whether references to other kinds here count
-   as uses of them for unused abstract kind warnings. *)
+   as uses of them for unused abstract kind warnings.
+
+   [warn] (default: true) controls whether redundant/ignored kind modifier
+   warnings are emitted. *)
 val of_annotation :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:('l * allowed) History.annotation_context ->
   Env.t ->
   Parsetree.jkind_annotation ->
@@ -443,6 +466,7 @@ val of_annotation_option_default :
     as uses of them for unused abstract kind warnings. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:History.annotation_context_l ->
   transl_type:(Parsetree.core_type -> Types.type_expr) ->
   Env.t ->
@@ -463,9 +487,15 @@ val of_type_decl_overapproximate_unknown :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
+(** Choose an appropriate jkind for a boxed record type *)
+val for_boxed_record_with_updates :
+  (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record :
-  Types.label_declaration list -> sort Layout.t list -> Types.jkind_l
+val for_unboxed_record_with_updates :
+  (Types.label_declaration * Types.type_expr * Sort.t Layout.t) list ->
+  Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type.
 
@@ -529,6 +559,9 @@ val for_abbreviation :
 (** The jkind for array elements, creating a new sort variable. *)
 val for_array_element_sort : level:int -> Types.jkind_lr * sort
 
+(** The jkind of the parameter of the [effect] type. *)
+val for_effect_arg : Ident.t -> 'd Types.jkind
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -569,6 +602,10 @@ val generalize : current_level:int -> 'd Types.jkind -> unit
     jkinds - raises on Any. *)
 val sort_of_jkind : Env.t -> Types.jkind_l -> sort
 
+(** Returns the sort corresponding to the jkind, unless the layout is Any, a
+    product containing Any, or abstract. *)
+val sort_option_of_jkind : Env.t -> Types.jkind_l -> sort option
+
 (** Gets the layout of a jkind; returns [None] if the layout is still unknown,
     or the (fully expanded) kind is abstract. Never does mutation. *)
 val get_layout : Env.t -> 'd Types.jkind -> Layout.Const.t option
@@ -596,16 +633,6 @@ val set_externality_upper_bound :
 (** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
 val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
-(** Computes a jkind that is the same as the input but with an updated
-    nullability on the layout's scannable axis *)
-val set_root_nullability :
-  Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
-
-(** Computes a jkind that is the same as the input but with an updated
-    separability on the layout's scannable axis *)
-val set_root_separability :
-  Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
-
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 
@@ -626,13 +653,13 @@ val apply_modality_r :
     Adjusts nullability to be [Maybe_null], and separability to be
     [Maybe_separable] if it is already [Separable]. If the jkind is already
     [Maybe_null], fails. *)
-val apply_or_null_l : Types.jkind_l -> (Types.jkind_l, unit) result
+val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
 
 (** Change a jkind to be appropriate for an expectation of a type passed to the
     [or_null] constructor. Adjusts nullability to be [Non_null], and
     separability to be [Non_float] if it is demanded to be [Separable]. If the
     jkind is already [Non_null], fails. *)
-val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
+val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just

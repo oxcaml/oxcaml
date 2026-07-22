@@ -29,7 +29,7 @@ type packed = P : 'a -> packed
 Line 3, characters 20-25:
 3 | let f (P (type (a : value)) (x : a)) = ()
                         ^^^^^
-Error: The layout of a is value maybe_separable maybe_null
+Error: The layout of a is value_or_null
          because of the definition of packed at line 1, characters 0-52.
        But the layout of a must be a sublayout of value
          because of the annotation on the existential variable a.
@@ -44,7 +44,7 @@ let k (Packed (type a) (x : a)) = ()
 Line 1, characters 20-21:
 1 | let k (Packed (type a) (x : a)) = ()
                         ^
-Error: The layout of a is value maybe_separable maybe_null
+Error: The layout of a is value_or_null
          because of the definition of packed at line 1, characters 0-57.
        But the layout of a must be a sublayout of value
          because it's an unannotated existential type variable.
@@ -144,7 +144,7 @@ Line 3, characters 41-42:
                                              ^
 Error: This pattern matches values of type "a"
        but a pattern was expected which matches values of type "('a : value)"
-       The layout of a is value maybe_separable maybe_null
+       The layout of a is value_or_null
          because of the annotation on the existential variable a.
        But the layout of a must be a sublayout of value
          because of the definition of packed at line 1, characters 0-44.

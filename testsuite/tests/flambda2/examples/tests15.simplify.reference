@@ -1,5 +1,5 @@
 let $camlTests15__immstring13 = "tests15.ml" in
-let $camlTests15__const_block15 = Block 0 ($camlTests15__immstring13, 10, 52)
+let $camlTests15__const_block15 = Block 0 ($camlTests15__immstring13, 18, 52)
 in
 let $camlTests15__Pmakeblock18 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block15)
@@ -45,7 +45,7 @@ let code loopify(never) size(5) newer_version_of(set_to_x_2)
         my_closure _region _ghost_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+  let prim = %num_conv.[tagged_imm].[`nativeint`] (i) in
   let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim, 120s) in
   cont k (0)
 in

@@ -11,7 +11,7 @@
    module = "";
    flags = "-output-obj";
    program = "main.dll";
-   all_modules = "dynlink.cma main.ml entry.c";
+   all_modules = "main.ml entry.c";
    ocamlc.byte;
    script = "${csharp_cmd}";
    script;
@@ -27,9 +27,9 @@
    module = "";
    flags = "-output-obj";
    program = "main_obj.${objext}";
-   all_modules = "dynlink.cma entry.c main.ml";
+   all_modules = "entry.c main.ml";
    ocamlc.byte;
-   script = "${mkdll} -maindll -o main.dll main_obj.${objext} entry.${objext} ${ocamlsrcdir}/${runtime_dir}/libcamlrun.${libext} ${bytecc_libs}";
+   script = "${mkdll} -maindll -o main.dll main_obj.${objext} entry.${objext} ${ocamlsrcdir}/runtime/libcamlrun.${libext} ${bytecc_libs}";
    script;
    script = "${csharp_cmd}";
    script;
@@ -45,7 +45,7 @@
    ocamlopt.byte;
    flags = "-output-obj";
    program = "main.dll";
-   all_modules = "dynlink.cmxa entry.c main.ml";
+   all_modules = "entry.c main.ml";
    ocamlopt.byte;
    script = "${csharp_cmd}";
    script;
@@ -62,9 +62,9 @@
    ocamlopt.byte;
    flags = "-output-obj";
    program = "main_obj.${objext}";
-   all_modules = "dynlink.cmxa entry.c main.ml";
+   all_modules = "entry.c main.ml";
    ocamlopt.byte;
-   script = "${mkdll} -maindll -o main.dll main_obj.${objext} entry.${objext} ${ocamlsrcdir}/${runtime_dir}/libasmrun.${libext} ${nativecc_libs}";
+   script = "${mkdll} -maindll -o main.dll main_obj.${objext} entry.${objext} ${ocamlsrcdir}/runtime/libasmrun.${libext} ${nativecc_libs}";
    script;
    script = "${csharp_cmd}";
    script;

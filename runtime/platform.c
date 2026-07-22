@@ -17,13 +17,15 @@
 
 #include "caml/config.h"
 #include <string.h>
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <errno.h>
 #include "caml/osdeps.h"
 #include "caml/platform.h"
 #include "caml/fail.h"
+#include "caml/lf_skiplist.h"
+#include "caml/misc.h"
 #include "caml/signals.h"
 #ifdef HAS_SYS_MMAN_H
 #include <sys/mman.h>
@@ -37,7 +39,10 @@
 #include "sync_posix.h"
 
 #ifdef _WIN32
-/* CR ocaml 5 compactor:
+/* CR nbarnes: The following comment is no longer quite true (since
+ * #3179); think again about Windows compatibility.
+
+   CR ocaml 5 compactor:
 
    The runtime does not currently guarantee that memory is released to the OS in
    the same block sizes as it was allocated, making it incompatible with
@@ -123,12 +128,29 @@ void caml_plat_mutex_free(caml_plat_mutex* m)
   check_err("mutex_free", pthread_mutex_destroy(m));
 }
 
+CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
+{
+#ifdef DEBUG
+  /* The following logic is needed to let caml_plat_assert_all_locks_unlocked()
+     behave correctly in child processes after a fork operation. */
+  if (caml_plat_try_lock(m)) {
+    /* lock was not held at fork time */
+    caml_plat_unlock(m);
+  } else {
+    /* lock was held at fork time, parent process still holds it, but we
+       don't and need to fix lock count */
+    DEBUG_UNLOCK(m);
+  }
+#endif
+  caml_plat_mutex_init(m);
+}
+
+/* Condition variables */
 static void caml_plat_cond_init_aux(caml_plat_cond *cond)
 {
   custom_condvar_init(cond);
 }
 
-/* Condition variables */
 void caml_plat_cond_init(caml_plat_cond* cond)
 {
   caml_plat_cond_init_aux(cond);
@@ -285,7 +307,7 @@ void caml_plat_futex_free(caml_plat_futex* ftx) {
 
 #  elif 0 /* defined(__DragonFly__)
    TODO The following code for DragonFly is untested,
-   we currently use the fallback instead. */ */
+   we currently use the fallback instead. */
 #    define CAML_PLAT_FUTEX_WAIT(ftx, undesired)        \
   umtx_sleep((volatile const int*)ftx, undesired, 0)
 #    define CAML_PLAT_FUTEX_WAKE(ftx)               \
@@ -380,11 +402,6 @@ void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
 
 /* Memory management */
 
-static uintnat round_up(uintnat size, uintnat align) {
-  CAMLassert(Is_power_of_2(align));
-  return (size + align - 1) & ~(align - 1);
-}
-
 intnat caml_plat_pagesize = 0;
 intnat caml_plat_hugepagesize = 0;
 intnat caml_plat_mmap_alignment = 0;
@@ -393,15 +410,31 @@ uintnat caml_mem_round_up_mapping_size(uintnat size)
 {
   if (caml_plat_hugepagesize > caml_plat_pagesize &&
       size > caml_plat_hugepagesize/2)
-    return round_up(size, caml_plat_hugepagesize);
+    return caml_round_up(size, caml_plat_hugepagesize);
   else
-    return round_up(size, caml_plat_pagesize);
+    return caml_round_up(size, caml_plat_pagesize);
 }
 
 #define Is_page_aligned(size) ((size & (caml_plat_pagesize - 1)) == 0)
 
+#ifdef DEBUG
+static struct lf_skiplist mmap_blocks;
+#endif
+
+#ifndef _WIN32
+#endif
+
 void* caml_mem_map(uintnat size, uintnat flags, const char* name)
 {
+#ifdef DEBUG
+  if (mmap_blocks.head == NULL) {
+    /* The first call to caml_mem_map should be during caml_init_domains, called
+       by caml_init_gc during startup - i.e. before any domains have started. */
+    CAMLassert(atomic_load_acquire(&caml_num_domains_running) <= 1);
+    caml_lf_skiplist_init(&mmap_blocks);
+  }
+#endif
+
   void* mem = caml_plat_mem_map(size, flags, name);
 
   if (mem == 0) {
@@ -414,6 +447,10 @@ void* caml_mem_map(uintnat size, uintnat flags, const char* name)
   CAML_GC_MESSAGE(ADDRSPACE,
                   "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p for %s\n", size, mem, name);
+
+#ifdef DEBUG
+  caml_lf_skiplist_insert(&mmap_blocks, (uintnat)mem, size);
+#endif
 
   return mem;
 }
@@ -439,6 +476,11 @@ void caml_mem_decommit(void* mem, uintnat size, const char* name)
 
 void caml_mem_unmap(void* mem, uintnat size)
 {
+#ifdef DEBUG
+  uintnat data;
+  CAMLassert(caml_lf_skiplist_find(&mmap_blocks, (uintnat)mem, &data) != 0);
+  CAMLassert(data == size);
+#endif
   CAML_GC_MESSAGE(ADDRSPACE,
                   "munmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p\n", size, mem);
@@ -459,24 +501,27 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
     caml_plat_mem_name_map(mem, length, mapping_name);
 }
 
-#define Min_sleep_ns       10000 // 10 us
-#define Slow_sleep_ns    1000000 //  1 ms
-#define Max_sleep_ns  1000000000 //  1 s
+#define Min_sleep_nsec  (10 * NSEC_PER_USEC) /* 10 usec */
+#define Slow_sleep_nsec  (1 * NSEC_PER_MSEC) /*  1 msec */
+#define Max_sleep_nsec   (1 * NSEC_PER_SEC)  /*  1 sec  */
 
-unsigned caml_plat_spin_back_off(unsigned sleep_ns,
+unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
                                  const struct caml_plat_srcloc* loc)
 {
-  if (sleep_ns < Min_sleep_ns) sleep_ns = Min_sleep_ns;
-  if (sleep_ns > Max_sleep_ns) sleep_ns = Max_sleep_ns;
-  unsigned next_sleep_ns = sleep_ns + sleep_ns / 4;
-  if (sleep_ns < Slow_sleep_ns && Slow_sleep_ns <= next_sleep_ns) {
+  if (sleep_nsec < Min_sleep_nsec) sleep_nsec = Min_sleep_nsec;
+  if (sleep_nsec > Max_sleep_nsec) sleep_nsec = Max_sleep_nsec;
+  unsigned next_sleep_nsec = sleep_nsec + sleep_nsec / 4;
+  if (sleep_nsec < Slow_sleep_nsec && Slow_sleep_nsec <= next_sleep_nsec) {
     caml_gc_log("Slow spin-wait loop in %s at %s:%d",
                 loc->function, loc->file, loc->line);
   }
 #ifdef _WIN32
-  Sleep(sleep_ns/1000000);
+  Sleep(sleep_nsec / NSEC_PER_MSEC);
+#elif defined (HAS_NANOSLEEP)
+  const struct timespec req = caml_timespec_of_nsec(sleep_nsec);
+  nanosleep(&req, NULL);
 #else
-  usleep(sleep_ns/1000);
+  usleep(sleep_nsec / NSEC_PER_USEC);
 #endif
-  return next_sleep_ns;
+  return next_sleep_nsec;
 }

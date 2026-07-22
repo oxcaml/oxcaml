@@ -166,7 +166,7 @@ let symbol_prefix () =
       ""
 
 let entry_points ~phrase_name symbols =
-  let separator = (* if Config.runtime5 then "." else *) "__" in
+  let separator = "__" in
   let prefix = symbol_prefix () in
   let symbol_name name =
     Printf.sprintf "%scaml%s%s%s" prefix phrase_name separator name

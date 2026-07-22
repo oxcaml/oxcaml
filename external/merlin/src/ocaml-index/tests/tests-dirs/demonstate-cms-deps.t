@@ -33,8 +33,10 @@ If we use cmt files and don't include dependencies, ocaml-index will succeed bec
 files include the load-path in them:
   $ ocaml-index aggregate -o main.uideps main.cmt
   $ ocaml-index dump main.uideps
-  2 uids:
-  {uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+  4 uids:
+  {uid: Foo; locs: "Foo": File "main.ml", line 1, characters 14-17
+   uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+   uid: Foo.0; locs: "Foo.Bar": File "main.ml", line 1, characters 14-21
    uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{}
@@ -43,7 +45,9 @@ If we use cms files and don't include dependencies, ocaml-index will fail to ind
 identifiers from dependencies:
   $ ocaml-index aggregate -o main.uideps main.cms
   $ ocaml-index dump main.uideps
-  1 uids: {uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
+  2 uids:
+  {uid: Foo; locs: "Foo": File "main.ml", line 1, characters 14-17
+   uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{}
 
@@ -51,17 +55,21 @@ If we pass a hidden dependency as a visible one, we can run into trouble. Note t
 ocaml-index believes that "Foo.Bar.x" comes from Foo rather than Bar:
   $ ocaml-index aggregate -o main.uideps main.cms -I hidden_lib -I visible_lib
   $ ocaml-index dump main.uideps
-  2 uids:
-  {uid: Foo.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
-   uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
+  4 uids:
+  {uid: Foo; locs: "Foo": File "main.ml", line 1, characters 14-17
+   uid: Foo.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+   uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5
+   uid: Foo.1; locs: "Foo.Bar": File "main.ml", line 1, characters 14-21 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{}
 
 If we pass dependencies, we get the correct results:
   $ ocaml-index aggregate -o main.uideps main.cms -H hidden_lib -I visible_lib
   $ ocaml-index dump main.uideps
-  2 uids:
-  {uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+  4 uids:
+  {uid: Foo; locs: "Foo": File "main.ml", line 1, characters 14-17
+   uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+   uid: Foo.0; locs: "Foo.Bar": File "main.ml", line 1, characters 14-21
    uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{}
@@ -71,8 +79,10 @@ Since visible_lib comes first, "Foo" in main.ml corresponds to visible_lib/foo.m
   $ $OCAMLC -bin-annot-cms -bin-annot-occurrences -c main.ml -I visible_lib -I hidden_lib
   $ ocaml-index aggregate -o main.uideps main.cms -I visible_lib -I hidden_lib
   $ ocaml-index dump main.uideps
-  2 uids:
-  {uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+  4 uids:
+  {uid: Foo; locs: "Foo": File "main.ml", line 1, characters 14-17
+   uid: Bar.0; locs: "Foo.Bar.x": File "main.ml", line 1, characters 14-23
+   uid: Foo.0; locs: "Foo.Bar": File "main.ml", line 1, characters 14-21
    uid: Main.0; locs: "x": File "main.ml", line 1, characters 4-5 },
   0 approx shapes: {}, and shapes for CUS .
   and related uids:{}

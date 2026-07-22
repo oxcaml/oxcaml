@@ -67,9 +67,15 @@ let is_unquoted_symbol s =
   (not (String.equal s "")) && Misc.Stdlib.String.for_all is_identchar s
 
 let is_unquoted_ident s =
+  let name, stamp =
+    match String.split_on_char '/' s with
+    | [] | [_] | _ :: _ :: _ :: _ -> s, ""
+    | [name; stamp] -> name, stamp
+  in
   (not (String.equal s ""))
   && is_identstart s.[0]
-  && Misc.Stdlib.String.for_all is_identchar s
+  && Misc.Stdlib.String.for_all is_identchar name
+  && Misc.Stdlib.String.for_all (fun c -> char_between c ('0', '9')) stamp
 
 let symbol_part ppf s =
   if is_unquoted_symbol s
@@ -134,6 +140,42 @@ let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
   | Toplevel -> Format.pp_print_string ppf "toplevel"
+
+let cfprintf directive ppf fmt =
+  directive ppf;
+  Format.kfprintf Flambda_colours.pop ppf fmt
+
+let naked_number ppf fmt = cfprintf Flambda_colours.naked_number ppf fmt
+
+let float ppf f = naked_number ppf "%h" f
+
+let float32 ppf f = naked_number ppf "%hs" f
+
+let int ppf i = naked_number ppf "%Li" i
+
+let int8 ppf i = naked_number ppf "%as" Numeric_types.Int8.print i
+
+let int16 ppf i = naked_number ppf "%aS" Numeric_types.Int16.print i
+
+let int32 ppf i = naked_number ppf "%lil" i
+
+let int64 ppf i = naked_number ppf "%LiL" i
+
+let nativeint ppf i = naked_number ppf "%Lin" i
+
+let vec128 ppf ({ word0; word1 } : Vector_types.Vec128.Bit_pattern.bits) =
+  naked_number ppf "vec128[%016Lx:%016Lx]" word0 word1
+
+let vec256 ppf
+    ({ word0; word1; word2; word3 } : Vector_types.Vec256.Bit_pattern.bits) =
+  naked_number ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2 word3
+
+let vec512 ppf
+    ({ word0; word1; word2; word3; word4; word5; word6; word7 } :
+      Vector_types.Vec512.Bit_pattern.bits) =
+  naked_number ppf
+    "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
+    word1 word2 word3 word4 word5 word6 word7
 
 let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   Format.pp_print_string ppf
@@ -203,6 +245,29 @@ and kind_with_subkind ppf (k : kind_with_subkind) =
 let kind_with_subkind ppf k =
   directive Flambda_colours.kind kind_with_subkind ppf k
 
+let const ppf (c : Fexpr.const) =
+  match c with
+  | Naked_immediate i ->
+    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
+      Flambda_colours.pop
+  | Tagged_immediate i ->
+    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
+      Flambda_colours.pop
+  | Naked_float f -> float ppf f
+  | Naked_float32 f -> float32 ppf f
+  | Naked_int8 i -> int8 ppf i
+  | Naked_int16 i -> int16 ppf i
+  | Naked_int32 i -> int32 ppf i
+  | Naked_int64 i -> int64 ppf i
+  | Naked_nativeint i -> nativeint ppf i
+  | Naked_vec128 v -> vec128 ppf v
+  | Naked_vec256 v -> vec256 ppf v
+  | Naked_vec512 v -> vec512 ppf v
+  | Null -> Format.fprintf ppf "null"
+  | Poison (kind, name) ->
+    Format.fprintf ppf "%tpoison.%a.%s%t" Flambda_colours.invalid_keyword
+      kind_with_subkind kind name Flambda_colours.pop
+
 let arity ppf (a : arity) =
   match a with
   | [] -> directive Flambda_colours.kind Format.pp_print_string ppf "unit"
@@ -217,8 +282,7 @@ let kinded_variable ppf (v, (k : kind_with_subkind option)) =
 let field_of_block ppf : field_of_block -> unit = function
   | Symbol s -> symbol ppf s
   | Dynamically_computed v -> variable ppf v
-  | Tagged_immediate i ->
-    directive Flambda_colours.tagged_immediate Format.pp_print_string ppf i
+  | Const cst -> const ppf cst
 
 type parens =
   | Never
@@ -253,40 +317,6 @@ let coercion ppf : coercion -> unit = function
 
 let coercion ppf coercion_ =
   directive Flambda_colours.coercion coercion ppf coercion_
-
-let cfprintf directive ppf fmt =
-  directive ppf;
-  Format.kfprintf Flambda_colours.pop ppf fmt
-
-let naked_number ppf fmt = cfprintf Flambda_colours.naked_number ppf fmt
-
-let float ppf f = naked_number ppf "%h" f
-
-let const ppf (c : Fexpr.const) =
-  match c with
-  | Naked_immediate i ->
-    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
-      Flambda_colours.pop
-  | Tagged_immediate i ->
-    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
-      Flambda_colours.pop
-  | Naked_float f -> float ppf f
-  | Naked_float32 f -> naked_number ppf "%hs" f
-  | Naked_int8 i -> naked_number ppf "%as" Numeric_types.Int8.print i
-  | Naked_int16 i -> naked_number ppf "%aS" Numeric_types.Int16.print i
-  | Naked_int32 i -> naked_number ppf "%lil" i
-  | Naked_int64 i -> naked_number ppf "%LiL" i
-  | Naked_nativeint i -> naked_number ppf "%Lin" i
-  | Naked_vec128 { word0; word1 } ->
-    naked_number ppf "vec128[%016Lx:%016Lx]" word0 word1
-  | Naked_vec256 { word0; word1; word2; word3 } ->
-    naked_number ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2
-      word3
-  | Naked_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
-    naked_number ppf
-      "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
-      word1 word2 word3 word4 word5 word6 word7
-  | Null -> Format.fprintf ppf "null"
 
 let rec simple ppf : simple -> unit = function
   | Symbol s -> symbol ppf s
@@ -347,8 +377,8 @@ let alloc_mode_for_applications_opt ppf (alloc : alloc_mode_for_applications)
 let boxed_variable ppf var ~kind =
   Format.fprintf ppf "%a : %s boxed" variable var kind
 
-let float_or_variable ppf : float or_variable -> unit = function
-  | Const f -> float ppf f
+let or_variable const ppf : _ or_variable -> unit = function
+  | Const f -> const ppf f
   | Var v -> variable ppf v
 
 let static_data ppf : static_data -> unit = function
@@ -357,21 +387,14 @@ let static_data ppf : static_data -> unit = function
       tag
       (pp_comma_list field_of_block)
       elts
-  | Boxed_float32 (Const f) -> Format.fprintf ppf "%hs" f
-  | Boxed_float (Const f) -> Format.fprintf ppf "%h" f
-  | Boxed_int32 (Const i) -> Format.fprintf ppf "%lil" i
-  | Boxed_int64 (Const i) -> Format.fprintf ppf "%LiL" i
-  | Boxed_nativeint (Const i) -> Format.fprintf ppf "%Lin" i
-  | Boxed_vec128 (Const { word0; word1 }) ->
-    Format.fprintf ppf "vec128[%016Lx:%016Lx]" word0 word1
-  | Boxed_vec256 (Const { word0; word1; word2; word3 }) ->
-    Format.fprintf ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2
-      word3
-  | Boxed_vec512
-      (Const { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
-    Format.fprintf ppf
-      "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
-      word1 word2 word3 word4 word5 word6 word7
+  | Boxed_float32 (Const f) -> float32 ppf f
+  | Boxed_float (Const f) -> float ppf f
+  | Boxed_int32 (Const i) -> int32 ppf i
+  | Boxed_int64 (Const i) -> int64 ppf i
+  | Boxed_nativeint (Const i) -> nativeint ppf i
+  | Boxed_vec128 (Const v) -> vec128 ppf v
+  | Boxed_vec256 (Const v) -> vec256 ppf v
+  | Boxed_vec512 (Const v) -> vec512 ppf v
   | Boxed_float (Var v) -> boxed_variable ppf v ~kind:"float"
   | Boxed_float32 (Var v) -> boxed_variable ppf v ~kind:"float32"
   | Boxed_int32 (Var v) -> boxed_variable ppf v ~kind:"int32"
@@ -382,15 +405,55 @@ let static_data ppf : static_data -> unit = function
   | Boxed_vec512 (Var v) -> boxed_variable ppf v ~kind:"vec512"
   | Immutable_float_block elements ->
     Format.fprintf ppf "Float_block (%a)"
-      (pp_comma_list float_or_variable)
+      (pp_comma_list @@ or_variable float)
       elements
   | Immutable_float_array elements ->
     Format.fprintf ppf "Float_array [|%a|]"
-      (pp_semi_list float_or_variable)
+      (pp_semi_list @@ or_variable float)
+      elements
+  | Immutable_float32_array elements ->
+    Format.fprintf ppf "Float32_array [|%a|]"
+      (pp_semi_list @@ or_variable float32)
       elements
   | Immutable_value_array elements ->
     Format.fprintf ppf "Value_array [|%a|]"
       (pp_semi_list field_of_block)
+      elements
+  | Immutable_int_array elements ->
+    Format.fprintf ppf "Int_array [|%a|]"
+      (pp_semi_list @@ or_variable int)
+      elements
+  | Immutable_int8_array elements ->
+    Format.fprintf ppf "Int8_array [|%a|]"
+      (pp_semi_list @@ or_variable int8)
+      elements
+  | Immutable_int16_array elements ->
+    Format.fprintf ppf "Int16_array [|%a|]"
+      (pp_semi_list @@ or_variable int16)
+      elements
+  | Immutable_int32_array elements ->
+    Format.fprintf ppf "Int32_array [|%a|]"
+      (pp_semi_list @@ or_variable int32)
+      elements
+  | Immutable_int64_array elements ->
+    Format.fprintf ppf "Int64_array [|%a|]"
+      (pp_semi_list @@ or_variable int64)
+      elements
+  | Immutable_nativeint_array elements ->
+    Format.fprintf ppf "Nativeint_array [|%a|]"
+      (pp_semi_list @@ or_variable nativeint)
+      elements
+  | Immutable_vec128_array elements ->
+    Format.fprintf ppf "Vec128_array [|%a|]"
+      (pp_semi_list @@ or_variable vec128)
+      elements
+  | Immutable_vec256_array elements ->
+    Format.fprintf ppf "Vec256_array [|%a|]"
+      (pp_semi_list @@ or_variable vec256)
+      elements
+  | Immutable_vec512_array elements ->
+    Format.fprintf ppf "Vec512_array [|%a|]"
+      (pp_semi_list @@ or_variable vec512)
       elements
   | Empty_array kind ->
     Format.fprintf ppf "Empty_array%a" (empty_array_kind ~space:Before) kind
@@ -401,16 +464,18 @@ let static_data ppf : static_data -> unit = function
 let static_data_binding ppf { symbol = s; defining_expr = sp } =
   Format.fprintf ppf "%a =@ %a" symbol s static_data sp
 
-let prim_param ppf = function
-  | Flag f -> Format.fprintf ppf ".%a" ident f
-  | Positional p -> Format.fprintf ppf ".[`%s`]" p.txt
-  | Labeled { label; value } ->
-    Format.fprintf ppf ".%a[`%s`]" ident label value.txt
+let rec prim_param ppf = function
+  | Labeled (f, []) -> Format.fprintf ppf "%a" ident f.txt
+  | Labeled (label, ps) ->
+    Format.fprintf ppf "%a[%a]" ident label.txt prim_sub_params ps
+  | Anonymous ps -> Format.fprintf ppf "[%a]" prim_sub_params ps
+
+and prim_sub_params ppf params = pp_comma_list prim_param ppf params
 
 let prim_params ppf params =
-  Format.fprintf ppf "%a"
-    (Format.pp_print_list ~pp_sep:(fun _ () -> ()) prim_param)
-    params
+  pp_list
+    (fun ppf -> Format.fprintf ppf ".%a" prim_param)
+    ~sep:empty_fmt ppf params
 
 let prim_op ppf ({ prim; params } : prim_op) =
   (* CR bclement: use [Flambda_primitive.classify_for_printing]. *)
@@ -487,6 +552,12 @@ let static_closure_binding ppf (scb : static_closure_binding) =
     (fun_decl Flambda_colours.static_keyword)
     scb.fun_decl
 
+let method_kind ppf mk =
+  match (mk : Call_kind.Method_kind.t) with
+  | Self -> Format.pp_print_string ppf "self"
+  | Public -> Format.pp_print_string ppf "public"
+  | Cached -> Format.pp_print_string ppf "cached"
+
 let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
   match ck with
   | Function Indirect -> alloc_mode_for_applications_opt ppf alloc_mode ~space
@@ -501,6 +572,10 @@ let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
     pp_spaced ~space ppf "ccall%a"
       (pp_option ~space:Before Format.pp_print_string)
       noalloc_kwd
+  | Method { kind; obj } ->
+    pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
+      (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)
+      obj
 
 let inline_attribute ~space ppf (i : Inline_attribute.t) =
   let str =

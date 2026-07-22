@@ -35,7 +35,7 @@
               apply f (Pfield) -> k3 * k2)
                where k3 (apply_result_1 : val) =
                  let Pmakeblock =
-                   %block.[`0`].`local`[`my_region`]
+                   %block.[`0`].`local`[my_region]
                      (apply_result_1, apply_result)
                  in
                  cont k1 (Pmakeblock)))
@@ -91,7 +91,7 @@
         cont k3)
      where k3 =
        let Pfield = %block_load.[`0`] (l1) in
-       let Pmakeblock = %block.[`0`].`local`[`my_region`] (Pfield, l2) in
+       let Pmakeblock = %block.[`0`].`local`[my_region] (Pfield, l2) in
        let Pfield_1 = %block_load.[`1`] (l1) in
        apply direct(rev_app_4 &my_region &my_ghost_region)
          (my_closure ~ depth my_depth -> next_depth
@@ -108,9 +108,8 @@
          -> k1 * k2
          : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
-   let rev_app = %project_value_slot.[`find_span`].[`rev_app`] (my_closure)
-   in
-   let spans = %project_function_slot.[`find_span`].[`spans`] (my_closure) in
+   let rev_app = %project_value_slot.[find_span].[rev_app] (my_closure) in
+   let spans = %project_function_slot.[find_span].[spans] (my_closure) in
    (let prim = %is_int (l) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -124,9 +123,9 @@
      where k4 =
        let l_1 = %block_load.[`1`] (l) in
        let a = %block_load.[`0`] (l) in
-       let acc_1 = %block.[`0`].`local`[`my_region`] (a, acc) in
+       let acc_1 = %block.[`0`].`local`[my_region] (a, acc) in
        (apply break_here (a) -> k6 * k2
-          where k6 (apply_result : imm tagged) =
+          where k6 (apply_result : [ 0 |1 ]) =
             ((let untagged = %untag_imm (apply_result) in
               switch untagged
                 | 0 -> k6
@@ -144,11 +143,10 @@
                 (break_here, l_1, acc_1)
                 -> k1 * k2
           where k4 =
-            let Pmakeblock = %block.[`0`].`local`[`my_region`] (acc_1, l_1)
-            in
+            let Pmakeblock = %block.[`0`].`local`[my_region] (acc_1, l_1) in
             cont k1 (Pmakeblock))
      where k3 =
-       let Pmakeblock = %block.[`0`].`local`[`my_region`] (acc, 0) in
+       let Pmakeblock = %block.[`0`].`local`[my_region] (acc, 0) in
        cont k1 (Pmakeblock)
  in
  let code rec size(39)
@@ -158,10 +156,8 @@
          -> k1 * k2
          : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] local =
    let next_depth = rec_info (succ my_depth) in
-   let rev_app = %project_value_slot.[`spans`].[`rev_app`] (my_closure) in
-   let find_span =
-     %project_function_slot.[`spans`].[`find_span`] (my_closure)
-   in
+   let rev_app = %project_value_slot.[spans].[rev_app] (my_closure) in
+   let find_span = %project_function_slot.[spans].[find_span] (my_closure) in
    (let prim = %is_int (l) in
     let Pisint = %tag_imm (prim) in
     (let untagged = %untag_imm (Pisint) in
@@ -198,7 +194,7 @@
                             (apply_result_1 :
                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                       let Pmakeblock =
-                        %block.[`0`].`local`[`my_region`]
+                        %block.[`0`].`local`[my_region]
                           (apply_result_1, apply_result)
                       in
                       cont k1 (Pmakeblock))))

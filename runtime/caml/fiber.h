@@ -21,6 +21,7 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stdbool.h>
 #include "misc.h"
 #include "mlvalues.h"
 #include "roots.h"
@@ -33,6 +34,7 @@ struct stack_handler {
   value handle_value;
   value handle_exn;
   value handle_effect;
+  value handle_tick; /* tick handler callback, NULL if not preemptible */
   struct stack_info* parent; /* parent OCaml stack if any */
 };
 
@@ -90,7 +92,9 @@ struct stack_info {
 #define Stack_handle_value(stk) (stk)->handler->handle_value
 #define Stack_handle_exception(stk) (stk)->handler->handle_exn
 #define Stack_handle_effect(stk) (stk)->handler->handle_effect
+#define Stack_handle_tick(stk) (stk)->handler->handle_tick
 #define Stack_parent(stk) (stk)->handler->parent
+#define Stack_is_preemptible(stk) (Stack_handle_tick(stk) != Val_null)
 
 /* Stack layout for native code. Stack grows downwards.
  *
@@ -283,11 +287,18 @@ struct c_stack_link {
  *   handle_exception function is executed on the parent stack.
  */
 
-/* The table of global identifiers */
+/* The table of global identifiers. Val_unit initially and replaced with a block
+   during bytecode startup. */
 extern value caml_global_data;
 
 #define Trap_pc(tp) (((code_t *)(tp))[0])
 #define Trap_link(tp) ((tp)[1])
+
+/* type tick_outcome in stdlib/effect.ml */
+enum tick_outcome {
+  TICK_RESULT_PREEMPT = 0,
+  TICK_RESULT_CONTINUE = 1
+};
 
 struct stack_cache {
   _Atomic(struct stack_info*) head;
@@ -308,6 +319,11 @@ void caml_scan_stack(
 value caml_alloc_stack(value hval, value hexn, value heff);
 value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
                             value bind);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                   value htick);
+value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
+                                        value htick, value dyn,
+                                        value bind);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
                                           value hexn, value heff,
                                           value dyn, value bind,
@@ -359,58 +375,41 @@ value caml_continuation_use (value cont);
    Used for cloning continuations and continuation backtraces. */
 void caml_continuation_replace(value cont, struct stack_info* stack);
 
+/* Returns 1 if the given continuation has a gc_regs, marking it as a
+   preemption */
+bool caml_continuation_is_preemption(value cont);
+
+/* If the given continuation is a preeempted continuation, returns a pointer to
+   its [gc_regs] struct, or NULL otherwise */
+value* caml_continuation_gc_regs(value cont);
+
+value caml_tick_fiber_exn(struct stack_info* stack);
+
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 
 value caml_make_unhandled_effect_exn (value effect);
 
+typedef struct dynamic_cache_s *dynamic_cache_t;
 
-/* We support "dynamic variables", whose value may be set in
-   three ways:
+/* Create a new dynamic cache */
+extern dynamic_cache_t caml_dynamic_cache_new(void);
 
-   - the "initial" value, specified when the `Dynamic.t` is
-     created (with `caml_dymamic_make`);
-   - any per-thread "root" value, set with `caml_dynamic_set_root`;
-   - a "temporary" value, optionally set when a fiber is created
-     (passed to `caml_alloc_stack`).
+/* Delete a dynamic cache */
+extern void caml_dynamic_cache_delete(dynamic_cache_t);
 
-   These are in reverse order of precedence for the value read from a
-   dynamic variable (by `caml_dynamic_get`):
+/* Install a new dynamic cache for this thread */
+extern void caml_dynamic_cache_enter_thread(dynamic_cache_t);
 
-   - First any temporary value; then
-   - any per-thread root value (including any inherited from a parent thread);
-   - finally. the initial value.
+/* Clear the cache. Used when switching fibers. */
+extern void caml_dynamic_cache_flush(dynamic_cache_t);
 
-   The per-thread "root" values, and a cache of looked-up values, are
-   stored in a per-thread dynamic context structure, That is
-   abstracted as a one-word (pointer) `dynamic_thread_t` value. The
-   current dynamic context is in `Caml_state->dynamic_bindings`. The
-   API here provides the rest of the runtime with all the necessary
-   operations on these (otherwise abstract) values. */
-
-typedef struct dynamic_thread_s *dynamic_thread_t;
-
-/* Create a new dynamic context, for a new thread. `parent` is NULL
- * for the first thread; otherwise is the parent's context (from which
- * per-thread root bindings are inherited). */
-extern dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent);
-
-/* Delete a dynamic context, called when a thread terminates. */
-extern void caml_dynamic_delete_thread(dynamic_thread_t);
-
-/* Switch the "current" dynamic context */
-extern void caml_dynamic_enter_thread(dynamic_thread_t);
-
-/* Flush a dynamic context's cache of binding values. Used when
- * swtiching fibers. */
-extern void caml_dynamic_flush_thread(dynamic_thread_t);
-
-/* Apply a GC scanning action to the roots in a dynamic context. */
-extern void caml_dynamic_scan_thread_roots(dynamic_thread_t,
-                                           scanning_action,
-                                           scanning_action_flags,
-                                           void *);
+/* Apply a GC scanning action to the roots in a dynamic cache. */
+extern void caml_dynamic_cache_scan_roots(dynamic_cache_t,
+                                          scanning_action,
+                                          scanning_action_flags,
+                                          void *);
 
 #endif /* CAML_INTERNALS */
 

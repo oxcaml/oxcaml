@@ -284,6 +284,7 @@ let add_equations_on_params typing_env ~is_recursive ~params:params'
           then
             let raw_kind = Flambda_kind.With_subkind.kind kind in
             let type_from_kind =
+              (* CR mshinwell/vlaviron: use allocation mode information *)
               T.unknown_with_subkind kind
                 ~machine_width:(TE.machine_width typing_env)
             in

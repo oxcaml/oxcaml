@@ -62,6 +62,7 @@ and extra_ty =
   *)
 
 val unboxed_version : t -> t
+val boxed_version : t -> t option
 val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool
@@ -72,6 +73,9 @@ val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
 val scope: t -> int
 val flatten : t -> [ `Contains_apply | `Ok of Ident.t * string list ]
+
+val scrape_extra_ty: t -> t
+(** Removes surrounding `Pext_ty` constructors from a path *)
 
 val name: ?paren:(string -> bool) -> t -> string
     (* [paren] tells whether a path suffix needs parentheses *)

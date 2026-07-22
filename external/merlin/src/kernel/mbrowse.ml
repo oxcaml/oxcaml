@@ -332,7 +332,7 @@ let of_typedtree = function
   | `Interface sg -> of_signature sg
 
 let optional_label_sugar = function
-  | Typedtree.Texp_construct (id, _, [ e ], _)
+  | Typedtree.Texp_construct (id, _, _, [ (_, e) ], _)
     when id.Location.loc.Location.loc_ghost
          && id.Location.txt = Longident.Lident "Some" -> Some e
   | _ -> None

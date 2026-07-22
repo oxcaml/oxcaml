@@ -17,7 +17,7 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
     | 0 -> k (0)
     | 1 -> k2
     where k2 =
-      ((let prim_1 = %array_length (a) in
+      ((let prim_1 = %array_length.`float` (a) in
         let prim_2 = %int_comp.unsigned.lt (int_add_2, prim_1) in
         switch prim_2
           | 0 -> k2

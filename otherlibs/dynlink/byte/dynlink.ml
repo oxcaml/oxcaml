@@ -16,6 +16,7 @@
 (**************************************************************************)
 
 open! Dynlink_compilerlibs
+open Cmo_format
 
 module DC = Dynlink_common
 module DT = Dynlink_types
@@ -67,20 +68,18 @@ module Bytecode = struct
     let unsafe_module (t : t) = t.cu_primitives <> []
   end
 
-  type handle = Stdlib.in_channel * filename * Digest.t
+  type handle =
+    Stdlib.in_channel * filename * Digest.t * Symtable.global_map option
 
   let default_crcs = ref [| |]
   let default_global_map = ref Symtable.empty_global_map
-
-  external get_bytecode_sections : unit -> Symtable.bytecode_sections =
-    "caml_dynlink_get_bytecode_sections"
 
   let init () =
     if !Sys.interactive then begin (* PR#6802 *)
       invalid_arg "The dynlink.cma library cannot be used \
         inside the OCaml toplevel"
     end;
-    default_crcs := Symtable.init_toplevel ~get_bytecode_sections;
+    default_crcs := Symtable.init_toplevel ();
     default_global_map := Symtable.current_state ()
 
   let is_native = false
@@ -116,22 +115,20 @@ module Bytecode = struct
 
   let run_shared_startup _ = ()
 
-  let with_lock lock f =
-    match lock with
-    | None -> f ()
-    | Some lock ->
-      Mutex.lock lock;
-      Fun.protect f
-        ~finally:(fun () -> Mutex.unlock lock)
-
   let really_input_bigarray ic ar st n =
     match In_channel.really_input_bigarray ic ar st n with
       | None -> raise End_of_file
       | Some () -> ()
 
-  let run lock (ic, file_name, file_digest) ~unit_header ~priv =
-    let clos = with_lock lock (fun () ->
-        let old_state = Symtable.current_state () in
+  type instruct_debug_event
+  external reify_bytecode :
+    (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+    instruct_debug_event list array -> string option ->
+    Obj.t * (unit -> Obj.t)
+    = "caml_reify_bytecode"
+
+  let run lock (ic, file_name, file_digest, _old_st) ~unit_header ~priv:_ =
+    let clos = Mutex.protect lock (fun () ->
         let compunit : Cmo_format.compilation_unit_descr = unit_header in
         seek_in ic compunit.cu_pos;
         let code =
@@ -172,11 +169,10 @@ module Bytecode = struct
               (* CR ocaml 5 compressed-marshal:
               (Compression.input_value ic : Instruct.debug_event list)
               *)
-              (Marshal.from_channel ic : Instruct.debug_event list)
+              (Marshal.from_channel ic : instruct_debug_event list)
             |]
           end in
-        if priv then Symtable.hide_additions old_state;
-        let _, clos = Meta.reify_bytecode code events (Some digest) in
+        let _, clos = reify_bytecode code events (Some digest) in
         clos
       )
     in
@@ -189,7 +185,7 @@ module Bytecode = struct
         (DT.Error (Library's_module_initializers_failed exn))
         (Printexc.get_raw_backtrace ())
 
-  let load ~filename:file_name ~priv:_ =
+  let load ~filename:file_name ~priv =
     let ic =
       try open_in_bin file_name
       with exc -> raise (DT.Error (Cannot_open_dynamic_library exc))
@@ -201,7 +197,13 @@ module Bytecode = struct
         try really_input_string ic (String.length Config.cmo_magic_number)
         with End_of_file -> raise (DT.Error (Not_a_bytecode_file file_name))
       in
-      let handle = ic, file_name, file_digest in
+      let old_symtable =
+        if priv then
+          Some (Symtable.current_state ())
+        else
+          None
+      in
+      let handle = ic, file_name, file_digest, old_symtable in
       if buffer = Config.cmo_magic_number then begin
         let compunit_pos = input_binary_int ic in  (* Go to descriptor *)
         seek_in ic compunit_pos;
@@ -211,7 +213,7 @@ module Bytecode = struct
       if buffer = Config.cma_magic_number then begin
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
         seek_in ic toc_pos;
-        let lib = (input_value ic : Cmo_format.library) in
+        let lib = (input_value ic : library) in
         Dll.open_dlls Dll.For_execution
           (List.map Dll.extract_dll_name lib.lib_dllibs);
         handle, lib.lib_units
@@ -244,7 +246,12 @@ module Bytecode = struct
   let does_symbol_exist ~bytecode_or_asm_symbol =
     Option.is_some (unsafe_get_global_value ~bytecode_or_asm_symbol)
 
-  let finish (ic, _filename, _digest) =
+  let finish (ic, _filename, _digest, restore_symtable) =
+    begin match restore_symtable with
+    | Some old_state ->
+      Symtable.hide_additions old_state
+    | None -> ()
+    end;
     close_in ic
 end
 
