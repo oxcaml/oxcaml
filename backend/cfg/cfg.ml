@@ -355,6 +355,9 @@ let is_pure_basic : basic -> bool = function
     (* May reallocate the stack. *)
     false
 
+let is_dead_basic (instr : basic instruction) ~live_after =
+  is_pure_basic instr.desc && Reg.disjoint_set_array live_after instr.res
+
 let same_location (r1 : Reg.t) (r2 : Reg.t) =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:"Cfg got unknown register location." r1 r2
