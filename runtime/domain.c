@@ -64,9 +64,6 @@ typedef cpuset_t cpu_set_t;
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/dynamic.h"
-#include "caml/finalise.h"
-#include "caml/gc_ctrl.h"
-#include "caml/globroots.h"
 #include "caml/intext.h"
 #include "caml/major_gc.h"
 #include "caml/minor_gc.h"
@@ -77,11 +74,8 @@ typedef cpuset_t cpu_set_t;
 #include "caml/platform.h"
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
-#include "caml/startup.h"
 #include "caml/startup_aux.h"
 #include "caml/sync.h"
-#include "caml/weak.h"
-#include "sync_posix.h"
 
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
