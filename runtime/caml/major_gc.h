@@ -18,6 +18,11 @@
 
 #ifdef CAML_INTERNALS
 
+#include "config.h"
+#include "domain_state.h"
+#include "misc.h"
+#include "mlvalues.h"
+
 typedef enum {
   Phase_sweep_main,
   Phase_sweep_and_mark_main,

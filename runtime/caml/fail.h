@@ -22,6 +22,9 @@
 
 #include "misc.h"
 #include "mlvalues.h"
+#include <stdint.h>
+#include "config.h"
+#include "domain_state.h"
 
 #ifdef CAML_INTERNALS
 /* Built-in exceptions. In bytecode, these exceptions are the first fields in

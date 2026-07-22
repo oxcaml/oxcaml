@@ -21,6 +21,7 @@
 #ifdef CAML_INTERNALS
 
 #include "camlatomic.h"
+#include "config.h"
 #include "misc.h"
 #include "mlvalues.h"
 
