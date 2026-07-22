@@ -1785,6 +1785,15 @@ let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
     Flambda_arity.unarize
       (Flambda_arity.from_lambda_list [layout] ~machine_width)
   in
+  if
+    List.compare_lengths kinds offsets <> 0
+    || List.compare_lengths kinds new_values <> 0
+  then
+    Misc.fatal_errorf
+      "write_offset: layout %a unarizes to %d kind(s) and %d offset(s), but %d \
+       new value(s) were supplied"
+      Printlambda.layout layout (List.length kinds) (List.length offsets)
+      (List.length new_values);
   let writes =
     Misc.Stdlib.List.map3
       (fun kind offset new_value ->
@@ -1841,15 +1850,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
           shape
       in
-      let args =
-        let new_indexes_to_old_indexes =
-          Mixed_block_shape.new_indexes_to_old_indexes shape
-        in
-        let args = Array.of_list args in
-        Array.init (Array.length args) (fun new_index ->
-            args.(new_indexes_to_old_indexes.(new_index)))
-        |> Array.to_list
-      in
       let flattened_reordered_shape =
         Mixed_block_shape.flattened_reordered_shape shape
       in
@@ -1860,6 +1860,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
            shape length (%d)"
           (List.length args)
           (Array.length flattened_reordered_shape);
+      let args =
+        let new_indexes_to_old_indexes =
+          Mixed_block_shape.new_indexes_to_old_indexes shape
+        in
+        let args = Array.of_list args in
+        Array.init (Array.length args) (fun new_index ->
+            args.(new_indexes_to_old_indexes.(new_index)))
+        |> Array.to_list
+      in
       let args =
         List.mapi
           (fun new_index arg ->
@@ -1900,18 +1909,36 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       |> Flambda_arity.Component_for_creation.from_lambda ~machine_width
     in
     let field_arity = Flambda_arity.create [field_arity_component] in
-    let num_fields_prior_to_projected_fields =
+    (* "Components" below refers to the unarized components of the block, as
+       distinct from the source-level fields of the unboxed product; the
+       projected field occupies a contiguous range of such components. *)
+    let num_components_prior_to_projected_field =
       Misc.Stdlib.List.split_at n layouts
       |> fst
       |> List.map
            (Flambda_arity.Component_for_creation.from_lambda ~machine_width)
       |> Flambda_arity.create |> Flambda_arity.cardinal_unarized
     in
-    let num_projected_fields = Flambda_arity.cardinal_unarized field_arity in
+    let num_projected_components =
+      Flambda_arity.cardinal_unarized field_arity
+    in
     let projected_args =
-      List.hd orig_args |> Array.of_list
-      |> (fun a ->
-      Array.sub a num_fields_prior_to_projected_fields num_projected_fields)
+      let unarized_args = List.hd orig_args |> Array.of_list in
+      if
+        num_components_prior_to_projected_field + num_projected_components
+        > Array.length unarized_args
+      then
+        Misc.fatal_errorf
+          "Punboxed_product_field: projection of field %d requires unarized \
+           components %d to %d (inclusive), but only %d unarized argument(s) \
+           were supplied:@ %a"
+          n num_components_prior_to_projected_field
+          (num_components_prior_to_projected_field + num_projected_components
+         - 1)
+          (Array.length unarized_args)
+          Printlambda.primitive prim;
+      Array.sub unarized_args num_components_prior_to_projected_field
+        num_projected_components
       |> Array.to_list
     in
     List.map (fun arg : H.expr_primitive -> Simple arg) projected_args
@@ -3263,6 +3290,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Flambda_arity.unarize
         (Flambda_arity.from_lambda_list [layout] ~machine_width)
     in
+    if List.compare_lengths kinds offsets <> 0
+    then
+      Misc.fatal_errorf
+        "%a: layout unarizes to %d kind(s) but %d offset(s) were computed"
+        Printlambda.primitive prim (List.length kinds) (List.length offsets);
     let reads =
       List.map2
         (fun kind offset ->
@@ -3295,6 +3327,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Flambda_arity.unarize
         (Flambda_arity.from_lambda_list [layout] ~machine_width)
     in
+    if List.compare_lengths kinds offsets <> 0
+    then
+      Misc.fatal_errorf
+        "%a: layout unarizes to %d kind(s) but %d offset(s) were computed"
+        Printlambda.primitive prim (List.length kinds) (List.length offsets);
     let reads =
       List.map2
         (fun kind offset ->

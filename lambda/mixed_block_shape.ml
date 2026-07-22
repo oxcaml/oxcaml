@@ -146,14 +146,24 @@ let new_block_length t = Array.length t.flattened_reordered_shape
 
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
+  let check_index index trees =
+    if index < 0 || index >= Array.length trees
+    then
+      Misc.fatal_errorf
+        "Field index %d in path (%a) is out of range for shape:@ %a" index
+        (Format.pp_print_list Format.pp_print_int)
+        original_path print t
+  in
   match path with
   | [] -> Misc.fatal_errorf "No path provided:@ %a" print t
   | index :: path ->
+    check_index index forest;
     let tree = forest.(index) in
     let rec lookup_path' path tree =
       match path, tree with
       | [], Leaf { new_index; _ } -> [new_index]
       | index :: path, Node { children; _ } ->
+        check_index index children;
         lookup_path' path children.(index)
       | [], Node { children } -> flatten_tree_array children
       | _ :: _, Leaf _ ->
