@@ -1218,6 +1218,8 @@ module Joined_envs : sig
 
   val keys : t -> Index.Set.t
 
+  val exists_in_all_joined_envs : t -> _ Index.Map.t -> bool
+
   (** Returns the aliases of a variable in all the environments where it exists.
 
       The provided variable {b must} be defined in the current compilation unit.
@@ -1260,6 +1262,9 @@ end = struct
     | Some (_, { current; _ }) -> current
 
   let keys t = Index.Map.keys (envs_and_equations t)
+
+  let exists_in_all_joined_envs t m =
+    Index.Map.subset_domain (envs_and_equations t) m
 
   let get_canonical_simple_ignoring_name_mode typing_env simple =
     Simple_in_one_joined_env.create
@@ -1624,7 +1629,26 @@ let add_to_inverse_relations inverse_relations name relation ~scrutinee =
     (Name.Map.singleton name
        (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
 
-let recover_inverse_relations inverse_relations name ty =
+let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
+    ty =
+  (* We can only recover inverse relations if the type we are recovering from is
+     valid in all the joined environments.
+
+     If we have a type [x : Variant (is_int = y)] for [x], but [x] only exists
+     in a subset of the joined environments, then the equation [y = %is_int x]
+     is only valid in those environments -- in particular, if [y] exists in more
+     environments than [x], it is unsound to include that equation in the target
+     environment.
+
+     We avoid this situation by only recovering relations if the type we are
+     recovering from exists in all the joined environments -- this ensures that
+     the variables mentioned in the type cannot exist in more environments than
+     the type itself.
+
+     CR-someday bclement: We could be more precise here by recovering relations
+     if they are valid in all the environments where the involved variables are
+     defined, but it is not clear if that would actually be useful. *)
+  assert exists_in_all_joined_envs;
   match TG.descr ty with
   | Value (Ok (No_alias { is_null = Not_null; non_null = Ok head })) -> (
     match head with
@@ -1734,8 +1758,17 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
       with
       | Unknown, t -> types_in_target_env, inverse_relations, t
       | Known ty, t ->
+        let exists_in_all_joined_envs =
+          Joined_envs.exists_in_all_joined_envs t.joined_envs types
+        in
         let ty, inverse_relations =
-          recover_inverse_relations inverse_relations (name :> Name.t) ty
+          if exists_in_all_joined_envs
+          then
+            recover_inverse_relations ~exists_in_all_joined_envs
+              inverse_relations
+              (name :> Name.t)
+              ty
+          else ty, inverse_relations
         in
         let ty = Type_in_target_env.create ty in
         ( Name_in_target_env.Map.add name ty types_in_target_env,
