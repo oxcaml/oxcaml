@@ -1772,7 +1772,7 @@ let tree_of_typexp mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
-  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  if Ctype.contains_initial_stage_splice (Env.stage !printing_env :> int) ty
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)

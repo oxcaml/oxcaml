@@ -148,7 +148,7 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
-val contains_toplevel_splice: int -> type_expr -> bool
+val contains_initial_stage_splice: int -> type_expr -> bool
 val iter_type_expr_with_stages:
         (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
 
