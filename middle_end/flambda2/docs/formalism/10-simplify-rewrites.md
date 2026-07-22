@@ -531,7 +531,10 @@ STATIC (encoded in the primitive payload) or DYNAMIC (a Simple operand):
     String load to mutable bytes, so the primitive alone does not guarantee
     immutability); constant-index loads from statically-known string contents
     fold directly in simplify_string_or_bigstring_load (contents ride
-    String_info in the types domain, so no per-load projection is needed).
+    String_info in the types domain, so no per-load projection is needed —
+    PENDING UPSTREAM: this fold lives on the `flambda2-string-load-fold`
+    branch, commit 9712d270eb, not yet in mainline; the NOT-CSE-eligible
+    fact already holds there; proviso lifts when the branch lands).
     Variable-index immutable string loads are never shared. Bytes/Bigstring
     loads: neither mechanism (mutable).
 NOTES: Sharpens the corrected S.Rewrite.CSE.Eligible into a design invariant WITH

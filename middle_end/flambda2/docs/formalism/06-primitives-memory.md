@@ -1188,6 +1188,11 @@ primitives may be applied to *bytes*, so the String tag does not imply the
 storage is immutable (witnessed by tests/prim-bigstring/string_access.ml).
 The fold above is still sound because Contents-known String_info arises only
 from genuine immutable string literals (this_immutable_string).
+PENDING UPSTREAM: the contents-known fold described here is implemented on
+the `flambda2-string-load-fold` branch (commit 9712d270eb), not yet in the
+compiler's mainline, where simplify_string_or_bigstring_load is a stub; the
+CSE-ineligibility fact itself (eligibility = false) already holds in
+mainline. This proviso lifts when that branch lands.
 ```
 
 ### Phys_equal
