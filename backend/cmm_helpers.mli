@@ -114,10 +114,14 @@ val infix_header : int -> nativeint
 
 val black_custom_header : size:int -> nativeint
 
-(** [unit_*_header] variants emit white (UNMARKED) headers for static data of
-    unloadable compilation units, and black headers otherwise. The choice is
-    driven by [!Clflags.unit_is_unloadable]. Use these in to_cmm code paths that
-    emit static data for the current CU. *)
+(** [unit_*_header] variants are aliases for the corresponding black-header
+    functions. Static data of unloadable compilation units is also emitted black
+    (NOT_MARKABLE): the blocks are invisible to the GC while the unit's
+    initialiser runs and are donated to the major heap afterwards (via
+    [caml_activate_unloadable_unit]), which forces their headers to the current
+    allocation colour. Use these in to_cmm code paths that emit static data for
+    the current CU, i.e. blocks that end up inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket. *)
 val unit_block_header : int -> int -> nativeint
 
 val unit_mixed_block_header :
@@ -762,33 +766,20 @@ val cdefine_symbol : symbol -> data_item list
     contain additional data items afterwards). *)
 val emit_block : symbol -> nativeint -> data_item list -> data_item list
 
-(** Like [emit_block], but uses a white header for unloadable compilation units
-    and a black header otherwise (gated by [!Clflags.unit_is_unloadable]). Use
-    this for static data belonging to the CU under compilation. In unloadable
-    mode, also registers the symbol via [register_unloadable_data_block_symbol].
-*)
+(** Like [emit_block], but for static data belonging to the CU under compilation
+    (in unloadable mode, blocks emitted this way end up inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket). *)
 val emit_unit_block : symbol -> nativeint -> data_item list -> data_item list
 
-(** When true, [emit_unit_block] does not register the emitted symbol with
-    [unloadable_data_block_symbols]. The to_cmm Code_block emission pass sets
-    this around its emit calls because Code_blocks are tracked separately via
-    the runtime's [code_blocks] list. *)
-val suppress_unloadable_data_block_tracking : bool ref
+(** The CU-relative basenames of the symbols bracketing the contiguous run of
+    static data blocks in an unloadable CU. Everything between the two symbols
+    must be well-formed blocks with no intervening padding; the JIT loader
+    passes the delimited region to the runtime, which donates it to the major
+    heap as a heap extent once the unit's initialiser has run. The full linkage
+    names are obtained via [make_symbol]. *)
+val unloadable_blocks_start_symbol_basename : string
 
-(** Register a static data block symbol as belonging to the current (unloadable)
-    compilation unit. No-op if the CU is not unloadable, or if
-    [suppress_unloadable_data_block_tracking] is set. Used by emit paths that do
-    not go through [emit_unit_block] (notably static set-of-closures blocks). *)
-val register_unloadable_data_block_symbol : symbol -> unit
-
-(** Retrieve and clear the list of unloadable data block symbols accumulated
-    since the last flush. Called once per compilation unit by [to_cmm.ml]. *)
-val flush_unloadable_data_block_symbols : unit -> symbol list
-
-(** The CU-relative basename of the static array emitted by to_cmm to enumerate
-    unloadable data block addresses. The full linkage name is obtained via
-    [make_symbol]. *)
-val unloadable_data_blocks_symbol_basename : string
+val unloadable_blocks_end_symbol_basename : string
 
 (** Register an unloadable function entry's linkage name so that to_cmm can emit
     the [unloadable_code_blocks] sentinel array. No-op if the CU is not

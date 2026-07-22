@@ -38,12 +38,17 @@ val register_unloadable_unit :
   nativeint
   (* Address of the unit's code-blocks sentinel array:
      [count; entry_1; code_block_1; ...; entry_count; code_block_count]. *) ->
-  nativeint
-  (* Address of the unit's data-blocks sentinel array:
-     [count; addr_1; ...; addr_count]. 0n if absent. *) ->
+  nativeint (* unloadable_blocks_start *) ->
+  nativeint (* unloadable_blocks_end *) ->
   nativeint (* code_end *) ->
   nativeint (* frametable, or 0n if absent *) ->
   nativeint (* gc_roots, or 0n if absent *) ->
   nativeint (* JIT buffer base address *) ->
   int (* JIT buffer size in bytes *) ->
-  unit
+  nativeint (* unit handle for [activate_unloadable_unit] *)
+
+(** Activate a registered unloadable unit: unregister its gc_roots
+    dyn-globals and donate its static-block region to the major heap as a
+    heap extent. Must be called exactly once, after the unit's initialiser
+    has finished (normally or with an exception). *)
+val activate_unloadable_unit : nativeint -> unit

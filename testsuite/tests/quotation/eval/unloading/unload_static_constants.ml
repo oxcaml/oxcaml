@@ -1,7 +1,6 @@
 (* TEST
   include eval;
   flags = "-extension runtime_metaprogramming";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)

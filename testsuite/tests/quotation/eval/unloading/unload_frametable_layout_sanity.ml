@@ -1,6 +1,5 @@
 (* TEST
   modules = "unload_frametable_layout_sanity_.c";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)

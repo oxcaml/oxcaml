@@ -282,26 +282,19 @@ let white_closure_header sz = block_header Obj.closure_tag sz
 
 let black_closure_header sz = black_block_header Obj.closure_tag sz
 
-(* CU-appropriate variants: emit white (UNMARKED) headers for static data
-   belonging to an unloadable compilation unit, otherwise black headers.
-   Unloadable CU static data must be UNMARKED so that it remains scan-eligible
-   during the major GC mark phase, allowing unreferenced code/data blocks to be
-   collected. AOT (non-unloadable) CU static data continues to be black to
-   preserve the existing no-naked-pointers contract. *)
-let unit_block_header tag sz =
-  if !Clflags.unit_is_unloadable
-  then block_header tag sz
-  else black_block_header tag sz
+(* CU-appropriate variants. Static data always gets black (NOT_MARKABLE)
+   headers, including for unloadable compilation units: an unloadable unit's
+   static blocks remain invisible to the GC (exactly like AOT static data) while
+   the unit's initialiser runs, and are only donated to the major heap
+   afterwards, by [caml_activate_unloadable_unit] — which forces every block
+   header to the current allocation colour at that point. These aliases mark the
+   emission sites whose blocks end up inside the donated region. *)
+let unit_block_header tag sz = black_block_header tag sz
 
 let unit_mixed_block_header tag sz ~scannable_prefix_len =
-  if !Clflags.unit_is_unloadable
-  then white_mixed_block_header tag sz ~scannable_prefix_len
-  else black_mixed_block_header tag sz ~scannable_prefix_len
+  black_mixed_block_header tag sz ~scannable_prefix_len
 
-let unit_closure_header sz =
-  if !Clflags.unit_is_unloadable
-  then white_closure_header sz
-  else black_closure_header sz
+let unit_closure_header sz = black_closure_header sz
 
 let local_closure_header sz = local_block_header Obj.closure_tag sz
 
@@ -4275,33 +4268,13 @@ let emit_block symb white_header cont =
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
 
-(* Tracking of static data blocks in unloadable CUs. The symbols registered here
-   are emitted in [to_cmm.ml]'s unit emission as a static array
-   ("unloadable_data_blocks") that the runtime registration path reads to
-   populate the [data_blocks] field of [caml_unloadable_unit]. The runtime needs
-   this list to normalize surviving units' block headers at end of major cycle.
-   [Code_block]s are tracked in a parallel sentinel array
-   ("unloadable_code_blocks") via [register_unloadable_code_block_entry] below.
+(* Tracking of (function-entry linkage name) for each unloadable function in the
+   CU. The corresponding [Code_block] linkage name is reconstructed via
+   [code_block_symbol_name].
 
    File-global state is OK here because compilation is serial (one CU per
    process); concurrent CU compilation would need this threaded through the
    to_cmm context. *)
-let unloadable_data_block_symbols : Cmm.symbol list ref = ref []
-
-let suppress_unloadable_data_block_tracking = ref false
-
-let register_unloadable_data_block_symbol sym =
-  if !Clflags.unit_is_unloadable && not !suppress_unloadable_data_block_tracking
-  then unloadable_data_block_symbols := sym :: !unloadable_data_block_symbols
-
-let flush_unloadable_data_block_symbols () =
-  let r = !unloadable_data_block_symbols in
-  unloadable_data_block_symbols := [];
-  r
-
-(* Tracking of (function-entry linkage name) for each unloadable function in the
-   CU. The corresponding [Code_block] linkage name is reconstructed via
-   [code_block_symbol_name]. *)
 let unloadable_code_block_entries : string list ref = ref []
 
 let register_unloadable_code_block_entry entry_linkage_name =
@@ -4315,48 +4288,34 @@ let flush_unloadable_code_block_entries () =
   unloadable_code_block_entries := [];
   r
 
-(* The known name (relative to the current compilation unit) of the static array
-   emitted by to_cmm to enumerate unloadable static data blocks. The JIT loader
-   looks up this symbol and passes its address to the runtime. *)
-let unloadable_data_blocks_symbol_basename = "unloadable_data_blocks"
-
-(* The known name of the parallel sentinel array that lists every unloadable
-   function in the CU as (entry_address, code_block_address) pairs. Layout:
-   [count; entry_1; code_block_1; ...; entry_count; code_block_count]. *)
+(* The known name of the sentinel array that lists every unloadable function in
+   the CU as (entry_address, code_block_address) pairs. Layout: [count; entry_1;
+   code_block_1; ...; entry_count; code_block_count]. *)
 let unloadable_code_blocks_symbol_basename = "unloadable_code_blocks"
 
-(* CU-appropriate emit: in unloadable mode, [Global] symbols get a white
-   (UNMARKED) header and are registered for end-of-cycle normalization; [Local]
-   symbols get a black (NOT_MARKABLE) header and are never tracked. Outside
-   unloadable mode, every symbol gets a black header.
+(* The known names (relative to the current compilation unit) of the symbols
+   bracketing the contiguous run of static data blocks in an unloadable CU. The
+   JIT loader passes the delimited region to the runtime, which donates it to
+   the major heap as a heap extent once the unit's initialiser has run
+   ([caml_activate_unloadable_unit]). Every emitted item between the two symbols
+   must be a well-formed block (header word followed by its fields), with no
+   padding in between: the extent machinery walks the region
+   header-by-header. *)
+let unloadable_blocks_start_symbol_basename = "unloadable_blocks_start"
 
-   Why the split: white-headered blocks must be re-marked to MARKED at the end
-   of each surviving cycle so the imminent color rotation maps them to UNMARKED
-   for the next cycle. A white-headered block that is *not* tracked would have
-   its bits left at zero, which the next cycle interprets as GARBAGE — any heap
-   pointer reaching it would then trip [!Has_status_hd(hd, GARBAGE)] in the
-   debug runtime (or read evicted bits in release).
+let unloadable_blocks_end_symbol_basename = "unloadable_blocks_end"
 
-   We can't put [Local] symbols in the per-unit [unloadable_data_blocks] array
-   because Mach-O cannot relocate [Csymbol_address] entries to a Local symbol
-   cross-section. So [Local] symbols use a black header, which the mark scan
-   treats as NOT_MARKABLE (skipped, never asserted on). This is safe because
-   Local symbols are CU-private — no heap pointer from another CU can reach
-   them, and within the unit any Global ancestor block whose fields reference a
-   Local block IS tracked, so the unit cannot be unloaded while a Local block is
-   still transitively heap-reachable. *)
-let emit_unit_block symb white_header cont =
-  let header =
-    if !Clflags.unit_is_unloadable
-    then
-      match symb.sym_global with
-      | Global ->
-        register_unloadable_data_block_symbol symb;
-        white_header
-      | Local -> Nativeint.logor white_header caml_black
-    else Nativeint.logor white_header caml_black
-  in
-  (Cint header :: cdefine_symbol symb) @ cont
+(* CU-appropriate emit: currently identical to [emit_block]; the separate name
+   marks the emission sites for static data belonging to the CU under
+   compilation, i.e. blocks that (in unloadable mode) end up inside the
+   [unloadable_blocks_start]/[unloadable_blocks_end] bracket. Zero-wosize blocks
+   (empty arrays, dependency-free [Code_block]s, an empty module block) are
+   permitted: the heap-extent machinery keeps block sizes in its free-block
+   headers, so it can manage them like any others. [To_cmm] emits a terminal
+   padding block so that a zero-wosize block is never the last block in the
+   bracket (its value — one word past its header — must remain a valid address
+   within the donated region). *)
+let emit_unit_block symb white_header cont = emit_block symb white_header cont
 
 let emit_string_constant_fields s cont =
   let n = size_int - 1 - (String.length s mod size_int) in

@@ -76,27 +76,17 @@ let emit_code_block_for ~all_code (code : Code.t) res =
     let n_fields = List.length dep_fields in
     let header = C.unit_block_header Runtimetags.code_block_tag n_fields in
     let block_sym = code_block_symbol_for code_id in
-    (* Suppress unloadable_data_block tracking for Code_blocks: they are tracked
-       separately via the runtime's [code_blocks] list (located by the JIT
-       loader using the [_code_block] symbol-name suffix). *)
-    let prev = !C.suppress_unloadable_data_block_tracking in
-    C.suppress_unloadable_data_block_tracking := true;
     let data_items = C.emit_unit_block block_sym header dep_fields in
-    C.suppress_unloadable_data_block_tracking := prev;
     R.add_archive_data_items res data_items
 
 (* The entry function's [Code_block] has zero dependency fields, even though the
    entry calls top-level functions in the unit and references the unit's static
-   data. The entry is only on-stack during initialisation (so F.2 keeps its
-   [Code_block] alive while running), and once [Eval.eval] returns nothing
-   reaches the entry's Code_block.
-
-   If a major GC fires *during* eval'd initialisation and walks the running
-   entry, the entry's Code_block is darkened but the rest of the unit is not
-   marked through its dep fields — only through whatever the stack and closures
-   already point at. This is fine because every same-CU function the entry
-   transitively calls is itself reachable via stack frames or live closures at
-   that point. *)
+   data. This is fine because the unit's static blocks are only donated to the
+   major heap *after* the initialiser has finished
+   ([caml_activate_unloadable_unit]): while the entry runs, the GC does not
+   manage the unit's blocks at all, so nothing depends on the entry's dep
+   fields. Once [Eval.eval] returns, nothing reaches the entry's Code_block and
+   it is reclaimed with the rest of the unit's dead blocks. *)
 let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
   if not !Clflags.unit_is_unloadable
   then res
@@ -108,11 +98,5 @@ let emit_entry_code_block ~(entry_sym : Cmm.symbol) res =
       }
     in
     let header = C.unit_block_header Runtimetags.code_block_tag 0 in
-    (* Suppress data-block tracking: Code_blocks are tracked separately via the
-       unit's [unloadable_code_blocks] sentinel array (see [to_cmm.ml] and the
-       JIT loader). *)
-    let prev = !C.suppress_unloadable_data_block_tracking in
-    C.suppress_unloadable_data_block_tracking := true;
     let data_items = C.emit_unit_block block_sym header [] in
-    C.suppress_unloadable_data_block_tracking := prev;
     R.add_archive_data_items res data_items)

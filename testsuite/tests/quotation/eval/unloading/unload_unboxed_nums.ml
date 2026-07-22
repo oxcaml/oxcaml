@@ -2,7 +2,6 @@
   include eval;
   include stdlib_upstream_compatible;
   flags = "-extension runtime_metaprogramming";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)

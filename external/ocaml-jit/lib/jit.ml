@@ -264,10 +264,10 @@ let jit_load (type a r)
   (* If the compilation unit emitted an [unloadable_code_blocks] sentinel
      symbol, register the unit with the runtime so the GC can detect
      when the unit becomes unreachable and unload its text/data buffers.
-     Both the code-blocks and data-blocks sentinels are looked up by
-     exact linker name (constructed from [phrase_name]) — no symbol-table
-     scan by suffix. *)
-  let entry_points =
+     The sentinel and the [unloadable_blocks_start]/[unloadable_blocks_end]
+     bracket symbols are looked up by exact linker name (constructed from
+     [phrase_name]) — no symbol-table scan by suffix. *)
+  let entry_points, unloadable_unit_handle =
     let prefix = symbol_prefix () in
     let separator = "__" in
     let sentinel_name basename =
@@ -280,9 +280,13 @@ let jit_load (type a r)
     in
     let code_blocks_table_addr = sentinel "unloadable_code_blocks" in
     if Nativeint.equal code_blocks_table_addr 0n
-    then entry_points
+    then (entry_points, None)
     else
-      let data_blocks_table_addr = sentinel "unloadable_data_blocks" in
+      let blocks_start_addr = sentinel "unloadable_blocks_start" in
+      let blocks_end_addr = sentinel "unloadable_blocks_end" in
+      if Nativeint.equal blocks_start_addr 0n
+         || Nativeint.equal blocks_end_addr 0n
+      then failwithf "unloadable_blocks_start/end missing for unloadable unit";
       let code_end_addr =
         match entry_points.code_end with
         | Some addr -> Address.to_nativeint addr
@@ -298,19 +302,21 @@ let jit_load (type a r)
         | Some addr -> Address.to_nativeint addr
         | None -> 0n
       in
-      (* Registration window safety: between this call and [jit_run],
-         a major GC on another domain might scan via gc_roots, the
-         frametable, or registered code fragments — all of which are
-         now visible. The unit's static blocks are born-marked
-         (white -> MARKED via [normalize_block_color]) and the
-         entry's Code_block has zero dep fields, so a scan in this
-         window cannot dereference a not-yet-populated field. F.2
-         return-address scans cannot land in our text range because
-         no thread has yet entered this unit's code. *)
-      Externals.register_unloadable_unit code_blocks_table_addr
-        data_blocks_table_addr code_end_addr frametable_addr gc_roots_addr
-        (Address.to_nativeint buffer_base)
-        buffer_size;
+      (* Registration window safety: between this call and the activation
+         after [jit_run], the unit's static blocks keep their NOT_MARKABLE
+         emission headers, so the GC treats them exactly like AOT static
+         data (invisible to marking and sweeping); heap values stored into
+         them during initialisation are kept alive by the gc_roots
+         dyn-globals registration performed here. Only the activation call
+         below donates the blocks to the major heap, making the unit
+         eligible for reclamation. *)
+      let handle =
+        Externals.register_unloadable_unit code_blocks_table_addr
+          blocks_start_addr blocks_end_addr code_end_addr frametable_addr
+          gc_roots_addr
+          (Address.to_nativeint buffer_base)
+          buffer_size
+      in
       (* The unloadable-unit registration owns the frame table, gc_roots
          and code-fragment registrations — drop them from [entry_points]
          so [jit_run] (the legacy non-unloadable path) does not also
@@ -319,14 +325,43 @@ let jit_load (type a r)
          when a freed unit's buffer address gets reused by a later unit.
          [data_begin]/[data_end] go to [caml_page_table_add] under
          runtime 4 only, so leaving them is harmless on runtime 5. *)
-      { entry_points with
-        frametable = None;
-        gc_roots = None;
-        code_begin = None;
-        code_end = None;
-      }
+      ( { entry_points with
+          frametable = None;
+          gc_roots = None;
+          code_begin = None;
+          code_end = None;
+        },
+        Some handle )
   in
-  let result = jit_run entry_points in
+  let result =
+    match unloadable_unit_handle with
+    | None -> jit_run entry_points
+    | Some handle ->
+      (* Activate the unit — dropping its gc_roots registration and donating
+         its static blocks to the major heap — once the initialiser has
+         finished, whether it returned or raised. On the exception path the
+         unit is typically unreferenced and the GC will reclaim it in due
+         course.
+
+         Before activating, pin the unit's module block in
+         [unloadable_pin]: from activation onwards the unit is kept alive
+         only by references the GC can see, and the caller has not yet had
+         a chance to obtain one (it looks the module block up by symbol
+         name after we return). The pin is a global of this (AOT) library,
+         so the GC scans it every cycle. [Eval.eval] clears it via
+         [clear_unloadable_pin] once it holds the module block as an
+         ordinary value; otherwise it is overwritten on the next load. *)
+      Fun.protect
+        ~finally:(fun () ->
+          (match
+             Symbols.find local_symbols
+               (Printf.sprintf "%scaml%s" (symbol_prefix ()) phrase_name)
+           with
+          | Some addr -> Globals.unloadable_pin := Some (Address.to_obj addr)
+          | None -> ());
+          Externals.activate_unloadable_unit handle)
+        (fun () -> jit_run entry_points)
+  in
   outcome_ref := Some result
 
 (* JIT callback that handles architecture-agnostic packed sections *)
@@ -421,6 +456,8 @@ let jit_load_program_top ~phrase_name ppf program :
   match jit_load_program ~phrase_name ppf program with
   | Result obj -> Result obj
   | Exception exn -> Exception exn
+
+let clear_unloadable_pin () = Globals.unloadable_pin := None
 
 let jit_lookup_symbol symbol =
   (* Try with symbol prefix first (e.g., "_" on macOS) *)

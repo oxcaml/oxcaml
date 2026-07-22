@@ -1,7 +1,6 @@
 (* TEST
   include eval;
   flags = "-extension runtime_metaprogramming -I ${ocamlsrcdir}/utils";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)

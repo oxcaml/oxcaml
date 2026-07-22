@@ -326,7 +326,16 @@ void caml_unregister_frametable_from_stw_single(intnat *frametable)
   /* Caller must hold the STW barrier (e.g. from
      [cycle_major_heap_from_stw_single]). Walks the frametables linked list
      for an entry whose [frametable] field matches [frametable], unlinks it,
-     and rebuilds the descriptor hashtable from the remaining entries. */
+     and rebuilds the descriptor hashtable from the remaining entries.
+
+     Unlike [caml_unregister_frametables], this removes the descriptors
+     immediately rather than parking the entry on the zombie list, so the
+     frametable memory may be freed as soon as this returns. This is what
+     the unloadable-unit unload path needs: its frametables live inside the
+     unit's buffer (they cannot be copied on registration because
+     [retaddr_rel] fields are 32-bit self-relative and the buffer is not
+     guaranteed to be within 2GB of any copy), and the buffer is freed
+     during the same STW section. */
   caml_frametable_list **link = &current_frame_descrs.frametables;
   caml_frametable_list *removed = NULL;
   while (*link != NULL) {

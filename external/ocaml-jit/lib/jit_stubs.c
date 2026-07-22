@@ -364,9 +364,12 @@ struct jit_unit_loader_data {
 };
 
 static void jit_unit_on_unload(struct caml_unloadable_unit *u) {
-  /* Called from STW once the GC has determined the unit is unreachable.
-   * Frees the per-unit metadata arrays, restores the JIT buffer to RW so
-   * [free] is well-defined, and releases the buffer back to the allocator.
+  /* Called (under the STW barrier, from
+   * [caml_unloadable_process_pending_unloads]) once the GC has reclaimed
+   * the unit's heap-extent region and the runtime has removed the unit's
+   * code fragments and frame table. Frees the per-unit metadata arrays,
+   * restores the JIT buffer to RW so [free] is well-defined, and releases
+   * the buffer back to the allocator.
    *
    * This path only runs when unloading is supported (see
    * [jit_supports_unloading]); under that gate [jit_memalign] always uses
@@ -374,8 +377,6 @@ static void jit_unit_on_unload(struct caml_unloadable_unit *u) {
   struct jit_unit_loader_data *ld =
       (struct jit_unit_loader_data *)u->loader_data;
 
-  caml_stat_free(u->code_blocks);
-  caml_stat_free(u->data_blocks);
   caml_stat_free(u->text_ranges);
   caml_stat_free(u->text_range_fragnums);
 
@@ -406,21 +407,28 @@ static int cmp_uintnat(const void *a, const void *b) {
 }
 
 /* Build and register an [caml_unloadable_unit] for a JIT-emitted compilation
- * unit. Inputs are scalars from the OCaml side:
+ * unit. Called BEFORE the unit's initialiser runs; the returned handle must
+ * be passed to [jit_activate_unloadable_unit] once the initialiser has
+ * finished (normally or with an exception). Inputs are scalars from the
+ * OCaml side:
  *   - [code_blocks_table_addr]: address of the unit's [unloadable_code_blocks]
  *     sentinel array, layout
  *         [count; entry_1; code_block_1; ...; entry_count; code_block_count]
- *     The runtime uses [code_block_i] to populate the [code_blocks] field
- *     (mark-time darken targets) and [entry_i] to derive per-function text
- *     ranges [entry_i .. entry_{i+1}). Per-function fragments are needed so
+ *     The runtime uses [entry_i] to derive per-function text ranges
+ *     [entry_i .. entry_{i+1}). Per-function fragments are needed so
  *     that F.2 (stack-RA scan) can recover the entry from a return address
- *     via [caml_find_code_fragment_by_pc]->code_start.
- *   - [data_blocks_table_addr]: address of the [unloadable_data_blocks]
- *     sentinel, layout [count; addr_1; ...; addr_count]. May be 0n if the
- *     unit has no static data blocks.
+ *     via [caml_find_code_fragment_by_pc]->code_start. (The [code_block_i]
+ *     halves are no longer read here: liveness tracking is done by the
+ *     heap-extent machinery.)
+ *   - [blocks_start_addr] / [blocks_end_addr]: the unit's
+ *     [unloadable_blocks_start] / [unloadable_blocks_end] symbols,
+ *     delimiting the contiguous region of static data blocks that
+ *     activation donates to the major heap.
  *   - [code_end_addr]: address of the unit's [code_end] symbol; the upper
  *     bound of the last function's text range.
  *   - [frametable_addr]: address of the unit's frame table (or 0 if none).
+ *   - [gc_roots_addr]: address of the unit's [gc_roots] table (or 0);
+ *     registered as dyn-globals until activation.
  *   - [buffer_base_addr]: base of the JIT-allocated buffer covering both
  *     text and data; passed through to the on_unload callback for [free].
  *   - [buffer_size]: size of that buffer in bytes.
@@ -429,12 +437,12 @@ static int cmp_uintnat(const void *a, const void *b) {
  * runtime keeps them alive until the unit is unloaded, at which point the
  * installed [on_unload] callback releases everything. */
 CAMLprim value jit_register_unloadable_unit_native(
-    value code_blocks_table_addr, value data_blocks_table_addr,
-    value code_end_addr, value frametable_addr, value gc_roots_addr,
-    value buffer_base_addr, value buffer_size) {
-  CAMLparam5(code_blocks_table_addr, data_blocks_table_addr, code_end_addr,
-             frametable_addr, gc_roots_addr);
-  CAMLxparam2(buffer_base_addr, buffer_size);
+    value code_blocks_table_addr, value blocks_start_addr,
+    value blocks_end_addr, value code_end_addr, value frametable_addr,
+    value gc_roots_addr, value buffer_base_addr, value buffer_size) {
+  CAMLparam5(code_blocks_table_addr, blocks_start_addr, blocks_end_addr,
+             code_end_addr, frametable_addr);
+  CAMLxparam3(gc_roots_addr, buffer_base_addr, buffer_size);
 
   intnat *code_blocks_table =
       (intnat *)Nativeint_val(code_blocks_table_addr);
@@ -442,13 +450,15 @@ CAMLprim value jit_register_unloadable_unit_native(
    * would indicate a bug in the loader's sentinel lookup. */
   if (code_blocks_table == NULL)
     caml_failwith("jit_register_unloadable_unit: NULL code_blocks_table");
-  uintnat n_code = (uintnat)code_blocks_table[0];
-  uintnat n_funcs = n_code;
+  uintnat n_funcs = (uintnat)code_blocks_table[0];
 
-  intnat *data_blocks_table =
-      (intnat *)Nativeint_val(data_blocks_table_addr);
-  uintnat n_data = (data_blocks_table == NULL) ? 0
-                                               : (uintnat)data_blocks_table[0];
+  char *blocks_start = (char *)Nativeint_val(blocks_start_addr);
+  char *blocks_end = (char *)Nativeint_val(blocks_end_addr);
+  if (blocks_start == NULL || blocks_end == NULL
+      || blocks_end < blocks_start
+      || ((uintnat)blocks_start % sizeof(value)) != 0
+      || ((uintnat)(blocks_end - blocks_start) % sizeof(value)) != 0)
+    caml_failwith("jit_register_unloadable_unit: bad blocks range");
 
   /* Allocate every owned buffer up-front and check each. On any failure,
    * free everything allocated so far and raise. This avoids the
@@ -458,10 +468,6 @@ CAMLprim value jit_register_unloadable_unit_native(
       caml_stat_alloc_noexc(sizeof(struct caml_unloadable_unit));
   struct jit_unit_loader_data *ld =
       caml_stat_alloc_noexc(sizeof(struct jit_unit_loader_data));
-  value *code_blocks_buf =
-      (n_code > 0) ? caml_stat_alloc_noexc(n_code * sizeof(value)) : NULL;
-  value *data_blocks_buf =
-      (n_data > 0) ? caml_stat_alloc_noexc(n_data * sizeof(value)) : NULL;
   char **text_ranges_buf =
       (n_funcs > 0) ? caml_stat_alloc_noexc(2 * n_funcs * sizeof(char *))
                     : NULL;
@@ -471,15 +477,11 @@ CAMLprim value jit_register_unloadable_unit_native(
       (n_funcs > 0) ? caml_stat_alloc_noexc(n_funcs * sizeof(uintnat)) : NULL;
 
   if (u == NULL || ld == NULL
-      || (n_code > 0 && code_blocks_buf == NULL)
-      || (n_data > 0 && data_blocks_buf == NULL)
       || (n_funcs > 0 && text_ranges_buf == NULL)
       || (n_funcs > 0 && text_range_fragnums_buf == NULL)
       || (n_funcs > 0 && entries_sorted == NULL)) {
     caml_stat_free(u);
     caml_stat_free(ld);
-    caml_stat_free(code_blocks_buf);
-    caml_stat_free(data_blocks_buf);
     caml_stat_free(text_ranges_buf);
     caml_stat_free(text_range_fragnums_buf);
     caml_stat_free(entries_sorted);
@@ -487,14 +489,12 @@ CAMLprim value jit_register_unloadable_unit_native(
   }
 
   u->next = NULL;
-  u->num_code_blocks = n_code;
-  u->num_data_blocks = n_data;
+  u->blocks_base = (void *)blocks_start;
+  u->blocks_size = (size_t)(blocks_end - blocks_start);
   u->num_text_ranges = n_funcs;
   u->frametable = (intnat *)Nativeint_val(frametable_addr);
   u->gc_roots = (void *)Nativeint_val(gc_roots_addr);
   u->on_unload = &jit_unit_on_unload;
-  u->code_blocks = code_blocks_buf;
-  u->data_blocks = data_blocks_buf;
   u->text_ranges = text_ranges_buf;
   u->text_range_fragnums = text_range_fragnums_buf;
   u->loader_data = ld;
@@ -513,18 +513,10 @@ CAMLprim value jit_register_unloadable_unit_native(
   }
 
   /* Walk the [unloadable_code_blocks] sentinel: pairs of (entry, code_block)
-   * starting at index 1. The [code_blocks] array is the mark-time
-   * darken-target list; [entries_sorted] becomes the basis for per-function
-   * text ranges below. */
-  for (uintnat i = 0; i < n_code; i++) {
-    u->code_blocks[i] = (value)code_blocks_table[1 + 2 * i + 1];
+   * starting at index 1. [entries_sorted] becomes the basis for
+   * per-function text ranges below. */
+  for (uintnat i = 0; i < n_funcs; i++) {
     entries_sorted[i] = (uintnat)code_blocks_table[1 + 2 * i];
-  }
-
-  for (uintnat i = 0; i < n_data; i++) {
-    /* The array entries are stored as raw addresses (Csymbol_address, which
-     * the assembler emits as machine words). */
-    u->data_blocks[i] = (value)data_blocks_table[1 + i];
   }
 
   /* Sort entries by address and deduplicate. On Mach-O the assembler/
@@ -532,7 +524,9 @@ CAMLprim value jit_register_unloadable_unit_native(
    * for the same function entry, yielding repeated entries in the
    * sentinel; we collapse those here so per-function text ranges are
    * strictly increasing and no two code fragments share a [code_start]. */
-  qsort(entries_sorted, n_funcs, sizeof(uintnat), cmp_uintnat);
+  if (n_funcs > 0) {
+    qsort(entries_sorted, n_funcs, sizeof(uintnat), cmp_uintnat);
+  }
   uintnat n_unique = 0;
   for (uintnat i = 0; i < n_funcs; i++) {
     if (i == 0 || entries_sorted[i] != entries_sorted[i - 1]) {
@@ -558,27 +552,46 @@ CAMLprim value jit_register_unloadable_unit_native(
   caml_stat_free(entries_sorted);
 
   caml_register_unloadable_unit(u);
-  CAMLreturn(Val_unit);
+  CAMLreturn(caml_copy_nativeint((intnat)u));
 }
 
 CAMLprim value jit_register_unloadable_unit_bytecode(value *argv, int argn) {
   (void)argn;
   return jit_register_unloadable_unit_native(argv[0], argv[1], argv[2],
                                              argv[3], argv[4], argv[5],
-                                             argv[6]);
+                                             argv[6], argv[7]);
+}
+
+/* Activate a previously-registered unloadable unit: unregister its
+ * gc_roots dyn-globals and donate its static-block region to the major
+ * heap. Must be called exactly once per registered unit, after the unit's
+ * initialiser has finished (normally or with an exception). */
+CAMLprim value jit_activate_unloadable_unit(value unit_handle) {
+  CAMLparam1(unit_handle);
+  struct caml_unloadable_unit *u =
+      (struct caml_unloadable_unit *)Nativeint_val(unit_handle);
+  if (u == NULL)
+    caml_failwith("jit_activate_unloadable_unit: NULL unit handle");
+  caml_activate_unloadable_unit(u);
+  CAMLreturn(Val_unit);
 }
 #else
 CAMLprim value jit_register_unloadable_unit_native(
-    value a, value b, value c, value d, value e, value f, value g) {
+    value a, value b, value c, value d, value e, value f, value g, value h) {
   /* Unloadable units require runtime 5 (concurrent marker). */
-  (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
-  return Val_unit;
+  (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; (void)h;
+  return caml_copy_nativeint(0);
 }
 
 CAMLprim value jit_register_unloadable_unit_bytecode(value *argv, int argn) {
   (void)argn;
   return jit_register_unloadable_unit_native(argv[0], argv[1], argv[2],
                                              argv[3], argv[4], argv[5],
-                                             argv[6]);
+                                             argv[6], argv[7]);
+}
+
+CAMLprim value jit_activate_unloadable_unit(value unit_handle) {
+  (void)unit_handle;
+  return Val_unit;
 }
 #endif

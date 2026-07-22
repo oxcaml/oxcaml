@@ -14,23 +14,48 @@
 
 /* Runtime registration for unloadable compilation units. An unloadable unit
  * is a JIT-emitted (or Dynlink-loaded with opt-in) compilation unit whose
- * code and static data may be reclaimed by the GC at end of major cycle when
- * unreferenced.
+ * code and static data may be reclaimed by the GC when unreferenced.
  *
- * Each unit holds:
- *   - A list of [Code_block] addresses (one per function defined in the
- *     unit), each a heap-shaped block tagged [Code_block_tag] holding
- *     pointers to dependency [Code_block]s and data blocks.
- *   - A list of static-data block addresses (white-headed; unmarked at
- *     emission time per B.1).
- *   - A list of (text_start, text_end) ranges covering the JIT-emitted code
- *     for the unit. Each range is registered with the standard code-fragment
- *     table so [caml_find_code_fragment_by_pc] returns the fragment when a
- *     return address lands in unloadable code.
- *   - A pointer to the unit's frame table.
+ * The unit's static data blocks (including the per-function [Code_block]s)
+ * occupy one contiguous region which, once the unit's initialiser has run,
+ * is donated to the major heap as a heap extent
+ * ([caml_add_blocks_to_heap]). From that point the GC marks and sweeps
+ * those blocks like any other major-heap blocks; when every block in the
+ * extent has died, the extent's free callback fires and the unit is
+ * unloaded (code fragments removed, frame table unregistered, buffers
+ * freed via the loader's [on_unload] callback).
  *
- * The runtime structure owns no per-symbol mark bits and no dependency
- * arrays — those live in the heap-shaped [Code_block]s themselves. */
+ * The unit's code is kept alive through the [Code_block] dependency graph:
+ *   - Every function in the unit has a [Code_block] (tag [Code_block_tag])
+ *     in the extent whose fields are the function's direct dependencies
+ *     (other functions' [Code_block]s plus same-CU static data blocks).
+ *   - The word immediately before each function entry in [.text] holds the
+ *     address of that function's [Code_block] (the "back-pointer").
+ *   - The mark phase darkens [Code_block]s via three paths: the closure
+ *     function-slot walk (closinfo unloadable bit), the stack
+ *     return-address scan (FRAME_DESCRIPTOR_UNLOADABLE), and the stack
+ *     code-pointer-slot scan (FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS).
+ *
+ * Lifecycle:
+ *   1. [caml_register_unloadable_unit] (before the unit's initialiser
+ *      runs): registers code fragments and the frame table, and registers
+ *      the unit's [gc_roots] as dyn-globals. At this stage the unit's
+ *      static blocks still have their NOT_MARKABLE emission headers, so
+ *      the GC ignores them entirely, exactly as for AOT static data; the
+ *      dyn-globals scan keeps heap values stored into them alive.
+ *   2. [caml_activate_unloadable_unit] (after the initialiser has
+ *      returned, or raised): unregisters the dyn-globals and donates the
+ *      static-block region to the major heap as an extent. The extent
+ *      machinery forces every block to the current allocation colour, so
+ *      the unit survives the in-progress major cycle by construction.
+ *   3. When the GC finds the whole extent dead, the free callback runs
+ *      (from sweeping, with the usual finaliser-like restrictions): the
+ *      unit is unlinked from the registration list, the observability
+ *      counters are updated, and the unit is queued for unloading.
+ *   4. At the start of the next major cycle (under the STW barrier,
+ *      [caml_unloadable_process_pending_unloads]) the queued units'
+ *      code fragments are removed, their frame tables unregistered, and
+ *      the loader's [on_unload] callback frees the underlying buffers. */
 
 #ifndef CAML_UNLOADABLE_H
 #define CAML_UNLOADABLE_H
@@ -43,120 +68,89 @@
 struct caml_unloadable_unit {
   struct caml_unloadable_unit *next;
 
-  /* Code_block heap-shaped objects (tag = Code_block_tag) for each function
-   * defined in the unit. The mark phase darkens these via the closure /
-   * frame back-pointer paths (F.1 / F.2). */
-  value *code_blocks;
-  uintnat num_code_blocks;
-
-  /* Static-data block addresses for the unit. Headers are unmarked at
-   * emission time (B.1) so the standard mark scan can darken them when
-   * referenced; at end of cycle, surviving blocks are reset back to
-   * UNMARKED. */
-  value *data_blocks;
-  uintnat num_data_blocks;
+  /* Contiguous region holding every static data block of the unit
+   * (including [Code_block]s), delimited by the CU's
+   * [unloadable_blocks_start] / [unloadable_blocks_end] symbols. Donated
+   * to the major heap by [caml_activate_unloadable_unit]. */
+  void *blocks_base;
+  size_t blocks_size; /* in bytes */
 
   /* (text_start, text_end) pairs covering the unit's [.text] regions. Each
    * range is registered with the runtime code-fragment table; the fragnums
-   * are stored here so the end-of-major-cycle unload pass can remove
-   * them during unload. */
+   * are stored here so the unload path can remove them. */
   char **text_ranges; /* Flat: [s0, e0, s1, e1, ...]; length = 2 * num_text_ranges. */
   int *text_range_fragnums;
   uintnat num_text_ranges;
 
-  /* Frame table pointer (intnat[1+num]; first slot = entry count). The frame
-   * table is registered with [caml_register_frametables] at registration
-   * time. */
+  /* The unit's frame table (intnat[1+num]; first slot = entry count),
+   * inside the unit's buffer, or NULL if none. Registered directly with
+   * [caml_register_frametables] at registration time — it cannot be
+   * copied, because frame descriptors encode their return addresses as
+   * 32-bit self-relative offsets. Unregistered under the STW barrier
+   * (via [caml_unregister_frametable_from_stw_single]) immediately before
+   * the buffer is freed. */
   intnat *frametable;
 
-  /* Dyn-globals (gc_roots) pointer. Address of the unit's null-terminated
-   * [gc_roots] array; the major GC's global-root scan walks each entry to
-   * mark the unit's static blocks (per B.1 they have white headers, so this
-   * scan is the path that marks them when they are reachable). Registered
-   * with [caml_register_dyn_globals] at unit registration; removed via
-   * [caml_unregister_dyn_global] on unload. May be [NULL] if the unit has
-   * no gc_roots table (degenerate case). */
+  /* Dyn-globals (gc_roots) pointer, registered at registration time and
+   * removed again by [caml_activate_unloadable_unit]. Needed only while
+   * the unit's initialiser runs: during that window the unit's static
+   * blocks are not yet part of the heap, so heap values stored into them
+   * are kept alive by the dyn-globals field scan (as for AOT data). May
+   * be NULL. */
   void *gc_roots;
 
-  /* Optional callback invoked from STW when the unit has been determined
-   * unreachable and its registration has been removed. The loader uses this
-   * to [munmap] the text and data buffers and free the unit structure
-   * itself. May be [NULL] for transient test-only registrations. */
+  /* Optional callback invoked once the GC has reclaimed the unit's extent
+   * and its runtime registrations have been removed. The loader uses this
+   * to free the text/data buffer and the unit structure itself. Runs under
+   * the STW barrier (from [caml_unloadable_process_pending_unloads]); must
+   * not allocate on the OCaml heap or call back into OCaml. */
   void (*on_unload)(struct caml_unloadable_unit *);
 
-  /* Loader-private data (e.g. mmap base addresses, allocator handles). The
-   * runtime never inspects this field. */
+  /* Loader-private data (e.g. buffer base addresses). The runtime never
+   * inspects this field. */
   void *loader_data;
 };
 
 /* Register an unloadable compilation unit with the runtime. Called by the
  * loader (e.g. ocaml-jit) after the unit's text and data buffers have been
- * mapped and relocations applied.
+ * mapped and relocations applied, but BEFORE the unit's initialiser runs.
  *
  * The runtime takes ownership of the [unit] structure and links it into the
- * global registration list. The arrays referenced by the structure must
- * remain valid until the end-of-major-cycle unload pass
- * ([caml_unloadable_check_and_unload_dead]) reclaims the unit and calls its
- * [on_unload] callback.
+ * global registration list.
  *
  * Side effects:
- *   - Registers each [text_ranges[i]] pair as a code fragment.
+ *   - Registers each [text_ranges[i]] pair as a code fragment, tagging it
+ *     with [owner_unloadable_unit] so the stack scans can identify
+ *     unloadable PCs.
  *   - Registers [frametable] via [caml_register_frametables].
- *
- * Must be called from a non-GC context (or holding the appropriate mutex);
- * the runtime takes the unloadable-units lock internally. */
+ *   - Registers [gc_roots] as dyn-globals (if non-NULL). */
 CAMLextern void caml_register_unloadable_unit(struct caml_unloadable_unit *u);
 
-/* Iterate over all currently-registered unloadable units, calling [f] on
- * each. Used by the end-of-major-cycle pass (G) to find units that have
- * become unreachable and to reset surviving units' mark bits.
+/* Activate an unloadable unit: unregister its [gc_roots] dyn-globals and
+ * donate its static-block region to the major heap as a heap extent.
+ * Must be called exactly once, after the unit's initialiser has finished
+ * (normally or with an exception). From this point the GC may reclaim the
+ * unit once no references to its code or data remain.
  *
- * Must be called from a stop-the-world section. */
-void caml_iter_unloadable_units(
-    void (*f)(struct caml_unloadable_unit *, void *), void *user_data);
+ * The two steps happen without any intervening GC safe point (plain C
+ * code), which matters: between dropping the roots and donating the
+ * blocks, heap values referenced only from the unit's static data would
+ * otherwise be unprotected. */
+CAMLextern void caml_activate_unloadable_unit(struct caml_unloadable_unit *u);
 
-/* End-of-major-cycle hook (G). Called by [major_gc.c] from the STW
- * single-leader portion of [cycle_major_heap_from_stw_single], BEFORE
- * [caml_cycle_heap_from_stw_single] rotates the global heap state.
- *
- * For each registered unloadable unit:
- *   - If no Code_block or data block in the unit has the current
- *     [caml_global_heap_state.MARKED] bits, the unit is unreachable. It is
- *     unlinked from the registration list, its code fragments are removed,
- *     and its [on_unload] callback (if any) is invoked. The loader is
- *     responsible for [munmap]ping the buffers in [on_unload].
- *   - Otherwise, the unit's blocks are uniformly rewritten to MARKED bits
- *     so that the rotation maps them to UNMARKED in the new cycle. This
- *     keeps surviving units' headers consistent with subsequent cycles.
- *
- * Caller must be in STW; this function takes the unloadable-units lock
- * internally. */
-void caml_unloadable_check_and_unload_dead(void);
-
-/* Compactor robustness pair. [caml_unloadable_pre_compact] flips every
- * registered unloadable static block (code blocks and data blocks) to
- * NOT_MARKABLE; [caml_unloadable_post_compact] restores them to UNMARKED.
- *
- * Both run from STW around [caml_compact_heap]. The pre-call ensures
- * the compactor's [compact_update_value] early-outs on JIT static
- * blocks via its NOT_MARKABLE check, so a heap pointer to such a block
- * is never mistaken for a pointer to an evacuated heap block (which
- * would read [Field(v, 0)] as a forwarding pointer and corrupt the
- * heap reference). The post-call returns the blocks to UNMARKED so
- * the next mark cycle can darken them by the standard path.
- *
- * Without this pair, safety relies on the precise interleaving of the
- * end-of-cycle pass, the heap-state rotation, and the compactor — see
- * the in-source comment in [runtime/unloadable.c] for the full
- * argument. */
-void caml_unloadable_pre_compact(void);
-void caml_unloadable_post_compact(void);
+/* Drain the queue of units whose extents the GC has reclaimed: remove
+ * their code fragments, unregister their frame tables, and invoke their
+ * [on_unload] callbacks (which free the underlying buffers). Called by
+ * [major_gc.c] from the STW single-domain portion of
+ * [cycle_major_heap_from_stw_single]; must be called under the STW
+ * barrier because frame-table removal mutates the global descriptor
+ * hashtable in place. */
+void caml_unloadable_process_pending_unloads(void);
 
 /* Cumulative counters since process start. [registered] counts every
  * successful [caml_register_unloadable_unit] call; [unloaded] counts every
- * unit unlinked from the registration list by [caml_unloadable_check_and_
- * unload_dead]. The number of currently-live units equals the difference.
- * Used by tests to confirm unloading is firing. */
+ * unit reclaimed by the GC. The number of currently-live units equals the
+ * difference. Used by tests to confirm unloading is firing. */
 CAMLextern uintnat caml_unloadable_units_registered_total(void);
 CAMLextern uintnat caml_unloadable_units_unloaded_total(void);
 
@@ -166,29 +160,15 @@ CAMLextern uintnat caml_unloadable_units_unloaded_total(void);
  * unloadable units. Defined in [unloadable.c]. */
 CAMLextern atomic_uintnat caml_unloadable_units_live_count;
 
-/* Look up the unloadable unit (if any) whose [.text] range contains [pc].
- * Returns NULL when [pc] lies in non-unloadable code. Used by F.2 (stack
- * return-address scan) and F.3 (stack code-pointer slot scan) to gate
- * dereference of the [entry - 1] back-pointer: the code-fragment table
- * also contains non-unloadable text (main program startup, Dynlink), so
- * code-fragment presence alone is not a reliable "unloadable code"
- * predicate.
- *
- * O(log n) via the code-fragment skiplist: every unloadable text range is
- * registered as a code fragment with [cf->owner_unloadable_unit] pointing
- * at its owning unit (see [caml_register_unloadable_unit]). A NULL
- * fragment means non-registered text; a non-NULL fragment with NULL
- * owner means non-unloadable registered text. Performance-critical
- * callers (e.g. [caml_visit_frame_code_ptr_slots]) prefer to inline the
- * skiplist lookup themselves to avoid a redundant call. */
-struct caml_unloadable_unit *caml_find_unloadable_unit_by_pc(char *pc);
-
 /* Darken the [Code_block] associated with an unloadable function entry. The
- * back-pointer convention (D) places the [Code_block] address in the word
+ * back-pointer convention places the [Code_block] address in the word
  * immediately before the entry [PC]. This helper reads that word and feeds
  * it to [caml_darken], so the standard mark scan recursively darkens the
- * Code_block's dep code-blocks and dep data blocks. Used by F.1 (closure
- * scan) where we know we are in the mark phase.
+ * Code_block's dep code-blocks and dep data blocks. Used by the closure
+ * scan (F.1) where we know we are in the mark phase.
+ *
+ * Before the unit is activated its blocks are NOT_MARKABLE, so this is a
+ * harmless no-op in that window.
  *
  * Callers are responsible for ensuring [entry] does point into unloadable
  * code (closinfo bit / FRAME_DESCRIPTOR_UNLOADABLE / code-fragment lookup);
@@ -263,8 +243,8 @@ Caml_inline void caml_darken_unloadable_code_blocks_in_closure(
 /* Like [caml_darken_code_block_for_entry], but invokes a generic
  * [scanning_action]. Used by F.2 / F.3 in the stack-walker, which is shared
  * across mark, oldify, and compactor scans. For non-mark scans the action's
- * effect on a static [Code_block] is benign (oldify is a no-op for
- * out-of-heap blocks; the compactor does not move static data).
+ * effect on a [Code_block] is benign (oldify is a no-op for non-young
+ * values; the compactor does not move extent blocks).
  *
  * The slot pointer is to a local because [oldify_one] writes [*p = v]
  * unconditionally for non-young values; passing NULL would crash a minor

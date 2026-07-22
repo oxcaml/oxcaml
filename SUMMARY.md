@@ -10,10 +10,10 @@ cannot be `free`d while any closure, return address, or other reference
 reaches into the unit's text or data.
 
 This PR adds a runtime mechanism that lets the major GC determine when an
-entire JIT-emitted CU has become unreachable and reclaim it as a single
-unit at the end of a major cycle. The mechanism is general; the only
-in-tree consumer today is the metaprogramming JIT, but a future Dynlink
-opt-in would slot in through the same runtime registration path.
+entire JIT-emitted CU has become unreachable and reclaim it. The mechanism
+is general; the only in-tree consumer today is the metaprogramming JIT, but
+a future Dynlink opt-in would slot in through the same runtime registration
+path.
 
 ## Why
 
@@ -25,10 +25,56 @@ would make it unbounded.
 
 ## How — overview
 
-Each unloadable CU becomes a **scannable region with explicit dependency
-edges**. The standard mark phase keeps the unit's code and data alive
-transitively; nothing in the GC needed a new mark domain or a new pass over
-the heap. The only new GC work is:
+The GC-facing half of the design is built on **heap extensions**
+(`caml_add_blocks_to_heap` in `runtime/shared_heap.c`): a region of
+caller-owned memory, pre-filled with well-formed OCaml blocks, donated to
+the major heap. The GC marks and sweeps those blocks exactly like other
+major-heap blocks (dead blocks are individually freed in place and
+coalesced), compaction updates their fields without moving them, and once
+*every* block in the region is dead the region's free callback fires.
+
+Each unloadable CU's static data — ordinary constants, closures, the
+module block, and the `Code_block` dependency blocks described below — is
+emitted as one contiguous run of blocks, bracketed by two symbols
+(`unloadable_blocks_start` / `unloadable_blocks_end`). The unit's lifecycle
+has three stages:
+
+1. **Register** (before the unit's initialiser runs). The loader registers
+   the unit's code fragments (tagged so stack scans can recognise
+   unloadable PCs), a *copy* of its frame table, and its `gc_roots` as
+   dyn-globals. The static blocks still carry their black (NOT_MARKABLE)
+   emission headers, so the GC ignores them entirely — exactly as for AOT
+   static data — and the dyn-globals scan keeps heap values stored into
+   them alive during initialisation.
+
+2. **Activate** (immediately after the initialiser returns or raises;
+   `caml_activate_unloadable_unit`). The dyn-globals registration is
+   dropped and the bracketed region is donated to the major heap as a heap
+   extension. The extension machinery forces every block to the current
+   allocation colour, so the unit survives the in-progress major cycle by
+   construction; from the next cycle onwards its blocks live and die by
+   ordinary marking. The two steps share no GC safe point, so there is no
+   window in which init-stored heap values are unprotected.
+
+3. **Unload** (when the whole extent is dead). The extent free callback —
+   running from GC sweeping — unlinks the unit, updates the observability
+   counters, and queues it; at the start of the next major cycle, under
+   the STW barrier, the runtime removes the unit's code fragments,
+   unregisters its frame table, and invokes the loader's `on_unload`
+   callback, which frees the text/data buffer. (See "Frame tables and
+   deferred unloading" below for why the split is necessary.)
+
+Keeping the unit's *code* alive is what requires new GC work. Each function
+in an unloadable CU has a **`Code_block`** — a regular OCaml block (new tag
+243) in the bracketed data region whose scannable fields are the function's
+direct unloadable dependencies (other functions' `Code_block`s, plus
+same-CU static data blocks). Marking a `Code_block` darkens its dep fields
+via the standard mark loop, so transitive reachability falls out of
+existing GC mechanics. Each function's `Code_block` address is stored in
+**one machine word in `.text`, immediately before the function's entry
+label** — set at link/load time, never written again, so `.text` stays RX.
+
+The mark phase darkens `Code_block`s via three paths:
 
 1. A short walk over each closure's function slots, looking for slots whose
    code lives in an unloadable CU (one new closinfo bit identifies these).
@@ -37,33 +83,16 @@ the heap. The only new GC work is:
 3. A scan over a small number of "transient code pointer" slots in each
    frame — values like `closure.code` that are in flight from a closure
    Field-0 load to an indirect call.
-4. A new end-of-cycle pass that asks, for each registered unit, "did
-   anything in the unit get marked this cycle?", and either resets the
-   unit's marks for the next cycle or removes the unit and invokes its
-   loader's free callback.
 
-The dependency graph itself lives in the **heap, in standard heap-shaped
-blocks**. For every function in an unloadable CU the compiler emits a
-`Code_block` — a regular OCaml block (new tag 243) in the unit's `.data`
-section, whose scannable fields are the function's direct unloadable
-dependencies (other functions' `Code_block`s, plus same-CU static data
-blocks). Marking a `Code_block` darkens its dep fields via the standard
-mark loop, so transitive reachability falls out of existing GC mechanics.
-
-Each function's `Code_block` address is stored in **one machine word in
-`.text`, immediately before the function's entry label**. Set at link/load
-time, never written again — `.text` stays RX. The GC paths above read this
-back-pointer to map "function entry I'm looking at" to "Code_block I need
-to darken".
-
-Static data emitted by an unloadable CU uses white (UNMARKED) headers for
-Global symbols (which the GC's standard mark scan can then darken via heap
-references), and black (NOT_MARKABLE) headers for Local symbols (which are
-only reachable transitively from a Global ancestor in the same unit). The
-unit's `gc_roots` table is registered with the runtime's global-root scan;
-this scan walks the **fields** of each registered block, not the block
-itself — which is the subtlety that lets the unit become unreachable in
-the first place.
+Consequently: if any closure, frame, or in-flight code pointer can reach a
+function of the unit, that function's `Code_block` is marked every cycle
+and the extent — and hence the buffer, including `.text` — stays alive.
+When nothing reaches the unit any more, all of its blocks go unmarked, the
+extent dies, and the free callback reclaims the whole unit. Individual
+blocks that become unreachable while the unit as a whole is still live
+(e.g. a helper closure only used during initialisation) are reclaimed
+in place by the ordinary extent sweep — a small bonus over whole-unit
+reclamation.
 
 ## Tricky cases
 
@@ -74,32 +103,23 @@ returns a `unit -> Buffer.t` closure. While the eval'd initialiser is
 running, no closure for it exists yet — every reference to the unit's text
 lives only on the call stack.
 
-This works because each unloadable frame's return address darkens the
-running function's `Code_block` via the back-pointer at `entry - 1`. Every
-function transitively called from the entry is on the stack above the
-entry, so every active function's `Code_block` is darkened by the frame at
-its return PC.
+Deferring activation until after the initialiser has finished makes this
+window a non-problem: during initialisation the unit's blocks are not part
+of the heap at all (black headers, gc_roots registered), so the GC can
+neither reclaim them nor prematurely sweep blocks that the initialiser has
+not yet referenced. Once activation donates the blocks, each unloadable
+frame's return address darkens the running function's `Code_block` via the
+back-pointer at `entry - 1`, covering code that is on the stack (e.g. a
+function that re-enters unit code via a callback).
 
-The entry function (module initialiser) itself is on the bottom of the
-stack while the unit is running. Its `Code_block` exists with **zero
-dependency fields** — the design choice that lets it not have to enumerate
-all top-level functions and static data of the unit. While the entry is
-running, the same stack-walk argument darkens every function it has called.
-Once the entry has returned, nothing reaches the entry's `Code_block` —
-which is correct: the entry is no longer needed.
+### The window between activation and the caller taking its reference
 
-### Born-marked units registered mid-cycle
-
-The concurrent major marker on another domain can be in the middle of a
-mark cycle when `Eval.eval` registers a new unit. The shared-heap allocator
-already handles this for ordinary heap blocks by stamping mid-cycle
-allocations as `MARKED` (so the marker skips them and they survive the
-cycle by construction). The same convention is applied at registration to
-every block in the new unit. Without this, a curry-stub closure allocated
-right after registration would be MARKED-by-allocator while the static
-block it references would be UNMARKED-by-emission, and the closure-Field-0
-darken path would never run because the closure itself is skipped by the
-marker.
+After activation, the unit is kept alive only by GC-visible references —
+but the caller has not yet looked up the module block (it does so by
+symbol name, invisible to the GC). The JIT pins the unit's module block in
+an OCaml global (`Globals.unloadable_pin`) immediately before activation;
+`Eval.eval` clears the pin once it holds the module block as an ordinary
+value on its own frame.
 
 ### Indirect calls through unloadable code pointers
 
@@ -137,33 +157,6 @@ sit before the scannable env. Probing the next word for an infix tag
 would misclassify these. Reading the arity from the closinfo is the
 authoritative signal.
 
-### Compactor must not mistake JIT static blocks for evacuated heap blocks
-
-The compactor moves heap-pool blocks and rewrites every heap pointer
-to its new location. JIT static blocks live outside the pools and so
-are never moved; but `compact_update_value` (in
-`runtime/shared_heap.c`) treats *any* block whose status equals
-`caml_global_heap_state.MARKED` as having been evacuated and reads
-`Field(v, 0)` as a forwarding pointer. If a JIT static block ever
-appeared MARKED at compaction time, every heap reference to it would
-be silently rewritten to whatever value its first data field held.
-
-Today the post-rotation status of every surviving unloadable block
-is UNMARKED (the end-of-cycle pass writes MARKED pre-rotation; the
-rotation maps MARKED→UNMARKED), so the check misses them. That
-safety relies on the precise interleaving of the end-of-cycle pass,
-the cycle rotation, and the compactor — if any of those are
-reordered, the failure mode is silent heap-pointer corruption.
-
-The robustness fix is a two-step flip around `caml_compact_heap`:
-`caml_unloadable_pre_compact` rewrites every registered unloadable
-block (code blocks and data blocks) to NOT_MARKABLE so
-`compact_update_value` takes its NOT_MARKABLE early-out path
-unconditionally; `caml_unloadable_post_compact` restores them to
-UNMARKED so the next mark cycle can darken them by the standard
-path. Both run from STW barriers placed around the existing
-`caml_compact_heap` call in `cycle_all_domains_callback`.
-
 ### Closures crossing CU boundaries
 
 When a closure from unloadable unit A is captured in a curry-stub closure
@@ -173,6 +166,44 @@ underlying unloadable closure as a value-slot env field. The standard env
 scan reaches the underlying closure, and its closinfo carries the
 unloadable bit, so the major-GC closure-scan darkens A's `Code_block`
 through it.
+
+### Frame tables and deferred unloading
+
+Frame descriptors encode their return addresses as 32-bit *self-relative*
+offsets (`retaddr_rel`), so a unit's frame table cannot be copied out of
+its buffer (a copy is not guaranteed to land within 2GB of the code); the
+table inside the buffer is registered directly. Consequently the buffer
+cannot be freed until the table's descriptors have been removed from the
+global hashtable, and that removal mutates shared state, so it must happen
+under the STW barrier — but the extent free callback runs from concurrent
+sweeping. The callback therefore only unlinks the unit and queues it
+(updating the observability counters immediately); the actual unload —
+code-fragment removal, `caml_unregister_frametable_from_stw_single`,
+buffer free — runs at the start of the next major cycle, in the STW
+single-domain section (`caml_unloadable_process_pending_unloads`). In the
+interim the stale registrations are harmless: no stack can hold a PC into
+a unit whose extent was found fully dead.
+
+### Zero-size blocks
+
+Unloadable units contain zero-wosize static blocks: empty arrays,
+dependency-free `Code_block`s (including the entry function's), and
+occasionally an empty module block. The heap-extension machinery supports
+these — its free-block headers carry the block size, so sweeping and
+consolidation are unaffected — with one caveat: a zero-wosize block's
+*value* points one word past its header, so such a block must never be the
+last block of the donated region (otherwise address-range classification
+of the value, e.g. `Is_young` inside `caml_darken`, could misattribute it
+to another memory region). The compiler therefore ends the bracketed
+region with an anonymous one-field padding block; the GC frees it in
+place after the first cycle, which is harmless.
+
+One debug-runtime consequence: in cycles where the UNMARKED status
+encoding is 0, a live zero-wosize tag-0 block has an all-zero header, so
+the heap verifier's "header must be non-zero" assertion (which exists to
+catch references to freed pool slots) had to be dropped; the adjacent
+UNMARKED-status assertion still provides that coverage in the other
+cycles.
 
 ## Scope and limitations
 
@@ -208,9 +239,10 @@ programs:
   O(log n) skiplist lookup on the code-fragment table, plus one pointer
   read — both via existing runtime infrastructure.
 
-End-of-cycle cost is O(total unloadable symbols) per major GC for the
-mark-reset pass. Bounded and infrequent. Worth measuring under real
-workloads, but no obvious scaling cliff.
+Steady-state GC cost is the ordinary extent sweep from the heap-extension
+machinery: proportional to the unit's block count, incremental, and
+integrated with the existing sweep budget. There is no separate
+end-of-cycle pass and no compaction special-casing.
 
 ## Configuration
 
@@ -220,8 +252,8 @@ workloads, but no obvious scaling cliff.
   through Flambda 2's `Code_metadata` and from there to every emit-time
   consumer.
 - `OCAML_UNLOADABLE_DEBUG=1` — runtime env var, prints one line per
-  registration, end-of-cycle check, and unload to stderr. Useful for
-  diagnosing test failures.
+  registration, activation, and unload to stderr. Useful for diagnosing
+  test failures.
 
 ## Observability
 
@@ -237,8 +269,12 @@ The live count is the difference.
 
 ## Testing
 
-A new directory `testsuite/tests/quotation/eval/unloading/` adds 23 tests
-exercising the mechanism end-to-end. Coverage axes:
+`testsuite/tests/heap_extent/` covers the heap-extension machinery in
+isolation (basic liveness, compaction, debug runtime, many extents,
+multi-domain).
+
+`testsuite/tests/quotation/eval/unloading/` adds 23 tests exercising the
+unloading mechanism end-to-end. Coverage axes:
 
 - Smoke and reachability via closures.
 - Every closure shape (single/multi-function, sizes 2 and 3, mutual rec up
@@ -252,8 +288,7 @@ exercising the mechanism end-to-end. Coverage axes:
   synthetic frame descriptors covering both unloadable and non-unloadable
   PCs.
 - Major GC during eval'd module initialisation, with a same-CU recursive
-  helper deeply on the stack, exercising the zero-dep entry `Code_block`
-  invariant.
+  helper deeply on the stack.
 
 All tests carry `runtime5; no-address-sanitizer;`. The musl CI matrix
 entry disables the directory entirely (unloading is unsupported on musl

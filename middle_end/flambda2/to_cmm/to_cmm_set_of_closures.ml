@@ -689,27 +689,12 @@ let let_static_set_of_closures0 env res closure_symbols
   let block =
     match l with
     | _ :: _ ->
-      (* In unloadable mode, [Global] closure symbols get a white header and are
-         registered in the unit's [data_blocks] list so the GC can normalize and
-         re-mark them at end of cycle. [Local] closure symbols get a black
-         header (NOT_MARKABLE) and are not tracked: we cannot relocate
-         [Csymbol_address] entries in the side array to a Local symbol
-         cross-section on Mach-O, and a Local block is by definition only
-         reachable from a tracked Global block in the same unit. The
-         non-unloadable case is unchanged: [unit_closure_header] already returns
-         a black header. See [Cmm_helpers.emit_unit_block] for the analogous
-         treatment of non-closure static blocks. *)
-      let header_bits =
-        if !Clflags.unit_is_unloadable
-        then
-          match (closure_symbol_for_updates : Cmm.symbol).sym_global with
-          | Global ->
-            C.register_unloadable_data_block_symbol closure_symbol_for_updates;
-            C.unit_closure_header length
-          | Local -> C.black_closure_header length
-        else C.unit_closure_header length
-      in
-      C.cint header_bits :: l
+      (* Static closure blocks are emitted with black (NOT_MARKABLE) headers in
+         all modes. For unloadable units, the block lives inside the
+         [unloadable_blocks_start]/[unloadable_blocks_end] bracket and is
+         donated to the major heap (with its header colour rewritten) by
+         [caml_activate_unloadable_unit] once the unit's initialiser has run. *)
+      C.cint (C.unit_closure_header length) :: l
     | [] ->
       Misc.fatal_error "Cannot statically allocate an empty set of closures"
   in

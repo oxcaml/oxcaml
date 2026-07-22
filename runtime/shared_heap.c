@@ -90,6 +90,12 @@ typedef struct heap_extent {
  * distinguishable header word (Infix_tag, NOT_MARKABLE), with
  * unchanged wosize, allowing the block to be skipped when sweeping
  * the extent. Adjacent free blocks are combined during sweeping.
+ * Keeping the size in the header means we can permit zero-wosize
+ * blocks in extents (the client must ensure such a block is never
+ * the last block of an extent: its value points one word past its
+ * header, and that address must stay inside the extent so that
+ * address-based classification of the value — e.g. [Is_young] in
+ * [caml_darken] — cannot misattribute it to another memory region).
  *
  * These distinguished headers can't simply be NOT_MARKABLE, as
  * continuations have that colour during their stack scan.
@@ -710,9 +716,12 @@ static void add_extent(struct caml_heap_state *local,
   while (p < limit) {
     header_t hd = Hd_hp(p);
     CAMLassert(!Is_extent_free_hd(hd));
-    CAMLassert(Wosize_hd(hd) > 0);
     mlsize_t whsize = Whsize_hd(hd);
     CAMLassert(whsize <= remaining);
+    /* A zero-wosize block's value points one word past its header, so it
+       must not be the last block of the extent (see the comment on
+       zero-wosize blocks above). */
+    CAMLassert(Wosize_hd(hd) > 0 || p + whsize < limit);
     Hd_hp(p) = With_status_hd(hd, color); /* force to allocation colour */
     ++ blocks;
     p += whsize;
@@ -1308,7 +1317,13 @@ static void verify_object(struct heap_verify_state* st, value v) {
   if (!Is_block(v)) return;
 
   CAMLassert (!Is_young(v));
-  CAMLassert (Hd_val(v));
+  /* No [CAMLassert (Hd_val(v))] here, though a header of 0 normally
+     indicates a freed pool slot: a live zero-wosize block in a heap extent
+     (e.g. an empty array of an unloadable compilation unit) has tag 0 and
+     wosize 0, so in cycles where the UNMARKED status encoding is 0 its
+     header is legitimately all-zero. The UNMARKED status assertion below
+     still catches live references to freed pool slots in the other
+     cycles. */
 
   if (Tag_val(v) == Infix_tag) {
     v -= Infix_offset_val(v);

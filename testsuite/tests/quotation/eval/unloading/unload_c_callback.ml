@@ -2,7 +2,6 @@
   modules = "unload_c_callback_.c";
   include eval;
   flags = "-extension runtime_metaprogramming";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)

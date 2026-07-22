@@ -1872,14 +1872,11 @@ static void cycle_major_heap_from_stw_single(
   uintnat num_domains_in_stw)
 {
 #ifdef NATIVE_CODE
-  /* G: end-of-cycle unloadable-unit pass. Runs BEFORE the heap-state
-     rotation so the per-block MARKED bits still reflect cycle-N's
-     interpretation. Walks all registered unloadable units; unreachable
-     units are unlinked (and their loader callback invoked) and surviving
-     units have their blocks normalized so the rotation leaves them as
-     UNMARKED for cycle N+1. Native-code only: unloadable units are a
-     native-only concept (JIT-emitted code; bytecode is interpreted). */
-  caml_unloadable_check_and_unload_dead();
+  /* Unload any unloadable units whose heap extents the GC reclaimed during
+     the finished cycle: remove their code fragments, unregister their frame
+     tables (which mutates the global descriptor hashtable, hence STW), and
+     free their buffers. */
+  caml_unloadable_process_pending_unloads();
 #endif
 
   /* Cycle major heap colours */
@@ -2016,27 +2013,7 @@ static void stw_cycle_all_domains(
   caml_cycle_heap(domain->shared_heap);
 
   if (compacting) {
-#ifdef NATIVE_CODE
-    /* Robustness against the compactor mistaking a JIT static block for
-     * an evacuated heap block. The compactor's [compact_update_value]
-     * treats any block whose status equals [caml_global_heap_state.MARKED]
-     * as having been evacuated and reads [Field(v, 0)] as a forwarding
-     * pointer. Today our static blocks are UNMARKED at this point (the
-     * end-of-cycle pass writes them MARKED pre-rotation, then rotation
-     * relabels MARKED -> UNMARKED), so the check misses them — but the
-     * invariant is fragile. Flip every registered unloadable block to
-     * NOT_MARKABLE so the compactor takes its earlier early-out path
-     * unconditionally; restore to UNMARKED below. */
-    Caml_global_barrier_if_final(participating_count) {
-      caml_unloadable_pre_compact();
-    }
-#endif
     caml_compact_heap(domain, participating_count, participating);
-#ifdef NATIVE_CODE
-    Caml_global_barrier_if_final(participating_count) {
-      caml_unloadable_post_compact();
-    }
-#endif
   }
 
   /* Update GC stats (these could have significantly changed e.g. due

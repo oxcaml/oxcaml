@@ -196,10 +196,13 @@ void* caml_copy_and_register_frametable(void *table, int size);
 void caml_unregister_frametables(void **tables, int ntables);
 void caml_unregister_frametable(void *table);
 
-/* Unregister a previously-registered frame table. Caller must hold the
-   STW barrier; the global frame-descriptor hashtable is mutated in place
-   and rebuilt from the remaining frametables. Used by the unloadable-unit
-   unload pass (G) to drop frametables of unreachable units. */
+/* Unregister a previously-registered frame table, removing its descriptors
+   immediately (unlike [caml_unregister_frametables], which defers removal
+   to a zombie list whose cleanup later reads the table). Caller must hold
+   the STW barrier; the global frame-descriptor hashtable is mutated in
+   place and rebuilt from the remaining frametables. Used by the
+   unloadable-unit unload path, whose frametables live inside the unit's
+   buffer and are freed during the same STW section. */
 void caml_unregister_frametable_from_stw_single(intnat *frametable);
 
 /* a linked list of frametables */

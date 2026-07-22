@@ -1,6 +1,5 @@
 (* TEST
   modules = "unload_code_ptr_slot_gating_.c";
-  runtime5;
   no-address-sanitizer;
   { native; }
 *)
