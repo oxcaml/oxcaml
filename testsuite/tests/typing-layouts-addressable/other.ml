@@ -3049,6 +3049,12 @@ type plain_bits64 : bits64
 type accepted_plain_bits64 = plain_bits64 requires_addressable
 
 [%%expect{|
+Line 1, characters 33-44:
+1 | type addressable_bits64 : bits64 addressable
+                                     ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
 type addressable_bits64 : bits64
 type plain_bits64 : bits64
 type accepted_plain_bits64 = plain_bits64 requires_addressable
@@ -3097,7 +3103,7 @@ type accepted_inherent_addressable_product =
   inherent_addressable_product requires_addressable
 
 [%%expect{|
-type addressed_product : bits8 addressable & bits16 addressable
+type addressed_product : (bits8 & bits16) addressable
 type component_addressed_product : bits8 addressable & bits64
 type inherent_addressable_product : bits64 & word
 type accepted_addressed_product = addressed_product requires_addressable
@@ -3169,6 +3175,12 @@ type accepted_addressable_float64 =
   addressable_float64 requires_addressable
 
 [%%expect{|
+Line 1, characters 43-54:
+1 | type addressable_twice : bits8 addressable addressable
+                                               ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 addressable".
+
 type addressable_twice : bits8 addressable
 type addressable_float64 : float64 addressable
 type accepted_addressable_float64 = addressable_float64 requires_addressable
