@@ -292,6 +292,7 @@ ocaml/primitives.new
 
 /runtime/domain_state.inc
 /runtime/caml/jumptbl.h
+/runtime/api-testing
 /runtime/caml/m.h
 /runtime/caml/s.h
 /runtime/primitives
