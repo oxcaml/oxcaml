@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
@@ -31,7 +30,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/fiber.h"
-#include "caml/fail.h"
 
 /* Returns the next frame descriptor (or NULL if none is available),
    and updates *pc and *sp to point to the following one.  */

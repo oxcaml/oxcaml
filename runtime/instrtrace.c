@@ -20,11 +20,9 @@
 #ifdef DEBUG
 
 #include <stdio.h>
-#include <string.h>
 #include <ctype.h>
 
 #include "caml/fiber.h"
-#include "caml/domain.h"
 #include "caml/instrtrace.h"
 #include "caml/instruct.h"
 #include "caml/misc.h"

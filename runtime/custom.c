@@ -23,11 +23,8 @@
 #include "caml/camlatomic.h"
 #include "caml/custom.h"
 #include "caml/fail.h"
-#include "caml/gc_ctrl.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
-#include "caml/shared_heap.h"
-#include "caml/signals.h"
 #include "caml/memprof.h"
 
 static_assert(sizeof(struct custom_operations) == CUSTOM_OPS_STRUCT_SIZE, "");

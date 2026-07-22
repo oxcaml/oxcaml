@@ -18,11 +18,9 @@
 /* Dynamic loading of C primitives. */
 
 #include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "caml/config.h"
 #ifndef _WIN32
 #include <unistd.h>
 #endif

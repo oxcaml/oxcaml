@@ -18,7 +18,6 @@
 /* Stack backtrace for uncaught exceptions */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "caml/alloc.h"
@@ -26,7 +25,6 @@
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
 #include "caml/fail.h"
-#include "caml/debugger.h"
 #include "caml/startup.h"
 
 /* Start or stop the backtrace machinery */
