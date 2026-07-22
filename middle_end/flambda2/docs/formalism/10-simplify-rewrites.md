@@ -534,7 +534,7 @@ STATIC (encoded in the primitive payload) or DYNAMIC (a Simple operand):
     String_info in the types domain, so no per-load projection is needed —
     PENDING UPSTREAM: this fold lives on the `flambda2-string-load-fold`
     branch, commit 9712d270eb, not yet in mainline; the NOT-CSE-eligible
-    fact already holds there; proviso lifts when the branch lands).
+    fact already holds in mainline; proviso lifts when the branch lands).
     Variable-index immutable string loads are never shared. Bytes/Bigstring
     loads: neither mechanism (mutable).
 NOTES: Sharpens the corrected S.Rewrite.CSE.Eligible into a design invariant WITH

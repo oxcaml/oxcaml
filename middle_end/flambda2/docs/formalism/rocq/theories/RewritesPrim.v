@@ -944,7 +944,9 @@ Definition S_Rewrite_Prim_CompareRecovery_documented : Prop := True.
     CSE and the relational types domain, Get_header only CSE;
     (4) String_or_bigstring_load (String) rides neither (its storage
     may be mutable bytes via the deprecated %caml_string_get*
-    builtins), only contents-known folds.
+    builtins), only contents-known folds (PENDING UPSTREAM: the
+    fold lives on flambda2-string-load-fold, 9712d270eb -- see the
+    rule's proviso).
     ENCODING NOTE (hybrid, catalog): the eligibility-assignment
     clauses are stated on cse_prim_pred and proved outright
     (envelope-Qed); the types-domain sharing clauses and the
