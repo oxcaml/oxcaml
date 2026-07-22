@@ -110,6 +110,9 @@ and out_jkind =
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
+  | Ojkind_operator of out_jkind * string list
+  (** Postfix kind operator words applied to a jkind, parenthesizing the
+      operand where needed: [(bits8 & bits16) addressable] *)
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list

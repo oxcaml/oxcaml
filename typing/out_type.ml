@@ -1290,16 +1290,11 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     if not mark_is_informative
     then unmarked ()
     else
-      (* A product informatively marked addressable as a whole: prefer the
-         constant printer, which can render the mark (e.g.
-         [(bits8 & bits16) addressable]); [Ojkind_product] cannot. *)
-      match Jkind.Desc.get_const desc with
-      | Some c -> out_jkind_of_const_jkind env c
-      | None ->
-        (* CR layouts: a marked product containing sort variables loses its
-           mark here. Such a layout can only arise from intersecting with
-           [any addressable], and this only affects printing. *)
-        unmarked ())
+      (* A product informatively marked addressable as a whole: print the
+         components as in the unmarked case (in particular still eliding
+         bounds implied by the layout) and attach the mark, e.g.
+         [(bits8 & bits16) addressable]. *)
+      Ojkind_operator (unmarked (), ["addressable"]))
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)

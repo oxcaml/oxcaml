@@ -658,6 +658,10 @@ and print_out_jkind ppf ojkind =
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_operator (base, words) ->
+      fprintf ppf "%a %a"
+        (pp_element ~nested:true) base
+        (pp_print_list ~pp_sep:pp_print_space pp_print_string) words
   in
   pp_element ~nested:false ppf ojkind
 
