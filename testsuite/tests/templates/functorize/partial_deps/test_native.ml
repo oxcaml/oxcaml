@@ -97,11 +97,7 @@
  module = "q_impl/q_impl.ml";
  ocamlopt.byte;
 
- (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] =====
-
-    Story: bundle a module whose bound_globals include a compound
-    reference where the top level has visible args only (no hidden),
-    but the arg itself is parameterised (has nested hidden args). *)
+ (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] ===== *)
 
  (* Step 1: build [Foo_q], a plain library parameterised by [Q]. *)
 
@@ -127,9 +123,9 @@
  module = "nested_arg/nested_arg.mli nested_arg/nested_arg.ml";
  ocamlopt.byte;
 
- (* Step 3: bundle [Nested_arg].  The functorizer pulls in [Foo_q]
-    and [Q_impl] transitively and specialises the compound reference
-    in the bundle. *)
+ (* Step 3: functorize [Nested_arg].  [Foo_q] and [Q_impl] are pulled
+    in transitively and the compound reference is specialised in the
+    result. *)
 
  flags = "$flg -functorize -I p -I q -I q_impl -I foo_q -I nested_arg \
    Nested_arg";
@@ -138,7 +134,7 @@
  all_modules = "";
  ocamlopt.byte;
 
- (* Step 4: consume the bundle by applying [Bundle.Make (P_int) ()]
+ (* Step 4: consume the result by applying [Bundle.Make (P_int) ()]
     and printing [Inst.Nested_arg.describe] (which composes strings
     from [Nested_arg] and, via the compound alias, [Foo_q]). *)
 
@@ -172,11 +168,7 @@
  reference = "test_functorize_nested_arg.reference";
  check-program-output;
 
- (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl{P}]{P} =====
-
-    Story: same as Case 1, but the compound reference now has BOTH
-    visible AND hidden args at the top level ([P] is unfilled at the
-    top too). *)
+ (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl{P}]{P} ===== *)
 
  (* Step 1: build [Pair_pq], a plain library parameterised by both
     [P] and [Q]. *)
@@ -203,8 +195,8 @@
  module = "partial_pq/partial_pq.mli partial_pq/partial_pq.ml";
  ocamlopt.byte;
 
- (* Step 3: bundle [Partial_pq].  The functorizer pulls in [Pair_pq]
-    and [Q_impl] and specialises the compound reference. *)
+ (* Step 3: functorize [Partial_pq].  [Pair_pq] and [Q_impl] are
+    pulled in and the compound reference is specialised. *)
 
  flags = "$flg -functorize -I p -I q -I q_impl -I pair_pq -I partial_pq \
    Partial_pq";
@@ -213,7 +205,7 @@
  all_modules = "";
  ocamlopt.byte;
 
- (* Step 4: consume the bundle by applying [Bundle.Make (P_int) ()]
+ (* Step 4: consume the result by applying [Bundle.Make (P_int) ()]
     and printing [Inst.Partial_pq.describe]. *)
 
  flags = "$flg -I bundle_partial -I p -I p_int -I q -I q_impl -I pair_pq \
