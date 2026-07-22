@@ -28,15 +28,7 @@ let f (x : t8_plain) =
 external magic : ('a : any) ('b : any). 'a -> 'b = "%obj_magic"
   [@@layout_poly]
 type t8_plain : bits8
-Line 7, characters 3-4:
-7 |   (r : ('b : any addressable))
-       ^
-Error: The value "r" has type "('a : bits8)"
-       but an expression was expected of type "('b : any addressable)"
-       The layout of 'b is any addressable
-         because of the annotation on the type variable 'b.
-       But the layout of 'b must overlap with bits8
-         because of the definition of r at line 6, characters 10-17.
+val f : ('b : bits8 addressable). t8_plain -> 'b = <fun>
 |}]
 
 (* The same bug through expected-type propagation: the argument is still
@@ -48,18 +40,7 @@ let g (x : t8_plain) =
   r
 
 [%%expect{|
-Line 2, characters 11-18:
-2 |   let r = (magic x : ('b : any addressable)) in
-               ^^^^^^^
-Error: This expression has type "('a : bits8)"
-       but an expression was expected of type
-         "('b : '_representable_layout_1 addressable)"
-       The layout of 'b is '_representable_layout_1 addressable
-         because of the annotation on the type variable 'b.
-       But the layout of 'b must overlap with bits8
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+val g : ('b : bits8 addressable). t8_plain -> 'b = <fun>
 |}]
 
 (**********************************************************************)
@@ -72,7 +53,14 @@ Error: This expression has type "('a : bits8)"
 type bad : any addressable = #{ x : int8#; y : int16# }
 
 [%%expect{|
-type bad = #{ x : int8#; y : int16#; }
+Line 1, characters 0-55:
+1 | type bad : any addressable = #{ x : int8#; y : int16# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "bad" is bits8 & bits16
+         because it is an unboxed record.
+       But the layout of type "bad" must be a sublayout of
+           (any & any) addressable
+         because of the annotation on the declaration of the type bad.
 |}]
 
 type ('a : any addressable) reqa
@@ -83,17 +71,20 @@ type ('a : any addressable) reqa
 Line 2, characters 20-23:
 2 | type inconsistent = bad reqa
                         ^^^
-Error: This type "bad" should be an instance of type "('a : any addressable)"
-       The layout of bad is bits8 & bits16
-         because of the definition of bad at line 1, characters 0-55.
-       But the layout of bad must be a sublayout of any addressable
-         because of the definition of reqa at line 1, characters 0-32.
+Error: Unbound type constructor "bad"
 |}]
 
 type bad_single : any addressable = #{ x : int8# }
 
 [%%expect{|
-type bad_single = #{ x : int8#; }
+Line 1, characters 0-50:
+1 | type bad_single : any addressable = #{ x : int8# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "bad_single" is bits8
+         because it is an unboxed record.
+       But the layout of type "bad_single" must be a sublayout of
+           any addressable
+         because of the annotation on the declaration of the type bad_single.
 |}]
 
 (* A product of addressable kinds is addressable, so this is fine. *)
