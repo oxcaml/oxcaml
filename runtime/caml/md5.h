@@ -22,6 +22,9 @@
 
 #include "mlvalues.h"
 #include "io.h"
+#include <stdint.h>
+#include "config.h"
+#include "misc.h"
 
 CAMLextern void caml_md5_block(unsigned char digest[16],
                                void * data, uintnat len);

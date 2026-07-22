@@ -83,6 +83,8 @@ extern void AnnotateHappensAfter(const char *f, int l, void *addr);
 #ifdef CAML_INTERNALS
 
 #include "mlvalues.h"
+#include "config.h"
+#include "misc.h"
 
 struct stack_info;
 
