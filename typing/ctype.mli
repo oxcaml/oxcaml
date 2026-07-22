@@ -712,7 +712,8 @@ val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
 
 (* Get the base of the jkind of a type, expanding it and looking through
    [[@@unboxed]] types. *)
-val type_jkind_base : Env.t -> type_expr -> Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
+val type_jkind_base :
+  Env.t -> type_expr -> Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context :
