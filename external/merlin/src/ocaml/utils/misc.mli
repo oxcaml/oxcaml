@@ -1361,6 +1361,25 @@ module Colours : sig
   val without_colours : f:(unit -> 'a) -> 'a
 end
 
+(** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
+    flat or_null cannot nest, so there is no [join]. *)
+module Or_null : sig
+  type 'a t = Null | This of 'a [@@or_null]
+
+  val return : 'a -> 'a t
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  val both : 'a t -> 'b t -> ('a * 'b) t
+
+  module Syntax : sig
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
+end
+
 (** {1 Merlin} *)
 (** These functions are specific to merlin. *)
 

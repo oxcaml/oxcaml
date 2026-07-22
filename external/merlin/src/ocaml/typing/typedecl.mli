@@ -250,7 +250,6 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
-  | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats

@@ -477,6 +477,8 @@ and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   | Polymorphic_parameter param ->
     line i ppf "Polymorphic_parameter\n";
     poly_param (i+1) ppf param;
+  | Module_pack pty ->
+    line i ppf "Module_pack %a\n" Rawprinttyp.type_expr pty;
 
 and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   line i ppf "pattern %a\n" fmt_location x.pat_loc;
@@ -771,7 +773,8 @@ and expression i ppf x =
       line i ppf "Texp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
-  | Texp_atomic_loc (e, sort, li, _, amode) ->
+  | Texp_atomic_loc { record = e; record_sort = sort; lid = li;
+                      alloc_mode = amode } ->
       line i ppf "Texp_atomic_loc\n";
       expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;

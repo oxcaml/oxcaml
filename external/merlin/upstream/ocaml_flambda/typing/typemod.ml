@@ -1403,11 +1403,12 @@ and apply_modalities_module_type env modalities = function
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
-  modalities =
+    ?(allow_redundant_staticity = false) modalities =
   match modalities with
   | [] -> { moda_modalities = default_modalities; moda_desc = [] }
   | _ :: _ ->
     Typemode.transl_modalities_with_default
+      ~allow_redundant_staticity
       ~default:default_modalities ~maturity:Stable modalities
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -2193,7 +2194,8 @@ and add_implicit_jkinds env attrs =
   in
   List.fold_left register_default env attrs
 
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
+and transl_signature ?(interface_toplevel = false) env
+      {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
   (* We assume the structure (described by the signature) to be at legacy mode,
@@ -2201,7 +2203,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
   (* CR-soon zqian: make it a parameter instead *)
   let md_mode = Value.legacy in
 
-  let sig_modalities = transl_modalities psg_modalities in
+  let sig_modalities =
+    transl_modalities ~allow_redundant_staticity:interface_toplevel
+      psg_modalities
+  in
 
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
@@ -4419,8 +4424,8 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
                       Argument_for_non_parameter (arg_module, arg_filename)));
       let modes =
         Includecore.Specific
-          ((Env.mode_unit ~staticity:actual_staticity, None),
-           Env.mode_unit ~staticity:arg_staticity)
+          ((Persistent_env.mode_pers_mod actual_staticity, None),
+           Persistent_env.mode_pers_mod arg_staticity)
       in
       let coercion =
         Includemod.compunit_as_argument
@@ -4460,7 +4465,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
+        mode (Persistent_env.mode_pers_mod Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4542,7 +4547,8 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
-                  ((mode, None), Env.mode_unit ~staticity))
+                  ((mode, None),
+                   Persistent_env.mode_pers_mod staticity))
                 sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
@@ -4582,7 +4588,9 @@ let type_implementation target modulename initial_env ast =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
             let modes =
-              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              let mode =
+                Persistent_env.mode_pers_mod Dynamic
+              in
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
@@ -4676,7 +4684,7 @@ let type_interface ~sourcefile modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-  let sg = transl_signature env ast in
+  let sg = transl_signature ~interface_toplevel:true env ast in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
@@ -4772,7 +4780,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
       let modes =
-        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
       Includemod.compunit initial_env ~mark:true

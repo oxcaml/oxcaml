@@ -488,13 +488,14 @@ module IdTbl =
       }
 
     let rec find_same_without_locks id tbl =
-      try Ident.find_same id tbl.current
-      with Not_found as exn ->
+      match Ident.find_same_or_null id tbl.current with
+      | This data -> data
+      | Null ->
         begin match tbl.layer with
         | Open {next; _} -> find_same_without_locks id next
         | Map {f; next} -> f (find_same_without_locks id next)
         | Lock {lock=_; next} -> find_same_without_locks id next
-        | Nothing -> raise exn
+        | Nothing -> raise Not_found
         end
 
     let find_same id (tbl : (empty, _, _) t) =
@@ -1186,48 +1187,6 @@ let rec address_head = function
   | Alocal id -> AHlocal id
   | Adot (a, _, _) -> address_head a
 
-(* The name of the compilation unit currently compiled. *)
-module Current_unit : sig
-  val get : unit -> Unit_info.t option
-  val get_cu : unit -> Compilation_unit.t option
-  val set : Unit_info.t -> unit
-  val unset : unit -> unit
-
-  module Name : sig
-    val get : unit -> string
-    val is : string -> bool
-    val is_ident : Ident.t -> bool
-    val is_path : Path.t -> bool
-  end
-end = struct
-  let current_unit : Unit_info.t option ref =
-    ref None
-  let get () =
-    !current_unit
-  let get_cu () =
-    Option.map Unit_info.modname (get ())
-  let set cu =
-    current_unit := Some cu
-  let unset () =
-    current_unit := None
-
-  module Name = struct
-    let get () =
-      match !current_unit with
-      | None -> ""
-      | Some cu ->
-        Compilation_unit.Name.to_string
-          (Compilation_unit.name (Unit_info.modname cu))
-    let is name =
-      get () = name
-    let is_ident id =
-      Ident.is_global id && is (Ident.name id)
-    let is_path = function
-    | Pident id -> is_ident id
-    | Pdot _ | Papply _ | Pextra_ty _ -> false
-  end
-end
-
 let set_current_unit = Current_unit.set
 let get_current_unit = Current_unit.get
 let get_current_unit_name = Current_unit.Name.get
@@ -1307,23 +1266,7 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit ~staticity =
-  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
-  Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity;
-    }
-    ~hint_monadic:hint ~hint_comonadic:hint
-
-let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
+let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -1341,7 +1284,6 @@ let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
   in
   let mda_address = Lazy_backtrack.create_forced addr in
   let mda_declaration = md in
-  let mda_mode = Mode.Value.disallow_right (mode_unit ~staticity) in
   let mda_shape = shape in
   let mda_components =
     let mty = md.md_type in
@@ -3066,8 +3008,18 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
        because of the call to [check_well_formed_module]. *)
     let mty = Subst.modtype (Rescope (Path.scope p)) sub f_comp.fcomp_res in
     let addr = Lazy_backtrack.create_failed Not_found in
-    !check_well_formed_module env loc
-      ("the signature of " ^ Path.name p) mty;
+    let can_load_cmis =
+      match Persistent_env.can_load_cmis !persistent_env with
+      | Persistent_env.Can_load_cmis -> true
+      | Persistent_env.Cannot_load_cmis _ -> false
+    in
+    (* If cmis cannot be loaded (e.g. when the printer of another error forces
+       this application), lookups made by the well-formedness check can fail
+       spuriously. In that case, we skip the check and don't cache the
+       components so that the check runs on a later forcing. *)
+    if can_load_cmis then
+      !check_well_formed_module env loc
+        ("the signature of " ^ Path.name p) mty;
     let shape_arg =
       shape_of_path ~namespace:Shape.Sig_component_kind.Module env arg
     in
@@ -3079,7 +3031,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
         fcomp_res_mode shape
     in
-    stamped_path_add f_comp.fcomp_cache arg comps;
+    if can_load_cmis then stamped_path_add f_comp.fcomp_cache arg comps;
     comps
 
 (* Define forward functions *)
@@ -3435,8 +3387,9 @@ let enter_unbound_module name reason env =
 
 (* Read a signature from a file *)
 let read_signature modname cmi =
-  let mty, staticity = read_pers_mod modname cmi in
-  Subst.Lazy.force_signature mty, staticity
+  let mty, mode = read_pers_mod modname cmi in
+  (* [mode] read from the cmi is always a constant *)
+  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3868,7 +3821,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
           (* The cmi is not loaded, so [cmi_staticity] is unknown.
              Conservatively fall back to [Dynamic]. *)
           Mode.Value.disallow_right
-            (mode_unit ~staticity:Mode.Staticity.Dynamic)
+            (Persistent_env.mode_pers_mod Dynamic)
       in
       path, (mode, locks), a
     end
@@ -4641,7 +4594,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
          fall back to [Dynamic]. *)
       path, Location.none,
         Mode.Value.disallow_right
-          (mode_unit ~staticity:Mode.Staticity.Dynamic)
+          (Persistent_env.mode_pers_mod Dynamic)
     else
       let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
@@ -5710,12 +5663,6 @@ let () =
           None
     )
 
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
-
 (* helper for merlin *)
 
 let check_state_consistency () =
@@ -6033,9 +5980,3 @@ type 'acc fold_all_labels_f =
 let fold_all_labels f ident env init =
   let acc_after_legacy = fold_labels Legacy (f.fold_all_labels_f Legacy) ident env init in
   fold_labels Unboxed_product (f.fold_all_labels_f Unboxed_product) ident env acc_after_legacy
-
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit
