@@ -77,9 +77,19 @@ module Typing_env_extension : sig
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
 
-  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
-  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
   val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
@@ -991,6 +1001,10 @@ module Rewriter : sig
     val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
     val closure : 'a closure_field list -> 'a t
+
+    (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+        matching the type of its (unboxed) contents. *)
+    val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
   end
 
   type 'a expr

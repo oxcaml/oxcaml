@@ -156,13 +156,15 @@ type instruction =
   | Kgetdynmet
   | Kevent of debug_event
   | Kperform
-  | Kresume
-  | Kresumeterm of int
+  | Kcontinue
+  | Kcontinueterm of int
+  | Kdiscontinue
+  | Kdiscontinueterm of int
+  | Kdiscontinue_with_backtrace
+  | Kdiscontinue_with_backtraceterm of int
   | Kreperformterm of int
   | Kwith_stack
-  | Kwith_stack_bind
   | Kwith_stack_preemptible
-  | Kwith_stack_bind_preemptible
   | Kstop
 
 val immed_min: int

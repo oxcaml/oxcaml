@@ -524,11 +524,11 @@ let primitive ppf = function
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
-  | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
   | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
-  | Pwith_stack_bind_preemptible -> fprintf ppf "with_stack_bind_preemptible"
   | Pperform -> fprintf ppf "perform"
-  | Presume -> fprintf ppf "resume"
+  | Pcontinue -> fprintf ppf "continue"
+  | Pdiscontinue -> fprintf ppf "discontinue"
+  | Pdiscontinue_with_backtrace -> fprintf ppf "discontinue_with_backtrace"
   | Preperform -> fprintf ppf "reperform"
   | Pmake_unboxed_product layouts ->
       fprintf ppf "make_unboxed_product #(%a)"
@@ -1074,10 +1074,10 @@ let name_of_primitive = function
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
-  | Pwith_stack_bind -> "Pwith_stack_bind"
   | Pwith_stack_preemptible -> "Pwith_stack_preemptible"
-  | Pwith_stack_bind_preemptible -> "Pwith_stack_bind_preemptible"
-  | Presume -> "Presume"
+  | Pcontinue -> "Pcontinue"
+  | Pdiscontinue -> "Pdiscontinue"
+  | Pdiscontinue_with_backtrace -> "Pdiscontinue_with_backtrace"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"

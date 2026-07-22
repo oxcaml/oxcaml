@@ -82,6 +82,9 @@ val build : prefix:string -> igot:Igot.t -> symbols:string list -> t
 (** Returns the list of entries in the IPLT. *)
 val entries : t -> Entry.t list
 
+(** Returns the number of entries in the IPLT (O(1)). *)
+val num_entries : t -> int
+
 (** Returns the section data (machine code). *)
 val section_data : t -> bytes
 

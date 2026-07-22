@@ -1,5 +1,5 @@
 opam-version: "2.0"
-synopsis: "OxCaml 5.2.0 CI dependencies meta-package"
+synopsis: "OxCaml 5.4.0 CI dependencies meta-package"
 maintainer: "oxcaml-team"
 license: "MIT"
 authors: "oxcaml-team"
@@ -11,7 +11,7 @@ depends: [
   "menhir" {= "20231231"}
   "ocamlformat" {= "0.29.0"}
   # This version should be the same as in default.nix
-  "dune" {= "3.20.2"}
+  "dune" {= "3.23.1"}
   "re" {>= "1.10.0"}
   # js_of_ocaml-compiler dependencies
   "ppxlib" {>= "0.15"}

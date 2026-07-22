@@ -45,11 +45,11 @@ module Element_ops = (val Gen_product_iarray_helpers.make_element_ops elem)
 
 module UTuple_array0 :
   Gen_u_iarray.S0 with type element_t = unboxed_t
-                  and type ('a : any) array_t = 'a iarray
+                  and type ('a : any mod separable) array_t = 'a iarray
                   and type mutable_t = unboxed_t array = struct
   type element_t = unboxed_t
 
-  type ('a : any) array_t = 'a iarray
+  type ('a : any mod separable) array_t = 'a iarray
   type mutable_t = unboxed_t array
 
   type element_arg = unit -> element_t

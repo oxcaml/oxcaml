@@ -824,7 +824,7 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2287,9 +2287,12 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
-  | Lop (Intop (Idiv | Imod)) ->
+  | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
+    I.xor (Reg32 RDX) (Reg32 RDX);
+    I.div (arg i 1)
   | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
     I.adc (arg i 3) (res i 1)
@@ -2358,7 +2361,8 @@ let emit_instr ~first ~last ~fallthrough i =
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
     I.add (int n) (addressing addr QWORD i 0)

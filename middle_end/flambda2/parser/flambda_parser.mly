@@ -137,7 +137,6 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_END   [@symbol "end"]
 %token KWD_ERROR [@symbol "error"]
 %token KWD_EXN   [@symbol "exn"]
-%token KWD_REGION [@symbol "region"]
 %token KWD_FLOAT [@symbol "float"]
 %token KWD_FLOAT32 [@symbol "float32"]
 %token KWD_HCF   [@symbol "halt_and_catch_fire"]
@@ -150,6 +149,9 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_INLINE [@symbol "inline"]
 %token KWD_INLINED [@symbol "inlined"]
 %token KWD_INLINING_STATE [@symbol "inlining_state"]
+%token KWD_INT   [@symbol "int"]
+%token KWD_INT8  [@symbol "int8"]
+%token KWD_INT16 [@symbol "int16"]
 %token KWD_INT32 [@symbol "int32"]
 %token KWD_INT64 [@symbol "int64"]
 %token KWD_INVALID [@symbol "invalid"]
@@ -166,9 +168,11 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_OF     [@symbol "of"]
 %token KWD_POISON [@symbol "poison"]
 %token KWD_POP    [@symbol "pop"]
+%token KWD_PRODUCT   [@symbol "product"]
 %token KWD_PUSH   [@symbol "push"]
 %token KWD_REC    [@symbol "rec"]
 %token KWD_REC_INFO [@symbol "rec_info"]
+%token KWD_REGION [@symbol "region"]
 %token KWD_REGULAR [@symbol "regular"]
 %token KWD_RERAISE [@symbol "reraise"]
 %token KWD_SET_OF_CLOSURES [@symbol "set_of_closures"]
@@ -184,6 +188,9 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_UNREACHABLE [@symbol "unreachable"]
 %token KWD_UNROLL [@symbol "unroll"]
 %token KWD_VAL    [@symbol "val"]
+%token KWD_VEC128 [@symbol "vec128"]
+%token KWD_VEC256 [@symbol "vec256"]
+%token KWD_VEC512 [@symbol "vec512"]
 %token KWD_WHERE  [@symbol "where"]
 %token KWD_WITH   [@symbol "with"]
 
@@ -199,12 +206,18 @@ let make_boxed_const_int (i, m) : static_data =
 %token STATIC_CONST_NATIVEINT_ARRAY [@symbol "Nativeint_array"]
 %token STATIC_CONST_FLOAT_ARRAY [@symbol "Float_array"]
 %token STATIC_CONST_FLOAT32_ARRAY [@symbol "Float32_array"]
+%token STATIC_CONST_VEC128_ARRAY [@symbol "Vec128_array"]
+%token STATIC_CONST_VEC256_ARRAY [@symbol "Vec256_array"]
+%token STATIC_CONST_VEC512_ARRAY [@symbol "Vec512_array"]
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
 
 %start flambda_unit
-%type <Fexpr.alloc_mode_for_allocations> alloc_mode_for_allocations_opt
-%type <Fexpr.alloc_mode_for_applications> alloc_mode_for_applications_opt
+%type <Fexpr.alloc_mode_for_allocations> alloc_mode_for_allocations
+%type <Fexpr.region Fexpr.alloc_mode_for_applications>
+  alloc_mode_for_applications
+%type <Fexpr.variable Fexpr.alloc_mode_for_applications>
+  alloc_mode_for_function_params
 %type <Fexpr.empty_array_kind> empty_array_kind
 %type <Fexpr.const> const
 %type <Fexpr.continuation> continuation
@@ -285,8 +298,7 @@ code:
   | header = code_header;
     params = kinded_args;
     closure_var = variable;
-    region_var = variable;
-    ghost_region_var = variable;
+    region_vars = alloc_mode_for_function_params;
     depth_var = variable;
     MINUSGREATER; ret_cont = continuation_id;
     exn_cont = exn_continuation_id;
@@ -301,7 +313,7 @@ code:
       in
       let result_mode : alloc_mode_for_assignments = if result_mode then Local else Heap in
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
-        params_and_body = { params; closure_var; region_var; ghost_region_var; depth_var;
+        params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
         code_size; is_tupled; stub; loopify; result_mode; } }
 ;
@@ -347,14 +359,36 @@ mutability:
 
 empty_array_kind:
   | { Values_or_immediates_or_naked_floats }
+  | KWD_FLOAT32 { Naked_float32s }
+  | KWD_INT { Naked_ints }
+  | KWD_INT8 { Naked_int8s }
+  | KWD_INT16 { Naked_int16s }
+  | KWD_INT32 { Naked_int32s }
+  | KWD_INT64 { Naked_int64s }
+  | KWD_NATIVEINT { Naked_nativeints }
+  | KWD_VEC128 { Naked_vec128s }
+  | KWD_VEC256 { Naked_vec256s }
+  | KWD_VEC512 { Naked_vec512s }
+  | KWD_PRODUCT { Unboxed_products }
 
-alloc_mode_for_allocations_opt:
-  | { Heap }
-  | AMP; region = region { Local { region } }
+alloc_mode_for_allocations:
+  | AMP; alloc_region = region { Heap { alloc_region } }
+  | AMP; alloc_region = region; AMP; region = region
+    { Local { alloc_region; region } }
 
-alloc_mode_for_applications_opt:
-  | { Heap }
-  | AMP; region = region; AMP; ghost_region = region { Local { region; ghost_region } }
+alloc_mode_for_applications:
+  | AMP; alloc_region = region { Heap { alloc_region } }
+  | AMP; alloc_region = region;
+    AMP; region = region;
+    AMP; ghost_region = region
+    { Local { alloc_region; region; ghost_region } }
+
+alloc_mode_for_function_params:
+  | AMP; alloc_region = variable { Heap { alloc_region } }
+  | AMP; alloc_region = variable;
+    AMP; region = variable;
+    AMP; ghost_region = variable
+    { Local { alloc_region; region; ghost_region } }
 
 prim_param_val:
   | i = IDENT { make_located i ($startpos, $endpos) }
@@ -401,6 +435,9 @@ naked_number_kind:
   | KWD_INT32 { Naked_int32 }
   | KWD_INT64 { Naked_int64 }
   | KWD_NATIVEINT { Naked_nativeint }
+  | KWD_VEC128 { Naked_vec128 }
+  | KWD_VEC256 { Naked_vec256 }
+  | KWD_VEC512 { Naked_vec512 }
 ;
 (*
 kind:
@@ -435,6 +472,17 @@ subkind:
   | KWD_IMM KWD_ARRAY { Immediate_array }
   | KWD_VAL KWD_ARRAY { Value_array }
   | KWD_ANY KWD_ARRAY { Generic_array }
+  | KWD_FLOAT32 KWD_ARRAY { Unboxed_float32_array }
+  | KWD_INT KWD_ARRAY { Untagged_int_array }
+  | KWD_INT8 KWD_ARRAY { Untagged_int8_array }
+  | KWD_INT16 KWD_ARRAY { Untagged_int16_array }
+  | KWD_INT32 KWD_ARRAY { Unboxed_int32_array }
+  | KWD_INT64 KWD_ARRAY { Unboxed_int64_array }
+  | KWD_NATIVEINT KWD_ARRAY { Unboxed_nativeint_array }
+  | KWD_VEC128 KWD_ARRAY { Unboxed_vec128_array }
+  | KWD_VEC256 KWD_ARRAY { Unboxed_vec256_array }
+  | KWD_VEC512 KWD_ARRAY { Unboxed_vec512_array }
+  | KWD_PRODUCT KWD_ARRAY { Unboxed_product_array }
 ;
 kinds_with_subkinds_nonempty:
   | sks = separated_nonempty_list(STAR, kind_with_subkind) { sks }
@@ -558,13 +606,17 @@ with_value_slots_opt:
 ;
 
 value_slot:
-  | var = value_slot_for_projection; EQUAL; value = simple; { { var; value; } }
+  | var = value_slot_for_projection; EQUAL; value = simple;
+    { { var; value; kind = None } }
+  | var = value_slot_for_projection; COLON; kind = naked_number_kind;
+    EQUAL; value = simple;
+    { { var; value; kind = Some kind } }
 ;
 
 fun_decl:
   | KWD_CLOSURE; code_id = code_id;
     function_slot = function_slot_opt;
-    alloc = alloc_mode_for_allocations_opt;
+    alloc = alloc_mode_for_allocations;
     { { code_id; function_slot; alloc; } }
 ;
 
@@ -596,17 +648,20 @@ method_kind:
   | KWD_CACHED { Call_kind.Method_kind.Cached }
 
 call_kind:
-  | alloc = alloc_mode_for_applications_opt; { (Function Indirect, alloc) }
+  | alloc = alloc_mode_for_applications; { (Function Indirect, alloc) }
   | KWD_DIRECT; LPAREN;
       code_id = code_id;
       function_slot = function_slot_opt;
-      alloc = alloc_mode_for_applications_opt;
+      alloc = alloc_mode_for_applications;
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
-  | KWD_CCALL; noalloc = boption(KWD_NOALLOC)
-    { (C_call { alloc = not noalloc }, (Heap : alloc_mode_for_applications)) }
-  | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN
-    { (Method { kind; obj }, (Heap : alloc_mode_for_applications)) }
+  | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
+    { (C_call { alloc = not noalloc },
+      (Heap { alloc_region } : region alloc_mode_for_applications)) }
+  | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
+      AMP; alloc_region = region
+    { (Method { kind; obj },
+        (Heap { alloc_region } : region alloc_mode_for_applications)) }
 ;
 
 inline:
@@ -649,7 +704,13 @@ loopify:
 
 region:
   | v = variable { Named v }
-  | KWD_TOPLEVEL { Toplevel }
+  | KWD_TOPLEVEL; DOT; i = IDENT {
+    match i with
+    | "alloc_region" -> Toplevel_alloc_region
+    | "region" -> Toplevel_region
+    | "ghost_region" -> Toplevel_ghost_region
+    | _ -> Misc.fatal_errorf "toplevel. must be followed \
+      by alloc_region, region or ghost_region" }
 ;
 
 result_continuation:
@@ -711,6 +772,39 @@ int64: i = INT { make_int64 i };
 nativeint: i = INT { make_nativeint i };
 targetint: i = INT { make_targetint i };
 
+vec128:
+| KWD_VEC128 LBRACK; w0 = INT; COLON; w1 = INT; RBRACK
+ { Vector_types.Vec128.Bit_pattern.{
+     word0 = make_int64 w0;
+     word1 = make_int64 w1;
+ }}
+;
+vec256:
+| KWD_VEC256 LBRACK; w0 = INT; COLON; w1 = INT;
+  COLON; w2 = INT; COLON; w3 = INT; RBRACK
+ { Vector_types.Vec256.Bit_pattern.{
+     word0 = make_int64 w0;
+     word1 = make_int64 w1;
+     word2 = make_int64 w2;
+     word3 = make_int64 w3;
+ }}
+;
+vec512:
+| KWD_VEC512 LBRACK; w0 = INT; COLON; w1 = INT;
+  COLON; w2 = INT; COLON; w3 = INT;
+  COLON; w4 = INT; COLON; w5 = INT;
+  COLON; w6 = INT; COLON; w7 = INT; RBRACK
+ { Vector_types.Vec512.Bit_pattern.{
+     word0 = make_int64 w0;
+     word1 = make_int64 w1;
+     word2 = make_int64 w2;
+     word3 = make_int64 w3;
+     word4 = make_int64 w4;
+     word5 = make_int64 w5;
+     word6 = make_int64 w6;
+     word7 = make_int64 w7;
+ }}
+;
 static_data:
   | STATIC_CONST_BLOCK; m = mutability; tag = tag; LPAREN;
     elements = separated_list(COMMA, field_of_block); RPAREN
@@ -762,6 +856,18 @@ static_data:
     is = separated_list(SEMICOLON, or_variable(nativeint));
     RBRACKPIPE
     { Immutable_nativeint_array is }
+  | STATIC_CONST_VEC128_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(vec128));
+    RBRACKPIPE
+    { Immutable_vec128_array is }
+  | STATIC_CONST_VEC256_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(vec256));
+    RBRACKPIPE
+    { Immutable_vec256_array is }
+  | STATIC_CONST_VEC512_ARRAY; LBRACKPIPE;
+    is = separated_list(SEMICOLON, or_variable(vec512));
+    RBRACKPIPE
+    { Immutable_vec512_array is }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
   | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }
@@ -773,6 +879,9 @@ static_data_kind:
   | KWD_INT32 KWD_BOXED { fun v -> Boxed_int32 (Var v) }
   | KWD_INT64 KWD_BOXED { fun v -> Boxed_int64 (Var v) }
   | KWD_NATIVEINT KWD_BOXED { fun v -> Boxed_nativeint (Var v) }
+  | KWD_VEC128 KWD_BOXED { fun v -> Boxed_vec128 (Var v) }
+  | KWD_VEC256 KWD_BOXED { fun v -> Boxed_vec256 (Var v) }
+  | KWD_VEC512 KWD_BOXED { fun v -> Boxed_vec512 (Var v) }
 
 or_variable(cst):
   | c = cst { (Const c : _ Fexpr.or_variable) }

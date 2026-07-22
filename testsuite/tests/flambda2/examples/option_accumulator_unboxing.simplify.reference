@@ -1,0 +1,78 @@
+let code last_option_0 deleted in
+let code last_custom_1 deleted in
+let code inline(never) loopify(never) size(47) newer_version_of(last_option_0)
+      last_option_0_1 (h : val, `default`, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  let for_stop = %int_barith.sub (n, 1) in
+  (let prim = %int_comp.le (0, for_stop) in
+   switch prim
+     | 0 -> k2 (1i, poison.val.variant_unboxing_field)
+     | 1 -> k3
+     where k3 =
+       let prim_1 = %untag_imm (for_stop) in
+       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
+       (cont k3 (0L)
+          where rec k3 (for_counter_naked : int64) =
+            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
+            let i = %tag_imm (prim_2) in
+            (apply &my_alloc_region h (i) -> k4 * k1
+               where k4 (return_val0) =
+                 let for_next_naked =
+                   %int_barith.`int64`.add (for_counter_naked, 1L)
+                 in
+                 let prim_3 =
+                   %int_comp.`int64`.le (for_next_naked, for_stop_naked)
+                 in
+                 switch prim_3
+                   | 0 -> k2 (0i, return_val0)
+                   | 1 -> k3 (for_next_naked))))
+    where k2 (is_int : imm, unboxed_field_0_0) =
+      switch is_int
+        | 0 -> k (unboxed_field_0_0)
+        | 1 -> k (`default`)
+in
+let $camlOption_accumulator_unboxing__last_option_2 =
+  closure last_option_0_1 @last_option &toplevel.alloc_region
+in
+let code inline(never) loopify(never) size(47) newer_version_of(last_custom_1)
+      last_custom_1_1 (h : val, `default` : val, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let for_stop = %int_barith.sub (n, 1) in
+  (let prim = %int_comp.le (0, for_stop) in
+   switch prim
+     | 0 -> k2 (1i, poison.val.variant_unboxing_field)
+     | 1 -> k3
+     where k3 =
+       let prim_1 = %untag_imm (for_stop) in
+       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
+       (cont k3 (0L)
+          where rec k3 (for_counter_naked : int64) =
+            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
+            let i = %tag_imm (prim_2) in
+            (apply &my_alloc_region h (i) -> k4 * k1
+               where k4 (return_val0 : val) =
+                 let for_next_naked =
+                   %int_barith.`int64`.add (for_counter_naked, 1L)
+                 in
+                 let prim_3 =
+                   %int_comp.`int64`.le (for_next_naked, for_stop_naked)
+                 in
+                 switch prim_3
+                   | 0 -> k2 (0i, return_val0)
+                   | 1 -> k3 (for_next_naked))))
+    where k2 (is_int : imm, unboxed_field_0_0) =
+      switch is_int
+        | 0 -> k (unboxed_field_0_0)
+        | 1 -> k (`default`)
+in
+let $camlOption_accumulator_unboxing__last_custom_3 =
+  closure last_custom_1_1 @last_custom &toplevel.alloc_region
+in
+let $camlOption_accumulator_unboxing =
+  Block 0 ($camlOption_accumulator_unboxing__last_option_2,
+           $camlOption_accumulator_unboxing__last_custom_3)
+in
+cont done ($camlOption_accumulator_unboxing)

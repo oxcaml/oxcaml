@@ -145,6 +145,16 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
     Misc.fatal_errorf "Bad kind %a for [memory_chunk_of_kind]"
       Flambda_kind.With_subkind.print kind
 
+let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
+  match memory_chunk_of_kind kind with
+  | Word_val -> Word_int
+  | ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+    | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
+    | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+    | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) as mem
+    ->
+    mem
+
 let machtype_of_kinded_parameter p = Bound_parameter.kind p |> machtype_of_kind
 
 let param_machtype_of_kinded_parameter bp : _ To_cmm_env.param_type =
@@ -349,7 +359,7 @@ let invalid res ~message =
     | None ->
       let message_sym =
         Symbol.create
-          (Compilation_unit.get_current_exn ())
+          (Current_unit.get_cu_exn ())
           (Linkage_name.of_string
              (Variable.unique_name
                 (Variable.create "invalid" Flambda_kind.value)))
@@ -538,11 +548,13 @@ let extended_machtype_of_return_arity arity =
 let alloc_mode_for_applications_to_cmx t =
   match t with
   | Alloc_mode.For_applications.Local _ -> Cmx_format.Alloc_local
-  | Alloc_mode.For_applications.Heap -> Cmx_format.Alloc_heap
+  | Alloc_mode.For_applications.Heap _ -> Cmx_format.Alloc_heap
 
 let alloc_mode_for_allocations_to_cmm t =
   match t with
-  | Alloc_mode.For_allocations.Heap -> Cmm.Alloc_mode.Heap
+  | Alloc_mode.For_allocations.Heap _ ->
+    (* XXX todo propagate alloc_modes in cmm *)
+    Cmm.Alloc_mode.Heap
   | Alloc_mode.For_allocations.Local _ ->
     assert (Flambda_features.stack_allocation_enabled ());
     Cmm.Alloc_mode.Local
