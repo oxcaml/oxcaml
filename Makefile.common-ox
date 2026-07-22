@@ -96,13 +96,7 @@ boot-compiler: _build/_bootinstall
 	$(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
 
 boot-runtest: boot-compiler
-<<<<<<< HEAD
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
-||||||| f61189cc39
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
-=======
-	$(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
->>>>>>> origin/main
+	$(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
 
 runtime-stdlib: boot-compiler
 	$(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
@@ -158,29 +152,20 @@ minimize-stdlib: boot-minimizer boot-compiler
           $(ws_runstd) \
           --only-packages=ocaml_runtime_stdlib @install
 
-# Directories that should be excluded from the dune workspace
-inactive_dirs := $(if $(filter runtime4,$(RUNTIME_DIR)),runtime debugger,runtime4 debugger4)
-
 # We want to be able to build the @runtest dune alias, but exclude
 # external/merlin from that (since Merlin only builds in the boot workspace).
 # Dune doesn't offer a native way to do this, so instead we list all directories
 # and build @runtest in each directory, excluding external/merlin and any
 # directories not in the dune workspace. (We can exclude external/ as a whole
 # since all the non-merlin directories in that folder are vendored anyways.)
-runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out $(addsuffix /,$(inactive_dirs)) autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
+runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
 
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-<<<<<<< HEAD
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
-||||||| f61189cc39
-	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
-=======
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
->>>>>>> origin/main
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
 
 runtest-llvmize: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
@@ -214,41 +199,7 @@ dune_config_targets = \
   duneconf/main.ws \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
-<<<<<<< HEAD
-  dune-project \
-  $(ocamldir)/dune.runtime_selection \
-  $(ocamldir)/otherlibs/dune
-
-$(ocamldir)/otherlibs/dune:
-	if [ "$(RUNTIME_DIR)" = "runtime4" ]; then \
-          echo "(dirs (:standard \ systhreads runtime_events))" > $@; \
-	else \
-          echo "(dirs (:standard \ systhreads4))" > $@; \
-	fi
-
-$(ocamldir)/dune.runtime_selection:
-	echo "(dirs (:standard \ $(inactive_dirs)))" > $@
-||||||| f61189cc39
-  dune-project \
-  $(ocamldir)/dune.runtime_selection \
-  $(ocamldir)/otherlibs/dune
-
-$(ocamldir)/otherlibs/dune:
-	if [ "$(RUNTIME_DIR)" = "runtime4" ]; then \
-          echo "(dirs (:standard \ systhreads runtime_events))" > $@; \
-	else \
-          echo "(dirs (:standard \ systhreads4))" > $@; \
-	fi
-
-$(ocamldir)/dune.runtime_selection:
-	if [ "$(RUNTIME_DIR)" = "runtime4" ]; then \
-          echo "(dirs (:standard \ runtime debugger))" > $@; \
-	else \
-          echo "(dirs (:standard \ runtime4 debugger4))" > $@; \
-	fi
-=======
   dune-project
->>>>>>> origin/main
 
 _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo -n '$(NATDYNLINKOPTS)' > $(ocamldir)/natdynlinkops

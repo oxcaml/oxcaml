@@ -12,9 +12,6 @@ dune merlin-exclude
 file_formats/cfg_format.ml* merlin-exclude
 file_formats/cmj_format.mli merlin-exclude
 
-lambda/** merlin-exclude
-lambda/mixed_product_bytes.ml* -merlin-exclude
-
 typing/cmt2annot.mli merlin-exclude
 
 utils/arrayset.ml* merlin-exclude

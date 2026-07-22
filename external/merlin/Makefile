@@ -17,26 +17,9 @@ export RUNTIME_DIR
 parent-boot-config:
 	$(MAKE) -C $(PARENT) _build/_bootinstall
 
-<<<<<<< HEAD
 parent-install:
 	$(MAKE) -C $(PARENT) install
-||||||| f61189cc39
-bench_disabled:
-	merl-an benchmark -p /projects/irmin -s 1 --data=merl-an_bench
-	echo "Top 10 slowest queries:"
-	jq -s "[ (map(.sample_id |= tostring)) + (map(.sample_id |= tostring)) | group_by(.sample_id)[] | select(length > 1) | add ] | sort_by( .responses[0].timing.clock) | reverse | .[:10]" merl-an_bench/query_responses.json merl-an_bench/commands.json
-	echo "Benchmark result:"
-	jq . merl-an_bench/bench.json
-=======
-bench:
-	merl-an benchmark -p /projects/irmin,/projects/big-bertha -s 1 --data=merl-an_bench
-	echo "Top 10 slowest queries:"
-	jq -s "[ (map(.sample_id |= tostring)) + (map(.sample_id |= tostring)) | group_by(.sample_id)[] | select(length > 1) | add ] | sort_by( .responses[0].timing.clock) | reverse | .[:10]" merl-an_bench/query_responses.json merl-an_bench/commands.json
-	echo "Benchmark result:"
-	jq . merl-an_bench/bench.json
->>>>>>> origin/main
 
-<<<<<<< HEAD
 build: parent-boot-config
 	$(dune) build $(DUNE_OPTS) $(ARGS)
 
@@ -68,11 +51,3 @@ test test-promote: parent-boot-config
 	else \
 	    $(dune) build $(DUNE_OPTS) $(ARGS) $(PROMOTE); \
 	fi
-||||||| f61189cc39
-bench:
-	echo ""
-
-.PHONY: all build dev clean test promote bench bench_disabled
-=======
-.PHONY: all build dev clean test promote bench bench
->>>>>>> origin/main

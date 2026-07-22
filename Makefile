@@ -163,13 +163,7 @@ hacking-externals: _build/_bootinstall
 
 .PHONY: hacking-runtest
 hacking-runtest: _build/_bootinstall
-<<<<<<< HEAD
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) $(runtest_targets)
-||||||| f61189cc39
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) @runtest
-=======
-	$(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) @runtest
->>>>>>> origin/main
+	$(dune) build $(ws_boot) $(coverage_dune_flags) -w $(boot_targets) $(runtest_targets)
 
 # Only needed for running the test tools by hand; runtest will take care of
 # building them using Dune

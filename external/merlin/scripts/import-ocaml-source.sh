@@ -64,9 +64,6 @@ function merlin-target () {
     parsing/unit_info.ml*)
       echo "${base/#parsing/typing}";;
 
-    lambda/mixed_product_bytes.ml*)
-      echo "${base/#lambda/typing}";;
-
     .gitattributes|base-rev.txt) ;;
 
     # Most cases are simple
