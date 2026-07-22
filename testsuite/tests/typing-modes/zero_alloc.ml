@@ -1027,6 +1027,73 @@ Error: The value "(+)" is "alloc"
          which is expected to be "noalloc".
 |}]
 
+(* Referencing [(+)] bare eta-expands it into a closure, which allocates. *)
+let (alloc_int_ref @ noalloc_strict) () = ( + )
+[%%expect{|
+Line 1, characters 42-47:
+1 | let (alloc_int_ref @ noalloc_strict) () = ( + )
+                                              ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 37-47
+         which is expected to be "noalloc_strict".
+|}]
+let (alloc_int_ref @ noalloc) () = ( + )
+[%%expect{|
+Line 1, characters 35-40:
+1 | let (alloc_int_ref @ noalloc) () = ( + )
+                                       ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 30-40
+         which is expected to be "noalloc".
+|}]
+
+(* A partial application of [(+)] also allocates a closure. *)
+let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
+[%%expect{|
+Line 1, characters 53-58:
+1 | let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
+                                                         ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 41-60
+         which is expected to be "noalloc_strict".
+|}]
+let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
+[%%expect{|
+Line 1, characters 46-51:
+1 | let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
+                                                  ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 34-53
+         which is expected to be "noalloc".
+|}]
+
+(* [(( + ) a) a] forces [( + ) a] to be materialised as its own partial
+   application (a closure), unlike the fully-applied [a + a]. *)
+let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
+[%%expect{|
+Line 1, characters 52-57:
+1 | let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
+                                                        ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 39-62
+         which is expected to be "noalloc_strict".
+|}]
+let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
+[%%expect{|
+Line 1, characters 45-50:
+1 | let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
+                                                 ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 32-55
+         which is expected to be "noalloc".
+|}]
+
 (* CR-soon shsong: revisit exception handling after implementing the
     part that distinguishes noalloc_strict and noalloc *)
 (* Constructing an exception (an extensible variant) with an argument
