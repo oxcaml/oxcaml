@@ -48,3 +48,5 @@ gen_native missing_impl/test_byte.ml missing_impl/test_native.ml
 gen_native cmifile/test_byte.ml cmifile/test_native.ml
 gen_native output_modes/test_byte.ml output_modes/test_native.ml
 gen_native multi_instances/test_byte.ml multi_instances/test_native.ml
+gen_native complete_arg/test_byte.ml complete_arg/test_native.ml
+gen_native nested_static/test_byte.ml nested_static/test_native.ml
