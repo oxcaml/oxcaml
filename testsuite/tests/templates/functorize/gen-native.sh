@@ -50,3 +50,4 @@ gen_native output_modes/test_byte.ml output_modes/test_native.ml
 gen_native multi_instances/test_byte.ml multi_instances/test_native.ml
 gen_native complete_arg/test_byte.ml complete_arg/test_native.ml
 gen_native nested_static/test_byte.ml nested_static/test_native.ml
+gen_native shared_dep/test_byte.ml shared_dep/test_native.ml
