@@ -162,7 +162,8 @@ let of_int_of_kind machine_width (kind : Flambda_kind.t) i =
   | Naked_number Naked_float ->
     naked_float (Numeric_types.Float_by_bit_pattern.create (float_of_int i))
   | Naked_number Naked_float32 ->
-    naked_float32 (Numeric_types.Float32_by_bit_pattern.create (float_of_int i))
+    naked_float32
+      (Numeric_types.Float32_by_bit_pattern.of_int64 (Int64.of_int i))
   | Naked_number Naked_immediate ->
     naked_immediate (Target_ocaml_int.of_int machine_width i)
   | Naked_number Naked_int8 -> naked_int8 (Numeric_types.Int8.of_int i)
