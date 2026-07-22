@@ -434,7 +434,7 @@ type mp : (bits8 & bits16) addressable
 type ok = mp reqa
 
 [%%expect{|
-type mp : (bits8 & bits16) addressable mod external_
+type mp : (bits8 & bits16) addressable
 type ok = mp reqa
 |}]
 
@@ -455,11 +455,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : bits8 addressable & bits16 addressable end
        is not included in
-         sig type t : (bits8 & bits16) addressable mod external_ end
+         sig type t : (bits8 & bits16) addressable end
        Type declarations do not match:
          type t : bits8 addressable & bits16 addressable
        is not included in
-         type t : (bits8 & bits16) addressable mod external_
+         type t : (bits8 & bits16) addressable
        The layout of the first is bits8 addressable & bits16 addressable
          because of the definition of t at line 4, characters 2-49.
        But the layout of the first must be a sublayout of
@@ -480,11 +480,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t : (bits8 & bits16) addressable mod external_ end
+         sig type t : (bits8 & bits16) addressable end
        is not included in
          sig type t : bits8 addressable & bits16 addressable end
        Type declarations do not match:
-         type t : (bits8 & bits16) addressable mod external_
+         type t : (bits8 & bits16) addressable
        is not included in
          type t : bits8 addressable & bits16 addressable
        The layout of the first is (bits8 & bits16) addressable
