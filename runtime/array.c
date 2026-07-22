@@ -23,8 +23,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
-#include "caml/runtime_events.h"
-#include "caml/custom.h"
 
 static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 
