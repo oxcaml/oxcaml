@@ -47,6 +47,11 @@ val crc : t -> string option
 
 val has_name : t -> name:CU.Name.t -> bool
 
+(** [true] if this import's module was listed in [-no-crc] (i.e. is in
+    [Clflags.no_crc]), meaning its row should be omitted from emitted import
+    tables. *)
+val excluded_by_no_crc : t -> bool
+
 val dummy : t
 
 val print : Format_doc.formatter -> t -> unit
