@@ -1004,27 +1004,15 @@ Error: The value "Int64.add" is "alloc"
          which is expected to be "noalloc".
 |}]
 
-(* CR shsong: [int] arithmetic operator is an [alloc] value and rejected
-    conservatively, even though no allocation occurs. *)
+(* A fully-applied non-allocating [int] primitive does not force the enclosing
+   function to [alloc], so this is accepted. *)
 let (alloc_int_arith @ noalloc_strict) (a : int) = a + a
 [%%expect{|
-Line 1, characters 53-54:
-1 | let (alloc_int_arith @ noalloc_strict) (a : int) = a + a
-                                                         ^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 39-56
-         which is expected to be "noalloc_strict".
+val alloc_int_arith : int -> int = <fun>
 |}]
 let (alloc_int_arith @ noalloc) (a : int) = a + a
 [%%expect{|
-Line 1, characters 46-47:
-1 | let (alloc_int_arith @ noalloc) (a : int) = a + a
-                                                  ^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 32-49
-         which is expected to be "noalloc".
+val alloc_int_arith : int -> int = <fun>
 |}]
 
 (* Referencing [(+)] bare eta-expands it into a closure, which allocates. *)
@@ -1092,6 +1080,50 @@ Error: The value "(+)" is "alloc"
        but is expected to be "noalloc"
          because it is used inside the function at line 1, characters 32-55
          which is expected to be "noalloc".
+|}]
+
+(* The fully-applied relaxation also reaches primitives applied through [|>]
+   ([%revapply]) and [@@] ([%apply]). Both operators are themselves fully
+   applied and non-allocating, and the actual function's args are threaded
+   through as its own applied arity, so these fully-applied cases are accepted. *)
+
+(* [|>] with a simple (non-application) head: [( ~- )] fully applied. *)
+let (alloc_int_revapply @ noalloc_strict) (a : int) = a |> ( ~- )
+[%%expect{|
+val alloc_int_revapply : int -> int = <fun>
+|}]
+
+(* [|>] with an application head: [( + ) b] fully applied to [a] as well. *)
+let (alloc_int_revapply_app @ noalloc_strict) (a : int) (b : int) =
+  a |> ( + ) b
+[%%expect{|
+val alloc_int_revapply_app : int -> (int -> int) @ local = <fun>
+|}]
+
+(* [@@] with a simple head: [( ~- )] fully applied. *)
+let (alloc_int_apply @ noalloc_strict) (a : int) = ( ~- ) @@ a
+[%%expect{|
+val alloc_int_apply : int -> int = <fun>
+|}]
+
+(* [@@] with an application head: [( + ) a] fully applied to [b] as well. *)
+let (alloc_int_apply_app @ noalloc_strict) (a : int) (b : int) =
+  ( + ) a @@ b
+[%%expect{|
+val alloc_int_apply_app : int -> (int -> int) @ local = <fun>
+|}]
+
+(* Guard: a *partial* application through [|>] stays rejected -- [( + ) a] is a
+   closure, so [( + )] is not fully applied and reports the [noalloc] error. *)
+let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
+[%%expect{|
+Line 1, characters 67-72:
+1 | let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
+                                                                       ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 50-72
+         which is expected to be "noalloc_strict".
 |}]
 
 (* CR-soon shsong: revisit exception handling after implementing the
@@ -1280,19 +1312,13 @@ Error: The value "mk_local" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* [my_id] do not allocate, but referencing the value is conservatively
-   treated as [alloc]. *)
+(* [my_id] (a fully-applied [%identity]) does not force the enclosing function
+   to [alloc], so this is accepted. *)
 external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
 let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
 [%%expect{|
 external my_id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
-Line 2, characters 55-60:
-2 | let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
-                                                           ^^^^^
-Error: The value "my_id" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 43-62
-         which is expected to be "noalloc_strict".
+val prim_value_captured : int -> int = <fun>
 |}]
 
 (* [!] does not allocate, but referencing the value is conservatively
