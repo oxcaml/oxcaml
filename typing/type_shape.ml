@@ -194,6 +194,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
+      | p when Path.same p Predef.path_unboxed_mask -> Some Unboxed_mask
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -211,6 +212,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_int32 -> Some Int32
       | p when Path.same p Predef.path_int64 -> Some Int64
       | p when Path.same p Predef.path_lazy_t -> Some Lazy_t
+      | p when Path.same p Predef.path_mask -> Some Mask
       | p when Path.same p Predef.path_nativeint -> Some Nativeint
       | p when Path.same p Predef.path_string -> Some String
       | p when Path.same p Predef.path_exn -> Some Exception
@@ -403,6 +405,7 @@ module Type_decl_shape = struct
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256
     | Types.Vec512 -> Layout.Base Vec512
+    | Types.Mask -> Layout.Base Mask
     | Types.Word -> Layout.Base Word
     | Types.Void -> Layout.Base Void
     | Types.Product args ->

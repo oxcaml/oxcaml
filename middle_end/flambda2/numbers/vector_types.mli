@@ -90,3 +90,20 @@ module Vec512 : sig
     val of_bits : bits -> t
   end
 end
+
+module Mask : sig
+  module Bit_pattern : sig
+    (** 64-bit AVX512 mask value whose comparison and equality relations are
+        lexicographically ordered by bit pattern. *)
+
+    include Container_types.S
+
+    val zero : t
+
+    type bits = { word0 : int64 }
+
+    val to_bits : t -> bits
+
+    val of_bits : bits -> t
+  end
+end

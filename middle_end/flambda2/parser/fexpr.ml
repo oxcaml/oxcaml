@@ -65,6 +65,7 @@ type subkind =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+  | Boxed_mask
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
@@ -85,6 +86,7 @@ type subkind =
   | Unboxed_vec128_array
   | Unboxed_vec256_array
   | Unboxed_vec512_array
+  | Unboxed_mask_array
   | Unboxed_product_array
 
 and kind_with_subkind =
@@ -106,6 +108,7 @@ type const =
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
   | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
+  | Naked_mask of Vector_types.Mask.Bit_pattern.bits
   | Naked_nativeint of targetint
   | Null
   | Poison of kind_with_subkind * string
@@ -144,6 +147,7 @@ type static_data =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.bits or_variable
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.bits or_variable
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
   | Immutable_float32_array of float or_variable list
@@ -160,6 +164,7 @@ type static_data =
       Vector_types.Vec256.Bit_pattern.bits or_variable list
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.bits or_variable list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
   | Mutable_string of { initial_value : string }
   | Immutable_string of string

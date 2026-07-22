@@ -49,7 +49,7 @@ module Unboxed_or_untagged_array_tags = struct
 
   let untagged_int_array_tag = 10
 
-  (* Tag 11 is currently unassigned to align the int16 and int8 tags *)
+  let unboxed_mask_array_tag = 11
 
   let untagged_int16_array_zero_tag = 12
 
@@ -307,6 +307,9 @@ let boxedvec512_header =
   block_header 0 (size_vec512 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
+let boxedmask_header =
+  block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
 let boxedvec128_local_header =
   local_block_header 0 (size_vec128 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
@@ -318,6 +321,9 @@ let boxedvec256_local_header =
 let boxedvec512_local_header =
   local_block_header 0 (size_vec512 / size_addr)
     ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
+let boxedmask_local_header =
+  local_block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let floatarray_header len =
   (* Zero-sized float arrays have tag zero for consistency with
@@ -406,6 +412,11 @@ let alloc_boxedvec512_header (mode : Cmm.Alloc_mode.t) dbg =
   | Heap -> Cconst_natint (boxedvec512_header, dbg)
   | Local -> Cconst_natint (boxedvec512_local_header, dbg)
 
+let alloc_boxedmask_header (mode : Cmm.Alloc_mode.t) dbg =
+  match mode with
+  | Heap -> Cconst_natint (boxedmask_header, dbg)
+  | Local -> Cconst_natint (boxedmask_local_header, dbg)
+
 let alloc_floatarray_header len dbg = Cconst_natint (floatarray_header len, dbg)
 
 let alloc_closure_header ~(mode : Cmm.Alloc_mode.t) sz dbg =
@@ -483,9 +494,9 @@ let rec map_tail1 e ~f =
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-  | Cinvalid _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _
+  | Ccatch _ | Cswitch _ | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -1676,6 +1687,16 @@ let unbox_vec512 =
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
       | _ -> None)
 
+let box_mask =
+  box_vector ~alloc_kind:Alloc_block_kind_mask ~header:alloc_boxedmask_header
+
+let unbox_mask =
+  unbox_vector ~header:boxedmask_header ~local_header:boxedmask_local_header
+    ~chunk:Word_mask ~structured_constant_of_sym:(fun symbol dbg ->
+      match Cmmgen_state.structured_constant_of_sym symbol with
+      | Some (Const_mask n) -> Some (Cconst_mask (n, dbg))
+      | _ -> None)
+
 (* Conversions for 16-bit floats *)
 
 let float_of_float16 dbg c =
@@ -1737,6 +1758,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
   | Word_int -> size_int
+  | Word_mask -> size_int
   | Word_val -> size_addr
   | Double -> size_float
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> size_vec128
@@ -1884,6 +1906,9 @@ let unboxed_float32_array_length =
 
 let unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
+
+let unboxed_mask_array_length =
+  unboxed_or_untagged_int_or_int64_or_nativeint_array_length
 
 let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
   bind "arr" arr (fun arr ->
@@ -2172,6 +2197,14 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr ~array_index dbg
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
+let unboxed_mask_array_ref arr ~array_index dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" array_index (fun index ->
+          Cop
+            ( mk_load_mut Word_mask,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
+
 let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
     ~log2_size_addr ~memory_chunk =
   bind "arr" arr (fun arr ->
@@ -2204,6 +2237,15 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
               int_array_set arr index new_value dbg)))
+
+let unboxed_mask_array_set arr ~index ~new_value dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" index (fun index ->
+          bind "new_value" new_value (fun new_value ->
+              Cop
+                ( Cstore (Word_mask, Assignment),
+                  [array_indexing log2_size_addr arr index dbg; new_value],
+                  dbg ))))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
   if Arch.big_endian && memory_chunk_width_in_bytes memory_chunk <> size_addr
@@ -2318,6 +2360,7 @@ module Extended_machtype_component = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 
   let of_machtype_component (component : machtype_component) =
@@ -2329,6 +2372,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
@@ -2341,6 +2385,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 
   let change_tagged_int_to_val t : machtype_component =
@@ -2353,6 +2398,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 end
 
@@ -2374,6 +2420,8 @@ module Extended_machtype = struct
   let typ_vec256 = [| Extended_machtype_component.Vec256 |]
 
   let typ_vec512 = [| Extended_machtype_component.Vec512 |]
+
+  let typ_mask = [| Extended_machtype_component.Mask |]
 
   let typ_void = [||]
 
@@ -2397,6 +2445,7 @@ module Extended_machtype = struct
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
     | Punboxed_vector Unboxed_vec256 -> typ_vec256
     | Punboxed_vector Unboxed_vec512 -> typ_vec512
+    | Punboxed_mask -> typ_mask
     | Punboxed_or_untagged_integer _ ->
       (* Only 64-bit architectures, so this is always [typ_int] *)
       typ_any_int
@@ -2421,6 +2470,7 @@ let machtype_identifier t =
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
     | Vec512 -> 'Z'
+    | Mask -> 'K'
     | Float32 -> 'S'
     | Addr ->
       Misc.fatal_error "[Addr] is forbidden inside arity for generic functions"
@@ -2480,7 +2530,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_val -> 1
+  | Word_int | Word_mask | Word_val -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2494,7 +2544,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int -> generic_case ()
+  | Word_int | Word_mask -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2612,15 +2662,15 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Word_int | Word_val -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned
+          | Word_mask | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)
           match memory_chunk with
-          | Word_int | Thirtytwo_unsigned | Thirtytwo_signed | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned
+          | Word_int | Word_mask | Thirtytwo_unsigned | Thirtytwo_signed
+          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
           | Sixteen_unsigned | Sixteen_signed ->
@@ -3992,7 +4042,8 @@ let machtype_stored_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let machtype_non_scanned_size t =
@@ -4009,7 +4060,8 @@ let machtype_non_scanned_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let make_tuple l = match l with [e] -> e | _ -> Ctuple l
@@ -4022,7 +4074,7 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> true
+        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -4057,6 +4109,8 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         | Vec512 ->
           ( (non_scanned_pos + ints_per_vec512, scanned_pos),
             load Fivetwelve_unaligned non_scanned_pos )
+        | Mask ->
+          (non_scanned_pos + 1, scanned_pos), load Word_mask non_scanned_pos
         | Val -> (non_scanned_pos, scanned_pos + 1), load Word_val scanned_pos
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> Misc.fatal_error "[Addr] cannot be read")
@@ -4468,6 +4522,9 @@ let emit_vec256_constant symb bits cont =
 let emit_vec512_constant symb bits cont =
   emit_block symb boxedvec512_header (Cvec512 bits :: cont)
 
+let emit_mask_constant symb bits cont =
+  emit_block symb boxedmask_header (Cint (Int64.to_nativeint bits) :: cont)
+
 let emit_float_array_constant symb fields cont =
   emit_block symb
     (floatarray_header (List.length fields))
@@ -4853,6 +4910,8 @@ let vec256 ~dbg bits = Cconst_vec256 (bits, dbg)
 
 let vec512 ~dbg bits = Cconst_vec512 (bits, dbg)
 
+let mask ~dbg bits = Cconst_mask (bits, dbg)
+
 let nativeint ~dbg i = natint_const_untagged dbg i
 
 let letin v ~defining_expr ~body =
@@ -4861,8 +4920,8 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Cconst_mask _ | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -5213,7 +5272,7 @@ let cmm_arith_size (e : Cmm.expression) =
   match e with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cvar _ | Cconst_vec128 _ | Cconst_vec256 _
-  | Cconst_vec512 _ ->
+  | Cconst_vec512 _ | Cconst_mask _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
@@ -5525,6 +5584,14 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
     ~alloc_kind:Alloc_block_kind_int64_u_array
     ~tag_of_length:(fun _ ->
       Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag)
+    ~elements mode dbg
+
+let allocate_unboxed_mask_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_mask_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.unboxed_mask_array_tag)
     ~elements mode dbg
 
 let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements

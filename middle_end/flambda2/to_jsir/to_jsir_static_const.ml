@@ -129,7 +129,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Boxed_nativeint value ->
     const_or_var ~env ~res ~symbol
       ~to_jsir_const:To_jsir_shared.nativeint_to_jsir_const value
-  | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ ->
+  | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ ->
     (* Need SIMD *)
     static_const_not_supported const
   | Immutable_float_block values ->
@@ -214,7 +214,7 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       ~bits_to_array:(fun bits ->
         Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
   | Immutable_vec128_array _ | Immutable_vec256_array _
-  | Immutable_vec512_array _ ->
+  | Immutable_vec512_array _ | Immutable_mask_array _ ->
     (* Need SIMD *)
     static_const_not_supported const
   | Empty_array _kind ->

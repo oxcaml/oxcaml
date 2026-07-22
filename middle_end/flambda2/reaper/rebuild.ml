@@ -631,6 +631,8 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Boxed_vec512 n ->
     SC.boxed_vec512
       (rewrite_or_variable Vector_types.Vec512.Bit_pattern.zero env n)
+  | Boxed_mask n ->
+    SC.boxed_mask (rewrite_or_variable Vector_types.Mask.Bit_pattern.zero env n)
   | Immutable_float_block fields ->
     SC.immutable_float_block (rewrite_or_variables Float.zero env fields)
   | Immutable_float_array fields ->
@@ -666,6 +668,9 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Immutable_vec512_array fields ->
     SC.immutable_vec512_array
       (rewrite_or_variables Vector_types.Vec512.Bit_pattern.zero env fields)
+  | Immutable_mask_array fields ->
+    SC.immutable_mask_array
+      (rewrite_or_variables Vector_types.Mask.Bit_pattern.zero env fields)
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =

@@ -23,6 +23,7 @@ module T = struct
   type reg_class =
     | GPR
     | SIMD
+    | MASK
 
   type[@ocamlformat "disable"] _ phys_reg_classed =
     | RAX : [> `GPR] phys_reg_classed | RBX : [> `GPR] phys_reg_classed
@@ -42,6 +43,11 @@ module T = struct
     | MM12 : [> `SIMD] phys_reg_classed | MM13 : [> `SIMD] phys_reg_classed
     | MM14 : [> `SIMD] phys_reg_classed | MM15 : [> `SIMD] phys_reg_classed
 
+    | K1 : [> `MASK] phys_reg_classed | K2 : [> `MASK] phys_reg_classed
+    | K3 : [> `MASK] phys_reg_classed | K4 : [> `MASK] phys_reg_classed
+    | K5 : [> `MASK] phys_reg_classed | K6 : [> `MASK] phys_reg_classed
+    | K7 : [> `MASK] phys_reg_classed
+
   type phys_reg = P : _ phys_reg_classed -> phys_reg [@@unboxed]
 
   let phys_gpr_regs_sans_frame_pointer_classed =
@@ -54,16 +60,19 @@ module T = struct
     [| MM0;  MM1;  MM2;  MM3;  MM4;  MM5;  MM6;  MM7;
        MM8;  MM9;  MM10; MM11; MM12; MM13; MM14; MM15 |]
 
+  let phys_mask_regs_classed = [| K1; K2; K3; K4; K5; K6; K7 |]
+
   module Reg_class = struct
     type t = reg_class
 
     let of_machtype : Cmm.machtype_component -> t = function
       | Val | Int | Addr -> GPR
       | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> SIMD
+      | Mask -> MASK
 
-    let all = [GPR; SIMD]
+    let all = [GPR; SIMD; MASK]
 
-    let[@inline] to_int : t -> int = function GPR -> 0 | SIMD -> 1
+    let[@inline] to_int : t -> int = function GPR -> 0 | SIMD -> 1 | MASK -> 2
 
     let hash = to_int
 
@@ -72,7 +81,7 @@ module T = struct
     let print : Format.formatter -> t -> unit =
      fun ppf reg_class ->
       Format.fprintf ppf "%s"
-        (match reg_class with GPR -> "GPR" | SIMD -> "SIMD")
+        (match reg_class with GPR -> "GPR" | SIMD -> "SIMD" | MASK -> "MASK")
   end
 
   module Phys_reg = struct
@@ -89,6 +98,9 @@ module T = struct
       | P MM8  -> "mm8"  | P MM9 -> "mm9"   | P MM10 -> "mm10" | P MM11 -> "mm11"
       | P MM12 -> "mm12" | P MM13 -> "mm13" | P MM14 -> "mm14" | P MM15 -> "mm15"
 
+      | P K1 -> "k1" | P K2 -> "k2" | P K3 -> "k3" | P K4 -> "k4"
+      | P K5 -> "k5" | P K6 -> "k6" | P K7 -> "k7"
+
     let[@inline][@ocamlformat "disable"] to_int : t -> int = function
       | P RAX  -> 0  | P RBX  -> 1  | P RDI  -> 2  | P RSI  -> 3
       | P RDX  -> 4  | P RCX  -> 5  | P R8   -> 6  | P R9   -> 7
@@ -99,6 +111,9 @@ module T = struct
       | P MM4  -> 17 | P MM5  -> 18 | P MM6  -> 19 | P MM7  -> 20
       | P MM8  -> 21 | P MM9  -> 22 | P MM10 -> 23 | P MM11 -> 24
       | P MM12 -> 25 | P MM13 -> 26 | P MM14 -> 27 | P MM15 -> 28
+
+      | P K1 -> 29 | P K2 -> 30 | P K3 -> 31 | P K4 -> 32
+      | P K5 -> 33 | P K6 -> 34 | P K7 -> 35
 
     include Identifiable.Make (struct
       type t = phys_reg
@@ -123,6 +138,7 @@ module T = struct
           ( MM0 | MM1 | MM2 | MM3 | MM4 | MM5 | MM6 | MM7 | MM8 | MM9 | MM10
           | MM11 | MM12 | MM13 | MM14 | MM15 ) ->
         SIMD
+      | P (K1 | K2 | K3 | K4 | K5 | K6 | K7) -> MASK
   end
 
   let phys_gpr_regs_sans_frame_pointer =
@@ -132,13 +148,17 @@ module T = struct
 
   let phys_simd_regs = Array.map (fun p -> P p) phys_simd_regs_classed
 
+  let phys_mask_regs = Array.map (fun p -> P p) phys_mask_regs_classed
+
   let[@inline] registers = function
     | GPR -> phys_gpr_regs
     | SIMD -> phys_simd_regs
+    | MASK -> phys_mask_regs
 
   let[@inline] registers_sans_frame_pointer = function
     | GPR -> phys_gpr_regs_sans_frame_pointer
     | SIMD -> phys_simd_regs
+    | MASK -> phys_mask_regs
 
   let available_registers =
     if Config.with_frame_pointers
@@ -160,6 +180,9 @@ module T = struct
     | P MM4  -> 21 | P MM5  -> 22 | P MM6  -> 23 | P MM7  -> 24
     | P MM8  -> 25 | P MM9  -> 26 | P MM10 -> 27 | P MM11 -> 28
     | P MM12 -> 29 | P MM13 -> 30 | P MM14 -> 31 | P MM15 -> 32
+
+    | P K1 -> 119 | P K2 -> 120 | P K3 -> 121 | P K4 -> 122
+    | P K5 -> 123 | P K6 -> 124 | P K7 -> 125
 
   let check_typ_reg_class typ phys_reg =
     let typ_reg_class = Reg_class.of_machtype typ in
@@ -192,6 +215,8 @@ module T = struct
 
   let zmm_name = phys_simd_regs |> Array.map (to_target_name ~kind:"z")
 
+  let mask_name = phys_mask_regs |> Array.map (to_target_name ~kind:"")
+
   let first_in_class reg_class = Phys_reg.to_int (registers reg_class).(0)
 
   let index_in_class phys_reg =
@@ -207,6 +232,7 @@ module T = struct
       | Float | Float32 | Vec128 | Valx2 -> xmm_name
       | Vec256 -> ymm_name
       | Vec512 -> zmm_name
+      | Mask -> mask_name
     in
     names.(index_in_class)
 
@@ -219,6 +245,7 @@ module T = struct
     let index = index_in_class phys_reg in
     match reg_class with
     | GPR -> index
+    | MASK -> Misc.fatal_error "avx512 masks not yet implemented"
     | SIMD ->
       let slot_size_in_vals =
         match simd with

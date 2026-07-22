@@ -500,7 +500,7 @@ let convert_block_access_field_kind_from_value_kind
   | Pvariant { consts = _; non_consts } -> (
     match non_consts with [] -> Immediate | _ :: _ -> Any_value)
   | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ ->
+  | Pboxedvectorval _ | Pboxedmaskval ->
     Any_value
 
 (* This function shouldn't be used directly since lambda mixed blocks with an
@@ -512,7 +512,7 @@ let mixed_block_access_field_kind
   | Value value_kind ->
     Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-    | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+    | Vec512 | Mask | Word | Untagged_immediate ) as mixed_block_element ->
     Flat_suffix
       (K.Flat_suffix_element.from_singleton_mixed_block_element
          mixed_block_element)

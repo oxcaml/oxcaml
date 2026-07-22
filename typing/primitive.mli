@@ -44,6 +44,7 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
 (* CR mshinwell/ccasinghino: should we actually use

@@ -20,6 +20,9 @@ let vec256 bits : Vector_types.Vec256.Bit_pattern.t =
 let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
   Vector_types.Vec512.Bit_pattern.of_bits bits
 
+let mask bits : Vector_types.Mask.Bit_pattern.t =
+  Vector_types.Mask.Bit_pattern.of_bits bits
+
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
@@ -46,6 +49,7 @@ let rec subkind :
   | Boxed_vec128 -> Boxed_vec128
   | Boxed_vec256 -> Boxed_vec256
   | Boxed_vec512 -> Boxed_vec512
+  | Boxed_mask -> Boxed_mask
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } ->
     let consts =
@@ -75,6 +79,7 @@ let rec subkind :
   | Unboxed_vec128_array -> Unboxed_vec128_array
   | Unboxed_vec256_array -> Unboxed_vec256_array
   | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_mask_array -> Unboxed_mask_array
   | Unboxed_product_array -> Unboxed_product_array
 
 and value_kind_with_subkind :
@@ -108,6 +113,7 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_vec128 bits -> Reg_width_const.naked_vec128 (bits |> vec128)
   | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
   | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
+  | Naked_mask bits -> Reg_width_const.naked_mask (bits |> mask)
   | Null -> Reg_width_const.const_null
   | Poison (kind, name) ->
     let kind = Flambda_kind.With_subkind.kind (value_kind_with_subkind kind) in
@@ -591,6 +597,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const (SC.boxed_vec256 (or_variable vec256 env i))
         | Boxed_vec512 i ->
           static_const (SC.boxed_vec512 (or_variable vec512 env i))
+        | Boxed_mask i -> static_const (SC.boxed_mask (or_variable mask env i))
         | Immutable_float_block elements ->
           static_const
             (SC.immutable_float_block
@@ -642,6 +649,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const
             (SC.immutable_vec512_array
                (List.map (or_variable vec512 env) elements))
+        | Immutable_mask_array elements ->
+          static_const
+            (SC.immutable_mask_array (List.map (or_variable mask env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
         | Mutable_string { initial_value = s } ->
           static_const (SC.mutable_string ~initial_value:s)

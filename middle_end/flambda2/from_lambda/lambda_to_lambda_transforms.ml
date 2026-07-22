@@ -496,7 +496,7 @@ let makearray_dynamic_scannable_unboxed_product env
       List.exists must_be_scanned kinds
     | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
     | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-    | Punboxedvectorarray _ ->
+    | Punboxedvectorarray _ | Punboxedmaskarray ->
       Misc.fatal_errorf
         "%s: should have been sent to [makearray_dynamic_singleton]"
         (Printlambda.array_kind lambda_array_kind)
@@ -534,7 +534,8 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
           Debuginfo.print_compact dbg
       | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
       | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-      | Punboxedvectorarray _ | Pgcscannableproductarray _ ->
+      | Punboxedvectorarray _ | Punboxedmaskarray | Pgcscannableproductarray _
+        ->
         Misc.fatal_errorf
           "Cannot compile Pmakearray_dynamic at layout %s without an \
            initializer:@ %a"
@@ -617,6 +618,10 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     makearray_dynamic_singleton_uninitialized "unboxed_vec512" ~length mode loc
     |> initialize_array env loc ~length (Punboxedvectorarray_set Unboxed_vec512)
          Sixty_four_or_more ~init
+  | Punboxedmaskarray ->
+    makearray_dynamic_singleton_uninitialized "unboxed_mask" ~length mode loc
+    |> initialize_array env loc ~length Punboxedmaskarray_set Sixty_four_or_more
+         ~init
   | Pgcscannableproductarray _ ->
     let init = must_have_initializer () in
     makearray_dynamic_scannable_unboxed_product env lambda_array_kind mode
@@ -824,7 +829,8 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
     arrayblit_runtime env args loc
   | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
   | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-  | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
+  | Punboxedmaskarray_set | Pgcscannableproductarray_set _
+  | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
   | Punspecializedarray_set _ ->
     Misc.fatal_error "arrayblit: Punspecializedarray_set"

@@ -1835,6 +1835,14 @@ module Jkind0 = struct
           name = "vec512"
         }
 
+      let mask =
+        { jkind =
+            mk_jkind (Base (Mask, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.min;
+          name = "mask"
+        }
+
       let kind_of_unboxed_128bit_vectors =
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
@@ -1857,6 +1865,14 @@ module Jkind0 = struct
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "vec512 mod everything"
+        }
+
+      let kind_of_unboxed_mask =
+        { jkind =
+            mk_jkind (Base (Mask, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min;
+          name = "mask mod everything"
         }
 
       let builtins =
@@ -1888,7 +1904,8 @@ module Jkind0 = struct
           bits64;
           vec128;
           vec256;
-          vec512 ]
+          vec512;
+          mask ]
 
       let additional_common_jkinds =
         [ any_mod_everything;
@@ -1905,7 +1922,8 @@ module Jkind0 = struct
           kind_of_unboxed_int64;
           kind_of_unboxed_128bit_vectors;
           kind_of_unboxed_256bit_vectors;
-          kind_of_unboxed_512bit_vectors ]
+          kind_of_unboxed_512bit_vectors;
+          kind_of_unboxed_mask ]
 
       let common_jkinds = builtins @ additional_common_jkinds
 

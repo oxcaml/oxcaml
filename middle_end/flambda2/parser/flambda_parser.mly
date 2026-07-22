@@ -158,6 +158,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_LET   [@symbol "let"]
 %token KWD_LOCAL [@symbol "local"]
 %token KWD_LOOPIFY [@symbol "loopify"]
+%token KWD_MASK [@symbol "mask"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
 %token KWD_NEVER  [@symbol "never"]
@@ -482,6 +483,7 @@ subkind:
   | KWD_VEC128 KWD_ARRAY { Unboxed_vec128_array }
   | KWD_VEC256 KWD_ARRAY { Unboxed_vec256_array }
   | KWD_VEC512 KWD_ARRAY { Unboxed_vec512_array }
+  | KWD_MASK KWD_ARRAY { Unboxed_mask_array }
   | KWD_PRODUCT KWD_ARRAY { Unboxed_product_array }
 ;
 kinds_with_subkinds_nonempty:

@@ -60,6 +60,7 @@ module Runtime_layout = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -73,6 +74,7 @@ module Runtime_layout = struct
     | Vec128 -> 16
     | Vec256 -> 32
     | Vec512 -> 64
+    | Mask -> 8
     | Value -> Arch.size_addr
     | Word -> Arch.size_addr
     | Untagged_immediate ->
@@ -95,6 +97,7 @@ module Runtime_layout = struct
     | Vec128 -> Other Vec128
     | Vec256 -> Other Vec256
     | Vec512 -> Other Vec512
+    | Mask -> Other Mask
 
   let to_string (t : t) : string =
     match t with
@@ -108,6 +111,7 @@ module Runtime_layout = struct
     | Vec128 -> "vec128"
     | Vec256 -> "vec256"
     | Vec512 -> "vec512"
+    | Mask -> "mask"
     | Word -> "word"
     | Untagged_immediate -> "untagged_immediate"
 
@@ -124,6 +128,7 @@ module Runtime_layout = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
 
@@ -139,11 +144,12 @@ module Runtime_layout = struct
     | Vec128, Vec128
     | Vec256, Vec256
     | Vec512, Vec512
+    | Mask, Mask
     | Word, Word
     | Untagged_immediate, Untagged_immediate ->
       true
     | ( ( Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-        | Vec256 | Vec512 | Word | Untagged_immediate ),
+        | Vec256 | Vec512 | Mask | Word | Untagged_immediate ),
         _ ) ->
       false
 
@@ -158,8 +164,9 @@ module Runtime_layout = struct
     | Vec128 -> 7
     | Vec256 -> 8
     | Vec512 -> 9
-    | Word -> 10
-    | Untagged_immediate -> 11
+    | Mask -> 10
+    | Word -> 11
+    | Untagged_immediate -> 12
 end
 
 type t =
@@ -233,6 +240,7 @@ and predef =
   | Int32
   | Int64
   | Lazy_t of t
+  | Mask
   | Nativeint
   | String
   | Simd of simd_vec_split
@@ -251,6 +259,7 @@ and unboxed =
   | Unboxed_int32
   | Unboxed_int16
   | Unboxed_int8
+  | Unboxed_mask
   | Unboxed_simd of simd_vec_split
 
 and simd_vec_split =
@@ -329,13 +338,15 @@ let hash_predef_int64 = 12
 
 let hash_predef_lazy_t = 13
 
-let hash_predef_nativeint = 14
+let hash_predef_mask = 14
 
-let hash_predef_simd = 15
+let hash_predef_nativeint = 15
 
-let hash_predef_string = 16
+let hash_predef_simd = 16
 
-let hash_predef_unboxed = 17
+let hash_predef_string = 17
+
+let hash_predef_unboxed = 18
 
 let runtime_layout_of_simd_vec_split : simd_vec_split -> Runtime_layout.t =
   function
@@ -356,6 +367,7 @@ let runtime_layout_of_unboxed : unboxed -> Runtime_layout.t = function
   | Unboxed_int32 -> Bits32
   | Unboxed_int16 -> Bits16
   | Unboxed_int8 -> Bits8
+  | Unboxed_mask -> Mask
   | Unboxed_simd vec_split -> runtime_layout_of_simd_vec_split vec_split
 
 let simd_vec_split_to_byte_size s =
@@ -365,7 +377,7 @@ let simd_vec_split_to_byte_size s =
 let runtime_layout_of_predef : predef -> Runtime_layout.t = function
   | Array _ | Bytes | Char | Extension_constructor | Exception | Float | Float32
   | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint
-  | Simd _ | String ->
+  | Mask | Simd _ | String ->
     Value
   | Unboxed unboxed -> runtime_layout_of_unboxed unboxed
 
@@ -400,7 +412,8 @@ let hash_unboxed : unboxed -> int = function
   | Unboxed_int32 -> 4
   | Unboxed_int16 -> 5
   | Unboxed_int8 -> 6
-  | Unboxed_simd svs -> Hashtbl.hash (7, hash_simd_vec_split svs)
+  | Unboxed_mask -> 7
+  | Unboxed_simd svs -> Hashtbl.hash (8, hash_simd_vec_split svs)
 
 let hash_mixed_block_field (type label) (hash_label : label -> int)
     { field_type; label } =
@@ -431,6 +444,7 @@ let hash_predef predef =
   | Int32 -> hash_predef_int32
   | Int64 -> hash_predef_int64
   | Lazy_t s -> Hashtbl.hash (hash_predef_lazy_t, hash s)
+  | Mask -> hash_predef_mask
   | Nativeint -> hash_predef_nativeint
   | String -> hash_predef_string
   | Simd svs -> Hashtbl.hash (hash_predef_simd, hash_simd_vec_split svs)
@@ -611,6 +625,7 @@ let print_unboxed fmt unb =
     | Unboxed_int32 -> "int32#"
     | Unboxed_int16 -> "int16#"
     | Unboxed_int8 -> "int8#"
+    | Unboxed_mask -> "mask#"
     | Unboxed_simd svs -> Format.asprintf "%a#" print_simd_vec_split svs
   in
   Format.pp_print_string fmt s
@@ -704,6 +719,7 @@ and print_predef fmt p =
   | Int32 -> Format.pp_print_string fmt "int32"
   | Int64 -> Format.pp_print_string fmt "int64"
   | Lazy_t elem -> Format.fprintf fmt "%a lazy_t" print elem
+  | Mask -> Format.pp_print_string fmt "mask"
   | Nativeint -> Format.pp_print_string fmt "nativeint"
   | String -> Format.pp_print_string fmt "string"
   | Simd svs -> Format.fprintf fmt "%a" print_simd_vec_split svs
@@ -749,11 +765,13 @@ let equal_unboxed u1 u2 =
   | Unboxed_int64, Unboxed_int64
   | Unboxed_int32, Unboxed_int32
   | Unboxed_int16, Unboxed_int16
-  | Unboxed_int8, Unboxed_int8 ->
+  | Unboxed_int8, Unboxed_int8
+  | Unboxed_mask, Unboxed_mask ->
     true
   | Unboxed_simd svs1, Unboxed_simd svs2 -> equal_simd_vec_split svs1 svs2
   | ( ( Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-      | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_simd _ ),
+      | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask
+      | Unboxed_simd _ ),
       _ ) ->
     false
 
@@ -839,6 +857,7 @@ and equal_predef p1 p2 =
   | Int16, Int16
   | Int32, Int32
   | Int64, Int64
+  | Mask, Mask
   | Nativeint, Nativeint
   | String, String
   | Exception, Exception ->
@@ -847,8 +866,8 @@ and equal_predef p1 p2 =
   | Simd svs1, Simd svs2 -> equal_simd_vec_split svs1 svs2
   | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
   | ( ( Array _ | Bytes | Char | Extension_constructor | Float | Float32
-      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Nativeint | String
-      | Lazy_t _ | Simd _ | Exception | Unboxed _ ),
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint
+      | String | Lazy_t _ | Simd _ | Exception | Unboxed _ ),
       _ ) ->
     false
 

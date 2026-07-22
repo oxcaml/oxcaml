@@ -1103,6 +1103,7 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> extend Fpext ~from:T.float ~to_:T.double
+  | Word_mask -> not_implemented_basic ~msg:"load mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"load vector" i
@@ -1128,6 +1129,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> trunc Fptrunc T.float
+  | Word_mask -> not_implemented_basic ~msg:"store mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"store vector" i

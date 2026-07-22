@@ -196,6 +196,7 @@ end = struct
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
               | Naked_number Naked_vec256 -> UK.naked_vec256_fields
               | Naked_number Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_number Naked_mask -> UK.naked_mask_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields

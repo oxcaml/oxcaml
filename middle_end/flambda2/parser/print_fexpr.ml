@@ -179,6 +179,9 @@ let vec512 ppf
     "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
     word1 word2 word3 word4 word5 word6 word7
 
+let mask ppf ({ word0 } : Vector_types.Mask.Bit_pattern.bits) =
+  naked_number ppf "mask[%016Lx]" word0
+
 let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   Format.pp_print_string ppf
   @@
@@ -194,6 +197,7 @@ let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
   | Naked_vec128 -> "vec128"
   | Naked_vec256 -> "vec256"
   | Naked_vec512 -> "vec512"
+  | Naked_mask -> "mask"
 
 let rec subkind ppf (k : subkind) =
   let str s = Format.pp_print_string ppf s in
@@ -208,6 +212,7 @@ let rec subkind ppf (k : subkind) =
   | Boxed_vec128 -> str "vec128 boxed"
   | Boxed_vec256 -> str "vec256 boxed"
   | Boxed_vec512 -> str "vec512 boxed"
+  | Boxed_mask -> str "mask boxed"
   | Variant { consts; non_consts } -> variant_subkind ppf consts non_consts
   | Tagged_immediate -> str "imm tagged"
   | Float_array -> str "float array"
@@ -224,6 +229,7 @@ let rec subkind ppf (k : subkind) =
   | Unboxed_vec128_array -> str "vec128 array"
   | Unboxed_vec256_array -> str "vec256 array"
   | Unboxed_vec512_array -> str "vec512 array"
+  | Unboxed_mask_array -> str "mask array"
   | Unboxed_product_array -> str "product array"
 
 and variant_subkind ppf consts non_consts =
@@ -276,6 +282,7 @@ let const ppf (c : Fexpr.const) =
   | Naked_vec128 v -> vec128 ppf v
   | Naked_vec256 v -> vec256 ppf v
   | Naked_vec512 v -> vec512 ppf v
+  | Naked_mask v -> mask ppf v
   | Null -> Format.fprintf ppf "null"
   | Poison (kind, name) ->
     Format.fprintf ppf "%tpoison.%a.%s%t" Flambda_colours.invalid_keyword
@@ -376,6 +383,7 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
     | Naked_vec128s -> Some "vec128"
     | Naked_vec256s -> Some "vec256"
     | Naked_vec512s -> Some "vec512"
+    | Naked_masks -> Some "mask"
     | Unboxed_products -> Some "product"
   in
   pp_option ~space Format.pp_print_string ppf str
@@ -408,6 +416,7 @@ let static_data ppf : static_data -> unit = function
   | Boxed_vec128 (Const v) -> vec128 ppf v
   | Boxed_vec256 (Const v) -> vec256 ppf v
   | Boxed_vec512 (Const v) -> vec512 ppf v
+  | Boxed_mask (Const v) -> mask ppf v
   | Boxed_float (Var v) -> boxed_variable ppf v ~kind:"float"
   | Boxed_float32 (Var v) -> boxed_variable ppf v ~kind:"float32"
   | Boxed_int32 (Var v) -> boxed_variable ppf v ~kind:"int32"
@@ -416,6 +425,7 @@ let static_data ppf : static_data -> unit = function
   | Boxed_vec128 (Var v) -> boxed_variable ppf v ~kind:"vec128"
   | Boxed_vec256 (Var v) -> boxed_variable ppf v ~kind:"vec256"
   | Boxed_vec512 (Var v) -> boxed_variable ppf v ~kind:"vec512"
+  | Boxed_mask (Var v) -> boxed_variable ppf v ~kind:"mask"
   | Immutable_float_block elements ->
     Format.fprintf ppf "Float_block (%a)"
       (pp_comma_list @@ or_variable float)
@@ -467,6 +477,10 @@ let static_data ppf : static_data -> unit = function
   | Immutable_vec512_array elements ->
     Format.fprintf ppf "Vec512_array [|%a|]"
       (pp_semi_list @@ or_variable vec512)
+      elements
+  | Immutable_mask_array elements ->
+    Format.fprintf ppf "Mask_array [|%a|]"
+      (pp_semi_list @@ or_variable mask)
       elements
   | Empty_array kind ->
     Format.fprintf ppf "Empty_array%a" (empty_array_kind ~space:Before) kind
