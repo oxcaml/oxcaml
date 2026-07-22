@@ -492,13 +492,13 @@ end = struct
       Typing_recovery.log_or_raise (freeze_error (loc, env, err))
     else
       raise (In_context (loc, env, err))
-end
 
-let is_recoverable = function
-  | Error.In_context _
-  | Env.Error.In_context _
-  | Typetexp.Error.In_context _ -> true
-  | exn -> !Typing_recovery.is_typemod_recoverable_error exn
+  let () =
+    Typing_recovery.register_recoverable (function
+        | In_context _ -> true
+        | _ -> false
+      )
+end
 
 let error_of_filter_arrow_failure ~explanation ~first ty_fun
   : filter_arrow_failure -> _ = function
@@ -3437,7 +3437,7 @@ let rec type_pat
     if !Clflags.typing_recovery then
       Typing_recovery_state.with_saved_types (fun () ->
           try delayed ()
-          with exn when is_recoverable exn ->
+          with exn when Typing_recovery.is_recoverable exn ->
             (* We only want to catch error, not internal exceptions
                such as [Need_backtrack], etc.
 
@@ -6713,7 +6713,8 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
           (fun () ->
              type_expect_ ?recarg ~overwrite env expected_mode
                sexp ty_expected_explained)
-      with exn when !Clflags.typing_recovery && is_recoverable exn ->
+      with exn when !Clflags.typing_recovery
+                 && Typing_recovery.is_recoverable exn ->
         Typing_recovery.erroneous_type_register ty_expected_explained.ty;
         let loc = sexp.pexp_loc in
         let exp =
@@ -8239,10 +8240,11 @@ and type_expect_
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
       in
-      if !Clflags.typing_recovery then
+      begin
         try suspended ()
         with Error.In_context
-            (_, _, Undefined_method (obj, _, _)) ->
+            (_, _, Undefined_method (obj, _, _)) when
+            !Clflags.typing_recovery ->
             rue {
               exp_desc = Texp_send(obj, Tmeth_name met.txt, Default);
               exp_loc = loc; exp_extra = [];
@@ -8250,7 +8252,7 @@ and type_expect_
               exp_attributes =
                 Typing_recovery_state.recovery_attributes sexp.pexp_attributes;
               exp_env = env }
-      else suspended ()
+      end
   | Pexp_new cl ->
       submode ~loc ~env Value.legacy expected_mode;
       let (cl_path, cl_decl, cl_mode) =
@@ -8591,7 +8593,8 @@ and type_expect_
             exp_attributes = sexp.pexp_attributes;
             exp_env = env;
           }
-      | exception exn when !Clflags.typing_recovery && is_recoverable exn ->
+      | exception exn when !Clflags.typing_recovery
+                        && Typing_recovery.is_recoverable exn ->
           (* We're dropping the local open node and keeping only its body.
            We also don't report any error in the body, as there's no way to
            tell if it is due to the failed open. *)
@@ -9459,11 +9462,14 @@ and type_function
           exp_type)
       in
       let newtype = id, newtype_var, jkind_annot, uid in
-      (try
-         with_explanation ty_fun.explanation (fun () ->
-             unify_exp_types loc env exp_type (instance ty_expected))
-       with exn when !Clflags.typing_recovery && is_recoverable exn ->
-         Typing_recovery.erroneous_type_register ty_expected);
+      begin
+        try
+          with_explanation ty_fun.explanation (fun () ->
+              unify_exp_types loc env exp_type (instance ty_expected))
+        with exn when !Clflags.typing_recovery
+                   && Typing_recovery.is_recoverable exn ->
+            Typing_recovery.erroneous_type_register ty_expected
+     end;
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
         fun_alloc_mode; ret_info;
@@ -9640,7 +9646,8 @@ and type_function
       (try
          with_explanation ty_fun.explanation (fun () ->
              unify_exp_types loc env exp_type (instance ty_expected))
-       with exn when !Clflags.typing_recovery && is_recoverable exn ->
+       with exn when !Clflags.typing_recovery
+                  && Typing_recovery.is_recoverable exn ->
          Typing_recovery.erroneous_type_register ty_expected);
       (* This is quadratic, as it extracts all of the parameters from an arrow
          type for each parameter that's added. Now that functions are n-ary,
@@ -9856,7 +9863,8 @@ and type_label_access
       (label_disambiguate record_form usage lid env expected_type) labels in
   (record, record_sort, Mode.Value.disallow_right mode,
    label, expected_type, ambiguity)
-  with exn when !Clflags.typing_recovery && is_recoverable exn ->
+  with exn when !Clflags.typing_recovery
+             && Typing_recovery.is_recoverable exn ->
     Typing_recovery.erroneous_type_register ty_exp;
     let arg_kind, _ =
       Jkind.of_new_sort_var ~why:Record_projection ~level:(Ctype.get_current_level ())

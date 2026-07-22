@@ -417,7 +417,3 @@ val check_recursive_class_bindings :
   Env.t -> Ident.t list -> Typedtree.class_expr list -> unit
 
 val src_pos : Location.t -> Typedtree.attributes -> Env.t -> Typedtree.expression
-
-(** Checks whether an exception is potentially recoverable (exposed to the
-    user). *)
-val is_recoverable : exn -> bool

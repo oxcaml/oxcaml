@@ -123,9 +123,10 @@ end = struct
     Typing_recovery.log_or_raise (In_context (loc, env, err))
 
   let () =
-    Typing_recovery.is_typemod_recoverable_error := (function
+    Typing_recovery.register_recoverable (function
         | In_context _ -> true
-        | _ -> false)
+        | _ -> false
+      )
 end
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
@@ -2599,7 +2600,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | item :: srem -> begin
         match transl_sig_item env sig_type item with
         | exception exn when
-            !Clflags.typing_recovery && Typecore.is_recoverable exn ->
+            !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
             transl_sig env sig_items sig_type srem
         | new_item, new_types, env ->
             transl_sig env
@@ -4176,7 +4177,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
               (List.rev_append sg sig_acc)
               (List.rev_append sg sig_acc_include_functor)
         | exception exn when
-            !Clflags.typing_recovery && Typecore.is_recoverable exn ->
+            !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
             type_struct env shape_map srem str_acc sig_acc
               sig_acc_include_functor
       end
