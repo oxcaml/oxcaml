@@ -30,50 +30,22 @@ type t = C : int64# -> t
 *)
 type t = int64# list;;
 [%%expect {|
-Line 1, characters 9-15:
-1 | type t = int64# list;;
-             ^^^^^^
-Error: This type "int64#" should be an instance of type "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = int64# list
 |}];;
 
 let f (_ : int64# list) = ();;
 [%%expect {|
-Line 1, characters 11-17:
-1 | let f (_ : int64# list) = ();;
-               ^^^^^^
-Error: This type "int64#" should be an instance of type "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : int64# list -> unit = <fun>
 |}];;
 
 type t = C of int64# list;;
 [%%expect {|
-Line 1, characters 14-20:
-1 | type t = C of int64# list;;
-                  ^^^^^^
-Error: This type "int64#" should be an instance of type "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of int64# list
 |}];;
 
 type t = C : int64# list -> t;;
 [%%expect {|
-Line 1, characters 13-19:
-1 | type t = C : int64# list -> t;;
-                 ^^^^^^
-Error: This type "int64#" should be an instance of type "('a : value_or_null)"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : int64# list -> t
 |}];;
 
 (* Syntax: int64#c

@@ -30,50 +30,22 @@ type t = C : int32# -> t
 *)
 type t = int32# list;;
 [%%expect {|
-Line 1, characters 9-15:
-1 | type t = int32# list;;
-             ^^^^^^
-Error: This type "int32#" should be an instance of type "('a : value_or_null)"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = int32# list
 |}];;
 
 let f (_ : int32# list) = ();;
 [%%expect {|
-Line 1, characters 11-17:
-1 | let f (_ : int32# list) = ();;
-               ^^^^^^
-Error: This type "int32#" should be an instance of type "('a : value_or_null)"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : int32# list -> unit = <fun>
 |}];;
 
 type t = C of int32# list;;
 [%%expect {|
-Line 1, characters 14-20:
-1 | type t = C of int32# list;;
-                  ^^^^^^
-Error: This type "int32#" should be an instance of type "('a : value_or_null)"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of int32# list
 |}];;
 
 type t = C : int32# list -> t;;
 [%%expect {|
-Line 1, characters 13-19:
-1 | type t = C : int32# list -> t;;
-                 ^^^^^^
-Error: This type "int32#" should be an instance of type "('a : value_or_null)"
-       The layout of int32# is bits32
-         because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : int32# list -> t
 |}];;
 
 (* Syntax: int32#c

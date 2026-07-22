@@ -618,7 +618,8 @@ module type S =
   end
 |}]
 
-(* "'c is a value and not layout-polymorphic" *)
+(* On this branch [list] takes [any], so ['c list] does not force ['c] to be a
+   value and ['c] is layout-polymorphic. *)
 module type S = sig
   val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
 end
@@ -626,7 +627,7 @@ end
 module type S =
   sig
     val baz8 :
-      layout_ l l0.
-        ('a : l) ('b : l0) 'c. 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+      layout_ l l0 l1.
+        ('a : l) ('b : l0) ('c : l1). 'a -> 'b -> 'c list -> #('a * 'b * 'c)
   end
 |}]

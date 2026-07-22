@@ -617,24 +617,34 @@ val f : unit -> int32# M_any.t = <fun>
 
 
 (* doesn't work when the type constructor puts a constraint on ['a] *)
-external[@layout_poly] id : ('a : any). 'a list -> 'a list = "%identity"
+type ('a : value_or_null) value = 'a
+external[@layout_poly] id : ('a : any). 'a value -> 'a value = "%identity"
 
 [%%expect{|
-Line 1, characters 28-58:
-1 | external[@layout_poly] id : ('a : any). 'a list -> 'a list = "%identity"
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+type ('a : value_or_null) value = 'a
+Line 2, characters 28-60:
+2 | external[@layout_poly] id : ('a : any). 'a value -> 'a value = "%identity"
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind any.
        But it was inferred to have kind value_or_null
-         because the type argument of list has kind value_or_null.
+         because of the definition of value at line 1, characters 0-36.
 |}]
 
-(* Test this when sorts can be inside unboxed records *)
-(* type ('a : any) r = {field: 'a} [@@unboxed]
+type ('a : any) r = {field: 'a} [@@unboxed]
+
 external[@layout_poly] id : ('a : any). 'a M_any.t r -> 'a M_any.t r = "%identity"
 
 let f (): float# M_any.t r = id (assert false : float# M_any.t r)
 let f (): int64# M_any.t r = id (assert false : int64# M_any.t r)
-let f (): int32# M_any.t r = id (assert false : int32# M_any.t r) *)
+let f (): int32# M_any.t r = id (assert false : int32# M_any.t r)
+[%%expect{|
+type ('a : any) r = { field : 'a; } [@@unboxed]
+external id : ('a : any). 'a M_any.t r -> 'a M_any.t r = "%identity"
+  [@@layout_poly]
+val f : unit -> float# M_any.t r = <fun>
+val f : unit -> int64# M_any.t r = <fun>
+val f : unit -> int32# M_any.t r = <fun>
+|}]
 
 
 (********************************************)

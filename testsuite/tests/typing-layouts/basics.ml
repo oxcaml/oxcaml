@@ -1297,27 +1297,12 @@ Error: The value "v" has type "('a : value_or_null)"
 (* list *)
 type t13f = t_float64 list;;
 [%%expect{|
-Line 1, characters 12-21:
-1 | type t13f = t_float64 list;;
-                ^^^^^^^^^
-Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+type t13f = t_float64 list
 |}];;
 
 let x13 (v : t_float64) = [v];;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let x13 (v : t_float64) = [v];;
-                               ^
-Error: The value "v" has type "t_float64" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : t_float64 -> t_float64 list = <fun>
 |}];;
 
 let x13 v =
@@ -1333,7 +1318,7 @@ Error: The value "v" has type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a value layout
-         because the type argument of list has layout value_or_null.
+         because it's the type of a constructor argument being projected.
 |}];;
 
 (* array *)
@@ -1370,14 +1355,8 @@ and foo14 = string
 type t14 = foo14 list
 and foo14 = t_float64;;
 [%%expect{|
-Line 2, characters 0-21:
-2 | and foo14 = t_float64;;
-    ^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of foo14 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of foo14 must be a value layout
-         because the type argument of list has layout value_or_null.
+type t14 = foo14 list
+and foo14 = t_float64
 |}];;
 
 (****************************************************)

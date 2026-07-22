@@ -280,7 +280,9 @@ let not_ambiguous__as p = function
 ;;
 [%%expect {|
 val not_ambiguous__as :
-  ('a list * 'b list -> bool) -> 'a list * 'b list -> unit = <fun>
+  ('a : any) ('b : any).
+    ('a list * 'b list -> bool) -> 'a list * 'b list -> unit =
+  <fun>
 |}]
 
 let not_ambiguous__as_var p = function
@@ -288,8 +290,8 @@ let not_ambiguous__as_var p = function
   | _ -> ()
 ;;
 [%%expect {|
-val not_ambiguous__as_var : ('a list * 'b -> bool) -> 'a list * 'b -> unit =
-  <fun>
+val not_ambiguous__as_var :
+  ('a : any) 'b. ('a list * 'b -> bool) -> 'a list * 'b -> unit = <fun>
 |}]
 
 let not_ambiguous__var_as p = function
@@ -298,7 +300,8 @@ let not_ambiguous__var_as p = function
 ;;
 [%%expect {|
 val not_ambiguous__var_as :
-  ('a list * 'b -> bool) -> ('a list * 'b) * 'c option * 'd option -> unit =
+  ('a : any) 'b 'c 'd.
+    ('a list * 'b -> bool) -> ('a list * 'b) * 'c option * 'd option -> unit =
   <fun>
 |}]
 
@@ -307,7 +310,8 @@ let not_ambiguous__lazy = function
   | _ -> ()
 ;;
 [%%expect {|
-val not_ambiguous__lazy : ('a list * 'b list) * bool lazy_t -> unit = <fun>
+val not_ambiguous__lazy :
+  ('a : any) ('b : any). ('a list * 'b list) * bool lazy_t -> unit = <fun>
 |}]
 
 type t = A of int * int option * int option | B;;

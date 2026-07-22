@@ -1095,30 +1095,14 @@ Error: The value "v" has type "('a : value_or_null)"
 |}];;
 
 (* list *)
-(* CR layouts: should work after relaxing the mixed block restriction. *)
 type t13 = t_void list;;
 [%%expect{|
-Line 1, characters 11-17:
-1 | type t13 = t_void list;;
-               ^^^^^^
-Error: This type "t_void" should be an instance of type "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+type t13 = t_void list
 |}];;
 
 let x13 (VV v) = [v];;
 [%%expect{|
-Line 1, characters 18-19:
-1 | let x13 (VV v) = [v];;
-                      ^
-Error: The value "v" has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : void_variant -> t_void list = <fun>
 |}];;
 
 let x13 v =
@@ -1134,7 +1118,7 @@ Error: The value "v" has type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+         because it's the type of a constructor argument being projected.
 |}];;
 
 (* array *)
@@ -1175,14 +1159,8 @@ and foo14 = string
 type t14 = foo14 list
 and foo14 = t_void;;
 [%%expect{|
-Line 2, characters 0-18:
-2 | and foo14 = t_void;;
-    ^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of foo14 is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of foo14 must be a value layout
-         because the type argument of list has layout value_or_null.
+type t14 = foo14 list
+and foo14 = t_void
 |}];;
 
 (****************************************************)

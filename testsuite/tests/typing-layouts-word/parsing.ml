@@ -30,54 +30,22 @@ type t = C : nativeint# -> t
 *)
 type t = nativeint# list;;
 [%%expect {|
-Line 1, characters 9-19:
-1 | type t = nativeint# list;;
-             ^^^^^^^^^^
-Error: This type "nativeint#" should be an instance of type
-         "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = nativeint# list
 |}];;
 
 let f (_ : nativeint# list) = ();;
 [%%expect {|
-Line 1, characters 11-21:
-1 | let f (_ : nativeint# list) = ();;
-               ^^^^^^^^^^
-Error: This type "nativeint#" should be an instance of type
-         "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : nativeint# list -> unit = <fun>
 |}];;
 
 type t = C of nativeint# list;;
 [%%expect {|
-Line 1, characters 14-24:
-1 | type t = C of nativeint# list;;
-                  ^^^^^^^^^^
-Error: This type "nativeint#" should be an instance of type
-         "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of nativeint# list
 |}];;
 
 type t = C : nativeint# list -> t;;
 [%%expect {|
-Line 1, characters 13-23:
-1 | type t = C : nativeint# list -> t;;
-                 ^^^^^^^^^^
-Error: This type "nativeint#" should be an instance of type
-         "('a : value_or_null)"
-       The layout of nativeint# is word
-         because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : nativeint# list -> t
 |}];;
 
 (* Syntax: nativeint#c

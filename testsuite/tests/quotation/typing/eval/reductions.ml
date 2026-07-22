@@ -88,12 +88,14 @@ val f : <[int]> expr -> int = <fun>
 (* Type constructors *)
 let f (x : <[$('a) list]> expr) : 'a eval list = eval x
 [%%expect {|
-val f : <[$('a) list]> expr -> 'a eval list = <fun>
+val f : ('a : any). <[$('a) list]> expr -> 'a eval list = <fun>
 |}]
 let f (x : <[($('a), $('b)) Either.t]> expr)
     : ('a eval, 'b eval) Either.t = eval x
 [%%expect {|
-val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
+val f :
+  ('a : any) ('b : any).
+    <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
 (* non-top-level type constructor -- locally abstract type *)
