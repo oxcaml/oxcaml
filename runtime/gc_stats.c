@@ -38,6 +38,12 @@ void caml_accum_heap_stats(struct heap_stats* acc, const struct heap_stats* h)
   acc->large_max_words = intnat_max(acc->large_max_words, acc->large_words);
   acc->large_max_words = intnat_max(acc->large_max_words, h->large_max_words);
   acc->large_blocks += h->large_blocks;
+  acc->extents += h->extents;
+  acc->extent_words += h->extent_words;
+  acc->extent_live_words += h->extent_live_words;
+  acc->extent_max_words = intnat_max(acc->extent_max_words, acc->extent_words);
+  acc->extent_max_words = intnat_max(acc->extent_max_words, h->extent_max_words);
+  acc->extent_blocks += h->extent_blocks;
   acc->dependent_bytes += h->dependent_bytes;
 }
 
@@ -49,6 +55,10 @@ void caml_remove_heap_stats(struct heap_stats* acc, const struct heap_stats* h)
   acc->pool_frag_words -= h->pool_frag_words;
   acc->large_words -= h->large_words;
   acc->large_blocks -= h->large_blocks;
+  acc->extents -= h->extents;
+  acc->extent_words -= h->extent_words;
+  acc->extent_live_words -= h->extent_live_words;
+  acc->extent_blocks -= h->extent_blocks;
   acc->dependent_bytes -= h->dependent_bytes;
 }
 

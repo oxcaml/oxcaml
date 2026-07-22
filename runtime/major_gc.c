@@ -1787,7 +1787,11 @@ static bool should_compact_from_stw_single(int compaction_mode)
   struct gc_stats s;
   caml_compute_gc_stats(&s);
 
-  uintnat heap_words = s.global_stats.chunk_words + s.heap_stats.large_words;
+  /* Don't count extents, as they can't be affected by compaction.
+     TODO: consider omitting large_words, here and for live_words, for
+     the same reason. */
+  uintnat heap_words = (s.global_stats.chunk_words
+                        + s.heap_stats.large_words);
 
   if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize()) {
     CAML_GC_MESSAGE (POLICY,
@@ -1830,7 +1834,8 @@ static bool should_compact_from_stw_single(int compaction_mode)
     return false;
   }
 
-  uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
+  uintnat live_words = (s.heap_stats.pool_live_words
+                        + s.heap_stats.large_words);
   uintnat free_words = heap_words - live_words;
   double current_overhead = 100.0 * free_words / live_words;
 
@@ -1891,9 +1896,12 @@ static void cycle_major_heap_from_stw_single(
     intnat heap_words, not_garbage_words, swept_words;
 
     caml_compute_gc_stats(&s);
-    heap_words = s.heap_stats.pool_words + s.heap_stats.large_words;
-    not_garbage_words = s.heap_stats.pool_live_words
-      + s.heap_stats.large_words;
+    heap_words = (s.heap_stats.pool_words
+                  + s.heap_stats.large_words
+                  + s.heap_stats.extent_words);
+    not_garbage_words = (s.heap_stats.pool_live_words
+                         + s.heap_stats.large_words
+                         + s.heap_stats.extent_live_words);
     swept_words = domain->swept_words;
     caml_gc_log ("heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d "
                  "not_garbage_words %"ARCH_INTNAT_PRINTF_FORMAT"d "
