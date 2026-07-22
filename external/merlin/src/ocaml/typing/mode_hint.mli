@@ -36,6 +36,8 @@ type pinpoint_desc =
   | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Effect_match  (** A pattern match with effect cases *)
+  | Effect_try  (** A try-with expression with effect cases *)
   | Class  (** A class declaration *)
   | Object  (** An object declaration *)
   | Loop  (** A loop *)
@@ -142,6 +144,7 @@ type allocation_desc =
   | Function_coercion
   | Float_projection
   | Lpoly_captured_environment
+  | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
 
@@ -163,11 +166,10 @@ type 'd morph =
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
-  | Captured_by_partial_application : (disallowed * 'r) morph
-  | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
+  | Allocation : allocation -> ('l * 'r) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph

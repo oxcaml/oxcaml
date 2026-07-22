@@ -209,7 +209,8 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
     P.Array_kind.element_kinds kind
   in
   let mem_chunks_per_non_unarized_element =
-    List.map C.memory_chunk_of_kind element_kinds_per_non_unarized_element
+    List.map C.memory_chunk_of_non_scannable_kind
+      element_kinds_per_non_unarized_element
   in
   let num_mem_chunks_per_non_unarized_element =
     List.length mem_chunks_per_non_unarized_element
@@ -883,8 +884,9 @@ let phys_equal _env dbg op x y =
   | Eq -> C.eq ~dbg x y
   | Neq -> C.neq ~dbg x y
 
-let requires_sign_extended_operands : P.binary_int_arith_op -> bool = function
-  | Div | Mod ->
+let requires_sign_or_zero_extended_operands : P.binary_int_arith_op -> bool =
+  function
+  | Div (Signed | Unsigned) | Mod (Signed | Unsigned) ->
     (* Note that it would be wrong to apply [C.low_bits] to operands for div and
        mod.
 
@@ -922,7 +924,7 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
         C.Scalar_type.Integral.static_cast ~dbg ~src:kind ~dst:operator_type
           operand
       in
-      if requires_sign_extended_operands op
+      if requires_sign_or_zero_extended_operands op
       then operand
       else
         let bits =
@@ -943,26 +945,29 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
        sign-extensions, e.g. when chaining additions together. Also see comment
        below about [C.low_bits] in the [Div] and [Mod] cases. *)
   in
+  let unsigned_wrap f =
+    (* Since all operands are sign-extended, unsigned operators must have the
+       same width as their inputs. *)
+    wrap (C.Scalar_type.Integral.with_signedness kind ~signedness:Unsigned) f
+  in
   match kind with
   | Tagged _ -> (
-    let wrap f =
-      (* the operators below operate on tagged immediates directly *)
-      wrap tagged_immediate f
-    in
+    (* the operators below operate on tagged immediates directly *)
+    let wrap f = wrap tagged_immediate f in
     match op with
     | Add -> wrap C.add_int_caml
     | Sub -> wrap C.sub_int_caml
     | Mul -> wrap C.mul_int_caml
-    | Div -> wrap C.div_int_caml
-    | Mod -> wrap C.mod_int_caml
+    | Div Signed -> wrap C.div_int_caml
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int_caml
+    | Mod Signed -> wrap C.mod_int_caml
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int_caml
     | And -> wrap C.and_int_caml
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
   | Untagged untagged -> (
-    let wrap f =
-      (* the operators below operate on register-width naked nativeints *)
-      wrap naked_nativeint f
-    in
+    (* the operators below operate on register-width naked nativeints *)
+    let wrap f = wrap naked_nativeint f in
     let dividend_cannot_be_min_int =
       C.Scalar_type.Integer.bit_width untagged < C.arch_bits
     in
@@ -970,8 +975,10 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int
     | Sub -> wrap C.sub_int
     | Mul -> wrap C.mul_int
-    | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
-    | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Div Signed -> wrap (C.div_int ~dividend_cannot_be_min_int)
+    | Div Unsigned -> unsigned_wrap C.unsigned_div_int
+    | Mod Signed -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Mod Unsigned -> unsigned_wrap C.unsigned_mod_int
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
@@ -1119,11 +1126,16 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
-let unary_primitive env res dbg f arg =
+let unary_primitive env res dbg f (_arg_simple : Simple.t option)
+    (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
-  | Duplicate_array _ | Duplicate_block _ | Obj_dup ->
+  | Duplicate_array { alloc_region; _ }
+  | Duplicate_block { alloc_region; _ }
+  | Obj_dup { alloc_region } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    let () = ignore alloc_region in
     ( None,
       res,
       (C.extcall ~dbg ~alloc:true ~returns:true ~is_c_builtin:false
@@ -1169,6 +1181,7 @@ let unary_primitive env res dbg f arg =
   | Unbox_number kind -> None, res, unbox_number ~dbg kind arg
   | Untag_immediate -> Some (Env.Untag arg), res, C.untag_int arg dbg
   | Box_number (kind, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     None, res, box_number ~dbg kind alloc_mode arg
   | Tag_immediate ->
     (* We could return [Env.Tag] here, but probably unnecessary at the
@@ -1249,11 +1262,13 @@ let unary_primitive env res dbg f arg =
       |> C.memory_chunk_of_kind
     in
     None, res, C.load ~dbg memory_chunk Mutable ~addr:arg
-  | Make_lazy lazy_tag ->
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
     None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
 
-let binary_primitive env dbg f x y =
+let binary_primitive env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =
   match (f : P.binary_primitive) with
   | Block_set { kind; init; field } ->
     block_set ~dbg kind init ~field ~block:x ~new_value:y
@@ -1290,7 +1305,9 @@ let binary_primitive env dbg f x y =
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
-let ternary_primitive _env dbg f x y z =
+let ternary_primitive _env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
+    (x : Cmm.expression) (y : Cmm.expression) (z : Cmm.expression) =
   match (f : P.ternary_primitive) with
   | Array_set (array_kind, array_set_kind) ->
     array_set ~dbg array_kind array_set_kind ~arr:x ~index:y ~new_value:z
@@ -1348,7 +1365,10 @@ let ternary_primitive _env dbg f x y z =
     in
     C.return_unit dbg store
 
-let quaternary_primitive _env dbg f x y z w =
+let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
+    (_y_simple : Simple.t option) (_z_simple : Simple.t option)
+    (_w_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression)
+    (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
   | Atomic_compare_and_set_field block_access_kind ->
     C.atomic_compare_and_set_field ~dbg
@@ -1364,8 +1384,12 @@ let variadic_primitive _env dbg f args =
     C.beginregion ~dbg
   | Begin_region { ghost = true } | Begin_try_region { ghost = true } ->
     C.int ~dbg 0
-  | Make_block (kind, _mut, alloc_mode) -> make_block ~dbg kind alloc_mode args
-  | Make_array (kind, _mut, alloc_mode) -> make_array ~dbg kind alloc_mode args
+  | Make_block (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_block ~dbg kind alloc_mode args
+  | Make_array (kind, _mut, alloc_mode) ->
+    (* CR alloc_regions: propagate alloc_regions to CMM. *)
+    make_array ~dbg kind alloc_mode args
 
 let arg ?consider_inlining_effectful_expressions ~dbg env res simple =
   C.simple ?consider_inlining_effectful_expressions ~dbg env res simple
@@ -1397,20 +1421,25 @@ let arg_list' ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, env, res, effs
 
+(* CR mshinwell: For the moment we don't provide the [Simple]s to the above
+   translation functions for splittable primitives. This is ok for now but may
+   require revisiting in future. *)
 let trans_prim : To_cmm_env.t To_cmm_env.trans_prim =
   { nullary = nullary_primitive;
-    unary = unary_primitive;
+    unary = (fun env res dbg prim x -> unary_primitive env res dbg prim None x);
     binary =
       (fun env res dbg prim x y ->
-        let cmm = binary_primitive env dbg prim x y in
+        let cmm = binary_primitive env dbg prim None None x y in
         None, res, cmm);
     ternary =
       (fun env res dbg prim x y z ->
-        let cmm = ternary_primitive env dbg prim x y z in
+        let cmm = ternary_primitive env dbg prim None None None x y z in
         None, res, cmm);
     quaternary =
       (fun env res dbg prim x y z w ->
-        let cmm = quaternary_primitive env dbg prim x y z w in
+        let cmm =
+          quaternary_primitive env dbg prim None None None None x y z w
+        in
         None, res, cmm);
     variadic =
       (fun env res dbg prim args ->
@@ -1466,43 +1495,49 @@ let prim_simple env res dbg p =
     let extra, res, expr = nullary_primitive env res dbg prim in
     Env.simple expr free_vars, extra, env, res, Ece.pure
   | Unary (unary, x) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let extra, res, expr = unary_primitive env res dbg unary x.cmm in
-    Env.simple expr x.free_vars, extra, env, res, x.effs
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let extra, res, expr = unary_primitive env res dbg unary (Some x) x'.cmm in
+    Env.simple expr x'.free_vars, extra, env, res, x'.effs
   | Binary (binary, x, y) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let free_vars = Backend_var.Set.union x.free_vars y.free_vars in
-    let effs = Ece.join x.effs y.effs in
-    let expr = binary_primitive env dbg binary x.cmm y.cmm in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
+    let effs = Ece.join x'.effs y'.effs in
+    let expr =
+      binary_primitive env dbg binary (Some x) (Some y) x'.cmm y'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Ternary (ternary, x, y, z) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let free_vars =
       Backend_var.Set.union
-        (Backend_var.Set.union x.free_vars y.free_vars)
-        z.free_vars
+        (Backend_var.Set.union x'.free_vars y'.free_vars)
+        z'.free_vars
     in
-    let effs = Ece.join (Ece.join x.effs y.effs) z.effs in
-    let expr = ternary_primitive env dbg ternary x.cmm y.cmm z.cmm in
+    let effs = Ece.join (Ece.join x'.effs y'.effs) z'.effs in
+    let expr =
+      ternary_primitive env dbg ternary (Some x) (Some y) (Some z) x'.cmm y'.cmm
+        z'.cmm
+    in
     Env.simple expr free_vars, None, env, res, effs
   | Quaternary (quaternary, x, y, z, w) ->
-    let To_cmm_env.{ env; res; expr = x } = arg env res x in
-    let To_cmm_env.{ env; res; expr = y } = arg env res y in
-    let To_cmm_env.{ env; res; expr = z } = arg env res z in
-    let To_cmm_env.{ env; res; expr = w } = arg env res w in
+    let To_cmm_env.{ env; res; expr = x' } = arg env res x in
+    let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let To_cmm_env.{ env; res; expr = z' } = arg env res z in
+    let To_cmm_env.{ env; res; expr = w' } = arg env res w in
     let free_vars =
       Backend_var.Set.union
         (Backend_var.Set.union
-           (Backend_var.Set.union x.free_vars y.free_vars)
-           z.free_vars)
-        w.free_vars
+           (Backend_var.Set.union x'.free_vars y'.free_vars)
+           z'.free_vars)
+        w'.free_vars
     in
-    let effs = Ece.join (Ece.join (Ece.join x.effs y.effs) z.effs) w.effs in
+    let effs = Ece.join (Ece.join (Ece.join x'.effs y'.effs) z'.effs) w'.effs in
     let expr =
-      quaternary_primitive env dbg quaternary x.cmm y.cmm z.cmm w.cmm
+      quaternary_primitive env dbg quaternary (Some x) (Some y) (Some z)
+        (Some w) x'.cmm y'.cmm z'.cmm w'.cmm
     in
     Env.simple expr free_vars, None, env, res, effs
   | Variadic (variadic, l) ->

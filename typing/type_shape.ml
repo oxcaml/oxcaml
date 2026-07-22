@@ -324,15 +324,15 @@ module Type_shape = struct
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Trepr (_, _)
-                | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
+                | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+                | Tbox _ ->
                   assert false
               in
               Misc.fatal_errorf
                 "Linking and substitution should not reach this stage. Found \
                  %s type in file %s."
                 str
-                (match Compilation_unit.get_current () with
+                (match Current_unit.get_cu () with
                 | None -> "<unknown>"
                 | Some cu -> Compilation_unit.full_path_as_string cu)
               (* We cannot access the type printer here, so this
@@ -366,6 +366,7 @@ module Type_shape = struct
           | Tquote_eval _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
+          | Tbox _ -> unknown_shape_value
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in
@@ -481,6 +482,9 @@ module Type_decl_shape = struct
               args
           in
           Array.of_list lys
+        | Constructor_variable ->
+          Misc.fatal_error
+            "Type_shape: unexpected variable constructor representation"
       in
       Some
         { Shape.name;

@@ -53,7 +53,7 @@ let setup_reader_config config =
     Unit_info.make_with_known_compilation_unit
       ~source_file:config.query.filename guessed_file_type "" compilation_unit
   in
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit unit_info;
   Location.input_name := config.query.filename;
   fast := ocaml.unsafe;
   classic := ocaml.classic;
@@ -64,7 +64,7 @@ let setup_reader_config config =
   applicative_functors := ocaml.applicative_functors;
   nopervasives := ocaml.nopervasives;
   strict_formats := ocaml.strict_formats;
-  open_modules := ocaml.open_modules;
+  open_args := ocaml.open_args;
   cmi_file := ocaml.cmi_file;
   as_parameter := ocaml.as_parameter;
   zero_alloc_check := ocaml.zero_alloc_check;

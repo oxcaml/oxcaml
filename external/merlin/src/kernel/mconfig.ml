@@ -18,7 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    open_modules : string list;
+    open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;
@@ -55,7 +55,13 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
-      ("open_modules", Json.list Json.string x.open_modules);
+      ( "open_args",
+        Json.list
+          (fun (arg : Clflags.open_arg) ->
+            match arg with
+            | Open md -> `Assoc [ ("open", `String md) ]
+            | Open_cmi file -> `Assoc [ ("open-cmi", `String file) ])
+          x.open_args );
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
       ("warnings", dump_warnings x.warnings);
@@ -443,6 +449,7 @@ let ocaml_ignored_flags =
     "-compat-32";
     "-config";
     "-custom";
+    "-dcanonical-ids";
     "-dclambda";
     "-dcmm";
     "-dcse";
@@ -453,7 +460,10 @@ let ocaml_ignored_flags =
     "-dlambda";
     "-dblambda";
     "-dlinear";
+    "-dmatchcomp";
+    "-dno-canonical-ids";
     "-dparsetree";
+    "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
     "-dslambda";
@@ -471,6 +481,7 @@ let ocaml_ignored_flags =
     "-fPIC";
     "-g";
     "-i";
+    "-i-variance";
     "-inlining-report";
     "-keep-docs";
     "-no-keep-docs";
@@ -539,6 +550,7 @@ let ocaml_ignored_flags =
     "-flambda2-result-types-all-functions";
     "-flambda2-result-types-functors-only";
     "-flambda2-speculative-inlining-only-if-arguments-useful";
+    "-flambda2-speculative-inlining-track-lifted-constants";
     "-flambda2-unbox-along-intra-function-control-flow";
     "-flambda2-unicode";
     "-flambda2-kind-checks";
@@ -554,6 +566,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-expert-phantom-lets";
     "-no-flambda2-join-points";
     "-no-flambda2-speculative-inlining-only-if-arguments-useful";
+    "-no-flambda2-speculative-inlining-track-lifted-constants";
     "-no-flambda2-unbox-along-intra-function-control-flow";
     "-ocamlcfg";
     "-no-ocamlcfg";
@@ -567,11 +580,6 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
-    "-flambda2-inline-large-functor-size";
-    "-flambda2-inline-small-functor-size";
-    "-flambda2-speculative-inlining-track-lifted-constants";
-    "-name-mangling-scheme";
-    "-no-flambda2-speculative-inlining-track-lifted-constants";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
@@ -624,6 +632,7 @@ let ocaml_ignored_flags =
     "-dzero-alloc";
     "-dletreclambda";
     "-dcounters";
+    "-experimental-optimizations";
     "-vectorize";
     "-no-vectorize";
     "-dvectorize";
@@ -784,6 +793,7 @@ let ocaml_ignored_parametrized_flags =
     "-intf";
     "-intf_suffix";
     "-intf-suffix";
+    "-keywords";
     "-o";
     "-rounds";
     "-runtime-variant";
@@ -805,6 +815,7 @@ let ocaml_ignored_parametrized_flags =
     "-reorder-blocks-random";
     "-heap-reduction-threshold";
     "-flambda2-cse-depth";
+    "-dbranch-relaxation-max-displacement";
     "-flambda2-expert-max-block-size-for-projections";
     "-flambda2-expert-max-unboxing-depth";
     "-flambda2-join-depth";
@@ -819,6 +830,8 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-prim-cost";
     "-flambda2-inline-small-function-size";
     "-flambda2-inline-threshold";
+    "-flambda2-inline-small-functor-size";
+    "-flambda2-inline-large-functor-size";
     "-flambda2-join-algorithm";
     "-flambda2-expert-cont-specialization-threshold";
     "-regalloc";
@@ -841,6 +854,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-shape-reduce-depth";
     "-gdwarf-config-shape-eval-depth";
     "-gdwarf-config-max-cms-files-per-unit";
+    "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
     "-gdwarf-config-max-type-to-shape-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
@@ -862,7 +876,8 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-expert-max-function-simplify-run";
     "-llvm-flags";
     "-reaper-preserve-direct-calls";
-    "-save-ir-after"
+    "-save-ir-after";
+    "-X"
   ]
 
 let ocaml_warnings_spec ~error =
@@ -953,8 +968,13 @@ let ocaml_flags =
       " Reject invalid formats accepted by legacy implementations" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
-          { ocaml with open_modules = md :: ocaml.open_modules }),
+          { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
       "<module>  Opens the module <module> before typing" );
+    ( "-open-cmi",
+      Marg.param "file" (fun file ocaml ->
+          { ocaml with open_args = Clflags.Open_cmi file :: ocaml.open_args }),
+      "<file>  Opens the module whose compiled interface is <file> before \
+       typing" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1032,9 +1052,12 @@ let ocaml_flags =
       Marg.int (fun kind_verbosity ocaml -> { ocaml with kind_verbosity }),
       "Set the verbosity used for printing kinds (0=not verbose, 1=expanded, \
        2=expanded with all mod bounds)" );
+    ( "-ikinds",
+      Marg.unit (fun ocaml -> { ocaml with ikinds = true }),
+      "Enable ikinds-based kind checker (experimental)" );
     ( "-no-ikinds",
-      Marg.bool (fun no_ikinds ocaml -> { ocaml with ikinds = not no_ikinds }),
-      "Disable ikinds-based kind checker" )
+      Marg.unit (fun ocaml -> { ocaml with ikinds = false }),
+      "Disable ikinds-based kind checker (experimental)" )
   ]
 
 (** {1 Main configuration} *)
@@ -1054,7 +1077,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
-        open_modules = [];
+        open_args = [];
         ppx = [];
         pp = None;
         warnings = Warnings.backup ();
@@ -1066,7 +1089,7 @@ let initial =
         zero_alloc_assert = Zero_alloc_annotations.Assert.Assert_default;
         infer_with_bounds = false;
         kind_verbosity = 0;
-        ikinds = false
+        ikinds = true
       };
     merlin =
       { build_path = [];

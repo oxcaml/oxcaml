@@ -29,7 +29,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let is_nontail_call : Cfg.terminator -> bool =
  fun term_desc ->
@@ -161,6 +161,16 @@ let rec find_stack_check_block :
 let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
   let block = Cfg.get_block_exn cfg label in
   let stack_offset = Cfg.first_instruction_stack_offset block in
+  (* Registers live across the check are the block's live-in = the next
+     instruction's live-in. As [instr.live] is the live-across set, recover the
+     live-in by adding the next instruction's arguments. This is what the
+     emitter's [save_simd] needs to preserve SIMD registers across the realloc
+     handler (a C call that clobbers caller-save SIMD registers). *)
+  let live =
+    match DLL.hd block.body with
+    | Some hd -> Reg.add_set_array hd.live hd.arg
+    | None -> Reg.add_set_array block.terminator.live block.terminator.arg
+  in
   let check : Cfg.basic Cfg.instruction =
     (* CR xclerc for xclerc: double check `available_before` and
        `available_across`.
@@ -173,7 +183,7 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
     let id = InstructionId.get_and_incr cfg.next_instruction_id in
     Cfg.make_instruction ()
       ~desc:(Cfg.Stack_check { max_frame_size_bytes = max_frame_size })
-      ~stack_offset ~id ~available_before:Reg_availability_set.Unreachable
+      ~stack_offset ~id ~live ~available_before:Reg_availability_set.Unreachable
       ~available_across:Reg_availability_set.Unreachable
   in
   DLL.add_begin block.body check
@@ -199,21 +209,13 @@ let insert_stack_checks (cfg : Cfg.t) ~max_frame_size
 (* CR-someday xclerc for xclerc: we may want to duplicate the check in some
    cases, rather than simply pushing it down. *)
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
-  match Config.runtime5 with
-  | false -> cfg_with_layout
-  | true ->
-    let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    (if not Config.no_stack_checks
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  (if not Config.no_stack_checks
+   then
+     let { max_frame_size; blocks_needing_stack_checks } = build_cfg_info cfg in
+     if not (Label.Set.is_empty blocks_needing_stack_checks)
      then
-       let { max_frame_size; blocks_needing_stack_checks } =
-         build_cfg_info cfg
-       in
-       if not (Label.Set.is_empty blocks_needing_stack_checks)
-       then
-         if
-           Label.Tbl.length cfg.blocks
-           < !Oxcaml_flags.cfg_stack_checks_threshold
-         then
-           insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
-         else insert_instruction cfg cfg.entry_label ~max_frame_size);
-    cfg_with_layout
+       if Label.Tbl.length cfg.blocks < !Oxcaml_flags.cfg_stack_checks_threshold
+       then insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
+       else insert_instruction cfg cfg.entry_label ~max_frame_size);
+  cfg_with_layout

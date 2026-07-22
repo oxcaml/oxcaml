@@ -421,15 +421,15 @@ let name_defined_earlier ~binding_time_resolver ~binding_times_and_modes alias
        However if this situation occurs they should have binding time
        [Binding_time.imported_variables] (see [Typing_env.add_equation0]). *)
     let alias_binding_time =
-      match Name.Map.find alias binding_times_and_modes with
-      | exception Not_found -> Binding_time.imported_variables
-      | _, binding_time_and_mode ->
+      match Name.Map.find_or_null alias binding_times_and_modes with
+      | Null -> Binding_time.imported_variables
+      | This (_, binding_time_and_mode) ->
         Binding_time.With_name_mode.binding_time binding_time_and_mode
     in
     let than_binding_time =
-      match Name.Map.find than binding_times_and_modes with
-      | exception Not_found -> Binding_time.imported_variables
-      | _, binding_time_and_mode ->
+      match Name.Map.find_or_null than binding_times_and_modes with
+      | Null -> Binding_time.imported_variables
+      | This (_, binding_time_and_mode) ->
         Binding_time.With_name_mode.binding_time binding_time_and_mode
     in
     if Binding_time.strictly_earlier alias_binding_time ~than:than_binding_time
@@ -471,9 +471,9 @@ let binding_time_and_name_mode ~binding_times_and_modes elt =
     ~const:(fun _ -> Binding_time.With_name_mode.consts)
     ~var:(fun var ~coercion:_ ->
       let name = Name.var var in
-      match Name.Map.find name binding_times_and_modes with
-      | _, binding_time_and_mode -> binding_time_and_mode
-      | exception Not_found ->
+      match Name.Map.find_or_null name binding_times_and_modes with
+      | This (_, binding_time_and_mode) -> binding_time_and_mode
+      | Null ->
         (* This variable must be in another compilation unit. *)
         Binding_time.With_name_mode.imported_variables)
     ~symbol:(fun _ ~coercion:_ -> Binding_time.With_name_mode.symbols)
@@ -554,9 +554,9 @@ let canonical t element : canonical =
   Simple.pattern_match element
     ~const:(fun _ -> Is_canonical)
     ~name:(fun name ~coercion:coercion_from_bare_element_to_element ->
-      match Name.Map.find name t.canonical_elements with
-      | exception Not_found -> Is_canonical
-      | canonical_element, coercion_from_bare_element_to_canonical ->
+      match Name.Map.find_or_null name t.canonical_elements with
+      | Null -> Is_canonical
+      | This (canonical_element, coercion_from_bare_element_to_canonical) ->
         let coercion_from_element_to_bare_element =
           Coercion.inverse coercion_from_bare_element_to_element
         in

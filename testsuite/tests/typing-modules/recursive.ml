@@ -17,9 +17,9 @@ Error: The type abbreviation "T.t" is cyclic:
 module rec X : (sig module type A = X.A end)
   = struct module type A end
 [%%expect {|
-Line 1, characters 36-39:
+Line 1, characters 36-37:
 1 | module rec X : (sig module type A = X.A end)
-                                        ^^^
+                                        ^
 Error: This module type is recursive. This use of the recursive module "X"
        within its own definition makes the module type of "X" depend on itself.
        Such recursive definitions of module types are not allowed.
@@ -29,9 +29,9 @@ Error: This module type is recursive. This use of the recursive module "X"
 module rec X : (sig module type A := X.A end)
   = struct end
 [%%expect {|
-Line 1, characters 37-40:
+Line 1, characters 37-38:
 1 | module rec X : (sig module type A := X.A end)
-                                         ^^^
+                                         ^
 Error: This module type is recursive. This use of the recursive module "X"
        within its own definition makes the module type of "X" depend on itself.
        Such recursive definitions of module types are not allowed.

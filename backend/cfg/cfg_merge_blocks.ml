@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Int = Numbers.Int
 module List = ListLabels
 
@@ -48,7 +48,11 @@ end = struct
       && Misc.Stdlib.Array.equal equal_reg left_res right_res
       && equal_desc left_desc right_desc
       (* CR-someday xclerc for xclerc: consider definin equal in `Debuginfo` *)
-      && Debuginfo.compare left_dbg right_dbg = 0
+      (* Debug info is allowed to differ (the merged-away paths inherit the
+         representative block's locations), unless the user has asked for
+         debugging to take precedence over code generation. *)
+      && ((not !Dwarf_flags.gdwarf_may_alter_codegen)
+         || Debuginfo.compare left_dbg right_dbg = 0)
 
   let basic_block :
       equal_reg:(Reg.t -> Reg.t -> bool) ->
@@ -169,11 +173,21 @@ let run_before_register_allocation cfg_with_layout =
   run ~equal_reg cfg_with_layout
 
 let run_after_register_allocation cfg_with_layout =
+  (* [same_loc] alone is not enough: it compares locations only up to register
+     or stack class, which conflates machtype components that share a class
+     (e.g. [Val], [Int], and [Addr] all map to the integer stack class). That
+     distinction matters because [Val] denotes a GC root recorded in the frame
+     descriptor at call sites, whereas [Int] does not. Two blocks that are
+     instruction-identical at the location level but disagree on whether a live
+     value is a pointer have different frame tables; merging them and keeping
+     only one would drop a GC root on the paths reaching the other, so we
+     additionally require the machtype components to be equal. *)
   let equal_reg x y =
     Reg.same_loc_fatal_on_unknown
       ~fatal_message:
         "Cfg_merge_blocks.run_after_register_allocation should only be run \
          after register allocation"
       x y
+    && Cmm.equal_machtype_component x.Reg.typ y.Reg.typ
   in
   run ~equal_reg cfg_with_layout

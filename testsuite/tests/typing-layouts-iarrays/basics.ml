@@ -89,13 +89,12 @@ Line 1, characters 28-34:
 Error: Unbound value "(.:())"
 |}];;
 
+(****************************************************)
+(* Test 3.5: operations in the Iarray module work *)
+
 let f (x : float# iarray) = Iarray.length x
 [%%expect{|
-Line 1, characters 28-41:
-1 | let f (x : float# iarray) = Iarray.length x
-                                ^^^^^^^^^^^^^
-Error: Unbound module "Iarray"
-Hint: Did you mean "Array"?
+val f : float# iarray -> int = <fun>
 |}];;
 
 (*****************************************************************
@@ -224,7 +223,7 @@ end
 Line 13, characters 39-42:
 13 |                     #42L (get_third [: #0L; #1L; #42L :]))
                                             ^^^
-Error: This expression has type "int64#" but an expression was expected of type
+Error: This constant has type "int64#" but an expression was expected of type
          "('a : bits32)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
@@ -268,7 +267,7 @@ let _ =
 Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0 in
                                            ^^^^^
-Error: This expression has type "float#" but an expression was expected of type
+Error: This constant has type "float#" but an expression was expected of type
          "('a : value_maybe_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -284,7 +283,7 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42l in
                                            ^^^^
-Error: This expression has type "int32#" but an expression was expected of type
+Error: This constant has type "int32#" but an expression was expected of type
          "('a : value_maybe_null)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
@@ -300,7 +299,7 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42L in
                                            ^^^^
-Error: This expression has type "int64#" but an expression was expected of type
+Error: This constant has type "int64#" but an expression was expected of type
          "('a : value_maybe_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
@@ -316,7 +315,7 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42n in
                                            ^^^^
-Error: This expression has type "nativeint#"
+Error: This constant has type "nativeint#"
        but an expression was expected of type "('a : value_maybe_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
@@ -332,8 +331,8 @@ let _ =
 Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0s in
                                            ^^^^^^
-Error: This expression has type "float32#"
-       but an expression was expected of type "('a : value_maybe_null)"
+Error: This constant has type "float32#" but an expression was expected of type
+         "('a : value_maybe_null)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
        But the layout of float32# must be a value layout
@@ -400,8 +399,7 @@ Line 2, characters 6-19:
 2 |   let [: #(s, _) :] = arr in
           ^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-[:  :]
+  Here is an example of a case that is not matched: "[:  :]"
 
 Line 3, characters 13-14:
 3 |   use_global s

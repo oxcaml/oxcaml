@@ -17,6 +17,12 @@ type t : immutable_data non_pointer
 
 type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
 [%%expect{|
+Line 1, characters 37-52:
+1 | type ('a : any non_pointer, 'b : any maybe_separable, 'c : any) t;;
+                                         ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "any".
+
 type ('a : any non_pointer, 'b : any, 'c : any) t
 |}]
 
@@ -34,6 +40,12 @@ type t : value non_pointer & value_maybe_separable & float64
 type t_maybeptr : any maybe_separable
 type t_nonptr : any non_pointer
 [%%expect{|
+Line 1, characters 22-37:
+1 | type t_maybeptr : any maybe_separable
+                          ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "any".
+
 type t_maybeptr : any
 type t_nonptr : any non_pointer
 |}]
@@ -48,6 +60,12 @@ type t_nonptr_val : value non_pointer
 type ('a : any maybe_separable) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 [%%expect{|
+Line 1, characters 15-30:
+1 | type ('a : any maybe_separable) accepts_maybeptr
+                   ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "any".
+
 type ('a : any) accepts_maybeptr
 type ('a : any non_pointer) accepts_nonptr
 |}]
@@ -283,6 +301,12 @@ let f (a : (_ : any non_pointer)) (b : (_ : any maybe_separable)) =
   let _unify_them = [ a; b ] in
   ()
 [%%expect{|
+Line 1, characters 48-63:
+1 | let f (a : (_ : any non_pointer)) (b : (_ : any maybe_separable)) =
+                                                    ^^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "any".
+
 val f : ('a : value_or_null non_pointer). 'a -> 'a -> unit = <fun>
 |}]
 
@@ -307,6 +331,16 @@ let f (type a : float64 maybe_separable) (x : a) =
   let g (x : (_ : float64 non_pointer)) = () in
   g x
 [%%expect{|
+Line 1, characters 16-39:
+1 | let f (type a : float64 maybe_separable) (x : a) =
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "maybe_separable" have no effect on the kind "float64".
+
+Line 2, characters 18-37:
+2 |   let g (x : (_ : float64 non_pointer)) = () in
+                      ^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "float64".
+
 val f : ('a : float64). 'a -> unit = <fun>
 |}]
 
@@ -354,7 +388,7 @@ let f (type a1 : value non_pointer) (type a2 : value) (a1 : a1) (a2 : a2) =
 Line 5, characters 19-20:
 5 |   cant_promote_snd v
                        ^
-Error: This expression has type "a2" but an expression was expected of type
+Error: The value "v" has type "a2" but an expression was expected of type
          "('a : value non_pointer)"
        The layout of a2 is value
          because of the annotation on the abstract type declaration for a2.
@@ -400,8 +434,8 @@ let outer (type a : value non_float) (nf : a or_null) =
 Line 8, characters 4-6:
 8 |   f nf
         ^^
-Error: This expression has type "a or_null"
-       but an expression was expected of type "'a or_null"
+Error: The value "nf" has type "a or_null" but an expression was expected of type
+         "'a or_null"
        The layout of a is value non_float
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be a sublayout of value non_pointer

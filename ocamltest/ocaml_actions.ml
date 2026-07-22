@@ -189,23 +189,26 @@ let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
 
 let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
-    let library = Misc.find_in_path directories library in
-    let ic = open_in_bin library in
-    try
-      let len_magic_number = String.length Config.cma_magic_number in
-      let magic_number = really_input_string ic len_magic_number in
-      if magic_number = Config.cma_magic_number then
-        let toc_pos = input_binary_int ic in
-        seek_in ic toc_pos;
-        let toc = (input_value ic : Cmo_format.library) in
-        close_in ic;
-        if toc.Cmo_format.lib_dllibs <> [] then Some (Ok ()) else None
-      else
-        raise End_of_file
-    with End_of_file
-       | Sys_error _ ->
-         begin try close_in ic with Sys_error _ -> () end;
-         Some (Error ("Corrupt or non-CMA file: " ^ library))
+    match Misc.find_in_path directories library with
+    | exception Not_found ->
+      Some (Error ("file not found in include path: " ^ library))
+    | library ->
+      let ic = open_in_bin library in
+      try
+        let len_magic_number = String.length Config.cma_magic_number in
+        let magic_number = really_input_string ic len_magic_number in
+        if magic_number = Config.cma_magic_number then
+          let toc_pos = input_binary_int ic in
+          seek_in ic toc_pos;
+          let toc = (input_value ic : Cmo_format.library) in
+          close_in ic;
+          if toc.Cmo_format.lib_dllibs <> [] then Some (Ok ()) else None
+        else
+          raise End_of_file
+      with End_of_file
+         | Sys_error _ ->
+           begin try close_in ic with Sys_error _ -> () end;
+           Some (Error ("Corrupt or non-CMA file: " ^ library))
   in
   List.find_map loads_c_code (String.words libraries)
 
@@ -218,7 +221,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let output_variable = Compiler.output_variable in
   let prepare = prepare_module output_variable log env in
   let modules =
-    List.concatmap prepare (List.map Ocaml_filetypes.filetype all_modules) in
+    List.concat_map prepare (List.map Ocaml_filetypes.filetype all_modules) in
   let has_c_file = List.exists is_c_file modules in
   let c_headers_flags =
     if has_c_file then Ocaml_flags.c_includes else "" in
@@ -355,7 +358,7 @@ let find_source_modules log env =
       ((plugins env) @ (modules env) @ [(Actions_helpers.testfile env)]) in
   print_module_names log "Specified" specified_modules;
   let source_modules =
-    List.concatmap
+    List.concat_map
       (add_module_interface source_directory)
       specified_modules in
   print_module_names log "Source" source_modules;
@@ -552,44 +555,6 @@ let env_with_lib_unix env =
   in
   Environments.add Ocaml_variables.caml_ld_library_path newlibs env
 
-let debug log env =
-  let program = Environments.safe_lookup Builtin_variables.program env in
-  let what = Printf.sprintf "Debugging program %s" program in
-  Printf.fprintf log "%s\n%!" what;
-  let commandline =
-  [
-    Ocaml_commands.ocamlrun_ocamldebug;
-    Ocaml_flags.ocamldebug_default_flags;
-    program
-  ] in
-  let systemenv =
-    Environments.append_to_system_env
-      default_ocaml_env
-      (env_with_lib_unix env)
-  in
-  let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:systemenv
-      ~stdin_variable: Ocaml_variables.ocamldebug_script
-      ~stdout_variable:Builtin_variables.output
-      ~stderr_variable:Builtin_variables.output
-      ~append:true
-      log (env_with_lib_unix env) commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-        what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
-
-let ocamldebug =
-  Actions.make ~name:"ocamldebug" ~description:"Run ocamldebug on the program"
-    ~does_something:true
-    debug
-
 let objinfo log env =
   let tools_directory = Ocaml_directories.tools in
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -632,7 +597,12 @@ let ocamlobjinfo =
   Actions.make ~name:"ocamlobjinfo"
     ~description:"Run ocamlobjinfo on the program"
     ~does_something:true
-    objinfo
+    (fun log env ->
+       if Ocamltest_config.ocamlobjinfo then
+         objinfo log env
+       else
+         Result.skip_with_reason "ocamlobjinfo not available", env
+    )
 
 let mklib log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -849,7 +819,7 @@ let run_codegen log env =
     if exit_status=0
     then begin
       let finalise =
-        if Ocamltest_config.ccomptype="msvc"
+        if Ocamltest_config.ccomp_type="msvc"
         then finalise_codegen_msvc
         else finalise_codegen_cc
       in
@@ -872,7 +842,7 @@ let run_cc log env =
   let what = Printf.sprintf "Running C compiler to build %s" program in
   Printf.fprintf log "%s\n%!" what;
   let output_exe =
-    if Ocamltest_config.ccomptype="msvc" then "/Fe" else "-o "
+    if Ocamltest_config.ccomp_type="msvc" then "/Fe" else "-o "
   in
   let commandline =
   [
@@ -931,22 +901,30 @@ let run_expect_once input_file principal log env ~backend =
   let exit_status =
     Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
   in
-  if exit_status=0 then (Result.pass, env)
+  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
+  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
   else begin
     let reason = (Actions_helpers.mkreason
       "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
+    (Result.fail_with_reason reason, env, ~needs_principal:false)
   end
 
 let run_expect_twice input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1) = run_expect_once input_file false log env ~backend in
+  let (result1, env1, ~needs_principal) =
+    run_expect_once input_file false log env ~backend
+  in
   if Result.is_pass result1 then begin
     let intermediate_file = corrected input_file in
-    let (result2, env2) =
-      run_expect_once intermediate_file true log env1 ~backend in
+    let (result2, env2, output_file) =
+      if needs_principal then
+        let (result2, env2, ..) =
+          run_expect_once intermediate_file true log env1 ~backend
+        in
+        (result2, env2, corrected intermediate_file)
+      else (result1, env1, intermediate_file)
+    in
     if Result.is_pass result2 then begin
-      let output_file = corrected intermediate_file in
       let output_env = Environments.add_bindings
       [
         Builtin_variables.reference, input_file;
@@ -1291,9 +1269,7 @@ let config_variables _log env =
       Ocamltest_config.ocamlopt_default_flags;
     Ocaml_variables.ocamlrunparam, Sys.safe_getenv "OCAMLRUNPARAM";
     Ocaml_variables.ocamlsrcdir, Ocaml_directories.srcdir;
-    Ocaml_variables.os_type, Sys.os_type;
-    Ocaml_variables.runtime_dir,
-      if Config.runtime5 then "runtime" else "runtime4"
+    Ocaml_variables.os_type, Sys.os_type
   ] env
 
 let flat_float_array = Actions.make
@@ -1460,14 +1436,6 @@ let no_poll_insertion = Actions.make
     "Poll insertion disabled"
     "Poll insertion enabled")
 
-let multidomain = Actions.make
-  ~name:"multidomain"
-  ~description:"Passes if multiple domains is enabled"
-  ~does_something:false
-  (Actions_helpers.predicate Config.multidomain
-    "Multidomain enabled"
-    "Multidomain disabled")
-
 let stack_checks = Actions.make
   ~name:"stack-checks"
   ~description:"Passes if stack checks are enabled"
@@ -1484,22 +1452,6 @@ let no_stack_checks = Actions.make
     "Stack checks disabled"
     "Stack checks enabled")
 
-let runtime4 = Actions.make
-  ~name:"runtime4"
-  ~description:"Passes if the OCaml 4.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate (not Config.runtime5)
-    "4.x runtime being used"
-    "5.x runtime being used")
-
-let runtime5 = Actions.make
-  ~name:"runtime5"
-  ~description:"Passes if the OCaml 5.x runtime is being used"
-  ~does_something:false
-  (Actions_helpers.predicate Config.runtime5
-    "5.x runtime being used"
-    "4.x runtime being used")
-
 (* CR ttebbi: We should also protect against non-default register allocation
     options. *)
 let only_default_codegen = Actions.make
@@ -1509,12 +1461,27 @@ let only_default_codegen = Actions.make
   ~does_something:false
   (Actions_helpers.predicate
     (Config.no_stack_checks
-      && Config.runtime5
       && not Config.poll_insertion
       && not Config.with_address_sanitizer
       && not Config.with_frame_pointers)
     "default codegen"
     "non-default codegen")
+
+(* Like [only_default_codegen] but requires stack checks to be enabled. Used by
+   [%%expect_asm] tests that check the code emitted for stack checks (e.g. the
+   stack-realloc handler), which only exists when stack checks are on. *)
+let only_stack_checks_codegen = Actions.make
+  ~name:"only-stack-checks-codegen"
+  ~description:"Passes if codegen options are at the default except that stack \
+                checks are enabled"
+  ~does_something:false
+  (Actions_helpers.predicate
+    (not Config.no_stack_checks
+      && not Config.poll_insertion
+      && not Config.with_address_sanitizer
+      && not Config.with_frame_pointers)
+    "stack-checks codegen"
+    "non-stack-checks codegen")
 
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
@@ -1728,17 +1695,14 @@ let init () =
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
-    ocamldebug;
     ocamlmklib;
     fexpr;
     check_fexpr_dump;
     codegen;
     cc;
     ocamlobjinfo;
-    multidomain;
     stack_checks;
     no_stack_checks;
-    runtime4;
-    runtime5;
-    only_default_codegen
+    only_default_codegen;
+    only_stack_checks_codegen
   ]

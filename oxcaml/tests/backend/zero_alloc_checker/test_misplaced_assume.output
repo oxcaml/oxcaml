@@ -1,5 +1,5 @@
 File "test_misplaced_assume.ml", line 5, characters 33-43:
-Warning 53 [misplaced-attribute]: the "zero_alloc" attribute cannot appear in this context
+Warning 53 [misplaced-attribute]: the zero_alloc attribute cannot appear in this context
 
 File "test_misplaced_assume.ml", line 5, characters 5-15:
 Error: Annotation check for zero_alloc failed on function Test_misplaced_assume.foo (camlTest_misplaced_assume.foo_HIDE_STAMP).

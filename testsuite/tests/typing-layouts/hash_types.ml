@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_beta";
+ flags = "-extension layouts_beta -w -181-220";
  expect;
 *)
 
@@ -269,7 +269,7 @@ type r2 = { i : int; s : string; }
 Line 3, characters 34-35:
 3 | let bad_id : r# -> r2# = fun x -> x
                                       ^
-Error: This expression has type "r#" but an expression was expected of type "r2#"
+Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 |}]
 
 (* Mutable fields imply modalities *)
@@ -326,7 +326,7 @@ let bad : itu -> int32# = fun x -> x
 Line 1, characters 35-36:
 1 | let bad : itu -> int32# = fun x -> x
                                        ^
-Error: This expression has type "itu" = "float/2#"
+Error: The value "x" has type "itu" = "float/2#"
        but an expression was expected of type "int32#"
        Line 1, characters 0-20:
          Definition of type "float/1"
@@ -1085,8 +1085,8 @@ module F : functor (M : sig type t = float end) -> sig type u = M.t# end
 Line 4, characters 13-23:
 4 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "FloatId.t" has no unboxed version.
+Error: In the signature of this functor application: The type "FloatId.t"
+       has no unboxed version.
 |}]
 
 (* ..and module substitution... *)
@@ -1104,8 +1104,8 @@ Lines 1-6, characters 18-32:
 4 |   end
 5 |   type u = Float.t#
 6 | end with module Float := FloatId
-Error: In this instantiated signature:
-       The type "FloatId.t" has no unboxed version.
+Error: In this instantiated signature: The type "FloatId.t"
+       has no unboxed version.
 |}]
 
 (* ..and module type substitution. *)
@@ -1213,8 +1213,8 @@ module G :
 Line 10, characters 13-44:
 10 | module Bad = G(struct type t = float id end)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "N.t" has no unboxed version.
+Error: In the signature of this functor application: The type "N.t"
+       has no unboxed version.
 |}]
 
 (* Chain of two aliases that lose unboxed versions *)
@@ -1230,8 +1230,8 @@ module F :
 Line 5, characters 13-23:
 5 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "s" has no unboxed version.
+Error: In the signature of this functor application: The type "s"
+       has no unboxed version.
 |}]
 
 (* Mutually recursive aliases that lose unboxed versions *)
@@ -1247,8 +1247,8 @@ module F :
 Line 5, characters 13-23:
 5 | module Bad = F(FloatId)
                  ^^^^^^^^^^
-Error: In the signature of this functor application:
-       The type "s" has no unboxed version.
+Error: In the signature of this functor application: The type "s"
+       has no unboxed version.
 |}]
 
 (* Make sure our check isn't too restrictive. We allow a module with a
@@ -1301,18 +1301,8 @@ type ('a, 'b) s = ('a, 'b) t
 type packed = T : ('a, 'b) s# -> packed [@@unboxed]
 |}]
 
-(* This one is rejected, but it should be *)
-type 'a t = { i : 'a }
-and bad = P : 'a t# -> bad [@@unboxed]
-[%%expect{|
-Line 2, characters 0-38:
-2 | and bad = P : 'a t# -> bad [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'a".
-       You should annotate it with "[@@ocaml.boxed]".
-|}]
+(* See hash_types-no-flat-float-array.ml for the [@@unboxed] existential test that is
+   rejected only when the flat float array optimization is enabled. *)
 
 type ('a, 'b) t = { a : 'a }
 type ('a, 'b) s = ('a, 'b) t
@@ -1321,4 +1311,79 @@ type packed = T : (int, 'b) s# -> packed [@@unboxed]
 type ('a, 'b) t = { a : 'a; }
 type ('a, 'b) s = ('a, 'b) t
 type packed = T : (int, 'b) s# -> packed [@@unboxed]
+|}]
+
+(* Unboxed arrays and iarrays, which are unrepresentable *)
+
+type ('a : any) arr_u : any = 'a array#
+[%%expect{|
+type ('a : any separable) arr_u = 'a array#
+|}]
+
+type ('a : any) arr = 'a array
+type ('a : any) arr_u_2 = 'a arr#
+[%%expect{|
+type ('a : any separable) arr = 'a array
+type ('a : any separable) arr_u_2 = 'a arr#
+|}]
+
+type ('a : any) iarr_u : any = 'a iarray#
+[%%expect{|
+type ('a : any separable) iarr_u = 'a iarray#
+|}]
+
+let bad (_ : 'a array#) = ()
+[%%expect{|
+Line 1, characters 8-23:
+1 | let bad (_ : 'a array#) = ()
+            ^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "'a array#"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_1)"
+       The layout of 'a array# is any
+         because it is the unboxed version of the primitive type array.
+       But the layout of 'a array# must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+let bad (_ : 'a iarray#) = ()
+[%%expect{|
+Line 1, characters 8-24:
+1 | let bad (_ : 'a iarray#) = ()
+            ^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "'a iarray#"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_2)"
+       The layout of 'a iarray# is any
+         because it is the unboxed version of the primitive type iarray.
+       But the layout of 'a iarray# must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+(* [array#] is invariant in its parameter, like [array]. *)
+type +'a bad = 'a array#
+[%%expect{|
+Line 1, characters 0-24:
+1 | type +'a bad = 'a array#
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+(* [iarray#] is covariant in its parameter, like [iarray] (unlike [array#]). *)
+type +'a co = 'a iarray#
+[%%expect{|
+type 'a co = 'a iarray#
+|}]
+
+(* The parameters of [array#] and [iarray#] have separability mode [Ind], like
+   [array]'s: an existential under them needn't be separable. (Cf. the abstract
+   type in hash_types-flat-float-array.ml, whose parameter gets the worst-case
+   mode.) *)
+type p = P : 'a array# -> p [@@unboxed]
+type q = Q : 'a iarray# -> q [@@unboxed]
+[%%expect{|
+type p = P : 'a array# -> p [@@unboxed]
+type q = Q : 'a iarray# -> q [@@unboxed]
 |}]

@@ -23,9 +23,6 @@ type t
 (* For predefined exception identifiers. *)
 val for_predef_ident : Ident.t -> t
 
-(** It is assumed that the provided [Ident.t] is in the current unit. *)
-val for_local_ident : Ident.t -> t
-
 (** To be avoided if possible. Linkage names are intended to be generated
     by this module. *)
 val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
@@ -34,13 +31,11 @@ val for_name : Compilation_unit.t -> string -> t
 
 val for_structured_mangling_path :
     compilation_unit:Compilation_unit.t ->
-    path:Structured_mangling.path ->
+    path:Compilation_unit.t Structured_mangling.path ->
     suffix:string ->
     t
 
 val for_compilation_unit : Compilation_unit.t -> t
-val for_current_unit : unit -> t
-val for_new_const_in_current_unit : unit -> t
 
 val compilation_unit : t -> Compilation_unit.t
 
@@ -52,6 +47,3 @@ val linkage_name_for_ocamlobjinfo : t -> string
 include Identifiable.S with type t := t
 
 val is_predef_exn : t -> bool
-
-(* Temporary means to identify that the program running is ocamlc. *)
-val this_is_ocamlc : unit -> unit

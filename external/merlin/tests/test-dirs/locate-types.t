@@ -113,11 +113,11 @@ Type variables
 
   $ run "_ one_arg"
   one_arg (4:8)
-    '_weak1
+    'a
 
   $ run "'a one_arg"
   one_arg (4:8)
-    '_a
+    'a
 
 Objects
 
@@ -187,7 +187,7 @@ Compound types
   two_arg (5:14)
     option
       a (1:5)
-    '_weak1
+    'a
 
   $ run "a -> b -> #(x:a * b)"
   Arrow
@@ -207,12 +207,12 @@ Type variables
 
   $ run "('a, 'b) two_arg"
   two_arg (5:14)
-    '_a
-    '_b
+    'a
+    'b
 
   $ run "'a -> 'b -> 'c -> 'a"
   Arrow
-    '_a
-    '_b
-    '_c
-    '_a
+    'a
+    'b
+    'c
+    'a

@@ -33,7 +33,7 @@ module Util = struct
   let predef_types =
     let tbl = Hashtbl.create 14 in
     let () =
-      let constant c = Ast_helper.Exp.constant c in
+      let constant c = Ast_helper.Exp.constant (Ast_helper.Const.mk c) in
       let construct s =
         Ast_helper.Exp.construct (Location.mknoloc (Longident.Lident s)) None
       in
@@ -378,7 +378,7 @@ module Gen = struct
     let constructor env type_expr path constrs =
       log ~title:"constructors" "[%s]"
         (String.concat ~sep:"; "
-           (List.map constrs ~f:(fun c -> c.Types.cstr_name)));
+           (List.map constrs ~f:(fun c -> c.Data_types.cstr_name)));
       (* [make_constr] builds the PAST repr of a type constructor applied
          to holes *)
       let make_constr env path type_expr cstr_descr =
@@ -416,7 +416,7 @@ module Gen = struct
               if Util.typeable env exp type_expr then Some exp
               else (
                 log ~title:"constructor" "%s's type is not unifiable with %a"
-                  cstr_descr.Types.cstr_name Logger.fmt (fun fmt ->
+                  cstr_descr.Data_types.cstr_name Logger.fmt (fun fmt ->
                     Printtyp.Compat.type_expr fmt type_expr);
                 None))
         | None -> []
@@ -456,10 +456,10 @@ module Gen = struct
     let record env typ path labels record_form =
       log ~title:"record labels" "[%s]"
         (String.concat ~sep:"; "
-           (List.map labels ~f:(fun l -> l.Types.lbl_name)));
+           (List.map labels ~f:(fun l -> l.Data_types.lbl_name)));
 
       let labels =
-        List.map labels ~f:(fun ({ lbl_name; _ } as lbl) ->
+        List.map labels ~f:(fun ({ Data_types.lbl_name; _ } as lbl) ->
             let _, arg, res = Ctype.instance_label ~fixed:true lbl in
             Ctype.unify env res typ;
             let lid =
@@ -528,7 +528,7 @@ module Gen = struct
                   val_attributes = [];
                   val_zero_alloc = Zero_alloc.default;
                   val_modalities = Mode.Modality.(of_const Const.id);
-                  val_uid = Uid.mk ~current_unit:(Env.get_unit_name ())
+                  val_uid = Uid.mk ~current_unit:(Env.get_current_unit ())
                 }
               in
               let env =
@@ -564,19 +564,17 @@ module Gen = struct
           List.map choices ~f:(fun choice ->
               Ast_helper.Exp.unboxed_tuple choice)
         | Tvariant row_desc -> variant env rtyp row_desc
-        | Tquote _ | Tsplice _ | Tquote_eval _ -> []
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ -> []
         | Trepr (ty, _) ->
           (* CR modes: This isn't quite right, but it's probably good enough. *)
           exp_or_hole env ty
-        | Tpackage (path, lids_args) -> begin
+        | Tpackage ({ pack_path = path; _ } as pack) -> begin
           let open Ast_helper in
           try
-            let ty =
-              Typemod.modtype_of_package env Location.none path lids_args
-            in
+            let ty = Typemod.modtype_of_package env Location.none pack in
             let ast =
               Exp.constraint_
-                (Exp.pack (module_ env ty))
+                (Exp.pack (module_ env ty) None)
                 (Some (Ptyp_of_type.core_type typ))
                 []
             in

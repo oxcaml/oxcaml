@@ -13,13 +13,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module File_sections = Oxcaml_utils.File_sections
-
 type code_status =
   | Loaded of Code.t
   | Not_loaded of
       { sections : File_sections.t;
-        index : int;
+        index : File_sections.Idx.t;
         metadata : Code_metadata.t;
         delayed_renaming : Renaming.t
       }
@@ -29,7 +27,7 @@ type t =
   | Metadata_only of Code_metadata.t
 
 type code_present =
-  | Present of { index : int }
+  | Present of { index : File_sections.Idx.t }
   | Absent
 
 type raw =

@@ -106,13 +106,66 @@ module TypePairs = struct
         f (type_expr t1, type_expr t2))
 end
 
-
 (**** Type level management ****)
 
 let generic_level = Ident.highest_scope
 let lowest_level = Ident.lowest_scope
 
+(**** leveled type pool ****)
+(* This defines a stack of pools of type nodes indexed by the level
+   we will try to generalize them in [Ctype.with_local_level_gen].
+   [pool_of_level] returns the pool in which types at level [level]
+   should be kept, which is the topmost pool whose level is lower or
+   equal to [level].
+   [Ctype.with_local_level_gen] shall call [with_new_pool] to create
+   a new pool at a given level. On return it shall process all nodes
+   that were added to the pool.
+   Remark: the only function adding to a pool is [add_to_pool], and
+   the only function returning the contents of a pool is [with_new_pool],
+   so that the initial pool can be added to, but never read from. *)
+
+type pool = {level: int; mutable pool: transient_expr list; next: pool}
+(* To avoid an indirection we choose to add a dummy level at the end of
+   the list. It will never be accessed, as [pool_of_level] is always called
+   with [level >= 0]. *)
+let rec dummy = {level = max_int; pool = []; next = dummy}
+let pool_stack = s_table (fun () -> {level = 0; pool = []; next = dummy}) ()
+
+(* Lookup in the stack is linear, but the depth is the number of nested
+   generalization points (e.g. lhs of let-definitions), which in ML is known
+   to be generally low. In most cases we are allocating in the topmost pool.
+   In [Ctype.with_local_gen], we move non-generalizable type nodes from the
+   topmost pool to one deeper in the stack, so that for each type node the
+   accumulated depth of lookups over its life is bounded by the depth of
+   the stack when it was allocated.
+   In case this linear search turns out to be costly, we could switch to
+   binary search, exploiting the fact that the levels of pools in the stack
+   are expected to grow. *)
+let rec pool_of_level level pool =
+  if level >= pool.level then pool else pool_of_level level pool.next
+
+(* Create a new pool at given level, and use it locally. *)
+let with_new_pool ~level f =
+  let pool = {level; pool = []; next = !pool_stack} in
+  let r =
+    Misc.protect_refs [ R(pool_stack, pool) ] f
+  in
+  (r, pool.pool)
+
+let add_to_pool ~level ty =
+  if level >= generic_level || level <= lowest_level then () else
+  let pool = pool_of_level level !pool_stack in
+  pool.pool <- ty :: pool.pool
+
 (**** Some type creators ****)
+
+let newty3 ~level ~scope desc =
+  let ty = proto_newty3 ~level ~scope desc in
+  add_to_pool ~level ty;
+  Transient_expr.type_expr ty
+
+let newty2 ~level desc =
+  newty3 ~level ~scope:Ident.lowest_scope desc
 
 let newgenty desc = newty2 ~level:generic_level desc
 let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
@@ -122,6 +175,7 @@ let newgenstub ~scope jkind =
 let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
 (**** Check some types ****)
 
@@ -129,6 +183,8 @@ let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
+let is_poly_Tpoly ty =
+  match get_desc ty with Tpoly (_, _ :: _) -> true | _ -> false
 let type_kind_is_abstract decl =
   match decl.type_kind with Type_abstract _ -> true | _ -> false
 let type_origin decl =
@@ -293,8 +349,8 @@ let fold_type_expr f init ty =
   | Tarrow (_, ty1, ty2, _) ->
       let result = f init ty1 in
       f result ty2
-  | Ttuple l            -> List.fold_left f init (List.map snd l)
-  | Tunboxed_tuple l    -> List.fold_left f init (List.map snd l)
+  | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
+  | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tconstr (_, l, _)   -> List.fold_left f init l
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
@@ -318,9 +374,10 @@ let fold_type_expr f init ty =
     List.fold_left f result tyl
   | Trepr (ty, _sort_vars) ->
     f init ty
-  | Tpackage (_, fl)  ->
-    List.fold_left (fun result (_n, ty) -> f result ty) init fl
+  | Tpackage pack ->
+    List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
+  | Tbox ty -> f init ty
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -433,7 +490,8 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr p; mod_bounds = _; with_bounds = No_with_bounds } ->
+    | Some { base = Kconstr (p, _); mod_bounds = _;
+             with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
       ()
@@ -482,7 +540,7 @@ let type_iterators mark =
     match get_desc ty with
       Tconstr (p, _, _)
     | Tobject (_, {contents=Some (p, _)})
-    | Tpackage (p, _) ->
+    | Tpackage {pack_path = p} ->
         it.it_path p
     | Tvariant row ->
         Option.iter (fun (p,_) -> it.it_path p) (row_name row)
@@ -558,8 +616,11 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tpoly (f ty, tyl)
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
-  | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
+  | Tpackage pack       ->
+      Tpackage {pack with
+        pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
+  | Tbox ty -> Tbox (f ty)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig
@@ -836,16 +897,15 @@ let tpoly_get_mono ty =
   | Tpoly(ty, []) -> ty
   | _ -> assert false
 
-                  (**********)
-                  (*  Misc  *)
-                  (**********)
+                  (*******************************)
+                  (*  Utilities for box types    *)
+                  (*******************************)
 
-(**** Type information getter ****)
-
-let cstr_type_path cstr =
-  match get_desc cstr.cstr_res with
-  | Tconstr (p, _, _) -> p
-  | _ -> assert false
+let simple_unbox_ty ty =
+  match get_desc ty with
+  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
+  | Tbox ty -> Some ty
+  | _ -> None
 
                   (************)
                   (*  Jkinds  *)
@@ -1210,6 +1270,13 @@ module Jkind0 = struct
       | Layout l -> (
         match f l with None -> None | Some l -> Some { t with base = Layout l })
 
+    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
+        Jkind_types.Layout.Const.t jkind_base =
+      match base with
+      | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
+      | Layout l ->
+        Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
 
@@ -1240,7 +1307,7 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base = Kconstr path;
+      { base = Kconstr (path, Jkind_types.Scannable_axes.max);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1269,8 +1336,9 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr p1, Kconstr p2 ->
+        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
+          Jkind_types.Scannable_axes.equal sa1 sa2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
@@ -2011,8 +2079,8 @@ module Jkind0 = struct
       Some
         Parsetree.{
           pjka_loc = Location.none;
-          pjka_desc = Pjk_abbreviation ({ loc = Location.none;
-                                          txt = (Lident name) }, [])
+          pjka_desc = Pjk_abbreviation { loc = Location.none;
+                                         txt = (Lident name) }
         }
 
     let mark_best (type l r) (t : (l * r) jkind) =
@@ -2038,6 +2106,28 @@ module Jkind0 = struct
         | _ ->
           fresh_jkind Jkind_desc.Builtin.any
             ~annotation:(mk_annot "any") ~why:(Any_creation why)
+
+      let any_with_nullability nullability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with nullability })
+          }
+          ~annotation:None ~why:(Any_creation why)
+
+      let any_with_separability separability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with separability })
+          }
+          ~annotation:None ~why:(Any_creation why)
 
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
@@ -2513,11 +2603,7 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
-    let for_or_null_argument ident =
-      let why : Jkind_intf.History.value_creation_reason =
-        Type_argument
-          { parent_path = Path.Pident ident; position = 1; arity = 1 }
-      in
+    let for_or_null_payload_with_history why =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max
           ~externality:Mod_bounds.Externality.max
@@ -2534,13 +2620,29 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Value_creation why)
 
-    let for_variant_with_null_result path param =
-      let why : Jkind_intf.History.value_or_null_creation_reason =
+    let for_or_null_argument ident =
+      let why : Jkind_intf.History.value_creation_reason =
         Type_argument
-          { parent_path = path; position = 1; arity = 1 }
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      for_or_null_payload_with_history why
+
+    let for_or_null_payload path =
+      for_or_null_payload_with_history (Or_null_payload path)
+
+    let for_effect_arg ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      Builtin.value ~why
+
+    let for_variant_with_null_result path ~modality payload_ty =
+      let why : Jkind_intf.History.value_or_null_creation_reason =
+        Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
+      |> add_with_bounds ~modality ~type_expr:payload_ty
       |> mark_best
   end
 

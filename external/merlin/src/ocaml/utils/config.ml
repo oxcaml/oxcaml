@@ -31,33 +31,35 @@
 let version = Sys.ocaml_version
 
 (* When bumping this number, be sure to also update ../typing/magic_numbers.ml *)
-let cmi_magic_number = "Caml1999I579"
+let cmi_magic_number = "Caml1999I581"
 
 let as_debug_prefix_map_flag = ""
 
-let ast_impl_magic_number = "Caml1999M579"
-let ast_intf_magic_number = "Caml1999N579"
-let cmt_magic_number = "Caml1999T579"
-let cms_magic_number = "Caml1999S579"
-let index_magic_number = "Merl2023I579"
+let ast_impl_magic_number = "Caml1999M581"
+let ast_intf_magic_number = "Caml1999N581"
+let cmt_magic_number = "Caml1999T581"
+let cms_magic_number = "Caml1999S581"
+let index_magic_number = "Merl2023I581"
 
 let interface_suffix = ref ".mli"
 
 let max_tag = 245
+let flat_float_array = false
+
+let reserved_header_bits = 8
+let syntax_quotations = true
+
+let merlin = true
+
+let default_keyword_edition = None, []
 
 type name_mangling_scheme =
   | Flat
   | Structured
 
+exception Invalid_name_mangling_scheme of string
+
 let name_mangling_scheme = Flat
-
-let flat_float_array = false
-
-let reserved_header_bits = 8
-let runtime5 = true
-let syntax_quotations = true
-
-let merlin = true
 
 module Magic_numbers = struct
   type t =

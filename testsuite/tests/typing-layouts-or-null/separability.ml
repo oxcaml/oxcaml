@@ -883,7 +883,7 @@ let fails = make_vect 3 (This 5.)
 Line 1, characters 30-32:
 1 | let fails = make_vect 3 (This 5.)
                                   ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.
@@ -1002,24 +1002,9 @@ Error: Signature mismatch:
 
 (* Separability and [@@unboxed] existential types. *)
 
-(* Some [@@unboxed] existentials are non-separable and thus forbidden. *)
-(* CR separability: mark them as non-separable instead. *)
-
-type 'a abstract
-
-type packed = P : 'a abstract -> packed [@@unboxed]
-[%%expect{|
-type 'a abstract
-Line 3, characters 0-51:
-3 | type packed = P : 'a abstract -> packed [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type cannot be unboxed because
-       it might contain both float and non-float values,
-       depending on the instantiation of the existential variable "'a".
-       You should annotate it with "[@@ocaml.boxed]".
-|}]
-
-(* [non_float] annotations allow us to bypass this check. *)
+(* Some [@@unboxed] existentials are non-separable and thus forbidden;
+   see separability-no-flat-float-array.ml for those cases (they only fire when the
+   flat float array optimization is enabled). *)
 
 type 'a non_float : value mod non_float
 

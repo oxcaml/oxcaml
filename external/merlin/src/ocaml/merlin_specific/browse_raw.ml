@@ -79,8 +79,8 @@ type node =
   | Method_call of expression * meth * Location.t
   | Record_field :
       [ `Expression of expression | `Pattern of pattern ]
-      * 'rep Types.gen_label_description
-      * 'rep Types.record_form
+      * 'rep Data_types.gen_label_description
+      * 'rep Data_types.record_form
       * Longident.t Location.loc
       -> node
   | Module_binding_name of module_binding
@@ -449,8 +449,10 @@ let rec of_expression_desc loc = function
            | _, Omitted _ -> id_fold
            | _, Arg (e, _) -> of_expression e)
          ls
-  | Texp_match (e, _, cs, _) -> of_expression e ** list_fold of_case cs
-  | Texp_try (e, cs) -> of_expression e ** list_fold of_case cs
+  | Texp_match (e, _, cs, effs, _) ->
+    of_expression e ** list_fold of_case cs ** list_fold of_case effs
+  | Texp_try (e, cs, effs) ->
+    of_expression e ** list_fold of_case cs ** list_fold of_case effs
   | Texp_tuple (es, _) -> list_fold (fun (_lbl, e) -> of_expression e) es
   | Texp_unboxed_tuple es ->
     list_fold (fun (_lbl, e, _sort) -> of_expression e) es
@@ -736,8 +738,10 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
   in
   function
   | Pjk_default -> id_fold
-  | Pjk_abbreviation (_, scannable_axis_annotations) ->
-    list_fold of_scannable_axis_annotation scannable_axis_annotations
+  | Pjk_abbreviation _ -> id_fold
+  | Pjk_operator (jkind, scannable_axis_annotations) ->
+    of_jkind_annotation jkind
+    ** list_fold of_scannable_axis_annotation scannable_axis_annotations
   | Pjk_mod (jkind, mod_bounds) ->
     of_jkind_annotation jkind ** list_fold of_mod_bound mod_bounds
   | Pjk_with (jkind, ct, modalities) ->
@@ -768,7 +772,36 @@ let of_node node =
     | Pattern { pat_desc; pat_extra = _ } -> of_pattern_desc pat_desc
     | Expression { exp_desc; exp_extra = _; exp_loc } ->
       of_expression_desc exp_loc exp_desc
-    | Case { c_lhs; c_guard; c_rhs } ->
+    | Case { c_lhs; c_cont = Some (id, vd); c_guard; c_rhs } ->
+      let name = Ident.name id in
+      let sort =
+        match vd.Types.val_kind with
+        | Types.Val_reg sort | Types.Val_mut (_, sort) -> sort
+        | Types.Val_prim _
+        | Types.Val_ivar _
+        | Types.Val_self _
+        | Types.Val_anc _ -> Jkind.Sort.(of_const Const.for_continuation)
+      in
+      let cont_pat =
+        { pat_desc =
+            Tpat_var
+              { id;
+                name = { txt = name; loc = vd.val_loc };
+                uid = vd.val_uid;
+                sort;
+                mode = Mode.Value.disallow_right Mode.Value.legacy
+              };
+          pat_loc = vd.val_loc;
+          pat_extra = [];
+          pat_type = vd.val_type;
+          pat_env = c_rhs.exp_env;
+          pat_attributes = [];
+          pat_unique_barrier = Unique_barrier.not_computed ()
+        }
+      in
+      of_pattern c_lhs ** of_expression c_rhs ** of_pattern cont_pat
+      ** option_fold of_expression c_guard
+    | Case { c_lhs; c_cont = None; c_guard; c_rhs } ->
       of_pattern c_lhs ** of_expression c_rhs
       ** option_fold of_expression c_guard
     | Class_expr { cl_desc } -> of_class_expr_desc cl_desc
@@ -819,8 +852,8 @@ let of_node node =
     | With_constraint (Twith_jkind jk | Twith_jkindsubst jk) ->
       app (Jkind_declaration jk)
     | Core_type { ctyp_desc } -> of_core_type_desc ctyp_desc
-    | Package_type { pack_fields } ->
-      list_fold (fun (_, ct) -> of_core_type ct) pack_fields
+    | Package_type { tpt_cstrs } ->
+      list_fold (fun (_, ct) -> of_core_type ct) tpt_cstrs
     | Row_field rf ->
       begin match rf.rf_desc with
       | Ttag (_, _, cts) -> list_fold of_core_type cts
@@ -972,8 +1005,8 @@ let fake_path { Location.loc; txt = lid } typ name =
 let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
   let init =
     match (pat_desc : k pattern_desc) with
-    | Tpat_construct (lid_loc, { Types.cstr_name; cstr_res; _ }, _, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Tpat_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Tpat_var { id; name = { loc; txt }; _ } ->
       [ (mkloc (Path.Pident id) loc, Some (Longident.Lident txt)) ]
     | Tpat_alias { id; name; _ } ->
@@ -1024,8 +1057,8 @@ let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
         | _ -> assert false
       in
       [ (mkloc (Path.Pident id) loc, lid) ]
-    | Texp_construct (lid_loc, { Types.cstr_name; cstr_res; _ }, _, _, _) ->
-      fake_path lid_loc cstr_res cstr_name
+    | Texp_construct (lid_loc, { Data_types.cstr_name; cstr_res; _ }, _, _, _)
+      -> fake_path lid_loc cstr_res cstr_name
     | Texp_open (od, _) -> module_expr_paths od.open_expr
     (* Normally, [expression_paths] just works at top-level, without
        going deep into an expression. But freshly bound newtypes are
@@ -1120,8 +1153,8 @@ let node_paths_full =
     [ (reloc (Path.Pident mtd_id) mtd_name, Some (Lident mtd_name.txt)) ]
   | With_constraint c -> with_constraint_paths c
   | Core_type ct -> core_type_paths ct
-  | Package_type { pack_path; pack_txt } ->
-    [ (reloc pack_path pack_txt, Some pack_txt.txt) ]
+  | Package_type { tpt_path; tpt_txt } ->
+    [ (reloc tpt_path tpt_txt, Some tpt_txt.txt) ]
   | Value_description { val_id; val_name } ->
     [ (reloc (Path.Pident val_id) val_name, Some (Lident val_name.txt)) ]
   | Type_declaration { typ_id; typ_name } ->
@@ -1137,7 +1170,7 @@ let node_paths_full =
   | Class_declaration ci -> ci_paths ci
   | Class_description ci -> ci_paths ci
   | Class_type_declaration ci -> ci_paths ci
-  | Record_field (_, { Types.lbl_res; lbl_name; _ }, _, lid_loc) ->
+  | Record_field (_, { Data_types.lbl_res; lbl_name; _ }, _, lid_loc) ->
     fake_path lid_loc lbl_res lbl_name
   | _ -> []
 

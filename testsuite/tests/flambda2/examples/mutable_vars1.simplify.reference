@@ -1,7 +1,7 @@
 let code escape_string_0 deleted in
 let code loopify(never) size(64) newer_version_of(escape_string_0)
       escape_string_0_1 (s : val, s' : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let prim = %string_length (s) in
@@ -13,8 +13,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
     where k2 =
       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim) in
       (cont k2 (0L, 0)
-         where rec k2
-                     (for_counter_naked : int64, n_289_unboxed0 : imm tagged) =
+         where rec k2 (for_counter_naked : int64, n_unboxed0 : imm tagged) =
            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
            let i = %tag_imm (prim_2) in
            let prim_3 = %num_conv.[tagged_imm].[`nativeint`] (i) in
@@ -25,19 +24,19 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                | 0 -> k4
                | 1 -> k5
                where k5 =
-                 let prim_6 = %num_conv.[tagged_imm].[int8] (c) in
+                 let prim_6 = %num_conv.[tagged_imm].[`int8`] (c) in
                  let prim_7 =
-                   %num_conv.[tagged_imm].[`nativeint`] (n_289_unboxed0)
+                   %num_conv.[tagged_imm].[`nativeint`] (n_unboxed0)
                  in
                  let Pbytessetu =
                    %bytes_or_bigstring_set.bytes.[`8`] (s', prim_7, prim_6)
                  in
-                 cont k3 (n_289_unboxed0)
+                 cont k3 (n_unboxed0)
                where k4 =
-                 let int_add = %int_barith.add (n_289_unboxed0, 1) in
+                 let int_add = %int_barith.add (n_unboxed0, 1) in
                  cont k3 (int_add))
-              where k3 (n_289_unboxed0_1 : imm tagged) =
-                let int_add = %int_barith.add (n_289_unboxed0_1, 1) in
+              where k3 (n_unboxed0_1 : imm tagged) =
+                let int_add = %int_barith.add (n_unboxed0_1, 1) in
                 let for_next_naked =
                   %int_barith.`int64`.add (for_counter_naked, 1L)
                 in
@@ -49,7 +48,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                   | 1 -> k2 (for_next_naked, int_add)))
 in
 let $camlMutable_vars1__escape_string_1 =
-  closure escape_string_0_1 @escape_string
+  closure escape_string_0_1 @escape_string &toplevel.alloc_region
 in
 let $camlMutable_vars1 = Block 0 ($camlMutable_vars1__escape_string_1) in
 cont done ($camlMutable_vars1)

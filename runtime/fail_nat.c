@@ -84,7 +84,11 @@ void caml_raise(value v)
 
   /* Run callbacks here, so that a signal handler that arrived during
      a blocking call has a chance to interrupt the raising of EINTR */
-  v = caml_process_pending_actions_with_root(v);
+  caml_result result = caml_process_pending_actions_with_root_res(v);
+  /* If the result is a value, we want to assign it to [v].
+     If the result is an exception, we want to raise it instead of [v].
+     The line below does both these things at once. */
+  v = result.data;
 
   limit_of_current_c_stack_chunk = (char*)Caml_state->c_stack;
 
@@ -140,6 +144,9 @@ CAMLno_asan void caml_raise_async(value v)
   Caml_state->local_top = Caml_state->current_stack->local_top;
   Caml_state->local_limit = Caml_state->current_stack->local_limit;
 
+  /* Fiber switch: flush dynamic binding cache */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
   /* Do not run callbacks here: we are already raising an async exn,
      so no need to check for another one, and avoiding polling here
      removes the risk of recursion in caml_raise */
@@ -157,127 +164,75 @@ CAMLno_asan void caml_raise_async(value v)
   caml_raise_exception(Caml_state, v);
 }
 
-CAMLno_asan
-void caml_raise_constant(value tag)
+value caml_exception_failure(char const *msg)
 {
-  caml_raise(tag);
+  return caml_exception_with_string((value)caml_exn_Failure, msg);
 }
 
-void caml_raise_with_arg(value tag, value arg)
+value caml_exception_failure_value(value msg)
 {
-  CAMLparam2 (tag, arg);
-  CAMLlocal1 (bucket);
-
-  bucket = caml_alloc_small (2, 0);
-  Field(bucket, 0) = tag;
-  Field(bucket, 1) = arg;
-  caml_raise(bucket);
-  CAMLnoreturn;
+  return caml_exception_with_arg((value)caml_exn_Failure, msg);
 }
 
-void caml_raise_with_args(value tag, int nargs, value args[])
+value caml_exception_invalid_argument(char const *msg)
 {
-  CAMLparam1 (tag);
-  CAMLxparamN (args, nargs);
-  value bucket;
-  int i;
-
-  bucket = caml_alloc (1 + nargs, 0);
-  Field(bucket, 0) = tag;
-  for (i = 0; i < nargs; i++) Field(bucket, 1 + i) = args[i];
-  caml_raise(bucket);
-  CAMLnoreturn;
+  return caml_exception_with_string((value)caml_exn_Invalid_argument, msg);
 }
 
-void caml_raise_with_string(value tag, char const *msg)
+value caml_exception_invalid_argument_value(value msg)
 {
-  CAMLparam1(tag);
-  value v_msg = caml_copy_string(msg);
-  caml_raise_with_arg(tag, v_msg);
-  CAMLnoreturn;
+  return caml_exception_with_arg((value)caml_exn_Invalid_argument, msg);
 }
 
-static value caml_exn_with_arg(value tag, value arg)
+value caml_exception_out_of_memory(void)
 {
-  CAMLparam2(tag, arg);
-  CAMLlocal1(bucket);
-  bucket = caml_alloc_small(2, 0);
-  Field(bucket, 0) = tag;
-  Field(bucket, 1) = arg;
-  CAMLreturn(bucket);
+  return (value)caml_exn_Out_of_memory;
 }
 
-void caml_failwith (char const *msg)
+value caml_exception_out_of_fibers(void)
 {
-  caml_raise_with_string((value) caml_exn_Failure, msg);
-}
-
-void caml_failwith_value (value msg)
-{
-  caml_raise_with_arg((value) caml_exn_Failure, msg);
-}
-
-void caml_invalid_argument (char const *msg)
-{
-  caml_raise_with_string((value) caml_exn_Invalid_argument, msg);
-}
-
-void caml_invalid_argument_value (value msg)
-{
-  caml_raise_with_arg((value) caml_exn_Invalid_argument, msg);
-}
-
-void caml_raise_out_of_memory(void)
-{
-  /* Note that this is not an async exn. */
-  caml_raise_constant((value) caml_exn_Out_of_memory);
-}
-
-void caml_raise_out_of_fibers(void)
-{
-  /* Note that this is not an async exn. */
-  caml_raise_constant((value) caml_exn_Out_of_fibers);
+  return (value) caml_exn_Out_of_fibers;
 }
 
 /* Used by the stack overflow handler -> deactivate ASAN (see
    segv_handler in signals_nat.c). */
 CAMLno_asan
-void caml_raise_stack_overflow(void)
+value caml_exception_stack_overflow(void)
 {
-  caml_raise_async((value) caml_exn_Stack_overflow);
+  return (value)caml_exn_Stack_overflow;
 }
 
-void caml_raise_sys_error(value msg)
+value caml_exception_sys_error(value msg)
 {
-  caml_raise_with_arg((value) caml_exn_Sys_error, msg);
+  return caml_exception_with_arg((value)caml_exn_Sys_error, msg);
 }
 
-void caml_raise_end_of_file(void)
+value caml_exception_end_of_file(void)
 {
-  caml_raise_constant((value) caml_exn_End_of_file);
+  return (value)caml_exn_End_of_file;
 }
 
-void caml_raise_zero_divide(void)
+value caml_exception_zero_divide(void)
 {
-  caml_raise_constant((value) caml_exn_Division_by_zero);
+  return (value)caml_exn_Division_by_zero;
 }
 
-void caml_raise_not_found(void)
+value caml_exception_not_found(void)
 {
-  caml_raise_constant((value) caml_exn_Not_found);
+  return (value)caml_exn_Not_found;
 }
 
-void caml_raise_sys_blocked_io(void)
+value caml_exception_sys_blocked_io(void)
 {
-  caml_raise_constant((value) caml_exn_Sys_blocked_io);
+  return (value)caml_exn_Sys_blocked_io;
 }
 
-/* We use a pre-allocated exception because we can't
+/* We use pre-allocated exceptions because we can't
    do a GC before the exception is raised (lack of stack descriptors
-   for the ccall to [caml_array_bound_error]).  */
-static value array_bound_exn(void)
+   for the ccall).  */
+value caml_exception_array_bound_error(void)
 {
-  static atomic_uintnat exn_cache = ATOMIC_UINTNAT_INIT(0);
+  static atomic_uintnat exn_cache = 0;
   const value* exn = (const value*)atomic_load_acquire(&exn_cache);
   if (!exn) {
     exn = caml_named_value("Pervasives.array_bound_error");
@@ -291,26 +246,9 @@ static value array_bound_exn(void)
   return *exn;
 }
 
-void caml_array_bound_error(void)
+value caml_exception_array_align_error(void)
 {
-  caml_raise(array_bound_exn());
-}
-
-void caml_array_bound_error_asm(void)
-{
-#if defined(WITH_THREAD_SANITIZER)
-  char* exception_pointer = (char*)Caml_state->c_stack;
-  caml_tsan_exit_on_raise_c(exception_pointer);
-#endif
-
-  /* This exception is raised directly from ocamlopt-compiled OCaml,
-     not C, so we jump directly to the OCaml handler (and avoid GC) */
-  caml_raise_exception(Caml_state, array_bound_exn());
-}
-
-static value array_align_exn(void)
-{
-  static atomic_uintnat exn_cache = ATOMIC_UINTNAT_INIT(0);
+  static atomic_uintnat exn_cache = 0;
   const value* exn = (const value*)atomic_load_acquire(&exn_cache);
   if (!exn) {
     exn = caml_named_value("Pervasives.array_align_error");
@@ -324,25 +262,27 @@ static value array_align_exn(void)
   return *exn;
 }
 
-void caml_array_align_error(void)
+void caml_array_bound_error_asm(void)
 {
-  caml_raise(array_align_exn());
+#if defined(WITH_THREAD_SANITIZER)
+  char* exception_pointer = (char*)Caml_state->c_stack;
+  caml_tsan_exit_on_raise_c(exception_pointer);
+#endif
+
+  /* This exception is raised directly from ocamlopt-compiled OCaml,
+     not C, so we jump directly to the OCaml handler (and avoid GC) */
+  caml_raise_exception(Caml_state, caml_exception_array_bound_error());
 }
 
 void caml_array_align_error_asm(void)
 {
   /* This exception is raised directly from ocamlopt-compiled OCaml,
      not C, so we jump directly to the OCaml handler (and avoid GC) */
-  caml_raise_exception(Caml_state, array_align_exn());
+  caml_raise_exception(Caml_state, caml_exception_array_align_error());
 }
 
 int caml_is_special_exception(value exn) {
   return exn == (value) caml_exn_Match_failure
     || exn == (value) caml_exn_Assert_failure
     || exn == (value) caml_exn_Undefined_recursive_module;
-}
-
-value caml_failure_exn (value msg)
-{
-  return caml_exn_with_arg((value) caml_exn_Failure, msg);
 }

@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include "misc.h"
 #include "mlvalues.h"
+#include "dynamic.h"
 #include "roots.h"
 #include "platform.h"
 
@@ -71,10 +72,8 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
-  /* Temporary dynamic binding, applying only in this fiber */
-  /* TODO: Consider making this a table of bindings */
-  value dyn;
-  value val;
+  /* Temporary dynamic bindings, applying only in this fiber */
+  struct dynamic_table_s dyn;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -200,7 +199,8 @@ struct c_stack_link {
  *  -----------
  *
  * In native compilation the stack switching primitives
- * Pwith_stack/Pwith_stack_bind, Pperform, Preperform and Presume make use of
+ * Pwith_stack/Pwith_stack_preemptible, Pperform, Preperform, Pcontinue,
+ * Pdiscontinue and Pdiscontinue_with_backtrace make use of
  * corresponding functions implemented in the assembly files for an architecture
  * (such as runtime/amd64.S).
  *
@@ -230,11 +230,16 @@ struct c_stack_link {
  *  by setting up the required registers then jumping into caml_perform which
  *  does the switch to the parent and execution of the handle_effect function.
  *
- * caml_resume continuation function argument
- *  caml_resume resumes execution of continuation by making the current stack
- *  the parent of the new_fiber and then switching to the stack for new_fiber.
- *  The function with argument is then executed on the new stack. Care is taken
- *  to check if the continuation has already been resumed and so its stack null.
+ * caml_continue continuation value
+ * caml_discontinue continuation exn
+ * caml_discontinue_with_backtrace continuation exn backtrace
+ *  These three functions all resume execution of continuation by making the
+ *  current stack the parent of the new_fiber and then switching to the stack
+ *  for new_fiber. They differ in what is then done on the new stack:
+ *  caml_continue returns value (to the perform site), caml_discontinue raises
+ *  exn, and caml_discontinue_with_backtrace reraises exn with the provided
+ *  backtrace. Care is taken to check if the continuation has already been
+ *  resumed and so its stack null.
  *
  *
  *  Bytecode
@@ -249,16 +254,18 @@ struct c_stack_link {
  *   exception handlers) and calls a provided function with a provided argument
  *   as the first function on that stack.
  *
- *  Pwith_stack_bind -> WITH_STACK_BIND
- *   As per WITH_STACK, except it also binds a single dynamic variable within
- *   the scope of the stack.
- *
- *  Presume -> RESUME (& RESUMETERM if a tail call)
- *   RESUME checks that the continuation has not already been resumed. The
- *   stacks are then switched with the old stack becoming the parent of the new
- *   stack. Care is taken to setup the exception handler for the new stack.
- *   Execution continues on the new OCaml stack with the passed function and
- *   argument.
+ *  Pcontinue -> CONTINUE (& CONTINUETERM if a tail call)
+ *  Pdiscontinue -> DISCONTINUE (& DISCONTINUETERM if a tail call)
+ *  Pdiscontinue_with_backtrace -> DISCONTINUE_WITH_BACKTRACE
+ *                                 (& DISCONTINUE_WITH_BACKTRACETERM if a tail
+ *                                 call)
+ *   These instructions check that the continuation has not already been
+ *   resumed. The stacks are then switched with the old stack becoming the
+ *   parent of the new stack. Care is taken to setup the exception handler for
+ *   the new stack. Execution then continues on the new OCaml stack: CONTINUE
+ *   returns the value, DISCONTINUE raises the exception, and
+ *   DISCONTINUE_WITH_BACKTRACE restores the backtrace and reraises the
+ *   exception.
  *
  *  Pperform -> PERFORM
  *   PERFORM captures the current stack in a continuation object it allocates.
@@ -287,7 +294,8 @@ struct c_stack_link {
  *   handle_exception function is executed on the parent stack.
  */
 
-/* The table of global identifiers */
+/* The table of global identifiers. Val_unit initially and replaced with a block
+   during bytecode startup. */
 extern value caml_global_data;
 
 #define Trap_pc(tp) (((code_t *)(tp))[0])
@@ -316,17 +324,9 @@ void caml_scan_stack(
   struct stack_info* stack, value* v_gc_regs);
 
 value caml_alloc_stack(value hval, value hexn, value heff);
-value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
-                            value bind);
-value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
-                                   value htick);
-value caml_alloc_stack_bind_preemptible(value hval, value hexn, value heff,
-                                        value htick, value dyn,
-                                        value bind);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
-                                          value hexn, value heff,
-                                          value dyn, value bind,
-                                          int64_t id);
+                                          value hexn, value heff, int64_t id);
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
 CAMLextern int caml_try_realloc_stack (asize_t required_wsize);
@@ -382,60 +382,13 @@ bool caml_continuation_is_preemption(value cont);
    its [gc_regs] struct, or NULL otherwise */
 value* caml_continuation_gc_regs(value cont);
 
-value caml_tick_fiber_exn(struct stack_info* stack);
+caml_result caml_tick_fiber_res(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
 
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 
 value caml_make_unhandled_effect_exn (value effect);
-
-
-/* We support "dynamic variables", whose value may be set in
-   three ways:
-
-   - the "initial" value, specified when the `Dynamic.t` is
-     created (with `caml_dymamic_make`);
-   - any per-thread "root" value, set with `caml_dynamic_set_root`;
-   - a "temporary" value, optionally set when a fiber is created
-     (passed to `caml_alloc_stack`).
-
-   These are in reverse order of precedence for the value read from a
-   dynamic variable (by `caml_dynamic_get`):
-
-   - First any temporary value; then
-   - any per-thread root value (including any inherited from a parent thread);
-   - finally. the initial value.
-
-   The per-thread "root" values, and a cache of looked-up values, are
-   stored in a per-thread dynamic context structure, That is
-   abstracted as a one-word (pointer) `dynamic_thread_t` value. The
-   current dynamic context is in `Caml_state->dynamic_bindings`. The
-   API here provides the rest of the runtime with all the necessary
-   operations on these (otherwise abstract) values. */
-
-typedef struct dynamic_thread_s *dynamic_thread_t;
-
-/* Create a new dynamic context, for a new thread. `parent` is NULL
- * for the first thread; otherwise is the parent's context (from which
- * per-thread root bindings are inherited). */
-extern dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent);
-
-/* Delete a dynamic context, called when a thread terminates. */
-extern void caml_dynamic_delete_thread(dynamic_thread_t);
-
-/* Switch the "current" dynamic context */
-extern void caml_dynamic_enter_thread(dynamic_thread_t);
-
-/* Flush a dynamic context's cache of binding values. Used when
- * swtiching fibers. */
-extern void caml_dynamic_flush_thread(dynamic_thread_t);
-
-/* Apply a GC scanning action to the roots in a dynamic context. */
-extern void caml_dynamic_scan_thread_roots(dynamic_thread_t,
-                                           scanning_action,
-                                           scanning_action_flags,
-                                           void *);
 
 #endif /* CAML_INTERNALS */
 

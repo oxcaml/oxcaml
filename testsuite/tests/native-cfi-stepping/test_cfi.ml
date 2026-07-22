@@ -1,6 +1,5 @@
 (* TEST
   arch_amd64;  (* CR sdolan: get this to pass on arm64 as well *)
-  runtime5;
   flags = "-g";
   program = "${test_source_directory}/test_cfi";
   readonly_files = "test_cfi_stubs.c gdb_stepper.py";

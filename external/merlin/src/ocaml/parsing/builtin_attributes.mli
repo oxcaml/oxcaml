@@ -189,7 +189,7 @@ val select_attributes :
 (** [attr_equals_builtin attr s] is true if the name of the attribute is [s] or
     ["ocaml." ^ s].  This is useful for manually inspecting attribute names, but
     note that doing so will not result in marking the attribute used for the
-    purpose of warning 53, so it is usually preferrable to use [has_attribute]
+    purpose of warning 53, so it is usually preferable to use [has_attribute]
     or [select_attributes]. *)
 val attr_equals_builtin : Parsetree.attribute -> string -> bool
 
@@ -200,6 +200,7 @@ val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
 val has_flatten_floats: Parsetree.attributes -> bool
 val has_represent_as_float_array: Parsetree.attributes -> bool
+val has_immediate_all_void_constructor: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 

@@ -14,7 +14,7 @@
 (* CR-soon xclerc for xclerc: try to enable warning 4. *)
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 include Cfg_intf.S
 
 module Location : sig
@@ -423,8 +423,8 @@ end = struct
          testing. Currently it's not a problem because we abort the build
          whenever register allocation fails but if there was a fallback mode
          then the interesting files would be instantly overwritten. *)
-      Cfg_with_layout.save_as_dot ~filename:"before.dot" cfg
-        "before_allocation_before_validation";
+      Cfg_with_layout.save_as_dot ~annotate_instr:[Printcfg.instruction]
+        ~filename:"before.dot" cfg "before_allocation_before_validation";
     let basic_count, terminator_count =
       Cfg_with_layout.fold_instructions cfg
         ~instruction:(fun (basic_count, terminator_count) _ ->
@@ -634,9 +634,9 @@ end = struct
       Regalloc_utils.fatal
         "The desc of terminator with id %a changed, before: %a, after: %a."
         InstructionId.format id
-        (Cfg.dump_terminator ~sep:", ")
+        (Printcfg.terminator_desc ~sep:", ")
         old_instr
-        (Cfg.dump_terminator ~sep:", ")
+        (Printcfg.terminator_desc ~sep:", ")
         instr
 
   let verify_terminator ~seen_ids ~(successor_ids : InstructionId.t Label.Tbl.t)
@@ -660,7 +660,7 @@ end = struct
         Regalloc_utils.fatal
           "Register allocation added a terminator no. %a but that's not \
            allowed for this type of terminator: %a"
-          InstructionId.format id Cfg.print_terminator instr)
+          InstructionId.format id Printcfg.terminator instr)
 
   let compute_successor_ids t (cfg : Cfg.t) =
     let visited_labels = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
@@ -704,7 +704,7 @@ end = struct
           Regalloc_utils.fatal
             "Register allocation added a terminator no. %a but that's not \
              allowed for this type of terminator: %a"
-            InstructionId.format block.terminator.id Cfg.print_terminator
+            InstructionId.format block.terminator.id Printcfg.terminator
             block.terminator)
     in
     Label.Tbl.iter
@@ -1085,9 +1085,9 @@ end = struct
     Format.fprintf ppf "CFG REGALLOC Check failed in instr %a:\n"
       InstructionId.format t.loc_instr.id;
     Format.fprintf ppf "Instruction's description before allocation: %a\n"
-      Cfg.print_instruction reg_instr;
+      Printcfg.instruction reg_instr;
     Format.fprintf ppf "Instruction's description after allocation: %a\n"
-      (Cfg.print_instruction' ~print_reg:print_reg_as_loc)
+      (Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc)
       loc_instr;
     Format.fprintf ppf "Message: %s\n" t.message;
     Format.fprintf ppf "Live equations for the normal successor: [%a]\n"
@@ -1140,7 +1140,10 @@ module Transfer (Desc_val : Description_value) :
     let loc =
       match reg.reg_id with
       | Preassigned { location } -> location
-      | Named _ -> assert false
+      | Named _ ->
+        Misc.fatal_error
+          "Regalloc_validate.remove_exn_bucket: exception bucket register must \
+           be preassigned"
     in
     Equation_set.remove_result equations ~reg_res:[| reg |] ~loc_res:[| loc |]
     |> Result.map_error (fun message ->
@@ -1212,7 +1215,11 @@ module Transfer (Desc_val : Description_value) :
       match instr.desc with
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
-      | _ -> assert false)
+      | _ ->
+        Regalloc_utils.fatal
+          "Regalloc_validate.basic: added instruction no. %a must be Spill, \
+           Reload, or Move: %a"
+          InstructionId.format instr.id Printcfg.basic instr)
     | Some instr_before -> (
       match instr.desc with
       | Op Move
@@ -1255,7 +1262,7 @@ module Transfer (Desc_val : Description_value) :
         Regalloc_utils.fatal
           "Register allocation added a terminator no. %a but that's not \
            allowed for this type of terminator: %a"
-          InstructionId.format instr.id Cfg.print_terminator instr)
+          InstructionId.format instr.id Printcfg.terminator instr)
 
   (* This should remove the equations for the exception value, but we do that in
      [Domain.append_equations] because there we have more information to give if
@@ -1279,7 +1286,7 @@ let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
           |> Format.pp_print_option
                ~none:(fun ppf () -> Format.fprintf ppf "Unknown")
                Equation_set.print ppf);
-        Cfg.print_instruction' ~print_reg:print_reg_as_loc;
+        Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc;
         (fun ppf instr ->
           let print printer find instr =
             match find desc instr with
@@ -1289,9 +1296,9 @@ let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
             | None -> ()
           in
           match instr with
-          | `Basic instr -> print Cfg.print_basic Description.find_basic instr
+          | `Basic instr -> print Printcfg.basic Description.find_basic instr
           | `Terminator ti ->
-            print Cfg.print_terminator Description.find_terminator ti) ]
+            print Printcfg.terminator Description.find_terminator ti) ]
     ~annotate_block_end:(fun ppf block ->
       Label.Tbl.find_opt res_block block.start
       |> Format.pp_print_option
@@ -1423,7 +1430,8 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
        register allocation fails but if there was a fallback mode then the
        interesting files would be instantly overwritten. *)
     Cfg_with_layout.save_as_dot
-      ~annotate_instr:[Cfg.print_instruction' ~print_reg:print_reg_as_loc]
+      ~annotate_instr:
+        [Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc]
       ~filename:"after.dot" cfg "after_allocation_before_validation";
   Description.verify desc cfg;
   let module Check_backwards = Check_backwards (struct

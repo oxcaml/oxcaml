@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
 open! Regalloc_split_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module State = Regalloc_split_state
 module Substitution = Regalloc_substitution
 
@@ -424,7 +424,10 @@ let insert_phi_moves :
           in
           match predecessor_block.terminator.desc with
           | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Never ->
-            assert false
+            fatal
+              "Regalloc_split.insert_phi_moves: phi block %a has predecessor \
+               %a with unexpected terminator"
+              Label.format label Label.format predecessor_label
           | Tailcall_self _ -> ()
           | Always _ ->
             add_phi_moves_to_instr_list ~phi_moves ~instr_id

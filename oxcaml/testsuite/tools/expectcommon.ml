@@ -24,7 +24,13 @@ type string_constant =
 
 type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
 
-type expectation_kind = Expect_toplevel | Expect_asm | Expect_fexpr
+type expectation_kind =
+  | Expect_toplevel
+  (* When [whole_function] is [true], the capture extends past the hot body
+     and also shows the trailing out-of-line code: GC jump pads, safety-error
+     calls and the stack-realloc handler. *)
+  | Expect_asm of { whole_function : bool }
+  | Expect_fexpr
 
 type expectation =
   { extid_loc       : Location.t (* Location of "expect" in "[%%expect ...]" *)
@@ -41,6 +47,10 @@ type chunk =
 
 let register_assembly_callback :
   ((string -> unit) -> unit) option ref = ref None
+
+(* Set before compiling a chunk to tell the backend whether the [%%expect_asm]
+   capture should extend to the whole function (see [Expect_asm]). *)
+let set_assembly_whole_function : (bool -> unit) option ref = ref None
 
 let register_compilation_unit_callback :
   ((Compilation_unit.t -> unit) -> unit) option ref = ref None
@@ -68,7 +78,10 @@ let string_of_filter = function
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
     | "expect" | "ocaml.expect" -> Some Expect_toplevel
-    | "expect_asm" | "ocaml.expect_asm" -> Some Expect_asm
+    | "expect_asm" | "ocaml.expect_asm" ->
+      Some (Expect_asm { whole_function = false })
+    | "expect_asm_full" | "ocaml.expect_asm_full" ->
+      Some (Expect_asm { whole_function = true })
     | "expect_fexpr" | "ocaml.expect_fexpr" -> Some Expect_fexpr
     | _ -> None
   in
@@ -83,13 +96,15 @@ let match_expect_extension (ext : Parsetree.extension) =
         () =
       Location.raise_errorf ~loc "%s" msg
     in
-    if Option.is_none !register_assembly_callback && kind = Expect_asm
+    if
+      Option.is_none !register_assembly_callback
+      && (match kind with Expect_asm _ -> true | _ -> false)
     then invalid_payload ~msg:"expect_asm is only supported by expect.opt" ();
     if Option.is_none !register_compilation_unit_callback && kind = Expect_fexpr
     then invalid_payload ~msg:"expect_fexpr is only supported by expect.opt" ();
     let string_constant (e : Parsetree.expression) =
       match e.pexp_desc with
-      | Pexp_constant (Pconst_string (str, _, Some tag)) ->
+      | Pexp_constant {pconst_desc = Pconst_string (str, _, Some tag); _} ->
         { str; tag }
       | _ -> invalid_payload ~loc:e.pexp_loc ()
     in
@@ -103,7 +118,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     let parse_element (e : Parsetree.expression) =
       let filters, txt =
         match e.pexp_desc with
-        | Pexp_constant (Pconst_string _) ->
+        | Pexp_constant {pconst_desc = Pconst_string _; _} ->
             (* Bare string constant - no filter *)
             ([], string_constant e)
         | Pexp_construct ({txt = Lident filter; }, Some txt) ->
@@ -197,7 +212,7 @@ let match_expect_extension (ext : Parsetree.extension) =
         let expected_output =
           match kind with
           | Expect_toplevel -> validate_expect_toplevel expected_output
-          | Expect_asm -> validate_expect_asm expected_output
+          | Expect_asm _ -> validate_expect_asm expected_output
           | Expect_fexpr -> validate_expect_fexpr expected_output
         in
         { extid_loc
@@ -214,7 +229,7 @@ let match_expect_extension (ext : Parsetree.extension) =
           ; expected_output = [([], { tag = ""; str = "" })]
           ; kind
           }
-        | Expect_asm | Expect_fexpr -> invalid_payload ())
+        | Expect_asm _ | Expect_fexpr -> invalid_payload ())
       | _ -> invalid_payload ()
     in
     Some expectation
@@ -327,7 +342,7 @@ let eval_expectation expectation ~output =
         then [([Principal], if_principal)]
         else [([], if_not_principal)]
       | _ -> Misc.fatal_error "impossible: already validated")
-  | Expect_asm ->
+  | Expect_asm _ ->
     List.filter
       ~f:(fun (f, _) ->
           match current_arch_filter () with
@@ -372,6 +387,13 @@ function
   | (Ptop_dir _  | Ptop_def []) :: l -> min_line_number l
   | Ptop_def (st :: _) :: _ -> Some st.pstr_loc.loc_start.pos_lnum
 
+
+let visible_inline_code () =
+  let open Misc.Style in
+  let default = get_styles () in
+  let inline_code = { ansi = []; text_open = {|"|}; text_close={|"|} } in
+  set_styles { default with inline_code }
+
 let eval_expect_file fname ~file_contents ~execute_phrase =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
@@ -379,7 +401,9 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
   in
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
-  let () = Misc.Style.set_tag_handling ppf in
+  let () =
+    visible_inline_code ();
+    Misc.Style.set_tag_handling ppf in
   let exec_phrases phrases =
     let last_asm = ref None in
     let last_unit = ref None in
@@ -412,7 +436,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         Btype.backtrack snap;
         false
     in
-    let (_ : bool) =
+    let (success : bool) =
       List.fold_left phrases ~init:true ~f:(fun acc phrase ->
           if acc then exec_one phrase else acc)
     in
@@ -423,7 +447,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
       Buffer.add_char buf '\n';
     let s = Buffer.contents buf in
     Buffer.clear buf;
-    (Misc.delete_eol_spaces s, !last_asm, !last_unit)
+    (success, Misc.delete_eol_spaces s, !last_asm, !last_unit)
   in
   let fexpr_outputs unit filters =
     let read_dump_file pass =
@@ -461,22 +485,49 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
                   | Expect_fexpr -> true | _ -> false)
                 chunk.expectations
             in
+            let asm_expectations =
+              List.filter_map chunk.expectations ~f:(fun exp ->
+                  match exp.kind with
+                  | Expect_asm { whole_function } -> Some (exp, whole_function)
+                  | Expect_toplevel | Expect_fexpr -> None)
+            in
+            let whole_function = List.exists ~f:snd asm_expectations in
+            (if whole_function then
+               match
+                 List.find_opt asm_expectations
+                   ~f:(fun (_, whole_function) -> not whole_function)
+               with
+               | Some (exp, _) ->
+                 Location.raise_errorf ~loc:exp.extid_loc
+                   "[%%%%expect_asm] and [%%%%expect_asm_full] cannot be \
+                    attached to the same code block"
+               | None -> ());
             let keep_asm = !Clflags.keep_asm_file in
             if has_fexpr then Clflags.keep_asm_file := true;
-        let (toplevel_output, asm_output, last_unit) =
-          exec_phrases chunk.phrases
+            Option.iter (fun set -> set whole_function)
+              !set_assembly_whole_function;
+        let (success, toplevel_output, asm_output, last_unit) =
+          Fun.protect
+            ~finally:(fun () ->
+              Option.iter (fun set -> set false) !set_assembly_whole_function;
+              Clflags.keep_asm_file := keep_asm)
+            (fun () -> exec_phrases chunk.phrases)
         in
-        Clflags.keep_asm_file := keep_asm;
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm -> Option.value asm_output
-                              ~default:"\nNo assembly: compilation failed\n"
+            | Expect_asm _ ->
+                if success then
+                  Option.value asm_output
+                    ~default:"\nNo assembly: compilation failed\n"
+                else toplevel_output
             | Expect_fexpr ->
-                let filters =
-                  List.concat_map ~f:fst expectation.expected_output
-                in
-                fexpr_outputs last_unit filters
+                if success then
+                  let filters =
+                    List.concat_map ~f:fst expectation.expected_output
+                  in
+                  fexpr_outputs last_unit filters
+                else toplevel_output
           in
           eval_expectation expectation ~output)))
   in
@@ -485,9 +536,16 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> let (r, _, _) = exec_phrases phrases in r)
+        ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
-  { corrected_expectations; trailing_output }
+  let needs_principal =
+    List.exists chunks ~f:(fun chunk ->
+      List.exists chunk.expectations ~f:(fun expectation ->
+        match expectation.kind with
+        | Expect_toplevel -> true
+        | Expect_asm _ | Expect_fexpr -> false))
+  in
+  { corrected_expectations; trailing_output }, ~needs_principal
 
 let output_slice oc s a b =
   output_string oc (String.sub s ~pos:a ~len:(b - a))
@@ -532,8 +590,11 @@ let process_expect_file fname ~execute_phrase =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction = eval_expect_file fname ~file_contents ~execute_phrase in
-  write_corrected ~file:corrected_fname ~file_contents correction
+  let correction, ~needs_principal =
+    eval_expect_file fname ~file_contents ~execute_phrase
+  in
+  write_corrected ~file:corrected_fname ~file_contents correction;
+  needs_principal
 
 let repo_root = ref None
 let keep_original_error_size = ref false
@@ -593,8 +654,10 @@ let main (module Toplevel : Toplevel) fname =
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  process_expect_file fname ~execute_phrase:Toplevel.execute_phrase;
-  exit 0
+  let needs_principal =
+    process_expect_file fname ~execute_phrase:Toplevel.execute_phrase
+  in
+  exit (if needs_principal then 3 else 0)
 
 let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
   let args =

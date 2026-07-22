@@ -37,8 +37,6 @@
     -warn-error
     +A))))
 
-(include dune.runtime_selection)
-
 (copy_files# utils/*.ml{,i})
 
 (copy_files# parsing/*.ml{,i})
@@ -138,7 +136,6 @@
  (modules_without_implementation
   annot
   value_rec_types
-  asttypes
   cmo_format
   cmj_format
   outcometree
@@ -182,10 +179,14 @@
   diffing
   diffing_with_keys
   unit_info
+  linkdeps
   language_extension_kernel
   language_extension
   zero_alloc_utils
   zero_alloc_annotations
+  doubly_linked_list
+  file_sections
+  lru
   ;; PARSING
   location
   longident
@@ -208,6 +209,7 @@
   ;; TYPING
   ident
   path
+  current_unit
   jkind
   scalar
   primitive
@@ -234,6 +236,8 @@
   printtyped
   ctype
   printtyp
+  rawprinttyp
+  gprinttyp
   includeclass
   mtype
   envaux
@@ -247,6 +251,7 @@
   untypeast
   includemod
   includemod_errorprinter
+  errortrace_report
   typemode
   jkind_axis
   ldd_intf
@@ -274,6 +279,8 @@
   typedecl_properties
   typedecl_separability
   cmt2annot
+  out_type
+  data_types
   ; manual update: mli only files
   annot
   outcometree
@@ -320,6 +327,7 @@
   main_args
   compenv
   compmisc
+  opt_fuel
   makedepend
   compile_common
   instantiator
@@ -429,6 +437,7 @@
  (deps
   Makefile.build_config
   Makefile.config_if_required
+  Makefile.config
   Makefile.common
   (source_tree yacc))
  (targets ocamlyacc)
@@ -539,6 +548,7 @@
   ;; middle_end/
   backend_var
   compilenv
+  is_parameter
   ;; asmcomp/
   asmgen
   binary_emitter_verify
@@ -695,7 +705,6 @@
   compute_ranges
   compute_ranges_intf
   inlined_frame_ranges
-  is_parameter
   reg_availability_set
   reg_with_debug_info
   stack_reg_offset
@@ -734,7 +743,6 @@
  (libraries
   ocamlcommon
   oxcaml_common
-  oxcaml_utils
   flambda2_identifiers
   flambda2_cmx
   compiler_owee
@@ -846,7 +854,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.a}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.a}
    %{dep:oxcaml_common.a}
-   %{dep:utils/oxcaml_utils.a}
    %{dep:middle_end/flambda2/import/flambda2_import.a}
    %{dep:middle_end/flambda2/ui/flambda2_ui.a}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.a}
@@ -888,7 +895,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cma}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cma}
    %{dep:oxcaml_common.cma}
-   %{dep:utils/oxcaml_utils.cma}
    %{dep:middle_end/flambda2/import/flambda2_import.cma}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cma}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cma}
@@ -930,7 +936,6 @@
    %{dep:backend/debug/dwarf/dwarf_low/dwarf_low.cmxa}
    %{dep:backend/debug/dwarf/dwarf_high/dwarf_high.cmxa}
    %{dep:oxcaml_common.cmxa}
-   %{dep:utils/oxcaml_utils.cmxa}
    %{dep:middle_end/flambda2/import/flambda2_import.cmxa}
    %{dep:middle_end/flambda2/ui/flambda2_ui.cmxa}
    %{dep:middle_end/flambda2/algorithms/flambda2_algorithms.cmxa}

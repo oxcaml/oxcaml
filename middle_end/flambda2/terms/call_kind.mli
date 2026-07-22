@@ -29,7 +29,7 @@ module Function_call : sig
 end
 
 module Method_kind : sig
-  type t = private
+  type t =
     | Self
     | Public
     | Cached
@@ -60,15 +60,6 @@ module Effect : sig
           f : Simple.t;
           arg : Simple.t
         }
-    | With_stack_bind of
-        { valuec : Simple.t;
-          exnc : Simple.t;
-          effc : Simple.t;
-          dyn : Simple.t;
-          bind : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
-        }
     | With_stack_preemptible of
         { valuec : Simple.t;
           exnc : Simple.t;
@@ -77,20 +68,18 @@ module Effect : sig
           f : Simple.t;
           arg : Simple.t
         }
-    | With_stack_bind_preemptible of
-        { valuec : Simple.t;
-          exnc : Simple.t;
-          effc : Simple.t;
-          handle_tick : Simple.t;
-          dyn : Simple.t;
-          bind : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
-        }
-    | Resume of
+    | Continue of
         { cont : Simple.t;
-          f : Simple.t;
-          arg : Simple.t
+          value : Simple.t
+        }
+    | Discontinue of
+        { cont : Simple.t;
+          exn : Simple.t
+        }
+    | Discontinue_with_backtrace of
+        { cont : Simple.t;
+          exn : Simple.t;
+          bt : Simple.t
         }
 
   include Contains_names.S with type t := t
@@ -107,16 +96,6 @@ module Effect : sig
     arg:Simple.t ->
     t
 
-  val with_stack_bind :
-    valuec:Simple.t ->
-    exnc:Simple.t ->
-    effc:Simple.t ->
-    dyn:Simple.t ->
-    bind:Simple.t ->
-    f:Simple.t ->
-    arg:Simple.t ->
-    t
-
   val with_stack_preemptible :
     valuec:Simple.t ->
     exnc:Simple.t ->
@@ -126,18 +105,12 @@ module Effect : sig
     arg:Simple.t ->
     t
 
-  val with_stack_bind_preemptible :
-    valuec:Simple.t ->
-    exnc:Simple.t ->
-    effc:Simple.t ->
-    handle_tick:Simple.t ->
-    dyn:Simple.t ->
-    bind:Simple.t ->
-    f:Simple.t ->
-    arg:Simple.t ->
-    t
+  val continue : cont:Simple.t -> value:Simple.t -> t
 
-  val resume : cont:Simple.t -> f:Simple.t -> arg:Simple.t -> t
+  val discontinue : cont:Simple.t -> exn:Simple.t -> t
+
+  val discontinue_with_backtrace :
+    cont:Simple.t -> exn:Simple.t -> bt:Simple.t -> t
 end
 
 (* The allocation mode corresponds to the type of the function that is called:

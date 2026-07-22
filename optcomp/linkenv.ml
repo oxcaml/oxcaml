@@ -49,8 +49,8 @@ exception Error of error
 type t =
   { crc_interfaces : Cmi_consistbl.t;
     crc_implementations : Cmx_consistbl.t;
-    mutable implementations : CU.t list;
-    mutable cmx_required : CU.t list;
+    mutable implementations : CU.Set.t;
+    mutable cmx_required : CU.Set.t;
     interfaces : unit CU.Name.Tbl.t;
     implementations_defined : string CU.Tbl.t;
     mutable quoted_cmi : CU.Name.Set.t;
@@ -70,8 +70,8 @@ let create () =
   in
   { crc_interfaces = Cmi_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
-    implementations = [];
-    cmx_required = [];
+    implementations = CU.Set.empty;
+    cmx_required = CU.Set.empty;
     interfaces = CU.Name.Tbl.create 100;
     implementations_defined = CU.Tbl.create 100;
     quoted_cmi;
@@ -121,10 +121,10 @@ let check_cmx_consistency t file_name cmxs =
       (fun import ->
         let name = Import_info.cu import in
         let crco = Import_info.crc import in
-        t.implementations <- name :: t.implementations;
+        t.implementations <- CU.Set.add name t.implementations;
         match crco with
         | None ->
-          if List.mem name t.cmx_required
+          if CU.Set.mem name t.cmx_required
           then raise (Error (Missing_cmx (file_name, name)))
         | Some crc ->
           Cmx_consistbl.check t.crc_implementations name () crc file_name)
@@ -143,10 +143,11 @@ let check_consistency t ~unit cmis cmxs =
      let source = CU.Tbl.find t.implementations_defined unit.name in
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
    with Not_found -> ());
-  t.implementations <- unit.name :: t.implementations;
+  t.implementations <- CU.Set.add unit.name t.implementations;
   Cmx_consistbl.check t.crc_implementations unit.name () unit.crc unit.file_name;
   CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
-  if CU.is_packed unit.name then t.cmx_required <- unit.name :: t.cmx_required
+  if CU.is_packed unit.name
+  then t.cmx_required <- CU.Set.add unit.name t.cmx_required
 
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold
@@ -156,10 +157,11 @@ let extract_crc_interfaces t =
     t.interfaces []
 
 let extract_crc_implementations t =
-  Cmx_consistbl.extract t.implementations t.crc_implementations
-  |> List.map (fun (cu, crc) ->
+  Cmx_consistbl.fold_map t.implementations ~init:[]
+    ~f:(fun acc cu crc ->
       let crc = Option.map (fun ((), crc) -> crc) crc in
-      Import_info.create_normal cu ~crc)
+      Import_info.create_normal cu ~crc :: acc)
+    t.crc_implementations
 
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)
@@ -237,10 +239,11 @@ let lib_ccopts t = t.lib_ccopts
 open Format_doc
 
 let report_error ppf = function
-  | File_not_found name -> fprintf ppf "Cannot find file %s" name
+  | File_not_found name ->
+    fprintf ppf "Cannot find file %a" Location.Doc.quoted_filename name
   | Not_an_object_file name ->
     fprintf ppf "The file %a is not a compilation unit description"
-      Location.Doc.filename name
+      Location.Doc.quoted_filename name
   | Missing_implementations l ->
     let print_references ppf = function
       | [] -> ()
@@ -260,25 +263,25 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
        %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.Name.print_as_inline_code intf
   | Inconsistent_implementation (intf, file1, file2) ->
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \
        implementation %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.print_as_inline_code intf
   | Multiple_definition (modname, file1, file2) ->
     fprintf ppf "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-      Location.Doc.filename file1 Location.Doc.filename file2
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
       CU.Name.print_as_inline_code modname
   | Missing_cmx (filename, name) ->
     fprintf ppf
       "@[<hov>File %a@ was compiled without access@ to the .cmx file@ for \
        module %a,@ which was produced by `ocamlopt -for-pack'.@ Please \
        recompile %a@ with the correct `-I' option@ so that %a.cmx@ is found.@]"
-      Location.Doc.filename filename CU.print_as_inline_code name
-      Location.Doc.filename filename CU.print_as_inline_code name
+      Location.Doc.quoted_filename filename CU.print_as_inline_code name
+      Location.Doc.quoted_filename filename CU.print_as_inline_code name
   | Linking_error exitcode ->
     fprintf ppf "Error during linking (exit code %d)" exitcode
   | Archiver_error name ->
@@ -287,12 +290,12 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>The file %a@ can only be compiled with a backend with support \
        for metaprogramming@]"
-      Location.Doc.filename filename
+      Location.Doc.quoted_filename filename
   | Requires_metaprogramming_without_flag filename ->
     fprintf ppf
       "@[<hov>The library %a@ requires metaprogramming support@ but \
        -uses-metaprogramming was not passed@]"
-      Location.Doc.filename filename
+      Location.Doc.quoted_filename filename
 
 let () =
   Location.register_error_of_exn (function

@@ -83,7 +83,7 @@ float and non-float elements. However, all types in vanilla OCaml are
 
 ### Using scannable axes
 
-Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout.
+Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any` and abstract kinds.
 
 The `mod` syntax may also be written with scannable axes, and has the same effect, but should be considered deprecated: we will remove this syntax so that `mod` is reserved for modal axes.
 
@@ -317,7 +317,7 @@ For example, it's fine to write this function type:
 ```ocaml
 val f : ('a : any). 'a -> 'a (* valid as a type signature *)
 ```
-> (See the [previous section](#layout-annotation) to learn more about the layout annotation used here)
+> (See the [previous section](#layout-annotations) to learn more about the layout annotation used here)
 
 But it's not possible to implement a function of that type:
 
@@ -382,10 +382,7 @@ end
 ```
 We plan on lifting this restriction in the future.
 
-<!-- This heading is referred to by name in a link to an HTML anchor below.
-     If you rename it, please also update that link.
--->
-# `[@layout_poly]` attribute
+# `[@layout_poly]` attribute {#layout_poly-attribute}
 
 The attribute enables support for **limited layout polymorphism on external
 `%`-primitives**. This is possible because these primitives are always inlined at every

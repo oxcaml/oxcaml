@@ -135,6 +135,7 @@ type instruction =
   | DEC of arg
   | HLT
   | IDIV of arg
+  | DIV of arg
   | IMUL of arg * arg option
   | MUL of arg
   | INC of arg
@@ -173,6 +174,7 @@ type instruction =
   | SUB of arg * arg
   | SBB of arg * arg
   | TEST of arg * arg
+  | UD2
   | XCHG of arg * arg
   | XOR of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array
@@ -192,4 +194,4 @@ type asm_line =
   | Ins of instruction
   | Directive of Asm_targets.Asm_directives.Directive.t
 
-type asm_program = asm_line Oxcaml_utils.Doubly_linked_list.t
+type asm_program = asm_line Doubly_linked_list.t

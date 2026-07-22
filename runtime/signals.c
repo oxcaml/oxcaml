@@ -82,9 +82,8 @@ static bool check_pending_unblocked_signals(void)
 
 CAMLexport int caml_check_pending_signals(void)
 {
-  int i;
   bool pending = false;
-  for (i = 0; i < NSIG_WORDS; i++) {
+  for (int i = 0; i < NSIG_WORDS; i++) {
     if (atomic_load_relaxed(&caml_pending_signals[i]))
       pending = true;
   }
@@ -100,11 +99,10 @@ CAMLexport int caml_check_pending_signals(void)
 
 /* Execute all pending signals */
 
-CAMLexport value caml_process_pending_signals_exn(void)
+CAMLexport caml_result caml_process_pending_signals_res(void)
 {
-  int i, j, signo;
+  int signo;
   uintnat curr, mask ;
-  value exn;
 #ifdef POSIX_SIGNALS
   sigset_t set;
 #endif
@@ -112,17 +110,17 @@ CAMLexport value caml_process_pending_signals_exn(void)
   /* Check that there is indeed a pending signal before issuing the
       syscall in [pthread_sigmask]. */
   if (!caml_check_pending_signals())
-    return Val_unit;
+    return Result_unit;
 
 #ifdef POSIX_SIGNALS
   pthread_sigmask(/* dummy */ SIG_BLOCK, NULL, &set);
 #endif
 
-  for (i = 0; i < NSIG_WORDS; i++) {
+  for (int i = 0; i < NSIG_WORDS; i++) {
     curr = atomic_load_relaxed(&caml_pending_signals[i]);
     if (curr == 0) goto next_word;
     /* Scan curr for bits set */
-    for (j = 0; j < BITS_PER_WORD; j++) {
+    for (int j = 0; j < BITS_PER_WORD; j++) {
       mask = (uintnat)1 << j;
       if ((curr & mask) == 0) goto next_bit;
       signo = i * BITS_PER_WORD + j + 1;
@@ -135,8 +133,8 @@ CAMLexport value caml_process_pending_signals_exn(void)
         if (curr == 0) goto next_word;
         if ((curr & mask) == 0) goto next_bit;
       }
-      exn = caml_execute_signal_exn(signo);
-      if (Is_exception_result(exn)) return exn;
+      caml_result result = caml_execute_signal_res(signo);
+      if (caml_result_is_exception(result)) return result;
       /* curr probably changed during the evaluation of the signal handler;
          refresh it from memory */
       curr = atomic_load_relaxed(&caml_pending_signals[i]);
@@ -145,7 +143,7 @@ CAMLexport value caml_process_pending_signals_exn(void)
     }
   next_word: /* skip */;
   }
-  return Val_unit;
+  return Result_unit;
 }
 
 /* Record the delivery of a signal, and arrange for it to be processed
@@ -219,7 +217,7 @@ CAMLexport void caml_enter_blocking_section(void)
        are further async callbacks pending beyond OCaml signal
        handlers. */
     caml_handle_gc_interrupt();
-    caml_raise_async_if_exception(caml_process_pending_signals_exn(), "");
+    caml_get_value_or_raise_async(caml_process_pending_signals_res(), "");
   }
 
   /* Drop the systhreads lock */
@@ -261,47 +259,15 @@ CAMLexport void caml_leave_blocking_section(void)
 static value caml_signal_handlers;
 
 void caml_init_signal_handling(void) {
-  mlsize_t i;
-
   caml_signal_handlers = caml_alloc_shr(NSIG, 0);
-  for (i = 0; i < NSIG; i++)
+  for (mlsize_t i = 0; i < NSIG; i++)
     Field(caml_signal_handlers, i) = Val_unit;
   caml_register_generational_global_root(&caml_signal_handlers);
 }
 
-static void check_async_exn(value res, const char *msg)
-{
-  value exn;
-  const value *break_exn;
-
-  if (!Is_exception_result(res))
-    return;
-
-  exn = Extract_exception(res);
-
-  /* [Break] is not introduced as a predefined exception (in predef.ml and
-     stdlib.ml) since it causes trouble in conjunction with warnings about
-     constructor shadowing e.g. in format.ml.
-     "Sys.Break" must match stdlib/sys.mlp. */
-  break_exn = caml_named_value("Sys.Break");
-  if (break_exn != NULL && exn == *break_exn)
-    return;
-
-  caml_fatal_uncaught_exception_with_message(exn, msg);
-}
-
-value caml_raise_async_if_exception(value res, const char* where)
-{
-  if (Is_exception_result(res)) {
-    check_async_exn(res, where);
-    caml_raise_async(Extract_exception(res));
-  }
-  return res;
-}
-
 /* Execute a signal handler immediately */
 
-value caml_execute_signal_exn(int signal_number)
+caml_result caml_execute_signal_res(int signal_number)
 {
 #ifdef POSIX_SIGNALS
   sigset_t nsigs, sigs;
@@ -313,7 +279,7 @@ value caml_execute_signal_exn(int signal_number)
 #endif
   value handler = Field(caml_signal_handlers, signal_number);
   value signum = Val_int(caml_rev_convert_signal_number(signal_number));
-  value res = caml_callback_exn(handler, signum);
+  caml_result res = caml_callback_res(handler, signum);
 #ifdef POSIX_SIGNALS
   /* Restore the original signal mask */
   pthread_sigmask(SIG_SETMASK, &sigs, NULL);
@@ -409,7 +375,7 @@ CAMLexport int caml_check_pending_actions(void)
   return check_pending_actions(Caml_state);
 }
 
-value caml_do_pending_actions_flags_exn(int flags)
+caml_result caml_do_pending_actions_flags_res(int flags)
 {
   /* 1. Non-delayable actions that do not run OCaml code. */
 
@@ -425,26 +391,27 @@ value caml_do_pending_actions_flags_exn(int flags)
   Caml_state->action_pending = 0;
 
   /* Call signal handlers first */
-  value exn = caml_process_pending_signals_exn();
-  check_async_exn(exn, "signal handler");
-  if (Is_exception_result(exn)) goto exception;
+  caml_result res = caml_process_pending_signals_res();
+  caml_check_async(res, "signal handler");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Call memprof callbacks */
-  exn = caml_memprof_do_pending_exn();
-  check_async_exn(exn, "memprof callback");
-  if (Is_exception_result(exn)) goto exception;
+  res = caml_memprof_do_pending_res();
+  caml_check_async(res, "memprof callback");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Call finalisers */
-  exn = caml_final_do_calls_exn();
-  check_async_exn(exn, "finaliser");
-  if (Is_exception_result(exn)) goto exception;
+  res = caml_final_do_calls_res();
+  caml_check_async(res, "finaliser");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Process external interrupts (e.g. preemptive systhread switching). By doing
      this after all other possibly exception-returning actions, we do not need
      to set the action pending flag in case a context switch happens: all
      actions have been processed at this point. */
-  exn = caml_process_tick_exn();
-  check_async_exn(exn, "tick handler");
+  res = caml_process_tick_res();
+  caml_check_async(res, "tick handler");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Check for a pending preemption
 
@@ -456,12 +423,13 @@ value caml_do_pending_actions_flags_exn(int flags)
      again before returning to OCaml. The continuation this allocates is
      uninitialized, and should not be promoted before being initialized.
    */
+#ifdef NATIVE_CODE
   if (flags & CAML_FROM_CAML) {
     caml_domain_setup_preemption();
   }
+#endif
 
-
-  return Val_unit;
+  return Result_unit;
 
 exception:
   /* If an exception is raised during an asynchronous callback, then
@@ -469,7 +437,18 @@ exception:
      needed. Therefore, we set [Caml_state->action_pending] again in
      order to force reexamination of callbacks. */
   caml_set_action_pending(Caml_state);
-  return exn;
+  return res;
+}
+
+caml_result caml_do_pending_actions_res(void)
+{
+  return caml_do_pending_actions_flags_res(CAML_FROM_C);
+}
+
+value caml_do_pending_actions_flags_exn(int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_do_pending_actions_flags_res(flags));
 }
 
 value caml_do_pending_actions_exn(void)
@@ -477,15 +456,27 @@ value caml_do_pending_actions_exn(void)
   return caml_do_pending_actions_flags_exn(CAML_FROM_C);
 }
 
-value caml_process_pending_actions_with_root_flags_exn(value root, int flags)
+caml_result caml_process_pending_actions_with_root_flags_res(value root,
+                                                             int flags)
 {
   if (caml_check_pending_actions()) {
     CAMLparam1(root);
-    value exn = caml_do_pending_actions_flags_exn(flags);
-    if (Is_exception_result(exn)) CAMLreturn(exn);
+    caml_result result = caml_do_pending_actions_flags_res(flags);
+    if (caml_result_is_exception(result)) CAMLreturnT(caml_result, result);
     CAMLdrop;
   }
-  return root;
+  return Result_value(root);
+}
+
+caml_result caml_process_pending_actions_with_root_res(value root)
+{
+  return caml_process_pending_actions_with_root_flags_res(root, CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags_exn(value root, int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_with_root_flags_res(root, flags));
 }
 
 value caml_process_pending_actions_with_root_exn(value root)
@@ -495,9 +486,8 @@ value caml_process_pending_actions_with_root_exn(value root)
 
 value caml_process_pending_actions_with_root_flags(value root, int flags)
 {
-  return caml_raise_async_if_exception(
-    caml_process_pending_actions_with_root_flags_exn(root, flags),
-    "");
+  return caml_get_value_or_raise_async(
+    caml_process_pending_actions_with_root_flags_res(root, flags), "");
 }
 
 CAMLprim value caml_process_pending_actions_with_root(value root)
@@ -505,10 +495,13 @@ CAMLprim value caml_process_pending_actions_with_root(value root)
   return caml_process_pending_actions_with_root_flags(root, CAML_FROM_C);
 }
 
-
-CAMLexport value caml_process_pending_actions_exn(void)
+CAMLexport caml_result caml_process_pending_actions_res(void)
 {
-  return caml_process_pending_actions_with_root_exn(Val_unit);
+  if (caml_check_pending_actions()) {
+    return caml_do_pending_actions_res();
+  } else {
+    return Result_unit;
+  }
 }
 
 CAMLexport void caml_process_pending_actions_flags(int flags)
@@ -519,6 +512,19 @@ CAMLexport void caml_process_pending_actions_flags(int flags)
 CAMLexport void caml_process_pending_actions(void)
 {
   caml_process_pending_actions_flags(CAML_FROM_C);
+}
+
+/* deprecated, but kept around for backward-compatibility */
+CAMLexport value caml_process_pending_actions_exn(void)
+{
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_res());
+}
+
+CAMLexport value caml_process_pending_actions_flags_exn(int flags)
+{
+  return caml_result_get_encoded_exception(
+    caml_process_pending_actions_with_root_flags_res(Val_unit, flags));
 }
 
 /* OS-independent numbering of signals */
@@ -607,26 +613,36 @@ CAMLexport void caml_process_pending_actions(void)
 #ifndef SIGXFSZ
 #define SIGXFSZ -1
 #endif
+#ifndef SIGIO
+#define SIGIO -1
+#endif
+#ifndef SIGWINCH
+#define SIGWINCH -1
+#endif
 
 static const int posix_signals[] = {
   SIGABRT, SIGALRM, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
   SIGQUIT, SIGSEGV, SIGTERM, SIGUSR1, SIGUSR2, SIGCHLD, SIGCONT,
   SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU, SIGVTALRM, SIGPROF, SIGBUS,
-  SIGPOLL, SIGSYS, SIGTRAP, SIGURG, SIGXCPU, SIGXFSZ
+  SIGPOLL, SIGSYS, SIGTRAP, SIGURG, SIGXCPU, SIGXFSZ, SIGIO, SIGWINCH
 };
 
 CAMLexport int caml_convert_signal_number(int signo)
 {
-  if (signo < 0 && signo >= -(sizeof(posix_signals) / sizeof(int)))
+  if (signo < 0 && signo >= -(int)(sizeof(posix_signals) / sizeof(int)))
     return posix_signals[-signo-1];
   else
     return signo;
 }
 
+CAMLprim value caml_sys_convert_signal_number(value signo)
+{
+  return Val_int(caml_convert_signal_number(Int_val(signo)));
+}
+
 CAMLexport int caml_rev_convert_signal_number(int signo)
 {
-  int i;
-  for (i = 0; i < sizeof(posix_signals) / sizeof(int); i++)
+  for (int i = 0; i < (int)(sizeof(posix_signals) / sizeof(int)); i++)
     if (signo == posix_signals[i]) return -i - 1;
   return signo;
 }
@@ -637,6 +653,11 @@ static size_t max_size_t(size_t a, size_t b)
   return (a > b) ? a : b;
 }
 #endif
+
+CAMLprim value caml_sys_rev_convert_signal_number(value signo)
+{
+  return Val_int(caml_rev_convert_signal_number(Int_val(signo)));
+}
 
 void * caml_init_signal_stack(size_t* signal_stack_size)
 {
@@ -660,7 +681,7 @@ void * caml_init_signal_stack(size_t* signal_stack_size)
     stk.ss_size = max_size_t(
       SIGSTKSZ, 4 * max_size_t(MINSIGSTKSZ, at_minsigstksz));
 #else
-  /* Preserve existing runtime5 behaviour for now. */
+  /* Preserve existing behaviour for now. */
   stk.ss_size = SIGSTKSZ;
 #endif
 
@@ -853,7 +874,7 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
     caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   }
   caml_plat_unlock(&signal_install_mutex);
-  (void) caml_raise_async_if_exception(caml_process_pending_signals_exn(), "");
+  caml_get_value_or_raise_async(caml_process_pending_signals_res(), "");
   CAMLreturn (res);
  err:
   caml_plat_unlock(&signal_install_mutex);

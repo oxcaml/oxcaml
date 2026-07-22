@@ -72,15 +72,8 @@ let cmx_bundle ~quoted_cmx =
   CU.Set.iter find_all_cmxes quoted_cmx;
   ListLabels.map (CU.Tbl.to_list cmxes)
     ~f:(fun ((_, info) : CU.t * Cmx_format.unit_infos) ->
-      let raw_export_info, sections =
-        match info.ui_export_info with
-        | None -> None, Oxcaml_utils.File_sections.empty
-        | Some info ->
-          let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-          Some info, sections
-      in
       let serialized_sections, toc, total_length =
-        Oxcaml_utils.File_sections.serialize sections
+        File_sections.serialize info.ui_file_sections
       in
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
@@ -92,7 +85,7 @@ let cmx_bundle ~quoted_cmx =
           uir_quoted_cmx = Array.of_list info.ui_quoted_cmx;
           uir_format = info.ui_format;
           uir_generic_fns = info.ui_generic_fns;
-          uir_export_info = raw_export_info;
+          uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
@@ -113,10 +106,14 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx ~output_name
   let sourcefile_for_dwarf =
     Some (if named_startup_file then bundled_cm else ".bundled_cm")
   in
+  (* CR xclerc for xclerc: one would expect [Config.ext_obj] rather than ".cmx"
+     below, since the file contains object code; double check whether the
+     extension is used on purpose (e.g. by scripts or for statistics) before
+     changing it. *)
   let bundled_cm_obj = Filename.temp_file "bundled_cm" ".cmx" in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:bundled_cm
-    ~keep_asm:true (* TODO *)
-    ~obj_filename:bundled_cm_obj ~may_reduce_heap:true ~ppf_dump (fun () ->
+    ~keep_asm:!Clflags.keep_startup_file ~obj_filename:bundled_cm_obj
+    ~may_reduce_heap:true ~ppf_dump (fun () ->
       Location.input_name := "caml_bundled_cm";
       let bundle_comp_unit =
         CU.create CU.Prefix.empty (CU.Name.of_string "_bundled_cm")

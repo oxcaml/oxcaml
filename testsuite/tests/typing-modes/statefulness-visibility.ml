@@ -1,4 +1,5 @@
 (* TEST
+   flags = "-w -220";
    expect;
 *)
 

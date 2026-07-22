@@ -454,14 +454,20 @@ and eval_prim env prim =
   | Pset_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pset_ptr (new_layout, mode)
+  | Pget_ext_ptr (old_layout, mut) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pget_ext_ptr (new_layout, mut)
+  | Pset_ext_ptr (old_layout, mode) ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout then prim else Pset_ext_ptr (new_layout, mode)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
-  | Pwith_stack_bind | Pwith_stack_preemptible | Pwith_stack_bind_preemptible
-  | Pperform | Presume | Preperform | Pccall _ | Praise _ | Psequand | Psequor
-  | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
+  | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
+  | Psequor | Pnot | Pphys_equal _ | Pscalar _ | Poffsetref _ | Pstringlength
   | Pstringrefu | Pstringrefs | Pbyteslength | Pbytesrefu | Pbytessetu
   | Pbytesrefs | Pbytessets | Pmakearray _ | Pmakearray_dynamic _ | Pduparray _
   | Parrayblit _ | Parraylength _ | Parrayrefu _ | Parraysetu _ | Parrayrefs _
@@ -476,22 +482,21 @@ and eval_prim env prim =
   | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-  | Pfloat_array_set_vec _ | Pint_array_set_vec _
-  | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
-  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-  | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
-  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
-  | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
-  | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
-  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
-  | Pbox_vector _ | Pjoin_vec256 | Psplit_vec256
+  | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+  | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+  | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+  | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+  | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
+  | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
+  | Patomic_lxor_field | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit
+  | Punbox_vector _ | Pbox_vector _ | Pjoin_vec256 | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
@@ -530,7 +535,9 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pget_idx (layout, _)
   | Pset_idx (layout, _)
   | Pget_ptr (layout, _)
-  | Pset_ptr (layout, _) ->
+  | Pset_ptr (layout, _)
+  | Pget_ext_ptr (layout, _)
+  | Pset_ext_ptr (layout, _) ->
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts

@@ -28,7 +28,7 @@
 open! Int_replace_polymorphic_compare
 module C = Cfg
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Eliminate_dead_code : sig
   val run : Cfg_with_layout.t -> Label.Set.t
@@ -190,7 +190,10 @@ end = struct
     (* CR-someday xclerc: I am not positive it should be changed, but we
      * should not need a fix point here: `is_fallthrough_block` could
      * return the next non-fallthrough block rather than the next block. *)
-    if !C.verbose then CL.save_as_dot cfg_with_layout "before_elim_ft";
+    if !C.verbose
+    then
+      CL.save_as_dot ~annotate_instr:[Printcfg.instruction] cfg_with_layout
+        "before_elim_ft";
     let dead_labels =
       disconnect_fallthrough_blocks cfg_with_layout Label.Set.empty
     in
@@ -199,7 +202,8 @@ end = struct
       Printf.printf "%s: eliminated %d block that were dead or fallthrough.\n"
         cfg.fun_name
         (Label.Set.cardinal dead_labels);
-      CL.save_as_dot cfg_with_layout "after_elim_ft");
+      CL.save_as_dot ~annotate_instr:[Printcfg.instruction] cfg_with_layout
+        "after_elim_ft");
     dead_labels
 end
 

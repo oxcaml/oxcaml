@@ -126,12 +126,21 @@ module Scannable_axes : sig
   val equal : t -> t -> bool
 
   val less_or_equal : t -> t -> Misc.Le_result.t
+
+  val meet : t -> t -> t
 end
 
 module Layout : sig
-  (** Note that products have two possible encodings: as [Product ...] or as
+  (** Note that:
+
+      1. Products have two possible encodings: as [Product ...] or as
       [Sort (Product ...]. This duplication is hard to eliminate because of the
-      possibility that a sort variable may be instantiated by a product sort. *)
+      possibility that a sort variable may be instantiated by a product sort.
+
+      2. Scannable axes are meaningful only when the layout might be scannable
+      ([any], [scannable], a sort variable, or an abstract kind). On other
+      layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
+      [float64]. See [Layout.Const.get_root_scannable_axes]. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
@@ -159,6 +168,20 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    val is_scannable_or_any : t -> bool
+
+    (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
+        [Base Float64], [Product], [Univar], [Genvar]). *)
+    val get_root_scannable_axes : t -> Scannable_axes.t option
+
+    (** Updates the scannable axes at the root of [t] (changes nothing when
+        [get_root_scannable_axes] would return [None]). *)
+    val set_root_scannable_axes : t -> Scannable_axes.t -> t
+
+    (** Meets [sa] into [t]'s root scannable axes (if [t] has meaningful ones;
+        otherwise returns [t] unchanged). *)
+    val meet_root_scannable_axes : t -> Scannable_axes.t -> t
   end
 
   val of_const : Const.t -> Sort.t t

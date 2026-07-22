@@ -1816,6 +1816,12 @@ module Instruction_name = struct
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
         t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | UMAX_vector :
         ( triple,
           [ `Reg of
@@ -2079,6 +2085,7 @@ module Instruction_name = struct
         | TST -> "tst"
         | UADDLP_vector -> "uaddlp"
         | UBFM -> "ubfm"
+        | UDIV -> "udiv"
         | UMAX_vector -> "umax"
         | UMIN_vector -> "umin"
         | UMOV _ -> "umov"
@@ -2573,6 +2580,9 @@ module Instruction_name = struct
       | UBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
+      | UDIV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | UMAX_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
@@ -2681,14 +2691,15 @@ module Instruction = struct
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
     | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
-    | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
-    | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
-    | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR | STRB | STRH
-    | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register | SUB_immediate
-    | SUB_shifted_register | SUB_vector | SXTL _ | TST | UADDLP_vector | UBFM
-    | UMAX_vector | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _
-    | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _
-    | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1 | ZIP2 ->
+    | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
+    | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
+    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR
+    | STRB | STRH | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register
+    | SUB_immediate | SUB_shifted_register | SUB_vector | SXTL _ | TST
+    | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _ | UMULH
+    | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _
+    | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1
+    | ZIP2 ->
       None
 end
 
@@ -2957,11 +2968,26 @@ module DSL = struct
 
   let reg_op reg = Operand.Reg reg
 
-  let imm n : _ Operand.t = Imm (Twelve n)
+  let imm n : _ Operand.t =
+    (* An ADD/SUB/CMP 12-bit immediate, optionally shifted left by 12 (the shift
+       is inferred from the value). *)
+    if n < 0 || n > 0xFFF_000 || (n > 0xFFF && n land 0xFFF <> 0)
+    then
+      Misc.fatal_errorf
+        "imm: value %d not encodable as a 12-bit immediate, optionally shifted \
+         left by 12"
+        n;
+    Imm (Twelve n)
 
-  let imm_six n : _ Operand.t = Imm (Six n)
+  let imm_six n : _ Operand.t =
+    if n < 0 || n > 0x3F
+    then Misc.fatal_errorf "imm_six: value %d out of range [0, 63]" n;
+    Imm (Six n)
 
-  let imm_sixteen n : _ Operand.t = Imm (Sixteen_unsigned n)
+  let imm_sixteen n : _ Operand.t =
+    if n < 0 || n > 0xFFFF
+    then Misc.fatal_errorf "imm_sixteen: value %d out of range [0, 65535]" n;
+    Imm (Sixteen_unsigned n)
 
   let imm_sixteen_of_nativeint n : _ Operand.t =
     if Nativeint.compare n 0n < 0 || Nativeint.compare n 0xFFFFn > 0

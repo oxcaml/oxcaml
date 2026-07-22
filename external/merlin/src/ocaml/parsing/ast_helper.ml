@@ -30,21 +30,30 @@ type attrs = attribute list
 
 let default_loc = ref Location.none
 
-let const_string s = Pconst_string (s, !default_loc, None)
+let const_string s =
+  { pconst_desc = Pconst_string (s, !default_loc, None);
+    pconst_loc = !default_loc;
+  }
 
 let with_default_loc l f =
   Misc.protect_refs [Misc.R (default_loc, l)] f
 
 module Const = struct
-  let integer ?suffix i = Pconst_integer (i, suffix)
-  let int ?suffix i = integer ?suffix (Int.to_string i)
-  let int32 ?(suffix='l') i = integer ~suffix (Int32.to_string i)
-  let int64 ?(suffix='L') i = integer ~suffix (Int64.to_string i)
-  let nativeint ?(suffix='n') i = integer ~suffix (Nativeint.to_string i)
-  let float ?suffix f = Pconst_float (f, suffix)
-  let char c = Pconst_char c
+  let mk ?(loc = !default_loc) d =
+    {pconst_desc = d;
+     pconst_loc = loc}
+
+  let integer ?loc ?suffix i = mk ?loc (Pconst_integer (i, suffix))
+  let int ?loc ?suffix i = integer ?loc ?suffix (Int.to_string i)
+  let int32 ?loc ?(suffix='l') i = integer ?loc ~suffix (Int32.to_string i)
+  let int64 ?loc ?(suffix='L') i = integer ?loc ~suffix (Int64.to_string i)
+  let nativeint ?loc ?(suffix='n') i =
+    integer ?loc ~suffix (Nativeint.to_string i)
+  let float ?loc ?suffix f = mk ?loc (Pconst_float (f, suffix))
+  let char ?loc c = mk ?loc (Pconst_char c)
+  let untagged_char ?loc c = mk ?loc (Pconst_untagged_char c)
   let string ?quotation_delimiter ?(loc= !default_loc) s =
-    Pconst_string (s, loc, quotation_delimiter)
+    mk ~loc (Pconst_string (s, loc, quotation_delimiter))
 end
 
 module Attr = struct
@@ -76,7 +85,7 @@ module Typ = struct
   let alias ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_alias (a, b, c))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_poly (a, b))
-  let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
+  let package ?loc ?attrs a = mk ?loc ?attrs (Ptyp_package a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
@@ -138,8 +147,8 @@ module Typ = struct
               v, jkind) var_lst
             in
             Ptyp_poly(var_lst, loop core_type)
-        | Ptyp_package(longident,lst) ->
-            Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
+        | Ptyp_package ptyp ->
+            Ptyp_package (loop_package_type ptyp)
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
         | Ptyp_quote core_type ->
@@ -161,6 +170,8 @@ module Typ = struct
         match jkind.pjka_desc with
         | Pjk_default as x -> x
         | Pjk_abbreviation _ as x -> x
+        | Pjk_operator (jkind, sa) ->
+          Pjk_operator (loop_jkind jkind, sa)
         | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
         | Pjk_with (jkind, typ, modalities) ->
           Pjk_with (loop_jkind jkind, loop typ, modalities)
@@ -184,9 +195,17 @@ module Typ = struct
             Oinherit (loop t)
       in
       { field with pof_desc; }
+    and loop_package_type ptyp =
+      { ptyp with
+        ppt_cstrs = List.map (fun (n,typ) -> (n,loop typ) ) ptyp.ppt_cstrs }
     in
     loop t
 
+  let package_type ?(loc = !default_loc) ?(attrs = []) p c =
+    {ppt_loc = loc;
+     ppt_path = p;
+     ppt_cstrs = c;
+     ppt_attrs = attrs}
 end
 
 module Pat = struct
@@ -219,6 +238,7 @@ module Pat = struct
   let unpack ?loc ?attrs a = mk ?loc ?attrs (Ppat_unpack a)
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_open (a, b))
   let exception_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_exception a)
+  let effect_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_effect(a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ppat_extension a)
 end
 
@@ -274,7 +294,7 @@ module Exp = struct
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Pexp_poly (a, b))
   let object_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_object a)
   let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
-  let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
+  let pack ?loc ?attrs a b = mk ?loc ?attrs (Pexp_pack (a, b))
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_open (a, b))
   let letop ?loc ?attrs let_ ands body =
     mk ?loc ?attrs (Pexp_letop {let_; ands; body})
@@ -704,7 +724,6 @@ module Te = struct
      pext_loc = loc;
      pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
     }
-
 end
 
 module Csig = struct
@@ -776,7 +795,8 @@ let no_label = Nolabel
 let extract_str_payload = function
   | PStr [{ pstr_desc = Pstr_eval (
       {Parsetree. pexp_loc; pexp_desc =
-         Parsetree.Pexp_constant (Parsetree.Pconst_string (msg, _, _)) ; _ }, _
+         Parsetree.Pexp_constant
+           { pconst_desc = Parsetree.Pconst_string (msg, _, _); _ }; _ }, _
     ); _ }] ->
     Some (msg, pexp_loc)
   | _ -> None

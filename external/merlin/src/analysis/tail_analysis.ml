@@ -95,8 +95,8 @@ let expr_tail_positions = function
   | Texp_antiquotation _
   | Texp_unboxed_unit
   | Texp_unboxed_bool _ -> []
-  | Texp_match (_, _, cs, _) -> List.map cs ~f:(fun c -> Case c)
-  | Texp_try (_, cs) -> List.map cs ~f:(fun c -> Case c)
+  | Texp_match (_, _, cs, _, _) -> List.map cs ~f:(fun c -> Case c)
+  | Texp_try (_, cs, _) -> List.map cs ~f:(fun c -> Case c)
   | Texp_letmodule (_, _, _, _, e)
   | Texp_letexception (_, e)
   | Texp_let (_, _, e)

@@ -225,6 +225,12 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_experimental_optimizations f =
+  ( "-experimental-optimizations",
+    Arg.Unit f,
+    " Enable a bundle of experimental codegen optimizations that are not yet \
+     on by default (subject to change)" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -386,7 +392,12 @@ let mk_no_long_frames f =
 let mk_debug_long_frames_threshold f =
   ( "-debug-long-frames-threshold",
     Arg.Int f,
-    "n debug only: set long frames threshold" )
+    "<n>  debug only: set long frames threshold" )
+
+let mk_dbranch_relaxation_max_displacement f =
+  ( "-dbranch-relaxation-max-displacement",
+    Arg.Int f,
+    "<n>  debug only: lower the branch relaxation displacement threshold" )
 
 let mk_caml_apply_inline_fast_path f =
   ( "-caml-apply-inline-fast-path",
@@ -1153,6 +1164,11 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_ddebug_avail_sets f =
+  ( "-ddebug-avail-sets",
+    Arg.Unit f,
+    " Print availability sets when dumping CFG and Linear" )
+
 let mk_dwarf_for_startup_file f =
   ( "-gstartup",
     Arg.Unit f,
@@ -1203,8 +1219,10 @@ let mk_gdwarf_max_function_complexity f =
 let mk_gdwarf_compression f =
   ( "-gdwarf-compression",
     Arg.String f,
-    Format.sprintf " Set the DWARF compression format (default %s)"
-      !Dwarf_flags.gdwarf_compression )
+    Format.sprintf
+      " Set the DWARF compression format (default %s for\n\
+      \     -gno-upstream-dwarf or -gdwarf-inlined-frames, none otherwise)"
+      Dwarf_flags.default_gdwarf_compression )
 
 let mk_gdwarf_fission f =
   ( "-gdwarf-fission",
@@ -1300,6 +1318,7 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1327,6 +1346,7 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
@@ -1486,6 +1506,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1514,6 +1535,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_long_frames F.long_frames;
       mk_no_long_frames F.no_long_frames;
       mk_debug_long_frames_threshold F.long_frames_threshold;
+      mk_dbranch_relaxation_max_displacement
+        F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
@@ -1826,6 +1849,20 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ()
+
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
 
@@ -1914,6 +1951,9 @@ module Oxcaml_options_impl = struct
   let long_frames = set' Oxcaml_flags.allow_long_frames
   let no_long_frames = clear' Oxcaml_flags.allow_long_frames
   let long_frames_threshold n = set_long_frames_threshold n
+
+  let dbranch_relaxation_max_displacement n =
+    Oxcaml_flags.branch_relaxation_max_displacement := n
 
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
@@ -2198,6 +2238,7 @@ module type Debugging_options = sig
   val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
@@ -2217,6 +2258,7 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
@@ -2247,6 +2289,7 @@ module Debugging_options_impl = struct
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
   let gdwarf_may_alter_codegen () = Debugging.gdwarf_may_alter_codegen := true
@@ -2269,7 +2312,7 @@ module Debugging_options_impl = struct
     Debugging.dwarf_max_function_complexity := c
 
   let gdwarf_compression value =
-    Debugging.gdwarf_compression := String.lowercase_ascii value
+    Debugging.gdwarf_compression := Some (String.lowercase_ascii value)
 
   let gdwarf_fission value =
     match String.lowercase_ascii value with
@@ -2358,6 +2401,8 @@ module Extra_params = struct
                     possible_values)))
     | "regalloc-linscan-threshold" ->
         set_int' Oxcaml_flags.regalloc_linscan_threshold
+    | "dbranch-relaxation-max-displacement" ->
+        set_int' Oxcaml_flags.branch_relaxation_max_displacement
     | "regalloc-param" -> add_string Oxcaml_flags.regalloc_params
     | "regalloc-validate" -> set' Oxcaml_flags.regalloc_validate
     | "vectorize" -> set' Oxcaml_flags.vectorize
@@ -2377,8 +2422,13 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "experimental-optimizations" ->
+        if Compenv.check_bool ppf name v then
+          Oxcaml_options_impl.experimental_optimizations ();
+        true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
+    | "ddebug-avail-sets" -> set' Debugging.debug_avail_sets
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs

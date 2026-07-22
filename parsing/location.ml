@@ -342,7 +342,6 @@ module Doc = struct
     comma ();
     let startline = if line_valid startline then startline else 1 in
     let endline = if line_valid endline then endline else startline in
-
     begin if startline = endline then
         Fmt.fprintf ppf "%s %a"
           (capitalize "line") linenum startline
@@ -785,6 +784,7 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
+  footnote: Fmt.t option;
 }
 
 type report_printer = {
@@ -861,27 +861,47 @@ let batch_mode_printer : report_printer =
       | Misc.Error_style.Short ->
           ()
     in
-    Format.fprintf ppf "@[<v>%a:@ %a@]" print_loc loc
+    Format.fprintf ppf "%a:@ %a" print_loc loc
       (Fmt.compat highlight) loc
   in
-  let pp_txt ppf txt = Format.fprintf ppf "@[%a@]" Fmt.Doc.format txt in
-  let pp self ppf report =
-    setup_tags ();
-    separate_new_message ppf;
-    (* Make sure we keep [num_loc_lines] updated.
-       The tabulation box is here to give submessage the option
-       to be aligned with the main message box
-    *)
-    print_updating_num_loc_lines ppf (fun ppf () ->
-      Format.fprintf ppf "@[<v>%a%a%a: %a%a%a%a@]@."
+  let pp_txt ppf txt = Format.fprintf ppf "%a" Fmt.Doc.format txt in
+  let pp_footnote ppf f =
+    Option.iter (Format.fprintf ppf "@,%a" pp_txt) f
+  in
+  let error_format self ppf report =
+    Format.fprintf ppf "@[<v>%a%a%a: %a@[%a@]%a%a%a@]@."
       Format.pp_open_tbox ()
       (self.pp_main_loc self report) report.main.loc
       (self.pp_report_kind self report) report.kind
       Format.pp_set_tab ()
       (self.pp_main_txt self report) report.main.txt
       (self.pp_submsgs self report) report.sub
+      pp_footnote report.footnote
       Format.pp_close_tbox ()
-    ) ()
+  in
+  let warning_format self ppf report =
+    Format.fprintf ppf "@[<v>%a@[<b 2>%a: %a@]%a%a@]@."
+      (self.pp_main_loc self report) report.main.loc
+      (self.pp_report_kind self report) report.kind
+      (self.pp_main_txt self report) report.main.txt
+      (self.pp_submsgs self report) report.sub
+      pp_footnote report.footnote
+  in
+  let pp self ppf report =
+    setup_tags ();
+    separate_new_message ppf;
+    let printer ppf () = match report.kind with
+      | Report_warning _
+      | Report_warning_as_error _
+      | Report_alert _ | Report_alert_as_error _ ->
+          warning_format self ppf report
+      | Report_error -> error_format self ppf report
+    in
+    (* Make sure we keep [num_loc_lines] updated.
+       The tabulation box is here to give submessage the option
+       to be aligned with the main message box
+    *)
+    print_updating_num_loc_lines ppf printer ()
   in
   let pp_report_kind _self _ ppf = function
     | Report_error -> Format.fprintf ppf "@{<error>Error@}"
@@ -904,9 +924,20 @@ let batch_mode_printer : report_printer =
     ) msgs
   in
   let pp_submsg self report ppf { loc; txt } =
-    Format.fprintf ppf "@[%a  %a@]"
-      (self.pp_submsg_loc self report) loc
-      (self.pp_submsg_txt self report) txt
+    if loc.loc_ghost then
+      (* FIXME This change from ocaml/ocaml#13838 results in some very sad error
+               messages from some of our ppxes. We've tweaked it for now, but
+               intend to coordinate with upstream as to a more proper fix. *)
+      if is_none loc then
+        Format.fprintf ppf "@[%a@]" (self.pp_submsg_txt self report) txt
+      else
+        Format.fprintf ppf "%a@[%a@]"
+          (self.pp_submsg_loc self report) loc
+          (self.pp_submsg_txt self report) txt
+    else
+      Format.fprintf ppf "%a  @[%a@]"
+        (self.pp_submsg_loc self report) loc
+        (self.pp_submsg_txt self report) txt
   in
   let pp_submsg_loc self report ppf loc =
     if not (is_dummy_loc loc) then
@@ -961,21 +992,31 @@ let print_report ppf report =
 (* Reporting errors *)
 
 type error = report
+type delayed_msg = unit -> Fmt.t option
 
 let report_error ppf err =
   print_report ppf err
 
-let mkerror loc sub txt =
-  { kind = Report_error; main = { loc; txt }; sub }
+let mkerror loc sub footnote txt =
+  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
 
-let errorf ?(loc = none) ?(sub = []) =
-  Fmt.kdoc_printf (mkerror loc sub)
+let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf (mkerror loc sub footnote)
+let aligned_error_hint
+    ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) fmt =
+  Fmt.kdoc_printf (fun main hint ->
+      match hint with
+      | None -> mkerror loc sub footnote main
+      | Some hint ->
+          let main, hint = Misc.align_error_hint ~main ~hint in
+          mkerror loc (mknoloc hint :: sub) footnote main
+  ) fmt
 
-let error ?(loc = none) ?(sub = []) msg_str =
-  mkerror loc sub (Fmt.Doc.string msg_str Fmt.Doc.empty)
+let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
+  mkerror loc sub footnote Fmt.Doc.(string msg_str empty)
 
-let error_of_printer ?(loc = none) ?(sub = []) pp x =
-  mkerror loc sub (Fmt.doc_printf "%a" pp x)
+let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
+  mkerror loc sub footnote (Fmt.doc_printf "%a" pp x)
 
 let error_of_printer_file print x =
   error_of_printer ~loc:(in_file !input_name) print x
@@ -988,13 +1029,12 @@ let default_warning_alert_reporter report mk (loc: t) w : report option =
   match report w with
   | `Inactive -> None
   | `Active { Warnings.id; message; is_error; sub_locs } ->
-      let msg_of_str str = Format_doc.Doc.(empty |> string str) in
       let kind = mk is_error id in
-      let main = { loc; txt = msg_of_str message } in
+      let main = { loc; txt = message } in
       let sub = List.map (fun (loc, sub_message) ->
-        { loc; txt = msg_of_str sub_message }
+        { loc; txt = sub_message }
       ) sub_locs in
-      Some { kind; main; sub }
+      Some { kind; main; sub; footnote=None }
 
 
 let default_warning_reporter =
@@ -1129,8 +1169,8 @@ let () =
       | _ -> None
     )
 
-let raise_errorf ?(loc = none) ?(sub = []) =
-  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub txt)))
+let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
+  Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";

@@ -356,8 +356,7 @@ Lines 2-4, characters 2-11:
 3 |   | 0s -> 0
 4 |   | 1s -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-2s
+  Here is an example of a case that is not matched: "2s"
 
 - : int = 1
 |}]
@@ -558,8 +557,7 @@ Lines 2-4, characters 2-11:
 3 |   | 0S -> 0
 4 |   | 1S -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-2S
+  Here is an example of a case that is not matched: "2S"
 
 - : int = 1
 |}]
@@ -680,8 +678,7 @@ Lines 2-4, characters 2-13:
 3 |   | #'a' -> 0
 4 |   | #'b' -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#'c'
+  Here is an example of a case that is not matched: "#'c'"
 
 - : int = 1
 |}]
@@ -779,8 +776,7 @@ Lines 2-4, characters 2-12:
 3 |   | #0s -> 0
 4 |   | #1s -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#2s
+  Here is an example of a case that is not matched: "#2s"
 
 - : int = 1
 |}]
@@ -911,8 +907,7 @@ Lines 2-4, characters 2-12:
 3 |   | #0S -> 0
 4 |   | #1S -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#2S
+  Here is an example of a case that is not matched: "#2S"
 
 - : int = 1
 |}]

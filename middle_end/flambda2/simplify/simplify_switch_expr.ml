@@ -19,17 +19,34 @@ module TE = Flambda2_types.Typing_env
 module TI = Target_ocaml_int
 module Alias_set = TE.Alias_set
 
+type alias_set =
+  | Aliases of Alias_set.t
+  | Poison of Flambda_kind.t
+
 type mergeable_arms =
   | No_arms
   | Mergeable of
       { cont : Continuation.t;
-        args : Alias_set.t list
+        args : alias_set list
       }
   | Not_mergeable
 
+let inter_alias_set alias1 alias2 =
+  match alias1, alias2 with
+  | Aliases alias1, Aliases alias2 -> Aliases (Alias_set.inter alias1 alias2)
+  | Aliases alias, Poison _ | Poison _, Aliases alias -> Aliases alias
+  | Poison kind1, Poison kind2 ->
+    if Flambda_kind.equal kind1 kind2
+    then Poison kind1
+    else
+      Misc.fatal_errorf
+        "[inter_alias_set]: intersection of poison with different kinds %a and \
+         %a"
+        Flambda_kind.print kind1 Flambda_kind.print kind2
+
 let find_all_aliases env arg =
   let find_all_aliases () =
-    TE.aliases_of_simple env ~min_name_mode:NM.normal arg
+    Aliases (TE.aliases_of_simple env ~min_name_mode:NM.normal arg)
   in
   Simple.pattern_match'
     ~var:(fun _var ~coercion:_ ->
@@ -53,9 +70,12 @@ let find_all_aliases env arg =
          of continuations to variables that where not in scope during the
          downward traversal. In particular for the alias rewriting provided by
          data_flow *)
-      TE.Alias_set.singleton arg)
+      Aliases (TE.Alias_set.singleton arg))
     ~symbol:(fun _sym ~coercion:_ -> find_all_aliases ())
-    ~const:(fun _cst -> find_all_aliases ())
+    ~const:(fun cst ->
+      match Reg_width_const.is_poison cst with
+      | Some (kind, _name) -> Poison kind
+      | None -> find_all_aliases ())
     arg
 
 let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
@@ -151,7 +171,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               let args =
                 List.map2
                   (fun arg_set arg ->
-                    Alias_set.inter (find_all_aliases env_at_use arg) arg_set)
+                    inter_alias_set (find_all_aliases env_at_use arg) arg_set)
                   args (Apply_cont.args action)
               in
               ( new_let_conts,
@@ -183,9 +203,16 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
                 let not_arms = TI.Map.add arm action not_arms in
                 maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
               else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
+          | Poison (Value, _) ->
+            (* Poison can both be considered as an identity and as a not arm,
+               depending on what's best for us. *)
+            let identity_arms = TI.Map.add arm action identity_arms in
+            let not_arms = TI.Map.add arm action not_arms in
+            maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
           | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
           | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null ->
+          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null
+          | Poison ((Naked_number _ | Region | Rec_info), _) ->
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
         in
         Simple.pattern_match arg ~const ~name:(fun _ ~coercion:_ ->
@@ -197,13 +224,17 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
     new_let_conts, arms, Not_mergeable, identity_arms, not_arms
 
 let filter_and_choose_alias required_names alias_set =
-  let available_alias_set =
-    Alias_set.filter alias_set ~f:(fun alias ->
-        Simple.pattern_match alias
-          ~name:(fun name ~coercion:_ -> Name.Set.mem name required_names)
-          ~const:(fun _ -> true))
-  in
-  Alias_set.find_best available_alias_set
+  match alias_set with
+  | Poison kind ->
+    Some (Simple.const (Reg_width_const.const_poison kind "rebuild_switch"))
+  | Aliases alias_set ->
+    let available_alias_set =
+      Alias_set.filter alias_set ~f:(fun alias ->
+          Simple.pattern_match alias
+            ~name:(fun name ~coercion:_ -> Name.Set.mem name required_names)
+            ~const:(fun _ -> true))
+    in
+    Alias_set.find_best available_alias_set
 
 let find_cse_simple ?(required = true) dacc required_names prim =
   match P.Eligible_for_cse.create prim with
@@ -467,7 +498,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
   let block_sym =
     let var = Variable.create "switch_block" K.value in
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
@@ -802,7 +833,7 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
       Simplify_common.apply_cont_use_kind ~context:Switch_branch action
     in
     let { S.simples = args; simple_tys = arg_types } =
-      S.simplify_simples dacc args
+      S.simplify_simples (DA.with_denv dacc denv_at_use) args
     in
     let dacc, rewrite_id =
       DA.record_continuation_use dacc (AC.continuation action) use_kind

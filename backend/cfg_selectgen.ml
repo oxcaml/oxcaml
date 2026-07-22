@@ -22,7 +22,7 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
@@ -70,10 +70,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
-      | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
-      | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccsel _
-      | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
+      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
@@ -127,7 +127,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
         | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -345,8 +345,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
-    | Cdivi -> SU.basic_op (Intop Idiv), args
-    | Cmodi -> SU.basic_op (Intop Imod), args
+    | Cdivi { signed } -> SU.basic_op (Intop (Idiv { signed })), args
+    | Cmodi { signed } -> SU.basic_op (Intop (Imod { signed })), args
     | Caddi128 -> SU.basic_op (Int128op Iadd128), args
     | Csubi128 -> SU.basic_op (Int128op Isub128), args
     | Cmuli64 { signed } -> SU.basic_op (Int128op (Imul64 { signed })), args
@@ -768,7 +768,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_args, env) ->
         let* rs = emit_tuple env sub_cfg simple_args in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rs))
+        let rd = Reg.createv_with_typs rs in
+        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -1005,10 +1006,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
       | Basic basic ->
-        Misc.fatal_errorf "unexpected basic (%a)" Cfg.dump_basic basic
+        Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
       | Terminator term ->
         Misc.fatal_errorf "unexpected terminator (%a)"
-          (Cfg.dump_terminator ~sep:"")
+          (Printcfg.terminator_desc ~sep:"")
           term)
 
   and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
@@ -1191,7 +1192,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Array.iter
           (fun reg ->
             match reg.Reg.typ with
-            | Addr -> assert false
+            | Addr ->
+              Misc.fatal_error
+                "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
+                 Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
           src;
@@ -1476,8 +1480,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
       fun_args
 
   (* Sequentialization of a function definition *)

@@ -300,8 +300,8 @@ for the first stage.
 This is still under development, but should work!
 ```shell
 opam repo add oxcaml git+https://github.com/chambart/opam-repository-js.git#with-extensions
-opam switch create 5.2.0+oxcaml --repos oxcaml,default
-eval $(opam env --switch=5.2.0+oxcaml)
+opam switch create 5.4.0+oxcaml --repos oxcaml,default
+eval $(opam env --switch=5.4.0+oxcaml)
 ```
 
 ## Testing the compiler built locally with OPAM (old method)
@@ -350,7 +350,7 @@ available whatever the current active switch is.
 Once the plugin is installed, we can use it to install the compiler:
 
 ```shell
-opam custom-install ocaml-variants.5.2.0+oxcaml -- make -C ${oxcaml-root-dir} install_for_opam
+opam custom-install ocaml-variants.5.4.0+oxcaml -- make -C ${oxcaml-root-dir} install_for_opam
 ```
 The `-C ${oxcaml-dir}` part can be omitted if we're still in the build directory.
 
@@ -359,7 +359,7 @@ it is recommended to run the command `opam reinstall --forget-pending` after
 every use of `opam custom-install`, otherwise any subsequent `opam` command
 tries to rebuild the compiler from scratch.
 
-To finish the installation, `opam install ocaml.5.2.0` will install the remaining
+To finish the installation, `opam install ocaml.5.4.0` will install the remaining
 auxiliary packages necessary for a regular switch. After that, normal opam
 packages can be installed the usual way.
 
@@ -372,7 +372,7 @@ As `opam-custom-install` is still experimental, it can sometimes be hard to inst
 In this case, it is possible to use the more fragile `opam install --fake` command:
 
 ```shell
-opam install --fake ocaml-variants.5.2.0+oxcaml
+opam install --fake ocaml-variants.5.4.0+oxcaml
 make -C ${oxcaml-root-dir} install_for_opam
 ```
 

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -181";
  expect;
 *)
 
@@ -124,7 +125,7 @@ let should_fail = This (This 5)
 Line 1, characters 23-31:
 1 | let should_fail = This (This 5)
                            ^^^^^^^^
-Error: This expression has type "'a t" = "'a or_null"
+Error: This constructor has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The layout of 'a t is value_or_null
          because it is the primitive type or_null.
@@ -138,7 +139,7 @@ let should_also_fail = This Null
 Line 1, characters 28-32:
 1 | let should_also_fail = This Null
                                 ^^^^
-Error: This expression has type "'a t" = "'a or_null"
+Error: The constructor "Null" has type "'a t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The layout of 'a t is value_or_null
          because it is the primitive type or_null.
@@ -209,7 +210,7 @@ let should_fail = [| This 5.; Null |]
 Line 1, characters 26-28:
 1 | let should_fail = [| This 5.; Null |]
                               ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.
@@ -266,7 +267,7 @@ let should_fail = [: Null; This 5. :]
 Line 1, characters 32-34:
 1 | let should_fail = [: Null; This 5. :]
                                     ^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "5." has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.
@@ -436,7 +437,7 @@ let should_fail_unboxed_var = This (Wrap Null)
 Line 1, characters 35-46:
 1 | let should_fail_unboxed_var = This (Wrap Null)
                                        ^^^^^^^^^^^
-Error: This expression has type "unboxed_var"
+Error: This constructor has type "unboxed_var"
        but an expression was expected of type "('a : value)"
        The layout of unboxed_var is value_or_null
          because it is the primitive type or_null.
@@ -450,7 +451,7 @@ let should_fail_unboxed_gadt = This (Gadt Null)
 Line 1, characters 36-47:
 1 | let should_fail_unboxed_gadt = This (Gadt Null)
                                         ^^^^^^^^^^^
-Error: This expression has type "('a, 'a or_null) gadt"
+Error: This constructor has type "('a, 'a or_null) gadt"
        but an expression was expected of type "('b : value)"
        The layout of ('a, 'a or_null) gadt is value_or_null
          because it is the primitive type or_null.

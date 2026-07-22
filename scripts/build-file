@@ -35,7 +35,7 @@ try_target() {
   local label="$2"
   local rc=0
   local result
-  result=$(RUNTIME_DIR=runtime dune build --root=. --workspace=duneconf/boot.ws "$target" 2>&1) || rc=$?
+  result=$(dune build --root=. --workspace=duneconf/boot.ws "$target" 2>&1) || rc=$?
   if echo "$result" | grep -q "Don't know how to build"; then
     return 0
   fi

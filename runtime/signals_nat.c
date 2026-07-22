@@ -47,7 +47,7 @@ Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
 {
   frame_descr* d;
   caml_domain_state * dom_st = Caml_state;
-  caml_frame_descrs fds = caml_get_frame_descrs();
+  caml_frame_descrs* fds = caml_get_frame_descrs();
   struct stack_info* stack = dom_st->current_stack;
 
   char * sp = (char*)stack->sp;

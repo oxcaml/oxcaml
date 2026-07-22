@@ -225,10 +225,10 @@ module Transfer = struct
   let basic ({ avail_before } : domain) (instr : Cfg.basic Cfg.instruction) () :
       domain =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print instr.id
-      Cfg.print_basic instr;
+      Printcfg.basic instr;
     instr.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
-    then check_invariants instr ~print_instr:Cfg.print_basic ~avail_before;
+    then check_invariants instr ~print_instr:Printcfg.basic ~avail_before;
     (* CR gyorsh/mshinwell: There is something subtle here about the handling of
        Name_for_debugger in Cfg_availability : the field regs is part of the
        operation description (not instruction argument or result), and it starts
@@ -381,16 +381,18 @@ module Transfer = struct
   let terminator ({ avail_before } : domain)
       (term : Cfg.terminator Cfg.instruction) () : image =
     dprintf "Instruction: (id=%a) %a\n%!" InstructionId.print term.id
-      Cfg.print_terminator term;
+      Printcfg.terminator term;
     term.available_before <- avail_before;
     if !Dwarf_flags.ddebug_invariants
-    then check_invariants term ~print_instr:Cfg.print_terminator ~avail_before;
+    then check_invariants term ~print_instr:Printcfg.terminator ~avail_before;
     let avail_across, avail_after =
       match avail_before with
       | Unreachable -> unreachable, unreachable
       | Ok avail_before -> (
         match term.desc with
-        | Never -> assert false
+        | Never ->
+          Misc.fatal_error
+            "Cfg_available_regs.terminator: unexpected Never terminator"
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Call _ | Prim _ | Return | Raise _ | Tailcall_func _
         | Call_no_return _ | Invalid _ | Tailcall_self _ ->
@@ -398,7 +400,9 @@ module Transfer = struct
             ~is_interesting_constructor:
               Cfg.(
                 function
-                | Never -> assert false
+                | Never ->
+                  Misc.fatal_error
+                    "Cfg_available_regs.terminator: unexpected Never terminator"
                 | Call _ | Prim { op = Probe _; label_after = _ } -> true
                 | Always _ | Parity_test _ | Truth_test _ | Float_test _
                 | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _

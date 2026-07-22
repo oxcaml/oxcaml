@@ -14,7 +14,7 @@ type t_immediate : immediate;;
 
 (***************************************************)
 (* Test 1: constructor arguments may have any sort *)
-type t1_void = T1_void of t_void
+type t1_void = T1_void of t_void [@immediate_all_void_constructor]
 type t1_value = T1_value of t_value
 type t1_immediate = T1_immediate of t_immediate
 
@@ -26,7 +26,7 @@ type t_void : void
 type t_any : any
 type t_value
 type t_immediate : immediate
-type t1_void = T1_void of t_void
+type t1_void = T1_void of t_void [@immediate_all_void_constructor]
 type t1_value = T1_value of t_value
 type t1_immediate = T1_immediate of t_immediate
 type t1_mixed1 = T1_mixed1 of t_void * t_immediate
@@ -34,10 +34,12 @@ type t1_mixed2 = T1_mixed2 of t_immediate * t_value * t_void
 type t1_mixed3 = T1_mixed3 of t_value * t_immediate
 |}];;
 
-type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
+type 'a t1_constraint = T1_con of 'a [@immediate_all_void_constructor]
+  constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 [%%expect {|
-type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
+type 'a t1_constraint = T1_con of 'a [@immediate_all_void_constructor]
+  constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 |}]
 
@@ -261,7 +263,7 @@ val f6 : t6 -> float = <fun>
 Line 8, characters 32-36:
 8 |   let { fld6 = fld6 } = x in S6 fld6;;
                                     ^^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The value "fld6" has type "float" but an expression was expected of type
          "('a : immediate)"
        The layout of float is value
          because it is the primitive type float.
@@ -274,14 +276,14 @@ Error: This expression has type "float" but an expression was expected of type
 (* Test 7: Recursive propagation of immediacy checks *)
 
 (* See Note [Default layouts in transl_declaration] in Typedecl. *)
-type t7 = A | B | C | D of t7_void
+type t7 = A | B | C | D of t7_void [@immediate_all_void_constructor]
 and t7_2 = { x : t7 } [@@unboxed]
 and t7_void : void mod everything
 
 type t7_3 : immediate = t7_2
 
 [%%expect{|
-type t7 = A | B | C | D of t7_void
+type t7 = A | B | C | D of t7_void [@immediate_all_void_constructor]
 and t7_2 = { x : t7; } [@@unboxed]
 and t7_void : void mod everything
 type t7_3 = t7_2

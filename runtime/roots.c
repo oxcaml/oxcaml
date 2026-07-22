@@ -44,5 +44,4 @@ void caml_do_roots (
   hook = atomic_load(&caml_scan_roots_hook);
   if (hook != NULL) (*hook)(f, fflags, fdata, d);
   caml_final_do_roots(f, fflags, fdata, d, do_final_val);
-
 }

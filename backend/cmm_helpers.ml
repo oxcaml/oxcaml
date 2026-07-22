@@ -150,8 +150,7 @@ let bind_list name args fn =
 
 let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
-let caml_local =
-  Nativeint.shift_left (Nativeint.of_int (if Config.runtime5 then 3 else 2)) 8
+let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 (* cf. runtime/caml/gc.h *)
 
@@ -683,17 +682,21 @@ let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
     max_signed_bit_length'
 
-let ignore_low_bit_int = function
+let rec ignore_low_bit_int = function
   | Cop
       ( Caddi,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
-    c
-  | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
+    ignore_low_bit_int c
+  | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Casr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
   | c -> c
 
-let ignore_low_bit_int' arg =
+let rec ignore_low_bit_int' arg =
   let open P.Default_variables in
   P.run arg
     [ ( Guarded
@@ -704,8 +707,13 @@ let ignore_low_bit_int' arg =
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
           }
-      => fun env -> env#.c );
-      (Binop (Or, Any c, Const_int_fixed 1) => fun env -> env#.c) ]
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
+        ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
   check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
@@ -752,6 +760,9 @@ let rec or_const e n dbg =
   | n ->
     map_tail1 e ~f:(fun e ->
         let[@local] default () =
+          let e =
+            if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
+          in
           (* prefer putting constants on the right *)
           Cop (Cor, [e; natint_const_untagged dbg n], dbg)
         in
@@ -775,6 +786,9 @@ let rec and_const e n dbg =
         | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
         | None -> (
           let[@local] default () =
+            let e =
+              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
+            in
             (* prefer putting constants on the right *)
             Cop (Cand, [e; natint_const_untagged dbg n], dbg)
           in
@@ -1028,6 +1042,8 @@ let untag_int i dbg =
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
 
+let unsigned_untag_int i dbg = lsr_const i 1 dbg
+
 let mk_not dbg cmm =
   match cmm with
   | Cop
@@ -1212,6 +1228,92 @@ let divimm_parameters d =
      && unsigned_compare2 md (add2 twoszp twop1) <= 0
 *)
 
+let udivimm_parameters d =
+  (* Unsigned division and modulus at type nativeint. Algorithm: Hacker's
+     Delight, 2nd ed, Figure 10-2. *)
+  let open Nativeint in
+  let udivmod n d =
+    let q = unsigned_div n d in
+    q, sub n (mul q d)
+  in
+  let nc = sub (-1n) (unsigned_rem (neg d) d) in
+  let rec loop ~p ~a (q1, r1) (q2, r2) =
+    let p = p + 1 in
+    let q1, r1 =
+      let q1', r1' = shift_left q1 1, shift_left r1 1 in
+      if unsigned_compare r1 (sub nc r1) >= 0
+      then succ q1', sub r1' nc
+      else q1', r1'
+    in
+    let a, q2, r2 =
+      let q2', r2' = shift_left q2 1, shift_left r2 1 in
+      if unsigned_compare (succ r2) (sub d r2) >= 0
+      then
+        let a = if unsigned_compare q2 max_int >= 0 then true else a in
+        a, succ q2', sub (succ r2') d
+      else
+        let a = if unsigned_compare q2 min_int >= 0 then true else a in
+        a, q2', succ r2'
+    in
+    let delta = sub (pred d) r2 in
+    if
+      p < 128
+      && (unsigned_compare q1 delta < 0 || (equal q1 delta && equal r1 0n))
+    then loop ~p ~a (q1, r1) (q2, r2)
+    else succ q2, a, p - 64
+  in
+  loop ~p:63 ~a:false (udivmod min_int nc) (udivmod max_int d)
+
+(*= The result [(m, a, p)] of [udivimm_parameters d] satisfies the following
+    inequality for all 0 <= n < 2^wordsize:
+
+    0 <= n * (M * d - 2^P) / 2^P < d - (n mod d) (i)
+
+    where M = m + a * 2^wordsize and P = wordsize + p. It follows that:
+
+    floor(n / d) = floor(n / d + n*(M*d-2^P) / (d*2^P)) = floor(n * M / 2^P)
+
+    If we stipulate that M * d - 2^P < d, then if the correctness condition (i)
+    is ever violated, it will be violated for the largest n < 2^wordsize where n
+    mod d = d-1. These conditions are checked by the code below (see the comment
+    below [divimm_parameters] for the helper functions). It was tested for d and
+    (3^d mod 2^wordsize) where d ranges from 1 to 10^9, in the wordsize = 64
+    case.
+
+    let sub2 (xh, xl) (yh, yl) =
+      let zl = sub xl yl and zh = sub xh yh in
+      (if unsigned_compare xl yl < 0 then pred zh else zh), zl
+
+    let validate d m a p =
+      let one2 = 0n, 1n in
+      let two_p () = shl2 one2 (size + p) in
+      let n =
+        let largest_multiple_of_d = mul (unsigned_div (-1n) d) d in
+        let cand1 = pred largest_multiple_of_d in
+        let cand2 = add d cand1 in
+        if unsigned_compare cand1 cand2 < 0 then cand2 else cand1
+      in
+      let r_hi, r = (* calculate M*d - 2^P *)
+        let md_minus_ad = mul2 m d in
+        if not a then sub2 md_minus_ad (two_p ())
+        else
+          let md = add2 md_minus_ad (d, 0n) in
+          if p = size
+          then (
+            (* 2^P can't fit in a 2wordsize-bit integer. We make sure M*d - 2^P
+               doesn't underflow *)
+            assert (unsigned_compare2 md md_minus_ad < 0);
+            md)
+          else (
+            assert (unsigned_compare2 md_minus_ad md < 0);
+            sub2 md (two_p ()))
+      in
+      unsigned_compare 0n r_hi = 0 && unsigned_compare r d < 0
+                                                        (* 0 <= M*d - 2^P < d *)
+      && (p = size || unsigned_compare2 (mul2 n r) (two_p ()) < 0)
+                                                     (* n * (M*d - 2^P) < 2^P *)
+ *)
+
 let raise_symbol dbg symb =
   Cop
     (Craise Lambda.Raise_regular, [Cconst_symbol (global_symbol symb, dbg)], dbg)
@@ -1321,7 +1423,60 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
           add_int q sign_bit dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-      Cdivi c1 c2 ~dbg
+      (Cdivi { signed = true })
+      c1 c2 ~dbg
+
+let unsigned_div_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> c1
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
+  | _, Some -1n ->
+    (* unsigned division by unsigned max_int always returns 0 unless the
+       dividend is also max_int, in which case it's 1. *)
+    Cifthenelse
+      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+        dbg,
+        Cconst_int (1, dbg),
+        dbg,
+        Cconst_int (0, dbg),
+        dbg )
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then
+      if Nativeint.equal divisor Nativeint.min_int
+      then
+        (* special case for divisor = 1 << 63 since [log2_nativeint] assumes
+           argument is signed *)
+        lsr_const c1 63 dbg
+      else
+        let l = Misc.log2_nativeint divisor in
+        lsr_const c1 l dbg
+    else
+      bind "dividend" c1 (fun n ->
+          (* Algorithm:
+
+             q = umulhi n, M
+
+             if a then
+
+             q = ((n-q)/2 + q) u>> (s-1)
+
+             else
+
+             q u>>= s *)
+          let m, a, s = udivimm_parameters divisor in
+          let q =
+            Cop
+              (Cmulhi { signed = false }, [n; natint_const_untagged dbg m], dbg)
+          in
+          if a
+          then
+            lsr_const
+              (add_int (lsr_const (sub_int n q dbg) 1 dbg) q dbg)
+              (s - 1) dbg
+          else lsr_const q s dbg)
+  | _, _ -> Cop (Cdivi { signed = false }, [c1; c2], dbg)
 
 let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
@@ -1375,8 +1530,33 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           sub_int c1 (mul_int (div_int c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int
-      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one Cmodi
+      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
+      (Cmodi { signed = true })
       c1 c2 ~dbg
+
+let unsigned_mod_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> bind "dividend" c1 (fun _ -> Cconst_int (0, dbg))
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
+  | _, Some -1n ->
+    (* similarly, mod unsigned max_int is identity unless the dividend is
+       max_int, in which case it is 0 *)
+    bind "dividend" c1 (fun c1 ->
+        Cifthenelse
+          ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+            dbg,
+            Cconst_int (0, dbg),
+            dbg,
+            c1,
+            dbg ))
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then and_const c1 (Nativeint.pred divisor) dbg
+    else
+      bind "dividend" c1 (fun c1 ->
+          sub_int c1 (mul_int (unsigned_div_int c1 c2 dbg) c2 dbg) dbg)
+  | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
 (* Bool *)
 
@@ -1607,19 +1787,11 @@ let get_header_masked ptr dbg =
 let tag_offset = if big_endian then -1 else -size_int
 
 let get_tag ptr dbg =
-  if Proc.word_addressed
-  then
-    (* If byte loads are slow *)
-    Cop (Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
-  else
-    (* If byte loads are efficient *)
-    (* Same comment as [get_header] above *)
-    Cop
-      ( (if Config.runtime5
-         then mk_load_immut Byte_unsigned
-         else mk_load_mut Byte_unsigned),
-        [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
-        dbg )
+  (* Same comment as [get_header] above *)
+  Cop
+    ( mk_load_immut Byte_unsigned,
+      [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
+      dbg )
 
 let get_size ptr dbg = lsr_const (get_header_masked ptr dbg) 10 dbg
 
@@ -4119,8 +4291,7 @@ let assignment_kind (ptr : Lambda.immediate_or_pointer)
     assert Config.stack_allocation;
     Caml_modify_local
   | Heap_initialization, Pointer -> Caml_initialize
-  | Root_initialization, Pointer ->
-    if Config.runtime5 then Caml_initialize else Simple Initialization
+  | Root_initialization, Pointer -> Caml_initialize
   | Assignment _, Immediate -> Simple Assignment
   | Heap_initialization, Immediate | Root_initialization, Immediate ->
     Simple Initialization
@@ -4181,6 +4352,18 @@ let div_int_caml arg1 arg2 dbg =
        (untag_int arg2 dbg) dbg)
     dbg
 
+(* CR-someday jrayman: Since Ocaml ints are 63 bits, there is always a valid set
+   of division parameters with [a = false]. [udivimm_parameters] finds
+   parameters for 64-bit division, so it sometimes generates worse code with the
+   [a = true] fixup. A divisor of 7 is such a case. *)
+let unsigned_div_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_div_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
+    dbg
+
 let mod_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
@@ -4190,6 +4373,14 @@ let mod_int_caml arg1 arg2 dbg =
   tag_int
     (mod_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
+    dbg
+
+let unsigned_mod_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_mod_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
     dbg
 
 let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
@@ -4285,7 +4476,7 @@ let emit_float_array_constant symb fields cont =
 let make_symbol ?compilation_unit name =
   let compilation_unit =
     match compilation_unit with
-    | None -> Compilation_unit.get_current_exn ()
+    | None -> Current_unit.get_cu_exn ()
     | Some compilation_unit -> compilation_unit
   in
   (* CR sspies: [make_symbol] always uses flat name mangling. Structured
@@ -4729,11 +4920,9 @@ let float_of_float32 = unary (Cstatic_cast Float_of_float32)
 let lsl_int_caml_raw ~dbg arg1 arg2 =
   incr_int (lsl_int (decr_int arg1 dbg) arg2 dbg) dbg
 
-let lsr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [lsr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
-let asr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [asr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
 let eq ~dbg x y =
   match x, y with
@@ -5014,8 +5203,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr ),
+        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+          | Cxor | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)
@@ -5413,28 +5602,6 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
         arg ],
       dbg )
 
-let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
-  Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
-        Cop
-          ( Cextcall
-              { func = "caml_alloc_stack_bind";
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = [XInt; XInt; XInt; XInt; XInt]
-              },
-            [valuec; exnc; effc; dyn; bind],
-            dbg );
-        f;
-        arg ],
-      dbg )
-
 let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
@@ -5457,37 +5624,30 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
         arg ],
       dbg )
 
-let with_stack_bind_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~dyn ~bind
-    ~f ~arg =
-  let sym = Cmm.global_symbol "caml_runstack" in
+(* Rc_normal is required for [continue], [discontinue], and
+   [discontinue_with_backtrace], because there are some uses of effects with
+   repeated resumes, and these should consume O(1) stack space by tail-calling
+   the runtime resume function. *)
+
+let continue ~dbg ~cont ~value =
+  let sym = Cmm.global_symbol "caml_continue" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
-        Cop
-          ( Cextcall
-              { func = "caml_alloc_stack_bind_preemptible";
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = [XInt; XInt; XInt; XInt; XInt; XInt]
-              },
-            [valuec; exnc; effc; handle_tick; dyn; bind],
-            dbg );
-        f;
-        arg ],
+      [Cconst_symbol (sym, dbg); cont; value],
       dbg )
 
-let resume ~dbg ~cont ~f ~arg =
-  (* Rc_normal is required here, because there are some uses of effects with
-     repeated resumes, and these should consume O(1) stack space by tail-calling
-     caml_resume. *)
-  let sym = Cmm.global_symbol "caml_resume" in
+let discontinue ~dbg ~cont ~exn =
+  let sym = Cmm.global_symbol "caml_discontinue" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); cont; f; arg],
+      [Cconst_symbol (sym, dbg); cont; exn],
+      dbg )
+
+let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
+  let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

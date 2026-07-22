@@ -95,6 +95,12 @@ type address =
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
+(* The mode of a compilation unit: legacy on every axis, with the given
+   staticity. *)
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+val mode_pers_mod : Mode.Staticity.Const.t -> Mode.Value.lr
+
 type 'a sig_reader =
   Subst.Lazy.persistent_signature
   -> Global_module.Name.t
@@ -106,6 +112,15 @@ type 'a sig_reader =
 
 val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
   -> Subst.Lazy.persistent_signature
+
+(** [read_cmi_file] is a variant of [read] that takes the path of a cmi
+    file directly: it reads the cmi and registers it as a hidden import
+    under the module name stored inside the cmi (rather than one inferred
+    from the filename or supplied by the caller). Returns the resulting
+    global name and signature. *)
+val read_cmi_file :
+     'a t -> string
+  -> Global_module.Name.t * Subst.Lazy.persistent_signature
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
@@ -154,7 +169,7 @@ val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 val make_cmi : 'a t
   -> Compilation_unit.Name.t
   -> Cmi_format.kind
-  -> Subst.Lazy.persistent_signature
+  -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 

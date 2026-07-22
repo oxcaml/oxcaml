@@ -94,15 +94,6 @@ let compare_prefix prefix0 bit0 prefix1 bit1 =
   let c = compare bit0 bit1 in
   if c = 0 then compare prefix0 prefix1 else c
 
-type 'a or_null =
-  | Null
-  | This of 'a
-[@@or_null]
-
-let[@inline] option_of_or_null = function Null -> None | This x -> Some x
-
-let[@inline] _or_null_of_option = function None -> Null | Some x -> This x
-
 type empty = [`Empty]
 
 type leaf = [`Leaf]
@@ -573,6 +564,8 @@ module Tree_operations (Tree : Tree) : sig
     'c t
 
   val find_opt : key -> 'a t -> 'a option
+
+  val find_or_null : key -> 'a t -> 'a Or_null.t
 
   val get_singleton : 'a t -> 'a Binding.t option
 
@@ -1262,11 +1255,12 @@ end = struct
 
   let[@inline never] rec find_tree i t =
     match tree_descr t with
-    | Leaf l -> if leaf_key l = i then This (leaf_datum l) else Null
+    | Leaf l ->
+      if leaf_key l = i then Or_null.this (leaf_datum l) else Or_null.null
     | Branch b ->
       let prefix, bit = unpack (branch_prefix_and_bit b) in
       if not (match_prefix i prefix bit)
-      then Null
+      then Or_null.null
       else if zero_bit i bit
       then find_tree i (branch0 b)
       else find_tree i (branch1 b)
@@ -1736,10 +1730,15 @@ end = struct
     | Non_empty t0, Empty -> merge_left iv f t0
     | Non_empty t0, Non_empty t1 -> merge_tree iv f t0 t1
 
+  let find_or_null key t =
+    match descr t with
+    | Empty -> Or_null.null
+    | Non_empty tree -> find_tree key tree
+
   let find_opt key t =
     match descr t with
     | Empty -> None
-    | Non_empty tree -> option_of_or_null (find_tree key tree)
+    | Non_empty tree -> Or_null.to_option (find_tree key tree)
 
   let get_singleton t =
     match descr t with

@@ -17,7 +17,7 @@ open! Int_replace_polymorphic_compare
 open X86_ast
 open X86_proc
 open Amd64_simd_instrs
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let bprintf = Printf.bprintf
 
@@ -145,6 +145,7 @@ let print_instr b = function
   | DEC arg -> i1 b "dec" arg
   | HLT -> assert false
   | IDIV arg -> i1 b "idiv" arg
+  | DIV arg -> i1 b "div" arg
   | IMUL (arg, None) -> i1 b "imul" arg
   | IMUL (arg1, Some arg2) -> i2 b "imul" arg1 arg2
   | MUL arg -> i1 b "mul" arg
@@ -196,6 +197,7 @@ let print_instr b = function
   | SUB (arg1, arg2) -> i2 b "sub" arg1 arg2
   | SBB (arg1, arg2) -> i2 b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2 b "test" arg1 arg2
+  | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2 b "xor" arg1 arg2
   | SIMD (instr, args) -> (

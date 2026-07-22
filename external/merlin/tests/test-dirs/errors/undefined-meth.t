@@ -9,5 +9,10 @@
   > EOF
 
   $ $MERLIN single errors -filename main.ml <main.ml |
-  > tr '\r\n' ' ' | jq '.value[0].message'
-  "This expression has type < a : int; b : int; cdefg : int > It has no method cdef Hint: Did you mean cdefg?"
+  > tr '\r\n' ' ' | jq '.value[0] | {message, sub: [.sub[].message]}'
+  {
+    "message": "This expression has type < a : int; b : int; cdefg : int > It has no method cdef",
+    "sub": [
+      "Hint:      Did you mean cdefg?"
+    ]
+  }

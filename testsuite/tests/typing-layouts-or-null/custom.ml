@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -181";
  expect;
 *)
 
@@ -69,7 +70,7 @@ let bad = Yep (Yep 5)
 Line 1, characters 14-21:
 1 | let bad = Yep (Yep 5)
                   ^^^^^^^
-Error: This expression has type "'a t" but an expression was expected of type
+Error: This constructor has type "'a t" but an expression was expected of type
          "('b : value)"
        The layout of 'a t is value_or_null
          because of the definition of t at lines 1-4, characters 0-11.
@@ -153,8 +154,22 @@ Lines 1-5, characters 0-11:
 Error: Invalid [@or_null] declaration: it must have exactly two constructors.
 |}]
 
-(* CR or-null: allow non-parameterized custom [@@or_null] types.
-   Internal ticket 6853. *)
+type multi_arg_payload =
+  | A
+  | B of int * int
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type multi_arg_payload =
+2 |   | A
+3 |   | B of int * int
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one nullary constructor and one unary constructor.
+|}]
+
+(* Non-parameterized custom [@@or_null] types. *)
 
 type no_param =
   | A
@@ -162,17 +177,114 @@ type no_param =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type no_param =
-2 |   | A
-3 |   | B of int
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one type parameter.
+type no_param = A | B of int [@@or_null]
 |}]
 
-(* CR or-null: allow custom [@@or_null] types with unused type parameters.
-   Internal ticket 6853. *)
+type no_param_nonfloat =
+  | A_nonfloat
+  | B_nonfloat of t_non_float
+[@@or_null]
+
+[%%expect{|
+type no_param_nonfloat = A_nonfloat | B_nonfloat of t_non_float [@@or_null]
+|}]
+
+type succeeds_sep = no_param_nonfloat accepts_sep
+type succeeds_nonfloat = no_param_nonfloat accepts_nonfloat
+
+[%%expect{|
+type succeeds_sep = no_param_nonfloat accepts_sep
+type succeeds_nonfloat = no_param_nonfloat accepts_nonfloat
+|}]
+
+type float_payload =
+  | Nope_float
+  | Yep_float of float
+[@@or_null]
+
+[%%expect{|
+type float_payload = Nope_float | Yep_float of float [@@or_null]
+|}]
+
+type float_payload_fails_sep = float_payload accepts_sep
+
+[%%expect{|
+Line 1, characters 31-44:
+1 | type float_payload_fails_sep = float_payload accepts_sep
+                                   ^^^^^^^^^^^^^
+Error: This type "float_payload" should be an instance of type
+         "('a : any separable)"
+       The layout of float_payload is value_or_null
+         because of the definition of float_payload at lines 1-4, characters 0-11.
+       But the layout of float_payload must be a sublayout of any separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type float_payload_fails_nonfloat = float_payload accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 36-49:
+1 | type float_payload_fails_nonfloat = float_payload accepts_nonfloat
+                                        ^^^^^^^^^^^^^
+Error: This type "float_payload" should be an instance of type
+         "('a : value_or_null non_float)"
+       The layout of float_payload is value_or_null
+         because of the definition of float_payload at lines 1-4, characters 0-11.
+       But the layout of float_payload must be a sublayout of
+           value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type portable_payload : value_or_null mod portable =
+  | Portable_none
+  | Portable_some of (unit -> unit) @@ portable
+[@@or_null]
+
+[%%expect{|
+type portable_payload =
+    Portable_none
+  | Portable_some of (unit -> unit) @@ portable [@@or_null]
+|}]
+
+type nonportable_payload : value_or_null mod portable =
+  | Nonportable_none
+  | Nonportable_some of (unit -> unit)
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type nonportable_payload : value_or_null mod portable =
+2 |   | Nonportable_none
+3 |   | Nonportable_some of (unit -> unit)
+4 | [@@or_null]
+Error: The kind of type "nonportable_payload" is
+           value_or_null non_float mod aliased immutable
+         because an [@@or_null] type gets its kind by applying or_null to its
+         payload kind.
+       But the kind of type "nonportable_payload" must be a subkind of
+           value_or_null mod portable
+         because of the annotation on the declaration of the type nonportable_payload.
+|}]
+
+type probe_result : value =
+  | Probe_none
+  | Probe_some of int
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type probe_result : value =
+2 |   | Probe_none
+3 |   | Probe_some of int
+4 | [@@or_null]
+Error: The layout of type "probe_result" is value_or_null non_pointer
+         because an [@@or_null] type gets its layout by applying or_null to its
+         payload layout.
+       But the layout of type "probe_result" must be a sublayout of value
+         because of the annotation on the declaration of the type probe_result.
+|}]
+
+(* Custom [@@or_null] types with unused type parameters. *)
 
 type 'a unused_param =
   | A
@@ -180,13 +292,132 @@ type 'a unused_param =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a unused_param =
-2 |   | A
-3 |   | B of int
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       it must have exactly one nullary constructor and one unary constructor carrying the sole type parameter.
+type 'a unused_param = A | B of int [@@or_null]
+|}]
+
+type ('a, 'b) multi_param =
+  | Nope_multi
+  | Yep_multi of ('a list * 'b)
+[@@or_null]
+
+[%%expect{|
+type ('a, 'b) multi_param = Nope_multi | Yep_multi of ('a list * 'b) [@@or_null]
+|}]
+
+type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
+
+[%%expect{|
+type ('a, 'b) multi_param_succeeds_sep = ('a, 'b) multi_param accepts_sep
+|}]
+
+type ('a, 'b) multi_param_succeeds_nonfloat =
+  ('a, 'b) multi_param accepts_nonfloat
+
+[%%expect{|
+type ('a, 'b) multi_param_succeeds_nonfloat =
+    ('a, 'b) multi_param accepts_nonfloat
+|}]
+
+type ('a, 'b) eq = unit constraint 'a = 'b
+
+[%%expect{|
+type ('b, 'a) eq = unit constraint 'a = 'b
+|}]
+
+type ('a, 'b) inferred_constraint =
+  | Nope_inferred_constraint
+  | Yep_inferred_constraint of ('a, 'b) eq
+[@@or_null]
+
+[%%expect{|
+type ('a, 'b) inferred_constraint =
+    Nope_inferred_constraint
+  | Yep_inferred_constraint of ('a, 'a) eq constraint 'b = 'a [@@or_null]
+|}]
+
+type ('a, 'b) second_param =
+  | Nope_second
+  | Yep_second of 'b
+[@@or_null]
+
+[%%expect{|
+type ('a, 'b) second_param = Nope_second | Yep_second of 'b [@@or_null]
+|}]
+
+type ('a, 'b) swapped = ('b, 'a) second_param
+
+[%%expect{|
+type ('a, 'b) swapped = ('b, 'a) second_param
+|}]
+
+type second_param_succeeds_sep =
+  (float, t_non_float) second_param accepts_sep
+
+type second_param_succeeds_nonfloat =
+  (float, t_non_float) second_param accepts_nonfloat
+
+[%%expect{|
+type second_param_succeeds_sep =
+    (float, t_non_float) second_param accepts_sep
+type second_param_succeeds_nonfloat =
+    (float, t_non_float) second_param accepts_nonfloat
+|}]
+
+type second_param_fails_nonfloat =
+  (t_non_float, float) second_param accepts_nonfloat
+
+[%%expect{|
+Line 2, characters 2-35:
+2 |   (t_non_float, float) second_param accepts_nonfloat
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "(t_non_float, float) second_param"
+       should be an instance of type "('a : value_or_null non_float)"
+       The layout of (t_non_float, float) second_param is value_or_null
+         because of the definition of second_param at lines 1-4, characters 0-11.
+       But the layout of (t_non_float, float) second_param must be a sublayout of
+         value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type swapped_succeeds_nonfloat =
+  (t_non_float, float) swapped accepts_nonfloat
+
+[%%expect{|
+type swapped_succeeds_nonfloat =
+    (t_non_float, float) swapped accepts_nonfloat
+|}]
+
+type swapped_fails_nonfloat =
+  (float, t_non_float) swapped accepts_nonfloat
+
+[%%expect{|
+Line 2, characters 2-30:
+2 |   (float, t_non_float) swapped accepts_nonfloat
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type
+         "(float, t_non_float) swapped" = "(t_non_float, float) second_param"
+       should be an instance of type "('a : value_or_null non_float)"
+       The layout of (float, t_non_float) swapped is value_or_null
+         because of the definition of second_param at lines 1-4, characters 0-11.
+       But the layout of (float, t_non_float) swapped must be a sublayout of
+           value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type bad_payload =
+  | Nope_bad
+  | Yep_bad of int t
+[@@or_null]
+
+[%%expect{|
+Line 3, characters 15-20:
+3 |   | Yep_bad of int t
+                   ^^^^^
+Error: The layout of type "int t" is value_or_null
+         because of the definition of t at lines 1-4, characters 0-11.
+       But the layout of type "int t" must be a sublayout of
+           value_maybe_separable
+         because the payload of bad_payload has layout value.
 |}]
 
 (* CR or-null: allow GADT custom [@@or_null] types.
@@ -290,8 +521,8 @@ Lines 1-4, characters 0-11:
 3 |   | B of 'a
 4 | [@@or_null]
 Error: The layout of type "wrong_result_kind" is value_or_null
-         because of the annotation on 'a in the declaration of the type
-                                      wrong_result_kind.
+         because an [@@or_null] type gets its layout by applying or_null to its
+         payload layout.
        But the layout of type "wrong_result_kind" must be a sublayout of value
          because of the annotation on the declaration of the type wrong_result_kind.
 |}]
@@ -302,14 +533,14 @@ type ('a : float64) wrong_payload_kind : value_or_null =
 [@@or_null]
 
 [%%expect{|
-Line 1, characters 6-18:
-1 | type ('a : float64) wrong_payload_kind : value_or_null =
-          ^^^^^^^^^^^^
+Line 3, characters 9-11:
+3 |   | B of 'a
+             ^^
 Error: The layout of type "'a" is float64
          because of the annotation on 'a in the declaration of the type
                                       wrong_payload_kind.
        But the layout of type "'a" must be a value layout
-         because the type argument of wrong_payload_kind has layout value.
+         because the payload of wrong_payload_kind has layout value.
 |}]
 
 module M : sig
@@ -404,6 +635,120 @@ end
 
 [%%expect{|
 module M : sig type 'a t = Nope | Yep of 'a [@@or_null] end
+|}]
+
+module New_shape_inclusion : sig
+  type t : value_or_null mod non_float =
+    | New_shape_null
+    | New_shape_payload of t_non_float
+  [@@or_null]
+
+  type ('a, 'b) multi : value_or_null mod non_float =
+    | New_shape_multi_null
+    | New_shape_multi_payload of ('a list * 'b)
+  [@@or_null]
+end = struct
+  type t : value_or_null mod non_float =
+    | New_shape_null
+    | New_shape_payload of t_non_float
+  [@@or_null]
+
+  type ('a, 'b) multi : value_or_null mod non_float =
+    | New_shape_multi_null
+    | New_shape_multi_payload of ('a list * 'b)
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_inclusion :
+  sig
+    type t = New_shape_null | New_shape_payload of t_non_float [@@or_null]
+    type ('a, 'b) multi =
+        New_shape_multi_null
+      | New_shape_multi_payload of ('a list * 'b) [@@or_null]
+  end
+|}]
+
+module New_shape_abstract_inclusion : sig
+  type t : value_or_null mod non_float
+
+  type 'a unused : value_or_null mod non_float
+
+  type ('a, 'b) multi : value_or_null mod non_float
+end = struct
+  type t =
+    | New_shape_abstract_null
+    | New_shape_abstract_payload of t_non_float
+  [@@or_null]
+
+  type 'a unused =
+    | New_shape_abstract_unused_null
+    | New_shape_abstract_unused_payload of int
+  [@@or_null]
+
+  type ('a, 'b) multi =
+    | New_shape_abstract_multi_null
+    | New_shape_abstract_multi_payload of ('a list * 'b)
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_abstract_inclusion :
+  sig
+    type t : value_or_null non_float
+    type 'a unused : value_or_null non_float
+    type ('a, 'b) multi : value_or_null non_float
+  end
+|}]
+
+module New_shape_second_param_inclusion : sig
+  type ('a, 'b : value mod non_float) second :
+    value_or_null mod non_float
+end = struct
+  type ('a, 'b : value mod non_float) second =
+    | New_shape_second_null
+    | New_shape_second_payload of 'b
+  [@@or_null]
+end
+
+[%%expect{|
+module New_shape_second_param_inclusion :
+  sig type ('a, 'b : value non_float) second : value_or_null non_float end
+|}]
+
+module Bad_second_param_inclusion : sig
+  type ('a, 'b) second : value_or_null mod non_float
+end = struct
+  type ('a, 'b) second =
+    | Bad_null
+    | Bad_payload of 'b
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   type ('a, 'b) second =
+5 |     | Bad_null
+6 |     | Bad_payload of 'b
+7 |   [@@or_null]
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
+         end
+       is not included in
+         sig type ('a, 'b) second : value_or_null non_float end
+       Type declarations do not match:
+         type ('a, 'b) second = Bad_null | Bad_payload of 'b [@@or_null]
+       is not included in
+         type ('a, 'b) second : value_or_null non_float
+       The layout of the first is value_or_null
+         because of the definition of second at lines 4-7, characters 2-13.
+       But the layout of the first must be a sublayout of
+           value_or_null non_float
+         because of the definition of second at line 2, characters 2-52.
 |}]
 
 module M : sig

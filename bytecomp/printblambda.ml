@@ -213,10 +213,10 @@ let rec blambda ppf = function
       | Perform -> "perform"
       | Reperform -> "reperform"
       | With_stack -> "with_stack"
-      | With_stack_bind -> "with_stack_bind"
       | With_stack_preemptible -> "with_stack_preemptible"
-      | With_stack_bind_preemptible -> "with_stack_bind_preemptible"
-      | Resume -> "resume"
+      | Continue -> "continue"
+      | Discontinue -> "discontinue"
+      | Discontinue_with_backtrace -> "discontinue_with_backtrace"
     in
     fprintf ppf "@[<2>(%s@ %a)@]" op
       (pp_print_list ~pp_sep:pp_print_space blambda)

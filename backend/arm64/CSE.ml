@@ -29,8 +29,13 @@ let class_of_operation (op : Operation.t)
   | Specific spec ->
     let op_class : Cfg_cse_target_intf.op_class =
       match spec with
-      | Ifar_poll
-      | Ifar_alloc _
+      | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ ->
+        (* These far forms are introduced by branch relaxation, during [emit]
+           and after CSE, so they must never reach this pass. *)
+        Misc.fatal_errorf
+          "CSE.class_of_operation: unexpected %s; it comes from branch \
+           relaxation (after CSE) and must never reach this pass"
+          (Arch.specific_operation_name spec)
       | Ishiftarith _
       | Imuladd
       | Imulsub

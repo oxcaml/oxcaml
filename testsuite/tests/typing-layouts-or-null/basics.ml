@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension comprehensions -extension layouts_beta";
+ flags += "-extension comprehensions -extension layouts_beta -w -181";
  expect;
 *)
 
@@ -482,7 +482,7 @@ let u () =
 Line 2, characters 10-11:
 2 |   let rec x : t_value_or_null = assert false in
               ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 val u : unit -> unit = <fun>
 |}]

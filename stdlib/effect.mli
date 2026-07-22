@@ -12,17 +12,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@alert unstable
-    "The Effect interface may change in incompatible ways in the future."
-]
-
 (** Effects.
 
     See 'Language extensions/Effect handlers' section in the manual.
 
     @since 5.0 *)
 
-type _ t = ..
+[@@@alert unstable
+    "The Effect interface may change in incompatible ways in the future."
+]
+
+type 'a t = 'a eff = ..
 (** The type of effects. *)
 
 exception Unhandled : 'a t -> exn
@@ -43,9 +43,27 @@ type _ t +=
      finished *)
 
 external perform : 'a t -> 'a = "%perform"
+[@@alert unsafe_effects "Use [Effect.Safe.perform]. [Effect.perform] may not \
+                         function correctly on Js_of_ocaml"]
 (** [perform e] performs an effect [e].
 
     @raise Unhandled if there is no handler for [e]. *)
+
+module Handler : sig
+  (** A value of type [Effect.Handler.t] at mode [local] is proof that the
+      current function is running within an effect handler, and hence may
+      perform effects.
+
+      It is also necessary to ensure that effect handlers are compiled correctly
+      on the OxCaml branch of the Js_of_ocaml compiler *)
+  type t : void mod external_ many stateless immutable
+end
+
+module Safe : sig
+  (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local] to
+      prove that the current function is running in an effect handler. *)
+  val perform : Handler.t @ local -> 'a t -> 'a
+end
 
 type tick_outcome =
   | Preempt
@@ -54,7 +72,7 @@ type tick_outcome =
 module Deep : sig
   (** Deep handlers *)
 
-  type ('a,'b) continuation
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
   (** [('a,'b) continuation] is a delimited continuation that expects a ['a]
       value and returns a ['b] value. *)
 
@@ -104,6 +122,56 @@ module Deep : sig
 
       @raise Out_of_fibers if unable to allocate a fiber. *)
 
+  (** OxCaml versions of [Effect.Deep]. The computation passed to [match_with]
+      and [try_with] receives a [Handler.t @ local], allowing it to perform
+      effects. *)
+  module Safe : sig
+    val match_with
+      :  (Handler.t @ local -> 'c -> 'a) @ unyielding
+      -> 'c
+      -> ('a,'b) handler
+      -> 'b
+
+    val try_with
+      :  (Handler.t @ local -> 'b -> 'a) @ unyielding
+      -> 'b
+      -> 'a effect_handler
+      -> 'a
+
+    (** Like {!Deep.Safe}, but allow threading [Handler.t @ local] for the
+        parent stack to the handler callbacks *)
+    module With_handler : sig
+      type ('a,'b) handler =
+        { retc: Handler.t @ local -> 'a -> 'b;
+          exnc: Handler.t @ local -> exn -> 'b;
+          effc: 'c. Handler.t @ local -> 'c t
+                -> (('c,'b) continuation -> 'b) option @ local }
+      (** Like {!Deep.handler}, but each callback receives a {!Handler.t} token,
+          allowing them to perform effects. *)
+
+      type 'a effect_handler =
+        { effc: 'b. Handler.t @ local -> 'b t
+                -> (('b,'a) continuation -> 'a) option @ local }
+      (** Like {!Deep.effect_handler}, but [effc] receives a {!Handler.t} token,
+          allowing it to perform effects. *)
+
+      val match_with
+        :  Handler.t @ local
+        -> (Handler.t @ local -> 'c -> 'a) @ unyielding
+        -> 'c
+        -> ('a,'b) handler
+        -> 'b
+
+      val try_with
+        :  Handler.t @ local
+        -> (Handler.t @ local -> 'b -> 'a) @ unyielding
+        -> 'b
+        -> 'a effect_handler
+        -> 'a
+    end
+  end
+
+
   module Preemptible : sig
     (** Preemptible handlers
 
@@ -140,6 +208,51 @@ module Deep : sig
           performed.
 
         @raise Out_of_fibers if unable to allocate a fiber. *)
+
+    (** OxCaml versions of [Effect.Deep.Preemptible]. *)
+    module Safe : sig
+      val match_with
+        :  (Handler.t @ local -> 'c -> 'a) @ unyielding
+        -> 'c
+        -> ('a,'b) handler
+        -> 'b
+
+      val try_with
+        :  on_tick:(unit -> tick_outcome)
+        -> (Handler.t @ local -> 'b -> 'a) @ unyielding
+        -> 'b
+        -> 'a effect_handler
+        -> 'a
+
+      (** Like {!Deep.Preemptible.Safe}, but allow threading [Handler.t @ local]
+          for the parent stack to the handler callbacks *)
+      module With_handler : sig
+        type ('a,'b) handler =
+            { retc: Handler.t @ local -> 'a -> 'b;
+              exnc: Handler.t @ local -> exn -> 'b;
+              effc: 'c. Handler.t @ local -> 'c t
+                    -> (('c,'b) continuation -> 'b) option @ local;
+              tickc: unit -> tick_outcome }
+        (** Like {!Deep.Preemptible.handler}, but [retc], [exnc] and [effc] each
+            receive a {!Handler.t} token, allowing them to perform effects.
+            [tickc] does not, since it must be signal-safe. *)
+
+        val match_with
+          :  Handler.t @ local
+          -> (Handler.t @ local -> 'c -> 'a) @ unyielding
+          -> 'c
+          -> ('a,'b) handler
+          -> 'b
+
+        val try_with
+          :  Handler.t @ local
+          -> on_tick:(unit -> tick_outcome)
+          -> (Handler.t @ local -> 'b -> 'a) @ unyielding
+          -> 'b
+          -> 'a Safe.With_handler.effect_handler
+          -> 'a
+      end
+    end
   end
 
   external get_callstack :
@@ -196,6 +309,38 @@ module Shallow : sig
       resumed.
    *)
 
+  module Safe : sig
+    (** OxCaml version of [fiber], which provides a [Handler.t @ local
+        unyielding] to the computation to run. *)
+    val fiber
+      : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
+
+    (** Like {!Shallow}, but allow threading [Handler.t @ local]
+        for the parent stack to the handler callbacks *)
+    module With_handler : sig
+      type ('a,'b) handler =
+        { retc: Handler.t @ local -> 'a -> 'b;
+          exnc: Handler.t @ local -> exn -> 'b;
+          effc: 'c. Handler.t @ local -> 'c t
+                -> (('c,'a) continuation -> 'b) option @ local }
+      (** Like {!Shallow.handler}, but each callback receives a {!Handler.t}
+          token, allowing them to perform effects. *)
+
+      val continue_with
+        :  Handler.t @ local
+        -> ('c,'a) continuation -> 'c -> ('a,'b) handler -> 'b
+
+      val discontinue_with
+        :  Handler.t @ local
+        -> ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
+
+      val discontinue_with_backtrace
+        :  Handler.t @ local
+        -> ('a,'b) continuation -> exn -> Printexc.raw_backtrace
+        -> ('b,'c) handler -> 'c
+    end
+  end
+
   module Preemptible : sig
     (** Preemptible handlers
 
@@ -243,6 +388,56 @@ module Shallow : sig
         @raise Continuation_already_resumed if the continuation has already been
         resumed.
     *)
+
+    module Safe : sig
+
+      (** Like {!Shallow.Preemptible}, but allow threading [Handler.t @ local]
+          for the parent stack to the handler callbacks *)
+      module With_handler : sig
+        type ('a,'b) handler =
+            { retc: Handler.t @ local -> 'a -> 'b;
+              exnc: Handler.t @ local -> exn -> 'b;
+              effc: 'c. Handler.t @ local -> 'c t
+                    -> (('c,'a) continuation -> 'b) option @ local;
+              tickc: unit -> tick_outcome }
+        (** Like {!Shallow.Preemptible.handler}, but [retc], [exnc] and [effc]
+            each receive a {!Handler.t} token, allowing them to perform effects.
+            [tickc] does not, since it must be signal-safe. *)
+
+        val continue_with
+          :  Handler.t @ local
+          -> ('c,'a) continuation -> 'c -> ('a,'b) handler -> 'b
+        (** [continue_with h k v handler] resumes the continuation [k] with
+            value [v] within the handler [handler].
+
+            @raise Continuation_already_resumed if the continuation has already
+            been resumed.
+        *)
+
+        val discontinue_with
+          :  Handler.t @ local
+          -> ('c,'a) continuation -> exn -> ('a,'b) handler -> 'b
+        (** [discontinue_with h k e handler] resumes the continuation [k] by
+            raising the exception [e] within the handler [handler].
+
+            @raise Continuation_already_resumed if the continuation has already
+            been resumed.
+        *)
+
+        val discontinue_with_backtrace
+          :  Handler.t @ local
+          -> ('a,'b) continuation -> exn -> Printexc.raw_backtrace
+          -> ('b,'c) handler -> 'c
+        (** [discontinue_with_backtrace h k e bt handler] resumes the
+            continuation [k] by raising the exception [e] within the handler
+            [handler] using the raw backtrace [bt] as the origin of the
+            exception.
+
+            @raise Continuation_already_resumed if the continuation has already
+            been resumed.
+        *)
+      end
+    end
   end
 
   external get_callstack :

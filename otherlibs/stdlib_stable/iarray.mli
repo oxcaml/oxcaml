@@ -26,7 +26,7 @@ open! Stdlib
     sorting functions, which are given a copying API to replace the in-place
     one. *)
 
-type +'a t = 'a iarray
+type (+'a : any mod separable) t = 'a iarray
 (** An alias for the type of immutable arrays. *)
 
 external length : ('a : any mod separable). local_ 'a iarray -> int
@@ -41,11 +41,13 @@ external get :
 (** [get a n] returns the element number [n] of immutable array [a].
    The first element has number 0.
    The last element has number [length a - 1].
+   You can also write [a.:(n)] instead of [get a n].
 
    @raise Invalid_argument
    if [n] is outside the range 0 to [(length a - 1)]. *)
 
-val init : int -> local_ (int -> 'a) -> 'a iarray
+val init : ('a : value_or_null mod separable).
+  int -> local_ (int -> 'a) -> 'a iarray
 (** [init n f] returns a fresh immutable array of length [n],
    with element number [i] initialized to the result of [f i].
    In other terms, [init n f] tabulates the results of [f]
@@ -69,7 +71,7 @@ val concat : ('a : value_or_null mod separable). 'a iarray list -> 'a iarray
 val sub
   : ('a : value_or_null mod separable).
   'a iarray -> pos:int -> len:int -> 'a iarray
-(** [sub a pos len] returns a fresh immutable array of length [len],
+(** [sub a ~pos ~len] returns a fresh immutable array of length [len],
    containing the elements number [pos] to [pos + len - 1]
    of immutable array [a].  This creates a copy of the selected
    portion of the immutable array.
@@ -105,7 +107,7 @@ val iter
   local_ ('a -> unit) -> 'a iarray -> unit
 (** [iter f a] applies function [f] in turn to all
    the elements of [a].  It is equivalent to
-   [f (get a 0); f (get a 1); ...; f (get a (length a - 1)); ()]. *)
+   [f a.:(0); f a.:(1); ...; f a.:(length a - 1); ()]. *)
 
 val iteri
   : ('a : value_or_null mod separable).
@@ -119,7 +121,7 @@ val map
   local_ ('a -> 'b) -> 'a iarray -> 'b iarray
 (** [map f a] applies function [f] to all the elements of [a],
    and builds an immutable array with the results returned by [f]:
-   [[| f (get a 0); f (get a 1); ...; f (get a (length a - 1)) |]]. *)
+   [[| f a.:(0); f a.:(1); ...; f a.:(length a - 1) |]]. *)
 
 val mapi
   : ('a : value_or_null mod separable) ('b : value_or_null mod separable).
@@ -132,7 +134,7 @@ val fold_left
   : ('a : value_or_null) ('b : value_or_null mod separable).
   local_ ('a -> 'b -> 'a) -> 'a -> 'b iarray -> 'a
 (** [fold_left f init a] computes
-   [f (... (f (f init (get a 0)) (get a 1)) ...) (get a n-1)],
+   [f (... (f (f init a.:(0)) a.:(1)) ...) a.:(n-1)],
    where [n] is the length of the immutable array [a]. *)
 
 val fold_left_map
@@ -167,9 +169,7 @@ val map2
   local_ ('a -> 'b -> 'c) -> 'a iarray -> 'b iarray -> 'c iarray
 (** [map2 f a b] applies function [f] to all the elements of [a]
    and [b], and builds an immutable array with the results returned by [f]:
-   [[| f (get a 0) (get b 0);
-       ...;
-       f (get a (length a - 1)) (get b (length b - 1))|]].
+   [[| f a.:(0) b.:(0); ...; f a.:(length a - 1) b.:(length b - 1)|]].
    @raise Invalid_argument if the immutable arrays are not the same size. *)
 
 
@@ -213,20 +213,20 @@ val mem
 val memq
   : ('a : value_or_null mod separable).
   local_ 'a -> local_ 'a iarray -> bool
-(** Same as {!mem}, but uses physical equality
-   instead of structural equality to compare list elements. *)
+(** Same as {!mem}, but uses physical equality instead of structural equality
+    to compare array elements. *)
 
 val find_opt
   : ('a : value_or_null mod separable).
   local_ ('a -> bool) -> 'a iarray -> 'a option
-(** [find_opt ~f a] returns the first element of the immutable array [a] that
+(** [find_opt f a] returns the first element of the immutable array [a] that
     satisfies the predicate [f], or [None] if there is no value that satisfies
     [f] in the array [a]. *)
 
 val find_map
   : ('a : value_or_null mod separable) ('b : value_or_null).
   local_ ('a -> 'b option) -> 'a iarray -> 'b option
-(** [find_map ~f a] applies [f] to the elements of [a] in order, and returns the
+(** [find_map f a] applies [f] to the elements of [a] in order, and returns the
     first result of the form [Some v], or [None] if none exist. *)
 
 
@@ -272,7 +272,7 @@ val sort
    The result of [sort], which we'll call [a'], contains the same elements as
    [a], reordered in such a way that for all i and j valid indices of [a] (or
    equivalently, of [a']):
--   [cmp (get a' i) (get a' j)] >= 0 if and only if i >= j
+-   [cmp a'.:(i) a'.:(j)] >= 0 if and only if i >= j
 *)
 
 val stable_sort

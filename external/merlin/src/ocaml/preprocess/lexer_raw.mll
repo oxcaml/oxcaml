@@ -29,8 +29,14 @@ type error =
   | Unterminated_string_in_comment of Location.t * Location.t
   | Empty_character_literal
   | Keyword_as_label of string
+  | Capitalized_label of string
   | Invalid_literal of string
   | Invalid_directive of string * string option
+  | Invalid_encoding of string
+  | Invalid_char_in_ident of Uchar.t
+  | Non_lowercase_delimiter of string
+  | Capitalized_raw_identifier of string
+  | Unknown_keyword of string
 
 exception Error of error * Location.t
 
@@ -80,88 +86,110 @@ let rec catch m f = match m with
 
 (* The table of keywords *)
 
-let keyword_table : keywords =
-  create_hashtable 149 [
-    "and", AND;
-    "as", AS;
-    "assert", ASSERT;
-    "begin", BEGIN;
-    "class", CLASS;
-    "constraint", CONSTRAINT;
-    "do", DO;
-    "done", DONE;
-    "downto", DOWNTO;
-    "else", ELSE;
-    "end", END;
-    "exception", EXCEPTION;
-    "exclave_", EXCLAVE;
-    "external", EXTERNAL;
-    "false", FALSE;
-    "for", FOR;
-    "fun", FUN;
-    "function", FUNCTION;
-    "functor", FUNCTOR;
-    "global_", GLOBAL;
-    "if", IF;
-    "in", IN;
-    "include", INCLUDE;
-    "inherit", INHERIT;
-    "initializer", INITIALIZER;
-    "kind_", KIND;
-    "kind_of_", KIND_OF;
-    "layout_", LAYOUT;
-    "lazy", LAZY;
-    "let", LET;
-    "local_", LOCAL;
-    "match", MATCH;
-    "method", METHOD;
-    "mod", MOD;
-    "module", MODULE;
-    "mutable", MUTABLE;
-    "new", NEW;
-    "nonrec", NONREC;
-    "object", OBJECT;
-    "of", OF;
-    "open", OPEN;
-    "or", OR;
-    "overwrite_", OVERWRITE;
+let all_keywords =
+  let v5_3 = Some (5,3) in
+  let v1_0 = Some (1,0) in
+  let v1_6 = Some (1,6) in
+  let v4_2 = Some (4,2) in
+  let always = None in
+  let oxcaml = None in
+  [
+    "and", AND, always;
+    "as", AS, always;
+    "assert", ASSERT, v1_6;
+    "begin", BEGIN, always;
+    "borrow_", BORROW, oxcaml;
+    "class", CLASS, v1_0;
+    "constraint", CONSTRAINT, v1_0;
+    "do", DO, always;
+    "done", DONE, always;
+    "downto", DOWNTO, always;
+    "effect", EFFECT, v5_3;
+    "else", ELSE, always;
+    "end", END, always;
+    "exception", EXCEPTION, always;
+    "exclave_", EXCLAVE, oxcaml;
+    "external", EXTERNAL, always;
+    "false", FALSE, always;
+    "for", FOR, always;
+    "fun", FUN, always;
+    "function", FUNCTION, always;
+    "functor", FUNCTOR, always;
+    "global_", GLOBAL, oxcaml;
+    "if", IF, always;
+    "in", IN, always;
+    "include", INCLUDE, always;
+    "inherit", INHERIT, v1_0;
+    "initializer", INITIALIZER, v1_0;
+    "kind_", KIND, oxcaml;
+    "kind_of_", KIND_OF, oxcaml;
+    "layout_", LAYOUT, oxcaml;
+    "lazy", LAZY, v1_6;
+    "let", LET, always;
+    "local_", LOCAL, oxcaml;
+    "match", MATCH, always;
+    "method", METHOD, v1_0;
+    "mod", MOD, always;
+    "module", MODULE, always;
+    "mutable", MUTABLE, always;
+    "new", NEW, v1_0;
+    "nonrec", NONREC, v4_2;
+    "object", OBJECT, v1_0;
+    "of", OF, always;
+    "open", OPEN, always;
+    "or", OR, always;
+    "overwrite_", OVERWRITE, oxcaml;
 (*  "parser", PARSER; *)
-    "poly_", POLY;
-    "private", PRIVATE;
-    "rec", REC;
-    "repr_", REPR;
-    "sig", SIG;
-    "stack_", STACK;
-    "borrow_", BORROW;
-    "struct", STRUCT;
-    "then", THEN;
-    "to", TO;
-    "true", TRUE;
-    "try", TRY;
-    "type", TYPE;
-    "val", VAL;
-    "virtual", VIRTUAL;
-    "when", WHEN;
-    "while", WHILE;
-    "with", WITH;
+    "poly_", POLY, oxcaml;
+    "private", PRIVATE, v1_0;
+    "rec", REC, always;
+    "repr_", REPR, oxcaml;
+    "sig", SIG, always;
+    "stack_", STACK, oxcaml;
+    "struct", STRUCT, always;
+    "then", THEN, always;
+    "to", TO, always;
+    "true", TRUE, always;
+    "try", TRY, always;
+    "type", TYPE, always;
+    "val", VAL, always;
+    "virtual", VIRTUAL, v1_0;
+    "when", WHEN, always;
+    "while", WHILE, always;
+    "with", WITH, always;
 
-    "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
-    "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
-    "land", INFIXOP3("land");
-    "lsl", INFIXOP4("lsl");
-    "lsr", INFIXOP4("lsr");
-    "asr", INFIXOP4("asr");
+    "lor", INFIXOP3("lor"), always; (* Should be INFIXOP2 *)
+    "lxor", INFIXOP3("lxor"), always; (* Should be INFIXOP2 *)
+    "land", INFIXOP3("land"), always;
+    "lsl", INFIXOP4("lsl"), always;
+    "lsr", INFIXOP4("lsr"), always;
+    "asr", INFIXOP4("asr"), always
 ]
 
+let keyword_table = Hashtbl.create 149
+
+let populate_keywords (version,keywords) =
+  let greater (x:(int*int) option) (y:(int*int) option) =
+    match x, y with
+    | None, _ | _, None -> true
+    | Some x, Some y -> x >= y
+  in
+  let tbl = keyword_table in
+  Hashtbl.clear tbl;
+  let add_keyword (name, token, since) =
+    if greater version since then Hashtbl.replace tbl name (Some token)
+  in
+  List.iter ~f:add_keyword all_keywords;
+  List.iter ~f:(fun name ->
+    match List.find ~f:(fun (n,_,_) -> n = name) all_keywords with
+    | (_,tok,_) -> Hashtbl.replace tbl name (Some tok)
+    | exception Not_found -> Hashtbl.replace tbl name None
+    ) keywords
+
+(* FIXME: Merlin: this could be made configurable *)
+let () = populate_keywords (None,[])
+
 let keywords l = create_hashtable 11 l
-
-let lookup_keyword name =
-  match Hashtbl.find keyword_table name with
-  | kw -> kw
-  | exception Not_found ->
-     LIDENT name
-
-(* To buffer string literals *)
 
 let list_keywords =
   let add_kw str _tok kws = str :: kws in
@@ -439,14 +467,24 @@ let uchar_for_uchar_escape lexbuf =
 
 let keyword_or state s default =
   try Hashtbl.find state.keywords s
-      with Not_found -> try Hashtbl.find keyword_table s
-  with Not_found -> default
+  with Not_found ->
+    try Option.value ~default @@ Hashtbl.find keyword_table s
+    with Not_found -> default
 
 let is_keyword name =
-  match lookup_keyword name with
-  | LIDENT _ -> false
-  | _ -> true
+  Hashtbl.mem keyword_table name
+
 let () = Lexer.is_keyword_ref := is_keyword
+
+let find_keyword lexbuf name default =
+  match Hashtbl.find keyword_table name with
+  | Some x -> return x
+  | None -> fail lexbuf (Unknown_keyword name)
+  | exception Not_found -> return default
+
+let find_keyword state lexbuf ~name ~default =
+  try return @@ Hashtbl.find state.keywords name
+  with Not_found -> find_keyword lexbuf name default
 
 let check_label_name lexbuf name =
   if is_keyword name
@@ -542,6 +580,10 @@ let prepare_error loc = function
   | Keyword_as_label kwd ->
       Location.errorf ~loc
         "%a is a keyword, it cannot be used as label name" Style.inline_code kwd
+  | Capitalized_label lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as label name, \
+         it must start with a lowercase letter" Style.inline_code lbl
   | Invalid_literal s ->
       Location.errorf ~loc "Invalid literal %s" s
   | Invalid_directive (dir, explanation) ->
@@ -549,6 +591,25 @@ let prepare_error loc = function
         (fun ppf -> match explanation with
            | None -> ()
            | Some expl -> fprintf ppf ": %s" expl)
+  | Invalid_encoding s ->
+    Location.errorf ~loc "Invalid encoding of identifier %s." s
+  | Invalid_char_in_ident u ->
+      Location.errorf ~loc "Invalid character U+%04X in identifier"
+         (Uchar.to_int u)
+  | Capitalized_raw_identifier lbl ->
+      Location.errorf ~loc
+        "%a cannot be used as a raw identifier, \
+         it must start with a lowercase letter" Style.inline_code lbl
+  | Non_lowercase_delimiter name ->
+      Location.errorf ~loc
+        "%a cannot be used as a quoted string delimiter,@ \
+         it must contain only lowercase letters."
+         Style.inline_code name
+  | Unknown_keyword name ->
+      Location.errorf ~loc
+      "%a has been defined as an additional keyword.@ \
+       This version of OCaml does not support this keyword."
+      Style.inline_code name
 
 let () =
   Location.register_error_of_exn
@@ -663,21 +724,15 @@ rule token state = parse
   | (lowercase identchar * as name) ('#' symbolchar_or_hash+ as hashop)
       (* See Note [Lexing hack for hash operators] *)
       { enqueue_hashop_from_end_of_lexbuf_window lexbuf ~hashop;
-        return (try Hashtbl.find state.keywords name
-              with Not_found ->
-              lookup_keyword name) }
+        find_keyword state lexbuf ~name ~default:(LIDENT name) }
   | (lowercase identchar * as name) '#'
       (* See Note [Lexing hack for float#] *)
       { enqueue_hash_suffix_from_end_of_lexbuf_window lexbuf;
-        return (try Hashtbl.find state.keywords name
-              with Not_found ->
-              lookup_keyword name) }
+        find_keyword state lexbuf ~name ~default:(LIDENT name)}
   | raw_ident_escape (lowercase identchar * as name)
     { return (LIDENT name) }
   | lowercase identchar * as name
-    { return (try Hashtbl.find state.keywords name
-              with Not_found ->
-              lookup_keyword name) }
+    { find_keyword state lexbuf ~name ~default:(LIDENT name) }
   (* Lowercase latin1 identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
@@ -696,11 +751,7 @@ rule token state = parse
       { warn_latin1 lexbuf; return (LIDENT name) }
   | uppercase identchar * as name
     { (* Capitalized keywords for OUnit *)
-      return (try Hashtbl.find state.keywords name
-              with Not_found ->
-              try Hashtbl.find keyword_table name
-              with Not_found ->
-                UIDENT name) }
+      find_keyword state lexbuf ~name ~default:(UIDENT name)}
   | uppercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; return (UIDENT name) }
   (* This matches either an integer literal or a directive. If the text "#2"

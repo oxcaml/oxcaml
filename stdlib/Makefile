@@ -49,7 +49,7 @@ CAMLOPT=$(OCAMLRUN) $(OPTCOMPILER)
 CAMLDEP=$(BOOT_OCAMLC) -depend
 DEPFLAGS=-slash
 
-OC_CPPFLAGS += -I$(ROOTDIR)/$(RUNTIME_DIR)
+OC_CPPFLAGS += -I$(ROOTDIR)/runtime
 
 include StdlibModules
 
@@ -100,10 +100,7 @@ endif
 .INTERMEDIATE: tmpheader.exe
 tmpheader.exe: $(HEADERPROGRAM).$(O)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^)
-# FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
-ifneq "$(UNIX_OR_WIN32)" "win32"
-	strip $@
-endif
+	$(STRIP) $@
 
 stdlib.cma: $(OBJS)
 	$(V_LINKC)$(CAMLC) -a -o $@ $^
@@ -193,17 +190,3 @@ depend:
 	-e 's/^(${STDLIB_NAMESPACE_MODULES})(\.[^i]*)(i?) :/\1\2\3 : \1.ml\3/' \
 	-e 's#(^| )(${STDLIB_NAMESPACE_MODULES})[.]#\1stdlib__\u\2.#' \
 	> .$@
-
-# The following are for compatibility with runtime4
-
-camlheader:
-	touch camlheader
-
-camlheaderd:
-	touch camlheaderd
-
-camlheaderi:
-	touch camlheaderi
-
-camlheader_ur:
-	touch camlheader_ur

@@ -55,6 +55,12 @@ let expect_asm_callbacks = ref []
 
 let asm_collected_for_expect_asm = ref []
 
+(* When set, [record_for_expect_asm] extends the captured body past the hot body
+   to the end of the function's emission, including the trailing out-of-line
+   code (GC jump pads, safety-error calls, the stack-realloc handler). Used by
+   the [%%expect_asm_full] variant. *)
+let expect_asm_whole_function = ref false
+
 let register_expect_asm_callback f =
   (* Reset label counter to make assembly more predictable. *)
   Label.reset ();
@@ -784,6 +790,8 @@ let emit_jump_table t =
   done
 
 let emit_jump_tables () =
+  I.ud2 ();
+  (* data in text below *)
   D.align ~fill:Nop ~bytes:4;
   List.iter emit_jump_table !jump_tables;
   jump_tables := []
@@ -822,7 +830,7 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2074,9 +2082,7 @@ let emit_instr ~first ~last ~fallthrough i =
       emit_jump func)
   | Lcall_op (Lextcall { func; alloc; stack_ofs; stack_align; _ }) ->
     add_used_symbol func;
-    if
-      stack_ofs > 0
-      && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
+    if stack_ofs > 0
     then (
       I.mov rsp r13;
       I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
@@ -2091,19 +2097,9 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       load_symbol_addr (Cmm.global_symbol func) rax;
       emit_call (Cmm.global_symbol "caml_c_call");
-      record_frame i.live (Dbg_other i.dbg);
-      if (not Config.runtime5) && not (is_win64 system)
-      then
-        (* In amd64.S, "caml_c_call" tail-calls the C function (in order to
-           produce nicer backtraces), so we need to restore r15 manually after
-           it returns (note that this increases code size).
-
-           In amd64nt.asm (used for Win64), "caml_c_call" invokes the C function
-           via a regular call, and restores r15 itself, thus avoiding the code
-           size increase. *)
-        I.mov (domain_field Domainstate.Domain_young_ptr) r15)
+      record_frame i.live (Dbg_other i.dbg))
     else
-      let switch_stacks = Config.runtime5 && not Config.no_stack_checks in
+      let switch_stacks = not Config.no_stack_checks in
       if switch_stacks
       then (
         I.mov rsp r13;
@@ -2111,7 +2107,7 @@ let emit_instr ~first ~last ~fallthrough i =
         D.cfi_def_cfa_register ~reg:"r13";
         (* NB: gdb has asserts on contiguous stacks that mean it will not unwind
            through this unless we were to tag this calling frame with
-           cfi_signal_frame in it's definition. *)
+           cfi_signal_frame in its definition. *)
         I.mov (domain_field Domainstate.Domain_c_stack) rsp);
       emit_call (Cmm.global_symbol func);
       if switch_stacks
@@ -2297,9 +2293,12 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
-  | Lop (Intop (Idiv | Imod)) ->
+  | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
+    I.xor (Reg32 RDX) (Reg32 RDX);
+    I.div (arg i 1)
   | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
     I.adc (arg i 3) (res i 1)
@@ -2368,7 +2367,8 @@ let emit_instr ~first ~last ~fallthrough i =
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
     I.add (int n) (addressing addr QWORD i 0)
@@ -2538,15 +2538,9 @@ let emit_instr ~first ~last ~fallthrough i =
     I.cmp (int 0) (res16 i 0);
     I.set (cond Cne) (res8 i 0);
     I.movzx (res8 i 0) (res i 0)
-  | Lop Dls_get ->
-    if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
-    else Misc.fatal_error "Dls is not supported in runtime4."
+  | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
-  | Lop Domain_index ->
-    if Config.runtime5
-    then I.mov (domain_field Domainstate.Domain_id) (res i 0)
-    else I.xor (res32 i 0) (res32 i 0)
+  | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel { label = lbl; section_name } ->
@@ -2630,9 +2624,7 @@ let emit_instr ~first ~last ~fallthrough i =
     | Lambda.Raise_regular ->
       I.mov (int 0) (domain_field Domainstate.Domain_backtrace_pos);
       call_raise "caml_raise_exn"
-    | Lambda.Raise_reraise ->
-      call_raise
-        (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn")
+    | Lambda.Raise_reraise -> call_raise "caml_reraise_exn"
     | Lambda.Raise_notrace ->
       I.mov (domain_field Domainstate.Domain_exn_handler) rsp;
       I.pop (domain_field Domainstate.Domain_exn_handler);
@@ -2724,10 +2716,7 @@ let fundecl fundecl =
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   D.comment ("LLVM-MCA-BEGIN " ^ !function_name);
-  if
-    Config.runtime5
-    && (not Config.no_stack_checks)
-    && String.equal !Clflags.runtime_variant "d"
+  if (not Config.no_stack_checks) && String.equal !Clflags.runtime_variant "d"
   then emit_call (Cmm.global_symbol "caml_assert_stack_invariants");
   let fun_body_start = current_output_pos () in
   emit_all ~first:true ~fallthrough:true fundecl.fun_body;
@@ -2735,11 +2724,20 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
-    ~gc_jump_pads_end:(current_output_pos ());
+  let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
+  (* [record_for_expect_asm] runs after the trailing out-of-line code so the
+     [%%expect_asm_full] variant can include it (e.g. the stack-realloc
+     handler). For the plain variant the body still stops at [fun_body_end] and
+     the gc-pad range is unchanged, so its output is identical. *)
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start
+    ~fun_body_end:
+      (if !expect_asm_whole_function
+       then current_output_pos ()
+       else fun_body_end)
+    ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then
      let n = frame_size () - 8 - if fp then 8 else 0 in
@@ -2999,10 +2997,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if
-    Config.runtime5
-    && (not Config.no_stack_checks)
-    && n >= Stack_check.stack_threshold_size
+  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);
@@ -3132,6 +3127,7 @@ let end_assembly () =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
   D.switch_to_section frametable_section;
+  I.ud2 ();
   D.align
     ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
     ~bytes:8;

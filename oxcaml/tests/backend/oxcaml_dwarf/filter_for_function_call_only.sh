@@ -44,7 +44,9 @@ sed \
   -e '/caml_input_value_from_bytes/s|str=#\?[0-9]\{10,\}L\?|str=<PTR>|g' \
   -e '/caml_md5_string/s|str=#\?[0-9]\{5,\}L\?|str=<PTR>|g' \
   -e '/caml_sys_getenv/s|var=#\?[0-9]\{5,\}L\?|var=<PTR>|g' \
-  -e '/caml_ba_create/s|vdim=#\?[0-9]\{5,\}L\?|vdim=<PTR>|g' | \
+  -e '/caml_ba_create/s|vdim=#\?[0-9]\{5,\}L\?|vdim=<PTR>|g' \
+  -e 's|closure=#\?[0-9]\{5,\}L\?|closure=<PTR>|g' \
+  -e 's|body_callback=#\?[0-9]\{5,\}L\?|body_callback=<PTR>|g' | \
 # grep: Remove LLDB noise
 grep -v \
   -e '^(lldb) ' \
