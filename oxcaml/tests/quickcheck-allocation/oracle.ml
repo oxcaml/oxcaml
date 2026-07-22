@@ -31,9 +31,9 @@ module Outcome = struct
   type t =
     | Agree_noalloc (* FE accepts, BE passes -- agree *)
     | Soundness_suspect of { backend_error : string }
-        (* FE accepts, BE rejects -- ambiguous, triage *)
+      (* FE accepts, BE rejects -- ambiguous, triage *)
     | Fe_reject of { cause : string }
-        (* FE rejects -- possible precision gap; not confirmable by the backend *)
+  (* FE rejects -- possible precision gap; not confirmable by the backend *)
 end
 
 (* Run [compiler] with [args], returning (exit_code, captured_stderr). stdout is
@@ -128,9 +128,9 @@ let check ~compiler ~file =
   | Verdict.Reject _ as frontend ->
     (* The program does not typecheck, so the backend check cannot run on it. *)
     Ok (Outcome.Fe_reject { cause = Verdict.cause frontend })
-  | Verdict.Accept ->
-    (match run_backend ~compiler ~file with
-     | Verdict.Gen_error e -> Error e
-     | Verdict.Accept -> Ok Outcome.Agree_noalloc
-     | Verdict.Reject backend_error ->
-       Ok (Outcome.Soundness_suspect { backend_error }))
+  | Verdict.Accept -> (
+    match run_backend ~compiler ~file with
+    | Verdict.Gen_error e -> Error e
+    | Verdict.Accept -> Ok Outcome.Agree_noalloc
+    | Verdict.Reject backend_error ->
+      Ok (Outcome.Soundness_suspect { backend_error }))

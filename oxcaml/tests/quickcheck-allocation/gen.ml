@@ -90,6 +90,7 @@ module Ty = struct
     | Pair of t * t
     | List of t
     | Array of t
+    (* CR shsong: need to improve how we generate user-defined types *)
     | Record_int (* r *)
     | Record_float (* fr *)
     | Variant (* v *)
@@ -150,6 +151,7 @@ module Expr = struct
     | Var of string
     | Int_lit of int
     | Float_lit of float
+    (* CR shsong: consider to group bop to one variant *)
     | Add of t * t (* int + int *)
     | Fadd of t * t (* float +. float *)
     | Leq of t * t (* int <= int, used only as an [If] condition *)
@@ -159,6 +161,8 @@ module Expr = struct
     | Nil
     | Cons of t * t
     | Array_lit of t list
+    (* CR shsong: in the following four cases, user defined types are hard-coded
+       again. Improve this. *)
     | Record_int of t * t (* { a; b } *)
     | Record_float of t * t (* { fx; fy } *)
     | Constr_a (* A -- immediate *)
@@ -194,8 +198,10 @@ module Expr = struct
     | Labelled of string (* ~label:(var : t) *)
     | Opt of string * t option
   (* [Some d]: ?label:(var = (d : t)), binder has type [t] in the body. [None]:
-     ?label:(var : t option) -- NOT generated yet: the binder would have type [t
-     option], which needs option types in [Ty]. *)
+     ?label:(var : t option)
+
+     CR shsong: the [None] case is NOT generated yet: the binder would have type
+     [t option], which needs option types in [Ty]. *)
 
   (* Fully parenthesized: ugly but unambiguous, and shrinking (milestone 3) is
      the readability story, not the printer. *)
@@ -322,10 +328,15 @@ let fun_ty ctx =
           Arg_label.Optional l)
       shape
   in
+  (* CR shsong: It seems that currently a function type can only be an 1 or
+     2-ary function returns small_ty. *)
   List.fold_right
     (fun label ret -> Ty.Arrow { label; arg = small_ty ctx; ret })
     labels (small_ty ctx)
 
+(* CR shsong: We should allow more flexibility of generated type here: 1. Avoid
+   having small_ty, i.e., allow other types in pair, list, array, and function
+   return type; 2. Allow more kinds of variant and record types. *)
 let goal_ty ctx =
   let pair () = Ty.Pair (small_ty ctx, small_ty ctx) in
   match ctx.mode with
@@ -372,6 +383,8 @@ let rec gen_expr ctx env ty fuel =
     Expr.Var x
   in
   let let_in () =
+    (* CR shsong: bound_ty cannot be user-defined type here like a record or a
+       variant. *)
     let bound_ty =
       choose ctx
         [ (4, fun () -> small_ty ctx);

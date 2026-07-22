@@ -6,9 +6,7 @@ module Suspect = struct
     }
 
   let to_string { seed; sample; backend_error } =
-    Printf.sprintf
-      "seed=%d\n%sbackend error:\n%s"
-      seed
+    Printf.sprintf "seed=%d\n%sbackend error:\n%s" seed
       (Gen.Sample.to_string sample)
       backend_error
 end
@@ -126,8 +124,7 @@ let save stats ~dir =
 let report stats =
   let suspects = Stats.suspects stats in
   let gaps = Stats.gaps stats in
-  Printf.printf
-    "agree(noalloc)=%d suspects=%d fe_rejects=%d gen_errors=%d\n"
+  Printf.printf "agree(noalloc)=%d suspects=%d fe_rejects=%d gen_errors=%d\n"
     (Stats.agree_noalloc stats)
     (List.length suspects) (List.length gaps) (Stats.gen_errors stats);
   if suspects <> []
@@ -147,5 +144,6 @@ let report stats =
         (fun (_, a) (_, b) -> compare b a)
         (Hashtbl.fold (fun c n acc -> (c, n) :: acc) tbl [])
     in
-    print_endline "\nfrontend rejections (completeness candidates, ranked by cause):";
+    print_endline
+      "\nfrontend rejections (completeness candidates, ranked by cause):";
     List.iter (fun (c, n) -> Printf.printf "  %4d  %s\n" n c) ranked)

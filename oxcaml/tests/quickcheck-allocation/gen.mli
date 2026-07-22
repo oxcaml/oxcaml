@@ -11,10 +11,10 @@ module Mode : sig
 end
 
 module Sample : sig
-  (* A single program carrying both annotations on each function under test:
-     [@ noalloc_strict] drives the frontend Allocation-axis check, and
-     [@zero_alloc strict] enables the backend check. Both checks must see the same
-     program because the mode annotation changes inference (it forces every allocation
+  (* A single program carrying both annotations on each function under test: [@
+     noalloc_strict] drives the frontend Allocation-axis check, and [@zero_alloc
+     strict] enables the backend check. Both checks must see the same program
+     because the mode annotation changes inference (it forces every allocation
      in the function to be local). *)
   type t = { source : string }
 
