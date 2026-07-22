@@ -16,6 +16,12 @@
 
 (** The Flambda representation of a single compilation unit's code. *)
 
+module Metadata : sig
+  type t
+
+  val module_symbol : t -> Symbol.t
+end
+
 type t
 
 val print : Format.formatter -> t -> unit
@@ -30,6 +36,10 @@ val create :
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t Or_unknown.t ->
   t
+
+val of_metadata_and_body : Metadata.t -> Flambda.Expr.t -> t
+
+val metadata : t -> Metadata.t
 
 val return_continuation : t -> Continuation.t
 
