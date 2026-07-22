@@ -208,6 +208,8 @@ module Block_access_field_kind : sig
   val print : Format.formatter -> t -> unit
 
   val compare : t -> t -> int
+
+  val from_kind : Flambda_kind.With_subkind.full_kind -> t
 end
 
 module Mixed_block_access_field_kind : sig
