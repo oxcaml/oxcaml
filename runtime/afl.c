@@ -48,7 +48,6 @@ CAMLprim value caml_reset_afl_instrumentation(value full)
 #else
 
 #include <unistd.h>
-#include <sys/types.h>
 #include <signal.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
