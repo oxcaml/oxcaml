@@ -1,0 +1,120 @@
+; AVX512 intrinsics tests: each emitted intrinsic is checked bit-for-bit against
+; the real C intrinsic (the C compiler is the oracle). Enabled on amd64 non-macos
+; in the main context, like the other AVX512 tests.
+
+(foreign_library
+ (archive_name stubs_intrins)
+ (language c)
+ (names stubs)
+ (flags
+  (:standard
+   (:include flags512.sexp)))
+ (include_dirs "../../../../../runtime"))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "(-mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd)"))))
+
+(rule
+ (targets flags512.sexp)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{architecture} "amd64")))
+ (action
+  (with-stdout-to
+   flags512.sexp
+   (echo "()"))))
+
+(executable
+ (name smoke)
+ (modules smoke)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs_intrins))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   smoke.out
+   (run ./smoke.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected smoke.out)))
+
+; The C oracle for the generated tests must be compiled by clang: the host gcc
+; (8.5) lacks many of the newer AVX512 intrinsic names.
+(rule
+ (targets libgen512stubs.a)
+ (deps gen512_stubs.c (source_tree %{workspace_root}/runtime/caml))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (progn
+   (run clang -c -O2 -mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd
+     -I %{workspace_root}/runtime -o gen512_stubs.o gen512_stubs.c)
+   (run ar rcs libgen512stubs.a gen512_stubs.o))))
+
+(executable
+ (name gen512)
+ (modules gen512)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives gen512stubs))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   gen512.out
+   (run ./gen512.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected gen512.out)))
