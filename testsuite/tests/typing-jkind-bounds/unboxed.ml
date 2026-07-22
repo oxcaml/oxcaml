@@ -11,13 +11,7 @@ type 'a abs : immutable_data with 'a
 type 'a t : immutable_data with 'a abs = { foo : 'a abs } [@@unboxed]
 [%%expect {|
 type 'a abs : immutable_data with 'a
-Line 2, characters 0-69:
-2 | type 'a t : immutable_data with 'a abs = { foo : 'a abs } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because of the definition of abs at line 1, characters 0-36.
-       But the kind of type "t" must be a subkind of immutable_data with 'a abs
-         because of the annotation on the declaration of the type t.
+type 'a t = { foo : 'a abs; } [@@unboxed]
 |}]
 
 type 'a abs : immutable_data with 'a

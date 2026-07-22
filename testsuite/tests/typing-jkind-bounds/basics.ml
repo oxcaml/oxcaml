@@ -905,8 +905,8 @@ type t : any mod global = { x : u } [@@unboxed]
 Line 1, characters 0-47:
 1 | type t : any mod global = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod global
          because of the annotation on the declaration of the type t.
 |}]
@@ -916,8 +916,8 @@ type t : any mod portable = { x : u } [@@unboxed]
 Line 1, characters 0-49:
 1 | type t : any mod portable = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod portable
          because of the annotation on the declaration of the type t.
 |}]
@@ -927,8 +927,8 @@ type t : any mod contended = { x : u } [@@unboxed]
 Line 1, characters 0-50:
 1 | type t : any mod contended = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod contended
          because of the annotation on the declaration of the type t.
 |}]
@@ -938,8 +938,8 @@ type t : any mod external_ = { x : u } [@@unboxed]
 Line 1, characters 0-50:
 1 | type t : any mod external_ = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod external_
          because of the annotation on the declaration of the type t.
 |}]
@@ -949,8 +949,8 @@ type t : any mod many = { x : u } [@@unboxed]
 Line 1, characters 0-45:
 1 | type t : any mod many = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod many
          because of the annotation on the declaration of the type t.
 |}]
@@ -960,8 +960,8 @@ type t : any mod aliased = { x : u } [@@unboxed]
 Line 1, characters 0-48:
 1 | type t : any mod aliased = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of u at line 1, characters 0-14.
+Error: The kind of type "t" is value mod everything mod dynamic with u
+         because it's an @@unboxed record type.
        But the kind of type "t" must be a subkind of any mod aliased
          because of the annotation on the declaration of the type t.
 |}]

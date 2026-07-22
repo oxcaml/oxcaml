@@ -2377,6 +2377,19 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
+let for_at_at_unboxed_record ~get_ty_base ~lbl ~ld_type =
+  let inner_jkind_base = get_ty_base ld_type in
+  let jkind_of_base =
+    fresh_jkind
+      { base = inner_jkind_base;
+        mod_bounds = Mod_bounds.min;
+        with_bounds = No_with_bounds
+      }
+      ~annotation:None ~why:(Value_creation At_at_unboxed_record)
+  in
+  jkind_of_base
+  |> add_with_bounds ~modality:lbl.Types.ld_modalities ~type_expr:ld_type
+
 let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
@@ -3081,6 +3094,7 @@ module Format_history = struct
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
     | Unboxed_variant -> fprintf ppf "it's an unboxed variant type"
+    | At_at_unboxed_record -> fprintf ppf "it's an @@@@unboxed record type"
     | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"
     | Primitive id ->
@@ -4102,6 +4116,7 @@ module Debug_printers = struct
     | Boxed_record -> fprintf ppf "Boxed_record"
     | Boxed_variant -> fprintf ppf "Boxed_variant"
     | Unboxed_variant -> fprintf ppf "Unboxed_variant"
+    | At_at_unboxed_record -> fprintf ppf "At_at_unboxed_record"
     | Boxed -> fprintf ppf "Boxed"
     | Extensible_variant -> fprintf ppf "Extensible_variant"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)

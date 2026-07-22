@@ -403,6 +403,7 @@ module History = struct
     | Boxed_record
     | Boxed_variant
     | Unboxed_variant
+    | At_at_unboxed_record
     | Boxed
     | Extensible_variant
     | Primitive of Ident.t

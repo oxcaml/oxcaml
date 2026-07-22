@@ -494,6 +494,15 @@ val for_boxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
   Types.jkind_l
 
+(** Choose an appropriate jkind for an [@@unboxed] record type. *)
+val for_at_at_unboxed_record :
+  get_ty_base:
+    (Types.type_expr ->
+    Jkind_types.Sort.t Jkind_types.Layout.t Types.jkind_base) ->
+  lbl:Types.label_declaration ->
+  ld_type:Types.type_expr ->
+  Types.jkind_l
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.t Layout.t) list ->
@@ -542,8 +551,8 @@ val for_or_null_variant :
     [for_boxed_variant]. [get_ty_base] fetches the base of the jkind for a given
     type in an environment.
 
-    The [Types.constructor_declaration] is the only constructor of the
-    variant. *)
+    The [Types.constructor_declaration] is the only constructor of the variant.
+*)
 val for_unboxed_variant :
   decl_params:Types.type_expr list ->
   type_apply:
