@@ -124,6 +124,11 @@ module Layout : sig
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
+  (** Apply the [addressable] kind operator to the root of a layout: an override
+      of the root slot to [Addressable], not a meet. This does nothing to an
+      already-addressable kind. *)
+  val set_root_addressable : Sort.t t -> Sort.t t
+
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
 

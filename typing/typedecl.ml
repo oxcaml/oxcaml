@@ -1228,7 +1228,7 @@ let transl_declaration env sdecl (id, uid) =
       match kind with
       | Type_record_unboxed_product _ ->
         begin match Jkind.get_layout env jkind with
-        | Some (Any _) ->
+        | Some (Any (_, a)) ->
           (* [jkind_default] has just what we need here *)
           let default_layout =
             match Jkind.extract_layout env jkind_default with
@@ -1236,6 +1236,15 @@ let transl_declaration env sdecl (id, uid) =
             | Error _ ->
               Misc.fatal_error
                 "Typedecl.transl_declaration: abstract jkind_default"
+          in
+          let default_layout =
+            (* Keep the annotation's [addressable] mark on the root: the
+               labels' kinds are unconstrained by it (products do not make
+               their components addressable), but the product as a whole is
+               still required to be addressable. *)
+            match (a : Jkind.Addressability.t) with
+            | Addressable -> Jkind.Layout.set_root_addressable default_layout
+            | Unaddressable | Maybe_addressable -> default_layout
           in
           Jkind.set_layout jkind default_layout
         | _ -> jkind
