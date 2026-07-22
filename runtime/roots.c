@@ -18,16 +18,8 @@
 /* To walk the memory roots for garbage collection */
 
 #include "caml/finalise.h"
-#include "caml/globroots.h"
-#include "caml/major_gc.h"
-#include "caml/memory.h"
-#include "caml/minor_gc.h"
 #include "caml/misc.h"
-#include "caml/mlvalues.h"
 #include "caml/roots.h"
-#include "caml/major_gc.h"
-#include "caml/shared_heap.h"
-#include "caml/fiber.h"
 
 CAMLexport _Atomic scan_roots_hook caml_scan_roots_hook =
   (scan_roots_hook)NULL;
