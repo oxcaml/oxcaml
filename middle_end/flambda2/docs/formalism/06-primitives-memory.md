@@ -31,6 +31,17 @@ checks the frontend inserts around them (see
 out-of-contract argument has no defined meaning and the compiler is entitled to
 assume it never happens.
 
+Some primitives have *relational* (nondeterministic) denotations, written
+
+```
+⟦p⟧(v̄; H) ∋ (v, H′)
+```
+
+— the judgment relates the application to every result so listed. Where
+[§04](04-opsem.md)'s `OS.Let.Prim.*` premises are written with `=`, they read
+as membership for relational denotations: the machine may take any derivable
+result.
+
 Four families are *not* expressible by `⟦p⟧` as written, because their meaning
 touches machine components other than `H`: the region delimiters
 (`Begin_region`, `End_region`, `Begin_try_region`, `End_try_region`) act on the
@@ -1188,19 +1199,67 @@ CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal
 ---
 p = Phys_equal Eq
+Call vᵢ an ι-operand if it points to an *immutable heap object* — an immutable
+(NOT immutable-unique) block or array, a boxed number, a string, or a set of
+closures: anything the compiler is licensed to share, duplicate, or lift.
+Immutable_unique objects (extension constructors) are identity-significant —
+the compiler deliberately refuses to share or duplicate them
+(`Eligible_for_cse` excludes `Only_generative_effects Immutable_unique`), and
+exception matching observes their identity through (==) — so they compare
+exactly, like mutable objects.
 --------------------------------------------------
-⟦p⟧(v₁, v₂; H) = (naked_imm 1, H)   if v₁ and v₂ are the same machine word (same immediate, or same pointer, or both null)
-⟦p⟧(v₁, v₂; H) = (naked_imm 0, H)   otherwise
-NOTES: Phys_equal Neq is the boolean negation. Only for values of kind Value
-(stated in the mli). It compares the *representation word*, not contents:
+⟦p⟧(v₁, v₂; H) = (naked_imm 1, H)   if neither operand is an ι-operand and v₁, v₂
+  are the same machine word (same immediate, same pointer to a mutable or
+  Immutable_unique object, or both null)
+⟦p⟧(v₁, v₂; H) = (naked_imm 0, H)   if neither operand is an ι-operand and v₁, v₂
+  are not the same machine word
+⟦p⟧(v₁, v₂; H) ∋ (naked_imm 0, H)   if either operand is an ι-operand — ALWAYS
+  derivable, even for v₁ = v₂ = ptr ℓ: the implementation may have duplicated or
+  re-boxed the object between the evaluations that produced v₁ and v₂
+⟦p⟧(v₁, v₂; H) ∋ (naked_imm 1, H)   if either operand is an ι-operand and v₁, v₂
+  are equal up to folding of immutable heap objects (13 §1): the implementation
+  may have shared the two allocations — so result 1 still implies structural
+  equality
+NOTES: REVISED per 13 §4 item 8 (resolution adopted 2026-07-22; previously a
+deterministic word-equality on all operands): `(==)` on non-mutable values is
+implementation-dependent (the OCaml manual guarantees only that `e1 == e2`
+implies structural equality), and the pipeline legitimately shares immutable
+allocations (CSE, lifting to statics) and duplicates them (re-boxing at use
+sites; `-Oclassic` Delay-duplication), so identity on immutable heap objects is
+deliberately LOOSE — a relational result, per the notation for nondeterministic
+denotations. Identity of *mutable* and *Immutable_unique* objects stays exact:
+writes distinguish mutable locations, extension constructors are matched by
+identity, so sharing or duplicating either is not licensed and the compiler
+does not do it. Locality is immaterial to the ι-class: a LOCAL immutable
+object is ι even though the compiler currently shares and duplicates only
+heap allocations (CSE and classic-mode Delay both exclude locals) — the
+language's identity looseness comes from immutability, not from present
+sharing practice, so the model is deliberately wider on locals (sound
+direction; headroom for e.g. future local re-boxing). The `simplify_phys_equal` folds (`S.Rewrite.Prim.PhysEqual*`) remain
+licensed as *resolutions* of the loose result under `INV.Simplify.Preserves`'s
+refinement reading (13 §1): folding to 1 requires identical canonicals or
+operands provably the same immediate/null word (the shared-identity
+resolution — `T.prove_physical_equality`'s equality half plus `check_heads`'
+two same-word cases); folding to 0 is licensed either by content/kind
+incompatibility, where 1 is underivable (the prover's `check_heads` half — it
+never reasons from distinct *dynamic* allocations), or, for two distinct
+symbols, unequal without a content check — via the always-derivable-0 clause
+when an operand is ι (distinct static allocations, resolved), and via the
+exact clause otherwise (two distinct symbols are distinct addresses, §04;
+mutable statics are the live case).
+Phys_equal Neq is the boolean negation. Only for values of kind Value
+(stated in the mli). On non-ι operands it compares the *representation word*,
+not contents:
 - Two tagged immediates are phys-equal iff numerically equal.
-- Two pointers are phys-equal iff they point to the same location; two distinct
-  boxed floats (or blocks) with equal contents are NOT phys-equal.
+- Two pointers to mutable or Immutable_unique objects are phys-equal iff they
+  point to the same location.
 - Because floats are boxed at kind Value, `Phys_equal` on boxed floats is
-  pointer comparison and can differ from IEEE float equality (and mishandles
-  NaN/±0.0) — this is the well-known reason not to use (==) on floats.
-No_effects, No_coeffects (pointer identity of already-existing values is stable):
-Phys_equal is CSE-eligible.
+  ι-loose identity comparison (and even under sharing can differ from IEEE
+  float equality — it mishandles NaN/±0.0) — this is the well-known reason not
+  to use (==) on floats.
+No_effects, No_coeffects (identity of already-existing values is stable within
+one resolution): Phys_equal is CSE-eligible — a repeated comparison may be
+resolved consistently, which is itself a resolution of the loose result.
 ```
 
 ### Bigarray_load, Bigarray_get_alignment

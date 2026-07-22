@@ -70,9 +70,10 @@ Set Implicit Arguments.
       absolute address.  So the module-block observation is the
       structure reachable from sym_mod, compared up to a partial
       bijection [b] on addresses that is the identity on symbols.
-    - Reachability is not a separate definition: [heap_sim]
-      quantifies only over the pairs of [b], and [obj_sim] forces
-      every pointer field of a compared object back into [b], so
+    - Reachability is not a separate definition: [fold_heap_sim]
+      quantifies only over the pairs of [b], and [fold_osim] sends
+      every pointer field of a compared object back into [b] or
+      (for iota-objects, post-item-8) into structural descent, so
       seeding [b] with the observation roots (the sym_mod address in
       [Bsim_return]; the exception value in [Bsim_exn]; the trace
       values) makes the comparison close over exactly the reachable
@@ -99,8 +100,9 @@ Set Implicit Arguments.
       because cextern_rel already threads the heap through each
       event -- the oracle sees and produces real heaps, so a
       write-back is an ordinary heap update, not a hidden channel.
-    - Closures are compared as LEAVES ([Osim_closures] relates any
-      two Closures objects): Simplify legitimately renames code ids,
+    - Closures are compared as LEAVES ([FO_closures], Values.v,
+      relates any two Closures objects): Simplify legitimately
+      renames code ids,
       rewrites code bodies, and prunes dead value slots
       (INV.Simplify.DeadValueSlotCoherence), so a structural
       comparison of Closures objects would falsify
@@ -108,7 +110,7 @@ Set Implicit Arguments.
       first-order "reachable structure" observation stops at a
       closure; a closure's behavior is observable only by applying
       it, which is the whole-program part of the statement.
-      [Vsim_clos] requires the SAME function slot literally --
+      [FV_clos] requires the SAME function slot literally --
       RESOLVED correct: Simplify never renames the slots of an
       existing set (simplify_set_of_closures.ml:687 uses
       Function_slot.rename only to derive a lifted-closure SYMBOL
@@ -124,17 +126,46 @@ Set Implicit Arguments.
       pointers across calls, so a mid-trace divergence in a
       C-shared buffer is observable at a later call even if the
       runs re-converge before the final heap (Knuth KF-015,
-      resolved by the [seen] accumulator in [trace_sim_from]). *)
+      resolved by the [seen] accumulator in [trace_sim_from]).
+    - ITEM-8 AMENDMENT (2026-07-22; CORRESPONDENCE entries 44/75):
+      observations are now compared UP TO FOLDING of iota-objects
+      (13 section 1, adopted with the P.Binary.PhysEqual revision).
+      The location relation [b] generalizes from a full partial
+      bijection to the fold discipline ([fold_bij] below): bijective
+      on non-iota objects only, unconstrained on iota-objects, with
+      loc-to-symbol pairs admitted for lifting; value/object/heap
+      similarity is Values.v's class-aware fold core, which descends
+      structurally through iota-objects.  The event apparatus keeps
+      its KF-015 shape; only the [b]/[b_ev] discipline changes.
+      Closures stay leaves, per ruling (c) at the fold core. *)
 
-(** A partial bijection on addresses, identity on symbols (symbols
-    are stable names shared by both runs; only dynamic locations are
-    renamed). *)
-Record addr_bij (b : address -> address -> Prop) : Prop :=
-  mk_addr_bij {
-  ab_functional : forall a a1 a2, b a a1 -> b a a2 -> a1 = a2;
-  ab_injective : forall a1 a2 a, b a1 a -> b a2 a -> a1 = a2;
-  ab_sym_l : forall s a, b (Addr_sym s) a -> a = Addr_sym s;
-  ab_sym_r : forall a s, b a (Addr_sym s) -> a = Addr_sym s
+(** The location-relation discipline (ITEM-8 AMENDMENT, entry 44;
+    formerly a full partial bijection): the simulation core --
+    fold_vsim / fold_osim / fold_heap_sim and the iota-class -- is
+    hosted in Values.v; this file instantiates it with the
+    OBSERVATION discipline.  [b] is a partial bijection on NON-iota
+    objects only (mutables and Immutable_unique keep pinned
+    identities, matched one-to-one) and is UNCONSTRAINED by
+    injectivity/functionality on iota-objects (one shared target
+    block may stand for two source blocks and vice versa -- CSE
+    sharing and re-boxing respectively); a source-side symbol maps
+    only to itself, while a target-side symbol may also be reached
+    from a dynamic iota-location (lifting).  The classifying heaps
+    [Hcls]/[Hcls'] are the heaps at the comparison point (call-time
+    heaps in event_sim, final heaps in beh_sim); an address's class
+    is stable once allocated (immutability is permanent, addresses
+    are not reused), so any populating heap classifies
+    consistently. *)
+Record fold_bij (Hcls Hcls' : heap)
+    (b : address -> address -> Prop) : Prop :=
+  mk_fold_bij {
+  fb_functional : forall a a1 a2,
+      b a a1 -> b a a2 -> ~ iota_addr Hcls a -> a1 = a2;
+  fb_injective : forall a1 a2 a,
+      b a1 a -> b a2 a -> ~ iota_addr Hcls' a -> a1 = a2;
+  fb_sym_l : forall s a, b (Addr_sym s) a -> a = Addr_sym s;
+  fb_sym_r : forall a s,
+      b a (Addr_sym s) -> a = Addr_sym s \/ iota_addr Hcls a
 }.
 
 (** [b] pins the starting heap: it is the identity on every address
@@ -146,90 +177,15 @@ Definition pins (H0 : heap) (b : address -> address -> Prop)
   : Prop :=
   forall a o, H0 (HK_addr a) = Some o -> b a a.
 
-(** Value similarity under [b]: scalars equal on the nose, pointers
-    related by [b]. *)
-Inductive value_sim (b : address -> address -> Prop)
-  : value -> value -> Prop :=
-| Vsim_tagged_imm : forall n,
-    value_sim b (V_tagged_imm n) (V_tagged_imm n)
-| Vsim_naked_imm : forall n,
-    value_sim b (V_naked_imm n) (V_naked_imm n)
-| Vsim_naked_int8 : forall n,
-    value_sim b (V_naked_int8 n) (V_naked_int8 n)
-| Vsim_naked_int16 : forall n,
-    value_sim b (V_naked_int16 n) (V_naked_int16 n)
-| Vsim_naked_int32 : forall n,
-    value_sim b (V_naked_int32 n) (V_naked_int32 n)
-| Vsim_naked_int64 : forall n,
-    value_sim b (V_naked_int64 n) (V_naked_int64 n)
-| Vsim_naked_nativeint : forall n,
-    value_sim b (V_naked_nativeint n) (V_naked_nativeint n)
-| Vsim_naked_float : forall f,
-    value_sim b (V_naked_float f) (V_naked_float f)
-| Vsim_naked_float32 : forall f,
-    value_sim b (V_naked_float32 f) (V_naked_float32 f)
-| Vsim_naked_vec128 : forall v,
-    value_sim b (V_naked_vec128 v) (V_naked_vec128 v)
-| Vsim_naked_vec256 : forall v,
-    value_sim b (V_naked_vec256 v) (V_naked_vec256 v)
-| Vsim_naked_vec512 : forall v,
-    value_sim b (V_naked_vec512 v) (V_naked_vec512 v)
-| Vsim_ptr : forall a a',
-    b a a' ->
-    value_sim b (V_ptr a) (V_ptr a')
-| Vsim_clos : forall l l' f,
-    b (Addr_loc l) (Addr_loc l') ->
-    value_sim b (V_clos l f) (V_clos l' f)
-| Vsim_null : value_sim b V_null V_null
-| Vsim_region : forall i,
-    value_sim b (V_region i) (V_region i)
-| Vsim_rec_info : value_sim b V_rec_info V_rec_info.
-
-(** Heap-object similarity under [b]: same shape, fields related
-    pointwise; Closures objects are leaves (ENCODING NOTE above).
-    No clause for HO_Code: code lives under HK_code keys, never at
-    an address, so it is not part of the first-order observation. *)
-Inductive obj_sim (b : address -> address -> Prop)
-  : heap_object -> heap_object -> Prop :=
-| Osim_block : forall t mu vs vs',
-    Forall2 (value_sim b) vs vs' ->
-    obj_sim b (HO_Block t mu vs) (HO_Block t mu vs')
-| Osim_float_block : forall mu fs,
-    obj_sim b (HO_FloatBlock mu fs) (HO_FloatBlock mu fs)
-| Osim_mixed_block : forall t mu sigma vs vs',
-    Forall2 (value_sim b) vs vs' ->
-    obj_sim b (HO_MixedBlock t mu sigma vs)
-      (HO_MixedBlock t mu sigma vs')
-| Osim_array : forall ak mu vs vs',
-    Forall2 (value_sim b) vs vs' ->
-    obj_sim b (HO_Array ak mu vs) (HO_Array ak mu vs')
-| Osim_bytes : forall mu bs,
-    obj_sim b (HO_Bytes mu bs) (HO_Bytes mu bs)
-| Osim_bigstring : forall bs,
-    obj_sim b (HO_Bigstring bs) (HO_Bigstring bs)
-| Osim_bigarray : forall bk layout dims vs vs',
-    Forall2 (value_sim b) vs vs' ->
-    obj_sim b (HO_Bigarray bk layout dims vs)
-      (HO_Bigarray bk layout dims vs')
-| Osim_closures : forall funs venv funs' venv',
-    obj_sim b (HO_Closures funs venv) (HO_Closures funs' venv')
-| Osim_boxed : forall k v v',
-    value_sim b v v' ->
-    obj_sim b (HO_Boxed k v) (HO_Boxed k v')
-| Osim_lazy : forall t v v',
-    value_sim b v v' ->
-    obj_sim b (HO_Lazy t v) (HO_Lazy t v').
-
-(** Heap similarity: every pair of [b] is populated on both sides,
-    by similar objects.  Together with the root seeding in [beh_sim]
-    this is "the reachable substructures coincide up to renaming". *)
-Definition heap_sim (b : address -> address -> Prop) (H H' : heap)
-  : Prop :=
-  forall a a', b a a' ->
-    exists o o',
-      H (HK_addr a) = Some o /\
-      H' (HK_addr a') = Some o' /\
-      obj_sim b o o'.
+(** Value, object and heap similarity are the fold simulation core
+    of Values.v ([fold_vsim] / [fold_osim] / [fold_heap_sim]),
+    heap-parameterized so that iota-objects relate by structural
+    descent through the compared heaps while non-iota pointers and
+    closures go through [b] (entry 44's ITEM-8 AMENDMENT; the
+    pre-item-8 [value_sim]/[obj_sim]/[heap_sim] of this file were
+    the b-channel-only special case).  Together with the root
+    seeding in [beh_sim], [fold_heap_sim] is "the reachable
+    substructures coincide up to renaming and iota-folding". *)
 
 Definition sub_rel (b1 b2 : address -> address -> Prop) : Prop :=
   forall a a', b1 a a' -> b2 a a'.
@@ -244,32 +200,39 @@ Definition sub_rel (b1 b2 : address -> address -> Prop) : Prop :=
     results and raise payloads -- external code can stash a pointer
     at one call and read through it at the next; Knuth KF-015), and
     this event's callee and arguments -- and heap-consistent at the
-    CALL-TIME heaps.  A sub-bijection is needed because [b] also
+    CALL-TIME heaps.  A sub-relation is needed because [b] also
     relates locations allocated AFTER this event, which H_call does
-    not populate; [b_ev]'s bijectivity is inherited from [b] via
-    [sub_rel], so no separate addr_bij premise.  Results are
-    compared under the full [b]: they enter the program and are
-    observed at later points (and join [seen] for later events). *)
+    not populate; since the fold discipline is classified per
+    comparison point, [b_ev] carries its own [fold_bij] at the
+    call-time heaps (the pre-item-8 shape inherited bijectivity
+    from the behavior-wide [b]).  Results are compared under the
+    full [b]: they enter the program and are observed at later
+    points (and join [seen] for later events); a fresh iota result
+    is not yet in H_call, so its structural folding is anchored
+    where later comparisons populate it (the next event's [seen]
+    check, or the final heaps). *)
 Inductive event_sim (H0 : heap) (b : address -> address -> Prop)
   (seen : list (value * value)) : event -> event -> Prop :=
 | Esim_ccall_return : forall b_ev vf vf' args args' Hc Hc' rs rs',
     sub_rel b_ev b ->
     pins H0 b_ev ->
-    Forall (fun vv => value_sim b_ev (fst vv) (snd vv)) seen ->
-    value_sim b_ev vf vf' ->
-    Forall2 (value_sim b_ev) args args' ->
-    heap_sim b_ev Hc Hc' ->
-    Forall2 (value_sim b) rs rs' ->
+    fold_bij Hc Hc' b_ev ->
+    Forall (fun vv => fold_vsim b_ev Hc Hc' (fst vv) (snd vv)) seen ->
+    fold_vsim b_ev Hc Hc' vf vf' ->
+    Forall2 (fold_vsim b_ev Hc Hc') args args' ->
+    fold_heap_sim b_ev Hc Hc' ->
+    Forall2 (fold_vsim b Hc Hc') rs rs' ->
     event_sim H0 b seen (Ev_ccall_return vf args Hc rs)
       (Ev_ccall_return vf' args' Hc' rs')
 | Esim_ccall_raise : forall b_ev vf vf' args args' Hc Hc' v v',
     sub_rel b_ev b ->
     pins H0 b_ev ->
-    Forall (fun vv => value_sim b_ev (fst vv) (snd vv)) seen ->
-    value_sim b_ev vf vf' ->
-    Forall2 (value_sim b_ev) args args' ->
-    heap_sim b_ev Hc Hc' ->
-    value_sim b v v' ->
+    fold_bij Hc Hc' b_ev ->
+    Forall (fun vv => fold_vsim b_ev Hc Hc' (fst vv) (snd vv)) seen ->
+    fold_vsim b_ev Hc Hc' vf vf' ->
+    Forall2 (fold_vsim b_ev Hc Hc') args args' ->
+    fold_heap_sim b_ev Hc Hc' ->
+    fold_vsim b Hc Hc' v v' ->
     event_sim H0 b seen (Ev_ccall_raise vf args Hc v)
       (Ev_ccall_raise vf' args' Hc' v').
 
@@ -317,41 +280,41 @@ Definition stream_sim (H0 : heap)
   stream_sim_from H0 b [].
 
 (** Behavior similarity: same termination outcome, same trace, and
-    for the terminating outcomes the same observed heap structure --
-    rooted at sym_mod for normal termination (13-soundness.md
-    section 1: "the same final module block value at sym_mod") and
-    at the exception value for an uncaught exception.  ONE bijection
-    is chosen per pair of behaviors, scoped over the whole behavior
-    (all events and the final observation), pinning the shared
-    starting heap [H0]. *)
+    for the terminating outcomes the same observed heap structure
+    up to iota-folding -- rooted at sym_mod for normal termination
+    (13-soundness.md section 1: "the same final module block value
+    at sym_mod") and at the exception value for an uncaught
+    exception.  ONE location relation is chosen per pair of
+    behaviors, scoped over the whole behavior (all events and the
+    final observation), pinning the shared starting heap [H0]; its
+    fold discipline ([fold_bij]) is anchored at the final heaps for
+    the terminating outcomes and per-event (inside [event_sim]) for
+    the others, which carry no final heap to classify by. *)
 Inductive beh_sim (sym_mod : symbol) (H0 : heap)
   : behavior -> behavior -> Prop :=
 | Bsim_return : forall b tr tr' Hf Hf',
-    addr_bij b ->
+    fold_bij Hf Hf' b ->
     pins H0 b ->
     b (Addr_sym sym_mod) (Addr_sym sym_mod) ->
     trace_sim H0 b tr tr' ->
-    heap_sim b Hf Hf' ->
+    fold_heap_sim b Hf Hf' ->
     beh_sim sym_mod H0 (Beh_return tr Hf) (Beh_return tr' Hf')
 | Bsim_exn : forall b tr tr' v v' Hf Hf',
-    addr_bij b ->
+    fold_bij Hf Hf' b ->
     pins H0 b ->
     trace_sim H0 b tr tr' ->
-    value_sim b v v' ->
-    heap_sim b Hf Hf' ->
+    fold_vsim b Hf Hf' v v' ->
+    fold_heap_sim b Hf Hf' ->
     beh_sim sym_mod H0 (Beh_exn tr v Hf) (Beh_exn tr' v' Hf')
 | Bsim_diverge : forall b tr tr',
-    addr_bij b ->
     pins H0 b ->
     trace_sim H0 b tr tr' ->
     beh_sim sym_mod H0 (Beh_diverge tr) (Beh_diverge tr')
 | Bsim_react : forall b s s',
-    addr_bij b ->
     pins H0 b ->
     stream_sim H0 b s s' ->
     beh_sim sym_mod H0 (Beh_react s) (Beh_react s')
 | Bsim_undef : forall b tr tr',
-    addr_bij b ->
     pins H0 b ->
     trace_sim H0 b tr tr' ->
     beh_sim sym_mod H0 (Beh_undef tr) (Beh_undef tr').
@@ -374,6 +337,22 @@ Definition obs_equiv (sym_mod : symbol) (H0 : heap)
      exists beh2, B2 beh2 /\ beh_sim sym_mod H0 beh1 beh2) /\
   (forall beh2, B2 beh2 ->
      exists beh1, B1 beh1 /\ beh_sim sym_mod H0 beh1 beh2).
+
+(** Observational REFINEMENT (13-soundness.md section 1, item-8
+    resolution; entry 44: the second conjunct of [obs_equiv] alone):
+    every behavior of the transformed side [B2] has a source-side
+    match in [B1].  Refinement rather than two-sided equivalence is
+    FORCED, not chosen: Simplify legitimately RESOLVES the identity
+    looseness -- the simplify_phys_equal folds, CSE sharing, lifting
+    and re-boxing each prune outcomes on the identity dimension --
+    so no two-sided statement survives the loose denotation.  On
+    programs whose observations never consult loose identity,
+    refinement holds in both directions and coincides with
+    [obs_equiv] (witnessed by the reflexivity family in Values.v). *)
+Definition obs_refines (sym_mod : symbol) (H0 : heap)
+    (B1 B2 : behavior -> Prop) : Prop :=
+  forall beh2, B2 beh2 ->
+    exists beh1, B1 beh1 /\ beh_sim sym_mod H0 beh1 beh2.
 
 (** "U does not exhibit undefined behaviour" -- the modulo-UB
     hypothesis of INV.Simplify.Preserves (13-soundness.md section 1:
@@ -474,8 +453,14 @@ Fixpoint ctx_plug (C : expr_ctx) (e : expr) : expr :=
     behaviour -- modeled as no_ub, quantified per starting state
     ("from every starting heap" is the conclusion's quantifier and
     scopes over this hypothesis too: the license is per-heap).
-    Conclusion: obs_equiv of the two units' behavior sets at the
-    unit's module symbol, from the same rho_pre / H0.
+    Conclusion: obs_refines of the two units' behavior sets at the
+    unit's module symbol, from the same rho_pre / H0 -- U'
+    observationally REFINES U.  REVISED (13 s4 item 8, resolution
+    2026-07-22; entry 75): previously two-sided obs_equiv against
+    the deterministic PhysEqual denotation; the pair was jointly
+    refutable by a UB-free program (item 8's witness), and
+    refinement up to immutable-identity folding is the correct
+    statement for the language's actual license.
 
     ENCODING NOTE: two premises with no doc counterpart, both
     abstraction-soundness ties the doc leaves implicit:
@@ -523,7 +508,7 @@ Theorem INV_Simplify_Preserves :
           C cid = Some c0 ->
           heap_get_code H0 cid = Some (HO_Code c0)) ->
       no_ub (fl_unit_behavior fl U rho_pre H0) ->
-      obs_equiv (fu_module_symbol U) H0
+      obs_refines (fu_module_symbol U) H0
         (fl_unit_behavior fl U rho_pre H0)
         (fl_unit_behavior fl U' rho_pre H0).
 Admitted.
@@ -544,6 +529,11 @@ Admitted.
     mirrored one-for-one by Simplify.v's congruence frames).
 
     ENCODING NOTEs:
+    - REVISED (13 s4 item 8, resolution 2026-07-22; entry 75): the
+      conclusion is obs_refines -- the plugged rewritten term
+      REFINES the original -- exactly as for the headline rule; a
+      rewrite may resolve identity looseness, so two-sided
+      equivalence is not the doc's claim.
     - The doc takes E's soundness "at e" -- at the hole, mid-run.
       The modeled premise takes it at the machine state the
       config starts from (the top of C[.]).  States whose E-facts
@@ -567,20 +557,26 @@ Admitted.
       universally, exactly as in INV_Simplify_Preserves (see the
       note there).
     - The rewrites union is a strict subset of the doc's
-      quantification (KF-030, FIDELITY.md): it deliberately
+      quantification (KF-030, FIDELITY.md; REWRITTEN at the item-8
+      resolution -- entry 55, ruling (d)): it deliberately
       excludes S.Rewrite.CSE.Replace / S.Rewrite.CSE.Extend
       (composed whole by Simplify.v's cse_deep) and
       S.Loopify.SelfTailCall (composed by stc_deep), all e ~> e'
-      rules under the chapter.  Neither family is posable in this
-      local form: CSE needs the table-validity hypothesis that
-      lives in cse_deep's fempty-reachability discipline -- and
-      CSE.Replace's obligation as stated here is FALSE (a context
-      that itself establishes the table's equation, e.g. Cx =
-      let x = Make_block(0,Immutable)[a] in [.], is the KF-030
-      witness); a CSE-local obligation waits on the item-8 design
-      decision cited in that entry.  SelfTailCall needs the
-      loopify ambient indices (self continuation, entry depth).
-      Consequence for the factoring: an induction proving
+      rules under the chapter, on the STRUCTURAL ground alone,
+      which stands and is item-8-independent: the CSE table is
+      denv state, so those rules live in side judgments with the
+      table an explicit argument (RewritesPrim.v) and cannot be
+      union arms; SelfTailCall needs the loopify ambient indices
+      (self continuation, entry depth).  The former SECOND ground
+      -- that CSE.Replace's obligation here was FALSE (the item-8
+      witness, e.g. Cx = let x = Make_block(0,Immutable)[a] in
+      [.], establishing the table's equation in-context) -- is
+      DISSOLVED: it refuted only the pre-resolution two-sided
+      equivalence; under this rule's refinement reading it is
+      true-shaped ({true} contained in {true, false}), so the
+      local refinement obligation on rw_cse is now STATABLE --
+      booked as a follow-up item (entry 55).  Until it lands, the
+      factoring consequence stands: an induction proving
       INV_Simplify_Preserves gets no per-arm lemma from this
       obligation at the S_cse and simplify_code arms; those arms
       carry their composed obligations directly.  (The remaining
@@ -598,7 +594,7 @@ Theorem INV_Rewrite_Local :
       expr_wf rkt cpa cra Gamma Delta (ctx_plug Cx e) ->
       no_ub (fl_has_behavior fl
                (mk_config (Ctl_expr (ctx_plug Cx e)) rho K H T R)) ->
-      obs_equiv sym_mod H
+      obs_refines sym_mod H
         (fl_has_behavior fl
            (mk_config (Ctl_expr (ctx_plug Cx e)) rho K H T R))
         (fl_has_behavior fl

@@ -472,7 +472,11 @@ denv's CSE table maps p (with canonicalized arguments) to a simple s in scope
 E ⊢ (let x = Prim(p) in e) ⇝ (let x = s in e)   with x : alias-of s
 NOTES: The prior equal application already computed the value bound to s; reusing
   it is sound because p is pure (or an immutable allocation, where sharing changes
-  only identity of an immutable value, which is not observable). CSE runs *before*
+  only the physical identity of an immutable value — identity MAY be observed
+  through `phys_equal`; the change is licensed because `(==)` on non-mutable
+  values is implementation-dependent, and `P.Binary.PhysEqual` (06) together
+  with `INV.Simplify.Preserves`' refinement reading (13 §1, §4 item 8) grants
+  exactly this license). CSE runs *before*
   the per-primitive analysis in `simplify_primitive`. Only fires at normal name
   mode.
 ```

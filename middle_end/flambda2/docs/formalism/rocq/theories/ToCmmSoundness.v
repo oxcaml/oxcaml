@@ -82,7 +82,7 @@ Definition loc_map_inj (L : loc_map) : Prop :=
    correspondence (reviewer finding KF-015)".  This section is that
    correspondence.  It is the heterogeneous image of Soundness.v's
    event_sim/trace_sim_from (the KF-015 cumulative-seed shape):
-   value_sim under a per-event sub-bijection becomes rep_val under a
+   fold_vsim under a per-event sub-relation becomes rep_val under a
    per-event sub-map L_ev of the behavior-wide L, and the [seen]
    accumulator carries the (Flambda value, Cmm value) pairs every
    earlier event left in the external world's hands -- external
@@ -517,8 +517,10 @@ Definition custom_boxed_var_payload (sc : static_const) : Prop :=
     contains a raising external are outside this statement -- a
     narrowing inherited from ch. 15, not introduced here.
     ENCODING NOTE (further statement shape, cataloged with main):
-    - the modulo-UB clause is the (forall tr, b <> Beh_undef tr)
-      premise, inherited verbatim from ch. 13 as the doc says; the
+    - the modulo-UB clause is the no_ub premise on the Flambda
+      behavior set (Soundness.v), inherited from ch. 13 as the doc
+      says -- set-level rather than per-behavior since the item-8
+      re-pose makes the Flambda behavior EXISTENTIAL; the
       resource-exhaustion bullet is TBR_exhaust, related to every
       non-undef behavior with NO trace obligation;
     - the doc's single divergence bullet is the union of the
@@ -550,12 +552,34 @@ Definition custom_boxed_var_payload (sc : static_const) : Prop :=
       rule-minted atoms (x_exn, the KF-037 agreement premises).
       Intended instantiation: the code's create_local /
       next_raise_count freshness;
-    - KNOWN VIOLATION (doc, s5.6): -Oclassic Box_number duplication
-      plus the deterministic ch. 06 PhysEqual denotation falsifies
-      the rule as stated for a UB-free program; the doc says to
-      read it modulo immutable-block identity until fixed, and this
-      statement transcribes the rule as written, violation and
-      all -- it is Admitted, never used as an axiom. *)
+    - RE-POSED at the item-8 resolution (2026-07-22; entry 75,
+      KF-056): the doc's revised rule quantifies in the BACKWARD
+      direction -- EVERY Cmm outcome is matched by SOME behavior of
+      the (now relational) Flambda run.  The forward direction is
+      refutable: an abstract run may resolve
+      phys_equal(ptr l, ptr l) to 0 (the iota clause's always-
+      derivable answer) where the emitted word-equality code cannot
+      follow.  The conclusion composes the Flambda-side FOLDING
+      QUOTIENT with the untouched heterogeneous relation: some real
+      behavior b_f, a fold-variant b_q of it (beh_sim, Soundness.v
+      -- 13 section 1's folding, pinned at H0), and tocmm_beh_rel
+      relating b_q to the outcome.  Determinacy bridge (doc NOTES):
+      constructing the code-matching abstract behavior leans on the
+      reflexivity family at the fold core (Values.v) -- the machine
+      run that mirrors the code's actual resolutions is related to
+      itself -- and on cextern answers being MONOTONE under
+      iota-folding of the heap argument (KF-057 / W-34, entry 20:
+      any future constraint on cextern/cextern_c that could make
+      extern answers fold-sensitive must revisit this bridge).
+    - FORMER KNOWN VIOLATION (doc s5.6, resolved 2026-07-22 with
+      item 8): -Oclassic Box_number duplication plus the then-
+      deterministic ch. 06 PhysEqual denotation falsified the rule
+      as previously stated for a UB-free program; under the loose
+      denotation and the folded observation relation the
+      duplication is one of the abstract run's derivable
+      observations, and the old "read it modulo immutable-block
+      identity" instruction is superseded by the definitions
+      themselves. *)
 Theorem INV_ToCmm_Simulates :
   forall (flags : eff_flags) (U : flambda_unit) (P : cmm_program)
          (lookup_code : code_id -> option code0)
@@ -572,7 +596,7 @@ Theorem INV_ToCmm_Simulates :
          (th : tcenv) (s_init : cmm_symbol) (fd : cmm_fundecl)
          (ptys : list machtype) (lbl_exn : static_label)
          (rho_pre : env) (H0 : heap) (M0 : cmm_mem) (L0 : loc_map)
-         (c0 : config) (b : behavior),
+         (c0 : config),
     cp_funs P s_init = Some fd ->
     fd_params fd = [] ->
     tc_expr_data_sunk lookup_code classify_handler debug_flag
@@ -587,13 +611,15 @@ Theorem INV_ToCmm_Simulates :
     symaddr_agree P L0 ->
     loc_map_inj L0 ->
     initial U rho_pre H0 c0 ->
-    fl_has_behavior flags c0 b ->
-    (forall tr, b <> Beh_undef tr) ->
-    exists o,
+    no_ub (fl_has_behavior flags c0) ->
+    forall o,
       cmem_unit_behaves P
-        (CmCfg (fd_body fd) fempty kenv_empty M0 [] (c_R c0)) o /\
-      tocmm_beh_rel (cp_symaddr P) callee_name (fu_module_symbol U)
-        L0 b o.
+        (CmCfg (fd_body fd) fempty kenv_empty M0 [] (c_R c0)) o ->
+      exists b_f b_q,
+        fl_has_behavior flags c0 b_f /\
+        beh_sim (fu_module_symbol U) H0 b_f b_q /\
+        tocmm_beh_rel (cp_symaddr P) callee_name (fu_module_symbol U)
+          L0 b_q o.
 Admitted.
 
 (* ================================================================== *)

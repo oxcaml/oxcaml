@@ -30,9 +30,34 @@ Recall the observable behaviour of a run from [§04 §8.2](04-opsem.md)
   is `undef` (`⟦p⟧ = undef`; chapters [`05`](05-primitives-scalar.md),
   [`06`](06-primitives-memory.md)) — a stuck or wild state.
 
+Observations are compared **up to physical identity of immutable heap
+objects** (adopted with the revision of `P.Binary.PhysEqual` as the resolution
+of §4's item 8): the final module block value, uncaught-exception payloads, and
+the heap snapshots carried by C-call events are compared after *folding* —
+immutable heap objects (immutable — not `Immutable_unique` — blocks and
+arrays, boxed numbers, strings, sets of closures;
+[§06](06-primitives-memory.md)'s ι-class) are
+identified up to structural equality of their folded contents, a dynamic
+immutable object may be identified with a static one (lifting), and only
+non-ι objects — mutable and `Immutable_unique` alike — retain pinned
+identities, matched one-to-one. This is the
+observational face of the identity looseness `P.Binary.PhysEqual` grants on
+the same class of objects; each is insufficient without the other (a folding
+quotient cannot relate an identity test's result once it escapes into an
+immediate; a loose test cannot let one shared target block stand for two
+source blocks in the final structure).
+
 Two terms are **observationally equivalent** when, started from the same heap,
-they induce the same observations: the same C-call effect trace and the same
-termination outcome (including the same final module block value at `sym_mod`).
+they induce the same observations up to that folding: the same C-call effect
+trace and the same termination outcome (including the same final module block
+value at `sym_mod`). `U′` **observationally refines** `U` when every
+observation of `U′` from a heap is, up to the folding, an observation of `U`
+from that heap. Refinement rather than two-sided equivalence is the right
+obligation for Simplify because Simplify legitimately *resolves* the identity
+looseness — CSE sharing, the `phys_equal` constant folds, lifting, and
+re-boxing each shrink the observation set on the identity dimension; on
+programs whose observations never consult loose identity, refinement in both
+directions holds and coincides with equivalence.
 Alpha-renaming of bound variables/continuations and the insertion or removal of
 coercions (`Coercion.t`) are *not* observable: coercions are erased before
 `to_cmm` and stand for identity-at-runtime retagging of names ([§02](02-syntax.md)).
@@ -48,15 +73,21 @@ Simplify(U) = U′                         -- run terminates with result U′
 U does not exhibit undefined behaviour   -- no reachable ⟦p⟧ = undef, no missing
                                             switch arm, no reachable Invalid
 --------------------------------------------------
-U and U′ are observationally equivalent (§1): from every starting heap they
-produce the same C-call effect trace and the same termination outcome, including
-the same final module block value at sym_mod.
+U′ observationally refines U (§1): from every starting heap, every C-call
+effect trace and termination outcome of U′ — compared up to physical identity
+of immutable heap objects, including the final module block value at sym_mod —
+is an observation of U.
 NOTES: Claimed and empirically validated (§5), not proved; hence STATUS
 conjectured. This is the single property the whole formalism exists to make
 precise. The "modulo undefined behaviour" hypothesis is essential and is
 discussed below; it is not a weakness peculiar to Flambda 2 but the standard
 shape of an optimizing-compiler correctness statement for a language with
-undefined behaviour.
+undefined behaviour. REVISED (§4 item 8, adopted 2026-07-22): the conclusion
+was previously two-sided observational equivalence against a fully
+deterministic `P.Binary.PhysEqual`; the pair was jointly refutable by a UB-free
+program (item 8's witness). Refinement up to immutable identity is the
+correct statement for the language's actual license; see §1 and the revised
+`P.Binary.PhysEqual`.
 ```
 
 ### The "modulo undefined behaviour" clause
@@ -121,7 +152,7 @@ For every rewrite E ⊢ e ⇝ e′ (a rule in S.Rewrite.*, S.Inline.*, S.Unbox.*
 whenever E is a sound abstraction of the runtime state at e (every equation in E
 holds of the actual values, per T.Gamma.*) and the rule's side conditions hold,
 then for every context C[·] and heap such that C[e] is reachable and well-formed,
-C[e] and C[e′] are observationally equivalent.
+C[e′] observationally refines C[e] (§1).
 --------------------------------------------------
 INV.Simplify.Preserves follows by composing the local obligations along the
 traversal that rebuilds the term.
@@ -156,7 +187,7 @@ reviewer should distrust first:
 
 ## 3. Global invariants of the result
 
-`Simplify(U) = U′` is not only observationally equivalent to `U`; the result
+`Simplify(U) = U′` does not only refine `U` observationally (§2); the result
 `U′` also satisfies structural invariants that the pipeline downstream (Reaper,
 `to_cmm`) relies on. The genuinely global ones are stated as normative rules in
 chapter [`09`](09-simplify-structure.md); we reference them here rather than
@@ -694,6 +725,37 @@ claim elsewhere seems too clean.
    the refutation is reproducible in-model by composing the two rules. A
    14-validation witness (two immutable allocations, phys_equal folded to
    true) would be a worthwhile follow-up.
+   RESOLVED (2026-07-22, decided jointly with the classic-mode sibling as
+   recommended above): options (a) — scoped to immutable heap objects — and
+   (b) TOGETHER. `P.Binary.PhysEqual` is now loose on ι-operands (result 0
+   always derivable, even for identical pointers, licensing duplication and
+   dropping; result 1 derivable exactly up to folding, preserving the manual's
+   `==`-implies-structural-equality guarantee), and §1's observation relation
+   folds immutable identity, with the Preserves family restated as
+   REFINEMENT — Simplify resolves the looseness (CSE sharing, the
+   `phys_equal` folds, lifting, re-boxing each prune outcomes), so two-sided
+   equivalence is unrecoverable in the presence of the folds and refinement
+   is the honest statement. Each half alone is insufficient: a folding
+   quotient cannot relate this entry's witness once the boolean escapes into
+   an immediate, and a loose denotation alone cannot let one shared target
+   block stand for two source blocks in the final structure. The
+   `S.Rewrite.CSE.Replace` NOTES correction above is applied. The classic
+   sibling's repairs #1 and #2 are both subsumed (its #1 in the strengthened
+   even-same-word form); `INV.ToCmm.Simulates`' §5.6 caveat is dischargeable
+   against the revised semantics (recorded at 20 §5.6). This entry's witness
+   now exhibits refinement, not violation: the target's {true} ⊆ the
+   source's {true, false}. One qualification to the disciplined-fold
+   analysis above, from the resolution round's re-verification: the prover's
+   alias half also folds two DISTINCT SYMBOLS unequal with no content check —
+   disequality from distinct *static* allocations. Under the revised rule
+   that fold is licensed on two branches — the always-derivable-0 clause
+   when an operand is ι (a resolution), the exact clause otherwise (distinct
+   symbols are distinct addresses; mutable statics are the live case) — not
+   by 1-underivability; the "never from distinct allocations" discipline
+   holds as stated for dynamic allocations. The ι-class deliberately
+   excludes Immutable_unique blocks/arrays (extension constructors): the
+   compiler refuses to share or duplicate them, and exception matching
+   observes their identity, so they keep exact identity like mutables.
 
 ## 5. Validation summary
 

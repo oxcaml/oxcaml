@@ -92,6 +92,15 @@ The `INV.ToCmm.EffectLinear` zero-occurrence **Drop** arm needs the same license
 with `Gc.stat` / minor-words allocation counters as the weaker observable there —
 so `R.Observe` must carve out allocation counters.
 
+**RESOLUTION ADOPTED (2026-07-22, jointly with
+[`../13-soundness.md`](../13-soundness.md) §4 item 8):** repair 1 in
+strengthened form (`P.Binary.PhysEqual` loose on all immutable heap objects,
+result 0 derivable even for identical pointers — covering duplication AND
+dropping) together with repair 2's general observational analogue (13 §1's
+immutable-identity folding and refinement reading, rather than a
+Simulates-local clause). This study's mismatch is thereby reclassified:
+`-Oclassic`'s **false** is a derivable observation of the abstract run.
+
 Repros: `Emerson-the-Believer/scratch/physeq2.*`,
 `Sextus-the-Skeptic/sextus-exp/sx_physeq.ml`, `sx_classic.cmm`, `sx_default.cmm`.
 Not added as a `formalism/` fexpr test: classic mode skips Simplify, so the

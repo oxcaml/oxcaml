@@ -184,6 +184,242 @@ Definition alloc (o : heap_object) (H : heap) (l : location) (H' : heap)
   fresh_for H (HK_addr (Addr_loc l)) /\
   H' = heap_upd H (HK_addr (Addr_loc l)) o.
 
+(** ** The iota-class and the fold simulation core
+       (06-primitives-memory.md P.Binary.PhysEqual; 13-soundness.md
+       section 1; CORRESPONDENCE entries 44 (ITEM-8 AMENDMENT) and
+       75) *)
+
+(** The iota-class: immutable heap objects the compiler is licensed
+    to share, duplicate, or lift — immutable (NOT Immutable_unique)
+    blocks and arrays, boxed numbers, strings, and sets of closures.
+    Immutable_unique objects (extension constructors) are
+    identity-pinned and compare exactly, like mutable objects;
+    bigstrings, bigarrays, lazy blocks (forcing mutates) and code are
+    outside the class.  Locality is immaterial (ch. 06 NOTES): alloc
+    mode is erased at allocation (entry 10 — region placement is not
+    recorded in H), so LOCAL immutable objects classify iota even
+    though present sharing practice excludes locals — a deliberate
+    spec-widening in the sound direction (headroom for e.g. future
+    local re-boxing). *)
+Definition iota_object (o : heap_object) : Prop :=
+  match o with
+  | HO_Block _ Immutable _ => True
+  | HO_FloatBlock Immutable _ => True
+  | HO_MixedBlock _ Immutable _ _ => True
+  | HO_Array _ Immutable _ => True
+  | HO_Bytes Immutable _ => True
+  | HO_Closures _ _ => True
+  | HO_Boxed _ _ => True
+  | _ => False
+  end.
+
+(** The structurally-folded subclass: iota-objects MINUS sets of
+    closures.  Closures are fold LEAVES (entry 75, ruling (c)):
+    identified through the location relation plus literal slot
+    equality, never structurally recursed — which delivers the
+    sharing license (the observation instance's relation is
+    non-injective on iota) while keeping fold-equality underivable
+    on distinct closures under the diagonal instance, matching the
+    prover's never-fold-closure-equality discipline. *)
+Definition iota_struct (o : heap_object) : Prop :=
+  match o with
+  | HO_Closures _ _ => False
+  | _ => iota_object o
+  end.
+
+(** An address whose target is an iota-object of H (the class of an
+    allocated address never changes: immutability is permanent and
+    addresses are not reused). *)
+Definition iota_addr (H : heap) (a : address) : Prop :=
+  exists o, H (HK_addr a) = Some o /\ iota_object o.
+
+(** An iota-operand (P.Binary.PhysEqual's premise vocabulary): a
+    value pointing to an iota-object of H.  V_clos is a
+    set-of-closures view, always iota; immediates, null, regions and
+    rec_info are not heap operands at all. *)
+Definition is_iota (H : heap) (v : value) : Prop :=
+  match v with
+  | V_ptr a => iota_addr H a
+  | V_clos _ _ => True
+  | _ => False
+  end.
+
+(** The fold simulation core (entry-44 ITEM-8 AMENDMENT): ONE
+    heap-parameterized, object-class-aware similarity.  The location
+    relation [b] is the only channel for non-iota pointers and for
+    closures; identity-pinning disciplines on [b] are INSTANTIATION
+    properties (Soundness.v's observation instance constrains [b] to
+    a bijection on non-iota targets with initial-heap pins; the
+    diagonal instance below pins [b] to address equality).
+    Iota-objects other than closures additionally relate by
+    STRUCTURAL DESCENT through the two heaps — 13 section 1's
+    folding: one shared target block may stand for two source blocks
+    and vice versa (CSE sharing; re-boxing), and a dynamic
+    iota-location may relate to a symbol (lifting).
+    The fold is INDUCTIVE under the model's acyclicity (entry-44
+    ruling (b)): dynamic iota-allocations cannot self-reference
+    (their constructors take already-evaluated values), static
+    recursion passes through code ids
+    (WF.Syntax.StaticRecThroughCode), and closures and non-iota
+    objects are relation-leaves, so descent is well-founded.
+    TRIPWIRE (W-35): real OCaml's [let rec x = 1 :: x] builds cyclic
+    immutables via the alloc_dummy/update_dummy MUTATION idiom,
+    absent from the model (and if modeled, the block is built
+    Mutable, hence a leaf); any future extension minting cyclic
+    iota-objects breaks inductive totality and must revisit this
+    fold. *)
+Inductive fold_vsim (b : address -> address -> Prop) (H H' : heap)
+  : value -> value -> Prop :=
+| FV_tagged_imm : forall n,
+    fold_vsim b H H' (V_tagged_imm n) (V_tagged_imm n)
+| FV_naked_imm : forall n,
+    fold_vsim b H H' (V_naked_imm n) (V_naked_imm n)
+| FV_naked_int8 : forall n,
+    fold_vsim b H H' (V_naked_int8 n) (V_naked_int8 n)
+| FV_naked_int16 : forall n,
+    fold_vsim b H H' (V_naked_int16 n) (V_naked_int16 n)
+| FV_naked_int32 : forall n,
+    fold_vsim b H H' (V_naked_int32 n) (V_naked_int32 n)
+| FV_naked_int64 : forall n,
+    fold_vsim b H H' (V_naked_int64 n) (V_naked_int64 n)
+| FV_naked_nativeint : forall n,
+    fold_vsim b H H' (V_naked_nativeint n) (V_naked_nativeint n)
+| FV_naked_float : forall f,
+    fold_vsim b H H' (V_naked_float f) (V_naked_float f)
+| FV_naked_float32 : forall f,
+    fold_vsim b H H' (V_naked_float32 f) (V_naked_float32 f)
+| FV_naked_vec128 : forall v,
+    fold_vsim b H H' (V_naked_vec128 v) (V_naked_vec128 v)
+| FV_naked_vec256 : forall v,
+    fold_vsim b H H' (V_naked_vec256 v) (V_naked_vec256 v)
+| FV_naked_vec512 : forall v,
+    fold_vsim b H H' (V_naked_vec512 v) (V_naked_vec512 v)
+| FV_ptr : forall a a',
+    b a a' ->
+    fold_vsim b H H' (V_ptr a) (V_ptr a')
+| FV_ptr_iota : forall a a' o o',
+    H (HK_addr a) = Some o ->
+    H' (HK_addr a') = Some o' ->
+    iota_struct o ->
+    iota_struct o' ->
+    fold_osim b H H' o o' ->
+    fold_vsim b H H' (V_ptr a) (V_ptr a')
+| FV_clos : forall l l' f,
+    b (Addr_loc l) (Addr_loc l') ->
+    fold_vsim b H H' (V_clos l f) (V_clos l' f)
+| FV_null : fold_vsim b H H' V_null V_null
+| FV_region : forall i,
+    fold_vsim b H H' (V_region i) (V_region i)
+| FV_rec_info : fold_vsim b H H' V_rec_info V_rec_info
+
+(** Object-level similarity: same shape, fields related pointwise;
+    Closures objects are leaves (see above).  No clause for HO_Code:
+    code lives under HK_code keys, never at an address, so it is not
+    part of the first-order observation. *)
+with fold_osim (b : address -> address -> Prop) (H H' : heap)
+  : heap_object -> heap_object -> Prop :=
+| FO_block : forall t mu vs vs',
+    Forall2 (fold_vsim b H H') vs vs' ->
+    fold_osim b H H' (HO_Block t mu vs) (HO_Block t mu vs')
+| FO_float_block : forall mu fs,
+    fold_osim b H H' (HO_FloatBlock mu fs) (HO_FloatBlock mu fs)
+| FO_mixed_block : forall t mu sigma vs vs',
+    Forall2 (fold_vsim b H H') vs vs' ->
+    fold_osim b H H' (HO_MixedBlock t mu sigma vs)
+      (HO_MixedBlock t mu sigma vs')
+| FO_array : forall ak mu vs vs',
+    Forall2 (fold_vsim b H H') vs vs' ->
+    fold_osim b H H' (HO_Array ak mu vs) (HO_Array ak mu vs')
+| FO_bytes : forall mu bs,
+    fold_osim b H H' (HO_Bytes mu bs) (HO_Bytes mu bs)
+| FO_bigstring : forall bs,
+    fold_osim b H H' (HO_Bigstring bs) (HO_Bigstring bs)
+| FO_bigarray : forall bk layout dims vs vs',
+    Forall2 (fold_vsim b H H') vs vs' ->
+    fold_osim b H H' (HO_Bigarray bk layout dims vs)
+      (HO_Bigarray bk layout dims vs')
+| FO_closures : forall funs venv funs' venv',
+    fold_osim b H H' (HO_Closures funs venv) (HO_Closures funs' venv')
+| FO_boxed : forall k v v',
+    fold_vsim b H H' v v' ->
+    fold_osim b H H' (HO_Boxed k v) (HO_Boxed k v')
+| FO_lazy : forall t v v',
+    fold_vsim b H H' v v' ->
+    fold_osim b H H' (HO_Lazy t v) (HO_Lazy t v').
+
+(** Heap consistency of a location relation: every pair of [b] is
+    populated on both sides, by fold-similar objects.  Instantiation
+    material (Soundness.v seeds [b] at the observation roots). *)
+Definition fold_heap_sim (b : address -> address -> Prop)
+    (H H' : heap) : Prop :=
+  forall a a', b a a' ->
+    exists o o',
+      H (HK_addr a) = Some o /\
+      H' (HK_addr a') = Some o' /\
+      fold_osim b H H' o o'.
+
+(** The DIAGONAL instance (entry 75): fold-equality of two values
+    within ONE heap — P.Binary.PhysEqual's "equal up to folding of
+    immutable heap objects (13 section 1)".  [b] is pinned to
+    address equality, so non-iota pointers and closures compare as
+    machine words while iota-objects compare structurally:
+    simulation against self. *)
+Definition fold_eq (H : heap) (v1 v2 : value) : Prop :=
+  fold_vsim (fun a a' => a = a') H H v1 v2.
+
+(** Reflexivity family (entry 75; load-bearing TWICE: it witnesses
+    13 section 1's coincidence sentence — programs whose
+    observations never consult loose identity get refinement in
+    both directions — and it constructs the code-matching abstract
+    behavior in the re-posed INV.ToCmm.Simulates' determinacy
+    bridge).  Any reflexive location relation gives reflexivity
+    outright: pointers and closures go through [b]; no structural
+    descent is needed. *)
+Lemma Forall2_diag :
+  forall (A : Type) (R : A -> A -> Prop) (l : list A),
+    (forall x, R x x) -> Forall2 R l l.
+Proof.
+  intros A R l HR. induction l; constructor; auto.
+Qed.
+
+Lemma fold_vsim_refl :
+  forall (b : address -> address -> Prop) (H H' : heap) v,
+    (forall a, b a a) -> fold_vsim b H H' v v.
+Proof.
+  intros b H H' v Hb. destruct v; constructor; auto.
+Qed.
+
+(** Object-level reflexivity excludes code: [fold_osim] deliberately
+    has no HO_Code clause (code lives under HK_code keys, never at an
+    address), so the diagonal holds for every ADDRESSABLE object. *)
+Lemma fold_osim_refl :
+  forall (b : address -> address -> Prop) (H H' : heap) o,
+    (forall a, b a a) ->
+    (forall c, o <> HO_Code c) ->
+    fold_osim b H H' o o.
+Proof.
+  intros b H H' o Hb Hnc.
+  assert (Hv : forall v, fold_vsim b H H' v v).
+  { intro v. apply fold_vsim_refl. exact Hb. }
+  destruct o.
+  - apply FO_block. apply Forall2_diag. exact Hv.
+  - apply FO_float_block.
+  - apply FO_mixed_block. apply Forall2_diag. exact Hv.
+  - apply FO_array. apply Forall2_diag. exact Hv.
+  - apply FO_bytes.
+  - apply FO_bigstring.
+  - apply FO_bigarray. apply Forall2_diag. exact Hv.
+  - apply FO_closures.
+  - apply FO_boxed. apply Hv.
+  - apply FO_lazy. apply Hv.
+  - exfalso. exact (Hnc _ eq_refl).
+Qed.
+
+Lemma fold_eq_refl : forall (H : heap) v, fold_eq H v v.
+Proof.
+  intros H v. apply fold_vsim_refl. intro a. reflexivity.
+Qed.
+
 (** ** Value environment rho — 04-opsem.md §1.4
 
     [rho : (Variable + Symbol) -> value], i.e. keyed by [name]. *)

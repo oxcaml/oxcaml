@@ -360,17 +360,17 @@ Inductive cse_prim_pred : prim_op -> Prop :=
    pair is (No_effects, No_coeffects) or (Only_generative_effects
    Immutable, No_coeffects).  No rewrite by itself: this is the side
    condition for S.Rewrite.CSE.Replace / S.Rewrite.CSE.Extend.
-   FINDING #16 (doc-level design conflict, recorded, not resolved
-   here): the immutable-block-construction arm
+   FINDING #16 (doc-level design conflict; RESOLVED 2026-07-22 as
+   13 s4 item 8 -- entry 75): the immutable-block-construction arm
    (CPP_make_block_immutable, via the Only_generative_effects
-   Immutable clause) licenses sharing two distinct allocations, but
-   P.Binary.PhysEqual (PrimMemoryB.v) is deterministic location
-   equality; a context applying phys_equal to both copies observes
-   the merge, an in-model refutation path for a CSE soundness claim
-   over this arm.  Both rules are transcribed faithfully; the
-   resolution (nondeterministic phys-eq up to sharing, narrowing
-   this license, or a recorded discrepancy in 13-soundness.md) is a
-   formalism design decision escalated to the humans. *)
+   Immutable clause) licenses sharing two distinct allocations, and
+   P.Binary.PhysEqual (PrimMemoryB.v) is now RELATIONAL on exactly
+   that iota-class, with INV.Simplify.Preserves restated as
+   refinement (Soundness.v): the former in-model refutation
+   composition -- a context applying phys_equal to both copies and
+   observing the merge -- is now a licensed RESOLUTION of the loose
+   result.  Both rules remain transcribed faithfully; nothing is
+   narrowed. *)
 Definition cse_eligible (fl : eff_flags) (p : prim) : Prop :=
   cse_prim_pred (prim_op_of p)
   /\ (exists x co, In (Simple_name (Name_var x) co) (prim_args p))
@@ -406,8 +406,15 @@ Definition cse_table : Type := fmap prim simple.
    NM_normal binding below); the CSE table maps p with canonicalized
    arguments to a simple s in scope.  Conclusion: the binding's
    defining expression becomes an alias to s ("with x : alias-of s"
-   is dacc type recording, in prose).  CSE runs BEFORE the
-   per-primitive analysis in simplify_primitive. *)
+   is dacc type recording, in prose).  Reuse is sound per the
+   revised NOTES (item 8): p is pure, or an immutable allocation
+   where sharing changes only the physical identity of an immutable
+   value -- identity MAY be observed through phys_equal; the change
+   is licensed because (==) on non-mutable values is
+   implementation-dependent, and P.Binary.PhysEqual together with
+   INV.Simplify.Preserves' refinement reading grants exactly this
+   license.  CSE runs BEFORE the per-primitive analysis in
+   simplify_primitive. *)
 Inductive rw_cse (fl : eff_flags) (C : code_env) (tbl : cse_table)
     (E : tenv) : expr -> expr -> Prop :=
   | S_Rewrite_CSE_Replace : forall x p s body,

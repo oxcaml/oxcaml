@@ -288,7 +288,15 @@ here (writers: append as you add them):
 20. **C-call oracle keyed by value** (`Opsem.v`, `cextern_rel`): the doc's
     `Cextern` takes the syntactic callee simple `s_f`; the encoding keys by
     the callee *value* for ρ-independence (`OS.Apply.CCall`'s premises always
-    define `⟦s_f⟧ρ`).
+    define `⟦s_f⟧ρ`). DISCIPLINE (KF-057, item 8; W-34): the refinement
+    reading of ch. 13 carries a new implicit premise on this oracle —
+    `cextern_rel`'s licensed answers must be MONOTONE under
+    immutable-identity folding of its heap argument (sharing, dropping, or
+    lifting ι-objects changes the heap PASSED TO later externs, distinct
+    from the compared snapshots); any future constraint on
+    `cextern`/`cextern_c` that could make extern answers fold-sensitive
+    must revisit the re-posed `INV.ToCmm.Simulates`' determinacy bridge in
+    the same change.
 21. **Effects classification as Section Variables** (`Opsem.v`): the premises
     "p has No_effects or Only_generative_effects" / "Arbitrary_effects" of
     `OS.Let.Prim.*` are Section Variables `pure_prim`/`effectful_prim :
@@ -617,6 +625,46 @@ here (writers: append as you add them):
     `ToCmmSoundness.v`'s trace matching states its per-event
     correspondence with the same cumulative retention and cites this
     comparison rather than defining a parallel one.
+    ITEM-8 AMENDMENT (2026-07-22; entry 75): the location relation
+    generalizes from a pinned partial BIJECTION to the FOLD DISCIPLINE
+    of 13 §1 — `b` is bijective on non-ι objects only (mutables and
+    Immutable_unique), UNCONSTRAINED by injectivity/functionality on
+    ι-objects (one shared target block may stand for two source blocks
+    and vice versa — CSE sharing and re-boxing respectively), and may
+    relate a dynamic ι-location to a symbol (lifting); `heap_sim`
+    descends structurally through ι-objects under the same discipline.
+    The shared core is HOSTED IN `Values.v` (the value-owner precedent;
+    ruling (a)): one heap-parameterized, object-class-aware simulation
+    relation, with identity-pinning an INSTANTIATION property — this
+    entry's `obs_equiv`/`beh_sim` instantiate with the pins-and-
+    non-ι-bijection discipline above, and `PrimMemoryB.v`'s PhysEqual
+    premise takes the DIAGONAL instance (fold-equality within one heap
+    is simulation against self). The fold is INDUCTIVE under an explicit
+    acyclicity premise (ruling (b)): dynamic ι-allocations cannot
+    self-reference (their constructors take already-evaluated values),
+    static recursion passes through code ids
+    (`WF.Syntax.StaticRecThroughCode`), closures and non-ι objects are
+    relation-leaves — descent is well-founded. TRIPWIRE (W-35): real
+    OCaml's `let rec x = 1 :: x` builds cyclic immutables via the
+    alloc_dummy/update_dummy MUTATION idiom, absent from the model (and
+    if modeled, the block is built Mutable, hence a leaf); any future
+    extension minting cyclic ι-objects breaks inductive totality and
+    must revisit the fold. Closures remain LEAVES, now with the full
+    rationale (ruling (c)): identified through the location relation —
+    non-injective on ι, so one target closure stands for two shared
+    source closures, while literal slot equality keeps distinct slots of
+    one set distinct — never structurally recursed; this simultaneously
+    delivers the sharing license and keeps fold-to-1 underivable on
+    distinct closures under the diagonal instance, matching the
+    prover's never-fold-closure-equality discipline. `obs_refines` is
+    `obs_equiv`'s second conjunct alone (every transformed-side behavior
+    has a source-side match); the reflexivity-lemma family (identity
+    relation on non-ι, structural reflexivity on ι) is LOAD-BEARING
+    twice — it witnesses 13 §1's "identity-free programs get both
+    directions" sentence AND constructs the code-matching abstract
+    behavior in the re-posed `INV.ToCmm.Simulates`' determinacy bridge.
+    The event apparatus of amendment (b) keeps its shape; only the
+    `b`/`b_ev` discipline changes as above.
 
 45. **The control simulation statement** (`ToCmmControl.v`,
     `INV.ToCmm.Control`): the control relation is encoded at the doc's own
@@ -811,14 +859,21 @@ here (writers: append as you add them):
     section-1 sibling does). `INV.NameMode.Coherent`: no debug positions
     in modeled syntax, so the Phantom clause sharpens to "no free
     occurrence at all"; mode ≠ Normal covers Phantom and In_types in one
-    clause. DISCLOSURE (fidelity finding KF-030, corollary of §4 item 8):
-    the rewrites union deliberately excludes `CSE.Replace`/`Extend` and
-    `Loopify.SelfTailCall` (they live in `cse_deep`/`stc_deep`), and the
-    CSE exclusion is load-bearing — CSE.Replace's LOCAL obligation is
-    false as stated (plug the item-8 witness into a one-let context), so
-    a future `Preserves` proof gets no per-arm lemma from `Rewrite.Local`
-    at the `S_cse` and `simplify_code` arms; those carry composed
-    obligations directly, pending the item-8 design resolution.
+    clause. DISCLOSURE (fidelity finding KF-030; REWRITTEN at the item-8
+    resolution — ruling (d), partial re-entry): the rewrites union
+    excludes `CSE.Replace`/`Extend` and `Loopify.SelfTailCall` on the
+    STRUCTURAL ground alone, which stands and is item-8-independent —
+    the CSE table is denv state, so they live in side judgments with the
+    table an explicit argument (entry 56) and cannot be union arms. The
+    former SECOND ground is DISSOLVED: CSE.Replace's local obligation was
+    false as stated only against the pre-resolution equivalence (the
+    item-8 witness in a one-let context); under `Rewrite.Local`'s
+    refinement reading it is true-shaped ({true} ⊆ {true, false}), so
+    the local refinement obligation on `rw_cse` is now STATABLE — booked
+    as a wave/follow-up item (it hands a future `Preserves` proof
+    exactly the per-arm lemma the old text said was impossible); until
+    it lands, the `S_cse` and `simplify_code` arms keep their composed
+    obligations.
 
 56. **Prim-side rewrites** (`RewritesPrim.v`): the CSE table is denv
     state, so `CSE.Replace`/`Extend` live in side judgments
@@ -1159,7 +1214,9 @@ here (writers: append as you add them):
     is not false against `R.Obj`. If the compiler is fixed upstream,
     `ov_hole` flips as a strictly local change and the carve-out premise
     is deleted. Escalated to the maintainers with a suggested fexpr
-    confirmation test.
+    confirmation test. ITEM-8 UPDATE: the entry-68 carve-out premise and
+    this ruling are unaffected by the item-8 resolution (KF-040 is a
+    write-target bug, not an identity question).
 
 70. **Ch. 20 completion** (`ToCmmSoundness.v` inc 4 — the census-closing
     increment: `INV.ToCmm.EndToEnd`, `INV.ToCmm.InvalidUnreached`, nine
@@ -1293,6 +1350,69 @@ here (writers: append as you add them):
     transcription; the KF-051 repair is its enforcement in `sat_ext`.
     Does not supersede either .v fix — it gives them a stated premise
     to cite.
+
+75. **The item-8 resolution** (user decision, 2026-07-22; doc revisions
+    across chs. 06/10/11/13/20 + the classic validation study (plus the
+    =-premises reading note covering ch. 04, hosted at ch. 06's ⟦p⟧
+    preamble) —
+    all Dijkstra-stamped, Knuth design-PASS with KF-055/056/057 filed
+    and closed/riding; the .v wave follows this record). DECISION:
+    13 §4 item 8 resolved as option (a) SCOPED TO IMMUTABLE HEAP OBJECTS
+    plus option (b), jointly with the classic-mode sibling. Doc content:
+    `P.Binary.PhysEqual` is RELATIONAL on ι-operands (ι = immutable
+    heap objects EXCLUDING Immutable_unique blocks/arrays — extension
+    constructors are identity-pinned; closures included, ruling: the
+    pipeline shares/duplicates/lifts closures and the manual's ==⇒=
+    guarantee is vacuous on functionals) — result 0 always derivable
+    (even for identical pointers: duplication/dropping), result 1
+    derivable exactly up to 13 §1's folding (preserving ==⇒structural
+    equality); the ∋ relational-denotation notation is declared at the
+    ⟦p⟧ judgment preamble with the membership reading of
+    `OS.Let.Prim.*`'s =-premises (KF-055). Ch. 13 §1 compares
+    observations up to FOLDING of ι-objects and defines REFINEMENT;
+    `INV.Simplify.Preserves` and `INV.Rewrite.Local` conclude
+    refinement, not equivalence — forced, not chosen: the
+    `simplify_phys_equal` folds and CSE-of-phys_equal PRUNE outcomes,
+    so no two-sided statement survives a loose denotation.
+    `INV.ToCmm.Simulates` is RE-POSED in the backward direction
+    (∀ Cmm outcome ∃ Flambda behavior; KF-056 — the forward direction
+    is refutable: an abstract run may resolve
+    `phys_equal(ptr ℓ, ptr ℓ) → 0` where emitted word-equality code
+    cannot follow), with the determinacy-modulo-oracles bridge in its
+    NOTES; `INV.ToCmm.EndToEnd`'s conclusion is unchanged (already
+    refinement-shaped; its transitivity gloss re-worded
+    equivalence→refinement). Consumers swept (Knuth): `R.Observe` needs NO
+    change — the folding localizes to the flambda-side relation.
+    MECHANIZATION PLAN (Hopper's prep + rulings (a)-(f), W-33 inventory):
+    `is_iota` classifier + the fold core in `Values.v` (entry-44
+    amendment has the discipline; is_iota consults μ at the three-way
+    granularity — Base.v carries it verbatim, no gap); PhysEqual
+    4→8 constructors in `PrimMemoryB.v` (deterministic non-ι clauses on
+    `phys_same_word`; ι-clauses `∋ 0` always and `∋ 1` under the
+    diagonal fold premise — deliberate overlap on equal pointers, so
+    the fold core must be REFLEXIVE on ι-objects); `obs_refines` +
+    revised `b`-discipline in `Soundness.v`; both headline statements
+    re-shaped; `ToCmmSoundness.v`'s Simulates re-posed (Flambda-side
+    quotient, `tocmm_beh_rel` untouched) with its header caveat
+    rewritten; `RewritesPrim.v`'s CSE.Replace comment re-quoted and the
+    FINDING-16 pointer updated (the in-model refutation composition is
+    now a licensed resolution); `Soundness.v`'s KF-030 disclosure
+    comment (:569-588) re-worded to mirror entry 55's rewrite (it still
+    asserts the local form "is FALSE" with the old witness — a .v
+    comment the docs no longer support); `Pilot.v`'s const-fold proof re-greens
+    against the renamed relations (equivalence implies refinement), with
+    an optional second conclusion at equivalence strength witnessing the
+    identity-free-coincidence sentence. CENSUS: the resolution is
+    census-neutral (453 = 303/66/84; no id or STATUS moved; verified
+    thrice). COUNTING TRAP (recurring, now catalogued): line-anchored
+    STATUS extraction over-counts ch. 18 by one via the prose line
+    beginning "STATUS conjectured —" in TC.Let.Subst's NOTES
+    (18-to-cmm-data.md:143); use fence-aware extraction. WATCHES:
+    W-33 (superseded-.v inventory, closes as the wave lands), W-34
+    (cextern folding-monotonicity, entry 20), W-35 (cyclic-ι tripwire,
+    entry 44). Finding records: KF-055/056 closed on the doc letter;
+    KF-057 codified at entry 20; KF-030's disclosure rewritten at
+    entry 55 (partial re-entry).
 
 ## Build
 

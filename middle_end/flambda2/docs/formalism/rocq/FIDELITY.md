@@ -71,6 +71,8 @@ green, since compile-fix churn may moot or introduce drift.
 | ToCmmData.v FULL GREEN STAMP (both halves complete; CODE-anchor edge closed) | GREEN REVIEW (declaration — completes the split review) | ToCmmData.v CODE anchor lines (:126-127, :705-707, :721-725, :744, :754-755, :782-784, :797-798, :811-812, :825-826, :842-844, :857-858, :890-892, :926-928, :972-974, :1022-1023, :1052-1054, :1192-1195, :1545-1546, :1557-1558, :1576, :1650-1651); 18-to-cmm-data.md CODE lines (:25-26 through :492-493); Church's boundary reply (CF-1..CF-10 all dispositioned; CF-6 fix re-verified on disk :429 with site note :413-418; CF-1 3-arg caml_modify_local sites unchanged through the respin) | ToCmmData.v review COMPLETE, file GREEN-STAMPED. Church's half done: code-vs-.v on the section-3 images and all 20 tc_prim bodies = the CF-1..CF-10 arc, all dispositioned, with the green batch's CF-6 delta re-verified on current disk (block_set_image immediate branch = Cop (Cstore Word_int Assignment), unconditional drop correctly noted). My half done previous round (four inc-2 dispositions + W-17 + census). Boundary edge Church named — RULE-header CODE anchors (doc-metadata, my lane) — CLOSED with no discrepancy: all anchors match the doc's CODE lines 1:1 VERBATIM across every rule region (14 primitive rows doc :192-493 = .v :705-1049 region; section-2 kernel rules :25-115 = .v :126-127/:1052-1054/:1192-1195; section-4 statics :75-173 = .v :1545-1651), so anchor drift is impossible without doc drift, and every function an anchor names is on Church's byte-checked list (array_indexing, box_number, setfield_computed, array_set0, bigarray_load_or_store, string_like_load, make_alloc_generic, ...). HELD OUT (both halves, by agreement): the ArrayAccess row's `mut` premise — rides main's KF-045 doc ruling (W-30 watches ordering; Church's CF-2 follow-up rides it). With #25 completed, All.v (#26) is the only task left; this stamp was the last file-level gate before the finale. DELTA (2026-07-18, crossed traffic): the stamp declaration crossed Church's final sweep result — 13/14 doc-quoted shapes clean plus ONE new finding, CF-11 (medium, writer-side): TC_Prim_ArrayAccess_Vector_Load emitted `cmm_mut mu`, but array_load_vector takes no mutability parameter and bottoms out in load_chunk's mk_load_mut = always Mutable, and the doc's .Vector rule quotes the helper without routing mu — .v-vs-both per the CF-2/CF-6 taxonomy, no doc dependency. Fix landed and Hopper-greened (chain through ToCmmSoundness.v, zero warnings); VERIFIED ON DISK by me: constant CMut_mutable at :957, CF-11 note clause at :944-949 (correctly noting the scalar row keeps cmm_mut mu pending KF-045), scalar row unchanged at :911. STAMP RE-AFFIRMED post-CF-11 with the same single hold-out (KF-045's scalar row). MY ERRATUM (#3, minor): my inc-2 disposition re-check of the Vector rows verified index shape, chunk source, and width source but not the mutability token — the mu-vs-doc-silence divergence was visible doc-vs-.v (the doc's quoted helper carries no mutability) and I missed it; Church's quoted-shapes sweep caught it. CODE-anchor closure unaffected (CF-11 is a constructor-body field, not an anchor). KF-045 entry gains a CF-11 rider: the doc fix should add a parallel NOTES sentence to .Vector ("mu does not reach the load"). |
 | All.v (task #26) + finale Print Assumptions | GATE REVIEW (2026-07-22; definition-of-done items 1-4) | All.v (on disk, 26 imports); Hopper's verbatim Print Assumptions log (~/.claude/plans/flambda2-rocq-print-assumptions.log, both closures read in full); theories/ grep sweeps run independently (naked-Axiom grep, RULE-token grep on All.v, unique id count, unique id-status pair split, chapter-side id extraction, comm set-difference); CORRESPONDENCE.md sanctioned-Parameter cites (:263 cextern_c, :288 cextern_rel entry 20, :391 f16_round, :429/:836 prim_arg_kinds + prim_transfer, :657-664 the layout oracles); Representation.v Parameter inventory | PASS ON ALL GATES. (1) INV_Simplify_Preserves closure: static_consts_in and cmm_unique_binders both ABSENT as required; members are exactly the sanctioned flambda-side set — Unbox?/Inline?/abstract-transfer oracles (unbox_dec, inline_dec, prim_transfer, prim_arg_kinds), alpha predicates (free_vars/free_conts/bound_vars), the Base.v float32/float64 type+op family, f16_round, data_ptr, Machine.cextern (catalog entry 20), as_pointer; nothing else, no foreign Admitted (closures are statement-type-driven; both invariants are themselves Admitted, correctly the only theorem-constants present). (2) INV_ToCmm_Simulates closure: static_consts_in and cmm_unique_binders both PRESENT as required; plus the EIGHT layout oracles (all eight individually sanctioned at catalog :657-664 — the final report's "7 layout oracles" is a miscount to fix), header_is_local, gc_reloc (still an unconstrained Parameter — W-32 intact), cextern_c, Machine.cextern, floats/f16_round/data_ptr/as_pointer, free_vars; nothing unsanctioned. Statement shapes spot-verified against the catalog: Preserves = the entry-70-quoted premise set; Simulates carries tc_expr_data_sunk, the cmm_unique_binders premise (W-28), the KF-040 custom_boxed_var_payload carve-out, symaddr_agree/rep_heap/loc_map_inj, no-undef premise, exists-outcome + tocmm_beh_rel conclusion. (3) NO NAKED AXIOMS: grep over theories/ finds zero Axiom declarations. (4) All.v: imports all 26 content files, contains zero RULE tokens (no phantom ids; prose uses lowercase "rule"). (5) Coverage independently re-verified: 453 unique ids in theories/; unique id-status pairs exactly 303 normative / 66 descriptive / 84 conjectured; chapter-side extraction 453; symmetric set difference EMPTY (exact set equality). Counting caveat recorded: raw STATUS-occurrence grep reads 88 conjectured + noise ("STATUS preserved"/"STATUS marks" prose fragments, duplicate quotings) — unique-pair extraction is the correct method. FINAL FIDELITY STATEMENT (definition-of-done item 4): NO OPEN DISCREPANCY REPORTS. KF-001..KF-054 all resolved, accepted-as-cataloged, or closed by doc ruling; the Admitted-false family (KF-037/038/041/043/044/049/050/051/052/053) fully resolved on disk; KF-040's compiler-bug half and Finding #16's design conflict remain open UPSTREAM/USER-side only (final-report decision items, not mechanization discrepancies). |
 | Final report Part 1 (findings narrative) + last two comment residues | REPORT PASS + LANDING VERIFICATION (2026-07-22, at main's request — the project's last unverified deltas) | ~/.claude/plans/flambda2-rocq-final-report.md (whole file); 04-opsem.md §1.4 diff; Opsem.v:677-697 + .vo mtime; per-file `^Admitted.` counts across all 13 Admitted-bearing files; TypeGrammar.v:916 (cut_as_extension); non-anchored RULE-token grep over all 20 chapters; ToCmmControl.v:209/:259-283 (TestByValue) | Residues BOTH VERIFIED: ch. 04 §1.4 parenthetical ("unless rebound by OS.Let.Static — see that rule's NOTES") is exactly the recommended resync, prose-only; Opsem.v:687-690 header comment now quotes the corrected conclusion (v_j with the per-match NOTES gloss), .vo rebuilt. Report Part 1: per-file Admitted distribution EXACT (sums to 32; MeetJoin 10, Opsem/Pilot 0 among the 14 Admitted-free); Parameter inventory real (cut_as_extension confirmed a Parameter); Print Assumptions bullet matches my certification; falsity/USER-DECISION items match my entries; Part 3 errata corrected to five with my classification. TWO FACTUAL ERRORS FILED (report-side, not mechanization): (1) the Qed-under-conjectured sentence lists TC_Switch_TestByValue among "six doc conjectures now machine-checked theorems" — ON DISK it is an ADMITTED kernel with NO rule id (ToCmmControl.v:259, Admitted :283; catalog-62 family; one of that file's two Admitted, already correctly counted in the report's own 32) — an inherited ledger slip (Dijkstra's 07-18 class listing predates the report's "machine-checked" rendering); true inventory is five members, and the doc-conjecture-theorems count is 4 rule upgrades + 3 envelope-Qeds. (2) The coverage bullet's "naive counting reads 454 on the doc side: a prose line in ch. 18's NOTES" does not reproduce: non-anchored unique-id grep over the twenty chapters reads 453, and no chapter contains a non-line-initial `RULE ` token — the phantom either predates a doc edit or used a different pattern; the sentence needs its method stated or removal. Plus one wording nit: Simulates' closure additions are not "exactly" the listed apparatus + two conditions — f32_of_Z is a 14th addition (float-family, reachable only Cmm-side). CLOSURE (2026-07-22, same session): all three fixes applied by main and RE-VERIFIED against disk — (1) the Qed sentence now headlines SEVEN doc conjectures discharged (4 rule upgrades + 3 envelope-Qeds), states the support inventory as five, and carries an explicit reconciliation note that TC_Switch_TestByValue is an Admitted kernel with no rule id; (2) the 454 parenthetical now states the reproducible method — and it REPRODUCES: 18-to-cmm-data.md:143 is a line-initial "STATUS conjectured —" prose line inside TC.Let.Subst's NOTES (the rule's real field is :111), so line-anchored STATUS extraction reads 454 while RULE-token greps read 453; (3) f32_of_Z listed as the 14th addition. Dijkstra's reconciliation (same session) confirms both filings: the class-membership slip was his pre-coma conflation of the support-theorem inventory with the Qed class (census figures unaffected — his own per-file counts had TestByValue right all along), and the 454 reproduces under his actual method (line-anchored RULE/STATUS pairing: ch. 18 has 22 ^STATUS lines against 21 rule fences, :143 pairing a second time with :110's RULE line). FINAL VERDICT: report read CLEAN; delivery unblocked. |
+| Item-8 resolution package (revised P.Binary.PhysEqual; 13 §1 folding + refinement; Preserves/Rewrite.Local restated; CSE.Replace NOTES; 20 §2/§5.6/EffectLinear; classic_physequal_box addendum) | RULING REVIEW (2026-07-22, pre-mechanization gate at main's request; full diffs, not summaries: 06/10/13 vs the rescue snapshot, 20 + 14-validation vs HEAD) | 06-primitives-memory.md:1191-1234 diff; 13-soundness.md §1 + §2 + §4-item-8 diff (incl. the :745-754 qualification tail); 10-simplify-rewrites.md:475-479 diff + CSE.Eligible :427-457; 20-to-cmm-soundness.md diff + EndToEnd :89-115 + InvalidUnreached; 14-validation/classic_physequal_box.md diff; 17-representation.md R.Observe :462-479; 04-opsem.md OS.Let.Prim premises; 06:62 mutability grammar; equivalence-phrase sweep over all chapters; ∋-notation grep | DESIGN PASSES — the refinement architecture is the right shape and coheres: pruning direction correct ({true} ⊆ {true,false} witness reclassification verified); the each-half-insufficient argument verified in both directions; CSE.Replace correction is item 8's mandated sentence verbatim; the symbol-disequality qualification (:745-751) is sound (licensed by always-derivable-0, not 1-underivability); repeated-comparison consistency handled ("consistent resolution is itself a resolution"); the NaN caveat is inherited, not worsened (==⇒= already fails at NaN in real OCaml; the float warning survives); R.Observe needs NO change — folding is correctly localized to the flambda-side §1 relation, the bridge's literal-equality reading survives because the backward-direction abstract behavior is the one matching Cmm's identity choices; closures-in-ι DEFENSIBLE (pipeline shares/duplicates/lifts closures; (=) raises on functionals so the manual's ==⇒= is vacuous there); EffectLinear Drop-arm answer ACCEPTED on its two grounds, completed by KF-057's oracle-input rider; no RULE id or STATUS moved in any of the five diffs (baseline 303/66/84 safe, Dijkstra re-certifies). THREE FINDINGS: KF-055 (high — the ι/Immutable_unique exclusion is DECIDED at 13 §4:751-754 but absent from the normative definition sites, and its letter leaves same-pointer unique comparisons (exception dispatch) with NO derivation; plus the ∋ notation is undefined and ch. 04's =-premises don't accept relational results — three one-line fixes + one sentence); KF-056 (high — Simulates' current ∀b∃o direction is refutable under relational PhysEqual; the re-posing must flip to ∀o∃b "Cmm refines Flambda", which EndToEnd's own :101-102 gloss already names; EndToEnd's "equivalence" parenthetical stale; decomposition needs a determinacy caveat); KF-057 (medium — cextern answer-monotonicity under folding is a new implicit premise; discipline sentence + watch). LOW rider: 11-inlining.md:170 still cites "observationally equivalent … stated in chapter 13" for what is now a refinement obligation — the only stale cross-reference the sweep found. |
+| Item-8 mechanization wave (fold core + re-shaped statements + event apparatus) | WAVE VERIFICATION (2026-07-22, at Hopper's green; against entries 44/75 and rulings (a)-(f)) | Values.v:185-416 (iota_object/iota_struct/iota_addr/is_iota, fold_vsim/fold_osim/fold_heap_sim, fold_eq diagonal, reflexivity family incl. fold_osim_refl's non-code premise, W-35 tripwire comment); Soundness.v:128-237 (ITEM-8 AMENDMENT header, fold_bij record, pins, event_sim), :334-364 (obs_equiv/obs_refines/no_ub), :497-514 (Preserves), :555-600 (Local + the rewritten KF-030 disclosure); ToCmmSoundness.v:578-623 (re-posed Simulates); Pilot.v:879/:908 sighted; counts by my own greps (Admitted terminators 32; unique id-status pairs 453; pre/post Print Assumptions name-set diff EMPTY) | ALL PASS. (1) iota_object implements the ruled table exactly (constructor-matched Immutable for the five μ-bearing forms; Closures/Boxed wholly ι; bigstring/bigarray/lazy/code excluded) with the doc rationale in the comment; iota_struct = ι minus closures with ruling (c)'s rationale verbatim. (2) fold_vsim/fold_osim: FV_clos = b + literal slot; FV_ptr_iota descent gated on BOTH sides iota_struct; FO_closures unconditional = catalog-44 leaf opacity (consistent with ruling (c) and the pre-item-8 certified treatment); no HO_Code clause with the reachability argument stated. (3) fold_bij: functionality waived on ι SOURCES, injectivity on ι TARGETS, fb_sym_l statics-fixed, fb_sym_r's lifting disjunct correctly ι-restricted; classification-stability note (class permanent once allocated) sound. (4) DESIGN POINT BLESSED: fold_osim_refl's explicit non-code premise is the honest shape — fold_osim is only consulted on HK_addr fetches, where HO_Code never lives (well-formed heaps install code at HK_code), so the premise discharges at every use site; the unconditional diagonal being unprovable is disclosed at the site as required. (5) obs_refines textually = obs_equiv's second conjunct, direction correct (transformed ⊆ source); Preserves/Local premise sides untouched, conclusions obs_refines. (6) Simulates re-posed exactly per KF-056 + ruling (e): certified premise set unchanged, set-level no_ub, ∀ Cmm outcome ∃ b_f b_q with fl_has_behavior + beh_sim quotient + tocmm_beh_rel UNTOUCHED. (7) Event apparatus: per-event fold_bij at call-time heaps (behavior-wide record correctly gone for the heap-less behaviors), results under full b with the fresh-ι anchoring disclosed; probed the diverging-last-event corner — fresh results from the final event before divergence are never re-read in the trace semantics, the same boundary as the certified KF-015 design, sound. (8) The KF-030 wave rider LANDED (Soundness.v:559-584 mirrors entry 55's rewrite exactly — structural ground alone, second ground dissolved, rw_cse obligation booked). (9) Counts independently confirmed: Admitted 32, census pairs 453, Print Assumptions name-sets IDENTICAL pre/post wave (empty diff of the two logs). No findings. |
 
 ## Findings
 
@@ -1300,6 +1302,23 @@ green, since compile-fix churn may moot or introduce drift.
   surface as stuck runs, which no_ub excludes") with the Local statement
   deferring there by reference — accepted, no duplication needed; L2 leg
   (d) in TrapNeutral's anchor (:874-877).
+- COROLLARY DELTA (2026-07-22, item-8 resolution; ruling (d)): the
+  design decision this entry held its optional strengthening on has
+  LANDED, and entry 55's disclosure is REWRITTEN accordingly
+  (verified, no drift): the union exclusion now rests on the
+  STRUCTURAL ground alone (denv-state table, side judgments — stands,
+  item-8-independent); the second ground is DISSOLVED (under
+  Rewrite.Local's refinement reading the one-let witness exhibits
+  {true} ⊆ {true, false}, so CSE.Replace's local obligation is
+  true-shaped); and the held-off CSE-local obligation — Plotkin's
+  optional strengthening, my hold-off — is now STATABLE on rw_cse
+  and booked as a wave/follow-up item. WAVE RIDER filed with main:
+  Soundness.v:569-588's disclosure comment (this entry's verified
+  fix) still states the local-form instance "is FALSE with the
+  Make_block(0,Immutable) context witness" — post-resolution that
+  comment must mirror entry 55's rewrite; it is MISSING from record
+  75's mechanization plan (which covers the RewritesPrim.v comment
+  and the FINDING-16 pointer but not this one).
 
 ### KF-031 — tc_raise_kind_opt defaults an absent raise kind to Raise_regular; the code defaults to Raise_notrace (low)
 - Chapter: 16-to-cmm-control.md:235-254 (TC.ApplyCont.Raise; the doc
@@ -3859,6 +3878,205 @@ For each rule that splices a stored term into a use site, check:
   no longer quoting the doc's line; comment-only resync, polish-wave
   candidate. The KF-054 seam is now closed at the root in all three
   places: foundational chapter, types chapter, mechanization.
+
+### KF-055 — the revised P.Binary.PhysEqual's letter leaves defined comparisons without derivations: identity-pinned immutables fall through every clause, and ch. 04's `=`-premises don't accept relational results (high; on the item-8 resolution package, ruling-review finding; the DESIGN is right — the letter lags it in three places)
+- Chapter: 06-primitives-memory.md:1191-1234 (revised PhysEqual),
+  04-opsem.md (OS.Let.Prim.Pure/Effect premises `⟦p⟧(v̄;H) = (v,H′)`),
+  13-soundness.md:33-46 (§1 folding enumeration), :751-754 (the §4
+  RESOLVED paragraph that already records the correct decision).
+  Owner: main (doc).
+- What differs, three legs of one gap:
+  (a) The ι-class decision EXCLUDES Immutable_unique blocks/arrays
+  (extension constructors; 13 §4:751-754 — compiler refuses to
+  share/duplicate them, exception matching observes identity;
+  corroborated by S.Rewrite.CSE.Eligible :439, whose generative
+  clause admits Only_generative_effects Immutable ONLY). But the
+  NORMATIVE definition site (06:1191-1193 "an immutable block …
+  an immutable array") and 13 §1's enumeration carry no qualifier —
+  per the mutability grammar (06:62, {Immutable, Immutable_unique,
+  Mutable}) their letter INCLUDES unique.
+  (b) With unique correctly excluded, unique operands take the
+  "neither operand is ι" clauses — whose 1-clause reads "same
+  immediate, same pointer to a MUTABLE object, or both null"
+  (06:1195-1197). A same-pointer pair of Immutable_unique objects
+  satisfies neither the 1-clause (not mutable) nor the 0-clause
+  (they ARE the same word): NO derivation. Stuck = undef
+  (OS.Unit.Final) — exception dispatch (compare a raised extension
+  constructor with itself) becomes UB by the letter of the rule.
+  The :1226 bullet ("Two pointers to mutable objects…") has the
+  same gap.
+  (c) The rule's relational clauses use `∋` "per the notation for
+  nondeterministic denotations" — no such notation is defined
+  anywhere (grep: ∋ occurs only at 06:1205/:1208), and ch. 04's
+  OS.Let.Prim.Pure/Effect premises are written `⟦p⟧ = (v,H′)`. Read
+  literally, a relational result never matches an `=`-premise, so
+  NO machine transition exists for any ι-comparison — every
+  phys_equal on immutables would be stuck = UB, collapsing the
+  resolution. (The .v is immune — denot is already a relation — but
+  the doc is the normative layer; KF-054's lesson: pin the
+  cross-chapter reading where it is consumed.)
+- Why it matters: (b) and (c) make defined programs undef in the
+  letter of the semantics; (a) is the decision recorded at the
+  wrong layer (a §4 findings entry is not a definition site).
+- Candidate fixes (three one-liners + one sentence): 06 ι-definition
+  gains "excluding Immutable_unique blocks/arrays (extension
+  constructors — identity-pinned; 13 §4 item 8)"; 06's word-equality
+  clause and the :1226 bullet say "mutable or Immutable_unique
+  object"; 13 §1's enumeration gains the same two words; one
+  sentence where ⟦p⟧'s judgment forms are declared (ch. 06 preamble
+  or ch. 04): relational denotations are written ⟦p⟧(v̄;H) ∋ (v,H′),
+  and the OS.Let.Prim.* `=`-premises read as membership for them.
+- Status: OPEN (filed 2026-07-22, item-8 ruling review; to main,
+  pre-mechanization blocker — Hopper holds anyway).
+  DELTA (2026-07-22, re-verified against final disk after Church's
+  round + main's three late fixes): legs (a) and (b) RESOLVED —
+  the ι-definition now carries the exclusion at the normative site
+  (06:1191-1198, "immutable (NOT immutable-unique) block or array",
+  with the Eligible_for_cse corroboration quoted and "they compare
+  exactly, like mutable objects" routing unique pairs through the
+  exact clauses' primary same-machine-word condition), and 13 §1:41
+  pins "only non-ι objects — mutable and Immutable_unique alike".
+  Two COSMETIC residues on leg (b): the exact 1-clause's
+  illustrative parenthetical (06:1201 "same pointer to a mutable
+  object") and the :1237 bullet still omit unique from the
+  illustration — substance is covered by :1197-1198; two words each
+  for completeness. Leg (c) STILL OPEN and still the one
+  pre-mechanization letter blocker: ∋ remains used only at
+  06:1205/:1208, "the notation for nondeterministic denotations"
+  is defined nowhere, and ch. 04's OS.Let.Prim.* =-premises still
+  lack the membership-reading sentence — without it no machine
+  transition exists for any relational result. Also verified in the
+  same pass: Church's fold-to-1 extension (identical canonicals OR
+  provably-same immediate/null word, check_heads' two cases,
+  :1223-1226) and the two-branch fold-to-0 (:1226-1232: never from
+  distinct DYNAMIC allocations; distinct symbols via always-0 when
+  an operand is ι, via the exact clause otherwise — mutable statics
+  the live case) — both sound; I probed the SOC-symbol corner (two
+  slots of one set: clos ℓ f vs clos ℓ g are distinct values,
+  closures-ι gives the relational branch, and literal-slot leaf
+  treatment keeps 1 underivable) and the mixed unique/ι pair (1
+  underivable — pinned leaf never fold-equals an ι object; 0 in
+  envelope) — no new holes.
+  DELTA 2 (2026-07-22, closure cluster verified): ENTRY CLOSED —
+  all three legs and both cosmetic residues now on disk. Leg (c):
+  ch. 06's ⟦p⟧ judgment preamble (:34-43) declares relational
+  denotations ("⟦p⟧(v̄; H) ∋ (v, H′) — the judgment relates the
+  application to every result so listed") WITH the membership
+  reading of ch. 04's OS.Let.Prim.* =-premises ("the machine may
+  take any derivable result") — exactly the required sentence, at
+  the right site. Leg (b) cosmetics: the word-equality gloss
+  (:1212) and the pointers bullet (:1248) both read "mutable or
+  Immutable_unique". Leg (a) second half: 13 §1's enumeration now
+  "immutable — not Immutable_unique — blocks and arrays". Also
+  verified in the same cluster: 11-inlining.md:170 now
+  "the right-hand configuration observationally refines the left"
+  (direction CORRECT — right-hand = the rewritten side, matching
+  §2's C[e′] refines C[e]). The letter now matches the design
+  everywhere this entry touched.
+
+### KF-056 — INV.ToCmm.Simulates' current direction (∀ Flambda behavior ∃ Cmm outcome) is refutable under the revised relational PhysEqual; the re-posing must flip to the "Cmm refines Flambda" direction EndToEnd's own gloss already names (high; design-direction ruling on the item-8 package; disclosed-in-place by the "to be re-posed" marker — this entry pins WHAT the re-posing must say)
+- Chapter: 20-to-cmm-soundness.md §2 (Simulates, "to be re-posed"
+  per the :74-78 FORMER-VIOLATION header), §3 EndToEnd :95-115.
+  Owner: main (doc) / Milner-lane .v when re-posed.
+- What differs: the pre-revision Simulates shape (kept in the .v:
+  given fl behavior b of U′, exists Cmm outcome o with
+  tocmm_beh_rel b o) is REFUTABLE under the revised PhysEqual:
+  an abstract run resolving phys_equal(ptr ℓ, ptr ℓ) → 0 on an
+  ι-operand takes a branch the emitted word-equality Cmm code never
+  takes; its observation (different module value, say) relates to
+  no outcome of the deterministic comparison the program P actually
+  contains. Sound direction: ∀ Cmm outcome o ∃ Flambda behavior b
+  of U′ with tocmm_beh_rel b o (given U′ undef-free) — "≈-refinement
+  of Flambda by Cmm", which is verbatim EndToEnd's :101-102
+  justification gloss. Composition then goes through cleanly:
+  Preserves (U′ ⊑fold U₀) ∘ re-posed Simulates (P ⊑≈ U′) ⇒ EndToEnd
+  (P refines U₀) — and EndToEnd's conclusion :97 was already
+  refinement-shaped, so it survives unchanged. Two riders: (i)
+  EndToEnd's :101 parenthetical "INV.Simplify.Preserves
+  (equivalence on Flambda observations)" is now stale — one word,
+  "refinement". (ii) §2's decomposition sentence (INV.ToCmm.Control
+  + TC.Prim.Sound) describes forward-simulation machinery; a
+  backward-direction top statement additionally needs a
+  determinacy-modulo-oracles bridge (GC/extern/alloc
+  nondeterminism) — one NOTES sentence at re-posing time.
+- Why it matters: without the direction pinned, the .v re-posing
+  could faithfully transcribe the old shape and mint a fresh
+  Admitted-refutable — the KF-037 class — on the flagship
+  simulation.
+- Status: OPEN (filed 2026-07-22, item-8 ruling review; direction
+  ruling delivered to main; .v holds with Hopper until doc
+  re-posing lands).
+  DELTA (2026-07-22, consolidated-ruling round): direction ruling
+  RESTATED as binding for Hopper's re-pose: her "quotient the
+  Flambda behavior, tocmm_beh_rel untouched" shape is CONFIRMED for
+  the fold-placement half (matches my R.Observe verification) but
+  is only half the re-pose — the quantifier flip (∀ Cmm outcome
+  ∃ Flambda behavior) is the other half and non-negotiable per this
+  entry's witness. Rider (i) still open on disk: EndToEnd :101
+  "(equivalence on Flambda observations)". Endorsed from her prep:
+  obs_refines as obs_equiv's second conjunct with fold-extended
+  similarity (transformed ⊆ original — matches 13 §1 as verified),
+  and the reflexivity-lemma family as the formal witness of the
+  identity-free-both-directions sentence, which is also what
+  reconciles the always-derivable-0-on-equal-pointers clause with
+  fold_eq reflexivity (the denotation is a set; both memberships
+  hold on the diagonal).
+  DELTA 2 (2026-07-22, same session): RE-POSE LANDED AND VERIFIED —
+  RESOLVED. 20 §2's Simulates now states the backward claim
+  verbatim per this entry ("EVERY outcome of the Cmm run … ∀ Cmm
+  outcome ∃ Flambda behaviour, '≈-refinement of Flambda by Cmm'",
+  :51-54), per-outcome cases each existential, trace preservation
+  incremental with fold-compared snapshots; the NOTES cite KF-056
+  by id, state the former forward direction's refutation with my
+  witness, and carry rider (ii) as the determinacy-modulo-oracles
+  bridge (:79-87: forward machinery over abstract runs whose
+  identity resolutions match the emitted code's; backward claim by
+  Cmm determinacy given the oracles' choices). I adversarially
+  checked the bridge: the code-matching abstract resolution always
+  EXISTS — word-equal comparisons resolve to 1 via fold reflexivity
+  (Hopper's booked reflexivity family is thus load-bearing here,
+  not just for the both-directions sentence), word-distinct via the
+  always-0 clause (ι) or the exact clause (non-ι) — so the witness
+  construction is total. Rider (i) FIXED: EndToEnd :118 now
+  "(refinement on Flambda observations)". NEW cosmetic residue: the
+  ch. 20 PREAMBLE (:10-12) still says ch. 13 is "an equivalence
+  within one machine" and calls this chapter's property "a forward
+  simulation" — both now imprecise (refinement; backward claim via
+  forward machinery); one sentence.
+  DELTA 3 (2026-07-22): preamble residue FIXED and verified —
+  20:9-14 now "the Cmm run refines the Flambda run, through ≈";
+  ch. 13 described as "a refinement within one machine (up to
+  immutable-identity folding, 13 §1)"; this chapter's property as
+  "a refinement between two machines … established by
+  forward-simulation machinery plus determinacy of the target
+  modulo its oracles (§2 NOTES)" — the machinery-vs-property
+  distinction drawn exactly as this entry required. NOTHING remains
+  open on KF-056; the item-8 letter items are all closed except
+  KF-057's catalog sentence, which rides main's batch.
+
+### KF-057 — the refinement reading carries a new implicit premise: cextern's licensed answers must be monotone under immutable-identity folding of its heap argument (medium; discipline note + watch, not poison)
+- Chapter: 13-soundness.md §1 (refinement definition); catalog
+  entry 20 territory (cextern_rel) + the :580 KF-015 discipline
+  note. Owner: main (catalog/doc sentence), Dijkstra (watch).
+- What differs: dropping/sharing/lifting immutable allocations
+  changes the heap PASSED TO later cexterns (not just the compared
+  snapshots — the oracle's INPUT). Refinement of the composite run
+  needs: if H′ folds into H, cextern's licensed answers at H′ are
+  within (up to folding) its answers at H. Nothing on disk states
+  this. NOT the Admitted-false class: cextern is an abstract
+  Parameter, so no in-development False is derivable (contrast
+  KF-053) — but an intended instantiation violating it falsifies
+  the conjecture's intent, and the EffectLinear Drop-arm answer
+  ("counters are not a modeled observable") silently leans on it:
+  the counter channel is closed precisely because the oracle is
+  ASSUMED not to read allocation history out of dom(H).
+- Candidate fix: one sentence at the cextern catalog entry (and/or
+  13 §1): the intended cextern instantiation answers up to
+  immutable-identity folding of its heap argument — the same
+  discipline family as the KF-015 note; plus a Dijkstra watch
+  keyed to any future cextern constraint or instantiation (the
+  gc_reloc/W-32 pattern).
+- Status: OPEN (filed 2026-07-22, item-8 ruling review).
 
 <!-- Finding template:
 ### KF-NNN — <RULE id> (<severity: high/med/low>)

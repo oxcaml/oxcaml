@@ -6,10 +6,12 @@ Chapters [`15`](15-cmm.md)–[`19`](19-cmm-memory-gc.md) defined the Cmm target
 machine, the `to_cmm` translation `⤳` (control [`16`](16-to-cmm-control.md), data
 [`18`](18-to-cmm-data.md)), the representation relation `≈`
 ([`17`](17-representation.md)), and the concrete memory/GC model. This chapter
-states the property tying them together: **`to_cmm` preserves observable
-behaviour, through `≈`**. Where Simplify's soundness ([`13`](13-soundness.md)) is
-an *equivalence within one machine*, `to_cmm`'s is a **forward simulation between
-two machines** carrying `≈` — the standard shape of a compiler-pass correctness
+states the property tying them together: **the Cmm run refines the Flambda
+run, through `≈`**. Where Simplify's soundness ([`13`](13-soundness.md)) is a
+*refinement within one machine* (up to immutable-identity folding, 13 §1),
+`to_cmm`'s is a **refinement between two machines** carrying `≈`, established
+by forward-simulation machinery plus determinacy of the target modulo its
+oracles (§2 NOTES) — the standard shape of a compiler-pass correctness
 statement. As with [`13`](13-soundness.md), the claim is not proved; it is the
 design intent of every rule in [`15`](15-cmm.md)–[`19`](19-cmm-memory-gc.md) and
 is empirically validated by the case studies in
@@ -49,32 +51,53 @@ Let P = ⟦U⟧ and let the initial Cmm state of P's module initialiser be
 initc(P), with initial(U) ≈cfg initc(P) (OS.Unit.Init ≈ the entry of the module
 initialiser; H₀ ≈ M₀ on predefined symbols).
 If the Flambda run of U does not exhibit undefined behaviour (as 13:
-INV.Simplify.Preserves), then the Cmm run of P either
-  • terminates normally with a memory M and the Flambda run terminates normally with
-    heap H, and H(sym_mod) ≈ (module image in M) with equal C-call traces (R.Observe); or
-  • both terminate by the same uncaught exception (values related by ≈ᵥ); or
-  • both diverge; or
-  • the Cmm run additionally exhausts resources (CM.Alloc.Exhaustion) where the
-    Flambda run diverges or terminates.
-In every outcome except resource exhaustion the two runs perform the SAME C-call
-effect trace — the step-wise simulation preserves the trace incrementally (so a run
-that does I/O and then raises, or diverges while doing I/O, has its trace preserved
-in the exception and divergence outcomes too), not only at normal termination.
+INV.Simplify.Preserves), then EVERY outcome of the Cmm run of P is matched by
+a behaviour of the (relational) Flambda run of U — ∀ Cmm outcome ∃ Flambda
+behaviour, "≈-refinement of Flambda by Cmm":
+  • if the Cmm run terminates normally with memory M, some Flambda behaviour
+    terminates normally with a heap H, and H(sym_mod) ≈ (module image in M) —
+    ≈ read up to 13 §1's immutable-identity folding — with equal C-call
+    traces (R.Observe); or
+  • if the Cmm run terminates by an uncaught exception, some Flambda behaviour
+    terminates by the related uncaught exception (≈ᵥ, up to the folding); or
+  • if the Cmm run diverges, some Flambda behaviour diverges; or
+  • if the Cmm run exhausts resources (CM.Alloc.Exhaustion), some Flambda
+    behaviour diverges or terminates.
+In every outcome except resource exhaustion the matching Flambda behaviour
+performs the SAME C-call effect trace (event-carried heap snapshots compared up
+to the folding) — the step-wise simulation preserves the trace incrementally
+(so a run that does I/O and then raises, or diverges while doing I/O, has its
+trace preserved in the exception and divergence outcomes too), not only at
+normal termination.
 --------------------------------------------------
-to_cmm preserves observable behaviour up to ≈, modulo undefined behaviour and
-resource exhaustion.
-NOTES: STATUS conjectured — claimed and empirically validated (§4), not proved. The
-proof obligation is a forward simulation: initial(U) ≈cfg initc(P), and every
+to_cmm refines observable behaviour up to ≈ and 13 §1's folding, modulo
+undefined behaviour and resource exhaustion.
+NOTES: STATUS conjectured — claimed and empirically validated (§4), not proved.
+REPOSED (KF-056, 2026-07-22): the top-level claim is the BACKWARD ("Cmm
+refines Flambda") direction — the former forward direction (∀ Flambda
+behaviour ∃ Cmm outcome) is refutable under the revised P.Binary.PhysEqual: an
+abstract run may resolve phys_equal(ptr ℓ, ptr ℓ) → 0 on an ι-operand and
+branch where the emitted word-equality code never goes. The
+proof machinery remains a forward simulation: initial(U) ≈cfg initc(P), and every
 Flambda step is matched by ≥0 Cmm steps re-establishing ≈cfg, where GC steps
 (CM.Alloc.GC) and delayed-binding materialization (18, TC.Let.Subst) are Cmm
-stutters that preserve ≈cfg with no Flambda step. Decomposes into: the control
+stutters that preserve ≈cfg with no Flambda step — stated over abstract runs
+whose identity resolutions match the emitted code's; the backward top-level
+claim follows by determinacy of the Cmm run modulo its oracles (GC relocation,
+extern answers, allocation addresses): given the oracles' choices the emitted
+run is unique, and the forward simulation of the code-matching abstract
+behaviour supplies its witness. Decomposes into: the control
 lemma INV.ToCmm.Control (16 §8, target-independent), and the per-primitive
 data obligation TC.Prim.Sound (18 §1, where ≈ is committed). The "modulo UB"
 clause is inherited verbatim from 13; the resource-exhaustion clause is the one
-outcome Cmm adds (19 §5). KNOWN VIOLATION: in `-Oclassic`, `Box_number`
-duplication combined with the deterministic ch06 `P.Binary.PhysEqual` denotation
-falsifies this rule for a program with no undefined behaviour (§5.6); until fixed,
-read INV.ToCmm.Simulates modulo immutable-block identity.
+outcome Cmm adds (19 §5). FORMER KNOWN VIOLATION, resolved 2026-07-22 (13 §4
+item 8): `-Oclassic` `Box_number` duplication falsified this rule against the
+then-deterministic ch06 `P.Binary.PhysEqual` (§5.6). Under the revised
+semantics — `P.Binary.PhysEqual` loose on immutable heap objects, observations
+compared up to immutable-identity folding (13 §1) — the duplication is one of
+the abstract run's derivable observations and the "modulo immutable-block
+identity" reading instruction is superseded by the definitions themselves,
+with the statement now re-posed as above.
 ```
 
 ## 3. The end-to-end story, and Invalid
@@ -94,7 +117,7 @@ undefined behaviour then P's observable behaviour refines U₀'s: same C-call tr
 and termination outcome, with the module value related through ≈, modulo resource
 exhaustion AND the known int→float32 constant-fold unsoundness (§5.1, 13 §4.7).
 --------------------------------------------------
-By transitivity of INV.Simplify.Preserves (equivalence on Flambda observations)
+By transitivity of INV.Simplify.Preserves (refinement on Flambda observations)
 and INV.ToCmm.Simulates (≈-refinement of Flambda by Cmm).
 NOTES: STATUS conjectured. This is the composed correctness of the two formalized
 passes, and it INHERITS INV.Simplify.Preserves as a premise — a premise with a known
@@ -329,8 +352,14 @@ More_than_one (the classify_let_binding convention), and Not_found ⟹ Regular i
 conservative default. Dead-allocation dropping and duplication both require the
 semantics to treat immutable-block identity as unobservable — two distinct licenses
 (drop covers UNREACHABLE blocks of ANY mutability; duplicate needs only
-immutable-block identity). This is exactly the license the classic-mode PhysEqual
-discrepancy (§5.6) shows the ch06 P.Binary.PhysEqual denotation withholds. Composes:
+immutable-block identity). This is exactly the license the revised ch06
+P.Binary.PhysEqual denotation and 13 §1's immutable-identity folding now GRANT
+(13 §4 item 8, adopted 2026-07-22; formerly withheld — the classic-mode
+discrepancy §5.6 was the witness). The Drop arm's `Gc.stat`/allocation-counter
+concern needs no `R.Observe` carve-out in the model: counters are not a modeled
+observable, and event heap snapshots compare reachable structure up to folding,
+which a dropped (unreachable) allocation never enters; real-world counter
+divergence remains a manual-level caveat. Composes:
 TC.Let.Subst, P.Effects.DelayDuplicable, R.Observe, INV.ToCmm.Simulates.
 ```
 
@@ -625,6 +654,17 @@ clean.
    license, with `Gc.stat` / minor-words allocation counters as the weaker
    observable (they must be carved out of `R.Observe`). See
    [`14-validation/classic_physequal_box.md`](14-validation/classic_physequal_box.md).
+   RESOLVED (2026-07-22, jointly with 13 §4 item 8): fix (1) adopted in
+   strengthened form — `P.Binary.PhysEqual` is loose on immutable heap
+   objects, with result 0 derivable even on `(ptr ℓ, ptr ℓ)`, licensing both
+   duplication and dropping — together with fix (2)'s observational analogue
+   (13 §1's immutable-identity folding + the refinement reading). The
+   witness's Cmm observation **false** is now one of the abstract run's
+   derivable observations, so the as-stated violation dissolves; the
+   `INV.ToCmm.Simulates` header records this and the statement is to be
+   re-posed against the revised 13 §1 relation. The Drop-arm counter concern
+   is answered at the `INV.ToCmm.EffectLinear` NOTES (no model-side
+   `R.Observe` carve-out needed; counters are not a modeled observable).
 
 ## 6. Summary of rules
 

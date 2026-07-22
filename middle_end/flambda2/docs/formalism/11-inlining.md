@@ -166,8 +166,8 @@ of [§04](04-opsem.md): binding `xᵢ = sᵢ` and jumping to `k` where the code 
 `k_ret^c` is exactly the small-step behaviour of `OS.Apply` followed by the
 `let` rules, up to the renaming θ (which is a bijective renaming of bound
 continuations and region variables and so preserves meaning). The formal
-soundness obligation — that the left- and right-hand configurations are
-observationally equivalent under any `⟨ρ, K, H, T, R⟩` — is stated in chapter
+soundness obligation — that the right-hand configuration observationally
+refines the left under any `⟨ρ, K, H, T, R⟩` — is stated in chapter
 [`13-soundness.md`](13-soundness.md); this chapter asserts it, and the
 validation case studies in [`14-validation/`](14-validation/) check instances.
 The region rule is the delicate part: it is sound precisely because `α`'s region

@@ -797,17 +797,31 @@ Inductive denot_mem_b
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal *)
-  (* phys_same_word (§1) is "the same machine word (same immediate,
-     or same pointer, or both null)"; Neq is the boolean negation
-     (NOTES).  The kind-Value premises are the doc's "Only for values
-     of kind Value (stated in the mli)" contract: off-kind operands
-     are stuck, not compared -- without the guard, phys_same_word's
+  (* REVISED per 13 s4 item 8 (resolution 2026-07-22; CORRESPONDENCE
+     entry 75; formerly a deterministic word-equality on all
+     operands): RELATIONAL on iota-operands.  Non-iota clauses stay
+     deterministic on phys_same_word (§1: "the same machine word --
+     same immediate, or same pointer, or both null"); if either
+     operand is an iota-operand (is_iota, Values.v -- immutable heap
+     objects the compiler may share, duplicate, or lift), result 0 is
+     ALWAYS derivable (even for identical pointers: the
+     implementation may have duplicated or re-boxed the object) and
+     result 1 is derivable exactly up to fold-equality (fold_eq,
+     Values.v -- the diagonal instance of 13 s1's folding), so
+     result 1 still implies structural equality.  The two iota
+     clauses deliberately OVERLAP on fold-equal operands (fold_eq is
+     reflexive, fold_eq_refl); Neq is the boolean negation (NOTES).
+     The kind-Value premises are the doc's "Only for values of kind
+     Value (stated in the mli)" contract: off-kind operands are
+     stuck, not compared -- without the guard, phys_same_word's
      catch-all arm would give them a DEFINED wrong answer (identical
      naked immediates "differing"). *)
   | P_Binary_PhysEqual_Eq_Same :
       forall v1 v2 H,
         value_kind v1 = K_value ->
         value_kind v2 = K_value ->
+        ~ is_iota H v1 ->
+        ~ is_iota H v2 ->
         phys_same_word v1 v2 = true ->
         denot_mem_b (Op_binary (BP_phys_equal EC_eq)) [v1; v2] H
           (PR_ok (V_naked_imm 1) H)
@@ -815,13 +829,32 @@ Inductive denot_mem_b
       forall v1 v2 H,
         value_kind v1 = K_value ->
         value_kind v2 = K_value ->
+        ~ is_iota H v1 ->
+        ~ is_iota H v2 ->
         phys_same_word v1 v2 = false ->
         denot_mem_b (Op_binary (BP_phys_equal EC_eq)) [v1; v2] H
           (PR_ok (V_naked_imm 0) H)
+  | P_Binary_PhysEqual_Eq_IotaZero :
+      forall v1 v2 H,
+        value_kind v1 = K_value ->
+        value_kind v2 = K_value ->
+        is_iota H v1 \/ is_iota H v2 ->
+        denot_mem_b (Op_binary (BP_phys_equal EC_eq)) [v1; v2] H
+          (PR_ok (V_naked_imm 0) H)
+  | P_Binary_PhysEqual_Eq_IotaOne :
+      forall v1 v2 H,
+        value_kind v1 = K_value ->
+        value_kind v2 = K_value ->
+        is_iota H v1 \/ is_iota H v2 ->
+        fold_eq H v1 v2 ->
+        denot_mem_b (Op_binary (BP_phys_equal EC_eq)) [v1; v2] H
+          (PR_ok (V_naked_imm 1) H)
   | P_Binary_PhysEqual_Neq_Same :
       forall v1 v2 H,
         value_kind v1 = K_value ->
         value_kind v2 = K_value ->
+        ~ is_iota H v1 ->
+        ~ is_iota H v2 ->
         phys_same_word v1 v2 = true ->
         denot_mem_b (Op_binary (BP_phys_equal EC_neq)) [v1; v2] H
           (PR_ok (V_naked_imm 0) H)
@@ -829,9 +862,26 @@ Inductive denot_mem_b
       forall v1 v2 H,
         value_kind v1 = K_value ->
         value_kind v2 = K_value ->
+        ~ is_iota H v1 ->
+        ~ is_iota H v2 ->
         phys_same_word v1 v2 = false ->
         denot_mem_b (Op_binary (BP_phys_equal EC_neq)) [v1; v2] H
           (PR_ok (V_naked_imm 1) H)
+  | P_Binary_PhysEqual_Neq_IotaOne :
+      forall v1 v2 H,
+        value_kind v1 = K_value ->
+        value_kind v2 = K_value ->
+        is_iota H v1 \/ is_iota H v2 ->
+        denot_mem_b (Op_binary (BP_phys_equal EC_neq)) [v1; v2] H
+          (PR_ok (V_naked_imm 1) H)
+  | P_Binary_PhysEqual_Neq_IotaZero :
+      forall v1 v2 H,
+        value_kind v1 = K_value ->
+        value_kind v2 = K_value ->
+        is_iota H v1 \/ is_iota H v2 ->
+        fold_eq H v1 v2 ->
+        denot_mem_b (Op_binary (BP_phys_equal EC_neq)) [v1; v2] H
+          (PR_ok (V_naked_imm 0) H)
 
   (** RULE P.Binary.BigarrayLoad (STATUS normative)
       -- 06-primitives-memory.md

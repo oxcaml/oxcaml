@@ -20,9 +20,11 @@
    conditional on ONE row of the sanctioned prim_arg_kinds oracle
    and on the argument constants being their own canonicals
    (which T.Env.Canonical.Least guarantees for every real E);
-   (b) pilot_constfold_preserves proves the obs_equiv conclusion
-   of INV.Simplify.Preserves outright for the concrete pair, by
-   behavior-set uniqueness on both sides.  Discovery recorded
+   (b) pilot_constfold_preserves proves full obs_equiv outright
+   for the concrete pair, by behavior-set uniqueness on both
+   sides -- strictly stronger than INV.Simplify.Preserves' post-
+   item-8 obs_refines conclusion, which pilot_constfold_refines
+   projects from it.  Discovery recorded
    below at H_mod: beh_sim observes the module block, so the
    starting heap must populate sym_mod for units (like these)
    that never store it. *)
@@ -853,10 +855,10 @@ Qed.
 (* ---------------------------------------------------------------- *)
 
 (* DISCOVERY (increment 2): beh_sim observes the final heap at
-   sym_mod through the bijection (Bsim_return seeds b at
-   Addr_sym sym_mod, and heap_sim requires every b-related address
-   populated on both sides).  The doc's "same final module block
-   value at sym_mod" presupposes the unit defines its module
+   sym_mod through the location relation (Bsim_return seeds b at
+   Addr_sym sym_mod, and fold_heap_sim requires every b-related
+   address populated on both sides).  The doc's "same final module
+   block value at sym_mod" presupposes the unit defines its module
    block; these pilot units never store one, so the equivalence is
    stated from a starting heap that already populates psym -- the
    smallest such heap. *)
@@ -872,19 +874,21 @@ Definition H_mod : heap :=
 Definition bij_mod : address -> address -> Prop :=
   fun a a' => a = Addr_sym psym /\ a' = Addr_sym psym.
 
-Lemma bij_mod_addr_bij : addr_bij bij_mod.
+(* The identity relation on one symbol satisfies the item-8 fold
+   discipline outright (the class premises are simply unused). *)
+Lemma bij_mod_fold_bij : fold_bij H_mod H_mod bij_mod.
 Proof.
   constructor.
-  - intros a a1 a2 Ha1 Ha2.
+  - intros a a1 a2 Ha1 Ha2 _.
     destruct Ha1 as [_ ->].  destruct Ha2 as [_ ->].
     reflexivity.
-  - intros a1 a2 a Ha1 Ha2.
+  - intros a1 a2 a Ha1 Ha2 _.
     destruct Ha1 as [-> _].  destruct Ha2 as [-> _].
     reflexivity.
   - intros s a Hb.  destruct Hb as [Hs ->].
     exact (eq_sym Hs).
   - intros a s Hb.  destruct Hb as [-> Hs].
-    exact (eq_sym Hs).
+    left.  exact (eq_sym Hs).
 Qed.
 
 Lemma bij_mod_pins : pins H_mod bij_mod.
@@ -901,7 +905,7 @@ Lemma beh_sim_mod_return :
   beh_sim psym H_mod (Beh_return [] H_mod) (Beh_return [] H_mod).
 Proof.
   apply Bsim_return with (b := bij_mod).
-  - exact bij_mod_addr_bij.
+  - exact bij_mod_fold_bij.
   - exact bij_mod_pins.
   - split; reflexivity.
   - constructor.
@@ -914,14 +918,17 @@ Proof.
     constructor.
 Qed.
 
-(* The micro-instance of INV.Simplify.Preserves: the conclusion of
-   the headline theorem, proved outright for the concrete
-   const-fold pair.  Both units' behavior sets are the singleton
-   {Beh_return [] H_mod} (5.4-5.6), and the singleton is
-   self-similar under bij_mod (5.7).  Together with
+(* The micro-instance of INV.Simplify.Preserves, at FULL
+   EQUIVALENCE strength (item 8): the headline theorem now
+   concludes obs_refines, and this pair -- whose observations never
+   consult loose identity -- gets refinement in BOTH directions,
+   witnessing 13 section 1's coincidence sentence (entry 75's
+   optional second conclusion, realized; the corollary below
+   projects the headline-shaped half).  Both units' behavior sets
+   are the singleton {Beh_return [] H_mod} (5.4-5.6), and the
+   singleton is self-similar under bij_mod (5.7).  Together with
    pilot_constfold_simplifies (5.2) this exhibits, end to end, one
-   derivable Simplify step whose obs_equiv conclusion is a
-   theorem. *)
+   derivable Simplify step whose conclusion is a theorem. *)
 Theorem pilot_constfold_preserves :
   forall (flags : eff_flags) (rho_pre : env),
     (forall x, env_get_var rho_pre x = None) ->
@@ -949,4 +956,17 @@ Proof.
       apply folded_behavior_unique in Hbeh.
       subst b2.
       exact beh_sim_mod_return.
+Qed.
+
+(* The headline-shaped half: INV_Simplify_Preserves' obs_refines
+   conclusion for the pair, projected from the equivalence. *)
+Corollary pilot_constfold_refines :
+  forall (flags : eff_flags) (rho_pre : env),
+    (forall x, env_get_var rho_pre x = None) ->
+    obs_refines psym H_mod
+      (fl_unit_behavior flags unit_prim rho_pre H_mod)
+      (fl_unit_behavior flags unit_folded rho_pre H_mod).
+Proof.
+  intros flags rho_pre Hno.
+  exact (proj2 (pilot_constfold_preserves flags rho_pre Hno)).
 Qed.
