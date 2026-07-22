@@ -67,8 +67,7 @@ function merlin-target () {
     lambda/mixed_product_bytes.ml*)
       echo "${base/#lambda/typing}";;
 
-    base-rev.txt) ;;
-    .gitattributes) ;;
+    .gitattributes|base-rev.txt) ;;
 
     # Most cases are simple
     *) echo "$base";;

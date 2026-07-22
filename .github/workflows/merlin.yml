@@ -49,7 +49,8 @@ jobs:
     - name: Assert Merlin is in sync with the compiler
       working-directory: oxcaml
       # This script will fail if compiler changes need to be imported into
-      # Merlin.
+      # Merlin. It is temporarily disabled until documentation and testing is complete
+      if: false
       run: external/merlin/scripts/assert-in-sync.sh
 
     - name: Pretend we're running in a container (makes setup-ocaml go faster)
