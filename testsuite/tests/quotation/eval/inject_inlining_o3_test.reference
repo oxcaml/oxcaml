@@ -10,4 +10,10 @@ File "//eval//", line 1, characters 45-47:
 Warning 20 [ignored-extra-argument]: this argument will not be used by the function.
 File "//eval//", line 1, characters 45-46:
 Warning 20 [ignored-extra-argument]: this argument will not be used by the function.
+
+File "//eval//", line 1, characters 11-47:
+Warning 55 [inlining-impossible]: Cannot inline:
+  
+  the optimizer did not know what function was being applied
+  (the full inlining stack was: //eval//:1,11--47)
 results: 2 42 42

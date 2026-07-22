@@ -475,8 +475,19 @@ treatment.
       as `extra_root_names` for the cmx export — the per-phase recording
       structure anticipated by the earlier design note.  `Reify_approx`
       never reaches `To_cmm` (fatal there).  Test:
-      inject_inlining_o3_test.ml (control warns; top-level function and
-      capturing local closure both inline silently at -O3).
+      inject_inlining_o3_test.ml (control warns; top-level function
+      inlines silently at -O3).
+      Correction (2026-07-22, from Mark): the tests' local-closure case
+      originally sat in the toplevel module initializer, where Simplify
+      lifts the closure to a symbol, so the -O3 test was exercising the
+      Value_symbol path rather than a dynamic closure.  The case now lives
+      under an [@inline never] function: it still inlines in classic mode
+      (lookup symbols work inside function bodies), and under -O3 it
+      degrades to Unknown as expected (warning 55 in the reference),
+      documenting the my_closure-gate limitation.  Probing also showed a
+      classic-mode gap: closures received as function results reify as
+      Unknown (closure conversion does not track call-result
+      approximations at the injection site).
 - [ ] M4: current-module references.
 - [ ] M3: `<[open]>` modes.
 
