@@ -1515,33 +1515,45 @@ let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
   in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 
+(** All three of [transl_maybe_local_instance], [transl_local_instance],
+    and [bind_local_instance] take [gm], [module_map], and [rev_bindings]:
+    - [gm] is a global module name that we need lambda code for.
+    - [module_map] maps from incomplete global module names to local idents.
+    - [rev_bindings] binds each of the local idents to a local instantiation
+      of the incomplete global module.
+
+    They return [(lam, module_map', rev_bindings')]:
+    - [lam] refers to [gm]'s runtime instance ([Lvar id] for a locally
+      bound instance, [Pgetglobal cu] for a complete static one).
+    - [module_map'] and [rev_bindings'] are the same as the input
+      [module_map] and [rev_bindings] but possibly extended with more
+      instantiations.
+
+    [transl_functorization_make] wraps the accumulated [rev_bindings]
+    into a flat sequence of [Llet]s at the top of the functor's body. *)
 let rec transl_maybe_local_instance ~(gm : Global_module.t) ~chain
-    ~find_impl_by_name ~param_map ~module_map ~k =
+    ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
   if Global_module.is_complete gm
   then
     let cu = Compilation_unit.of_complete_global_exn gm in
-    k (Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)) module_map
+    let lam = Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown) in
+    (lam, module_map, rev_bindings)
   else transl_local_instance ~gm ~chain ~find_impl_by_name ~param_map
-         ~module_map ~k
+         ~module_map ~rev_bindings
 
 and transl_local_instance ~(gm : Global_module.t) ~chain
-    ~find_impl_by_name ~param_map ~module_map ~k =
+    ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
   match Global_module.Map.find_opt gm module_map with
-  | Some id -> k (Lvar id) module_map
+  | Some id -> (Lvar id, module_map, rev_bindings)
   | None ->
       bind_local_instance ~gm ~chain ~find_impl_by_name ~param_map ~module_map
-        ~k
+        ~rev_bindings
 
-(** Bind a fresh local for the instantiation [gm].  Each runtime-param
-    slot is filled from [gm]'s [visible_args] (recursively instantiating
-    the arg) or [hidden_args] (resolved via [param_map]).
-    E.g. for [gm = Foo[A:A_int]{B}] (visible [A:A_int], hidden [B]):
-      let a_int = <inst of A_int, if parameterised>
-      let foo_a_int = Foo a_int_arg_block b_param
-      <k foo_a_int>
-    where [b_param] comes from [param_map]. *)
+(** Instantiate [gm] and bind it to a local ident. Return the updated
+    [module_map] and [rev_bindings]. [gm] must be incomplete (some hidden args,
+    at the top level or nested). *)
 and bind_local_instance ~(gm : Global_module.t) ~chain
-    ~find_impl_by_name ~param_map ~module_map ~k =
+    ~find_impl_by_name ~param_map ~module_map ~rev_bindings =
   let cu = cu_of_impl gm in
   let ui_format, _arg_descr = find_impl_by_name ~chain cu in
   let chain = gm :: chain in
@@ -1566,7 +1578,10 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
       gm.visible_args
     |> Global_module.Parameter_name.Map.of_list
   in
-  let transl_runtime_param (rp : Lambda.runtime_param) module_map ~k =
+  (* Similar to [transl_maybe_local_instance], returns [lam, module_map',
+     rev_bindings'] where [lam] satisfies the runtime parameter [rp]. *)
+  let transl_runtime_param (module_map, rev_bindings)
+      (rp : Lambda.runtime_param) =
     match rp with
     | Rp_main_module_block inner_gm ->
         let inner_gm =
@@ -1583,20 +1598,23 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
             "bind_local_instance: %a's hidden_args are not a subset of %a's"
             Global_module.print inner_gm
             Global_module.print gm;
-        transl_maybe_local_instance ~gm:inner_gm ~chain
-          ~find_impl_by_name ~param_map ~module_map
-          ~k
+        let lam, module_map, rev_bindings =
+          transl_maybe_local_instance ~gm:inner_gm ~chain
+            ~find_impl_by_name ~param_map ~module_map ~rev_bindings
+        in
+        ((module_map, rev_bindings), lam)
     | Rp_argument_block global ->
         (match Global_module.find_in_parameter_map global visible_arg_map with
          | Some arg_value ->
-             transl_maybe_local_instance ~gm:arg_value ~chain
-               ~find_impl_by_name ~param_map ~module_map
-               ~k:(fun main_block module_map ->
-                 let arg_block =
-                   project_arg_block ~find_impl_by_name ~chain
-                     ~gm:arg_value main_block
-                 in
-                 k arg_block module_map)
+             let main_block, module_map, rev_bindings =
+               transl_maybe_local_instance ~gm:arg_value ~chain
+                 ~find_impl_by_name ~param_map ~module_map ~rev_bindings
+             in
+             let arg_block =
+               project_arg_block ~find_impl_by_name ~chain
+                 ~gm:arg_value main_block
+             in
+             ((module_map, rev_bindings), arg_block)
          | None ->
              let global_name = Global_module.to_name global in
              if not
@@ -1617,35 +1635,36 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                      "bind_local_instance: %a not in param_map"
                      Global_module.print global
              in
-             k (Lvar id) module_map)
+             ((module_map, rev_bindings), Lvar id))
     | Rp_unit ->
-        k lambda_unit module_map
+        ((module_map, rev_bindings), lambda_unit)
   in
-  Stdlib.List.fold_left_map_cont transl_runtime_param runtime_params module_map
-    ~k:(fun ap_args module_map ->
-      let func =
-        Lprim
-          ( mod_field 0 (Module_value_only { field_count = 1 }),
-            [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
-            Loc_unknown )
-      in
-      let rhs =
-        Lapply
-          { ap_func = func;
-            ap_args;
-            ap_result_layout = layout_module;
-            ap_loc = Loc_unknown;
-            ap_inlined = Always_inlined;
-            ap_tailcall = Default_tailcall;
-            ap_specialised = Default_specialise;
-            ap_mode = alloc_heap;
-            ap_region_close = Rc_normal;
-            ap_probe = None
-          }
-      in
-      let body, extra = k (Lvar new_id) module_map in
-      ( Llet (Strict, layout_module, new_id, debug_uid_none, rhs, body),
-        extra ))
+  let (module_map, rev_bindings), ap_args =
+    List.fold_left_map transl_runtime_param (module_map, rev_bindings)
+      runtime_params
+  in
+  let func =
+    Lprim
+      ( mod_field 0 (Module_value_only { field_count = 1 }),
+        [Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)],
+        Loc_unknown )
+  in
+  let rhs =
+    Lapply
+      { ap_func = func;
+        ap_args;
+        ap_result_layout = layout_module;
+        ap_loc = Loc_unknown;
+        ap_inlined = Always_inlined;
+        ap_tailcall = Default_tailcall;
+        ap_specialised = Default_specialise;
+        ap_mode = alloc_heap;
+        ap_region_close = Rc_normal;
+        ap_probe = None
+      }
+  in
+  let rev_bindings = (new_id, rhs) :: rev_bindings in
+  (Lvar new_id, module_map, rev_bindings)
 
 (* Bundle's [Make]: generative functor over [params @ [unit]] that
    let-binds each module in [modules] (and transitive deps). *)
@@ -1675,31 +1694,38 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
       Global_module.Parameter_name.Map.empty
       params
   in
-  let body, required_globals =
-    Stdlib.List.fold_left_map_cont
-      (fun gm module_map ~k ->
+  let (module_map, rev_bindings), exposed_lambdas =
+    List.fold_left_map
+      (fun (module_map, rev_bindings) gm ->
         if Global_module.is_complete gm
         then
           Misc.fatal_errorf_doc
             "transl_functorization_make: bundled module %a is complete"
             Global_module.print gm;
-        transl_local_instance ~gm ~chain:[]
-          ~find_impl_by_name ~param_map ~module_map ~k)
+        let lam, module_map, rev_bindings =
+          transl_local_instance ~gm ~chain:[]
+            ~find_impl_by_name ~param_map ~module_map ~rev_bindings
+        in
+        ((module_map, rev_bindings), lam))
+      (Global_module.Map.empty, [])
       modules
-      Global_module.Map.empty
-      ~k:(fun exposed_lambdas module_map ->
-        let block =
-          Lprim
-            ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-              exposed_lambdas,
-              Loc_unknown )
-        in
-        let required_globals =
-          Global_module.Map.fold
-            (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
-            module_map Compilation_unit.Set.empty
-        in
-        (block, required_globals))
+  in
+  let block =
+    Lprim
+      ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+        exposed_lambdas,
+        Loc_unknown )
+  in
+  let body =
+    List.fold_left
+      (fun body (id, rhs) ->
+        Llet (Strict, layout_module, id, debug_uid_none, rhs, body))
+      block rev_bindings
+  in
+  let required_globals =
+    Global_module.Map.fold
+      (fun gm _id set -> Compilation_unit.Set.add (cu_of_impl gm) set)
+      module_map Compilation_unit.Set.empty
   in
   let unit_ident = Ident.create_local "*unit*" in
   let func_params =

@@ -191,21 +191,6 @@ module Stdlib : sig
     (** [fold_left_map2] is a combination of [fold_left2] and [map2] that threads an
         accumulator through calls to [f]. *)
 
-    val map_cont
-      : ('a -> ('b -> 'r) -> 'r)
-      -> 'a t
-      -> ('b list -> 'r)
-      -> 'r
-    (** CPS variant of [map]. *)
-
-    val fold_left_map_cont
-      : ('a -> 'acc -> k:('b -> 'acc -> 'r) -> 'r)
-      -> 'a t
-      -> 'acc
-      -> k:('b list -> 'acc -> 'r)
-      -> 'r
-    (** CPS variant of [fold_left_map]. *)
-
     val chunks_of : int -> 'a t -> 'a t t
     (** [chunks_of n t] returns a list of nonempty lists whose
         concatenation is equal to the original list. Every list has [n]

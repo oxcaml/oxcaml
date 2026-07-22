@@ -3059,6 +3059,10 @@ let disambiguate_sort_lid_a_list
   in
   lbl_a_list, ambiguity
 
+let map_fold_cont f xs k =
+  List.fold_right (fun x k ys -> f x (fun y -> k (y :: ys)))
+    xs (fun ys -> k (List.rev ys)) []
+
 (* Checks over the labels mentioned in a record pattern:
    no duplicate definitions (error); properly closed (warning) *)
 
@@ -4397,11 +4401,11 @@ let rec check_counter_example_pat
     in
     match record_form with
     | Legacy ->
-      Stdlib.List.map_cont type_label_pat fields
+      map_fold_cont type_label_pat fields
         (fun fields ->
            mkp k (Tpat_record (fields, sorts, rep, closed)))
     | Unboxed_product ->
-      Stdlib.List.map_cont type_label_pat fields
+      map_fold_cont type_label_pat fields
         (fun fields ->
            mkp k (Tpat_record_unboxed_product (fields, sorts, rep, closed)))
   in
@@ -4442,8 +4446,7 @@ let rec check_counter_example_pat
         solve_Ppat_tuple ~alloc_mode loc penv tpl expected_ty
       in
       let tpl_ann = List.combine tpl expected_tys in
-      Stdlib.List.map_cont
-        (fun ((l,p),(_,t,_)) k -> check_rec p t (fun p -> k (l, p)))
+      map_fold_cont (fun ((l,p),(_,t,_)) k -> check_rec p t (fun p -> k (l, p)))
         tpl_ann
         (fun pl ->
            let pat_type =
@@ -4461,7 +4464,7 @@ let rec check_counter_example_pat
            assert (Jkind.Sort.equate orig_sort sort))
         tpl expected_tys;
       let tpl_ann = List.combine tpl expected_tys in
-      Stdlib.List.map_cont
+      map_fold_cont
         (fun ((l,p,_),(_,t,_,sort)) k ->
           check_rec p t (fun p -> k (l, p, sort)))
         tpl_ann
@@ -4478,7 +4481,7 @@ let rec check_counter_example_pat
         solve_Ppat_construct
           type_pat_state penv loc constr None None expected_ty
       in
-      Stdlib.List.map_cont
+      map_fold_cont
         (fun ((_, p),t) -> check_rec p t.Types.ca_type)
         (List.combine targs ty_args)
         (fun args ->
@@ -4510,7 +4513,7 @@ let rec check_counter_example_pat
         solve_Ppat_array loc penv mut expected_ty
       in
       assert (Jkind.Sort.equate original_arg_sort arg_sort);
-      Stdlib.List.map_cont (fun p -> check_rec p ty_elt) tpl
+      map_fold_cont (fun p -> check_rec p ty_elt) tpl
         (fun pl -> mkp k (Tpat_array (mutability, arg_sort, pl)))
   | Tpat_or(tp1, tp2, _) ->
       (* We are in counter-example mode, but try to avoid backtracking *)
