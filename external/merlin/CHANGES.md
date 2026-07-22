@@ -1,10 +1,3 @@
-unreleased
-==========
-
-  + merlin library
-    - occurrences: fix files modified since the index was built never being
-      reported as out-of-sync.
-
 merlin 5.6
 ==========
 Sat Oct 04 15:10:42 CEST 2025
