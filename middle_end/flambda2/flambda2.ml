@@ -95,8 +95,9 @@ type run_result =
     reachable_names : NO.t
   }
 
-let build_run_result unit ~free_names ~final_typing_env ~extra_root_names
-    ~sections ~all_code slot_offsets : run_result =
+let build_run_result unit ~machine_width ~free_names ~final_typing_env
+    ~extra_root_names ~extra_approxs ~sections ~all_code slot_offsets :
+    run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
     NO.function_slots_in_normal_projections free_names
@@ -120,8 +121,9 @@ let build_run_result unit ~free_names ~final_typing_env ~extra_root_names
     Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
   in
   let reachable_names, cmx =
-    Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-      ~extra_root_names ~used_value_slots ~exported_offsets ~sections all_code
+    Flambda_cmx.prepare_cmx_file_contents ~machine_width ~final_typing_env
+      ~module_symbol ~extra_root_names ~extra_approxs ~used_value_slots
+      ~exported_offsets ~sections all_code
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; reachable_names }
@@ -176,7 +178,8 @@ let flambda_to_flambda0 : type m.
             all_code;
             slot_offsets;
             unit = flambda;
-            reified_approx_names
+            reified_approx_names;
+            reified_lookup_approxs
           } =
         Profile.record_call ~accumulate:true "simplify" (fun () ->
             Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
@@ -244,9 +247,9 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-        build_run_result flambda ~free_names ~final_typing_env
-          ~extra_root_names:reified_approx_names ~sections ~all_code
-          slot_offsets
+        build_run_result flambda ~machine_width ~free_names ~final_typing_env
+          ~extra_root_names:reified_approx_names
+          ~extra_approxs:reified_lookup_approxs ~sections ~all_code slot_offsets
       in
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code

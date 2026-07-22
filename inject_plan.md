@@ -481,13 +481,26 @@ treatment.
       originally sat in the toplevel module initializer, where Simplify
       lifts the closure to a symbol, so the -O3 test was exercising the
       Value_symbol path rather than a dynamic closure.  The case now lives
-      under an [@inline never] function: it still inlines in classic mode
-      (lookup symbols work inside function bodies), and under -O3 it
-      degrades to Unknown as expected (warning 55 in the reference),
-      documenting the my_closure-gate limitation.  Probing also showed a
-      classic-mode gap: closures received as function results reify as
-      Unknown (closure conversion does not track call-result
-      approximations at the injection site).
+      under an [@inline never] function.
+      Follow-up (2026-07-22): dynamic closures now work under -O3 too.
+      The my_closure gate is gone: [simplify_reify_approx] manufactures a
+      lookup symbol per symbol-less closure (mirroring classic mode) and
+      registers the approximation in a new [Downwards_acc] accumulator
+      ([reified_lookup_approxs], with the usual set-of-closures
+      save/restore); [Flambda_cmx.prepare_cmx_file_contents] gains
+      [~extra_approxs], exported as extra symbol equations merged into the
+      serialised typing env via
+      [Serializable.create_from_closure_conversion_approx] +
+      [Serializable.merge] (such symbols have no definition or static data;
+      they are pure cmx lookup keys, as in classic mode).  The eval side
+      needed no changes.  inject_inlining_o3_test now expects the dynamic
+      closure to inline silently.
+      Remaining gap (both modes): closures whose approximation/type is not
+      visible at the injection site, e.g. results of non-inlinable calls
+      (classic mode does not track call-result approximations; at -O3 the
+      callee's result type may not reveal the closure).  Also note the
+      reaper (off by default) does not know about reified-approx roots;
+      if enabled it could delete code the approximations reference.
 - [ ] M4: current-module references.
 - [ ] M3: `<[open]>` modes.
 

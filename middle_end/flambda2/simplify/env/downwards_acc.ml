@@ -29,6 +29,12 @@ type t =
     demoted_exn_handlers : Continuation.Set.t;
     code_ids_to_remember : Code_id.Set.t;
     reified_approx_names : Name_occurrences.t;
+    reified_lookup_approxs :
+      Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t
+      Symbol.Map.t;
+    (* Approximations of reified dynamic closures, registered under
+       manufactured lookup symbols; exported as extra symbol equations (see
+       [Flambda_cmx.prepare_cmx_file_contents]). *)
     (* Free names of the approximations reified by [Reify_approx]; see
        [Simplify_unary_primitive.simplify_reify_approx]. *)
     code_ids_to_never_delete : Code_id.Set.t;
@@ -54,6 +60,7 @@ let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         reified_approx_names = _;
+        reified_lookup_approxs = _;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
@@ -106,6 +113,7 @@ let create denv slot_offsets continuation_uses_env =
     demoted_exn_handlers = Continuation.Set.empty;
     code_ids_to_remember = Code_id.Set.empty;
     reified_approx_names = Name_occurrences.empty;
+    reified_lookup_approxs = Symbol.Map.empty;
     code_ids_to_never_delete = Code_id.Set.empty;
     code_ids_never_simplified = Code_id.Set.empty;
     debuginfo_rewrites = Simple.Map.empty;
@@ -227,6 +235,17 @@ let reified_approx_names t = t.reified_approx_names
 
 let with_reified_approx_names t ~reified_approx_names =
   { t with reified_approx_names }
+
+let add_reified_lookup_approx t symbol approx =
+  { t with
+    reified_lookup_approxs =
+      Symbol.Map.add symbol approx t.reified_lookup_approxs
+  }
+
+let reified_lookup_approxs t = t.reified_lookup_approxs
+
+let with_reified_lookup_approxs t ~reified_lookup_approxs =
+  { t with reified_lookup_approxs }
 
 let add_code_ids_to_remember t code_ids =
   if DE.at_unit_toplevel t.denv

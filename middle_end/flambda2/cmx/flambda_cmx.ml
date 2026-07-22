@@ -236,8 +236,9 @@ let prepare_cmx ~module_symbol ~extra_root_names create_typing_env
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~extra_root_names
-    ~used_value_slots ~exported_offsets ~sections all_code =
+let prepare_cmx_file_contents ~machine_width ~final_typing_env ~module_symbol
+    ~extra_root_names ~extra_approxs ~used_value_slots ~exported_offsets
+    ~sections all_code =
   match final_typing_env with
   | None ->
     Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
@@ -248,10 +249,35 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~extra_root_names
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in
     let create_typing_env reachable_names =
-      TE.Serializable.create typing_env ~reachable_names
+      let serializable = TE.Serializable.create typing_env ~reachable_names in
+      (* [extra_approxs] provides equations for symbols that have no definition
+         in the typing env, e.g. the manufactured lookup symbols under which the
+         approximations of reified dynamic closures are registered (see
+         [Simplify_unary_primitive.simplify_reify_approx]). They are consulted
+         by [load_symbol_approx] at demarshalling time. *)
+      let extra_approxs =
+        Symbol.Map.filter
+          (fun sym _ -> Name_occurrences.mem_symbol reachable_names sym)
+          extra_approxs
+      in
+      if Symbol.Map.is_empty extra_approxs
+      then serializable
+      else
+        TE.Serializable.merge serializable
+          (TE.Serializable.create_from_closure_conversion_approx ~machine_width
+             extra_approxs)
     in
     let free_names_of_name name =
-      Some (T.free_names (TE.Pre_serializable.find typing_env name))
+      match
+        Name.pattern_match name
+          ~symbol:(fun symbol -> Symbol.Map.find_opt symbol extra_approxs)
+          ~var:(fun _ -> None)
+      with
+      | Some approx ->
+        Some
+          (Value_approximation.free_names
+             ~code_free_names:Code_or_metadata.free_names approx)
+      | None -> Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx ~module_symbol ~extra_root_names create_typing_env
       ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets

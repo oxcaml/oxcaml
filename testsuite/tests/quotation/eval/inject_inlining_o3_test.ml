@@ -48,10 +48,10 @@ let () =
     Eval.eval_with_injector (fun injector ->
         <[ ($(Eval.inject injector top_level_double) [@inlined]) 21 ]>)
   in
-  (* Dynamic local closure without a symbol (it captures [base]): under -O3
-     it cannot be lifted to a symbol and its code uses [my_closure], so
-     reification currently degrades to Unknown (see inject_plan.md); warning
-     55 expected. *)
+  (* Dynamic local closure without a symbol (it captures [base]): the
+     approximation is registered under a manufactured lookup symbol,
+     exported as an extra symbol equation in the cmx; no warning
+     expected. *)
   let b : int = inject_local_closure () in
   (* The warnings are emitted via [Format.err_formatter]; flush it before
      printing the results so that the interleaving is deterministic. *)

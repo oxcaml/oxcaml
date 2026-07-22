@@ -1020,19 +1020,48 @@ let simplify_reify_approx dacc ~original_term:_ ~arg ~arg_ty ~result_var =
             match DE.find_code_exn denv code_id with
             | exception _ -> unknown
             | code ->
-              (* Closures whose code uses [my_closure] are not reified for now:
-                 the function slot's stamp is not preserved by the standalone
-                 form, and a mismatched slot in the reconstructed closure type
-                 would conflict with the value-slot projections of the inlined
-                 body. (See inject_plan.md.) *)
-              if
-                Code_metadata.is_my_closure_used
-                  (Code_or_metadata.code_metadata code)
-              then unknown
-              else
-                Closure_approximation
-                  { code_id; function_slot; code; symbol = None })
+              Closure_approximation
+                { code_id; function_slot; code; symbol = None })
           | Need_meet | Invalid -> unknown)
+  in
+  (* For closures that have no symbol of their own, manufacture a symbol and
+     register the closure's full approximation, to be exported as an extra
+     symbol equation in this unit's cmx data (see
+     [Flambda_cmx.prepare_cmx_file_contents]); the original code ID and function
+     slot (whose stamps the standalone form does not preserve) can then be
+     recovered at demarshalling time. This mirrors what [Closure_conversion]
+     does in classic mode. *)
+  let dacc, closure_lookup_symbols =
+    let rec assign dacc lookup_symbols (approx : _ VA.t) =
+      match approx with
+      | Closure_approximation { code_id; symbol = None; _ } ->
+        if Code_id.Map.mem code_id lookup_symbols
+        then dacc, lookup_symbols
+        else
+          let lookup_symbol =
+            Symbol.create
+              (Current_unit.get_cu_exn ())
+              (Linkage_name.of_string
+                 ("reified_"
+                 ^ Linkage_name.to_string (Code_id.linkage_name code_id)))
+          in
+          let dacc = DA.add_reified_lookup_approx dacc lookup_symbol approx in
+          let dacc =
+            (* Root the lookup symbol so that the approximation (and hence the
+               code) is exported. *)
+            DA.add_reified_approx_names dacc
+              (Name_occurrences.singleton_symbol lookup_symbol Name_mode.normal)
+          in
+          dacc, Code_id.Map.add code_id lookup_symbol lookup_symbols
+      | Block_approximation (_, _, fields, _) ->
+        Array.fold_left
+          (fun (dacc, lookup_symbols) field -> assign dacc lookup_symbols field)
+          (dacc, lookup_symbols) fields
+      | Closure_approximation { symbol = Some _; _ }
+      | Unknown _ | Value_symbol _ | Value_const _ ->
+        dacc, lookup_symbols
+    in
+    assign dacc Code_id.Map.empty approx
   in
   (* Record the approximation's free names: the compilation units they reference
      are marked as required by quotes, and the code they reference is exported
@@ -1043,7 +1072,7 @@ let simplify_reify_approx dacc ~original_term:_ ~arg ~arg_ty ~result_var =
   in
   let marshalled =
     VA.Standalone.to_marshalled_string
-      (VA.Standalone.create ~closure_lookup_symbols:Code_id.Map.empty approx)
+      (VA.Standalone.create ~closure_lookup_symbols approx)
   in
   let sym =
     Symbol.create

@@ -22,8 +22,12 @@ type simplify_result =
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t;
-    reified_approx_names : Name_occurrences.t
-        (* See [Downwards_acc.reified_approx_names]. *)
+    reified_approx_names : Name_occurrences.t;
+    (* See [Downwards_acc.reified_approx_names]. *)
+    reified_lookup_approxs :
+      Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t
+      Symbol.Map.t
+        (* See [Downwards_acc.reified_lookup_approxs]. *)
   }
 
 let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
@@ -96,5 +100,6 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     final_typing_env;
     all_code;
     slot_offsets;
-    reified_approx_names = DA.reified_approx_names (UA.creation_dacc uacc)
+    reified_approx_names = DA.reified_approx_names (UA.creation_dacc uacc);
+    reified_lookup_approxs = DA.reified_lookup_approxs (UA.creation_dacc uacc)
   }
