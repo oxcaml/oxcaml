@@ -115,7 +115,8 @@ extension at a fresh address.
 ```
 
 `ρ` resolves variables and symbols to values. A symbol `sym` resolves to
-`ptr sym` (a symbol is its own address); the object it denotes is `H(sym)`.
+`ptr sym` (a symbol is its own address, unless rebound by `OS.Let.Static` —
+see that rule's NOTES); the object it denotes is `H(sym)`.
 Code ids are not `Simple`s and so are not in `ρ`; they are resolved against `H`.
 
 We write `⟦s⟧ρ` for the value of a `Simple` `s = x | sym | c` under `ρ`:
@@ -133,7 +134,12 @@ CODE middle_end/flambda2/term_basics/coercion.mli#t
 NOTES: A `Simple` may carry a coercion `co`. Coercions record inlining depth and
 closure-specialization information and are the identity on runtime values; they
 are erased here. Constants `c` (`Reg_width_const.t`) denote the obvious value:
-tagged immediates, naked immediates, and naked numbers.
+tagged immediates, naked immediates, and naked numbers. When `ρ` rebinds a
+symbol — `OS.Let.Static` does this for static sets of closures, binding `symⱼ`
+to `clos ℓ fⱼ` — `ρ` takes precedence; the `⟦sym⟧ρ = ptr sym` equation states
+the denotation for symbols `ρ` does not rebind (Block_like and imported
+symbols). See [§07](07-types-domain.md) §4's preamble for the guarantee this
+gives obligations stated over environments.
 ```
 
 ### 1.5 The code table
@@ -350,8 +356,11 @@ match_against_bound_static g bs pairs each piece with its bound symbol / code id
 each Or_variable field `Var x` is read from ρ(x); each `Const c` is the constant c
 H′ = H extended at all the above symbols and code ids (all fresh, allocated once)
 --------------------------------------------------
-⟨Let (bs = Static_consts g) e, ρ, K, H, T, R⟩ ⟶ ⟨e, ρ[symⱼ ↦ ptr symⱼ …], K, H′, T, R⟩
-NOTES: Symbols and code ids are dominator-scoped, not syntactically scoped
+⟨Let (bs = Static_consts g) e, ρ, K, H, T, R⟩ ⟶ ⟨e, ρ[symⱼ ↦ vⱼ …], K, H′, T, R⟩
+NOTES: The rebinding `vⱼ` follows the match above: `clos ℓ fⱼ` for
+set-of-closures symbols (where `ρ` takes precedence over `OS.Simple.Eval`'s
+`ptr sym` fallback — see its NOTES), `ptr symⱼ` for Block_like.
+Symbols and code ids are dominator-scoped, not syntactically scoped
 (`bound_pattern.mli`, `Static`): they are considered in scope throughout the
 term dominated by this binding. The objects are statically allocated — installed
 into H once, never re-run — and are always on the heap (never in a region).

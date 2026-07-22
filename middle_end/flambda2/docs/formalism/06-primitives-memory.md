@@ -692,6 +692,28 @@ error, not modelled as undef here.
 ```
 
 ```rule
+RULE P.Binary.BlockSet.NakedFloats
+STATUS normative
+CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
+---
+p = Block_set { kind = Naked_floats _; init; field = i }
+H(ℓ) = FloatBlock(μ, [f₀ … fₙ₋₁])      0 ≤ i < n
+H′ = H[ℓ ↦ FloatBlock(μ, [f₀ … fᵢ₋₁, f, fᵢ₊₁ … fₙ₋₁])]
+--------------------------------------------------
+⟦p⟧(ptr ℓ, f; H) = (tagged_imm 0, H′)
+NOTES: Writes field i of a naked-float block (float records; `Lsetfloatfield`
+lowers to this), returning unit. The new value f is a naked float stored
+unboxed; no write barrier is needed (non-scannable payload). `init` and the μ
+discipline are exactly as in P.Binary.BlockSet (no operational mutability
+check; the store proceeds regardless of μ). undef if the first argument is not
+a pointer to a Naked_floats block, or i is out of range. This rule mirrors
+P.Unary.BlockLoad.NakedFloats; `Block_access_kind` for sets shares the
+Naked_floats case with loads (`flambda_primitive.ml#Block_access_kind`, the
+Float_record classification).
+```
+
+```rule
 RULE P.Binary.BlockSet.Mixed
 STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
@@ -1020,7 +1042,7 @@ delete it. `middle_end_only = true` means it is erased before code generation
 
 ```rule
 RULE P.Unary.MakeLazy
-STATUS conjectured
+STATUS normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 p = Make_lazy t      t ∈ {Lazy_tag, Forward_tag}
@@ -1029,7 +1051,9 @@ alloc(Lazy(t, v), H) = (ℓ, H′)
 ⟦p⟧(v; H) = (ptr ℓ, H′)
 NOTES: Allocates a lazy (or forward) block wrapping v. Only_generative_effects
 Mutable, No_coeffects (effects_and_coeffects_of_unary_primitive, Make_lazy case).
-Marked conjectured pending validation of the lazy/forward tag choice.
+The lazy/forward tag choice is validated against to_cmm_primitive.ml's Make_lazy
+lowering and Lazy_block_tag.to_tag (Lazy_tag → 246, Forward_tag → 250); see
+R.Obj.Lazy (17) for the representation.
 ```
 
 ### Int_as_pointer, Reinterpret_boxed_vector
@@ -1140,9 +1164,19 @@ bytes (word0 least significant); the `aligned` variants additionally require the
 accessed address to be w-byte aligned — misalignment is undef here (the
 frontend inserts an alignment check for *bigstrings*, whose data is off-heap
 and can be aligned; heap strings/bytes are only word-aligned, so an aligned
-access to them is unchecked and simply undef if misaligned). Simplify never
-folds these loads at any width (simplify_string_or_bigstring_load returns ⊤,
-even for known strings).
+access to them is unchecked and simply undef if misaligned). Simplify folds
+scalar-width String loads whose contents and index are statically known
+(simplify_string_or_bigstring_load: meet_strings must yield only
+Contents-known String_info, the naked_nativeint index must be a proven
+singleton, and the result type is the set of decoded values, materialized via
+reify); if every candidate string makes the access out of range the load is
+Invalid. Vector-width loads and Bytes/Bigstring loads still return ⊤. Despite
+the coeffect-free classification, String loads must NOT be marked CSE-eligible
+(binary_primitive_eligible_for_cse): the deprecated %caml_string_get*
+primitives may be applied to *bytes*, so the String tag does not imply the
+storage is immutable (witnessed by tests/prim-bigstring/string_access.ml).
+The fold above is still sound because Contents-known String_info arises only
+from genuine immutable string literals (this_immutable_string).
 ```
 
 ### Phys_equal

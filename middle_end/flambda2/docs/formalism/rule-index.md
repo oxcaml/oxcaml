@@ -141,7 +141,7 @@ copies the regenerated files back into the source tree.
 
 ## P — Primitive denotations (ch. 05-06)
 
-99 rules.
+100 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -201,6 +201,7 @@ copies the regenerated files back into the source tree.
 | `P.Unary.BlockLoad.NakedFloats` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind` | — |
 | `P.Unary.BlockLoad.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.element_kind_for_load`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape` | 14-validation/mixed-01-record.md |
 | `P.Binary.BlockSet` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set` | — |
+| `P.Binary.BlockSet.NakedFloats` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set` | — |
 | `P.Binary.BlockSet.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set` | 14-validation/mixed-03-mutable-set.md |
 | `P.Unary.DuplicateBlock` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Unary.DuplicateBlock.Mixed` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#Duplicate_block_kind`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
@@ -220,7 +221,7 @@ copies the regenerated files back into the source tree.
 | `P.Unary.EndTryRegion` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Unary.ObjDup` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Unary.OpaqueIdentity` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive` | — |
-| `P.Unary.MakeLazy` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
+| `P.Unary.MakeLazy` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Unary.IntAsPointer` | conjectured | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive` | — |
 | `P.Binary.ArrayLoad` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
 | `P.Binary.ArrayLoad.Vector` | normative | 06-primitives-memory.md | `middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive`<br>`middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load`<br>`middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
@@ -373,7 +374,7 @@ copies the regenerated files back into the source tree.
 | `S.Rewrite.CSE.Eligible` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/terms/flambda_primitive.ml#Eligible_for_cse.create`<br>`middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse`<br>`middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse` | 14-validation/cse_immutable_array_load_var_index.md<br>14-validation/cse_immutable_array_load.md |
 | `S.Rewrite.CSE.Replace` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/simplify_primitive.ml#apply_cse` | 14-validation/cse_immutable_array_load.md<br>14-validation/cse_immutable_array_load_var_index.md<br>14-validation/issue5721.md<br>14-validation/new-04-cse.md |
 | `S.Rewrite.CSE.Extend` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_primitive.ml#try_cse`<br>`middle_end/flambda2/simplify/common_subexpression_elimination.ml#T0.add` | 14-validation/new-04-cse.md |
-| `S.Rewrite.Share.StaticDynamicSplit` | conjectured | 10-simplify-rewrites.md | `middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse`<br>`middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load` | — |
+| `S.Rewrite.Share.StaticDynamicSplit` | conjectured | 10-simplify-rewrites.md | `middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse`<br>`middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load`<br>`middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load` | — |
 | `S.Rewrite.Switch.ArmPrune` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm` | 14-validation/array_element_kind_meet.md<br>14-validation/new-02-known-switch.md<br>14-validation/new-08-nested-switch.md |
 | `S.Rewrite.Switch.Merge` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch`<br>`middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_arm` | 14-validation/new-02-known-switch.md |
 | `S.Rewrite.Switch.Identity` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch` | 14-validation/n_way_join_null.md |
@@ -386,7 +387,7 @@ copies the regenerated files back into the source tree.
 | `S.Rewrite.LetCont.Inline` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/join_points.ml#compute_handler_env`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation` | 14-validation/new-03-letcont-inline.md |
 | `S.Rewrite.LetCont.InlineForcesElimination` | conjectured | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind`<br>`middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont` | — |
 | `S.Rewrite.LetCont.DeadHandler` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont` | — |
-| `S.Rewrite.LetCont.Shortcut` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/continuation_shortcut.ml#apply`<br>`middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts` | — |
+| `S.Rewrite.LetCont.Shortcut` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/continuation_shortcut.ml#apply`<br>`middle_end/flambda2/simplify/continuation_shortcut.ml#to_alias`<br>`middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts` | — |
 | `S.Rewrite.LetCont.ShortcutFlat` | conjectured | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler`<br>`middle_end/flambda2/simplify/continuation_shortcut.ml#apply`<br>`middle_end/flambda2/simplify/env/upwards_env.ml#add_continuation_shortcut` | — |
 | `S.Rewrite.LetCont.UnusedParam` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive`<br>`middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze` | — |
 | `S.Rewrite.LetCont.AliasedParam` | normative | 10-simplify-rewrites.md | `middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases`<br>`middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler` | — |
@@ -440,7 +441,7 @@ copies the regenerated files back into the source tree.
 
 ## CM — Core Cmm operational semantics (ch. 15, 19)
 
-27 rules.
+28 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -461,6 +462,7 @@ copies the regenerated files back into the source tree.
 | `CM.Catch.Exn` | normative | 15-cmm.md | `backend/cmm.mli#Exn_handler`<br>`backend/cmm_helpers.ml#trywith`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler` | — |
 | `CM.Raise` | normative | 15-cmm.md | `backend/cmm.mli#Craise`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise`<br>`backend/cmm_helpers.ml#raise_prim` | — |
 | `CM.Apply` | normative | 15-cmm.md | `backend/cmm.mli#Capply`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0` | — |
+| `CM.Apply.Raise` | normative | 15-cmm.md | `backend/cmm.mli#Capply`<br>`backend/cmm.mli#Craise` | — |
 | `CM.Extcall` | normative | 15-cmm.md | `backend/cmm.mli#Cextcall`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call` | — |
 | `CM.Invalid` | normative | 15-cmm.md | `backend/cmm.mli#Cinvalid`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid` | — |
 | `CM.Unit.Final` | normative | 15-cmm.md | `middle_end/flambda2/to_cmm/to_cmm.ml#unit`<br>`backend/cmm.mli#Cdata` | — |
@@ -474,7 +476,7 @@ copies the regenerated files back into the source tree.
 
 ## TC — to_cmm translation (ch. 16, 18)
 
-35 rules.
+36 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -490,6 +492,7 @@ copies the regenerated files back into the source tree.
 | `TC.ApplyCont.Raise` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise`<br>`backend/cmm_helpers.ml#raise_prim` | — |
 | `TC.Apply.Call` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0` | — |
 | `TC.Apply.Return` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_expr` | — |
+| `TC.Apply.ExnWrapper` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply`<br>`backend/cmm_helpers.ml#trywith`<br>`backend/cmm_helpers.ml#raise_prim` | — |
 | `TC.Switch` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch`<br>`backend/cmm_helpers.ml#transl_switch_clambda`<br>`backend/cmm_helpers.ml#ite` | — |
 | `TC.Invalid` | normative | 16-to-cmm-control.md | `middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid`<br>`middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid` | — |
 | `TC.Simple` | normative | 18-to-cmm-data.md | `middle_end/flambda2/to_cmm/to_cmm_shared.ml#simple`<br>`middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple` | — |
@@ -516,7 +519,7 @@ copies the regenerated files back into the source tree.
 
 ## R — Representation relation (ch. 17)
 
-15 rules.
+16 rules.
 
 | Rule ID | Status | Chapter | Code anchors | Verified |
 |---|---|---|---|---|
@@ -526,6 +529,7 @@ copies the regenerated files back into the source tree.
 | `R.Val.Clos` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot`<br>`middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout`<br>`backend/cmm_helpers.ml#infix_field_address` | — |
 | `R.Header` | normative | 17-representation.md | `backend/cmm_helpers.ml#block_header`<br>`backend/cmm_helpers.ml#Mixed_block_support`<br>`backend/cmm_helpers.ml#caml_black` | — |
 | `R.Obj.Block` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_alloc_generic` | — |
+| `R.Obj.Lazy` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive`<br>`middle_end/flambda2/terms/flambda_primitive.ml#Lazy_block_tag` | — |
 | `R.Obj.FloatBlock` | normative | 17-representation.md | `backend/cmm_helpers.ml#float_header`<br>`backend/cmm_helpers.ml#make_float_alloc`<br>`backend/cmm_helpers.ml#floatarray_header` | — |
 | `R.Obj.MixedBlock` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#make_mixed_alloc`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words` | — |
 | `R.Obj.Array` | normative | 17-representation.md | `middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block`<br>`backend/cmm_helpers.ml#array_indexing`<br>`backend/cmm_helpers.ml#Unboxed_or_untagged_array_tags`<br>`backend/cmm_helpers.ml#unboxed_or_untagged_packed_array_length` | — |
@@ -572,14 +576,14 @@ copies the regenerated files back into the source tree.
 
 _Generated by scanning chapters 02-20._
 
-- **Total rules:** 449
-- **By status:** normative 298, descriptive 66, conjectured 85
+- **Total rules:** 453
+- **By status:** normative 303, descriptive 66, conjectured 84
 - **By chapter:**
   - 02-syntax.md: 13
   - 03-kinds.md: 27
   - 04-opsem.md: 29
   - 05-primitives-scalar.md: 31
-  - 06-primitives-memory.md: 68
+  - 06-primitives-memory.md: 69
   - 07-types-domain.md: 30
   - 08-meet-join.md: 30
   - 09-simplify-structure.md: 37
@@ -587,9 +591,9 @@ _Generated by scanning chapters 02-20._
   - 11-inlining.md: 10
   - 12-unboxing.md: 18
   - 13-soundness.md: 12
-  - 15-cmm.md: 20
-  - 16-to-cmm-control.md: 15
-  - 17-representation.md: 15
+  - 15-cmm.md: 21
+  - 16-to-cmm-control.md: 16
+  - 17-representation.md: 16
   - 18-to-cmm-data.md: 21
   - 19-cmm-memory-gc.md: 7
   - 20-to-cmm-soundness.md: 12

@@ -657,6 +657,15 @@ definitions are the intended denotation; [§13](13-soundness.md) owns the soundn
 that ties them to Simplify. They are marked `conjectured` because the code does
 not compute `γ` and the reading is unverified.
 
+A note on symbols, inherited by every obligation in this section: symbols need
+no entry in `ρ`. A symbol is always evaluable — through `ρ` when `ρ` binds it
+(as `OS.Let.Static` arranges for static sets of closures), and to the static
+pointer `ptr sym` otherwise ([§04](04-opsem.md), `OS.Simple.Eval`) — in either
+case to a `Value`-kinded value, per symbols-denote-statics. So no clause built
+on this section (consistency of `ρ` with `E`, satisfaction of an extension, or
+a simulation premise over them) may demand that `ρ` literally bind a symbol;
+obligations read names the way evaluation does, through `⟦·⟧ρ`.
+
 ```rule
 RULE T.Gamma.Kind
 STATUS conjectured

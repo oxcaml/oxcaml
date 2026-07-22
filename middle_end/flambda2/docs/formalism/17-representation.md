@@ -147,11 +147,14 @@ CODE backend/cmm_helpers.ml#Mixed_block_support
 CODE backend/cmm_helpers.ml#caml_black
 ---
 The header word for a block of tag t, size sz (in words, not counting the header),
-GC color col, and mixed scannable-prefix p is:
-  hdr(t, sz, col, p) = (prefix_field ≪ 56) │ (sz ≪ 10) │ (col ≪ 8) │ t
+GC color col, and encoded prefix field pf is:
+  hdr(t, sz, col, pf) = (pf ≪ 56) │ (sz ≪ 10) │ (col ≪ 8) │ t
 where t occupies bits 0–7, col bits 8–9 (caml_black = caml_local = 3≪8), sz bits
-10–55, and prefix_field = 0 for a non-mixed block, = p+1 for a mixed block with
-scannable prefix p (bits 56–63; 0 means "not mixed").
+10–55, and pf bits 56–63. Callers pass pf = 0 for a non-mixed block and pf = p+1
+for a mixed block with scannable prefix p (0 means "not mixed"): the +1 encoding
+is written at each use site, so hdr is a function of its four arguments. (In the
+code the +1 lives in Mixed_block_support.make_header; the rules quote the
+encoded field so that hdr is well-defined.)
 --------------------------------------------------
 This is the concrete meaning of the header word at L(ℓ)−8.
 NOTES: 64-BIT-SPECIFIC. block_header = (sz≪10)+t; color OR'd in
@@ -189,6 +192,24 @@ Word_val (GC-scanned); immediate fields Word_int. Cmm image of P.Variadic.MakeBl
 ```
 
 ```rule
+RULE R.Obj.Lazy
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+CODE middle_end/flambda2/terms/flambda_primitive.ml#Lazy_block_tag
+---
+H ⊢ Lazy(t, v) @ a ≈ₒ M    iff
+  M[a−8] = hdr(tag(t), 1, col, 0)      -- tag(Lazy_tag) = 246, tag(Forward_tag) = 250; col white, or black once marked
+  and M[a] = w with v ≈ᵥ w             (one Word_val field)
+--------------------------------------------------
+A lazy (or forward) block: R.Obj.Block's layout at the given tag, one field.
+NOTES: Cmm image of P.Unary.MakeLazy(06). Make_lazy lowers to make_alloc
+(mode Heap hard-coded) with tag = Lazy_block_tag.to_tag t (Tag.lazy_tag = 246 /
+Tag.forward_tag = 250, runtime/caml/mlvalues.h); make_alloc means the one field
+is Word_val. Heap-only, so no static (black) or local (caml_local) cases; the
+GC may still blacken, hence col unconstrained between white and black.
+```
+
+```rule
 RULE R.Obj.FloatBlock
 STATUS normative
 CODE backend/cmm_helpers.ml#float_header
@@ -213,7 +234,7 @@ CODE backend/cmm_helpers.ml#make_mixed_alloc
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
 ---
 H ⊢ MixedBlock(t, μ, σ, [v₀ … v_{k−1}]) @ a ≈ₒ M    iff
-  M[a−8] = hdr(t, size_in_words(σ), col(μ), value_prefix_size(σ))
+  M[a−8] = hdr(t, size_in_words(σ), col(μ), value_prefix_size(σ) + 1)   -- mixed: pf = p+1
   and for each logical field j: the bytes at a + 8·offset_in_words(σ, j), of width
   chunk(σ, j), represent vⱼ (Word_val/Word_int for the value prefix; Double / Single /
   Byte_signed / Sixteen_signed / Thirtytwo_signed / Word_int for flat-suffix elements)
@@ -241,7 +262,7 @@ H ⊢ Array(ak, μ, [v₀ … v_{n−1}]) @ a ≈ₒ M    iff
 where, per array kind:
   Values / Gc_ignorable immediates → w = 8, tag = 0, prefix = 0 (Word_val / Word_int);
   Naked_floats → w = 8, tag = double_array_tag, prefix = 0 (Double), size = n words;
-  Naked_int64 / nativeint → w = 8, prefix = 1;
+  Naked_ints / Naked_int64 / nativeint → w = 8, prefix = 1;
   Naked_int32 / float32 → w = 4, prefix = 1 (packed 2 per word);
   Naked_int8 / int16 → w = 1 / 2, prefix = 1 (packed);
   vec128/256/512 → w = 16/32/64, prefix = 1;
@@ -250,7 +271,8 @@ For the PACKED/unboxed kinds the header tag is LENGTH-DEPENDENT — a base tag p
 the last-word padding (k − n mod k) mod k (the number of unused element slots in the
 final word; 0 when k divides n) (int32#/float32#: k = 2; int16#: k = 4; int8#: k = 8)
 — and prefix = 1
-(a MIXED header with scannable_prefix 0, so the header's top byte reads p+1 = 1).
+(a MIXED header with scannable prefix 0: prefix(ak) is the encoded field pf,
+so 1 = 0+1 here, and prefix = 0 above means non-mixed).
 The vector kinds are never packed (an element is ≥ a word), so their tags are the
 CONSTANTS unboxed_vec128/256/512_array_tag = 6/7/8 and the size is n·(2/4/8) words;
 the element count is recovered from the header as size ≫ log2(words per element)
@@ -337,8 +359,8 @@ H ⊢ Boxed(κ, c) @ a ≈ₒ M    iff, by κ:
   Naked_int64:      M[a−8] = hdr(custom_tag, 2, col, 0);  M[a] = &caml_int64_ops;  M[a+8] = c
   Naked_nativeint:  M[a−8] = hdr(custom_tag, 2, col, 0);  M[a] = &caml_nativeint_ops; M[a+8] = c
   Naked_vec128/256/512:
-                    M[a−8] = hdr(0, 2/4/8, col, 0)  (a MIXED header, scannable prefix 0,
-                      so the top byte reads 1);  the 16/32/64 bytes at a hold c
+                    M[a−8] = hdr(0, 2/4/8, col, 1)  (a MIXED header with scannable
+                      prefix 0, pf = 0+1 = 1);  the 16/32/64 bytes at a hold c
                       (little-endian, word0 first).  NO ops word; payload at offset 0.
 --------------------------------------------------
 A boxed number: a double is a bare double_tag block; the boxed ints/float32 are

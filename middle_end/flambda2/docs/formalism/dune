@@ -9,6 +9,11 @@
 ;;
 ;; to regenerate and promote the results into the tree.
 
+;; The Rocq mechanization under rocq/ builds independently via _CoqProject +
+;; rocq makefile; keep dune from scanning it (its in-tree .vo/.glob artifacts
+;; would otherwise become spurious deps of the regen rule below).
+(dirs :standard \ rocq)
+
 (rule
  (targets rule-index.new.md README.new.md)
  (deps

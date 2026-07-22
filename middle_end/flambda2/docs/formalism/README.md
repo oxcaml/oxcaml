@@ -45,9 +45,9 @@ the sync protocol below says what to do.
 
 ## Status & validation
 
-As of 2026-07-16 the formalism has **449 rules** across chapters 02-20:
-**298 normative** (the code must satisfy them), **66 descriptive** (current
-algorithms/heuristics that may change), and **85 conjectured** (believed but not
+As of 2026-07-16 the formalism has **453 rules** across chapters 02-20:
+**303 normative** (the code must satisfy them), **66 descriptive** (current
+algorithms/heuristics that may change), and **84 conjectured** (believed but not
 yet checked against the code). Counts and per-chapter breakdown are regenerated
 in [`rule-index.md`](rule-index.md).
 

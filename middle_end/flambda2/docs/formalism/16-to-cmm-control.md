@@ -302,7 +302,43 @@ target wraps the call in a Cexit to the join point. A single-param Inline binds
 the call result and splices the handler (no Cmm control). A multi-param Inline
 uses a Ccatch/Cexit pair to destructure the unboxed multi-value result. If the
 Apply's exn continuation carries extra args, translate_apply additionally wraps
-the call in a Ctrywith that reraises with the extras (translate_apply).
+the call in a Ctrywith that reraises with the extras (TC.Apply.ExnWrapper).
+```
+
+```rule
+RULE TC.Apply.ExnWrapper
+STATUS normative
+CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply
+CODE backend/cmm_helpers.ml#trywith
+CODE backend/cmm_helpers.ml#raise_prim
+---
+Let `call` = TC.Apply.Call for the application, with exn continuation k_exn:
+  extra_args(k_exn) = []  ⟹  call is used unchanged (the common case)
+  extra_args(k_exn) = s̄_extra ≠ [],  Θ ⊢ s̄_extra ⤳v v̄_extra  (translated at the CALL site):
+    call′ = Ccatch(Exn_handler, [⟨lbl_w, [x_exn],
+                      Cop(Craise (if !Clflags.debug then Raise_reraise else Raise_notrace),
+                          x_exn :: v̄_extra)⟩],   -- reraise with the extras
+              Ccatch(Normal, [⟨lbl_pop, [(x_res : return machtype)], x_res⟩],
+                Ccatch(Normal, [⟨lbl_push, [], Cexit(lbl_pop, [call], [Pop lbl_w])⟩],
+                  Cexit(lbl_push, [], [Push lbl_w]))))
+    with x_exn, x_res, lbl_pop, lbl_w, lbl_push fresh
+--------------------------------------------------
+TC.Apply.Return consumes call′ in place of call.
+NOTES: The arity bridge for callee exceptions. A callee's uncaught exception
+arrives bucket-only (CM.Apply.Raise), but an extras-carrying source exn handler
+compiles to an Exn_handler expecting the extras as additional Craise operands
+(TC.LetCont.Exn, TC.ApplyCont.Raise) — without this wrapper the composed model
+is stuck at a defined program point (fidelity finding KF-033, the Cmm-side twin
+of KF-019). translate_apply catches the bucket in a fresh extras-FREE
+Exn_handler and reraises (debug-gated as in TC.ApplyCont.Raise: Raise_reraise
+under -g, else Raise_notrace) with the extras, which are translated
+at the call site, where they are in scope — the same device used when inlining
+a function into a context whose exn continuation takes extra args (code
+comment). The Push/Pop trap actions are explicit on the Cexits: the push
+scaffold enters the guarded region, and the return path rides
+Cexit(lbl_pop, [call], [Pop lbl_w]) so the trap stack is balanced on both the
+return and raise paths. The Exn_handler is outermost: C.trywith is applied
+last, wrapping the pop/push scaffold. Steps to CM.Catch.Exn / CM.Raise.
 ```
 
 ## 6. Translating switches (`Switch`)
@@ -377,7 +413,7 @@ env K with χ via Φ (Jump↦CHandler at the same label; Inline↦spliced; Retur
 function boundary; Exn↦Exn_handler); the trap stacks T ≈ TT (same handler
 identities, same depth); the region stacks R ≈ RR.
 Then for every Flambda control transition
-  ⟨e, ρ, K, H, T, R⟩ ⟶ ⟨e′, ρ′, K′, H′, T′, R′⟩         (an OS.ApplyCont*/Switch/Apply/Invalid step)
+  ⟨e, ρ, K, H, T, R⟩ ⟶ ⟨e′, ρ′, K′, H′, T′, R′⟩         (an OS.LetCont*/ApplyCont*/Switch/Apply/Invalid step)
 there is a matching Cmm run
   ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c* ⟨e_c′, ce′, χ′, M′, TT′, RR′⟩
 with Θ′ ⊢ e′ ⤳ e_c′ and the relation re-established (T′ ≈ TT′, R′ ≈ RR′, K′ ≈ Φ′),

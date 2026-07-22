@@ -442,7 +442,9 @@ p is eligible for CSE iff:
 NOTES: The per-primitive predicate excludes primitives whose results are already
   propagated through types: Block_load, Project_function_slot/Project_value_slot,
   Duplicate_block/array, and all mutable or raw loads (mutable Array_load,
-  String_or_bigstring_load, Bigarray_load). It *includes* immutable and
+  String_or_bigstring_load — including the String case, whose storage may
+  actually be mutable bytes via the deprecated %caml_string_get* primitives —
+  and Bigarray_load). It *includes* immutable and
   immutable_unique Array_load — a genuine load that CSE, not type-based
   projection, deduplicates (decisive when the index is a variable; see the
   VERIFIED case study) — as well as the header-read family Is_int, Is_null,
@@ -502,6 +504,7 @@ CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for
 CODE middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
+CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load
 ---
 p is a pure ((No_effects, No_coeffects)) projection primitive
 --------------------------------------------------
@@ -519,8 +522,14 @@ STATIC (encoded in the primitive payload) or DYNAMIC (a Simple operand):
 (3) discriminators — Is_int, Get_tag, Is_null — carried by BOTH forward CSE and
     the relational types domain (a deliberate redundancy the code plans to retire).
     Get_header rides ONLY CSE (simplify_get_header installs no relation);
-(4) orphan — String_or_bigstring_load: neither mechanism; immutable string loads
-    are never shared.
+(4) contents-known fold only — String_or_bigstring_load (String): NOT
+    CSE-eligible (the deprecated %caml_string_get* primitives may apply the
+    String load to mutable bytes, so the primitive alone does not guarantee
+    immutability); constant-index loads from statically-known string contents
+    fold directly in simplify_string_or_bigstring_load (contents ride
+    String_info in the types domain, so no per-load projection is needed).
+    Variable-index immutable string loads are never shared. Bytes/Bigstring
+    loads: neither mechanism (mutable).
 NOTES: Sharpens the corrected S.Rewrite.CSE.Eligible into a design invariant WITH
 ITS REASON: types can carry only a projection whose path is a static index into a
 Row_like / product; CSE keys on the whole primitive so it can carry a variable
@@ -798,17 +807,25 @@ RULE S.Rewrite.LetCont.Shortcut
 STATUS normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/continuation_shortcut.ml#apply
+CODE middle_end/flambda2/simplify/continuation_shortcut.ml#to_alias
 CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
 ---
 let_cont k p̄ = apply_cont k′ ā in e   (handler is a single apply_cont, no trap action)
 --------------------------------------------------
-E ⊢ (let_cont k p̄ = apply_cont k′ ā in e) ⇝ e[ apply_cont k b̄ ↦ apply_cont k′ ā[p̄ ↦ b̄] ]
+E ⊢ (let_cont k p̄ = apply_cont k′ ā in e) ⇝ let_cont k p̄ = apply_cont k′ ā in e[ apply_cont k b̄ ↦ apply_cont k′ ā[p̄ ↦ b̄] ]
 NOTES: A continuation whose body is just a jump to another continuation becomes a
   shortcut: calls to k are rewritten to call k′ directly, substituting k's
-  arguments. When ā is exactly p̄ this is a pure alias k ≡ k′ (`to_alias`).
-  Shortcuts are never created to a linearly-used-inlinable continuation, so they
-  compose safely with S.Rewrite.LetCont.Inline. Sound because calling k always
-  immediately calls k′ with the substituted arguments.
+  arguments. The binder is kept: the substitution reaches apply_cont uses of k
+  only — a use of k in an Apply's return/exn position is not rewritten — so
+  `rebuild_let_cont` keeps the handler until
+  `num_free_occurrences_of_cont_in_body = Zero`; once no uses survive,
+  S.Rewrite.LetCont.DeadHandler composes to drop the binder, recovering the
+  binder-dropping form. When ā is exactly p̄ this is a pure alias k ≡ k′
+  (`to_alias`); only then are Apply return/exn uses of k also retargeted to k′
+  (`apply_continuation_aliases`, `apply_exn_continuation_aliases`). Shortcuts are
+  never created to a linearly-used-inlinable continuation, so they compose safely
+  with S.Rewrite.LetCont.Inline. Sound because calling k always immediately calls
+  k′ with the substituted arguments.
 ```
 
 ```rule

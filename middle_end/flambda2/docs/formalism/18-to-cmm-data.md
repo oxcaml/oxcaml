@@ -412,7 +412,7 @@ CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
 CODE backend/cmm_helpers.ml#array_indexing
 ---
-Array_load (ak, index i tagged):  ⟦arr; i⟧ ⤳ Cop(Cload{chunk(ak); mut}, [array_indexing log2(ak) arr i])
+Array_load (ak, index i tagged):  ⟦arr; i⟧ ⤳ Cop(Cload{chunk(ak); Mutable}, [array_indexing log2(ak) arr i])
 Array_set (ak, …):                ⟦arr; i; v⟧ ⤳ int_array_set / addr_array_store (caml_modify
   for value assignment) / float_array_set, at array_indexing log2(ak) arr i
 --------------------------------------------------
@@ -420,7 +420,13 @@ Commutes with ≈: element i of the array at scaled byte offset (R.Obj.Array); l
 yield vᵢ ≈ᵥ ·, sets update M consistently.
 NOTES: array_indexing takes the TAGGED index and folds the untag into the scale
 (constant n ↦ (n≫1)≪log2; the (c≪1)|1 pattern ↦ c≪log2). Immutable array loads are
-CSE-eligible (13 §4.4). Value stores use caml_modify (heap) / caml_modify_local
+CSE-eligible (13 §4.4), but the emitted load hint is Mutable regardless of the
+primitive's mutability annotation: array_load takes no mutability parameter (the
+annotation is dropped at dispatch), so the backend-level CSE opportunity for
+immutable arrays is not taken — a CR in array_load asks for it to be refactored
+in the style of block_load, which does thread mutability through to its loads;
+flip the emission line back to the primitive's flag if that refactor lands.
+Value stores use caml_modify (heap) / caml_modify_local
 (local) / caml_initialize (init). Cmm image of P.Binary.ArrayLoad / P.Ternary.ArraySet.
 Out-of-bounds is undef (06, checks inserted by the frontend, P.Unchecked.*).
 Vector load/set kinds take the separate path below. Array_length on an unboxed
@@ -447,7 +453,9 @@ NOTES: The byte offset is scaled by the SOURCE array's element width
 imm/int/int64/nativeint/float→3, vec128→4, vec256→5, vec512→6), while the chunk
 width follows the LOAD/SET kind — this is exactly what makes cross-kind
 reinterpret access work. Unlike scalar array access, the index is untagged then
-shifted (untag_int + lsl) rather than folded by array_indexing. ALWAYS the
+shifted (untag_int + lsl) rather than folded by array_indexing. μ does not reach
+the load: array_load_vector takes no mutability parameter and the unaligned
+load helpers are unconditionally Mutable. ALWAYS the
 `_unaligned` chunk, even for same-width vector arrays (unboxed vector arrays are
 only word-aligned). Vector access to a Values / Gc_ignorable_values array is a
 fatal error in array_load/array_set0, as are Unboxed_product sources (except

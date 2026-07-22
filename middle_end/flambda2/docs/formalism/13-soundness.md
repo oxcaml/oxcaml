@@ -644,6 +644,57 @@ claim elsewhere seems too clean.
    [`20-to-cmm-soundness.md`](20-to-cmm-soundness.md) §5), so the double rounding is
    unambiguously in the Simplify constant fold, not the lowering.
 
+8. **DESIGN CONFLICT (recorded, not resolved): CSE of immutable block
+   construction vs deterministic `Phys_equal`.** `S.Rewrite.CSE.Eligible`
+   admits `Make_block (_, Immutable, Heap)` (the `(Only_generative_effects
+   Immutable, No_coeffects)` clause; `variadic_primitive_eligible_for_cse` and
+   `Eligible_for_cse.create`, middle_end/flambda2/terms/flambda_primitive.ml —
+   the latter's comment reads "Allow constructions of immutable blocks to be
+   shared"), so two identical immutable allocations may be merged by
+   `S.Rewrite.CSE.Replace`, whose NOTES claim the identity change "is not
+   observable". `P.Binary.PhysEqual` says otherwise: it specifies `phys_equal`
+   as deterministic machine-word equality, and the pair is jointly refutable
+   against `INV.Simplify.Preserves`: `let x = Make_block(0, Immutable)[a] in
+   let y = Make_block(0, Immutable)[a] in phys_equal x y` evaluates to `false`
+   in every run of the source term (two fresh allocations), exhibits no
+   undefined behaviour, and after CSE (`y ↦ x`) evaluates — indeed
+   constant-folds — to `true` (`T.prove_physical_equality`,
+   middle_end/flambda2/types/provers.ml, proves equality of identical aliases;
+   `simplify_phys_equal` folds on it). The compiler is not wrong: the OCaml
+   manual specifies `(==)` on non-mutable values as implementation-dependent
+   (guaranteeing only that `e1 == e2` implies structural equality), and the
+   fold is disciplined in exactly the way that keeps sharing coherent —
+   `prove_physical_equality` proves *dis*equality only from content or kind
+   incompatibility (disjoint numeric sets, differing tags/shapes/sizes), never
+   from "distinct allocations", so every physical-equality fact Simplify
+   generates is stable under the sharing it introduces. The over-claim is in
+   the formalism: `P.Binary.PhysEqual` pins an answer the language
+   deliberately leaves loose, and `INV.Simplify.Preserves` then demands it be
+   preserved. (The same license covers other identity-affecting mechanisms:
+   lifting to statics, unboxing's re-boxing at use sites.) The `-Oclassic`
+   sibling of this conflict is recorded at
+   [`14-validation/classic_physequal_box.md`](14-validation/classic_physequal_box.md):
+   the same deterministic `P.Binary.PhysEqual` is refuted in the opposite
+   direction (`to_cmm` Delay-duplication splits identity) and its repair #1
+   coincides with option (b) below, so the resolution should be chosen jointly
+   (see also `INV.ToCmm.EffectLinear` NOTES in
+   [`20-to-cmm-soundness.md`](20-to-cmm-soundness.md)). Resolution is a
+   design decision, deferred: (a) qualify observational equivalence (§1) to
+   "up to physical identity of immutable values" (equivalently, relate U′'s
+   heap to U's by a folding of immutable blocks); (b) make ⟦Phys_equal⟧
+   nondeterministic on operands not provably the same word; (c) leave both
+   rules as faithful transcriptions of code truth with this recorded
+   refutation. The `S.Rewrite.CSE.Replace` NOTES sentence should in any case
+   be corrected to "identity may be observed through `phys_equal`; the change
+   is licensed because `(==)` on non-mutable values is implementation-
+   dependent". Mechanization pointer: FINDING #16 at
+   rocq/theories/RewritesPrim.v (`S.Rewrite.CSE.Eligible` site); the
+   mechanization derives the same fold via `S_Rewrite_Prim_PhysEqual_Equal`
+   (identical canonicals after `S_Rewrite_CSE_Replace` installs the alias), so
+   the refutation is reproducible in-model by composing the two rules. A
+   14-validation witness (two immutable allocations, phys_equal folded to
+   true) would be a worthwhile follow-up.
+
 ## 5. Validation summary
 
 The formalism is validated by *prediction*, not by post-hoc reading. The

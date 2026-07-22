@@ -133,14 +133,22 @@ STATUS conjectured
 CODE backend/cmm_helpers.ml#make_alloc_generic
 CODE backend/cmm.mli#machtype_component
 ---
-At an allocation point (CM.Alloc.Heap/Local), the machine may take a collection step
-  ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨e_c, ce′, χ, M′, TT, RR⟩
-for which there is a relocation ϕ : Addr ⇀ Addr on live Val-reachable blocks such that:
+An allocation (CM.Alloc.Heap/Local) may be preceded by a collection, atomically:
+at an allocation point, instead of allocating in M directly, the machine may take
+the single fused step
+  ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨e_c″, ce′, χ, M″, TT, RR⟩
+in which there is a relocation ϕ : Addr ⇀ Addr on live Val-reachable blocks such that:
   (i)   if H ≈_L M then H ≈_{ϕ∘L} M′   (the abstract heap is unchanged; only L moves);
-  (ii)  every Val root in ce and every Val field in M′ is updated by ϕ (ce′ = ϕ∘ce on Val);
+  (ii)  every Val root in ce, every Val word pending in e_c (already-evaluated
+        operands of the plugged context — including the allocation's own field
+        operands), and every Val field in M′ is updated by ϕ (ce′ = ϕ∘ce on
+        Val; e_c′ = e_c with its pending Val words rewritten by ϕ);
   (iii) Int/Float/naked values and their words are unchanged;
   (iv)  blocks unreachable from the Val roots may be dropped from M′ (reclaimed);
   (v)   local blocks (in regions on RR) are not moved.
+and the collected configuration ⟨e_c′, ce′, χ, M′, TT, RR⟩ performs the
+allocation by CM.Alloc.Heap/Local (with no further collection), reaching
+⟨e_c″, ce′, χ, M″, TT, RR⟩. There is no standalone collection transition.
 --------------------------------------------------
 The GC preserves the representation relation: H ≈_{ϕ∘L} M′ still holds, so no
 Flambda-observable changes. Modelled, not implemented, here.
@@ -148,8 +156,19 @@ NOTES: STATUS conjectured — this axiomatizes the OCaml moving minor/major coll
 as ≈-preserving, rather than modelling collection. This is the standard "GC is
 observational identity" assumption; its soundness rests on the machtype discipline
 (GC roots are exactly the Val-typed live variables; cmm.mli header comment) and on
-CM.Addr.NoSurvive. It is why `L` is existential and mutable (R.Heap): observations
-are compared up to ≈ (R.Observe), never by absolute address.
+CM.Addr.NoSurvive. In the plugging presentation the expression under reduction
+plays the register file's role: already-evaluated Val operands pending in e_c
+are GC roots exactly like Val-typed variables in ce, which is why (ii) rewrites
+them — most importantly the allocation's own field operands, which would
+otherwise be stored as stale addresses immediately after the collection. It is why `L` is existential and mutable (R.Heap): observations
+are compared up to ≈ (R.Observe), never by absolute address. Fusing collection
+into the allocating transition removes the zero-progress reading (an identity ϕ
+— nothing moves, nothing dropped — satisfies (i)–(v) vacuously, and as a
+standalone step would let CM.Unit.Final classify every allocating program as
+divergent via GC self-loops): every collection makes allocation progress, so an
+infinite run necessarily contains infinitely many non-GC steps. Real collectors
+run exactly at allocation points (make_alloc_generic), which the trigger
+already required.
 ```
 
 ## 4. The `Addr` discipline

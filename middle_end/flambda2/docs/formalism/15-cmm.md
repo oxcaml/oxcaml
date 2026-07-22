@@ -515,6 +515,17 @@ handler args are the remaining operands (`arg :: extra_args`); cfg_selectgen
 
 ## 8. Application
 
+A call runs the callee as a *nested run*: the callee's body starts with fresh
+variable and catch environments and a trap stack at its own base, against the
+caller's memory and the caller's region stack RR (a callee may allocate into
+the caller's open regions — local-returning functions). A nested run has
+exactly three outcomes, each visible at the
+call site: it returns (CM.Apply); it raises an exception that exhausts its own
+trap stack (CM.Apply.Raise — the exception resumes unwinding in the caller,
+matching the runtime's single global exception stack); or it diverges, in which
+case the caller's run diverges with it (CM.Unit.Final). The callee's Cextern
+events are part of the caller's trace.
+
 ```rule
 RULE CM.Apply
 STATUS normative
@@ -522,18 +533,55 @@ CODE backend/cmm.mli#Capply
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0
 ---
 e_c = Cop(Capply{result_type; region; callees}, [w_code; v̄_args], dbg)
-w_code addresses a function whose code, applied to v̄_args, yields result r̄ and
-memory M′ (running that function's own Cmm body to a Return_lbl exit)
+w_code addresses a function whose code, applied to v̄_args, RETURNS: the
+nested run of that function's body (fresh variable and catch environments,
+trap stack at its own base, region stack starting at the caller's RR) reaches
+a Cexit(Return_lbl, [r̄], []) with memory M′, its trap stack balanced back to
+its base and its region stack back at RR
 --------------------------------------------------
 ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨r̄, ce, χ, M′, TT, RR⟩
 NOTES: A Cmm call to the code pointed to by w_code (a code symbol for a direct
 call, C.direct_call; or the code pointer read from a closure for an indirect
-call, C.indirect_call / indirect_full_call). We treat the callee's execution as
-a nested run reaching its Return_lbl; the detailed calling convention
+call, C.indirect_call / indirect_full_call). A nested run has exactly three
+outcomes, each visible at the call site: it returns (this rule), it raises an
+exception that exhausts its own trap stack (CM.Apply.Raise), or it diverges —
+in which case the caller's run diverges with it (CM.Unit.Final). The callee's
+Cextern events are part of the caller's trace. The nested run inherits the
+caller's region stack and must return with it restored: to_cmm closes every
+non-ghost region it opens on every normal exit, and trap frames are matched
+likewise (the two balance clauses). The detailed calling convention
 (caml_apply/caml_curry arity dispatch) is the Cmm realization of
 OS.Apply.Indirect* and is not expanded here (its arity behaviour is described in
 04-opsem.md §6.2). `region`/`result_type` are calling-convention detail; `callees`
 records possible direct targets (Indirect_known_arity).
+```
+
+```rule
+RULE CM.Apply.Raise
+STATUS normative
+CODE backend/cmm.mli#Capply
+CODE backend/cmm.mli#Craise
+---
+e_c = Cop(Capply{result_type; region; callees}, [w_code; v̄_args], dbg)
+w_code addresses a function whose code, applied to v̄_args, RAISES: the nested
+run of that function's body (fresh variable and catch environments, trap stack
+at its own base, region stack starting at the caller's RR) reaches a Craise of
+v_exn at its base trap frame, with memory M′ and region stack RR′
+--------------------------------------------------
+⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨Cop(Craise Raise_reraise, [v_exn], dbg), ce, χ, M′, TT, RR′⟩
+NOTES: An exception escaping the callee resumes unwinding in the caller: the
+call site steps to a re-raise of the escaped value, which the caller's TT then
+handles via CM.Raise/CM.Catch.Exn (or which reaches the base frame as an
+uncaught exception, CM.Unit.Final). This transcribes the runtime's single
+global exception stack — there is no per-activation handler barrier — into the
+nested-run presentation. Raise_reraise: only backtrace recording is affected
+by the raise kind (16-to-cmm-control.md, TC.Raise NOTES). RR′, not RR: an
+escaping raise does not implicitly close regions the callee opened — the
+runtime's unwind restores only the exception-handler frame (caml_raise_exn /
+RESTORE_EXN_HANDLER_OCAML, runtime/amd64.S: %rsp and exn_handler only;
+caml_local_sp is untouched) — so they remain open in the caller and are
+reclaimed by the explicit End_region / End_try_region in the handler that
+catches the exception (CM.Region.End's pop-down-to-ι shape, [19](19-cmm-memory-gc.md)).
 ```
 
 ```rule
@@ -548,7 +596,10 @@ e_c = Cop(Cextcall{func; ty; ty_args; alloc; effects; coeffects; …}, [v̄], db
 ⟨e_c, ce, χ, M, TT, RR⟩ ⟶c ⟨r̄, ce, χ, M′, TT, RR⟩
 NOTES: The Cmm image of a Flambda C_call (OS.Apply.CCall). `Cextern` is the same
 axiomatized external relation as in 04-opsem.md §6.3; it is the only source of
-observable I/O and external mutation. Small integer results are sign-extended by
+observable I/O and external mutation. The observable event of an external call
+is the full application `Cextern(func, v̄, M) ∋ (r̄, M′)` — the call-time memory
+M is part of the trace observable named by CM.Unit.Final, not just the argument
+words. Small integer results are sign-extended by
 to_cmm (translate_external_call, maybe_sign_extend) because the C ABI does not
 promise it. A raising external transfers to the current trap handler.
 ```
@@ -592,15 +643,19 @@ Normal termination:  a Cexit(Return_lbl, [v̄], []) with TT balanced to the base
 Uncaught exception:  a Craise reaching the base trap frame ⟶c halt with v_exn.
 --------------------------------------------------
 A Cmm run is one of: normal termination (observing the module block image in M
-and the trace of Cextern effects), termination by uncaught exception, divergence,
-undefined behaviour (reaching Cinvalid or a stuck read/store), or RESOURCE
-EXHAUSTION (allocation failure / stack overflow — an outcome absent from the
-Flambda machine; see ch. 20).
+and the trace of Cextern effects), termination by uncaught exception, divergence
+(an infinite ⟶c sequence, or a run reaching a call whose nested run diverges,
+hereditarily), undefined behaviour (reaching Cinvalid or a stuck read/store), or
+RESOURCE EXHAUSTION (allocation failure / stack overflow — an outcome absent
+from the Flambda machine; see ch. 20).
 NOTES: The module block value at the module symbol is a CONCRETE byte image; it is
 compared to the Flambda observation H(sym_mod) through the representation relation
 `≈` (ch. 17), not directly. This is the target-side of OS.Unit.Final
 (04-opsem.md §8.2). Resource exhaustion is the one observable outcome Cmm can
 produce that Flambda cannot; ch. 20 records it in the simulation statement.
+Divergence inside a nested run surfaces at the call site via CM.Apply's outcome
+trichotomy; escaped exceptions surface as re-raises (CM.Apply.Raise), so the
+uncaught-exception outcome needs no special nesting clause.
 ```
 
 ## 11. Summary of rules
