@@ -24,7 +24,10 @@
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
+#include "camlatomic.h"
 #include "config.h"
+#include "misc.h"
 #include "mlvalues.h"
 #include "sys.h"
 #ifdef _MSC_VER
