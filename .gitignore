@@ -370,6 +370,7 @@ ocaml/primitives.new
 /toplevel/byte/trace.mli
 /toplevel/byte/topmain.mli
 /toplevel/native/trace.mli
+/toplevel/native/topmain.mli
 
 /utils/config_boot.ml
 /utils/config_boot.mli
