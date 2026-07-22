@@ -4,15 +4,8 @@
 open Stdlib
 
 external of_w :
-  int64 ->
-  int64 ->
-  int64 ->
-  int64 ->
-  int64 ->
-  int64 ->
-  int64 ->
-  int64 ->
-  int64x8 = "" "vec512_of_int64s"
+  int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64 -> int64
+  -> int64x8 = "" "vec512_of_int64s"
 [@@noalloc] [@@unboxed]
 
 external reint : 'a -> 'b = "%identity"
@@ -32,13752 +25,2941 @@ external int64_of_mask : mask -> int64
 let failures = ref 0
 
 let check512 name a b =
-  let a : int64x8 = reint a and b : int64x8 = reint b in
+  let a : int64x8 = reint a
+  and b : int64x8 = reint b in
   let ok = ref true in
   for i = 0 to 7 do
     if not (Int64.equal (w a i) (w b i)) then ok := false
   done;
-  if not !ok
-  then (
+  if not !ok then (
     incr failures;
     Printf.printf "MISMATCH %s\n" name)
 
 let check_mask name (a : mask) (b : mask) =
-  if not (Int64.equal (int64_of_mask a) (int64_of_mask b))
-  then (
+  if not (Int64.equal (int64_of_mask a) (int64_of_mask b)) then (
     incr failures;
     Printf.printf "MISMATCH %s: %Lx <> %Lx\n" name (int64_of_mask a)
       (int64_of_mask b))
 
-let va =
-  of_w 0x3f8000004048f5c3L 0xbff0000040a00000L 0x0000000100000002L
+let va = of_w 0x3f8000004048f5c3L 0xbff0000040a00000L 0x0000000100000002L
     0xfffffffe7fffffffL 0x8000000012345678L 0x40490fdbc0000000L
     0x0102030405060708L 0x1122334455667788L
 
-let vb =
-  of_w 0x4000000040400000L 0x3fc00000c1200000L 0x00000003fffffffdL
+let vb = of_w 0x4000000040400000L 0x3fc00000c1200000L 0x00000003fffffffdL
     0x000000057fffffffL 0x9abcdef0deadbeefL 0x3ff0000040000000L
     0x0807060504030201L 0x8877665544332211L
 
-let vc =
-  of_w 0x41000000c1a00000L 0x4048f5c33f800000L 0x0000000600000007L
+let vc = of_w 0x41000000c1a00000L 0x4048f5c33f800000L 0x0000000600000007L
     0xaaaaaaaa55555555L 0x0f0f0f0ff0f0f0f0L 0x400921fb54442d18L
     0xdeadbeefcafebabeL 0x0123456789abcdefL
 
-external caml_kadd_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kadd_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kadd_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kadd_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kadd_mask16"
-    (caml_kadd_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kadd_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kadd_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kadd_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kadd_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kadd_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kadd_mask32"
-    (caml_kadd_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kadd_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kadd_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kadd_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kadd_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kadd_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kadd_mask64"
-    (caml_kadd_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kadd_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kadd_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kadd_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kadd_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kadd_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kadd_mask8"
-    (caml_kadd_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kadd_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_kand_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kand_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kand_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kand_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kand_mask16"
-    (caml_kand_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kand_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kand_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kand_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kand_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kand_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kand_mask32"
-    (caml_kand_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kand_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kand_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kand_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kand_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kand_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kand_mask64"
-    (caml_kand_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kand_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kand_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kand_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kand_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kand_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kand_mask8"
-    (caml_kand_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kand_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_kandn_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kandn_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kandn_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kandn_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kandn_mask16"
-    (caml_kandn_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kandn_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kandn_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kandn_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kandn_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kandn_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kandn_mask32"
-    (caml_kandn_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kandn_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kandn_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kandn_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kandn_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kandn_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kandn_mask64"
-    (caml_kandn_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kandn_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kandn_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kandn_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kandn_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kandn_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kandn_mask8"
-    (caml_kandn_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kandn_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_knot_mask16 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_knot_mask16"
-[@@noalloc] [@@builtin]
-
-external c__knot_mask16 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__knot_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_knot_mask16"
-    (caml_knot_mask16 (mask_of_int64 0xa5a5L))
-    (c__knot_mask16 (mask_of_int64 0xa5a5L))
-
-external caml_knot_mask32 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_knot_mask32"
-[@@noalloc] [@@builtin]
-
-external c__knot_mask32 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__knot_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_knot_mask32"
-    (caml_knot_mask32 (mask_of_int64 0xa5a5a5a5L))
-    (c__knot_mask32 (mask_of_int64 0xa5a5a5a5L))
-
-external caml_knot_mask64 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_knot_mask64"
-[@@noalloc] [@@builtin]
-
-external c__knot_mask64 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__knot_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_knot_mask64"
-    (caml_knot_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
-    (c__knot_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
-
-external caml_knot_mask8 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_knot_mask8"
-[@@noalloc] [@@builtin]
-
-external c__knot_mask8 : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__knot_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_knot_mask8"
-    (caml_knot_mask8 (mask_of_int64 0xa5L))
-    (c__knot_mask8 (mask_of_int64 0xa5L))
-
-external caml_kor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kor_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kor_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kor_mask16"
-    (caml_kor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kor_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kor_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kor_mask32"
-    (caml_kor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kor_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kor_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kor_mask64"
-    (caml_kor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kor_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kor_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kor_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kor_mask8"
-    (caml_kor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_kxnor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxnor_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kxnor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxnor_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kxnor_mask16"
-    (caml_kxnor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kxnor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kxnor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxnor_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kxnor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxnor_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kxnor_mask32"
-    (caml_kxnor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kxnor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kxnor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxnor_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kxnor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxnor_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kxnor_mask64"
-    (caml_kxnor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kxnor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kxnor_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxnor_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kxnor_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxnor_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kxnor_mask8"
-    (caml_kxnor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kxnor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_kxor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxor_mask16"
-[@@noalloc] [@@builtin]
-
-external c__kxor_mask16 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxor_mask16"
-[@@noalloc]
-
-let () =
-  check_mask "_kxor_mask16"
-    (caml_kxor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__kxor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_kxor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxor_mask32"
-[@@noalloc] [@@builtin]
-
-external c__kxor_mask32 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxor_mask32"
-[@@noalloc]
-
-let () =
-  check_mask "_kxor_mask32"
-    (caml_kxor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-    (c__kxor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_kxor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxor_mask64"
-[@@noalloc] [@@builtin]
-
-external c__kxor_mask64 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxor_mask64"
-[@@noalloc]
-
-let () =
-  check_mask "_kxor_mask64"
-    (caml_kxor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__kxor_mask64
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_kxor_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_kxor_mask8"
-[@@noalloc] [@@builtin]
-
-external c__kxor_mask8 :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__kxor_mask8"
-[@@noalloc]
-
-let () =
-  check_mask "_kxor_mask8"
-    (caml_kxor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-    (c__kxor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
-
-external caml_mm512_abs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_abs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_abs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_abs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_abs_epi16"
-    (caml_mm512_abs_epi16 (reint va))
-    (c__mm512_abs_epi16 (reint va))
-
-external caml_mm512_abs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_abs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_abs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_abs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_abs_epi32"
-    (caml_mm512_abs_epi32 (reint va))
-    (c__mm512_abs_epi32 (reint va))
-
-external caml_mm512_abs_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_abs_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_abs_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_abs_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_abs_epi64"
-    (caml_mm512_abs_epi64 (reint va))
-    (c__mm512_abs_epi64 (reint va))
-
-external caml_mm512_abs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_abs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_abs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_abs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_abs_epi8"
-    (caml_mm512_abs_epi8 (reint va))
-    (c__mm512_abs_epi8 (reint va))
-
-external caml_mm512_add_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_add_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_epi16"
-    (caml_mm512_add_epi16 (reint va) (reint vb))
-    (c__mm512_add_epi16 (reint va) (reint vb))
-
-external caml_mm512_add_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_add_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_epi32"
-    (caml_mm512_add_epi32 (reint va) (reint vb))
-    (c__mm512_add_epi32 (reint va) (reint vb))
-
-external caml_mm512_add_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_add_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_epi64"
-    (caml_mm512_add_epi64 (reint va) (reint vb))
-    (c__mm512_add_epi64 (reint va) (reint vb))
-
-external caml_mm512_add_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_add_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_epi8"
-    (caml_mm512_add_epi8 (reint va) (reint vb))
-    (c__mm512_add_epi8 (reint va) (reint vb))
-
-external caml_mm512_add_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_add_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_pd"
-    (caml_mm512_add_pd (reint va) (reint vb))
-    (c__mm512_add_pd (reint va) (reint vb))
-
-external caml_mm512_add_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_add_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_add_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_add_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_add_ps"
-    (caml_mm512_add_ps (reint va) (reint vb))
-    (c__mm512_add_ps (reint va) (reint vb))
-
-external caml_mm512_adds_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_adds_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_adds_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_adds_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_adds_epi16"
-    (caml_mm512_adds_epi16 (reint va) (reint vb))
-    (c__mm512_adds_epi16 (reint va) (reint vb))
-
-external caml_mm512_adds_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_adds_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_adds_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_adds_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_adds_epi8"
-    (caml_mm512_adds_epi8 (reint va) (reint vb))
-    (c__mm512_adds_epi8 (reint va) (reint vb))
-
-external caml_mm512_adds_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_adds_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_adds_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_adds_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_adds_epu16"
-    (caml_mm512_adds_epu16 (reint va) (reint vb))
-    (c__mm512_adds_epu16 (reint va) (reint vb))
-
-external caml_mm512_adds_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_adds_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_adds_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_adds_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_adds_epu8"
-    (caml_mm512_adds_epu8 (reint va) (reint vb))
-    (c__mm512_adds_epu8 (reint va) (reint vb))
-
-external caml_mm512_and_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_and_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_and_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_and_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_and_epi32"
-    (caml_mm512_and_epi32 (reint va) (reint vb))
-    (c__mm512_and_epi32 (reint va) (reint vb))
-
-external caml_mm512_and_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_and_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_and_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_and_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_and_epi64"
-    (caml_mm512_and_epi64 (reint va) (reint vb))
-    (c__mm512_and_epi64 (reint va) (reint vb))
-
-external caml_mm512_and_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_and_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_and_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_and_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_and_pd"
-    (caml_mm512_and_pd (reint va) (reint vb))
-    (c__mm512_and_pd (reint va) (reint vb))
-
-external caml_mm512_and_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_and_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_and_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_and_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_and_ps"
-    (caml_mm512_and_ps (reint va) (reint vb))
-    (c__mm512_and_ps (reint va) (reint vb))
-
-external caml_mm512_and_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_and_si512"
-[@@noalloc] [@@builtin]
-
-external c__mm512_and_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_and_si512"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_and_si512"
-    (caml_mm512_and_si512 (reint va) (reint vb))
-    (c__mm512_and_si512 (reint va) (reint vb))
-
-external caml_mm512_andnot_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_andnot_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_andnot_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_andnot_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_andnot_epi32"
-    (caml_mm512_andnot_epi32 (reint va) (reint vb))
-    (c__mm512_andnot_epi32 (reint va) (reint vb))
-
-external caml_mm512_andnot_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_andnot_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_andnot_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_andnot_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_andnot_epi64"
-    (caml_mm512_andnot_epi64 (reint va) (reint vb))
-    (c__mm512_andnot_epi64 (reint va) (reint vb))
-
-external caml_mm512_andnot_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_andnot_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_andnot_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_andnot_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_andnot_pd"
-    (caml_mm512_andnot_pd (reint va) (reint vb))
-    (c__mm512_andnot_pd (reint va) (reint vb))
-
-external caml_mm512_andnot_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_andnot_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_andnot_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_andnot_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_andnot_ps"
-    (caml_mm512_andnot_ps (reint va) (reint vb))
-    (c__mm512_andnot_ps (reint va) (reint vb))
-
-external caml_mm512_andnot_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_andnot_si512"
-[@@noalloc] [@@builtin]
-
-external c__mm512_andnot_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_andnot_si512"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_andnot_si512"
-    (caml_mm512_andnot_si512 (reint va) (reint vb))
-    (c__mm512_andnot_si512 (reint va) (reint vb))
-
-external caml_mm512_avg_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_avg_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_avg_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_avg_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_avg_epu16"
-    (caml_mm512_avg_epu16 (reint va) (reint vb))
-    (c__mm512_avg_epu16 (reint va) (reint vb))
-
-external caml_mm512_avg_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_avg_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_avg_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_avg_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_avg_epu8"
-    (caml_mm512_avg_epu8 (reint va) (reint vb))
-    (c__mm512_avg_epu8 (reint va) (reint vb))
-
-external caml_mm512_broadcastmb_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_broadcastmb_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_broadcastmb_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_broadcastmb_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_broadcastmb_epi64"
-    (caml_mm512_broadcastmb_epi64 (mask_of_int64 0xa5L))
-    (c__mm512_broadcastmb_epi64 (mask_of_int64 0xa5L))
-
-external caml_mm512_broadcastmw_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_broadcastmw_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_broadcastmw_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_broadcastmw_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_broadcastmw_epi32"
-    (caml_mm512_broadcastmw_epi32 (mask_of_int64 0xa5a5L))
-    (c__mm512_broadcastmw_epi32 (mask_of_int64 0xa5a5L))
-
-external caml_mm512_cmpeq_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epi16_mask"
-    (caml_mm512_cmpeq_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epi32_mask"
-    (caml_mm512_cmpeq_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epi64_mask"
-    (caml_mm512_cmpeq_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epi8_mask"
-    (caml_mm512_cmpeq_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epu16_mask"
-    (caml_mm512_cmpeq_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epu32_mask"
-    (caml_mm512_cmpeq_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epu64_mask"
-    (caml_mm512_cmpeq_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_epu8_mask"
-    (caml_mm512_cmpeq_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_pd_mask"
-    (caml_mm512_cmpeq_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpeq_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpeq_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpeq_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpeq_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpeq_ps_mask"
-    (caml_mm512_cmpeq_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpeq_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epi16_mask"
-    (caml_mm512_cmpge_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epi32_mask"
-    (caml_mm512_cmpge_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epi64_mask"
-    (caml_mm512_cmpge_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epi8_mask"
-    (caml_mm512_cmpge_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epu16_mask"
-    (caml_mm512_cmpge_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epu32_mask"
-    (caml_mm512_cmpge_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epu64_mask"
-    (caml_mm512_cmpge_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpge_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpge_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpge_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpge_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpge_epu8_mask"
-    (caml_mm512_cmpge_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmpge_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epi16_mask"
-    (caml_mm512_cmpgt_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epi32_mask"
-    (caml_mm512_cmpgt_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epi64_mask"
-    (caml_mm512_cmpgt_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epi8_mask"
-    (caml_mm512_cmpgt_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epu16_mask"
-    (caml_mm512_cmpgt_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epu32_mask"
-    (caml_mm512_cmpgt_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epu64_mask"
-    (caml_mm512_cmpgt_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpgt_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpgt_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpgt_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpgt_epu8_mask"
-    (caml_mm512_cmpgt_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmpgt_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epi16_mask"
-    (caml_mm512_cmple_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmple_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epi32_mask"
-    (caml_mm512_cmple_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmple_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epi64_mask"
-    (caml_mm512_cmple_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmple_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epi8_mask"
-    (caml_mm512_cmple_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmple_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epu16_mask"
-    (caml_mm512_cmple_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmple_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epu32_mask"
-    (caml_mm512_cmple_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmple_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epu64_mask"
-    (caml_mm512_cmple_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmple_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_epu8_mask"
-    (caml_mm512_cmple_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmple_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_pd_mask"
-    (caml_mm512_cmple_pd_mask (reint va) (reint vb))
-    (c__mm512_cmple_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmple_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmple_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmple_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmple_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmple_ps_mask"
-    (caml_mm512_cmple_ps_mask (reint va) (reint vb))
-    (c__mm512_cmple_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epi16_mask"
-    (caml_mm512_cmplt_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epi32_mask"
-    (caml_mm512_cmplt_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epi64_mask"
-    (caml_mm512_cmplt_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epi8_mask"
-    (caml_mm512_cmplt_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epu16_mask"
-    (caml_mm512_cmplt_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epu32_mask"
-    (caml_mm512_cmplt_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epu64_mask"
-    (caml_mm512_cmplt_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_epu8_mask"
-    (caml_mm512_cmplt_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmplt_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_pd_mask"
-    (caml_mm512_cmplt_pd_mask (reint va) (reint vb))
-    (c__mm512_cmplt_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmplt_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmplt_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmplt_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmplt_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmplt_ps_mask"
-    (caml_mm512_cmplt_ps_mask (reint va) (reint vb))
-    (c__mm512_cmplt_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epi16_mask"
-    (caml_mm512_cmpneq_epi16_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epi32_mask"
-    (caml_mm512_cmpneq_epi32_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epi64_mask"
-    (caml_mm512_cmpneq_epi64_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epi8_mask"
-    (caml_mm512_cmpneq_epi8_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epu16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epu16_mask"
-    (caml_mm512_cmpneq_epu16_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epu16_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epu32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epu32_mask"
-    (caml_mm512_cmpneq_epu32_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epu32_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epu64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epu64_mask"
-    (caml_mm512_cmpneq_epu64_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epu64_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_epu8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_epu8_mask"
-    (caml_mm512_cmpneq_epu8_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_epu8_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_pd_mask"
-    (caml_mm512_cmpneq_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpneq_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpneq_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpneq_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpneq_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpneq_ps_mask"
-    (caml_mm512_cmpneq_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpneq_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpnle_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpnle_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpnle_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpnle_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpnle_pd_mask"
-    (caml_mm512_cmpnle_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpnle_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpnle_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpnle_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpnle_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpnle_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpnle_ps_mask"
-    (caml_mm512_cmpnle_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpnle_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpnlt_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpnlt_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpnlt_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpnlt_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpnlt_pd_mask"
-    (caml_mm512_cmpnlt_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpnlt_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpnlt_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpnlt_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpnlt_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpnlt_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpnlt_ps_mask"
-    (caml_mm512_cmpnlt_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpnlt_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpord_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpord_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpord_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpord_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpord_pd_mask"
-    (caml_mm512_cmpord_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpord_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpord_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpord_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpord_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpord_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpord_ps_mask"
-    (caml_mm512_cmpord_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpord_ps_mask (reint va) (reint vb))
-
-external caml_mm512_cmpunord_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpunord_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpunord_pd_mask :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpunord_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpunord_pd_mask"
-    (caml_mm512_cmpunord_pd_mask (reint va) (reint vb))
-    (c__mm512_cmpunord_pd_mask (reint va) (reint vb))
-
-external caml_mm512_cmpunord_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cmpunord_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cmpunord_ps_mask :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_cmpunord_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_cmpunord_ps_mask"
-    (caml_mm512_cmpunord_ps_mask (reint va) (reint vb))
-    (c__mm512_cmpunord_ps_mask (reint va) (reint vb))
-
-external caml_mm512_conflict_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_conflict_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_conflict_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_conflict_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_conflict_epi32"
-    (caml_mm512_conflict_epi32 (reint va))
-    (c__mm512_conflict_epi32 (reint va))
-
-external caml_mm512_conflict_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_conflict_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_conflict_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_conflict_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_conflict_epi64"
-    (caml_mm512_conflict_epi64 (reint va))
-    (c__mm512_conflict_epi64 (reint va))
-
-external caml_mm512_cvtepi32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtepi32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtepi32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_cvtepi32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtepi32_ps"
-    (caml_mm512_cvtepi32_ps (reint va))
-    (c__mm512_cvtepi32_ps (reint va))
-
-external caml_mm512_cvtepi64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtepi64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtepi64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_cvtepi64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtepi64_pd"
-    (caml_mm512_cvtepi64_pd (reint va))
-    (c__mm512_cvtepi64_pd (reint va))
-
-external caml_mm512_cvtepu32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtepu32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtepu32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_cvtepu32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtepu32_ps"
-    (caml_mm512_cvtepu32_ps (reint va))
-    (c__mm512_cvtepu32_ps (reint va))
-
-external caml_mm512_cvtepu64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtepu64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtepu64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_cvtepu64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtepu64_pd"
-    (caml_mm512_cvtepu64_pd (reint va))
-    (c__mm512_cvtepu64_pd (reint va))
-
-external caml_mm512_cvtpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_cvtpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtpd_epi64"
-    (caml_mm512_cvtpd_epi64 (reint va))
-    (c__mm512_cvtpd_epi64 (reint va))
-
-external caml_mm512_cvtpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_cvtpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtpd_epu64"
-    (caml_mm512_cvtpd_epu64 (reint va))
-    (c__mm512_cvtpd_epu64 (reint va))
-
-external caml_mm512_cvtps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_cvtps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtps_epi32"
-    (caml_mm512_cvtps_epi32 (reint va))
-    (c__mm512_cvtps_epi32 (reint va))
-
-external caml_mm512_cvtps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvtps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvtps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_cvtps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvtps_epu32"
-    (caml_mm512_cvtps_epu32 (reint va))
-    (c__mm512_cvtps_epu32 (reint va))
-
-external caml_mm512_cvttpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvttpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvttpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_cvttpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvttpd_epi64"
-    (caml_mm512_cvttpd_epi64 (reint va))
-    (c__mm512_cvttpd_epi64 (reint va))
-
-external caml_mm512_cvttpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvttpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvttpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_cvttpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvttpd_epu64"
-    (caml_mm512_cvttpd_epu64 (reint va))
-    (c__mm512_cvttpd_epu64 (reint va))
-
-external caml_mm512_cvttps_epi32 :
-  (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvttps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvttps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_cvttps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvttps_epi32"
-    (caml_mm512_cvttps_epi32 (reint va))
-    (c__mm512_cvttps_epi32 (reint va))
-
-external caml_mm512_cvttps_epu32 :
-  (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_cvttps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_cvttps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_cvttps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_cvttps_epu32"
-    (caml_mm512_cvttps_epu32 (reint va))
-    (c__mm512_cvttps_epu32 (reint va))
-
-external caml_mm512_div_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_div_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_div_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_div_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_div_pd"
-    (caml_mm512_div_pd (reint va) (reint vb))
-    (c__mm512_div_pd (reint va) (reint vb))
-
-external caml_mm512_div_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_div_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_div_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_div_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_div_ps"
-    (caml_mm512_div_ps (reint va) (reint vb))
-    (c__mm512_div_ps (reint va) (reint vb))
-
-external caml_mm512_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmadd_pd"
-    (caml_mm512_fmadd_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fmadd_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmadd_ps"
-    (caml_mm512_fmadd_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fmadd_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmaddsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fmaddsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmaddsub_pd"
-    (caml_mm512_fmaddsub_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fmaddsub_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmaddsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fmaddsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmaddsub_ps"
-    (caml_mm512_fmaddsub_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fmaddsub_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmsub_pd"
-    (caml_mm512_fmsub_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fmsub_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmsub_ps"
-    (caml_mm512_fmsub_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fmsub_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsubadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fmsubadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmsubadd_pd"
-    (caml_mm512_fmsubadd_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fmsubadd_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsubadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fmsubadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fmsubadd_ps"
-    (caml_mm512_fmsubadd_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fmsubadd_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fnmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fnmadd_pd"
-    (caml_mm512_fnmadd_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fnmadd_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fnmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fnmadd_ps"
-    (caml_mm512_fnmadd_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fnmadd_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_fnmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fnmsub_pd"
-    (caml_mm512_fnmsub_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_fnmsub_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_fnmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_fnmsub_ps"
-    (caml_mm512_fnmsub_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_fnmsub_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_getexp_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_getexp_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_getexp_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_getexp_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_getexp_pd"
-    (caml_mm512_getexp_pd (reint va))
-    (c__mm512_getexp_pd (reint va))
-
-external caml_mm512_getexp_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_getexp_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_getexp_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_getexp_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_getexp_ps"
-    (caml_mm512_getexp_ps (reint va))
-    (c__mm512_getexp_ps (reint va))
-
-external caml_mm512_kand :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kand"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kand :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kand"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kand"
-    (caml_mm512_kand (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kand (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_kandn :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kandn"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kandn :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kandn"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kandn"
-    (caml_mm512_kandn (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kandn (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_kmov : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kmov"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kmov : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kmov"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kmov"
-    (caml_mm512_kmov (mask_of_int64 0xa5a5L))
-    (c__mm512_kmov (mask_of_int64 0xa5a5L))
-
-external caml_mm512_knot : (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_knot"
-[@@noalloc] [@@builtin]
-
-external c__mm512_knot : (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_knot"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_knot"
-    (caml_mm512_knot (mask_of_int64 0xa5a5L))
-    (c__mm512_knot (mask_of_int64 0xa5a5L))
-
-external caml_mm512_kor :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kor"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kor"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kor"
-    (caml_mm512_kor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_kunpackb :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kunpackb"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kunpackb :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kunpackb"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kunpackb"
-    (caml_mm512_kunpackb (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kunpackb (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_kunpackd :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kunpackd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kunpackd :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kunpackd"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kunpackd"
-    (caml_mm512_kunpackd
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-    (c__mm512_kunpackd
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
-
-external caml_mm512_kunpackw :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kunpackw"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kunpackw :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kunpackw"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kunpackw"
-    (caml_mm512_kunpackw
-       (mask_of_int64 0xa5a5a5a5L)
-       (mask_of_int64 0x3c3c3c3cL))
-    (c__mm512_kunpackw (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
-
-external caml_mm512_kxnor :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kxnor"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kxnor :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kxnor"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kxnor"
-    (caml_mm512_kxnor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kxnor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_kxor :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_kxor"
-[@@noalloc] [@@builtin]
-
-external c__mm512_kxor :
-  (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_kxor"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_kxor"
-    (caml_mm512_kxor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-    (c__mm512_kxor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
-
-external caml_mm512_lzcnt_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_lzcnt_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_lzcnt_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_lzcnt_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_lzcnt_epi32"
-    (caml_mm512_lzcnt_epi32 (reint va))
-    (c__mm512_lzcnt_epi32 (reint va))
-
-external caml_mm512_lzcnt_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_lzcnt_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_lzcnt_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_lzcnt_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_lzcnt_epi64"
-    (caml_mm512_lzcnt_epi64 (reint va))
-    (c__mm512_lzcnt_epi64 (reint va))
-
-external caml_mm512_madd_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_madd_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_madd_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_madd_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_madd_epi16"
-    (caml_mm512_madd_epi16 (reint va) (reint vb))
-    (c__mm512_madd_epi16 (reint va) (reint vb))
-
-external caml_mm512_maddubs_epi16 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maddubs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maddubs_epi16 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_maddubs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maddubs_epi16"
-    (caml_mm512_maddubs_epi16 (reint va) (reint vb))
-    (c__mm512_maddubs_epi16 (reint va) (reint vb))
-
-external caml_mm512_mask2_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask2_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask2_permutex2var_epi16"
-    (caml_mm512_mask2_permutex2var_epi16 (reint va) (reint vb)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vc))
-    (c__mm512_mask2_permutex2var_epi16 (reint va) (reint vb)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vc))
-
-external caml_mm512_mask2_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask2_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask2_permutex2var_epi32"
-    (caml_mm512_mask2_permutex2var_epi32 (reint va) (reint vb)
-       (mask_of_int64 0xa5a5L) (reint vc))
-    (c__mm512_mask2_permutex2var_epi32 (reint va) (reint vb)
-       (mask_of_int64 0xa5a5L) (reint vc))
-
-external caml_mm512_mask2_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask2_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask2_permutex2var_epi64"
-    (caml_mm512_mask2_permutex2var_epi64 (reint va) (reint vb)
-       (mask_of_int64 0xa5L) (reint vc))
-    (c__mm512_mask2_permutex2var_epi64 (reint va) (reint vb)
-       (mask_of_int64 0xa5L) (reint vc))
-
-external caml_mm512_mask2_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask2_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask2_permutex2var_pd"
-    (caml_mm512_mask2_permutex2var_pd (reint va) (reint vb)
-       (mask_of_int64 0xa5L) (reint vc))
-    (c__mm512_mask2_permutex2var_pd (reint va) (reint vb) (mask_of_int64 0xa5L)
-       (reint vc))
-
-external caml_mm512_mask2_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask2_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask2_permutex2var_ps"
-    (caml_mm512_mask2_permutex2var_ps (reint va) (reint vb)
-       (mask_of_int64 0xa5a5L) (reint vc))
-    (c__mm512_mask2_permutex2var_ps (reint va) (reint vb)
-       (mask_of_int64 0xa5a5L) (reint vc))
-
-external caml_mm512_mask3_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmadd_pd"
-    (caml_mm512_mask3_fmadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fmadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmadd_ps"
-    (caml_mm512_mask3_fmadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fmadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask3_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fmaddsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmaddsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmaddsub_pd"
-    (caml_mm512_mask3_fmaddsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fmaddsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fmaddsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmaddsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmaddsub_ps"
-    (caml_mm512_mask3_fmaddsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fmaddsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask3_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmsub_pd"
-    (caml_mm512_mask3_fmsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fmsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmsub_ps"
-    (caml_mm512_mask3_fmsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fmsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask3_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fmsubadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmsubadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmsubadd_pd"
-    (caml_mm512_mask3_fmsubadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fmsubadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fmsubadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmsubadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fmsubadd_ps"
-    (caml_mm512_mask3_fmsubadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fmsubadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask3_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fnmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fnmadd_pd"
-    (caml_mm512_mask3_fnmadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fnmadd_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fnmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fnmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fnmadd_ps"
-    (caml_mm512_mask3_fnmadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fnmadd_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask3_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fnmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fnmsub_pd"
-    (caml_mm512_mask3_fnmsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-    (c__mm512_mask3_fnmsub_pd (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5L))
-
-external caml_mm512_mask3_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask3_fnmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask3_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fnmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask3_fnmsub_ps"
-    (caml_mm512_mask3_fnmsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-    (c__mm512_mask3_fnmsub_ps (reint va) (reint vb) (reint vc)
-       (mask_of_int64 0xa5a5L))
-
-external caml_mm512_mask_abs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_abs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_abs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_abs_epi16"
-    (caml_mm512_mask_abs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb))
-    (c__mm512_mask_abs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb))
-
-external caml_mm512_mask_abs_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_abs_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_abs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_abs_epi32"
-    (caml_mm512_mask_abs_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_abs_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_abs_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_abs_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_abs_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_abs_epi64"
-    (caml_mm512_mask_abs_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_abs_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_abs_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_abs_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_abs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_abs_epi8"
-    (caml_mm512_mask_abs_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb))
-    (c__mm512_mask_abs_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb))
-
-external caml_mm512_mask_add_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_add_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_epi16"
-    (caml_mm512_mask_add_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_add_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_add_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_add_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_epi32"
-    (caml_mm512_mask_add_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_add_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_add_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_add_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_epi64"
-    (caml_mm512_mask_add_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_add_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_add_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_add_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_epi8"
-    (caml_mm512_mask_add_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_add_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_add_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_add_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_pd"
-    (caml_mm512_mask_add_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_add_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_add_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_add_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_add_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_add_ps"
-    (caml_mm512_mask_add_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_add_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_adds_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_adds_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_adds_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_adds_epi16"
-    (caml_mm512_mask_adds_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_adds_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_adds_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_adds_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_adds_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_adds_epi8"
-    (caml_mm512_mask_adds_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_adds_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_adds_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_adds_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_adds_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_adds_epu16"
-    (caml_mm512_mask_adds_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_adds_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_adds_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_adds_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_adds_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_adds_epu8"
-    (caml_mm512_mask_adds_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_adds_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_and_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_and_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_and_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_and_epi32"
-    (caml_mm512_mask_and_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_and_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_and_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_and_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_and_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_and_epi64"
-    (caml_mm512_mask_and_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_and_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_and_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_and_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_and_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_and_pd"
-    (caml_mm512_mask_and_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_and_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_and_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_and_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_and_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_and_ps"
-    (caml_mm512_mask_and_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_and_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_andnot_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_andnot_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_andnot_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_andnot_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_andnot_epi32"
-    (caml_mm512_mask_andnot_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_andnot_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_andnot_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_andnot_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_andnot_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_andnot_epi64"
-    (caml_mm512_mask_andnot_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_andnot_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_andnot_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_andnot_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_andnot_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_andnot_pd"
-    (caml_mm512_mask_andnot_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_andnot_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_andnot_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_andnot_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_andnot_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_andnot_ps"
-    (caml_mm512_mask_andnot_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_andnot_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_avg_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_avg_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_avg_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_avg_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_avg_epu16"
-    (caml_mm512_mask_avg_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_avg_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_avg_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_avg_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_avg_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_avg_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_avg_epu8"
-    (caml_mm512_mask_avg_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_avg_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_blend_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_blend_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_epi16"
-    (caml_mm512_mask_blend_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_blend_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_blend_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_blend_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_epi32"
-    (caml_mm512_mask_blend_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_mask_blend_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_blend_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_blend_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_epi64"
-    (caml_mm512_mask_blend_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_blend_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_blend_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_blend_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_epi8"
-    (caml_mm512_mask_blend_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_blend_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_blend_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_blend_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_pd"
-    (caml_mm512_mask_blend_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_blend_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_blend_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_blend_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_blend_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_blend_ps"
-    (caml_mm512_mask_blend_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_mask_blend_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epi16_mask"
-    (caml_mm512_mask_cmpeq_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epi32_mask"
-    (caml_mm512_mask_cmpeq_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpeq_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpeq_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epi64_mask"
-    (caml_mm512_mask_cmpeq_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpeq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epi8_mask"
-    (caml_mm512_mask_cmpeq_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epu16_mask"
-    (caml_mm512_mask_cmpeq_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epu32_mask"
-    (caml_mm512_mask_cmpeq_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpeq_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpeq_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epu64_mask"
-    (caml_mm512_mask_cmpeq_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpeq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_epu8_mask"
-    (caml_mm512_mask_cmpeq_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_pd_mask"
-    (caml_mm512_mask_cmpeq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpeq_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpeq_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpeq_ps_mask"
-    (caml_mm512_mask_cmpeq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpeq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epi16_mask"
-    (caml_mm512_mask_cmpge_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpge_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epi32_mask"
-    (caml_mm512_mask_cmpge_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpge_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpge_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epi64_mask"
-    (caml_mm512_mask_cmpge_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpge_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epi8_mask"
-    (caml_mm512_mask_cmpge_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpge_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epu16_mask"
-    (caml_mm512_mask_cmpge_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpge_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epu32_mask"
-    (caml_mm512_mask_cmpge_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpge_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpge_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epu64_mask"
-    (caml_mm512_mask_cmpge_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpge_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpge_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpge_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpge_epu8_mask"
-    (caml_mm512_mask_cmpge_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpge_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epi16_mask"
-    (caml_mm512_mask_cmpgt_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpgt_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epi32_mask"
-    (caml_mm512_mask_cmpgt_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpgt_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpgt_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epi64_mask"
-    (caml_mm512_mask_cmpgt_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpgt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epi8_mask"
-    (caml_mm512_mask_cmpgt_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpgt_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epu16_mask"
-    (caml_mm512_mask_cmpgt_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpgt_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epu32_mask"
-    (caml_mm512_mask_cmpgt_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpgt_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpgt_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epu64_mask"
-    (caml_mm512_mask_cmpgt_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpgt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpgt_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpgt_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpgt_epu8_mask"
-    (caml_mm512_mask_cmpgt_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpgt_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epi16_mask"
-    (caml_mm512_mask_cmple_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmple_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epi32_mask"
-    (caml_mm512_mask_cmple_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmple_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmple_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epi64_mask"
-    (caml_mm512_mask_cmple_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmple_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epi8_mask"
-    (caml_mm512_mask_cmple_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmple_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epu16_mask"
-    (caml_mm512_mask_cmple_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmple_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epu32_mask"
-    (caml_mm512_mask_cmple_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmple_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmple_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epu64_mask"
-    (caml_mm512_mask_cmple_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmple_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_epu8_mask"
-    (caml_mm512_mask_cmple_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmple_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_pd_mask"
-    (caml_mm512_mask_cmple_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmple_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmple_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmple_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmple_ps_mask"
-    (caml_mm512_mask_cmple_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_mask_cmple_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epi16_mask"
-    (caml_mm512_mask_cmplt_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmplt_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epi32_mask"
-    (caml_mm512_mask_cmplt_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmplt_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmplt_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epi64_mask"
-    (caml_mm512_mask_cmplt_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmplt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epi8_mask"
-    (caml_mm512_mask_cmplt_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmplt_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epu16_mask"
-    (caml_mm512_mask_cmplt_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmplt_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epu32_mask"
-    (caml_mm512_mask_cmplt_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmplt_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmplt_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epu64_mask"
-    (caml_mm512_mask_cmplt_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmplt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_epu8_mask"
-    (caml_mm512_mask_cmplt_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmplt_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_pd_mask"
-    (caml_mm512_mask_cmplt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmplt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmplt_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmplt_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmplt_ps_mask"
-    (caml_mm512_mask_cmplt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_mask_cmplt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epi16_mask"
-    (caml_mm512_mask_cmpneq_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpneq_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epi32_mask"
-    (caml_mm512_mask_cmpneq_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpneq_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpneq_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epi64_mask"
-    (caml_mm512_mask_cmpneq_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpneq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epi8_mask"
-    (caml_mm512_mask_cmpneq_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpneq_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epu16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epu16_mask"
-    (caml_mm512_mask_cmpneq_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpneq_epu16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epu32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epu32_mask"
-    (caml_mm512_mask_cmpneq_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpneq_epu32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_cmpneq_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epu64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epu64_mask"
-    (caml_mm512_mask_cmpneq_epu64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpneq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_epu8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_epu8_mask"
-    (caml_mm512_mask_cmpneq_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_cmpneq_epu8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_pd_mask"
-    (caml_mm512_mask_cmpneq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpneq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpneq_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpneq_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpneq_ps_mask"
-    (caml_mm512_mask_cmpneq_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpneq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpnle_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnle_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpnle_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnle_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpnle_pd_mask"
-    (caml_mm512_mask_cmpnle_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpnle_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpnle_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnle_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpnle_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnle_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpnle_ps_mask"
-    (caml_mm512_mask_cmpnle_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpnle_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpnlt_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnlt_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpnlt_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnlt_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpnlt_pd_mask"
-    (caml_mm512_mask_cmpnlt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpnlt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpnlt_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnlt_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpnlt_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnlt_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpnlt_ps_mask"
-    (caml_mm512_mask_cmpnlt_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpnlt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpord_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpord_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpord_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpord_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpord_pd_mask"
-    (caml_mm512_mask_cmpord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_cmpord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpord_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpord_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpord_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpord_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpord_ps_mask"
-    (caml_mm512_mask_cmpord_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpord_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpunord_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpunord_pd_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpunord_pd_mask :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpunord_pd_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpunord_pd_mask"
-    (caml_mm512_mask_cmpunord_pd_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpunord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_cmpunord_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cmpunord_ps_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cmpunord_ps_mask :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_cmpunord_ps_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_cmpunord_ps_mask"
-    (caml_mm512_mask_cmpunord_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_cmpunord_ps_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_compress_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_compress_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_compress_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_compress_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_compress_epi32"
-    (caml_mm512_mask_compress_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb))
-    (c__mm512_mask_compress_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_compress_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_compress_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_compress_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_compress_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_compress_epi64"
-    (caml_mm512_mask_compress_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_compress_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_compress_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_compress_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_compress_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_compress_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_compress_pd"
-    (caml_mm512_mask_compress_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_compress_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_compress_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_compress_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_compress_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_compress_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_compress_ps"
-    (caml_mm512_mask_compress_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_compress_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_conflict_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_conflict_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_conflict_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_conflict_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_conflict_epi32"
-    (caml_mm512_mask_conflict_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb))
-    (c__mm512_mask_conflict_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_conflict_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_conflict_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_conflict_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_conflict_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_conflict_epi64"
-    (caml_mm512_mask_conflict_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_conflict_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvtepi32_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvtepi32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtepi32_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_cvtepi32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtepi32_ps"
-    (caml_mm512_mask_cvtepi32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvtepi32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_cvtepi64_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvtepi64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtepi64_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_cvtepi64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtepi64_pd"
-    (caml_mm512_mask_cvtepi64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvtepi64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvtepu32_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvtepu32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtepu32_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_cvtepu32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtepu32_ps"
-    (caml_mm512_mask_cvtepu32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvtepu32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_cvtepu64_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvtepu64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtepu64_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_cvtepu64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtepu64_pd"
-    (caml_mm512_mask_cvtepu64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvtepu64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvtpd_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtpd_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvtpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtpd_epi64"
-    (caml_mm512_mask_cvtpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvtpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvtpd_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtpd_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvtpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtpd_epu64"
-    (caml_mm512_mask_cvtpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvtpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvtps_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtps_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvtps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtps_epi32"
-    (caml_mm512_mask_cvtps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvtps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_cvtps_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvtps_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvtps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvtps_epu32"
-    (caml_mm512_mask_cvtps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvtps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_cvttpd_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvttpd_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvttpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvttpd_epi64"
-    (caml_mm512_mask_cvttpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvttpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvttpd_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvttpd_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvttpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvttpd_epu64"
-    (caml_mm512_mask_cvttpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_cvttpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_cvttps_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvttps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvttps_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvttps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvttps_epi32"
-    (caml_mm512_mask_cvttps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvttps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_cvttps_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_cvttps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_cvttps_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvttps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_cvttps_epu32"
-    (caml_mm512_mask_cvttps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_cvttps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_div_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_div_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_div_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_div_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_div_pd"
-    (caml_mm512_mask_div_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_div_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_div_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_div_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_div_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_div_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_div_ps"
-    (caml_mm512_mask_div_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_div_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_expand_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_expand_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_expand_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_expand_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_expand_epi32"
-    (caml_mm512_mask_expand_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_expand_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_expand_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_expand_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_expand_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_expand_epi64"
-    (caml_mm512_mask_expand_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_expand_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_expand_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_expand_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_expand_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_expand_pd"
-    (caml_mm512_mask_expand_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_expand_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_expand_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_expand_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_expand_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_expand_ps"
-    (caml_mm512_mask_expand_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_expand_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmadd_pd"
-    (caml_mm512_mask_fmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmadd_ps"
-    (caml_mm512_mask_fmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_fmaddsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmaddsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmaddsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmaddsub_pd"
-    (caml_mm512_mask_fmaddsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmaddsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_fmaddsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmaddsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmaddsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmaddsub_ps"
-    (caml_mm512_mask_fmaddsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmaddsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmsub_pd"
-    (caml_mm512_mask_fmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmsub_ps"
-    (caml_mm512_mask_fmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_fmsubadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmsubadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmsubadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmsubadd_pd"
-    (caml_mm512_mask_fmsubadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmsubadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_fmsubadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fmsubadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmsubadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fmsubadd_ps"
-    (caml_mm512_mask_fmsubadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fmsubadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fnmadd_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fnmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fnmadd_pd"
-    (caml_mm512_mask_fnmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fnmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fnmadd_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fnmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fnmadd_ps"
-    (caml_mm512_mask_fnmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fnmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fnmsub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_fnmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fnmsub_pd"
-    (caml_mm512_mask_fnmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fnmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_fnmsub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_fnmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_fnmsub_ps"
-    (caml_mm512_mask_fnmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_fnmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_getexp_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_getexp_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_getexp_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_getexp_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_getexp_pd"
-    (caml_mm512_mask_getexp_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_getexp_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_getexp_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_getexp_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_getexp_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_getexp_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_getexp_ps"
-    (caml_mm512_mask_getexp_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_getexp_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_lzcnt_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_lzcnt_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_lzcnt_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_lzcnt_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_lzcnt_epi32"
-    (caml_mm512_mask_lzcnt_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_lzcnt_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_lzcnt_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_lzcnt_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_lzcnt_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_lzcnt_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_lzcnt_epi64"
-    (caml_mm512_mask_lzcnt_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_lzcnt_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_madd_epi16 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_madd_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_madd_epi16 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_madd_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_madd_epi16"
-    (caml_mm512_mask_madd_epi16 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_madd_epi16 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_maddubs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_maddubs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_maddubs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_maddubs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_maddubs_epi16"
-    (caml_mm512_mask_maddubs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_maddubs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_max_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_max_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epi16"
-    (caml_mm512_mask_max_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_max_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_max_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_max_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epi32"
-    (caml_mm512_mask_max_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_max_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_max_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epi64"
-    (caml_mm512_mask_max_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_max_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_max_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epi8"
-    (caml_mm512_mask_max_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_max_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_max_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_max_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epu16"
-    (caml_mm512_mask_max_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_max_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_max_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_max_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epu32"
-    (caml_mm512_mask_max_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_max_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_max_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epu64"
-    (caml_mm512_mask_max_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_max_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_max_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_epu8"
-    (caml_mm512_mask_max_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_max_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_max_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_max_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_pd"
-    (caml_mm512_mask_max_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_max_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_max_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_max_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_max_ps"
-    (caml_mm512_mask_max_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_max_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_min_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_min_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epi16"
-    (caml_mm512_mask_min_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_min_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_min_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_min_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epi32"
-    (caml_mm512_mask_min_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_min_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_min_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epi64"
-    (caml_mm512_mask_min_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_min_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_min_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epi8"
-    (caml_mm512_mask_min_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_min_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_min_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_min_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epu16"
-    (caml_mm512_mask_min_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_min_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_min_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epu32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_min_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epu32"
-    (caml_mm512_mask_min_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_min_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epu64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_min_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epu64"
-    (caml_mm512_mask_min_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_min_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_min_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_epu8"
-    (caml_mm512_mask_min_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_min_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_min_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_min_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_pd"
-    (caml_mm512_mask_min_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_min_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_min_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_min_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_min_ps"
-    (caml_mm512_mask_min_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_min_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_mov_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_mov_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_epi16"
-    (caml_mm512_mask_mov_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb))
-    (c__mm512_mask_mov_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb))
-
-external caml_mm512_mask_mov_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_mov_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_epi32"
-    (caml_mm512_mask_mov_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_mov_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_mov_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_mov_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_epi64"
-    (caml_mm512_mask_mov_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_mov_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_mov_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_mov_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_epi8"
-    (caml_mm512_mask_mov_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb))
-    (c__mm512_mask_mov_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb))
-
-external caml_mm512_mask_mov_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_mov_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_pd"
-    (caml_mm512_mask_mov_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_mov_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_mov_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mov_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_mov_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mov_ps"
-    (caml_mm512_mask_mov_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_mov_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_movedup_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_movedup_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_movedup_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_movedup_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_movedup_pd"
-    (caml_mm512_mask_movedup_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_movedup_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_movehdup_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_movehdup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_movehdup_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_movehdup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_movehdup_ps"
-    (caml_mm512_mask_movehdup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_movehdup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_moveldup_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_moveldup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_moveldup_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_moveldup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_moveldup_ps"
-    (caml_mm512_mask_moveldup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_moveldup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_mul_epi32 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mul_epi32 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_mul_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mul_epi32"
-    (caml_mm512_mask_mul_epi32 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mul_epi32 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_mul_epu32 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mul_epu32 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_mul_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mul_epu32"
-    (caml_mm512_mask_mul_epu32 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mul_epu32 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_mul_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mul_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_mul_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mul_pd"
-    (caml_mm512_mask_mul_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mul_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_mul_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mul_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_mul_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mul_ps"
-    (caml_mm512_mask_mul_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mul_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_mulhi_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mulhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mulhi_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mulhi_epi16"
-    (caml_mm512_mask_mulhi_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_mulhi_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_mulhi_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mulhi_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mulhi_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhi_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mulhi_epu16"
-    (caml_mm512_mask_mulhi_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_mulhi_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_mulhrs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_mulhrs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mulhrs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhrs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mulhrs_epi16"
-    (caml_mm512_mask_mulhrs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_mulhrs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_mullo_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mullo_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_mullo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mullo_epi16"
-    (caml_mm512_mask_mullo_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_mullo_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_mullo_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mullo_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_mullo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mullo_epi32"
-    (caml_mm512_mask_mullo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mullo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_mullo_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_mullo_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_mullo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_mullo_epi64"
-    (caml_mm512_mask_mullo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_mullo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_or_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_or_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_or_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_or_epi32"
-    (caml_mm512_mask_or_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_or_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_or_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_or_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_or_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_or_epi64"
-    (caml_mm512_mask_or_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_or_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_or_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_or_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_or_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_or_pd"
-    (caml_mm512_mask_or_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_or_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_or_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_or_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_or_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_or_ps"
-    (caml_mm512_mask_or_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_or_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_packs_epi16 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_packs_epi16 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_packs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_packs_epi16"
-    (caml_mm512_mask_packs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_packs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_packs_epi32 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_packs_epi32 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_packs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_packs_epi32"
-    (caml_mm512_mask_packs_epi32 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_packs_epi32 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_packus_epi16 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packus_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_packus_epi16 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_packus_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_packus_epi16"
-    (caml_mm512_mask_packus_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_packus_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_packus_epi32 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_packus_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_packus_epi32 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_packus_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_packus_epi32"
-    (caml_mm512_mask_packus_epi32 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_packus_epi32 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutevar_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutevar_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutevar_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutevar_epi32"
-    (caml_mm512_mask_permutevar_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutevar_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutevar_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutevar_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutevar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutevar_pd"
-    (caml_mm512_mask_permutevar_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_permutevar_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutevar_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutevar_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutevar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutevar_ps"
-    (caml_mm512_mask_permutevar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_permutevar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutex2var_epi16"
-    (caml_mm512_mask_permutex2var_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutex2var_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutex2var_epi32"
-    (caml_mm512_mask_permutex2var_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutex2var_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutex2var_epi64"
-    (caml_mm512_mask_permutex2var_epi64 (reint va) (mask_of_int64 0xa5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutex2var_epi64 (reint va) (mask_of_int64 0xa5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutex2var_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutex2var_pd"
-    (caml_mm512_mask_permutex2var_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_permutex2var_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutex2var_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutex2var_ps"
-    (caml_mm512_mask_permutex2var_ps (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutex2var_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutexvar_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutexvar_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutexvar_epi16"
-    (caml_mm512_mask_permutexvar_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutexvar_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutexvar_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutexvar_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutexvar_epi32"
-    (caml_mm512_mask_permutexvar_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutexvar_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_permutexvar_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutexvar_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutexvar_epi64"
-    (caml_mm512_mask_permutexvar_epi64 (reint va) (mask_of_int64 0xa5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutexvar_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutexvar_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutexvar_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutexvar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutexvar_pd"
-    (caml_mm512_mask_permutexvar_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_permutexvar_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_permutexvar_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_permutexvar_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutexvar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_permutexvar_ps"
-    (caml_mm512_mask_permutexvar_ps (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_permutexvar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_rcp14_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rcp14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rcp14_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_rcp14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rcp14_pd"
-    (caml_mm512_mask_rcp14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_rcp14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_rcp14_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rcp14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rcp14_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_rcp14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rcp14_ps"
-    (caml_mm512_mask_rcp14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_rcp14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_rolv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rolv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rolv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_rolv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rolv_epi32"
-    (caml_mm512_mask_rolv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_rolv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_rolv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rolv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rolv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_rolv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rolv_epi64"
-    (caml_mm512_mask_rolv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_rolv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_rorv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rorv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rorv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_rorv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rorv_epi32"
-    (caml_mm512_mask_rorv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_rorv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_rorv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rorv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rorv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_rorv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rorv_epi64"
-    (caml_mm512_mask_rorv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_rorv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_rsqrt14_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rsqrt14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rsqrt14_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_rsqrt14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rsqrt14_pd"
-    (caml_mm512_mask_rsqrt14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_rsqrt14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_rsqrt14_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_rsqrt14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_rsqrt14_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_rsqrt14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_rsqrt14_ps"
-    (caml_mm512_mask_rsqrt14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_rsqrt14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_scalef_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_scalef_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_scalef_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_scalef_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_scalef_pd"
-    (caml_mm512_mask_scalef_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_scalef_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_scalef_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_scalef_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_scalef_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_scalef_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_scalef_ps"
-    (caml_mm512_mask_scalef_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_scalef_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_shuffle_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_shuffle_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_shuffle_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_shuffle_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_shuffle_epi8"
-    (caml_mm512_mask_shuffle_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_shuffle_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_sllv_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sllv_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_sllv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sllv_epi16"
-    (caml_mm512_mask_sllv_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_sllv_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_sllv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sllv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_sllv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sllv_epi32"
-    (caml_mm512_mask_sllv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sllv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_sllv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sllv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_sllv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sllv_epi64"
-    (caml_mm512_mask_sllv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sllv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_sqrt_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sqrt_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sqrt_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_sqrt_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sqrt_pd"
-    (caml_mm512_mask_sqrt_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-    (c__mm512_mask_sqrt_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
-
-external caml_mm512_mask_sqrt_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sqrt_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sqrt_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_sqrt_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sqrt_ps"
-    (caml_mm512_mask_sqrt_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-    (c__mm512_mask_sqrt_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
-
-external caml_mm512_mask_srav_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srav_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_srav_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srav_epi16"
-    (caml_mm512_mask_srav_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_srav_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_srav_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srav_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_srav_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srav_epi32"
-    (caml_mm512_mask_srav_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_srav_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_srav_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srav_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_srav_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srav_epi64"
-    (caml_mm512_mask_srav_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_srav_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_srlv_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srlv_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_srlv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srlv_epi16"
-    (caml_mm512_mask_srlv_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_srlv_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_srlv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srlv_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_srlv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srlv_epi32"
-    (caml_mm512_mask_srlv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_srlv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_srlv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_srlv_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_srlv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_srlv_epi64"
-    (caml_mm512_mask_srlv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_srlv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_sub_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_sub_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_epi16"
-    (caml_mm512_mask_sub_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_sub_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_sub_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_sub_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_epi32"
-    (caml_mm512_mask_sub_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sub_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_sub_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_sub_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_epi64"
-    (caml_mm512_mask_sub_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sub_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_sub_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_sub_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_epi8"
-    (caml_mm512_mask_sub_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_sub_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_sub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_sub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_pd"
-    (caml_mm512_mask_sub_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_sub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_sub_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_sub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_sub_ps"
-    (caml_mm512_mask_sub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_sub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_subs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_subs_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_subs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_subs_epi16"
-    (caml_mm512_mask_subs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_subs_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_subs_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_subs_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_subs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_subs_epi8"
-    (caml_mm512_mask_subs_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_subs_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_subs_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_subs_epu16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_subs_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_subs_epu16"
-    (caml_mm512_mask_subs_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_subs_epu16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_subs_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_subs_epu8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_subs_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_subs_epu8"
-    (caml_mm512_mask_subs_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_subs_epu8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_test_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_test_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_test_epi16_mask"
-    (caml_mm512_mask_test_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_test_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_test_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_test_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_test_epi32_mask"
-    (caml_mm512_mask_test_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_test_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_mask_test_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_test_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_test_epi64_mask"
-    (caml_mm512_mask_test_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_mask_test_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_test_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_test_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_test_epi8_mask"
-    (caml_mm512_mask_test_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_test_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_testn_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_testn_epi16_mask :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_testn_epi16_mask"
-    (caml_mm512_mask_testn_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_testn_epi16_mask
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_testn_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_testn_epi32_mask :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_testn_epi32_mask"
-    (caml_mm512_mask_testn_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_testn_epi32_mask (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_mask_testn_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_testn_epi64_mask :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_testn_epi64_mask"
-    (caml_mm512_mask_testn_epi64_mask (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_mask_testn_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_mask_testn_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_testn_epi8_mask :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_mask_testn_epi8_mask"
-    (caml_mm512_mask_testn_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_mask_testn_epi8_mask
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_mask_unpackhi_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_epi16"
-    (caml_mm512_mask_unpackhi_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpackhi_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_unpackhi_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_epi32"
-    (caml_mm512_mask_unpackhi_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpackhi_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpackhi_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_epi64"
-    (caml_mm512_mask_unpackhi_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpackhi_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpackhi_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_epi8"
-    (caml_mm512_mask_unpackhi_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpackhi_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_unpackhi_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_unpackhi_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_pd"
-    (caml_mm512_mask_unpackhi_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpackhi_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpackhi_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpackhi_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_unpackhi_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpackhi_ps"
-    (caml_mm512_mask_unpackhi_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpackhi_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpacklo_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_epi16 :
-  (int16x32[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_epi16"
-    (caml_mm512_mask_unpacklo_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpacklo_epi16 (reint va)
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_unpacklo_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_epi32"
-    (caml_mm512_mask_unpacklo_epi32 (reint va) (mask_of_int64 0xa5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpacklo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpacklo_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_epi64"
-    (caml_mm512_mask_unpacklo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpacklo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpacklo_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_epi8 :
-  (int8x64[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_epi8"
-    (caml_mm512_mask_unpacklo_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-    (c__mm512_mask_unpacklo_epi8 (reint va)
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint vb) (reint vc))
-
-external caml_mm512_mask_unpacklo_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_unpacklo_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_pd"
-    (caml_mm512_mask_unpacklo_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpacklo_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_unpacklo_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_unpacklo_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_unpacklo_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_unpacklo_ps"
-    (caml_mm512_mask_unpacklo_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_unpacklo_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_xor_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_xor_epi32 :
-  (int32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_mask_xor_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_xor_epi32"
-    (caml_mm512_mask_xor_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_xor_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_xor_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_xor_epi64 :
-  (int64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_mask_xor_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_xor_epi64"
-    (caml_mm512_mask_xor_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_xor_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_mask_xor_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_xor_pd :
-  (float64x8[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_mask_xor_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_xor_pd"
-    (caml_mm512_mask_xor_pd (reint va) (mask_of_int64 0xa5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_xor_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
-
-external caml_mm512_mask_xor_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mask_xor_ps :
-  (float32x16[@unboxed]) ->
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_mask_xor_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mask_xor_ps"
-    (caml_mm512_mask_xor_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-    (c__mm512_mask_xor_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_abs_epi16 :
-  (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_abs_epi16 :
-  (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_maskz_abs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_abs_epi16"
-    (caml_mm512_maskz_abs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
-    (c__mm512_maskz_abs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
-
-external caml_mm512_maskz_abs_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_abs_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_abs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_abs_epi32"
-    (caml_mm512_maskz_abs_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_abs_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_abs_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_abs_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_abs_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_abs_epi64"
-    (caml_mm512_maskz_abs_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_abs_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_abs_epi8 :
-  (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_abs_epi8 :
-  (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_maskz_abs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_abs_epi8"
-    (caml_mm512_maskz_abs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
-    (c__mm512_maskz_abs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
-
-external caml_mm512_maskz_add_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_add_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_epi16"
-    (caml_mm512_maskz_add_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_add_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_add_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_add_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_epi32"
-    (caml_mm512_maskz_add_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_add_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_add_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_add_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_epi64"
-    (caml_mm512_maskz_add_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_add_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_add_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_add_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_epi8"
-    (caml_mm512_maskz_add_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_add_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_add_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_add_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_pd"
-    (caml_mm512_maskz_add_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_add_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_add_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_add_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_add_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_add_ps"
-    (caml_mm512_maskz_add_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_add_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_adds_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_adds_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_adds_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_adds_epi16"
-    (caml_mm512_maskz_adds_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_adds_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_adds_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_adds_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_adds_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_adds_epi8"
-    (caml_mm512_maskz_adds_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_adds_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_adds_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_adds_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_adds_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_adds_epu16"
-    (caml_mm512_maskz_adds_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_adds_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_adds_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_adds_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_adds_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_adds_epu8"
-    (caml_mm512_maskz_adds_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_adds_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_and_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_and_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_and_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_and_epi32"
-    (caml_mm512_maskz_and_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_and_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_and_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_and_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_and_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_and_epi64"
-    (caml_mm512_maskz_and_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_and_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_and_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_and_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_and_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_and_pd"
-    (caml_mm512_maskz_and_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_and_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_and_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_and_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_and_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_and_ps"
-    (caml_mm512_maskz_and_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_and_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_andnot_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_andnot_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_andnot_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_andnot_epi32"
-    (caml_mm512_maskz_andnot_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_andnot_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_andnot_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_andnot_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_andnot_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_andnot_epi64"
-    (caml_mm512_maskz_andnot_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_andnot_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_andnot_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_andnot_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_andnot_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_andnot_pd"
-    (caml_mm512_maskz_andnot_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_andnot_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_andnot_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_andnot_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_andnot_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_andnot_ps"
-    (caml_mm512_maskz_andnot_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_andnot_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_avg_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_avg_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_avg_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_avg_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_avg_epu16"
-    (caml_mm512_maskz_avg_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_avg_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_avg_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_avg_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_avg_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_avg_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_avg_epu8"
-    (caml_mm512_maskz_avg_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_avg_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_compress_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_compress_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_compress_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_compress_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_compress_epi32"
-    (caml_mm512_maskz_compress_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_compress_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_compress_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_compress_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_compress_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_compress_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_compress_epi64"
-    (caml_mm512_maskz_compress_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_compress_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_compress_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_compress_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_compress_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_compress_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_compress_pd"
-    (caml_mm512_maskz_compress_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_compress_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_compress_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_compress_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_compress_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_compress_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_compress_ps"
-    (caml_mm512_maskz_compress_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_compress_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_conflict_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_conflict_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_conflict_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_conflict_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_conflict_epi32"
-    (caml_mm512_maskz_conflict_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_conflict_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_conflict_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_conflict_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_conflict_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_conflict_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_conflict_epi64"
-    (caml_mm512_maskz_conflict_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_conflict_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvtepi32_ps :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepi32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtepi32_ps :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvtepi32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtepi32_ps"
-    (caml_mm512_maskz_cvtepi32_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvtepi32_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_cvtepi64_pd :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepi64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtepi64_pd :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvtepi64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtepi64_pd"
-    (caml_mm512_maskz_cvtepi64_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvtepi64_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvtepu32_ps :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepu32_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtepu32_ps :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvtepu32_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtepu32_ps"
-    (caml_mm512_maskz_cvtepu32_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvtepu32_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_cvtepu64_pd :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepu64_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtepu64_pd :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvtepu64_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtepu64_pd"
-    (caml_mm512_maskz_cvtepu64_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvtepu64_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvtpd_epi64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtpd_epi64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvtpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtpd_epi64"
-    (caml_mm512_maskz_cvtpd_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvtpd_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvtpd_epu64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtpd_epu64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvtpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtpd_epu64"
-    (caml_mm512_maskz_cvtpd_epu64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvtpd_epu64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvtps_epi32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtps_epi32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvtps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtps_epi32"
-    (caml_mm512_maskz_cvtps_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvtps_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_cvtps_epu32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvtps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvtps_epu32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvtps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvtps_epu32"
-    (caml_mm512_maskz_cvtps_epu32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvtps_epu32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_cvttpd_epi64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvttpd_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvttpd_epi64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvttpd_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvttpd_epi64"
-    (caml_mm512_maskz_cvttpd_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvttpd_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvttpd_epu64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvttpd_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvttpd_epu64 :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_cvttpd_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvttpd_epu64"
-    (caml_mm512_maskz_cvttpd_epu64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_cvttpd_epu64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_cvttps_epi32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvttps_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvttps_epi32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvttps_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvttps_epi32"
-    (caml_mm512_maskz_cvttps_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvttps_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_cvttps_epu32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_cvttps_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_cvttps_epu32 :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_cvttps_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_cvttps_epu32"
-    (caml_mm512_maskz_cvttps_epu32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_cvttps_epu32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_div_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_div_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_div_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_div_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_div_pd"
-    (caml_mm512_maskz_div_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_div_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_div_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_div_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_div_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_div_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_div_ps"
-    (caml_mm512_maskz_div_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_div_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_expand_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_expand_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_expand_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_expand_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_expand_epi32"
-    (caml_mm512_maskz_expand_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_expand_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_expand_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_expand_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_expand_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_expand_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_expand_epi64"
-    (caml_mm512_maskz_expand_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_expand_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_expand_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_expand_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_expand_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_expand_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_expand_pd"
-    (caml_mm512_maskz_expand_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_expand_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_expand_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_expand_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_expand_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_expand_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_expand_ps"
-    (caml_mm512_maskz_expand_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_expand_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_fmadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmadd_pd"
-    (caml_mm512_maskz_fmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmadd_ps"
-    (caml_mm512_maskz_fmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmaddsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fmaddsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmaddsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmaddsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmaddsub_pd"
-    (caml_mm512_maskz_fmaddsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmaddsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmaddsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fmaddsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmaddsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmaddsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmaddsub_ps"
-    (caml_mm512_maskz_fmaddsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmaddsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmsub_pd"
-    (caml_mm512_maskz_fmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmsub_ps"
-    (caml_mm512_maskz_fmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmsubadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fmsubadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmsubadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmsubadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmsubadd_pd"
-    (caml_mm512_maskz_fmsubadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmsubadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fmsubadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fmsubadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fmsubadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmsubadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fmsubadd_ps"
-    (caml_mm512_maskz_fmsubadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fmsubadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fnmadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmadd_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fnmadd_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fnmadd_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fnmadd_pd"
-    (caml_mm512_maskz_fnmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fnmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fnmadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fnmadd_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fnmadd_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fnmadd_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fnmadd_ps"
-    (caml_mm512_maskz_fnmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fnmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fnmsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmsub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fnmsub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fnmsub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fnmsub_pd"
-    (caml_mm512_maskz_fnmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fnmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_fnmsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_fnmsub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_fnmsub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fnmsub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_fnmsub_ps"
-    (caml_mm512_maskz_fnmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-    (c__mm512_maskz_fnmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_getexp_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_getexp_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_getexp_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_getexp_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_getexp_pd"
-    (caml_mm512_maskz_getexp_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_getexp_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_getexp_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_getexp_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_getexp_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_getexp_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_getexp_ps"
-    (caml_mm512_maskz_getexp_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_getexp_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_lzcnt_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_lzcnt_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_lzcnt_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_lzcnt_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_lzcnt_epi32"
-    (caml_mm512_maskz_lzcnt_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_lzcnt_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_lzcnt_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_lzcnt_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_lzcnt_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_lzcnt_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_lzcnt_epi64"
-    (caml_mm512_maskz_lzcnt_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_lzcnt_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_madd_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_madd_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_madd_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_madd_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_madd_epi16"
-    (caml_mm512_maskz_madd_epi16 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_madd_epi16 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_maddubs_epi16 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_maddubs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_maddubs_epi16 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_maddubs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_maddubs_epi16"
-    (caml_mm512_maskz_maddubs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_maddubs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_max_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epi16"
-    (caml_mm512_maskz_max_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_max_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_max_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epi32"
-    (caml_mm512_maskz_max_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_max_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epi64"
-    (caml_mm512_maskz_max_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_max_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epi8"
-    (caml_mm512_maskz_max_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_max_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_max_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epu16"
-    (caml_mm512_maskz_max_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_max_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_max_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epu32"
-    (caml_mm512_maskz_max_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epu64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epu64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_max_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epu64"
-    (caml_mm512_maskz_max_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_max_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_epu8"
-    (caml_mm512_maskz_max_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_max_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_max_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_max_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_pd"
-    (caml_mm512_maskz_max_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_max_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_max_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_max_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_max_ps"
-    (caml_mm512_maskz_max_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_max_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_min_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epi16"
-    (caml_mm512_maskz_min_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_min_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_min_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epi32"
-    (caml_mm512_maskz_min_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_min_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epi64"
-    (caml_mm512_maskz_min_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_min_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epi8"
-    (caml_mm512_maskz_min_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_min_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_min_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epu16"
-    (caml_mm512_maskz_min_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_min_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_min_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epu32"
-    (caml_mm512_maskz_min_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epu64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epu64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_min_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epu64"
-    (caml_mm512_maskz_min_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_min_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_epu8"
-    (caml_mm512_maskz_min_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_min_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_min_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_min_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_pd"
-    (caml_mm512_maskz_min_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_min_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_min_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_min_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_min_ps"
-    (caml_mm512_maskz_min_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_min_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mov_epi16 :
-  (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_epi16 :
-  (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_maskz_mov_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_epi16"
-    (caml_mm512_maskz_mov_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
-    (c__mm512_maskz_mov_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
-
-external caml_mm512_maskz_mov_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_epi32 :
-  (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_maskz_mov_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_epi32"
-    (caml_mm512_maskz_mov_epi32 (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_mov_epi32 (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_mov_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_epi64 :
-  (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_maskz_mov_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_epi64"
-    (caml_mm512_maskz_mov_epi64 (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_mov_epi64 (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_mov_epi8 :
-  (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_epi8 :
-  (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_maskz_mov_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_epi8"
-    (caml_mm512_maskz_mov_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
-    (c__mm512_maskz_mov_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
-
-external caml_mm512_maskz_mov_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_mov_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_pd"
-    (caml_mm512_maskz_mov_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_mov_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_mov_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mov_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mov_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_mov_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mov_ps"
-    (caml_mm512_maskz_mov_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_mov_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_movedup_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_movedup_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_movedup_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_movedup_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_movedup_pd"
-    (caml_mm512_maskz_movedup_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_movedup_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_movehdup_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_movehdup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_movehdup_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_movehdup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_movehdup_ps"
-    (caml_mm512_maskz_movehdup_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_movehdup_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_moveldup_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_moveldup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_moveldup_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_moveldup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_moveldup_ps"
-    (caml_mm512_maskz_moveldup_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_moveldup_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_mul_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mul_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mul_epi32"
-    (caml_mm512_maskz_mul_epi32 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_mul_epi32 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mul_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mul_epu32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mul_epu32"
-    (caml_mm512_maskz_mul_epu32 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_mul_epu32 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mul_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mul_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mul_pd"
-    (caml_mm512_maskz_mul_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_mul_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mul_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mul_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_mul_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mul_ps"
-    (caml_mm512_maskz_mul_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_mul_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mulhi_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mulhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mulhi_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mulhi_epi16"
-    (caml_mm512_maskz_mulhi_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_mulhi_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_mulhi_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mulhi_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mulhi_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhi_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mulhi_epu16"
-    (caml_mm512_maskz_mulhi_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_mulhi_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_mulhrs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mulhrs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mulhrs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhrs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mulhrs_epi16"
-    (caml_mm512_maskz_mulhrs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_mulhrs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_mullo_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mullo_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mullo_epi16"
-    (caml_mm512_maskz_mullo_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_mullo_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_mullo_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mullo_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mullo_epi32"
-    (caml_mm512_maskz_mullo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_mullo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_mullo_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_mullo_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_mullo_epi64"
-    (caml_mm512_maskz_mullo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_mullo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_or_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_or_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_or_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_or_epi32"
-    (caml_mm512_maskz_or_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_or_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_or_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_or_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_or_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_or_epi64"
-    (caml_mm512_maskz_or_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_or_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_or_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_or_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_or_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_or_pd"
-    (caml_mm512_maskz_or_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_or_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_or_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_or_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_or_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_or_ps"
-    (caml_mm512_maskz_or_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_or_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_packs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_packs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_packs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_packs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_packs_epi16"
-    (caml_mm512_maskz_packs_epi16
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_packs_epi16
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_packs_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_packs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_packs_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_packs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_packs_epi32"
-    (caml_mm512_maskz_packs_epi32
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_packs_epi32
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_packus_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_packus_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_packus_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_packus_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_packus_epi16"
-    (caml_mm512_maskz_packus_epi16
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_packus_epi16
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_packus_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_packus_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_packus_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_packus_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_packus_epi32"
-    (caml_mm512_maskz_packus_epi32
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_packus_epi32
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_permutevar_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutevar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutevar_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutevar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutevar_pd"
-    (caml_mm512_maskz_permutevar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_permutevar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_permutevar_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutevar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutevar_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutevar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutevar_ps"
-    (caml_mm512_maskz_permutevar_ps (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_permutevar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_permutex2var_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutex2var_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutex2var_epi16"
-    (caml_mm512_maskz_permutex2var_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb) (reint vc))
-    (c__mm512_maskz_permutex2var_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb) (reint vc))
-
-external caml_mm512_maskz_permutex2var_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutex2var_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutex2var_epi32"
-    (caml_mm512_maskz_permutex2var_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb) (reint vc))
-    (c__mm512_maskz_permutex2var_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb) (reint vc))
-
-external caml_mm512_maskz_permutex2var_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutex2var_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutex2var_epi64"
-    (caml_mm512_maskz_permutex2var_epi64 (mask_of_int64 0xa5L) (reint va)
-       (reint vb) (reint vc))
-    (c__mm512_maskz_permutex2var_epi64 (mask_of_int64 0xa5L) (reint va)
-       (reint vb) (reint vc))
-
-external caml_mm512_maskz_permutex2var_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutex2var_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutex2var_pd"
-    (caml_mm512_maskz_permutex2var_pd (mask_of_int64 0xa5L) (reint va)
-       (reint vb) (reint vc))
-    (c__mm512_maskz_permutex2var_pd (mask_of_int64 0xa5L) (reint va) (reint vb)
-       (reint vc))
-
-external caml_mm512_maskz_permutex2var_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutex2var_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutex2var_ps"
-    (caml_mm512_maskz_permutex2var_ps (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb) (reint vc))
-    (c__mm512_maskz_permutex2var_ps (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb) (reint vc))
-
-external caml_mm512_maskz_permutexvar_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutexvar_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutexvar_epi16"
-    (caml_mm512_maskz_permutexvar_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_permutexvar_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_permutexvar_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutexvar_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutexvar_epi32"
-    (caml_mm512_maskz_permutexvar_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_permutexvar_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-
-external caml_mm512_maskz_permutexvar_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutexvar_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutexvar_epi64"
-    (caml_mm512_maskz_permutexvar_epi64 (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_permutexvar_epi64 (mask_of_int64 0xa5L) (reint va)
-       (reint vb))
-
-external caml_mm512_maskz_permutexvar_pd :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutexvar_pd :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutexvar_pd"
-    (caml_mm512_maskz_permutexvar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_permutexvar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_permutexvar_ps :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_permutexvar_ps :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_permutexvar_ps"
-    (caml_mm512_maskz_permutexvar_ps (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_permutexvar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_rcp14_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_rcp14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rcp14_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_rcp14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rcp14_pd"
-    (caml_mm512_maskz_rcp14_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_rcp14_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_rcp14_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_rcp14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rcp14_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_rcp14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rcp14_ps"
-    (caml_mm512_maskz_rcp14_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_rcp14_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_rolv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rolv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rolv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_rolv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rolv_epi32"
-    (caml_mm512_maskz_rolv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_rolv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_rolv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rolv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rolv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_rolv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rolv_epi64"
-    (caml_mm512_maskz_rolv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_rolv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_rorv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rorv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rorv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_rorv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rorv_epi32"
-    (caml_mm512_maskz_rorv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_rorv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_rorv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rorv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rorv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_rorv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rorv_epi64"
-    (caml_mm512_maskz_rorv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_rorv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_rsqrt14_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_rsqrt14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rsqrt14_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_rsqrt14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rsqrt14_pd"
-    (caml_mm512_maskz_rsqrt14_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_rsqrt14_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_rsqrt14_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_rsqrt14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_rsqrt14_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_rsqrt14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_rsqrt14_ps"
-    (caml_mm512_maskz_rsqrt14_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_rsqrt14_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_scalef_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_scalef_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_scalef_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_scalef_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_scalef_pd"
-    (caml_mm512_maskz_scalef_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_scalef_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_scalef_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_scalef_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_scalef_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_scalef_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_scalef_ps"
-    (caml_mm512_maskz_scalef_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_scalef_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_shuffle_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_shuffle_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_shuffle_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_shuffle_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_shuffle_epi8"
-    (caml_mm512_maskz_shuffle_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_shuffle_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_sllv_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sllv_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sllv_epi16"
-    (caml_mm512_maskz_sllv_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_sllv_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_sllv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sllv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sllv_epi32"
-    (caml_mm512_maskz_sllv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_sllv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sllv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sllv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sllv_epi64"
-    (caml_mm512_maskz_sllv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_sllv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sqrt_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_sqrt_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sqrt_pd :
-  (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_maskz_sqrt_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sqrt_pd"
-    (caml_mm512_maskz_sqrt_pd (mask_of_int64 0xa5L) (reint va))
-    (c__mm512_maskz_sqrt_pd (mask_of_int64 0xa5L) (reint va))
-
-external caml_mm512_maskz_sqrt_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_sqrt_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sqrt_ps :
-  (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_maskz_sqrt_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sqrt_ps"
-    (caml_mm512_maskz_sqrt_ps (mask_of_int64 0xa5a5L) (reint va))
-    (c__mm512_maskz_sqrt_ps (mask_of_int64 0xa5a5L) (reint va))
-
-external caml_mm512_maskz_srav_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srav_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_srav_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srav_epi16"
-    (caml_mm512_maskz_srav_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_srav_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_srav_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srav_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_srav_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srav_epi32"
-    (caml_mm512_maskz_srav_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_srav_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_srav_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srav_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_srav_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srav_epi64"
-    (caml_mm512_maskz_srav_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_srav_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_srlv_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srlv_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srlv_epi16"
-    (caml_mm512_maskz_srlv_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_srlv_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_srlv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srlv_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srlv_epi32"
-    (caml_mm512_maskz_srlv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_srlv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_srlv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_srlv_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_srlv_epi64"
-    (caml_mm512_maskz_srlv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_srlv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_sub_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_epi16"
-    (caml_mm512_maskz_sub_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_sub_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_sub_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_epi32"
-    (caml_mm512_maskz_sub_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_sub_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_sub_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_epi64"
-    (caml_mm512_maskz_sub_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_sub_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_sub_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_epi8"
-    (caml_mm512_maskz_sub_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_sub_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_sub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_pd"
-    (caml_mm512_maskz_sub_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_sub_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_sub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_sub_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_sub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_sub_ps"
-    (caml_mm512_maskz_sub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_sub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_subs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_subs_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_subs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_subs_epi16"
-    (caml_mm512_maskz_subs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_subs_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_subs_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_subs_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_subs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_subs_epi8"
-    (caml_mm512_maskz_subs_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_subs_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_subs_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_subs_epu16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_subs_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_subs_epu16"
-    (caml_mm512_maskz_subs_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_subs_epu16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_subs_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_subs_epu8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_subs_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_subs_epu8"
-    (caml_mm512_maskz_subs_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_subs_epu8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_epi16"
-    (caml_mm512_maskz_unpackhi_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_unpackhi_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_epi32"
-    (caml_mm512_maskz_unpackhi_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_unpackhi_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_epi64"
-    (caml_mm512_maskz_unpackhi_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpackhi_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_epi8"
-    (caml_mm512_maskz_unpackhi_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_unpackhi_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_pd"
-    (caml_mm512_maskz_unpackhi_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpackhi_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpackhi_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpackhi_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpackhi_ps"
-    (caml_mm512_maskz_unpackhi_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpackhi_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_epi16 :
-  (mask[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_epi16"
-    (caml_mm512_maskz_unpacklo_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_unpacklo_epi16
-       (mask_of_int64 0xa5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_epi32"
-    (caml_mm512_maskz_unpacklo_epi32 (mask_of_int64 0xa5a5L) (reint va)
-       (reint vb))
-    (c__mm512_maskz_unpacklo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_epi64"
-    (caml_mm512_maskz_unpacklo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpacklo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_epi8 :
-  (mask[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) ->
-  (int8x64[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_epi8"
-    (caml_mm512_maskz_unpacklo_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-    (c__mm512_maskz_unpacklo_epi8
-       (mask_of_int64 0xa5a5a5a5a5a5a5a5L)
-       (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_pd"
-    (caml_mm512_maskz_unpacklo_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpacklo_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_unpacklo_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_unpacklo_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_unpacklo_ps"
-    (caml_mm512_maskz_unpacklo_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_unpacklo_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_xor_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_xor_epi32 :
-  (mask[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_maskz_xor_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_xor_epi32"
-    (caml_mm512_maskz_xor_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_xor_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_xor_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_xor_epi64 :
-  (mask[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_maskz_xor_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_xor_epi64"
-    (caml_mm512_maskz_xor_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_xor_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_xor_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_xor_pd :
-  (mask[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_maskz_xor_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_xor_pd"
-    (caml_mm512_maskz_xor_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-    (c__mm512_maskz_xor_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
-
-external caml_mm512_maskz_xor_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_maskz_xor_ps :
-  (mask[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_maskz_xor_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_maskz_xor_ps"
-    (caml_mm512_maskz_xor_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-    (c__mm512_maskz_xor_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
-
-external caml_mm512_max_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_max_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epi16"
-    (caml_mm512_max_epi16 (reint va) (reint vb))
-    (c__mm512_max_epi16 (reint va) (reint vb))
-
-external caml_mm512_max_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_max_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epi32"
-    (caml_mm512_max_epi32 (reint va) (reint vb))
-    (c__mm512_max_epi32 (reint va) (reint vb))
-
-external caml_mm512_max_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_max_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epi64"
-    (caml_mm512_max_epi64 (reint va) (reint vb))
-    (c__mm512_max_epi64 (reint va) (reint vb))
-
-external caml_mm512_max_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_max_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epi8"
-    (caml_mm512_max_epi8 (reint va) (reint vb))
-    (c__mm512_max_epi8 (reint va) (reint vb))
-
-external caml_mm512_max_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_max_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epu16"
-    (caml_mm512_max_epu16 (reint va) (reint vb))
-    (c__mm512_max_epu16 (reint va) (reint vb))
-
-external caml_mm512_max_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_max_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epu32"
-    (caml_mm512_max_epu32 (reint va) (reint vb))
-    (c__mm512_max_epu32 (reint va) (reint vb))
-
-external caml_mm512_max_epu64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epu64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_max_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epu64"
-    (caml_mm512_max_epu64 (reint va) (reint vb))
-    (c__mm512_max_epu64 (reint va) (reint vb))
-
-external caml_mm512_max_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_max_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_epu8"
-    (caml_mm512_max_epu8 (reint va) (reint vb))
-    (c__mm512_max_epu8 (reint va) (reint vb))
-
-external caml_mm512_max_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_max_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_pd"
-    (caml_mm512_max_pd (reint va) (reint vb))
-    (c__mm512_max_pd (reint va) (reint vb))
-
-external caml_mm512_max_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_max_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_max_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_max_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_max_ps"
-    (caml_mm512_max_ps (reint va) (reint vb))
-    (c__mm512_max_ps (reint va) (reint vb))
-
-external caml_mm512_min_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_min_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epi16"
-    (caml_mm512_min_epi16 (reint va) (reint vb))
-    (c__mm512_min_epi16 (reint va) (reint vb))
-
-external caml_mm512_min_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_min_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epi32"
-    (caml_mm512_min_epi32 (reint va) (reint vb))
-    (c__mm512_min_epi32 (reint va) (reint vb))
-
-external caml_mm512_min_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_min_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epi64"
-    (caml_mm512_min_epi64 (reint va) (reint vb))
-    (c__mm512_min_epi64 (reint va) (reint vb))
-
-external caml_mm512_min_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_min_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epi8"
-    (caml_mm512_min_epi8 (reint va) (reint vb))
-    (c__mm512_min_epi8 (reint va) (reint vb))
-
-external caml_mm512_min_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_min_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epu16"
-    (caml_mm512_min_epu16 (reint va) (reint vb))
-    (c__mm512_min_epu16 (reint va) (reint vb))
-
-external caml_mm512_min_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_min_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epu32"
-    (caml_mm512_min_epu32 (reint va) (reint vb))
-    (c__mm512_min_epu32 (reint va) (reint vb))
-
-external caml_mm512_min_epu64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epu64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epu64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_min_epu64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epu64"
-    (caml_mm512_min_epu64 (reint va) (reint vb))
-    (c__mm512_min_epu64 (reint va) (reint vb))
-
-external caml_mm512_min_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_min_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_epu8"
-    (caml_mm512_min_epu8 (reint va) (reint vb))
-    (c__mm512_min_epu8 (reint va) (reint vb))
-
-external caml_mm512_min_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_min_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_pd"
-    (caml_mm512_min_pd (reint va) (reint vb))
-    (c__mm512_min_pd (reint va) (reint vb))
-
-external caml_mm512_min_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_min_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_min_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_min_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_min_ps"
-    (caml_mm512_min_ps (reint va) (reint vb))
-    (c__mm512_min_ps (reint va) (reint vb))
-
-external caml_mm512_movedup_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movedup_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movedup_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_movedup_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movedup_pd"
-    (caml_mm512_movedup_pd (reint va))
-    (c__mm512_movedup_pd (reint va))
-
-external caml_mm512_movehdup_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movehdup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movehdup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_movehdup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movehdup_ps"
-    (caml_mm512_movehdup_ps (reint va))
-    (c__mm512_movehdup_ps (reint va))
-
-external caml_mm512_moveldup_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_moveldup_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_moveldup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_moveldup_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_moveldup_ps"
-    (caml_mm512_moveldup_ps (reint va))
-    (c__mm512_moveldup_ps (reint va))
-
-external caml_mm512_movepi16_mask : (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movepi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movepi16_mask : (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_movepi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_movepi16_mask"
-    (caml_mm512_movepi16_mask (reint va))
-    (c__mm512_movepi16_mask (reint va))
-
-external caml_mm512_movepi32_mask : (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movepi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movepi32_mask : (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_movepi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_movepi32_mask"
-    (caml_mm512_movepi32_mask (reint va))
-    (c__mm512_movepi32_mask (reint va))
-
-external caml_mm512_movepi64_mask : (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movepi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movepi64_mask : (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_movepi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_movepi64_mask"
-    (caml_mm512_movepi64_mask (reint va))
-    (c__mm512_movepi64_mask (reint va))
-
-external caml_mm512_movepi8_mask : (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movepi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movepi8_mask : (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_movepi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_movepi8_mask"
-    (caml_mm512_movepi8_mask (reint va))
-    (c__mm512_movepi8_mask (reint va))
-
-external caml_mm512_movm_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movm_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movm_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_movm_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movm_epi16"
-    (caml_mm512_movm_epi16 (mask_of_int64 0xa5a5a5a5L))
-    (c__mm512_movm_epi16 (mask_of_int64 0xa5a5a5a5L))
-
-external caml_mm512_movm_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movm_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movm_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_movm_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movm_epi32"
-    (caml_mm512_movm_epi32 (mask_of_int64 0xa5a5L))
-    (c__mm512_movm_epi32 (mask_of_int64 0xa5a5L))
-
-external caml_mm512_movm_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movm_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movm_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_movm_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movm_epi64"
-    (caml_mm512_movm_epi64 (mask_of_int64 0xa5L))
-    (c__mm512_movm_epi64 (mask_of_int64 0xa5L))
-
-external caml_mm512_movm_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_movm_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_movm_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_movm_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_movm_epi8"
-    (caml_mm512_movm_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
-    (c__mm512_movm_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
-
-external caml_mm512_mul_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mul_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mul_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_mul_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mul_epi32"
-    (caml_mm512_mul_epi32 (reint va) (reint vb))
-    (c__mm512_mul_epi32 (reint va) (reint vb))
-
-external caml_mm512_mul_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mul_epu32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mul_epu32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_mul_epu32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mul_epu32"
-    (caml_mm512_mul_epu32 (reint va) (reint vb))
-    (c__mm512_mul_epu32 (reint va) (reint vb))
-
-external caml_mm512_mul_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mul_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mul_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_mul_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mul_pd"
-    (caml_mm512_mul_pd (reint va) (reint vb))
-    (c__mm512_mul_pd (reint va) (reint vb))
-
-external caml_mm512_mul_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mul_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mul_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_mul_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mul_ps"
-    (caml_mm512_mul_ps (reint va) (reint vb))
-    (c__mm512_mul_ps (reint va) (reint vb))
-
-external caml_mm512_mulhi_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mulhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mulhi_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_mulhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mulhi_epi16"
-    (caml_mm512_mulhi_epi16 (reint va) (reint vb))
-    (c__mm512_mulhi_epi16 (reint va) (reint vb))
-
-external caml_mm512_mulhi_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mulhi_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mulhi_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_mulhi_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mulhi_epu16"
-    (caml_mm512_mulhi_epu16 (reint va) (reint vb))
-    (c__mm512_mulhi_epu16 (reint va) (reint vb))
-
-external caml_mm512_mulhrs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mulhrs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mulhrs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_mulhrs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mulhrs_epi16"
-    (caml_mm512_mulhrs_epi16 (reint va) (reint vb))
-    (c__mm512_mulhrs_epi16 (reint va) (reint vb))
-
-external caml_mm512_mullo_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mullo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mullo_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_mullo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mullo_epi16"
-    (caml_mm512_mullo_epi16 (reint va) (reint vb))
-    (c__mm512_mullo_epi16 (reint va) (reint vb))
-
-external caml_mm512_mullo_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mullo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mullo_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_mullo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mullo_epi32"
-    (caml_mm512_mullo_epi32 (reint va) (reint vb))
-    (c__mm512_mullo_epi32 (reint va) (reint vb))
-
-external caml_mm512_mullo_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_mullo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_mullo_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_mullo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_mullo_epi64"
-    (caml_mm512_mullo_epi64 (reint va) (reint vb))
-    (c__mm512_mullo_epi64 (reint va) (reint vb))
-
-external caml_mm512_or_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_or_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_or_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_or_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_or_epi32"
-    (caml_mm512_or_epi32 (reint va) (reint vb))
-    (c__mm512_or_epi32 (reint va) (reint vb))
-
-external caml_mm512_or_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_or_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_or_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_or_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_or_epi64"
-    (caml_mm512_or_epi64 (reint va) (reint vb))
-    (c__mm512_or_epi64 (reint va) (reint vb))
-
-external caml_mm512_or_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_or_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_or_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_or_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_or_pd"
-    (caml_mm512_or_pd (reint va) (reint vb))
-    (c__mm512_or_pd (reint va) (reint vb))
-
-external caml_mm512_or_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_or_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_or_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_or_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_or_ps"
-    (caml_mm512_or_ps (reint va) (reint vb))
-    (c__mm512_or_ps (reint va) (reint vb))
-
-external caml_mm512_or_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_or_si512"
-[@@noalloc] [@@builtin]
-
-external c__mm512_or_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_or_si512"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_or_si512"
-    (caml_mm512_or_si512 (reint va) (reint vb))
-    (c__mm512_or_si512 (reint va) (reint vb))
-
-external caml_mm512_packs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_packs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_packs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_packs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_packs_epi16"
-    (caml_mm512_packs_epi16 (reint va) (reint vb))
-    (c__mm512_packs_epi16 (reint va) (reint vb))
-
-external caml_mm512_packs_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_packs_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_packs_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_packs_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_packs_epi32"
-    (caml_mm512_packs_epi32 (reint va) (reint vb))
-    (c__mm512_packs_epi32 (reint va) (reint vb))
-
-external caml_mm512_packus_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_packus_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_packus_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_packus_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_packus_epi16"
-    (caml_mm512_packus_epi16 (reint va) (reint vb))
-    (c__mm512_packus_epi16 (reint va) (reint vb))
-
-external caml_mm512_packus_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_packus_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_packus_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_packus_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_packus_epi32"
-    (caml_mm512_packus_epi32 (reint va) (reint vb))
-    (c__mm512_packus_epi32 (reint va) (reint vb))
-
-external caml_mm512_permutevar_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutevar_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutevar_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_permutevar_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutevar_epi32"
-    (caml_mm512_permutevar_epi32 (reint va) (reint vb))
-    (c__mm512_permutevar_epi32 (reint va) (reint vb))
-
-external caml_mm512_permutevar_pd :
-  (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutevar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutevar_pd :
-  (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_permutevar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutevar_pd"
-    (caml_mm512_permutevar_pd (reint va) (reint vb))
-    (c__mm512_permutevar_pd (reint va) (reint vb))
-
-external caml_mm512_permutevar_ps :
-  (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutevar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutevar_ps :
-  (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_permutevar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutevar_ps"
-    (caml_mm512_permutevar_ps (reint va) (reint vb))
-    (c__mm512_permutevar_ps (reint va) (reint vb))
-
-external caml_mm512_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutex2var_epi16 :
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) ->
-  (int16x32[@unboxed]) = "" "ctest__mm512_permutex2var_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutex2var_epi16"
-    (caml_mm512_permutex2var_epi16 (reint va) (reint vb) (reint vc))
-    (c__mm512_permutex2var_epi16 (reint va) (reint vb) (reint vc))
-
-external caml_mm512_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutex2var_epi32 :
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (int32x16[@unboxed]) = "" "ctest__mm512_permutex2var_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutex2var_epi32"
-    (caml_mm512_permutex2var_epi32 (reint va) (reint vb) (reint vc))
-    (c__mm512_permutex2var_epi32 (reint va) (reint vb) (reint vc))
-
-external caml_mm512_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutex2var_epi64 :
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (int64x8[@unboxed]) = "" "ctest__mm512_permutex2var_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutex2var_epi64"
-    (caml_mm512_permutex2var_epi64 (reint va) (reint vb) (reint vc))
-    (c__mm512_permutex2var_epi64 (reint va) (reint vb) (reint vc))
-
-external caml_mm512_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutex2var_pd :
-  (float64x8[@unboxed]) ->
-  (int64x8[@unboxed]) ->
-  (float64x8[@unboxed]) ->
-  (float64x8[@unboxed]) = "" "ctest__mm512_permutex2var_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutex2var_pd"
-    (caml_mm512_permutex2var_pd (reint va) (reint vb) (reint vc))
-    (c__mm512_permutex2var_pd (reint va) (reint vb) (reint vc))
-
-external caml_mm512_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutex2var_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutex2var_ps :
-  (float32x16[@unboxed]) ->
-  (int32x16[@unboxed]) ->
-  (float32x16[@unboxed]) ->
-  (float32x16[@unboxed]) = "" "ctest__mm512_permutex2var_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutex2var_ps"
-    (caml_mm512_permutex2var_ps (reint va) (reint vb) (reint vc))
-    (c__mm512_permutex2var_ps (reint va) (reint vb) (reint vc))
-
-external caml_mm512_permutexvar_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutexvar_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_permutexvar_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutexvar_epi16"
-    (caml_mm512_permutexvar_epi16 (reint va) (reint vb))
-    (c__mm512_permutexvar_epi16 (reint va) (reint vb))
-
-external caml_mm512_permutexvar_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutexvar_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_permutexvar_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutexvar_epi32"
-    (caml_mm512_permutexvar_epi32 (reint va) (reint vb))
-    (c__mm512_permutexvar_epi32 (reint va) (reint vb))
-
-external caml_mm512_permutexvar_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutexvar_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_permutexvar_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutexvar_epi64"
-    (caml_mm512_permutexvar_epi64 (reint va) (reint vb))
-    (c__mm512_permutexvar_epi64 (reint va) (reint vb))
-
-external caml_mm512_permutexvar_pd :
-  (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutexvar_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutexvar_pd :
-  (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_permutexvar_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutexvar_pd"
-    (caml_mm512_permutexvar_pd (reint va) (reint vb))
-    (c__mm512_permutexvar_pd (reint va) (reint vb))
-
-external caml_mm512_permutexvar_ps :
-  (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_permutexvar_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_permutexvar_ps :
-  (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_permutexvar_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_permutexvar_ps"
-    (caml_mm512_permutexvar_ps (reint va) (reint vb))
-    (c__mm512_permutexvar_ps (reint va) (reint vb))
-
-external caml_mm512_rcp14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rcp14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rcp14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_rcp14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rcp14_pd"
-    (caml_mm512_rcp14_pd (reint va))
-    (c__mm512_rcp14_pd (reint va))
-
-external caml_mm512_rcp14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rcp14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rcp14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_rcp14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rcp14_ps"
-    (caml_mm512_rcp14_ps (reint va))
-    (c__mm512_rcp14_ps (reint va))
-
-external caml_mm512_rolv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rolv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rolv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_rolv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rolv_epi32"
-    (caml_mm512_rolv_epi32 (reint va) (reint vb))
-    (c__mm512_rolv_epi32 (reint va) (reint vb))
-
-external caml_mm512_rolv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rolv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rolv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_rolv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rolv_epi64"
-    (caml_mm512_rolv_epi64 (reint va) (reint vb))
-    (c__mm512_rolv_epi64 (reint va) (reint vb))
-
-external caml_mm512_rorv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rorv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rorv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_rorv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rorv_epi32"
-    (caml_mm512_rorv_epi32 (reint va) (reint vb))
-    (c__mm512_rorv_epi32 (reint va) (reint vb))
-
-external caml_mm512_rorv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rorv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rorv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_rorv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rorv_epi64"
-    (caml_mm512_rorv_epi64 (reint va) (reint vb))
-    (c__mm512_rorv_epi64 (reint va) (reint vb))
-
-external caml_mm512_rsqrt14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rsqrt14_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rsqrt14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_rsqrt14_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rsqrt14_pd"
-    (caml_mm512_rsqrt14_pd (reint va))
-    (c__mm512_rsqrt14_pd (reint va))
-
-external caml_mm512_rsqrt14_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_rsqrt14_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_rsqrt14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_rsqrt14_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_rsqrt14_ps"
-    (caml_mm512_rsqrt14_ps (reint va))
-    (c__mm512_rsqrt14_ps (reint va))
-
-external caml_mm512_sad_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sad_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sad_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_sad_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sad_epu8"
-    (caml_mm512_sad_epu8 (reint va) (reint vb))
-    (c__mm512_sad_epu8 (reint va) (reint vb))
-
-external caml_mm512_scalef_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_scalef_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_scalef_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_scalef_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_scalef_pd"
-    (caml_mm512_scalef_pd (reint va) (reint vb))
-    (c__mm512_scalef_pd (reint va) (reint vb))
-
-external caml_mm512_scalef_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_scalef_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_scalef_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_scalef_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_scalef_ps"
-    (caml_mm512_scalef_ps (reint va) (reint vb))
-    (c__mm512_scalef_ps (reint va) (reint vb))
-
-external caml_mm512_shuffle_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_shuffle_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_shuffle_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_shuffle_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_shuffle_epi8"
-    (caml_mm512_shuffle_epi8 (reint va) (reint vb))
-    (c__mm512_shuffle_epi8 (reint va) (reint vb))
-
-external caml_mm512_sllv_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sllv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sllv_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_sllv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sllv_epi16"
-    (caml_mm512_sllv_epi16 (reint va) (reint vb))
-    (c__mm512_sllv_epi16 (reint va) (reint vb))
-
-external caml_mm512_sllv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sllv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sllv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_sllv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sllv_epi32"
-    (caml_mm512_sllv_epi32 (reint va) (reint vb))
-    (c__mm512_sllv_epi32 (reint va) (reint vb))
-
-external caml_mm512_sllv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sllv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sllv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_sllv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sllv_epi64"
-    (caml_mm512_sllv_epi64 (reint va) (reint vb))
-    (c__mm512_sllv_epi64 (reint va) (reint vb))
-
-external caml_mm512_sqrt_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sqrt_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sqrt_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_sqrt_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sqrt_pd"
-    (caml_mm512_sqrt_pd (reint va))
-    (c__mm512_sqrt_pd (reint va))
-
-external caml_mm512_sqrt_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sqrt_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sqrt_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_sqrt_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sqrt_ps"
-    (caml_mm512_sqrt_ps (reint va))
-    (c__mm512_sqrt_ps (reint va))
-
-external caml_mm512_srav_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srav_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srav_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_srav_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srav_epi16"
-    (caml_mm512_srav_epi16 (reint va) (reint vb))
-    (c__mm512_srav_epi16 (reint va) (reint vb))
-
-external caml_mm512_srav_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srav_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srav_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_srav_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srav_epi32"
-    (caml_mm512_srav_epi32 (reint va) (reint vb))
-    (c__mm512_srav_epi32 (reint va) (reint vb))
-
-external caml_mm512_srav_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srav_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srav_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_srav_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srav_epi64"
-    (caml_mm512_srav_epi64 (reint va) (reint vb))
-    (c__mm512_srav_epi64 (reint va) (reint vb))
-
-external caml_mm512_srlv_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srlv_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srlv_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_srlv_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srlv_epi16"
-    (caml_mm512_srlv_epi16 (reint va) (reint vb))
-    (c__mm512_srlv_epi16 (reint va) (reint vb))
-
-external caml_mm512_srlv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srlv_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srlv_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_srlv_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srlv_epi32"
-    (caml_mm512_srlv_epi32 (reint va) (reint vb))
-    (c__mm512_srlv_epi32 (reint va) (reint vb))
-
-external caml_mm512_srlv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_srlv_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_srlv_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_srlv_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_srlv_epi64"
-    (caml_mm512_srlv_epi64 (reint va) (reint vb))
-    (c__mm512_srlv_epi64 (reint va) (reint vb))
-
-external caml_mm512_sub_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_sub_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_epi16"
-    (caml_mm512_sub_epi16 (reint va) (reint vb))
-    (c__mm512_sub_epi16 (reint va) (reint vb))
-
-external caml_mm512_sub_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_sub_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_epi32"
-    (caml_mm512_sub_epi32 (reint va) (reint vb))
-    (c__mm512_sub_epi32 (reint va) (reint vb))
-
-external caml_mm512_sub_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_sub_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_epi64"
-    (caml_mm512_sub_epi64 (reint va) (reint vb))
-    (c__mm512_sub_epi64 (reint va) (reint vb))
-
-external caml_mm512_sub_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_sub_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_epi8"
-    (caml_mm512_sub_epi8 (reint va) (reint vb))
-    (c__mm512_sub_epi8 (reint va) (reint vb))
-
-external caml_mm512_sub_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_sub_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_pd"
-    (caml_mm512_sub_pd (reint va) (reint vb))
-    (c__mm512_sub_pd (reint va) (reint vb))
-
-external caml_mm512_sub_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_sub_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_sub_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_sub_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_sub_ps"
-    (caml_mm512_sub_ps (reint va) (reint vb))
-    (c__mm512_sub_ps (reint va) (reint vb))
-
-external caml_mm512_subs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_subs_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_subs_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_subs_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_subs_epi16"
-    (caml_mm512_subs_epi16 (reint va) (reint vb))
-    (c__mm512_subs_epi16 (reint va) (reint vb))
-
-external caml_mm512_subs_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_subs_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_subs_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_subs_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_subs_epi8"
-    (caml_mm512_subs_epi8 (reint va) (reint vb))
-    (c__mm512_subs_epi8 (reint va) (reint vb))
-
-external caml_mm512_subs_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_subs_epu16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_subs_epu16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_subs_epu16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_subs_epu16"
-    (caml_mm512_subs_epu16 (reint va) (reint vb))
-    (c__mm512_subs_epu16 (reint va) (reint vb))
-
-external caml_mm512_subs_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_subs_epu8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_subs_epu8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_subs_epu8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_subs_epu8"
-    (caml_mm512_subs_epu8 (reint va) (reint vb))
-    (c__mm512_subs_epu8 (reint va) (reint vb))
-
-external caml_mm512_test_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_test_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_test_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_test_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_test_epi16_mask"
-    (caml_mm512_test_epi16_mask (reint va) (reint vb))
-    (c__mm512_test_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_test_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_test_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_test_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_test_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_test_epi32_mask"
-    (caml_mm512_test_epi32_mask (reint va) (reint vb))
-    (c__mm512_test_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_test_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_test_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_test_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_test_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_test_epi64_mask"
-    (caml_mm512_test_epi64_mask (reint va) (reint vb))
-    (c__mm512_test_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_test_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_test_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_test_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_test_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_test_epi8_mask"
-    (caml_mm512_test_epi8_mask (reint va) (reint vb))
-    (c__mm512_test_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_testn_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_testn_epi16_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_testn_epi16_mask :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_testn_epi16_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_testn_epi16_mask"
-    (caml_mm512_testn_epi16_mask (reint va) (reint vb))
-    (c__mm512_testn_epi16_mask (reint va) (reint vb))
-
-external caml_mm512_testn_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_testn_epi32_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_testn_epi32_mask :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_testn_epi32_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_testn_epi32_mask"
-    (caml_mm512_testn_epi32_mask (reint va) (reint vb))
-    (c__mm512_testn_epi32_mask (reint va) (reint vb))
-
-external caml_mm512_testn_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_testn_epi64_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_testn_epi64_mask :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_testn_epi64_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_testn_epi64_mask"
-    (caml_mm512_testn_epi64_mask (reint va) (reint vb))
-    (c__mm512_testn_epi64_mask (reint va) (reint vb))
-
-external caml_mm512_testn_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_testn_epi8_mask"
-[@@noalloc] [@@builtin]
-
-external c__mm512_testn_epi8_mask :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed])
-  = "" "ctest__mm512_testn_epi8_mask"
-[@@noalloc]
-
-let () =
-  check_mask "_mm512_testn_epi8_mask"
-    (caml_mm512_testn_epi8_mask (reint va) (reint vb))
-    (c__mm512_testn_epi8_mask (reint va) (reint vb))
-
-external caml_mm512_unpackhi_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_unpackhi_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_epi16"
-    (caml_mm512_unpackhi_epi16 (reint va) (reint vb))
-    (c__mm512_unpackhi_epi16 (reint va) (reint vb))
-
-external caml_mm512_unpackhi_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_unpackhi_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_epi32"
-    (caml_mm512_unpackhi_epi32 (reint va) (reint vb))
-    (c__mm512_unpackhi_epi32 (reint va) (reint vb))
-
-external caml_mm512_unpackhi_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_unpackhi_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_epi64"
-    (caml_mm512_unpackhi_epi64 (reint va) (reint vb))
-    (c__mm512_unpackhi_epi64 (reint va) (reint vb))
-
-external caml_mm512_unpackhi_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_unpackhi_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_epi8"
-    (caml_mm512_unpackhi_epi8 (reint va) (reint vb))
-    (c__mm512_unpackhi_epi8 (reint va) (reint vb))
-
-external caml_mm512_unpackhi_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_unpackhi_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_pd"
-    (caml_mm512_unpackhi_pd (reint va) (reint vb))
-    (c__mm512_unpackhi_pd (reint va) (reint vb))
-
-external caml_mm512_unpackhi_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpackhi_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpackhi_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_unpackhi_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpackhi_ps"
-    (caml_mm512_unpackhi_ps (reint va) (reint vb))
-    (c__mm512_unpackhi_ps (reint va) (reint vb))
-
-external caml_mm512_unpacklo_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi16"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_epi16 :
-  (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed])
-  = "" "ctest__mm512_unpacklo_epi16"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_epi16"
-    (caml_mm512_unpacklo_epi16 (reint va) (reint vb))
-    (c__mm512_unpacklo_epi16 (reint va) (reint vb))
-
-external caml_mm512_unpacklo_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_unpacklo_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_epi32"
-    (caml_mm512_unpacklo_epi32 (reint va) (reint vb))
-    (c__mm512_unpacklo_epi32 (reint va) (reint vb))
-
-external caml_mm512_unpacklo_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_unpacklo_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_epi64"
-    (caml_mm512_unpacklo_epi64 (reint va) (reint vb))
-    (c__mm512_unpacklo_epi64 (reint va) (reint vb))
-
-external caml_mm512_unpacklo_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi8"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_epi8 :
-  (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed])
-  = "" "ctest__mm512_unpacklo_epi8"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_epi8"
-    (caml_mm512_unpacklo_epi8 (reint va) (reint vb))
-    (c__mm512_unpacklo_epi8 (reint va) (reint vb))
-
-external caml_mm512_unpacklo_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_unpacklo_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_pd"
-    (caml_mm512_unpacklo_pd (reint va) (reint vb))
-    (c__mm512_unpacklo_pd (reint va) (reint vb))
-
-external caml_mm512_unpacklo_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_unpacklo_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_unpacklo_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_unpacklo_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_unpacklo_ps"
-    (caml_mm512_unpacklo_ps (reint va) (reint vb))
-    (c__mm512_unpacklo_ps (reint va) (reint vb))
-
-external caml_mm512_xor_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_xor_epi32"
-[@@noalloc] [@@builtin]
-
-external c__mm512_xor_epi32 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_xor_epi32"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_xor_epi32"
-    (caml_mm512_xor_epi32 (reint va) (reint vb))
-    (c__mm512_xor_epi32 (reint va) (reint vb))
-
-external caml_mm512_xor_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_xor_epi64"
-[@@noalloc] [@@builtin]
-
-external c__mm512_xor_epi64 :
-  (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed])
-  = "" "ctest__mm512_xor_epi64"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_xor_epi64"
-    (caml_mm512_xor_epi64 (reint va) (reint vb))
-    (c__mm512_xor_epi64 (reint va) (reint vb))
-
-external caml_mm512_xor_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_xor_pd"
-[@@noalloc] [@@builtin]
-
-external c__mm512_xor_pd :
-  (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed])
-  = "" "ctest__mm512_xor_pd"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_xor_pd"
-    (caml_mm512_xor_pd (reint va) (reint vb))
-    (c__mm512_xor_pd (reint va) (reint vb))
-
-external caml_mm512_xor_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_xor_ps"
-[@@noalloc] [@@builtin]
-
-external c__mm512_xor_ps :
-  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
-  = "" "ctest__mm512_xor_ps"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_xor_ps"
-    (caml_mm512_xor_ps (reint va) (reint vb))
-    (c__mm512_xor_ps (reint va) (reint vb))
-
-external caml_mm512_xor_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "caml_vec512_unreachable" "caml_mm512_xor_si512"
-[@@noalloc] [@@builtin]
-
-external c__mm512_xor_si512 :
-  (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed])
-  = "" "ctest__mm512_xor_si512"
-[@@noalloc]
-
-let () =
-  check512 "_mm512_xor_si512"
-    (caml_mm512_xor_si512 (reint va) (reint vb))
-    (c__mm512_xor_si512 (reint va) (reint vb))
+
+external caml_kadd_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kadd_mask16" [@@noalloc] [@@builtin]
+external c__kadd_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kadd_mask16" [@@noalloc]
+let () = check_mask "_kadd_mask16" (caml_kadd_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kadd_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kadd_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kadd_mask32" [@@noalloc] [@@builtin]
+external c__kadd_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kadd_mask32" [@@noalloc]
+let () = check_mask "_kadd_mask32" (caml_kadd_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kadd_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kadd_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kadd_mask64" [@@noalloc] [@@builtin]
+external c__kadd_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kadd_mask64" [@@noalloc]
+let () = check_mask "_kadd_mask64" (caml_kadd_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kadd_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kadd_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kadd_mask8" [@@noalloc] [@@builtin]
+external c__kadd_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kadd_mask8" [@@noalloc]
+let () = check_mask "_kadd_mask8" (caml_kadd_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kadd_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_kand_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kand_mask16" [@@noalloc] [@@builtin]
+external c__kand_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kand_mask16" [@@noalloc]
+let () = check_mask "_kand_mask16" (caml_kand_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kand_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kand_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kand_mask32" [@@noalloc] [@@builtin]
+external c__kand_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kand_mask32" [@@noalloc]
+let () = check_mask "_kand_mask32" (caml_kand_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kand_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kand_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kand_mask64" [@@noalloc] [@@builtin]
+external c__kand_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kand_mask64" [@@noalloc]
+let () = check_mask "_kand_mask64" (caml_kand_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kand_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kand_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kand_mask8" [@@noalloc] [@@builtin]
+external c__kand_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kand_mask8" [@@noalloc]
+let () = check_mask "_kand_mask8" (caml_kand_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kand_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_kandn_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kandn_mask16" [@@noalloc] [@@builtin]
+external c__kandn_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kandn_mask16" [@@noalloc]
+let () = check_mask "_kandn_mask16" (caml_kandn_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kandn_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kandn_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kandn_mask32" [@@noalloc] [@@builtin]
+external c__kandn_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kandn_mask32" [@@noalloc]
+let () = check_mask "_kandn_mask32" (caml_kandn_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kandn_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kandn_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kandn_mask64" [@@noalloc] [@@builtin]
+external c__kandn_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kandn_mask64" [@@noalloc]
+let () = check_mask "_kandn_mask64" (caml_kandn_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kandn_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kandn_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kandn_mask8" [@@noalloc] [@@builtin]
+external c__kandn_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kandn_mask8" [@@noalloc]
+let () = check_mask "_kandn_mask8" (caml_kandn_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kandn_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_knot_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_knot_mask16" [@@noalloc] [@@builtin]
+external c__knot_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__knot_mask16" [@@noalloc]
+let () = check_mask "_knot_mask16" (caml_knot_mask16 (mask_of_int64 0xa5a5L)) (c__knot_mask16 (mask_of_int64 0xa5a5L))
+
+external caml_knot_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_knot_mask32" [@@noalloc] [@@builtin]
+external c__knot_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__knot_mask32" [@@noalloc]
+let () = check_mask "_knot_mask32" (caml_knot_mask32 (mask_of_int64 0xa5a5a5a5L)) (c__knot_mask32 (mask_of_int64 0xa5a5a5a5L))
+
+external caml_knot_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_knot_mask64" [@@noalloc] [@@builtin]
+external c__knot_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__knot_mask64" [@@noalloc]
+let () = check_mask "_knot_mask64" (caml_knot_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L)) (c__knot_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
+
+external caml_knot_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_knot_mask8" [@@noalloc] [@@builtin]
+external c__knot_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__knot_mask8" [@@noalloc]
+let () = check_mask "_knot_mask8" (caml_knot_mask8 (mask_of_int64 0xa5L)) (c__knot_mask8 (mask_of_int64 0xa5L))
+
+external caml_kor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kor_mask16" [@@noalloc] [@@builtin]
+external c__kor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kor_mask16" [@@noalloc]
+let () = check_mask "_kor_mask16" (caml_kor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kor_mask32" [@@noalloc] [@@builtin]
+external c__kor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kor_mask32" [@@noalloc]
+let () = check_mask "_kor_mask32" (caml_kor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kor_mask64" [@@noalloc] [@@builtin]
+external c__kor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kor_mask64" [@@noalloc]
+let () = check_mask "_kor_mask64" (caml_kor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kor_mask8" [@@noalloc] [@@builtin]
+external c__kor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kor_mask8" [@@noalloc]
+let () = check_mask "_kor_mask8" (caml_kor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_kxnor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxnor_mask16" [@@noalloc] [@@builtin]
+external c__kxnor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxnor_mask16" [@@noalloc]
+let () = check_mask "_kxnor_mask16" (caml_kxnor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kxnor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kxnor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxnor_mask32" [@@noalloc] [@@builtin]
+external c__kxnor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxnor_mask32" [@@noalloc]
+let () = check_mask "_kxnor_mask32" (caml_kxnor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kxnor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kxnor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxnor_mask64" [@@noalloc] [@@builtin]
+external c__kxnor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxnor_mask64" [@@noalloc]
+let () = check_mask "_kxnor_mask64" (caml_kxnor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kxnor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kxnor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxnor_mask8" [@@noalloc] [@@builtin]
+external c__kxnor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxnor_mask8" [@@noalloc]
+let () = check_mask "_kxnor_mask8" (caml_kxnor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kxnor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_kxor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxor_mask16" [@@noalloc] [@@builtin]
+external c__kxor_mask16 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxor_mask16" [@@noalloc]
+let () = check_mask "_kxor_mask16" (caml_kxor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__kxor_mask16 (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_kxor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxor_mask32" [@@noalloc] [@@builtin]
+external c__kxor_mask32 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxor_mask32" [@@noalloc]
+let () = check_mask "_kxor_mask32" (caml_kxor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__kxor_mask32 (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_kxor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxor_mask64" [@@noalloc] [@@builtin]
+external c__kxor_mask64 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxor_mask64" [@@noalloc]
+let () = check_mask "_kxor_mask64" (caml_kxor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__kxor_mask64 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_kxor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_kxor_mask8" [@@noalloc] [@@builtin]
+external c__kxor_mask8 : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__kxor_mask8" [@@noalloc]
+let () = check_mask "_kxor_mask8" (caml_kxor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL)) (c__kxor_mask8 (mask_of_int64 0xa5L) (mask_of_int64 0x3cL))
+
+external caml_mm512_abs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_abs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_abs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_abs_epi16" [@@noalloc]
+let () = check512 "_mm512_abs_epi16" (caml_mm512_abs_epi16 (reint va)) (c__mm512_abs_epi16 (reint va))
+
+external caml_mm512_abs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_abs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_abs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_abs_epi32" [@@noalloc]
+let () = check512 "_mm512_abs_epi32" (caml_mm512_abs_epi32 (reint va)) (c__mm512_abs_epi32 (reint va))
+
+external caml_mm512_abs_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_abs_epi64" [@@noalloc] [@@builtin]
+external c__mm512_abs_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_abs_epi64" [@@noalloc]
+let () = check512 "_mm512_abs_epi64" (caml_mm512_abs_epi64 (reint va)) (c__mm512_abs_epi64 (reint va))
+
+external caml_mm512_abs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_abs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_abs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_abs_epi8" [@@noalloc]
+let () = check512 "_mm512_abs_epi8" (caml_mm512_abs_epi8 (reint va)) (c__mm512_abs_epi8 (reint va))
+
+external caml_mm512_add_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_epi16" [@@noalloc] [@@builtin]
+external c__mm512_add_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_add_epi16" [@@noalloc]
+let () = check512 "_mm512_add_epi16" (caml_mm512_add_epi16 (reint va) (reint vb)) (c__mm512_add_epi16 (reint va) (reint vb))
+
+external caml_mm512_add_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_epi32" [@@noalloc] [@@builtin]
+external c__mm512_add_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_add_epi32" [@@noalloc]
+let () = check512 "_mm512_add_epi32" (caml_mm512_add_epi32 (reint va) (reint vb)) (c__mm512_add_epi32 (reint va) (reint vb))
+
+external caml_mm512_add_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_epi64" [@@noalloc] [@@builtin]
+external c__mm512_add_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_add_epi64" [@@noalloc]
+let () = check512 "_mm512_add_epi64" (caml_mm512_add_epi64 (reint va) (reint vb)) (c__mm512_add_epi64 (reint va) (reint vb))
+
+external caml_mm512_add_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_epi8" [@@noalloc] [@@builtin]
+external c__mm512_add_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_add_epi8" [@@noalloc]
+let () = check512 "_mm512_add_epi8" (caml_mm512_add_epi8 (reint va) (reint vb)) (c__mm512_add_epi8 (reint va) (reint vb))
+
+external caml_mm512_add_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_pd" [@@noalloc] [@@builtin]
+external c__mm512_add_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_add_pd" [@@noalloc]
+let () = check512 "_mm512_add_pd" (caml_mm512_add_pd (reint va) (reint vb)) (c__mm512_add_pd (reint va) (reint vb))
+
+external caml_mm512_add_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_add_ps" [@@noalloc] [@@builtin]
+external c__mm512_add_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_add_ps" [@@noalloc]
+let () = check512 "_mm512_add_ps" (caml_mm512_add_ps (reint va) (reint vb)) (c__mm512_add_ps (reint va) (reint vb))
+
+external caml_mm512_adds_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_adds_epi16" [@@noalloc] [@@builtin]
+external c__mm512_adds_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_adds_epi16" [@@noalloc]
+let () = check512 "_mm512_adds_epi16" (caml_mm512_adds_epi16 (reint va) (reint vb)) (c__mm512_adds_epi16 (reint va) (reint vb))
+
+external caml_mm512_adds_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_adds_epi8" [@@noalloc] [@@builtin]
+external c__mm512_adds_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_adds_epi8" [@@noalloc]
+let () = check512 "_mm512_adds_epi8" (caml_mm512_adds_epi8 (reint va) (reint vb)) (c__mm512_adds_epi8 (reint va) (reint vb))
+
+external caml_mm512_adds_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_adds_epu16" [@@noalloc] [@@builtin]
+external c__mm512_adds_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_adds_epu16" [@@noalloc]
+let () = check512 "_mm512_adds_epu16" (caml_mm512_adds_epu16 (reint va) (reint vb)) (c__mm512_adds_epu16 (reint va) (reint vb))
+
+external caml_mm512_adds_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_adds_epu8" [@@noalloc] [@@builtin]
+external c__mm512_adds_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_adds_epu8" [@@noalloc]
+let () = check512 "_mm512_adds_epu8" (caml_mm512_adds_epu8 (reint va) (reint vb)) (c__mm512_adds_epu8 (reint va) (reint vb))
+
+external caml_mm512_and_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_and_epi32" [@@noalloc] [@@builtin]
+external c__mm512_and_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_and_epi32" [@@noalloc]
+let () = check512 "_mm512_and_epi32" (caml_mm512_and_epi32 (reint va) (reint vb)) (c__mm512_and_epi32 (reint va) (reint vb))
+
+external caml_mm512_and_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_and_epi64" [@@noalloc] [@@builtin]
+external c__mm512_and_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_and_epi64" [@@noalloc]
+let () = check512 "_mm512_and_epi64" (caml_mm512_and_epi64 (reint va) (reint vb)) (c__mm512_and_epi64 (reint va) (reint vb))
+
+external caml_mm512_and_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_and_pd" [@@noalloc] [@@builtin]
+external c__mm512_and_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_and_pd" [@@noalloc]
+let () = check512 "_mm512_and_pd" (caml_mm512_and_pd (reint va) (reint vb)) (c__mm512_and_pd (reint va) (reint vb))
+
+external caml_mm512_and_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_and_ps" [@@noalloc] [@@builtin]
+external c__mm512_and_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_and_ps" [@@noalloc]
+let () = check512 "_mm512_and_ps" (caml_mm512_and_ps (reint va) (reint vb)) (c__mm512_and_ps (reint va) (reint vb))
+
+external caml_mm512_and_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_and_si512" [@@noalloc] [@@builtin]
+external c__mm512_and_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_and_si512" [@@noalloc]
+let () = check512 "_mm512_and_si512" (caml_mm512_and_si512 (reint va) (reint vb)) (c__mm512_and_si512 (reint va) (reint vb))
+
+external caml_mm512_andnot_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_andnot_epi32" [@@noalloc] [@@builtin]
+external c__mm512_andnot_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_andnot_epi32" [@@noalloc]
+let () = check512 "_mm512_andnot_epi32" (caml_mm512_andnot_epi32 (reint va) (reint vb)) (c__mm512_andnot_epi32 (reint va) (reint vb))
+
+external caml_mm512_andnot_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_andnot_epi64" [@@noalloc] [@@builtin]
+external c__mm512_andnot_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_andnot_epi64" [@@noalloc]
+let () = check512 "_mm512_andnot_epi64" (caml_mm512_andnot_epi64 (reint va) (reint vb)) (c__mm512_andnot_epi64 (reint va) (reint vb))
+
+external caml_mm512_andnot_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_andnot_pd" [@@noalloc] [@@builtin]
+external c__mm512_andnot_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_andnot_pd" [@@noalloc]
+let () = check512 "_mm512_andnot_pd" (caml_mm512_andnot_pd (reint va) (reint vb)) (c__mm512_andnot_pd (reint va) (reint vb))
+
+external caml_mm512_andnot_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_andnot_ps" [@@noalloc] [@@builtin]
+external c__mm512_andnot_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_andnot_ps" [@@noalloc]
+let () = check512 "_mm512_andnot_ps" (caml_mm512_andnot_ps (reint va) (reint vb)) (c__mm512_andnot_ps (reint va) (reint vb))
+
+external caml_mm512_andnot_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_andnot_si512" [@@noalloc] [@@builtin]
+external c__mm512_andnot_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_andnot_si512" [@@noalloc]
+let () = check512 "_mm512_andnot_si512" (caml_mm512_andnot_si512 (reint va) (reint vb)) (c__mm512_andnot_si512 (reint va) (reint vb))
+
+external caml_mm512_avg_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_avg_epu16" [@@noalloc] [@@builtin]
+external c__mm512_avg_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_avg_epu16" [@@noalloc]
+let () = check512 "_mm512_avg_epu16" (caml_mm512_avg_epu16 (reint va) (reint vb)) (c__mm512_avg_epu16 (reint va) (reint vb))
+
+external caml_mm512_avg_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_avg_epu8" [@@noalloc] [@@builtin]
+external c__mm512_avg_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_avg_epu8" [@@noalloc]
+let () = check512 "_mm512_avg_epu8" (caml_mm512_avg_epu8 (reint va) (reint vb)) (c__mm512_avg_epu8 (reint va) (reint vb))
+
+external caml_mm512_broadcastmb_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_broadcastmb_epi64" [@@noalloc] [@@builtin]
+external c__mm512_broadcastmb_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_broadcastmb_epi64" [@@noalloc]
+let () = check512 "_mm512_broadcastmb_epi64" (caml_mm512_broadcastmb_epi64 (mask_of_int64 0xa5L)) (c__mm512_broadcastmb_epi64 (mask_of_int64 0xa5L))
+
+external caml_mm512_broadcastmw_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_broadcastmw_epi32" [@@noalloc] [@@builtin]
+external c__mm512_broadcastmw_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_broadcastmw_epi32" [@@noalloc]
+let () = check512 "_mm512_broadcastmw_epi32" (caml_mm512_broadcastmw_epi32 (mask_of_int64 0xa5a5L)) (c__mm512_broadcastmw_epi32 (mask_of_int64 0xa5a5L))
+
+external caml_mm512_cmpeq_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epi16_mask" (caml_mm512_cmpeq_epi16_mask (reint va) (reint vb)) (c__mm512_cmpeq_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epi32_mask" (caml_mm512_cmpeq_epi32_mask (reint va) (reint vb)) (c__mm512_cmpeq_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epi64_mask" (caml_mm512_cmpeq_epi64_mask (reint va) (reint vb)) (c__mm512_cmpeq_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epi8_mask" (caml_mm512_cmpeq_epi8_mask (reint va) (reint vb)) (c__mm512_cmpeq_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epu16_mask" (caml_mm512_cmpeq_epu16_mask (reint va) (reint vb)) (c__mm512_cmpeq_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epu32_mask" (caml_mm512_cmpeq_epu32_mask (reint va) (reint vb)) (c__mm512_cmpeq_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epu64_mask" (caml_mm512_cmpeq_epu64_mask (reint va) (reint vb)) (c__mm512_cmpeq_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_epu8_mask" (caml_mm512_cmpeq_epu8_mask (reint va) (reint vb)) (c__mm512_cmpeq_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_pd_mask" (caml_mm512_cmpeq_pd_mask (reint va) (reint vb)) (c__mm512_cmpeq_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpeq_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpeq_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpeq_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpeq_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpeq_ps_mask" (caml_mm512_cmpeq_ps_mask (reint va) (reint vb)) (c__mm512_cmpeq_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epi16_mask" (caml_mm512_cmpge_epi16_mask (reint va) (reint vb)) (c__mm512_cmpge_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epi32_mask" (caml_mm512_cmpge_epi32_mask (reint va) (reint vb)) (c__mm512_cmpge_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epi64_mask" (caml_mm512_cmpge_epi64_mask (reint va) (reint vb)) (c__mm512_cmpge_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epi8_mask" (caml_mm512_cmpge_epi8_mask (reint va) (reint vb)) (c__mm512_cmpge_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epu16_mask" (caml_mm512_cmpge_epu16_mask (reint va) (reint vb)) (c__mm512_cmpge_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epu32_mask" (caml_mm512_cmpge_epu32_mask (reint va) (reint vb)) (c__mm512_cmpge_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epu64_mask" (caml_mm512_cmpge_epu64_mask (reint va) (reint vb)) (c__mm512_cmpge_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpge_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpge_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpge_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpge_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpge_epu8_mask" (caml_mm512_cmpge_epu8_mask (reint va) (reint vb)) (c__mm512_cmpge_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epi16_mask" (caml_mm512_cmpgt_epi16_mask (reint va) (reint vb)) (c__mm512_cmpgt_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epi32_mask" (caml_mm512_cmpgt_epi32_mask (reint va) (reint vb)) (c__mm512_cmpgt_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epi64_mask" (caml_mm512_cmpgt_epi64_mask (reint va) (reint vb)) (c__mm512_cmpgt_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epi8_mask" (caml_mm512_cmpgt_epi8_mask (reint va) (reint vb)) (c__mm512_cmpgt_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epu16_mask" (caml_mm512_cmpgt_epu16_mask (reint va) (reint vb)) (c__mm512_cmpgt_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epu32_mask" (caml_mm512_cmpgt_epu32_mask (reint va) (reint vb)) (c__mm512_cmpgt_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epu64_mask" (caml_mm512_cmpgt_epu64_mask (reint va) (reint vb)) (c__mm512_cmpgt_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpgt_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpgt_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpgt_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpgt_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpgt_epu8_mask" (caml_mm512_cmpgt_epu8_mask (reint va) (reint vb)) (c__mm512_cmpgt_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epi16_mask" (caml_mm512_cmple_epi16_mask (reint va) (reint vb)) (c__mm512_cmple_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epi32_mask" (caml_mm512_cmple_epi32_mask (reint va) (reint vb)) (c__mm512_cmple_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epi64_mask" (caml_mm512_cmple_epi64_mask (reint va) (reint vb)) (c__mm512_cmple_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epi8_mask" (caml_mm512_cmple_epi8_mask (reint va) (reint vb)) (c__mm512_cmple_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epu16_mask" (caml_mm512_cmple_epu16_mask (reint va) (reint vb)) (c__mm512_cmple_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epu32_mask" (caml_mm512_cmple_epu32_mask (reint va) (reint vb)) (c__mm512_cmple_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epu64_mask" (caml_mm512_cmple_epu64_mask (reint va) (reint vb)) (c__mm512_cmple_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_epu8_mask" (caml_mm512_cmple_epu8_mask (reint va) (reint vb)) (c__mm512_cmple_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_pd_mask" (caml_mm512_cmple_pd_mask (reint va) (reint vb)) (c__mm512_cmple_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmple_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmple_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmple_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmple_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmple_ps_mask" (caml_mm512_cmple_ps_mask (reint va) (reint vb)) (c__mm512_cmple_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epi16_mask" (caml_mm512_cmplt_epi16_mask (reint va) (reint vb)) (c__mm512_cmplt_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epi32_mask" (caml_mm512_cmplt_epi32_mask (reint va) (reint vb)) (c__mm512_cmplt_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epi64_mask" (caml_mm512_cmplt_epi64_mask (reint va) (reint vb)) (c__mm512_cmplt_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epi8_mask" (caml_mm512_cmplt_epi8_mask (reint va) (reint vb)) (c__mm512_cmplt_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epu16_mask" (caml_mm512_cmplt_epu16_mask (reint va) (reint vb)) (c__mm512_cmplt_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epu32_mask" (caml_mm512_cmplt_epu32_mask (reint va) (reint vb)) (c__mm512_cmplt_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epu64_mask" (caml_mm512_cmplt_epu64_mask (reint va) (reint vb)) (c__mm512_cmplt_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_epu8_mask" (caml_mm512_cmplt_epu8_mask (reint va) (reint vb)) (c__mm512_cmplt_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_pd_mask" (caml_mm512_cmplt_pd_mask (reint va) (reint vb)) (c__mm512_cmplt_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmplt_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmplt_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmplt_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmplt_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmplt_ps_mask" (caml_mm512_cmplt_ps_mask (reint va) (reint vb)) (c__mm512_cmplt_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epi16_mask" (caml_mm512_cmpneq_epi16_mask (reint va) (reint vb)) (c__mm512_cmpneq_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epi32_mask" (caml_mm512_cmpneq_epi32_mask (reint va) (reint vb)) (c__mm512_cmpneq_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epi64_mask" (caml_mm512_cmpneq_epi64_mask (reint va) (reint vb)) (c__mm512_cmpneq_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epi8_mask" (caml_mm512_cmpneq_epi8_mask (reint va) (reint vb)) (c__mm512_cmpneq_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epu16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epu16_mask" (caml_mm512_cmpneq_epu16_mask (reint va) (reint vb)) (c__mm512_cmpneq_epu16_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epu32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epu32_mask" (caml_mm512_cmpneq_epu32_mask (reint va) (reint vb)) (c__mm512_cmpneq_epu32_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epu64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epu64_mask" (caml_mm512_cmpneq_epu64_mask (reint va) (reint vb)) (c__mm512_cmpneq_epu64_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_epu8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_epu8_mask" (caml_mm512_cmpneq_epu8_mask (reint va) (reint vb)) (c__mm512_cmpneq_epu8_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_pd_mask" (caml_mm512_cmpneq_pd_mask (reint va) (reint vb)) (c__mm512_cmpneq_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpneq_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpneq_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpneq_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpneq_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpneq_ps_mask" (caml_mm512_cmpneq_ps_mask (reint va) (reint vb)) (c__mm512_cmpneq_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpnle_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpnle_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpnle_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpnle_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpnle_pd_mask" (caml_mm512_cmpnle_pd_mask (reint va) (reint vb)) (c__mm512_cmpnle_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpnle_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpnle_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpnle_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpnle_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpnle_ps_mask" (caml_mm512_cmpnle_ps_mask (reint va) (reint vb)) (c__mm512_cmpnle_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpnlt_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpnlt_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpnlt_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpnlt_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpnlt_pd_mask" (caml_mm512_cmpnlt_pd_mask (reint va) (reint vb)) (c__mm512_cmpnlt_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpnlt_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpnlt_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpnlt_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpnlt_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpnlt_ps_mask" (caml_mm512_cmpnlt_ps_mask (reint va) (reint vb)) (c__mm512_cmpnlt_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpord_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpord_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpord_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpord_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpord_pd_mask" (caml_mm512_cmpord_pd_mask (reint va) (reint vb)) (c__mm512_cmpord_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpord_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpord_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpord_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpord_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpord_ps_mask" (caml_mm512_cmpord_ps_mask (reint va) (reint vb)) (c__mm512_cmpord_ps_mask (reint va) (reint vb))
+
+external caml_mm512_cmpunord_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpunord_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpunord_pd_mask : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpunord_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpunord_pd_mask" (caml_mm512_cmpunord_pd_mask (reint va) (reint vb)) (c__mm512_cmpunord_pd_mask (reint va) (reint vb))
+
+external caml_mm512_cmpunord_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cmpunord_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_cmpunord_ps_mask : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_cmpunord_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_cmpunord_ps_mask" (caml_mm512_cmpunord_ps_mask (reint va) (reint vb)) (c__mm512_cmpunord_ps_mask (reint va) (reint vb))
+
+external caml_mm512_conflict_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_conflict_epi32" [@@noalloc] [@@builtin]
+external c__mm512_conflict_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_conflict_epi32" [@@noalloc]
+let () = check512 "_mm512_conflict_epi32" (caml_mm512_conflict_epi32 (reint va)) (c__mm512_conflict_epi32 (reint va))
+
+external caml_mm512_conflict_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_conflict_epi64" [@@noalloc] [@@builtin]
+external c__mm512_conflict_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_conflict_epi64" [@@noalloc]
+let () = check512 "_mm512_conflict_epi64" (caml_mm512_conflict_epi64 (reint va)) (c__mm512_conflict_epi64 (reint va))
+
+external caml_mm512_cvtepi32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtepi32_ps" [@@noalloc] [@@builtin]
+external c__mm512_cvtepi32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_cvtepi32_ps" [@@noalloc]
+let () = check512 "_mm512_cvtepi32_ps" (caml_mm512_cvtepi32_ps (reint va)) (c__mm512_cvtepi32_ps (reint va))
+
+external caml_mm512_cvtepi64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtepi64_pd" [@@noalloc] [@@builtin]
+external c__mm512_cvtepi64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_cvtepi64_pd" [@@noalloc]
+let () = check512 "_mm512_cvtepi64_pd" (caml_mm512_cvtepi64_pd (reint va)) (c__mm512_cvtepi64_pd (reint va))
+
+external caml_mm512_cvtepu32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtepu32_ps" [@@noalloc] [@@builtin]
+external c__mm512_cvtepu32_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_cvtepu32_ps" [@@noalloc]
+let () = check512 "_mm512_cvtepu32_ps" (caml_mm512_cvtepu32_ps (reint va)) (c__mm512_cvtepu32_ps (reint va))
+
+external caml_mm512_cvtepu64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtepu64_pd" [@@noalloc] [@@builtin]
+external c__mm512_cvtepu64_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_cvtepu64_pd" [@@noalloc]
+let () = check512 "_mm512_cvtepu64_pd" (caml_mm512_cvtepu64_pd (reint va)) (c__mm512_cvtepu64_pd (reint va))
+
+external caml_mm512_cvtpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_cvtpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_cvtpd_epi64" [@@noalloc]
+let () = check512 "_mm512_cvtpd_epi64" (caml_mm512_cvtpd_epi64 (reint va)) (c__mm512_cvtpd_epi64 (reint va))
+
+external caml_mm512_cvtpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_cvtpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_cvtpd_epu64" [@@noalloc]
+let () = check512 "_mm512_cvtpd_epu64" (caml_mm512_cvtpd_epu64 (reint va)) (c__mm512_cvtpd_epu64 (reint va))
+
+external caml_mm512_cvtps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_cvtps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_cvtps_epi32" [@@noalloc]
+let () = check512 "_mm512_cvtps_epi32" (caml_mm512_cvtps_epi32 (reint va)) (c__mm512_cvtps_epi32 (reint va))
+
+external caml_mm512_cvtps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvtps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_cvtps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_cvtps_epu32" [@@noalloc]
+let () = check512 "_mm512_cvtps_epu32" (caml_mm512_cvtps_epu32 (reint va)) (c__mm512_cvtps_epu32 (reint va))
+
+external caml_mm512_cvttpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvttpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_cvttpd_epi64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_cvttpd_epi64" [@@noalloc]
+let () = check512 "_mm512_cvttpd_epi64" (caml_mm512_cvttpd_epi64 (reint va)) (c__mm512_cvttpd_epi64 (reint va))
+
+external caml_mm512_cvttpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvttpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_cvttpd_epu64 : (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_cvttpd_epu64" [@@noalloc]
+let () = check512 "_mm512_cvttpd_epu64" (caml_mm512_cvttpd_epu64 (reint va)) (c__mm512_cvttpd_epu64 (reint va))
+
+external caml_mm512_cvttps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvttps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_cvttps_epi32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_cvttps_epi32" [@@noalloc]
+let () = check512 "_mm512_cvttps_epi32" (caml_mm512_cvttps_epi32 (reint va)) (c__mm512_cvttps_epi32 (reint va))
+
+external caml_mm512_cvttps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_cvttps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_cvttps_epu32 : (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_cvttps_epu32" [@@noalloc]
+let () = check512 "_mm512_cvttps_epu32" (caml_mm512_cvttps_epu32 (reint va)) (c__mm512_cvttps_epu32 (reint va))
+
+external caml_mm512_div_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_div_pd" [@@noalloc] [@@builtin]
+external c__mm512_div_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_div_pd" [@@noalloc]
+let () = check512 "_mm512_div_pd" (caml_mm512_div_pd (reint va) (reint vb)) (c__mm512_div_pd (reint va) (reint vb))
+
+external caml_mm512_div_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_div_ps" [@@noalloc] [@@builtin]
+external c__mm512_div_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_div_ps" [@@noalloc]
+let () = check512 "_mm512_div_ps" (caml_mm512_div_ps (reint va) (reint vb)) (c__mm512_div_ps (reint va) (reint vb))
+
+external caml_mm512_fmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_fmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fmadd_pd" [@@noalloc]
+let () = check512 "_mm512_fmadd_pd" (caml_mm512_fmadd_pd (reint va) (reint vb) (reint vc)) (c__mm512_fmadd_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_fmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fmadd_ps" [@@noalloc]
+let () = check512 "_mm512_fmadd_ps" (caml_mm512_fmadd_ps (reint va) (reint vb) (reint vc)) (c__mm512_fmadd_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmaddsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmaddsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_fmaddsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fmaddsub_pd" [@@noalloc]
+let () = check512 "_mm512_fmaddsub_pd" (caml_mm512_fmaddsub_pd (reint va) (reint vb) (reint vc)) (c__mm512_fmaddsub_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmaddsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmaddsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_fmaddsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fmaddsub_ps" [@@noalloc]
+let () = check512 "_mm512_fmaddsub_ps" (caml_mm512_fmaddsub_ps (reint va) (reint vb) (reint vc)) (c__mm512_fmaddsub_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_fmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fmsub_pd" [@@noalloc]
+let () = check512 "_mm512_fmsub_pd" (caml_mm512_fmsub_pd (reint va) (reint vb) (reint vc)) (c__mm512_fmsub_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_fmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fmsub_ps" [@@noalloc]
+let () = check512 "_mm512_fmsub_ps" (caml_mm512_fmsub_ps (reint va) (reint vb) (reint vc)) (c__mm512_fmsub_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmsubadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsubadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_fmsubadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fmsubadd_pd" [@@noalloc]
+let () = check512 "_mm512_fmsubadd_pd" (caml_mm512_fmsubadd_pd (reint va) (reint vb) (reint vc)) (c__mm512_fmsubadd_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fmsubadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fmsubadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_fmsubadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fmsubadd_ps" [@@noalloc]
+let () = check512 "_mm512_fmsubadd_ps" (caml_mm512_fmsubadd_ps (reint va) (reint vb) (reint vc)) (c__mm512_fmsubadd_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fnmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_fnmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fnmadd_pd" [@@noalloc]
+let () = check512 "_mm512_fnmadd_pd" (caml_mm512_fnmadd_pd (reint va) (reint vb) (reint vc)) (c__mm512_fnmadd_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fnmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_fnmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fnmadd_ps" [@@noalloc]
+let () = check512 "_mm512_fnmadd_ps" (caml_mm512_fnmadd_ps (reint va) (reint vb) (reint vc)) (c__mm512_fnmadd_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fnmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_fnmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_fnmsub_pd" [@@noalloc]
+let () = check512 "_mm512_fnmsub_pd" (caml_mm512_fnmsub_pd (reint va) (reint vb) (reint vc)) (c__mm512_fnmsub_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_fnmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_fnmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_fnmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_fnmsub_ps" [@@noalloc]
+let () = check512 "_mm512_fnmsub_ps" (caml_mm512_fnmsub_ps (reint va) (reint vb) (reint vc)) (c__mm512_fnmsub_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_getexp_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_getexp_pd" [@@noalloc] [@@builtin]
+external c__mm512_getexp_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_getexp_pd" [@@noalloc]
+let () = check512 "_mm512_getexp_pd" (caml_mm512_getexp_pd (reint va)) (c__mm512_getexp_pd (reint va))
+
+external caml_mm512_getexp_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_getexp_ps" [@@noalloc] [@@builtin]
+external c__mm512_getexp_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_getexp_ps" [@@noalloc]
+let () = check512 "_mm512_getexp_ps" (caml_mm512_getexp_ps (reint va)) (c__mm512_getexp_ps (reint va))
+
+external caml_mm512_kand : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kand" [@@noalloc] [@@builtin]
+external c__mm512_kand : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kand" [@@noalloc]
+let () = check_mask "_mm512_kand" (caml_mm512_kand (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kand (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_kandn : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kandn" [@@noalloc] [@@builtin]
+external c__mm512_kandn : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kandn" [@@noalloc]
+let () = check_mask "_mm512_kandn" (caml_mm512_kandn (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kandn (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_kmov : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kmov" [@@noalloc] [@@builtin]
+external c__mm512_kmov : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kmov" [@@noalloc]
+let () = check_mask "_mm512_kmov" (caml_mm512_kmov (mask_of_int64 0xa5a5L)) (c__mm512_kmov (mask_of_int64 0xa5a5L))
+
+external caml_mm512_knot : (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_knot" [@@noalloc] [@@builtin]
+external c__mm512_knot : (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_knot" [@@noalloc]
+let () = check_mask "_mm512_knot" (caml_mm512_knot (mask_of_int64 0xa5a5L)) (c__mm512_knot (mask_of_int64 0xa5a5L))
+
+external caml_mm512_kor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kor" [@@noalloc] [@@builtin]
+external c__mm512_kor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kor" [@@noalloc]
+let () = check_mask "_mm512_kor" (caml_mm512_kor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_kunpackb : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kunpackb" [@@noalloc] [@@builtin]
+external c__mm512_kunpackb : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kunpackb" [@@noalloc]
+let () = check_mask "_mm512_kunpackb" (caml_mm512_kunpackb (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kunpackb (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_kunpackd : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kunpackd" [@@noalloc] [@@builtin]
+external c__mm512_kunpackd : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kunpackd" [@@noalloc]
+let () = check_mask "_mm512_kunpackd" (caml_mm512_kunpackd (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL)) (c__mm512_kunpackd (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (mask_of_int64 0x3c3c3c3c3c3c3c3cL))
+
+external caml_mm512_kunpackw : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kunpackw" [@@noalloc] [@@builtin]
+external c__mm512_kunpackw : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kunpackw" [@@noalloc]
+let () = check_mask "_mm512_kunpackw" (caml_mm512_kunpackw (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL)) (c__mm512_kunpackw (mask_of_int64 0xa5a5a5a5L) (mask_of_int64 0x3c3c3c3cL))
+
+external caml_mm512_kxnor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kxnor" [@@noalloc] [@@builtin]
+external c__mm512_kxnor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kxnor" [@@noalloc]
+let () = check_mask "_mm512_kxnor" (caml_mm512_kxnor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kxnor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_kxor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_kxor" [@@noalloc] [@@builtin]
+external c__mm512_kxor : (mask[@unboxed]) -> (mask[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_kxor" [@@noalloc]
+let () = check_mask "_mm512_kxor" (caml_mm512_kxor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL)) (c__mm512_kxor (mask_of_int64 0xa5a5L) (mask_of_int64 0x3c3cL))
+
+external caml_mm512_lzcnt_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_lzcnt_epi32" [@@noalloc] [@@builtin]
+external c__mm512_lzcnt_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_lzcnt_epi32" [@@noalloc]
+let () = check512 "_mm512_lzcnt_epi32" (caml_mm512_lzcnt_epi32 (reint va)) (c__mm512_lzcnt_epi32 (reint va))
+
+external caml_mm512_lzcnt_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_lzcnt_epi64" [@@noalloc] [@@builtin]
+external c__mm512_lzcnt_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_lzcnt_epi64" [@@noalloc]
+let () = check512 "_mm512_lzcnt_epi64" (caml_mm512_lzcnt_epi64 (reint va)) (c__mm512_lzcnt_epi64 (reint va))
+
+external caml_mm512_madd_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_madd_epi16" [@@noalloc] [@@builtin]
+external c__mm512_madd_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_madd_epi16" [@@noalloc]
+let () = check512 "_mm512_madd_epi16" (caml_mm512_madd_epi16 (reint va) (reint vb)) (c__mm512_madd_epi16 (reint va) (reint vb))
+
+external caml_mm512_maddubs_epi16 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maddubs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maddubs_epi16 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maddubs_epi16" [@@noalloc]
+let () = check512 "_mm512_maddubs_epi16" (caml_mm512_maddubs_epi16 (reint va) (reint vb)) (c__mm512_maddubs_epi16 (reint va) (reint vb))
+
+external caml_mm512_mask2_permutex2var_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask2_permutex2var_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi16" [@@noalloc]
+let () = check512 "_mm512_mask2_permutex2var_epi16" (caml_mm512_mask2_permutex2var_epi16 (reint va) (reint vb) (mask_of_int64 0xa5a5a5a5L) (reint vc)) (c__mm512_mask2_permutex2var_epi16 (reint va) (reint vb) (mask_of_int64 0xa5a5a5a5L) (reint vc))
+
+external caml_mm512_mask2_permutex2var_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask2_permutex2var_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi32" [@@noalloc]
+let () = check512 "_mm512_mask2_permutex2var_epi32" (caml_mm512_mask2_permutex2var_epi32 (reint va) (reint vb) (mask_of_int64 0xa5a5L) (reint vc)) (c__mm512_mask2_permutex2var_epi32 (reint va) (reint vb) (mask_of_int64 0xa5a5L) (reint vc))
+
+external caml_mm512_mask2_permutex2var_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask2_permutex2var_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_epi64" [@@noalloc]
+let () = check512 "_mm512_mask2_permutex2var_epi64" (caml_mm512_mask2_permutex2var_epi64 (reint va) (reint vb) (mask_of_int64 0xa5L) (reint vc)) (c__mm512_mask2_permutex2var_epi64 (reint va) (reint vb) (mask_of_int64 0xa5L) (reint vc))
+
+external caml_mm512_mask2_permutex2var_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask2_permutex2var_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_pd" [@@noalloc]
+let () = check512 "_mm512_mask2_permutex2var_pd" (caml_mm512_mask2_permutex2var_pd (reint va) (reint vb) (mask_of_int64 0xa5L) (reint vc)) (c__mm512_mask2_permutex2var_pd (reint va) (reint vb) (mask_of_int64 0xa5L) (reint vc))
+
+external caml_mm512_mask2_permutex2var_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask2_permutex2var_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask2_permutex2var_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask2_permutex2var_ps" [@@noalloc]
+let () = check512 "_mm512_mask2_permutex2var_ps" (caml_mm512_mask2_permutex2var_ps (reint va) (reint vb) (mask_of_int64 0xa5a5L) (reint vc)) (c__mm512_mask2_permutex2var_ps (reint va) (reint vb) (mask_of_int64 0xa5a5L) (reint vc))
+
+external caml_mm512_mask3_fmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fmadd_pd" (caml_mm512_mask3_fmadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fmadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fmadd_ps" (caml_mm512_mask3_fmadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fmadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask3_fmaddsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmaddsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmaddsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmaddsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fmaddsub_pd" (caml_mm512_mask3_fmaddsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fmaddsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fmaddsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmaddsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmaddsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmaddsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fmaddsub_ps" (caml_mm512_mask3_fmaddsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fmaddsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask3_fmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fmsub_pd" (caml_mm512_mask3_fmsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fmsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fmsub_ps" (caml_mm512_mask3_fmsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fmsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask3_fmsubadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsubadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmsubadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fmsubadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fmsubadd_pd" (caml_mm512_mask3_fmsubadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fmsubadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fmsubadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fmsubadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fmsubadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fmsubadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fmsubadd_ps" (caml_mm512_mask3_fmsubadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fmsubadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask3_fnmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fnmadd_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fnmadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fnmadd_pd" (caml_mm512_mask3_fnmadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fnmadd_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fnmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fnmadd_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fnmadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fnmadd_ps" (caml_mm512_mask3_fnmadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fnmadd_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask3_fnmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fnmsub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask3_fnmsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask3_fnmsub_pd" (caml_mm512_mask3_fnmsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L)) (c__mm512_mask3_fnmsub_pd (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5L))
+
+external caml_mm512_mask3_fnmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask3_fnmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask3_fnmsub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask3_fnmsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask3_fnmsub_ps" (caml_mm512_mask3_fnmsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L)) (c__mm512_mask3_fnmsub_ps (reint va) (reint vb) (reint vc) (mask_of_int64 0xa5a5L))
+
+external caml_mm512_mask_abs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_abs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_abs_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_abs_epi16" (caml_mm512_mask_abs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb)) (c__mm512_mask_abs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb))
+
+external caml_mm512_mask_abs_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_abs_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_abs_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_abs_epi32" (caml_mm512_mask_abs_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_abs_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_abs_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_abs_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_abs_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_abs_epi64" (caml_mm512_mask_abs_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_abs_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_abs_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_abs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_abs_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_abs_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_abs_epi8" (caml_mm512_mask_abs_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb)) (c__mm512_mask_abs_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb))
+
+external caml_mm512_mask_add_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_add_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_add_epi16" (caml_mm512_mask_add_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_add_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_add_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_add_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_add_epi32" (caml_mm512_mask_add_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_add_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_add_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_add_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_add_epi64" (caml_mm512_mask_add_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_add_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_add_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_add_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_add_epi8" (caml_mm512_mask_add_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_add_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_add_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_add_pd" [@@noalloc]
+let () = check512 "_mm512_mask_add_pd" (caml_mm512_mask_add_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_add_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_add_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_add_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_add_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_add_ps" [@@noalloc]
+let () = check512 "_mm512_mask_add_ps" (caml_mm512_mask_add_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_add_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_adds_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_adds_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_adds_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_adds_epi16" (caml_mm512_mask_adds_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_adds_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_adds_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_adds_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_adds_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_adds_epi8" (caml_mm512_mask_adds_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_adds_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_adds_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_adds_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_adds_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_adds_epu16" (caml_mm512_mask_adds_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_adds_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_adds_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_adds_epu8" [@@noalloc] [@@builtin]
+external c__mm512_mask_adds_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_adds_epu8" [@@noalloc]
+let () = check512 "_mm512_mask_adds_epu8" (caml_mm512_mask_adds_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_adds_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_and_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_and_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_and_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_and_epi32" (caml_mm512_mask_and_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_and_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_and_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_and_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_and_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_and_epi64" (caml_mm512_mask_and_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_and_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_and_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_and_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_and_pd" [@@noalloc]
+let () = check512 "_mm512_mask_and_pd" (caml_mm512_mask_and_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_and_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_and_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_and_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_and_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_and_ps" [@@noalloc]
+let () = check512 "_mm512_mask_and_ps" (caml_mm512_mask_and_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_and_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_andnot_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_andnot_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_andnot_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_andnot_epi32" (caml_mm512_mask_andnot_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_andnot_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_andnot_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_andnot_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_andnot_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_andnot_epi64" (caml_mm512_mask_andnot_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_andnot_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_andnot_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_andnot_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_andnot_pd" [@@noalloc]
+let () = check512 "_mm512_mask_andnot_pd" (caml_mm512_mask_andnot_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_andnot_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_andnot_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_andnot_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_andnot_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_andnot_ps" [@@noalloc]
+let () = check512 "_mm512_mask_andnot_ps" (caml_mm512_mask_andnot_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_andnot_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_avg_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_avg_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_avg_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_avg_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_avg_epu16" (caml_mm512_mask_avg_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_avg_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_avg_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_avg_epu8" [@@noalloc] [@@builtin]
+external c__mm512_mask_avg_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_avg_epu8" [@@noalloc]
+let () = check512 "_mm512_mask_avg_epu8" (caml_mm512_mask_avg_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_avg_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_blend_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_blend_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_blend_epi16" (caml_mm512_mask_blend_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_blend_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_blend_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_blend_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_blend_epi32" (caml_mm512_mask_blend_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_blend_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_blend_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_blend_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_blend_epi64" (caml_mm512_mask_blend_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_blend_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_blend_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_blend_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_blend_epi8" (caml_mm512_mask_blend_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_blend_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_blend_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_blend_pd" [@@noalloc]
+let () = check512 "_mm512_mask_blend_pd" (caml_mm512_mask_blend_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_blend_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_blend_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_blend_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_blend_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_blend_ps" [@@noalloc]
+let () = check512 "_mm512_mask_blend_ps" (caml_mm512_mask_blend_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_blend_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epi16_mask" (caml_mm512_mask_cmpeq_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epi32_mask" (caml_mm512_mask_cmpeq_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epi64_mask" (caml_mm512_mask_cmpeq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epi8_mask" (caml_mm512_mask_cmpeq_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epu16_mask" (caml_mm512_mask_cmpeq_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epu32_mask" (caml_mm512_mask_cmpeq_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epu64_mask" (caml_mm512_mask_cmpeq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_epu8_mask" (caml_mm512_mask_cmpeq_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_pd_mask" (caml_mm512_mask_cmpeq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpeq_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpeq_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpeq_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpeq_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpeq_ps_mask" (caml_mm512_mask_cmpeq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpeq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epi16_mask" (caml_mm512_mask_cmpge_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epi32_mask" (caml_mm512_mask_cmpge_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epi64_mask" (caml_mm512_mask_cmpge_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epi8_mask" (caml_mm512_mask_cmpge_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epu16_mask" (caml_mm512_mask_cmpge_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epu32_mask" (caml_mm512_mask_cmpge_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epu64_mask" (caml_mm512_mask_cmpge_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpge_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpge_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpge_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpge_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpge_epu8_mask" (caml_mm512_mask_cmpge_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpge_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epi16_mask" (caml_mm512_mask_cmpgt_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epi32_mask" (caml_mm512_mask_cmpgt_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epi64_mask" (caml_mm512_mask_cmpgt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epi8_mask" (caml_mm512_mask_cmpgt_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epu16_mask" (caml_mm512_mask_cmpgt_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epu32_mask" (caml_mm512_mask_cmpgt_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epu64_mask" (caml_mm512_mask_cmpgt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpgt_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpgt_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpgt_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpgt_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpgt_epu8_mask" (caml_mm512_mask_cmpgt_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpgt_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epi16_mask" (caml_mm512_mask_cmple_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epi32_mask" (caml_mm512_mask_cmple_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epi64_mask" (caml_mm512_mask_cmple_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epi8_mask" (caml_mm512_mask_cmple_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epu16_mask" (caml_mm512_mask_cmple_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epu32_mask" (caml_mm512_mask_cmple_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epu64_mask" (caml_mm512_mask_cmple_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_epu8_mask" (caml_mm512_mask_cmple_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_pd_mask" (caml_mm512_mask_cmple_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmple_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmple_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmple_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmple_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmple_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmple_ps_mask" (caml_mm512_mask_cmple_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmple_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epi16_mask" (caml_mm512_mask_cmplt_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epi32_mask" (caml_mm512_mask_cmplt_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epi64_mask" (caml_mm512_mask_cmplt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epi8_mask" (caml_mm512_mask_cmplt_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epu16_mask" (caml_mm512_mask_cmplt_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epu32_mask" (caml_mm512_mask_cmplt_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epu64_mask" (caml_mm512_mask_cmplt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_epu8_mask" (caml_mm512_mask_cmplt_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_pd_mask" (caml_mm512_mask_cmplt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmplt_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmplt_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmplt_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmplt_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmplt_ps_mask" (caml_mm512_mask_cmplt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmplt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epi16_mask" (caml_mm512_mask_cmpneq_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epi32_mask" (caml_mm512_mask_cmpneq_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epi64_mask" (caml_mm512_mask_cmpneq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epi8_mask" (caml_mm512_mask_cmpneq_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epu16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epu16_mask" (caml_mm512_mask_cmpneq_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epu16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epu32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epu32_mask" (caml_mm512_mask_cmpneq_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epu32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epu64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epu64_mask" (caml_mm512_mask_cmpneq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epu64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_epu8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_epu8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_epu8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_epu8_mask" (caml_mm512_mask_cmpneq_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_epu8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_pd_mask" (caml_mm512_mask_cmpneq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpneq_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpneq_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpneq_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpneq_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpneq_ps_mask" (caml_mm512_mask_cmpneq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpneq_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpnle_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnle_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpnle_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnle_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpnle_pd_mask" (caml_mm512_mask_cmpnle_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpnle_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpnle_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnle_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpnle_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnle_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpnle_ps_mask" (caml_mm512_mask_cmpnle_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpnle_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpnlt_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnlt_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpnlt_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnlt_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpnlt_pd_mask" (caml_mm512_mask_cmpnlt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpnlt_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpnlt_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpnlt_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpnlt_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpnlt_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpnlt_ps_mask" (caml_mm512_mask_cmpnlt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpnlt_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpord_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpord_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpord_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpord_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpord_pd_mask" (caml_mm512_mask_cmpord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpord_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpord_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpord_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpord_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpord_ps_mask" (caml_mm512_mask_cmpord_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpord_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpunord_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpunord_pd_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpunord_pd_mask : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpunord_pd_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpunord_pd_mask" (caml_mm512_mask_cmpunord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_cmpunord_pd_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_cmpunord_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cmpunord_ps_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_cmpunord_ps_mask : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_cmpunord_ps_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_cmpunord_ps_mask" (caml_mm512_mask_cmpunord_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_cmpunord_ps_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_compress_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_compress_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_compress_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_compress_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_compress_epi32" (caml_mm512_mask_compress_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_compress_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_compress_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_compress_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_compress_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_compress_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_compress_epi64" (caml_mm512_mask_compress_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_compress_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_compress_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_compress_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_compress_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_compress_pd" [@@noalloc]
+let () = check512 "_mm512_mask_compress_pd" (caml_mm512_mask_compress_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_compress_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_compress_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_compress_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_compress_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_compress_ps" [@@noalloc]
+let () = check512 "_mm512_mask_compress_ps" (caml_mm512_mask_compress_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_compress_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_conflict_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_conflict_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_conflict_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_conflict_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_conflict_epi32" (caml_mm512_mask_conflict_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_conflict_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_conflict_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_conflict_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_conflict_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_conflict_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_conflict_epi64" (caml_mm512_mask_conflict_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_conflict_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvtepi32_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtepi32_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtepi32_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_cvtepi32_ps" [@@noalloc]
+let () = check512 "_mm512_mask_cvtepi32_ps" (caml_mm512_mask_cvtepi32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvtepi32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_cvtepi64_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtepi64_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtepi64_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_cvtepi64_pd" [@@noalloc]
+let () = check512 "_mm512_mask_cvtepi64_pd" (caml_mm512_mask_cvtepi64_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvtepi64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvtepu32_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtepu32_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtepu32_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_cvtepu32_ps" [@@noalloc]
+let () = check512 "_mm512_mask_cvtepu32_ps" (caml_mm512_mask_cvtepu32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvtepu32_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_cvtepu64_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtepu64_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtepu64_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_cvtepu64_pd" [@@noalloc]
+let () = check512 "_mm512_mask_cvtepu64_pd" (caml_mm512_mask_cvtepu64_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvtepu64_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvtpd_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtpd_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvtpd_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_cvtpd_epi64" (caml_mm512_mask_cvtpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvtpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvtpd_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtpd_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvtpd_epu64" [@@noalloc]
+let () = check512 "_mm512_mask_cvtpd_epu64" (caml_mm512_mask_cvtpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvtpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvtps_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtps_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvtps_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_cvtps_epi32" (caml_mm512_mask_cvtps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvtps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_cvtps_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvtps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvtps_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvtps_epu32" [@@noalloc]
+let () = check512 "_mm512_mask_cvtps_epu32" (caml_mm512_mask_cvtps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvtps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_cvttpd_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvttpd_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvttpd_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_cvttpd_epi64" (caml_mm512_mask_cvttpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvttpd_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvttpd_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvttpd_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_cvttpd_epu64" [@@noalloc]
+let () = check512 "_mm512_mask_cvttpd_epu64" (caml_mm512_mask_cvttpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_cvttpd_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_cvttps_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvttps_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvttps_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_cvttps_epi32" (caml_mm512_mask_cvttps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvttps_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_cvttps_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_cvttps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mask_cvttps_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_cvttps_epu32" [@@noalloc]
+let () = check512 "_mm512_mask_cvttps_epu32" (caml_mm512_mask_cvttps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_cvttps_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_div_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_div_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_div_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_div_pd" [@@noalloc]
+let () = check512 "_mm512_mask_div_pd" (caml_mm512_mask_div_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_div_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_div_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_div_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_div_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_div_ps" [@@noalloc]
+let () = check512 "_mm512_mask_div_ps" (caml_mm512_mask_div_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_div_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_expand_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_expand_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_expand_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_expand_epi32" (caml_mm512_mask_expand_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_expand_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_expand_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_expand_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_expand_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_expand_epi64" (caml_mm512_mask_expand_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_expand_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_expand_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_expand_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_expand_pd" [@@noalloc]
+let () = check512 "_mm512_mask_expand_pd" (caml_mm512_mask_expand_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_expand_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_expand_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_expand_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_expand_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_expand_ps" [@@noalloc]
+let () = check512 "_mm512_mask_expand_ps" (caml_mm512_mask_expand_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_expand_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_fmadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fmadd_pd" (caml_mm512_mask_fmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fmadd_ps" (caml_mm512_mask_fmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmaddsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmaddsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmaddsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmaddsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fmaddsub_pd" (caml_mm512_mask_fmaddsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fmaddsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmaddsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmaddsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmaddsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmaddsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fmaddsub_ps" (caml_mm512_mask_fmaddsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fmaddsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fmsub_pd" (caml_mm512_mask_fmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fmsub_ps" (caml_mm512_mask_fmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmsubadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsubadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmsubadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fmsubadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fmsubadd_pd" (caml_mm512_mask_fmsubadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fmsubadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fmsubadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fmsubadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fmsubadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fmsubadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fmsubadd_ps" (caml_mm512_mask_fmsubadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fmsubadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fnmadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fnmadd_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fnmadd_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fnmadd_pd" (caml_mm512_mask_fnmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fnmadd_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fnmadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fnmadd_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fnmadd_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fnmadd_ps" (caml_mm512_mask_fnmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fnmadd_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fnmsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_fnmsub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_fnmsub_pd" [@@noalloc]
+let () = check512 "_mm512_mask_fnmsub_pd" (caml_mm512_mask_fnmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_fnmsub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_fnmsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_fnmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_fnmsub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_fnmsub_ps" [@@noalloc]
+let () = check512 "_mm512_mask_fnmsub_ps" (caml_mm512_mask_fnmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_fnmsub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_getexp_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_getexp_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_getexp_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_getexp_pd" [@@noalloc]
+let () = check512 "_mm512_mask_getexp_pd" (caml_mm512_mask_getexp_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_getexp_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_getexp_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_getexp_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_getexp_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_getexp_ps" [@@noalloc]
+let () = check512 "_mm512_mask_getexp_ps" (caml_mm512_mask_getexp_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_getexp_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_lzcnt_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_lzcnt_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_lzcnt_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_lzcnt_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_lzcnt_epi32" (caml_mm512_mask_lzcnt_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_lzcnt_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_lzcnt_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_lzcnt_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_lzcnt_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_lzcnt_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_lzcnt_epi64" (caml_mm512_mask_lzcnt_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_lzcnt_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_madd_epi16 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_madd_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_madd_epi16 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_madd_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_madd_epi16" (caml_mm512_mask_madd_epi16 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_madd_epi16 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_maddubs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_maddubs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_maddubs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_maddubs_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_maddubs_epi16" (caml_mm512_mask_maddubs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_maddubs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_max_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_max_epi16" (caml_mm512_mask_max_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_max_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_max_epi32" (caml_mm512_mask_max_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_max_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_max_epi64" (caml_mm512_mask_max_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_max_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_max_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_max_epi8" (caml_mm512_mask_max_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_max_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_max_epu16" (caml_mm512_mask_max_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_max_epu32" [@@noalloc]
+let () = check512 "_mm512_mask_max_epu32" (caml_mm512_mask_max_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu64" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_max_epu64" [@@noalloc]
+let () = check512 "_mm512_mask_max_epu64" (caml_mm512_mask_max_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_max_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_epu8" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_max_epu8" [@@noalloc]
+let () = check512 "_mm512_mask_max_epu8" (caml_mm512_mask_max_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_max_pd" [@@noalloc]
+let () = check512 "_mm512_mask_max_pd" (caml_mm512_mask_max_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_max_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_max_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_max_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_max_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_max_ps" [@@noalloc]
+let () = check512 "_mm512_mask_max_ps" (caml_mm512_mask_max_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_max_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_min_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_min_epi16" (caml_mm512_mask_min_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_min_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_min_epi32" (caml_mm512_mask_min_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_min_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_min_epi64" (caml_mm512_mask_min_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_min_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_min_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_min_epi8" (caml_mm512_mask_min_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_min_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_min_epu16" (caml_mm512_mask_min_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epu32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_min_epu32" [@@noalloc]
+let () = check512 "_mm512_mask_min_epu32" (caml_mm512_mask_min_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epu32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu64" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epu64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_min_epu64" [@@noalloc]
+let () = check512 "_mm512_mask_min_epu64" (caml_mm512_mask_min_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_min_epu64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_epu8" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_min_epu8" [@@noalloc]
+let () = check512 "_mm512_mask_min_epu8" (caml_mm512_mask_min_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_min_pd" [@@noalloc]
+let () = check512 "_mm512_mask_min_pd" (caml_mm512_mask_min_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_min_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_min_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_min_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_min_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_min_ps" [@@noalloc]
+let () = check512 "_mm512_mask_min_ps" (caml_mm512_mask_min_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_min_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mov_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_mov_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_mov_epi16" (caml_mm512_mask_mov_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb)) (c__mm512_mask_mov_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb))
+
+external caml_mm512_mask_mov_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_mov_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_mov_epi32" (caml_mm512_mask_mov_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_mov_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_mov_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_mov_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_mov_epi64" (caml_mm512_mask_mov_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_mov_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_mov_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_mov_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_mov_epi8" (caml_mm512_mask_mov_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb)) (c__mm512_mask_mov_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb))
+
+external caml_mm512_mask_mov_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_mov_pd" [@@noalloc]
+let () = check512 "_mm512_mask_mov_pd" (caml_mm512_mask_mov_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_mov_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_mov_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mov_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_mov_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_mov_ps" [@@noalloc]
+let () = check512 "_mm512_mask_mov_ps" (caml_mm512_mask_mov_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_mov_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_movedup_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_movedup_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_movedup_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_movedup_pd" [@@noalloc]
+let () = check512 "_mm512_mask_movedup_pd" (caml_mm512_mask_movedup_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_movedup_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_movehdup_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_movehdup_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_movehdup_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_movehdup_ps" [@@noalloc]
+let () = check512 "_mm512_mask_movehdup_ps" (caml_mm512_mask_movehdup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_movehdup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_moveldup_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_moveldup_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_moveldup_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_moveldup_ps" [@@noalloc]
+let () = check512 "_mm512_mask_moveldup_ps" (caml_mm512_mask_moveldup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_moveldup_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_mul_epi32 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_mul_epi32 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_mul_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_mul_epi32" (caml_mm512_mask_mul_epi32 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_mul_epi32 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mul_epu32 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mask_mul_epu32 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_mul_epu32" [@@noalloc]
+let () = check512 "_mm512_mask_mul_epu32" (caml_mm512_mask_mul_epu32 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_mul_epu32 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mul_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_mul_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_mul_pd" [@@noalloc]
+let () = check512 "_mm512_mask_mul_pd" (caml_mm512_mask_mul_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_mul_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mul_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mul_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_mul_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_mul_ps" [@@noalloc]
+let () = check512 "_mm512_mask_mul_ps" (caml_mm512_mask_mul_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_mul_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mulhi_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mulhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_mulhi_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhi_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_mulhi_epi16" (caml_mm512_mask_mulhi_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_mulhi_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mulhi_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mulhi_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_mulhi_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhi_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_mulhi_epu16" (caml_mm512_mask_mulhi_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_mulhi_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mulhrs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mulhrs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_mulhrs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_mulhrs_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_mulhrs_epi16" (caml_mm512_mask_mulhrs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_mulhrs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mullo_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_mullo_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_mullo_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_mullo_epi16" (caml_mm512_mask_mullo_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_mullo_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mullo_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_mullo_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_mullo_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_mullo_epi32" (caml_mm512_mask_mullo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_mullo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_mullo_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_mullo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_mullo_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_mullo_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_mullo_epi64" (caml_mm512_mask_mullo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_mullo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_or_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_or_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_or_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_or_epi32" (caml_mm512_mask_or_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_or_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_or_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_or_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_or_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_or_epi64" (caml_mm512_mask_or_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_or_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_or_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_or_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_or_pd" [@@noalloc]
+let () = check512 "_mm512_mask_or_pd" (caml_mm512_mask_or_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_or_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_or_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_or_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_or_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_or_ps" [@@noalloc]
+let () = check512 "_mm512_mask_or_ps" (caml_mm512_mask_or_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_or_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_packs_epi16 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_packs_epi16 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_packs_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_packs_epi16" (caml_mm512_mask_packs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_packs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_packs_epi32 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_packs_epi32 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_packs_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_packs_epi32" (caml_mm512_mask_packs_epi32 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_packs_epi32 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_packus_epi16 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packus_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_packus_epi16 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_packus_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_packus_epi16" (caml_mm512_mask_packus_epi16 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_packus_epi16 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_packus_epi32 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_packus_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_packus_epi32 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_packus_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_packus_epi32" (caml_mm512_mask_packus_epi32 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_packus_epi32 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutevar_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutevar_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutevar_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_permutevar_epi32" (caml_mm512_mask_permutevar_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutevar_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutevar_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutevar_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutevar_pd" [@@noalloc]
+let () = check512 "_mm512_mask_permutevar_pd" (caml_mm512_mask_permutevar_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_permutevar_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutevar_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutevar_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutevar_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutevar_ps" [@@noalloc]
+let () = check512 "_mm512_mask_permutevar_ps" (caml_mm512_mask_permutevar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutevar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutex2var_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutex2var_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_permutex2var_epi16" (caml_mm512_mask_permutex2var_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutex2var_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutex2var_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutex2var_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_permutex2var_epi32" (caml_mm512_mask_permutex2var_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutex2var_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutex2var_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutex2var_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_permutex2var_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_permutex2var_epi64" (caml_mm512_mask_permutex2var_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_permutex2var_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutex2var_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutex2var_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutex2var_pd" [@@noalloc]
+let () = check512 "_mm512_mask_permutex2var_pd" (caml_mm512_mask_permutex2var_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_permutex2var_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutex2var_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutex2var_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutex2var_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutex2var_ps" [@@noalloc]
+let () = check512 "_mm512_mask_permutex2var_ps" (caml_mm512_mask_permutex2var_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutex2var_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutexvar_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutexvar_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_permutexvar_epi16" (caml_mm512_mask_permutexvar_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutexvar_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutexvar_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutexvar_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_permutexvar_epi32" (caml_mm512_mask_permutexvar_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutexvar_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutexvar_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutexvar_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_permutexvar_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_permutexvar_epi64" (caml_mm512_mask_permutexvar_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_permutexvar_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutexvar_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutexvar_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_permutexvar_pd" [@@noalloc]
+let () = check512 "_mm512_mask_permutexvar_pd" (caml_mm512_mask_permutexvar_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_permutexvar_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_permutexvar_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_permutexvar_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_permutexvar_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_permutexvar_ps" [@@noalloc]
+let () = check512 "_mm512_mask_permutexvar_ps" (caml_mm512_mask_permutexvar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_permutexvar_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_rcp14_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rcp14_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_rcp14_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_rcp14_pd" [@@noalloc]
+let () = check512 "_mm512_mask_rcp14_pd" (caml_mm512_mask_rcp14_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_rcp14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_rcp14_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rcp14_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_rcp14_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_rcp14_ps" [@@noalloc]
+let () = check512 "_mm512_mask_rcp14_ps" (caml_mm512_mask_rcp14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_rcp14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_rolv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rolv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_rolv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_rolv_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_rolv_epi32" (caml_mm512_mask_rolv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_rolv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_rolv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rolv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_rolv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_rolv_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_rolv_epi64" (caml_mm512_mask_rolv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_rolv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_rorv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rorv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_rorv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_rorv_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_rorv_epi32" (caml_mm512_mask_rorv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_rorv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_rorv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rorv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_rorv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_rorv_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_rorv_epi64" (caml_mm512_mask_rorv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_rorv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_rsqrt14_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rsqrt14_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_rsqrt14_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_rsqrt14_pd" [@@noalloc]
+let () = check512 "_mm512_mask_rsqrt14_pd" (caml_mm512_mask_rsqrt14_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_rsqrt14_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_rsqrt14_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_rsqrt14_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_rsqrt14_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_rsqrt14_ps" [@@noalloc]
+let () = check512 "_mm512_mask_rsqrt14_ps" (caml_mm512_mask_rsqrt14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_rsqrt14_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_scalef_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_scalef_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_scalef_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_scalef_pd" [@@noalloc]
+let () = check512 "_mm512_mask_scalef_pd" (caml_mm512_mask_scalef_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_scalef_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_scalef_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_scalef_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_scalef_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_scalef_ps" [@@noalloc]
+let () = check512 "_mm512_mask_scalef_ps" (caml_mm512_mask_scalef_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_scalef_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_shuffle_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_shuffle_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_shuffle_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_shuffle_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_shuffle_epi8" (caml_mm512_mask_shuffle_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_shuffle_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sllv_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_sllv_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_sllv_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_sllv_epi16" (caml_mm512_mask_sllv_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_sllv_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sllv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_sllv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_sllv_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_sllv_epi32" (caml_mm512_mask_sllv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_sllv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sllv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sllv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_sllv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_sllv_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_sllv_epi64" (caml_mm512_mask_sllv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_sllv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sqrt_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sqrt_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_sqrt_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_sqrt_pd" [@@noalloc]
+let () = check512 "_mm512_mask_sqrt_pd" (caml_mm512_mask_sqrt_pd (reint va) (mask_of_int64 0xa5L) (reint vb)) (c__mm512_mask_sqrt_pd (reint va) (mask_of_int64 0xa5L) (reint vb))
+
+external caml_mm512_mask_sqrt_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sqrt_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_sqrt_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_sqrt_ps" [@@noalloc]
+let () = check512 "_mm512_mask_sqrt_ps" (caml_mm512_mask_sqrt_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb)) (c__mm512_mask_sqrt_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb))
+
+external caml_mm512_mask_srav_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_srav_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_srav_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_srav_epi16" (caml_mm512_mask_srav_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_srav_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_srav_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_srav_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_srav_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_srav_epi32" (caml_mm512_mask_srav_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_srav_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_srav_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srav_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_srav_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_srav_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_srav_epi64" (caml_mm512_mask_srav_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_srav_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_srlv_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_srlv_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_srlv_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_srlv_epi16" (caml_mm512_mask_srlv_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_srlv_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_srlv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_srlv_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_srlv_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_srlv_epi32" (caml_mm512_mask_srlv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_srlv_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_srlv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_srlv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_srlv_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_srlv_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_srlv_epi64" (caml_mm512_mask_srlv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_srlv_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_sub_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_sub_epi16" (caml_mm512_mask_sub_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_sub_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_sub_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_sub_epi32" (caml_mm512_mask_sub_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_sub_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_sub_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_sub_epi64" (caml_mm512_mask_sub_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_sub_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_sub_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_sub_epi8" (caml_mm512_mask_sub_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_sub_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_sub_pd" [@@noalloc]
+let () = check512 "_mm512_mask_sub_pd" (caml_mm512_mask_sub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_sub_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_sub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_sub_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_sub_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_sub_ps" [@@noalloc]
+let () = check512 "_mm512_mask_sub_ps" (caml_mm512_mask_sub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_sub_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_subs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_subs_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_subs_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_subs_epi16" (caml_mm512_mask_subs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_subs_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_subs_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_subs_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_subs_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_subs_epi8" (caml_mm512_mask_subs_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_subs_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_subs_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mask_subs_epu16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_subs_epu16" [@@noalloc]
+let () = check512 "_mm512_mask_subs_epu16" (caml_mm512_mask_subs_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_subs_epu16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_subs_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_subs_epu8" [@@noalloc] [@@builtin]
+external c__mm512_mask_subs_epu8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_subs_epu8" [@@noalloc]
+let () = check512 "_mm512_mask_subs_epu8" (caml_mm512_mask_subs_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_subs_epu8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_test_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_test_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_test_epi16_mask" (caml_mm512_mask_test_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_test_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_test_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_test_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_test_epi32_mask" (caml_mm512_mask_test_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_test_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_test_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_test_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_test_epi64_mask" (caml_mm512_mask_test_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_test_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_test_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_test_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_test_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_test_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_test_epi8_mask" (caml_mm512_mask_test_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_test_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_testn_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_testn_epi16_mask : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_testn_epi16_mask" (caml_mm512_mask_testn_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_testn_epi16_mask (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_testn_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_testn_epi32_mask : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_testn_epi32_mask" (caml_mm512_mask_testn_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_mask_testn_epi32_mask (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_testn_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_testn_epi64_mask : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_testn_epi64_mask" (caml_mm512_mask_testn_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_mask_testn_epi64_mask (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_mask_testn_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_testn_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_mask_testn_epi8_mask : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_mask_testn_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_mask_testn_epi8_mask" (caml_mm512_mask_testn_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_mask_testn_epi8_mask (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_mask_unpackhi_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_epi16" (caml_mm512_mask_unpackhi_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpackhi_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_epi32" (caml_mm512_mask_unpackhi_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpackhi_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_epi64" (caml_mm512_mask_unpackhi_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpackhi_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_unpackhi_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_epi8" (caml_mm512_mask_unpackhi_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpackhi_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_unpackhi_pd" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_pd" (caml_mm512_mask_unpackhi_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpackhi_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpackhi_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpackhi_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_unpackhi_ps" [@@noalloc]
+let () = check512 "_mm512_mask_unpackhi_ps" (caml_mm512_mask_unpackhi_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpackhi_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_epi16 : (int16x32[@unboxed]) -> (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi16" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_epi16" (caml_mm512_mask_unpacklo_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_epi16 (reint va) (mask_of_int64 0xa5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_epi32" (caml_mm512_mask_unpacklo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_epi64" (caml_mm512_mask_unpacklo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_epi8" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_epi8 : (int8x64[@unboxed]) -> (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_mask_unpacklo_epi8" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_epi8" (caml_mm512_mask_unpacklo_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_epi8 (reint va) (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_unpacklo_pd" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_pd" (caml_mm512_mask_unpacklo_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_unpacklo_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_unpacklo_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_unpacklo_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_unpacklo_ps" [@@noalloc]
+let () = check512 "_mm512_mask_unpacklo_ps" (caml_mm512_mask_unpacklo_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_unpacklo_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_xor_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mask_xor_epi32 : (int32x16[@unboxed]) -> (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mask_xor_epi32" [@@noalloc]
+let () = check512 "_mm512_mask_xor_epi32" (caml_mm512_mask_xor_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_xor_epi32 (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_xor_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mask_xor_epi64 : (int64x8[@unboxed]) -> (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mask_xor_epi64" [@@noalloc]
+let () = check512 "_mm512_mask_xor_epi64" (caml_mm512_mask_xor_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_xor_epi64 (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_xor_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_pd" [@@noalloc] [@@builtin]
+external c__mm512_mask_xor_pd : (float64x8[@unboxed]) -> (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mask_xor_pd" [@@noalloc]
+let () = check512 "_mm512_mask_xor_pd" (caml_mm512_mask_xor_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc)) (c__mm512_mask_xor_pd (reint va) (mask_of_int64 0xa5L) (reint vb) (reint vc))
+
+external caml_mm512_mask_xor_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mask_xor_ps" [@@noalloc] [@@builtin]
+external c__mm512_mask_xor_ps : (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mask_xor_ps" [@@noalloc]
+let () = check512 "_mm512_mask_xor_ps" (caml_mm512_mask_xor_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc)) (c__mm512_mask_xor_ps (reint va) (mask_of_int64 0xa5a5L) (reint vb) (reint vc))
+
+external caml_mm512_maskz_abs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_abs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_abs_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_abs_epi16" (caml_mm512_maskz_abs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va)) (c__mm512_maskz_abs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
+
+external caml_mm512_maskz_abs_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_abs_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_abs_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_abs_epi32" (caml_mm512_maskz_abs_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_abs_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_abs_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_abs_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_abs_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_abs_epi64" (caml_mm512_maskz_abs_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_abs_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_abs_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_abs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_abs_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_abs_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_abs_epi8" (caml_mm512_maskz_abs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va)) (c__mm512_maskz_abs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
+
+external caml_mm512_maskz_add_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_add_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_add_epi16" (caml_mm512_maskz_add_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_add_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_add_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_add_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_add_epi32" (caml_mm512_maskz_add_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_add_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_add_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_add_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_add_epi64" (caml_mm512_maskz_add_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_add_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_add_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_add_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_add_epi8" (caml_mm512_maskz_add_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_add_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_add_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_add_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_add_pd" (caml_mm512_maskz_add_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_add_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_add_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_add_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_add_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_add_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_add_ps" (caml_mm512_maskz_add_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_add_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_adds_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_adds_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_adds_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_adds_epi16" (caml_mm512_maskz_adds_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_adds_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_adds_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_adds_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_adds_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_adds_epi8" (caml_mm512_maskz_adds_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_adds_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_adds_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_adds_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_adds_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_adds_epu16" (caml_mm512_maskz_adds_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_adds_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_adds_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_adds_epu8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_adds_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_adds_epu8" [@@noalloc]
+let () = check512 "_mm512_maskz_adds_epu8" (caml_mm512_maskz_adds_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_adds_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_and_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_and_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_and_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_and_epi32" (caml_mm512_maskz_and_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_and_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_and_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_and_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_and_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_and_epi64" (caml_mm512_maskz_and_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_and_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_and_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_and_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_and_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_and_pd" (caml_mm512_maskz_and_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_and_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_and_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_and_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_and_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_and_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_and_ps" (caml_mm512_maskz_and_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_and_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_andnot_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_andnot_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_andnot_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_andnot_epi32" (caml_mm512_maskz_andnot_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_andnot_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_andnot_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_andnot_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_andnot_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_andnot_epi64" (caml_mm512_maskz_andnot_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_andnot_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_andnot_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_andnot_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_andnot_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_andnot_pd" (caml_mm512_maskz_andnot_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_andnot_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_andnot_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_andnot_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_andnot_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_andnot_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_andnot_ps" (caml_mm512_maskz_andnot_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_andnot_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_avg_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_avg_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_avg_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_avg_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_avg_epu16" (caml_mm512_maskz_avg_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_avg_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_avg_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_avg_epu8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_avg_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_avg_epu8" [@@noalloc]
+let () = check512 "_mm512_maskz_avg_epu8" (caml_mm512_maskz_avg_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_avg_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_compress_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_compress_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_compress_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_compress_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_compress_epi32" (caml_mm512_maskz_compress_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_compress_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_compress_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_compress_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_compress_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_compress_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_compress_epi64" (caml_mm512_maskz_compress_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_compress_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_compress_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_compress_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_compress_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_compress_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_compress_pd" (caml_mm512_maskz_compress_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_compress_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_compress_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_compress_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_compress_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_compress_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_compress_ps" (caml_mm512_maskz_compress_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_compress_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_conflict_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_conflict_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_conflict_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_conflict_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_conflict_epi32" (caml_mm512_maskz_conflict_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_conflict_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_conflict_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_conflict_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_conflict_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_conflict_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_conflict_epi64" (caml_mm512_maskz_conflict_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_conflict_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvtepi32_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepi32_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtepi32_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_cvtepi32_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtepi32_ps" (caml_mm512_maskz_cvtepi32_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvtepi32_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_cvtepi64_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepi64_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtepi64_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_cvtepi64_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtepi64_pd" (caml_mm512_maskz_cvtepi64_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvtepi64_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvtepu32_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepu32_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtepu32_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_cvtepu32_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtepu32_ps" (caml_mm512_maskz_cvtepu32_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvtepu32_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_cvtepu64_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtepu64_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtepu64_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_cvtepu64_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtepu64_pd" (caml_mm512_maskz_cvtepu64_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvtepu64_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvtpd_epi64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtpd_epi64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_cvtpd_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtpd_epi64" (caml_mm512_maskz_cvtpd_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvtpd_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvtpd_epu64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtpd_epu64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_cvtpd_epu64" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtpd_epu64" (caml_mm512_maskz_cvtpd_epu64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvtpd_epu64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvtps_epi32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtps_epi32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_cvtps_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtps_epi32" (caml_mm512_maskz_cvtps_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvtps_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_cvtps_epu32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvtps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvtps_epu32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_cvtps_epu32" [@@noalloc]
+let () = check512 "_mm512_maskz_cvtps_epu32" (caml_mm512_maskz_cvtps_epu32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvtps_epu32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_cvttpd_epi64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvttpd_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvttpd_epi64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_cvttpd_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_cvttpd_epi64" (caml_mm512_maskz_cvttpd_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvttpd_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvttpd_epu64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvttpd_epu64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvttpd_epu64 : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_cvttpd_epu64" [@@noalloc]
+let () = check512 "_mm512_maskz_cvttpd_epu64" (caml_mm512_maskz_cvttpd_epu64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_cvttpd_epu64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_cvttps_epi32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvttps_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvttps_epi32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_cvttps_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_cvttps_epi32" (caml_mm512_maskz_cvttps_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvttps_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_cvttps_epu32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_cvttps_epu32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_cvttps_epu32 : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_cvttps_epu32" [@@noalloc]
+let () = check512 "_mm512_maskz_cvttps_epu32" (caml_mm512_maskz_cvttps_epu32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_cvttps_epu32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_div_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_div_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_div_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_div_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_div_pd" (caml_mm512_maskz_div_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_div_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_div_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_div_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_div_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_div_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_div_ps" (caml_mm512_maskz_div_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_div_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_expand_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_expand_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_expand_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_expand_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_expand_epi32" (caml_mm512_maskz_expand_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_expand_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_expand_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_expand_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_expand_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_expand_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_expand_epi64" (caml_mm512_maskz_expand_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_expand_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_expand_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_expand_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_expand_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_expand_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_expand_pd" (caml_mm512_maskz_expand_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_expand_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_expand_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_expand_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_expand_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_expand_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_expand_ps" (caml_mm512_maskz_expand_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_expand_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_fmadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmadd_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fmadd_pd" (caml_mm512_maskz_fmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmadd_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fmadd_ps" (caml_mm512_maskz_fmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmaddsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmaddsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmaddsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmaddsub_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fmaddsub_pd" (caml_mm512_maskz_fmaddsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmaddsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmaddsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmaddsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmaddsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmaddsub_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fmaddsub_ps" (caml_mm512_maskz_fmaddsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmaddsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmsub_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fmsub_pd" (caml_mm512_maskz_fmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmsub_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fmsub_ps" (caml_mm512_maskz_fmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmsubadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsubadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmsubadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fmsubadd_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fmsubadd_pd" (caml_mm512_maskz_fmsubadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmsubadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fmsubadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fmsubadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fmsubadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fmsubadd_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fmsubadd_ps" (caml_mm512_maskz_fmsubadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fmsubadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fnmadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmadd_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fnmadd_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fnmadd_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fnmadd_pd" (caml_mm512_maskz_fnmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fnmadd_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fnmadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmadd_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fnmadd_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fnmadd_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fnmadd_ps" (caml_mm512_maskz_fnmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fnmadd_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fnmsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmsub_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fnmsub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_fnmsub_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_fnmsub_pd" (caml_mm512_maskz_fnmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fnmsub_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_fnmsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_fnmsub_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_fnmsub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_fnmsub_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_fnmsub_ps" (caml_mm512_maskz_fnmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_fnmsub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_getexp_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_getexp_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_getexp_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_getexp_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_getexp_pd" (caml_mm512_maskz_getexp_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_getexp_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_getexp_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_getexp_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_getexp_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_getexp_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_getexp_ps" (caml_mm512_maskz_getexp_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_getexp_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_lzcnt_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_lzcnt_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_lzcnt_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_lzcnt_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_lzcnt_epi32" (caml_mm512_maskz_lzcnt_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_lzcnt_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_lzcnt_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_lzcnt_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_lzcnt_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_lzcnt_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_lzcnt_epi64" (caml_mm512_maskz_lzcnt_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_lzcnt_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_madd_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_madd_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_madd_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_madd_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_madd_epi16" (caml_mm512_maskz_madd_epi16 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_madd_epi16 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_maddubs_epi16 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_maddubs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_maddubs_epi16 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_maddubs_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_maddubs_epi16" (caml_mm512_maskz_maddubs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_maddubs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_max_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epi16" (caml_mm512_maskz_max_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_max_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epi32" (caml_mm512_maskz_max_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_max_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epi64" (caml_mm512_maskz_max_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_max_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_max_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epi8" (caml_mm512_maskz_max_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_max_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epu16" (caml_mm512_maskz_max_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_max_epu32" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epu32" (caml_mm512_maskz_max_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epu64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epu64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_max_epu64" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epu64" (caml_mm512_maskz_max_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_max_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_epu8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_max_epu8" [@@noalloc]
+let () = check512 "_mm512_maskz_max_epu8" (caml_mm512_maskz_max_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_max_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_max_pd" (caml_mm512_maskz_max_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_max_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_max_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_max_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_max_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_max_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_max_ps" (caml_mm512_maskz_max_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_max_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_min_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epi16" (caml_mm512_maskz_min_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_min_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epi32" (caml_mm512_maskz_min_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_min_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epi64" (caml_mm512_maskz_min_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_min_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_min_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epi8" (caml_mm512_maskz_min_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_min_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epu16" (caml_mm512_maskz_min_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_min_epu32" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epu32" (caml_mm512_maskz_min_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epu32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epu64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epu64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_min_epu64" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epu64" (caml_mm512_maskz_min_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_min_epu64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_epu8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_min_epu8" [@@noalloc]
+let () = check512 "_mm512_maskz_min_epu8" (caml_mm512_maskz_min_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_min_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_min_pd" (caml_mm512_maskz_min_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_min_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_min_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_min_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_min_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_min_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_min_ps" (caml_mm512_maskz_min_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_min_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mov_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mov_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_epi16" (caml_mm512_maskz_mov_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va)) (c__mm512_maskz_mov_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va))
+
+external caml_mm512_maskz_mov_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_mov_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_epi32" (caml_mm512_maskz_mov_epi32 (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_mov_epi32 (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_mov_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mov_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_epi64" (caml_mm512_maskz_mov_epi64 (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_mov_epi64 (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_mov_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_mov_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_epi8" (caml_mm512_maskz_mov_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va)) (c__mm512_maskz_mov_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va))
+
+external caml_mm512_maskz_mov_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_mov_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_pd" (caml_mm512_maskz_mov_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_mov_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_mov_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mov_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mov_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_mov_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_mov_ps" (caml_mm512_maskz_mov_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_mov_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_movedup_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_movedup_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_movedup_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_movedup_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_movedup_pd" (caml_mm512_maskz_movedup_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_movedup_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_movehdup_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_movehdup_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_movehdup_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_movehdup_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_movehdup_ps" (caml_mm512_maskz_movehdup_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_movehdup_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_moveldup_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_moveldup_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_moveldup_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_moveldup_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_moveldup_ps" (caml_mm512_maskz_moveldup_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_moveldup_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_mul_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mul_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_mul_epi32" (caml_mm512_maskz_mul_epi32 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_mul_epi32 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mul_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_epu32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mul_epu32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_epu32" [@@noalloc]
+let () = check512 "_mm512_maskz_mul_epu32" (caml_mm512_maskz_mul_epu32 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_mul_epu32 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mul_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mul_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_mul_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_mul_pd" (caml_mm512_maskz_mul_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_mul_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mul_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mul_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mul_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_mul_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_mul_ps" (caml_mm512_maskz_mul_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_mul_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mulhi_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mulhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mulhi_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhi_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_mulhi_epi16" (caml_mm512_maskz_mulhi_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_mulhi_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mulhi_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mulhi_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mulhi_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhi_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_mulhi_epu16" (caml_mm512_maskz_mulhi_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_mulhi_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mulhrs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mulhrs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mulhrs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mulhrs_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_mulhrs_epi16" (caml_mm512_maskz_mulhrs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_mulhrs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mullo_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mullo_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_mullo_epi16" (caml_mm512_maskz_mullo_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_mullo_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mullo_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mullo_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_mullo_epi32" (caml_mm512_maskz_mullo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_mullo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_mullo_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_mullo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_mullo_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_mullo_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_mullo_epi64" (caml_mm512_maskz_mullo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_mullo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_or_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_or_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_or_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_or_epi32" (caml_mm512_maskz_or_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_or_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_or_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_or_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_or_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_or_epi64" (caml_mm512_maskz_or_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_or_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_or_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_or_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_or_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_or_pd" (caml_mm512_maskz_or_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_or_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_or_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_or_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_or_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_or_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_or_ps" (caml_mm512_maskz_or_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_or_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_packs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_packs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_packs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_packs_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_packs_epi16" (caml_mm512_maskz_packs_epi16 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_packs_epi16 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_packs_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_packs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_packs_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_packs_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_packs_epi32" (caml_mm512_maskz_packs_epi32 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_packs_epi32 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_packus_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_packus_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_packus_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_packus_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_packus_epi16" (caml_mm512_maskz_packus_epi16 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_packus_epi16 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_packus_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_packus_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_packus_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_packus_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_packus_epi32" (caml_mm512_maskz_packus_epi32 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_packus_epi32 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutevar_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutevar_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutevar_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutevar_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_permutevar_pd" (caml_mm512_maskz_permutevar_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_permutevar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutevar_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutevar_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutevar_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutevar_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_permutevar_ps" (caml_mm512_maskz_permutevar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_permutevar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutex2var_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutex2var_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_permutex2var_epi16" (caml_mm512_maskz_permutex2var_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_permutex2var_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_permutex2var_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutex2var_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_permutex2var_epi32" (caml_mm512_maskz_permutex2var_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_permutex2var_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_permutex2var_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutex2var_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_permutex2var_epi64" (caml_mm512_maskz_permutex2var_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_permutex2var_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_permutex2var_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutex2var_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_permutex2var_pd" (caml_mm512_maskz_permutex2var_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_permutex2var_pd (mask_of_int64 0xa5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_permutex2var_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutex2var_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutex2var_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutex2var_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_permutex2var_ps" (caml_mm512_maskz_permutex2var_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc)) (c__mm512_maskz_permutex2var_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb) (reint vc))
+
+external caml_mm512_maskz_permutexvar_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutexvar_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_permutexvar_epi16" (caml_mm512_maskz_permutexvar_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_permutexvar_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutexvar_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutexvar_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_permutexvar_epi32" (caml_mm512_maskz_permutexvar_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_permutexvar_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutexvar_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutexvar_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_permutexvar_epi64" (caml_mm512_maskz_permutexvar_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_permutexvar_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutexvar_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutexvar_pd : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_permutexvar_pd" (caml_mm512_maskz_permutexvar_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_permutexvar_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_permutexvar_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_permutexvar_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_permutexvar_ps : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_permutexvar_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_permutexvar_ps" (caml_mm512_maskz_permutexvar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_permutexvar_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_rcp14_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rcp14_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rcp14_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_rcp14_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_rcp14_pd" (caml_mm512_maskz_rcp14_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_rcp14_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_rcp14_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rcp14_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rcp14_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_rcp14_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_rcp14_ps" (caml_mm512_maskz_rcp14_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_rcp14_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_rolv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rolv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rolv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_rolv_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_rolv_epi32" (caml_mm512_maskz_rolv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_rolv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_rolv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rolv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rolv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_rolv_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_rolv_epi64" (caml_mm512_maskz_rolv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_rolv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_rorv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rorv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rorv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_rorv_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_rorv_epi32" (caml_mm512_maskz_rorv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_rorv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_rorv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rorv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rorv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_rorv_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_rorv_epi64" (caml_mm512_maskz_rorv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_rorv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_rsqrt14_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rsqrt14_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rsqrt14_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_rsqrt14_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_rsqrt14_pd" (caml_mm512_maskz_rsqrt14_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_rsqrt14_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_rsqrt14_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_rsqrt14_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_rsqrt14_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_rsqrt14_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_rsqrt14_ps" (caml_mm512_maskz_rsqrt14_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_rsqrt14_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_scalef_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_scalef_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_scalef_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_scalef_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_scalef_pd" (caml_mm512_maskz_scalef_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_scalef_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_scalef_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_scalef_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_scalef_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_scalef_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_scalef_ps" (caml_mm512_maskz_scalef_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_scalef_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_shuffle_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_shuffle_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_shuffle_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_shuffle_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_shuffle_epi8" (caml_mm512_maskz_shuffle_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_shuffle_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sllv_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sllv_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_sllv_epi16" (caml_mm512_maskz_sllv_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_sllv_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sllv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sllv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_sllv_epi32" (caml_mm512_maskz_sllv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_sllv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sllv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sllv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sllv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_sllv_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_sllv_epi64" (caml_mm512_maskz_sllv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_sllv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sqrt_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sqrt_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sqrt_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_sqrt_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_sqrt_pd" (caml_mm512_maskz_sqrt_pd (mask_of_int64 0xa5L) (reint va)) (c__mm512_maskz_sqrt_pd (mask_of_int64 0xa5L) (reint va))
+
+external caml_mm512_maskz_sqrt_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sqrt_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sqrt_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_sqrt_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_sqrt_ps" (caml_mm512_maskz_sqrt_ps (mask_of_int64 0xa5a5L) (reint va)) (c__mm512_maskz_sqrt_ps (mask_of_int64 0xa5a5L) (reint va))
+
+external caml_mm512_maskz_srav_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srav_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_srav_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_srav_epi16" (caml_mm512_maskz_srav_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_srav_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_srav_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srav_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_srav_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_srav_epi32" (caml_mm512_maskz_srav_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_srav_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_srav_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srav_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srav_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_srav_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_srav_epi64" (caml_mm512_maskz_srav_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_srav_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_srlv_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srlv_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_srlv_epi16" (caml_mm512_maskz_srlv_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_srlv_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_srlv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srlv_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_srlv_epi32" (caml_mm512_maskz_srlv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_srlv_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_srlv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_srlv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_srlv_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_srlv_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_srlv_epi64" (caml_mm512_maskz_srlv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_srlv_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_sub_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_epi16" (caml_mm512_maskz_sub_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_sub_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_sub_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_epi32" (caml_mm512_maskz_sub_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_sub_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_sub_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_epi64" (caml_mm512_maskz_sub_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_sub_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_sub_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_epi8" (caml_mm512_maskz_sub_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_sub_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_sub_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_pd" (caml_mm512_maskz_sub_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_sub_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_sub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_sub_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_sub_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_sub_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_sub_ps" (caml_mm512_maskz_sub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_sub_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_subs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_subs_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_subs_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_subs_epi16" (caml_mm512_maskz_subs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_subs_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_subs_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_subs_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_subs_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_subs_epi8" (caml_mm512_maskz_subs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_subs_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_subs_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epu16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_subs_epu16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_subs_epu16" [@@noalloc]
+let () = check512 "_mm512_maskz_subs_epu16" (caml_mm512_maskz_subs_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_subs_epu16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_subs_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_subs_epu8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_subs_epu8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_subs_epu8" [@@noalloc]
+let () = check512 "_mm512_maskz_subs_epu8" (caml_mm512_maskz_subs_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_subs_epu8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_epi16" (caml_mm512_maskz_unpackhi_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_epi32" (caml_mm512_maskz_unpackhi_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_epi64" (caml_mm512_maskz_unpackhi_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_epi8" (caml_mm512_maskz_unpackhi_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_pd" (caml_mm512_maskz_unpackhi_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpackhi_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpackhi_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpackhi_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_unpackhi_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_unpackhi_ps" (caml_mm512_maskz_unpackhi_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpackhi_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi16" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_epi16" (caml_mm512_maskz_unpacklo_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_epi16 (mask_of_int64 0xa5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_epi32" (caml_mm512_maskz_unpacklo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_epi64" (caml_mm512_maskz_unpacklo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_epi8" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_epi8" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_epi8" (caml_mm512_maskz_unpacklo_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_pd" (caml_mm512_maskz_unpacklo_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_unpacklo_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_unpacklo_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_unpacklo_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_unpacklo_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_unpacklo_ps" (caml_mm512_maskz_unpacklo_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_unpacklo_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_xor_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_epi32" [@@noalloc] [@@builtin]
+external c__mm512_maskz_xor_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_maskz_xor_epi32" [@@noalloc]
+let () = check512 "_mm512_maskz_xor_epi32" (caml_mm512_maskz_xor_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_xor_epi32 (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_xor_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_epi64" [@@noalloc] [@@builtin]
+external c__mm512_maskz_xor_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_maskz_xor_epi64" [@@noalloc]
+let () = check512 "_mm512_maskz_xor_epi64" (caml_mm512_maskz_xor_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_xor_epi64 (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_xor_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_pd" [@@noalloc] [@@builtin]
+external c__mm512_maskz_xor_pd : (mask[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_maskz_xor_pd" [@@noalloc]
+let () = check512 "_mm512_maskz_xor_pd" (caml_mm512_maskz_xor_pd (mask_of_int64 0xa5L) (reint va) (reint vb)) (c__mm512_maskz_xor_pd (mask_of_int64 0xa5L) (reint va) (reint vb))
+
+external caml_mm512_maskz_xor_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_maskz_xor_ps" [@@noalloc] [@@builtin]
+external c__mm512_maskz_xor_ps : (mask[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_maskz_xor_ps" [@@noalloc]
+let () = check512 "_mm512_maskz_xor_ps" (caml_mm512_maskz_xor_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb)) (c__mm512_maskz_xor_ps (mask_of_int64 0xa5a5L) (reint va) (reint vb))
+
+external caml_mm512_max_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epi16" [@@noalloc] [@@builtin]
+external c__mm512_max_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_max_epi16" [@@noalloc]
+let () = check512 "_mm512_max_epi16" (caml_mm512_max_epi16 (reint va) (reint vb)) (c__mm512_max_epi16 (reint va) (reint vb))
+
+external caml_mm512_max_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epi32" [@@noalloc] [@@builtin]
+external c__mm512_max_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_max_epi32" [@@noalloc]
+let () = check512 "_mm512_max_epi32" (caml_mm512_max_epi32 (reint va) (reint vb)) (c__mm512_max_epi32 (reint va) (reint vb))
+
+external caml_mm512_max_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epi64" [@@noalloc] [@@builtin]
+external c__mm512_max_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_max_epi64" [@@noalloc]
+let () = check512 "_mm512_max_epi64" (caml_mm512_max_epi64 (reint va) (reint vb)) (c__mm512_max_epi64 (reint va) (reint vb))
+
+external caml_mm512_max_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epi8" [@@noalloc] [@@builtin]
+external c__mm512_max_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_max_epi8" [@@noalloc]
+let () = check512 "_mm512_max_epi8" (caml_mm512_max_epi8 (reint va) (reint vb)) (c__mm512_max_epi8 (reint va) (reint vb))
+
+external caml_mm512_max_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epu16" [@@noalloc] [@@builtin]
+external c__mm512_max_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_max_epu16" [@@noalloc]
+let () = check512 "_mm512_max_epu16" (caml_mm512_max_epu16 (reint va) (reint vb)) (c__mm512_max_epu16 (reint va) (reint vb))
+
+external caml_mm512_max_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epu32" [@@noalloc] [@@builtin]
+external c__mm512_max_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_max_epu32" [@@noalloc]
+let () = check512 "_mm512_max_epu32" (caml_mm512_max_epu32 (reint va) (reint vb)) (c__mm512_max_epu32 (reint va) (reint vb))
+
+external caml_mm512_max_epu64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epu64" [@@noalloc] [@@builtin]
+external c__mm512_max_epu64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_max_epu64" [@@noalloc]
+let () = check512 "_mm512_max_epu64" (caml_mm512_max_epu64 (reint va) (reint vb)) (c__mm512_max_epu64 (reint va) (reint vb))
+
+external caml_mm512_max_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_epu8" [@@noalloc] [@@builtin]
+external c__mm512_max_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_max_epu8" [@@noalloc]
+let () = check512 "_mm512_max_epu8" (caml_mm512_max_epu8 (reint va) (reint vb)) (c__mm512_max_epu8 (reint va) (reint vb))
+
+external caml_mm512_max_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_pd" [@@noalloc] [@@builtin]
+external c__mm512_max_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_max_pd" [@@noalloc]
+let () = check512 "_mm512_max_pd" (caml_mm512_max_pd (reint va) (reint vb)) (c__mm512_max_pd (reint va) (reint vb))
+
+external caml_mm512_max_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_max_ps" [@@noalloc] [@@builtin]
+external c__mm512_max_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_max_ps" [@@noalloc]
+let () = check512 "_mm512_max_ps" (caml_mm512_max_ps (reint va) (reint vb)) (c__mm512_max_ps (reint va) (reint vb))
+
+external caml_mm512_min_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epi16" [@@noalloc] [@@builtin]
+external c__mm512_min_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_min_epi16" [@@noalloc]
+let () = check512 "_mm512_min_epi16" (caml_mm512_min_epi16 (reint va) (reint vb)) (c__mm512_min_epi16 (reint va) (reint vb))
+
+external caml_mm512_min_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epi32" [@@noalloc] [@@builtin]
+external c__mm512_min_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_min_epi32" [@@noalloc]
+let () = check512 "_mm512_min_epi32" (caml_mm512_min_epi32 (reint va) (reint vb)) (c__mm512_min_epi32 (reint va) (reint vb))
+
+external caml_mm512_min_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epi64" [@@noalloc] [@@builtin]
+external c__mm512_min_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_min_epi64" [@@noalloc]
+let () = check512 "_mm512_min_epi64" (caml_mm512_min_epi64 (reint va) (reint vb)) (c__mm512_min_epi64 (reint va) (reint vb))
+
+external caml_mm512_min_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epi8" [@@noalloc] [@@builtin]
+external c__mm512_min_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_min_epi8" [@@noalloc]
+let () = check512 "_mm512_min_epi8" (caml_mm512_min_epi8 (reint va) (reint vb)) (c__mm512_min_epi8 (reint va) (reint vb))
+
+external caml_mm512_min_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epu16" [@@noalloc] [@@builtin]
+external c__mm512_min_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_min_epu16" [@@noalloc]
+let () = check512 "_mm512_min_epu16" (caml_mm512_min_epu16 (reint va) (reint vb)) (c__mm512_min_epu16 (reint va) (reint vb))
+
+external caml_mm512_min_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epu32" [@@noalloc] [@@builtin]
+external c__mm512_min_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_min_epu32" [@@noalloc]
+let () = check512 "_mm512_min_epu32" (caml_mm512_min_epu32 (reint va) (reint vb)) (c__mm512_min_epu32 (reint va) (reint vb))
+
+external caml_mm512_min_epu64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epu64" [@@noalloc] [@@builtin]
+external c__mm512_min_epu64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_min_epu64" [@@noalloc]
+let () = check512 "_mm512_min_epu64" (caml_mm512_min_epu64 (reint va) (reint vb)) (c__mm512_min_epu64 (reint va) (reint vb))
+
+external caml_mm512_min_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_epu8" [@@noalloc] [@@builtin]
+external c__mm512_min_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_min_epu8" [@@noalloc]
+let () = check512 "_mm512_min_epu8" (caml_mm512_min_epu8 (reint va) (reint vb)) (c__mm512_min_epu8 (reint va) (reint vb))
+
+external caml_mm512_min_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_pd" [@@noalloc] [@@builtin]
+external c__mm512_min_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_min_pd" [@@noalloc]
+let () = check512 "_mm512_min_pd" (caml_mm512_min_pd (reint va) (reint vb)) (c__mm512_min_pd (reint va) (reint vb))
+
+external caml_mm512_min_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_min_ps" [@@noalloc] [@@builtin]
+external c__mm512_min_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_min_ps" [@@noalloc]
+let () = check512 "_mm512_min_ps" (caml_mm512_min_ps (reint va) (reint vb)) (c__mm512_min_ps (reint va) (reint vb))
+
+external caml_mm512_movedup_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movedup_pd" [@@noalloc] [@@builtin]
+external c__mm512_movedup_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_movedup_pd" [@@noalloc]
+let () = check512 "_mm512_movedup_pd" (caml_mm512_movedup_pd (reint va)) (c__mm512_movedup_pd (reint va))
+
+external caml_mm512_movehdup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movehdup_ps" [@@noalloc] [@@builtin]
+external c__mm512_movehdup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_movehdup_ps" [@@noalloc]
+let () = check512 "_mm512_movehdup_ps" (caml_mm512_movehdup_ps (reint va)) (c__mm512_movehdup_ps (reint va))
+
+external caml_mm512_moveldup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_moveldup_ps" [@@noalloc] [@@builtin]
+external c__mm512_moveldup_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_moveldup_ps" [@@noalloc]
+let () = check512 "_mm512_moveldup_ps" (caml_mm512_moveldup_ps (reint va)) (c__mm512_moveldup_ps (reint va))
+
+external caml_mm512_movepi16_mask : (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movepi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_movepi16_mask : (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_movepi16_mask" [@@noalloc]
+let () = check_mask "_mm512_movepi16_mask" (caml_mm512_movepi16_mask (reint va)) (c__mm512_movepi16_mask (reint va))
+
+external caml_mm512_movepi32_mask : (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movepi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_movepi32_mask : (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_movepi32_mask" [@@noalloc]
+let () = check_mask "_mm512_movepi32_mask" (caml_mm512_movepi32_mask (reint va)) (c__mm512_movepi32_mask (reint va))
+
+external caml_mm512_movepi64_mask : (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movepi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_movepi64_mask : (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_movepi64_mask" [@@noalloc]
+let () = check_mask "_mm512_movepi64_mask" (caml_mm512_movepi64_mask (reint va)) (c__mm512_movepi64_mask (reint va))
+
+external caml_mm512_movepi8_mask : (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movepi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_movepi8_mask : (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_movepi8_mask" [@@noalloc]
+let () = check_mask "_mm512_movepi8_mask" (caml_mm512_movepi8_mask (reint va)) (c__mm512_movepi8_mask (reint va))
+
+external caml_mm512_movm_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movm_epi16" [@@noalloc] [@@builtin]
+external c__mm512_movm_epi16 : (mask[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_movm_epi16" [@@noalloc]
+let () = check512 "_mm512_movm_epi16" (caml_mm512_movm_epi16 (mask_of_int64 0xa5a5a5a5L)) (c__mm512_movm_epi16 (mask_of_int64 0xa5a5a5a5L))
+
+external caml_mm512_movm_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movm_epi32" [@@noalloc] [@@builtin]
+external c__mm512_movm_epi32 : (mask[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_movm_epi32" [@@noalloc]
+let () = check512 "_mm512_movm_epi32" (caml_mm512_movm_epi32 (mask_of_int64 0xa5a5L)) (c__mm512_movm_epi32 (mask_of_int64 0xa5a5L))
+
+external caml_mm512_movm_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movm_epi64" [@@noalloc] [@@builtin]
+external c__mm512_movm_epi64 : (mask[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_movm_epi64" [@@noalloc]
+let () = check512 "_mm512_movm_epi64" (caml_mm512_movm_epi64 (mask_of_int64 0xa5L)) (c__mm512_movm_epi64 (mask_of_int64 0xa5L))
+
+external caml_mm512_movm_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_movm_epi8" [@@noalloc] [@@builtin]
+external c__mm512_movm_epi8 : (mask[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_movm_epi8" [@@noalloc]
+let () = check512 "_mm512_movm_epi8" (caml_mm512_movm_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L)) (c__mm512_movm_epi8 (mask_of_int64 0xa5a5a5a5a5a5a5a5L))
+
+external caml_mm512_mul_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mul_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mul_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mul_epi32" [@@noalloc]
+let () = check512 "_mm512_mul_epi32" (caml_mm512_mul_epi32 (reint va) (reint vb)) (c__mm512_mul_epi32 (reint va) (reint vb))
+
+external caml_mm512_mul_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mul_epu32" [@@noalloc] [@@builtin]
+external c__mm512_mul_epu32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mul_epu32" [@@noalloc]
+let () = check512 "_mm512_mul_epu32" (caml_mm512_mul_epu32 (reint va) (reint vb)) (c__mm512_mul_epu32 (reint va) (reint vb))
+
+external caml_mm512_mul_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mul_pd" [@@noalloc] [@@builtin]
+external c__mm512_mul_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_mul_pd" [@@noalloc]
+let () = check512 "_mm512_mul_pd" (caml_mm512_mul_pd (reint va) (reint vb)) (c__mm512_mul_pd (reint va) (reint vb))
+
+external caml_mm512_mul_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mul_ps" [@@noalloc] [@@builtin]
+external c__mm512_mul_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_mul_ps" [@@noalloc]
+let () = check512 "_mm512_mul_ps" (caml_mm512_mul_ps (reint va) (reint vb)) (c__mm512_mul_ps (reint va) (reint vb))
+
+external caml_mm512_mulhi_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mulhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mulhi_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mulhi_epi16" [@@noalloc]
+let () = check512 "_mm512_mulhi_epi16" (caml_mm512_mulhi_epi16 (reint va) (reint vb)) (c__mm512_mulhi_epi16 (reint va) (reint vb))
+
+external caml_mm512_mulhi_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mulhi_epu16" [@@noalloc] [@@builtin]
+external c__mm512_mulhi_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mulhi_epu16" [@@noalloc]
+let () = check512 "_mm512_mulhi_epu16" (caml_mm512_mulhi_epu16 (reint va) (reint vb)) (c__mm512_mulhi_epu16 (reint va) (reint vb))
+
+external caml_mm512_mulhrs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mulhrs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mulhrs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mulhrs_epi16" [@@noalloc]
+let () = check512 "_mm512_mulhrs_epi16" (caml_mm512_mulhrs_epi16 (reint va) (reint vb)) (c__mm512_mulhrs_epi16 (reint va) (reint vb))
+
+external caml_mm512_mullo_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mullo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_mullo_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_mullo_epi16" [@@noalloc]
+let () = check512 "_mm512_mullo_epi16" (caml_mm512_mullo_epi16 (reint va) (reint vb)) (c__mm512_mullo_epi16 (reint va) (reint vb))
+
+external caml_mm512_mullo_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mullo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_mullo_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_mullo_epi32" [@@noalloc]
+let () = check512 "_mm512_mullo_epi32" (caml_mm512_mullo_epi32 (reint va) (reint vb)) (c__mm512_mullo_epi32 (reint va) (reint vb))
+
+external caml_mm512_mullo_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_mullo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_mullo_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_mullo_epi64" [@@noalloc]
+let () = check512 "_mm512_mullo_epi64" (caml_mm512_mullo_epi64 (reint va) (reint vb)) (c__mm512_mullo_epi64 (reint va) (reint vb))
+
+external caml_mm512_or_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_or_epi32" [@@noalloc] [@@builtin]
+external c__mm512_or_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_or_epi32" [@@noalloc]
+let () = check512 "_mm512_or_epi32" (caml_mm512_or_epi32 (reint va) (reint vb)) (c__mm512_or_epi32 (reint va) (reint vb))
+
+external caml_mm512_or_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_or_epi64" [@@noalloc] [@@builtin]
+external c__mm512_or_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_or_epi64" [@@noalloc]
+let () = check512 "_mm512_or_epi64" (caml_mm512_or_epi64 (reint va) (reint vb)) (c__mm512_or_epi64 (reint va) (reint vb))
+
+external caml_mm512_or_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_or_pd" [@@noalloc] [@@builtin]
+external c__mm512_or_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_or_pd" [@@noalloc]
+let () = check512 "_mm512_or_pd" (caml_mm512_or_pd (reint va) (reint vb)) (c__mm512_or_pd (reint va) (reint vb))
+
+external caml_mm512_or_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_or_ps" [@@noalloc] [@@builtin]
+external c__mm512_or_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_or_ps" [@@noalloc]
+let () = check512 "_mm512_or_ps" (caml_mm512_or_ps (reint va) (reint vb)) (c__mm512_or_ps (reint va) (reint vb))
+
+external caml_mm512_or_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_or_si512" [@@noalloc] [@@builtin]
+external c__mm512_or_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_or_si512" [@@noalloc]
+let () = check512 "_mm512_or_si512" (caml_mm512_or_si512 (reint va) (reint vb)) (c__mm512_or_si512 (reint va) (reint vb))
+
+external caml_mm512_packs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_packs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_packs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_packs_epi16" [@@noalloc]
+let () = check512 "_mm512_packs_epi16" (caml_mm512_packs_epi16 (reint va) (reint vb)) (c__mm512_packs_epi16 (reint va) (reint vb))
+
+external caml_mm512_packs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_packs_epi32" [@@noalloc] [@@builtin]
+external c__mm512_packs_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_packs_epi32" [@@noalloc]
+let () = check512 "_mm512_packs_epi32" (caml_mm512_packs_epi32 (reint va) (reint vb)) (c__mm512_packs_epi32 (reint va) (reint vb))
+
+external caml_mm512_packus_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_packus_epi16" [@@noalloc] [@@builtin]
+external c__mm512_packus_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_packus_epi16" [@@noalloc]
+let () = check512 "_mm512_packus_epi16" (caml_mm512_packus_epi16 (reint va) (reint vb)) (c__mm512_packus_epi16 (reint va) (reint vb))
+
+external caml_mm512_packus_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_packus_epi32" [@@noalloc] [@@builtin]
+external c__mm512_packus_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_packus_epi32" [@@noalloc]
+let () = check512 "_mm512_packus_epi32" (caml_mm512_packus_epi32 (reint va) (reint vb)) (c__mm512_packus_epi32 (reint va) (reint vb))
+
+external caml_mm512_permutevar_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutevar_epi32" [@@noalloc] [@@builtin]
+external c__mm512_permutevar_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_permutevar_epi32" [@@noalloc]
+let () = check512 "_mm512_permutevar_epi32" (caml_mm512_permutevar_epi32 (reint va) (reint vb)) (c__mm512_permutevar_epi32 (reint va) (reint vb))
+
+external caml_mm512_permutevar_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutevar_pd" [@@noalloc] [@@builtin]
+external c__mm512_permutevar_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_permutevar_pd" [@@noalloc]
+let () = check512 "_mm512_permutevar_pd" (caml_mm512_permutevar_pd (reint va) (reint vb)) (c__mm512_permutevar_pd (reint va) (reint vb))
+
+external caml_mm512_permutevar_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutevar_ps" [@@noalloc] [@@builtin]
+external c__mm512_permutevar_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_permutevar_ps" [@@noalloc]
+let () = check512 "_mm512_permutevar_ps" (caml_mm512_permutevar_ps (reint va) (reint vb)) (c__mm512_permutevar_ps (reint va) (reint vb))
+
+external caml_mm512_permutex2var_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi16" [@@noalloc] [@@builtin]
+external c__mm512_permutex2var_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_permutex2var_epi16" [@@noalloc]
+let () = check512 "_mm512_permutex2var_epi16" (caml_mm512_permutex2var_epi16 (reint va) (reint vb) (reint vc)) (c__mm512_permutex2var_epi16 (reint va) (reint vb) (reint vc))
+
+external caml_mm512_permutex2var_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi32" [@@noalloc] [@@builtin]
+external c__mm512_permutex2var_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_permutex2var_epi32" [@@noalloc]
+let () = check512 "_mm512_permutex2var_epi32" (caml_mm512_permutex2var_epi32 (reint va) (reint vb) (reint vc)) (c__mm512_permutex2var_epi32 (reint va) (reint vb) (reint vc))
+
+external caml_mm512_permutex2var_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_epi64" [@@noalloc] [@@builtin]
+external c__mm512_permutex2var_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_permutex2var_epi64" [@@noalloc]
+let () = check512 "_mm512_permutex2var_epi64" (caml_mm512_permutex2var_epi64 (reint va) (reint vb) (reint vc)) (c__mm512_permutex2var_epi64 (reint va) (reint vb) (reint vc))
+
+external caml_mm512_permutex2var_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_pd" [@@noalloc] [@@builtin]
+external c__mm512_permutex2var_pd : (float64x8[@unboxed]) -> (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_permutex2var_pd" [@@noalloc]
+let () = check512 "_mm512_permutex2var_pd" (caml_mm512_permutex2var_pd (reint va) (reint vb) (reint vc)) (c__mm512_permutex2var_pd (reint va) (reint vb) (reint vc))
+
+external caml_mm512_permutex2var_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutex2var_ps" [@@noalloc] [@@builtin]
+external c__mm512_permutex2var_ps : (float32x16[@unboxed]) -> (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_permutex2var_ps" [@@noalloc]
+let () = check512 "_mm512_permutex2var_ps" (caml_mm512_permutex2var_ps (reint va) (reint vb) (reint vc)) (c__mm512_permutex2var_ps (reint va) (reint vb) (reint vc))
+
+external caml_mm512_permutexvar_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi16" [@@noalloc] [@@builtin]
+external c__mm512_permutexvar_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_permutexvar_epi16" [@@noalloc]
+let () = check512 "_mm512_permutexvar_epi16" (caml_mm512_permutexvar_epi16 (reint va) (reint vb)) (c__mm512_permutexvar_epi16 (reint va) (reint vb))
+
+external caml_mm512_permutexvar_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi32" [@@noalloc] [@@builtin]
+external c__mm512_permutexvar_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_permutexvar_epi32" [@@noalloc]
+let () = check512 "_mm512_permutexvar_epi32" (caml_mm512_permutexvar_epi32 (reint va) (reint vb)) (c__mm512_permutexvar_epi32 (reint va) (reint vb))
+
+external caml_mm512_permutexvar_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutexvar_epi64" [@@noalloc] [@@builtin]
+external c__mm512_permutexvar_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_permutexvar_epi64" [@@noalloc]
+let () = check512 "_mm512_permutexvar_epi64" (caml_mm512_permutexvar_epi64 (reint va) (reint vb)) (c__mm512_permutexvar_epi64 (reint va) (reint vb))
+
+external caml_mm512_permutexvar_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutexvar_pd" [@@noalloc] [@@builtin]
+external c__mm512_permutexvar_pd : (int64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_permutexvar_pd" [@@noalloc]
+let () = check512 "_mm512_permutexvar_pd" (caml_mm512_permutexvar_pd (reint va) (reint vb)) (c__mm512_permutexvar_pd (reint va) (reint vb))
+
+external caml_mm512_permutexvar_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_permutexvar_ps" [@@noalloc] [@@builtin]
+external c__mm512_permutexvar_ps : (int32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_permutexvar_ps" [@@noalloc]
+let () = check512 "_mm512_permutexvar_ps" (caml_mm512_permutexvar_ps (reint va) (reint vb)) (c__mm512_permutexvar_ps (reint va) (reint vb))
+
+external caml_mm512_rcp14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rcp14_pd" [@@noalloc] [@@builtin]
+external c__mm512_rcp14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_rcp14_pd" [@@noalloc]
+let () = check512 "_mm512_rcp14_pd" (caml_mm512_rcp14_pd (reint va)) (c__mm512_rcp14_pd (reint va))
+
+external caml_mm512_rcp14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rcp14_ps" [@@noalloc] [@@builtin]
+external c__mm512_rcp14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_rcp14_ps" [@@noalloc]
+let () = check512 "_mm512_rcp14_ps" (caml_mm512_rcp14_ps (reint va)) (c__mm512_rcp14_ps (reint va))
+
+external caml_mm512_rolv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rolv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_rolv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_rolv_epi32" [@@noalloc]
+let () = check512 "_mm512_rolv_epi32" (caml_mm512_rolv_epi32 (reint va) (reint vb)) (c__mm512_rolv_epi32 (reint va) (reint vb))
+
+external caml_mm512_rolv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rolv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_rolv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_rolv_epi64" [@@noalloc]
+let () = check512 "_mm512_rolv_epi64" (caml_mm512_rolv_epi64 (reint va) (reint vb)) (c__mm512_rolv_epi64 (reint va) (reint vb))
+
+external caml_mm512_rorv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rorv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_rorv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_rorv_epi32" [@@noalloc]
+let () = check512 "_mm512_rorv_epi32" (caml_mm512_rorv_epi32 (reint va) (reint vb)) (c__mm512_rorv_epi32 (reint va) (reint vb))
+
+external caml_mm512_rorv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rorv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_rorv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_rorv_epi64" [@@noalloc]
+let () = check512 "_mm512_rorv_epi64" (caml_mm512_rorv_epi64 (reint va) (reint vb)) (c__mm512_rorv_epi64 (reint va) (reint vb))
+
+external caml_mm512_rsqrt14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rsqrt14_pd" [@@noalloc] [@@builtin]
+external c__mm512_rsqrt14_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_rsqrt14_pd" [@@noalloc]
+let () = check512 "_mm512_rsqrt14_pd" (caml_mm512_rsqrt14_pd (reint va)) (c__mm512_rsqrt14_pd (reint va))
+
+external caml_mm512_rsqrt14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_rsqrt14_ps" [@@noalloc] [@@builtin]
+external c__mm512_rsqrt14_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_rsqrt14_ps" [@@noalloc]
+let () = check512 "_mm512_rsqrt14_ps" (caml_mm512_rsqrt14_ps (reint va)) (c__mm512_rsqrt14_ps (reint va))
+
+external caml_mm512_sad_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sad_epu8" [@@noalloc] [@@builtin]
+external c__mm512_sad_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_sad_epu8" [@@noalloc]
+let () = check512 "_mm512_sad_epu8" (caml_mm512_sad_epu8 (reint va) (reint vb)) (c__mm512_sad_epu8 (reint va) (reint vb))
+
+external caml_mm512_scalef_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_scalef_pd" [@@noalloc] [@@builtin]
+external c__mm512_scalef_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_scalef_pd" [@@noalloc]
+let () = check512 "_mm512_scalef_pd" (caml_mm512_scalef_pd (reint va) (reint vb)) (c__mm512_scalef_pd (reint va) (reint vb))
+
+external caml_mm512_scalef_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_scalef_ps" [@@noalloc] [@@builtin]
+external c__mm512_scalef_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_scalef_ps" [@@noalloc]
+let () = check512 "_mm512_scalef_ps" (caml_mm512_scalef_ps (reint va) (reint vb)) (c__mm512_scalef_ps (reint va) (reint vb))
+
+external caml_mm512_shuffle_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_shuffle_epi8" [@@noalloc] [@@builtin]
+external c__mm512_shuffle_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_shuffle_epi8" [@@noalloc]
+let () = check512 "_mm512_shuffle_epi8" (caml_mm512_shuffle_epi8 (reint va) (reint vb)) (c__mm512_shuffle_epi8 (reint va) (reint vb))
+
+external caml_mm512_sllv_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sllv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_sllv_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_sllv_epi16" [@@noalloc]
+let () = check512 "_mm512_sllv_epi16" (caml_mm512_sllv_epi16 (reint va) (reint vb)) (c__mm512_sllv_epi16 (reint va) (reint vb))
+
+external caml_mm512_sllv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sllv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_sllv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_sllv_epi32" [@@noalloc]
+let () = check512 "_mm512_sllv_epi32" (caml_mm512_sllv_epi32 (reint va) (reint vb)) (c__mm512_sllv_epi32 (reint va) (reint vb))
+
+external caml_mm512_sllv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sllv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_sllv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_sllv_epi64" [@@noalloc]
+let () = check512 "_mm512_sllv_epi64" (caml_mm512_sllv_epi64 (reint va) (reint vb)) (c__mm512_sllv_epi64 (reint va) (reint vb))
+
+external caml_mm512_sqrt_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sqrt_pd" [@@noalloc] [@@builtin]
+external c__mm512_sqrt_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_sqrt_pd" [@@noalloc]
+let () = check512 "_mm512_sqrt_pd" (caml_mm512_sqrt_pd (reint va)) (c__mm512_sqrt_pd (reint va))
+
+external caml_mm512_sqrt_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sqrt_ps" [@@noalloc] [@@builtin]
+external c__mm512_sqrt_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_sqrt_ps" [@@noalloc]
+let () = check512 "_mm512_sqrt_ps" (caml_mm512_sqrt_ps (reint va)) (c__mm512_sqrt_ps (reint va))
+
+external caml_mm512_srav_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srav_epi16" [@@noalloc] [@@builtin]
+external c__mm512_srav_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_srav_epi16" [@@noalloc]
+let () = check512 "_mm512_srav_epi16" (caml_mm512_srav_epi16 (reint va) (reint vb)) (c__mm512_srav_epi16 (reint va) (reint vb))
+
+external caml_mm512_srav_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srav_epi32" [@@noalloc] [@@builtin]
+external c__mm512_srav_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_srav_epi32" [@@noalloc]
+let () = check512 "_mm512_srav_epi32" (caml_mm512_srav_epi32 (reint va) (reint vb)) (c__mm512_srav_epi32 (reint va) (reint vb))
+
+external caml_mm512_srav_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srav_epi64" [@@noalloc] [@@builtin]
+external c__mm512_srav_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_srav_epi64" [@@noalloc]
+let () = check512 "_mm512_srav_epi64" (caml_mm512_srav_epi64 (reint va) (reint vb)) (c__mm512_srav_epi64 (reint va) (reint vb))
+
+external caml_mm512_srlv_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srlv_epi16" [@@noalloc] [@@builtin]
+external c__mm512_srlv_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_srlv_epi16" [@@noalloc]
+let () = check512 "_mm512_srlv_epi16" (caml_mm512_srlv_epi16 (reint va) (reint vb)) (c__mm512_srlv_epi16 (reint va) (reint vb))
+
+external caml_mm512_srlv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srlv_epi32" [@@noalloc] [@@builtin]
+external c__mm512_srlv_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_srlv_epi32" [@@noalloc]
+let () = check512 "_mm512_srlv_epi32" (caml_mm512_srlv_epi32 (reint va) (reint vb)) (c__mm512_srlv_epi32 (reint va) (reint vb))
+
+external caml_mm512_srlv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_srlv_epi64" [@@noalloc] [@@builtin]
+external c__mm512_srlv_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_srlv_epi64" [@@noalloc]
+let () = check512 "_mm512_srlv_epi64" (caml_mm512_srlv_epi64 (reint va) (reint vb)) (c__mm512_srlv_epi64 (reint va) (reint vb))
+
+external caml_mm512_sub_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_epi16" [@@noalloc] [@@builtin]
+external c__mm512_sub_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_sub_epi16" [@@noalloc]
+let () = check512 "_mm512_sub_epi16" (caml_mm512_sub_epi16 (reint va) (reint vb)) (c__mm512_sub_epi16 (reint va) (reint vb))
+
+external caml_mm512_sub_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_epi32" [@@noalloc] [@@builtin]
+external c__mm512_sub_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_sub_epi32" [@@noalloc]
+let () = check512 "_mm512_sub_epi32" (caml_mm512_sub_epi32 (reint va) (reint vb)) (c__mm512_sub_epi32 (reint va) (reint vb))
+
+external caml_mm512_sub_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_epi64" [@@noalloc] [@@builtin]
+external c__mm512_sub_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_sub_epi64" [@@noalloc]
+let () = check512 "_mm512_sub_epi64" (caml_mm512_sub_epi64 (reint va) (reint vb)) (c__mm512_sub_epi64 (reint va) (reint vb))
+
+external caml_mm512_sub_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_epi8" [@@noalloc] [@@builtin]
+external c__mm512_sub_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_sub_epi8" [@@noalloc]
+let () = check512 "_mm512_sub_epi8" (caml_mm512_sub_epi8 (reint va) (reint vb)) (c__mm512_sub_epi8 (reint va) (reint vb))
+
+external caml_mm512_sub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_pd" [@@noalloc] [@@builtin]
+external c__mm512_sub_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_sub_pd" [@@noalloc]
+let () = check512 "_mm512_sub_pd" (caml_mm512_sub_pd (reint va) (reint vb)) (c__mm512_sub_pd (reint va) (reint vb))
+
+external caml_mm512_sub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_sub_ps" [@@noalloc] [@@builtin]
+external c__mm512_sub_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_sub_ps" [@@noalloc]
+let () = check512 "_mm512_sub_ps" (caml_mm512_sub_ps (reint va) (reint vb)) (c__mm512_sub_ps (reint va) (reint vb))
+
+external caml_mm512_subs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_subs_epi16" [@@noalloc] [@@builtin]
+external c__mm512_subs_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_subs_epi16" [@@noalloc]
+let () = check512 "_mm512_subs_epi16" (caml_mm512_subs_epi16 (reint va) (reint vb)) (c__mm512_subs_epi16 (reint va) (reint vb))
+
+external caml_mm512_subs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_subs_epi8" [@@noalloc] [@@builtin]
+external c__mm512_subs_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_subs_epi8" [@@noalloc]
+let () = check512 "_mm512_subs_epi8" (caml_mm512_subs_epi8 (reint va) (reint vb)) (c__mm512_subs_epi8 (reint va) (reint vb))
+
+external caml_mm512_subs_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_subs_epu16" [@@noalloc] [@@builtin]
+external c__mm512_subs_epu16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_subs_epu16" [@@noalloc]
+let () = check512 "_mm512_subs_epu16" (caml_mm512_subs_epu16 (reint va) (reint vb)) (c__mm512_subs_epu16 (reint va) (reint vb))
+
+external caml_mm512_subs_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_subs_epu8" [@@noalloc] [@@builtin]
+external c__mm512_subs_epu8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_subs_epu8" [@@noalloc]
+let () = check512 "_mm512_subs_epu8" (caml_mm512_subs_epu8 (reint va) (reint vb)) (c__mm512_subs_epu8 (reint va) (reint vb))
+
+external caml_mm512_test_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_test_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_test_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_test_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_test_epi16_mask" (caml_mm512_test_epi16_mask (reint va) (reint vb)) (c__mm512_test_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_test_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_test_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_test_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_test_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_test_epi32_mask" (caml_mm512_test_epi32_mask (reint va) (reint vb)) (c__mm512_test_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_test_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_test_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_test_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_test_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_test_epi64_mask" (caml_mm512_test_epi64_mask (reint va) (reint vb)) (c__mm512_test_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_test_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_test_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_test_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_test_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_test_epi8_mask" (caml_mm512_test_epi8_mask (reint va) (reint vb)) (c__mm512_test_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_testn_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_testn_epi16_mask" [@@noalloc] [@@builtin]
+external c__mm512_testn_epi16_mask : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_testn_epi16_mask" [@@noalloc]
+let () = check_mask "_mm512_testn_epi16_mask" (caml_mm512_testn_epi16_mask (reint va) (reint vb)) (c__mm512_testn_epi16_mask (reint va) (reint vb))
+
+external caml_mm512_testn_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_testn_epi32_mask" [@@noalloc] [@@builtin]
+external c__mm512_testn_epi32_mask : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_testn_epi32_mask" [@@noalloc]
+let () = check_mask "_mm512_testn_epi32_mask" (caml_mm512_testn_epi32_mask (reint va) (reint vb)) (c__mm512_testn_epi32_mask (reint va) (reint vb))
+
+external caml_mm512_testn_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_testn_epi64_mask" [@@noalloc] [@@builtin]
+external c__mm512_testn_epi64_mask : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_testn_epi64_mask" [@@noalloc]
+let () = check_mask "_mm512_testn_epi64_mask" (caml_mm512_testn_epi64_mask (reint va) (reint vb)) (c__mm512_testn_epi64_mask (reint va) (reint vb))
+
+external caml_mm512_testn_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_testn_epi8_mask" [@@noalloc] [@@builtin]
+external c__mm512_testn_epi8_mask : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (mask[@unboxed]) = "" "ctest__mm512_testn_epi8_mask" [@@noalloc]
+let () = check_mask "_mm512_testn_epi8_mask" (caml_mm512_testn_epi8_mask (reint va) (reint vb)) (c__mm512_testn_epi8_mask (reint va) (reint vb))
+
+external caml_mm512_unpackhi_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi16" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_unpackhi_epi16" [@@noalloc]
+let () = check512 "_mm512_unpackhi_epi16" (caml_mm512_unpackhi_epi16 (reint va) (reint vb)) (c__mm512_unpackhi_epi16 (reint va) (reint vb))
+
+external caml_mm512_unpackhi_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi32" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_unpackhi_epi32" [@@noalloc]
+let () = check512 "_mm512_unpackhi_epi32" (caml_mm512_unpackhi_epi32 (reint va) (reint vb)) (c__mm512_unpackhi_epi32 (reint va) (reint vb))
+
+external caml_mm512_unpackhi_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi64" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_unpackhi_epi64" [@@noalloc]
+let () = check512 "_mm512_unpackhi_epi64" (caml_mm512_unpackhi_epi64 (reint va) (reint vb)) (c__mm512_unpackhi_epi64 (reint va) (reint vb))
+
+external caml_mm512_unpackhi_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_epi8" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_unpackhi_epi8" [@@noalloc]
+let () = check512 "_mm512_unpackhi_epi8" (caml_mm512_unpackhi_epi8 (reint va) (reint vb)) (c__mm512_unpackhi_epi8 (reint va) (reint vb))
+
+external caml_mm512_unpackhi_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_pd" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_unpackhi_pd" [@@noalloc]
+let () = check512 "_mm512_unpackhi_pd" (caml_mm512_unpackhi_pd (reint va) (reint vb)) (c__mm512_unpackhi_pd (reint va) (reint vb))
+
+external caml_mm512_unpackhi_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpackhi_ps" [@@noalloc] [@@builtin]
+external c__mm512_unpackhi_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_unpackhi_ps" [@@noalloc]
+let () = check512 "_mm512_unpackhi_ps" (caml_mm512_unpackhi_ps (reint va) (reint vb)) (c__mm512_unpackhi_ps (reint va) (reint vb))
+
+external caml_mm512_unpacklo_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi16" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_epi16 : (int16x32[@unboxed]) -> (int16x32[@unboxed]) -> (int16x32[@unboxed]) = "" "ctest__mm512_unpacklo_epi16" [@@noalloc]
+let () = check512 "_mm512_unpacklo_epi16" (caml_mm512_unpacklo_epi16 (reint va) (reint vb)) (c__mm512_unpacklo_epi16 (reint va) (reint vb))
+
+external caml_mm512_unpacklo_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi32" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_unpacklo_epi32" [@@noalloc]
+let () = check512 "_mm512_unpacklo_epi32" (caml_mm512_unpacklo_epi32 (reint va) (reint vb)) (c__mm512_unpacklo_epi32 (reint va) (reint vb))
+
+external caml_mm512_unpacklo_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi64" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_unpacklo_epi64" [@@noalloc]
+let () = check512 "_mm512_unpacklo_epi64" (caml_mm512_unpacklo_epi64 (reint va) (reint vb)) (c__mm512_unpacklo_epi64 (reint va) (reint vb))
+
+external caml_mm512_unpacklo_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_epi8" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_epi8 : (int8x64[@unboxed]) -> (int8x64[@unboxed]) -> (int8x64[@unboxed]) = "" "ctest__mm512_unpacklo_epi8" [@@noalloc]
+let () = check512 "_mm512_unpacklo_epi8" (caml_mm512_unpacklo_epi8 (reint va) (reint vb)) (c__mm512_unpacklo_epi8 (reint va) (reint vb))
+
+external caml_mm512_unpacklo_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_pd" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_unpacklo_pd" [@@noalloc]
+let () = check512 "_mm512_unpacklo_pd" (caml_mm512_unpacklo_pd (reint va) (reint vb)) (c__mm512_unpacklo_pd (reint va) (reint vb))
+
+external caml_mm512_unpacklo_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_unpacklo_ps" [@@noalloc] [@@builtin]
+external c__mm512_unpacklo_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_unpacklo_ps" [@@noalloc]
+let () = check512 "_mm512_unpacklo_ps" (caml_mm512_unpacklo_ps (reint va) (reint vb)) (c__mm512_unpacklo_ps (reint va) (reint vb))
+
+external caml_mm512_xor_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_xor_epi32" [@@noalloc] [@@builtin]
+external c__mm512_xor_epi32 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_xor_epi32" [@@noalloc]
+let () = check512 "_mm512_xor_epi32" (caml_mm512_xor_epi32 (reint va) (reint vb)) (c__mm512_xor_epi32 (reint va) (reint vb))
+
+external caml_mm512_xor_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_xor_epi64" [@@noalloc] [@@builtin]
+external c__mm512_xor_epi64 : (int64x8[@unboxed]) -> (int64x8[@unboxed]) -> (int64x8[@unboxed]) = "" "ctest__mm512_xor_epi64" [@@noalloc]
+let () = check512 "_mm512_xor_epi64" (caml_mm512_xor_epi64 (reint va) (reint vb)) (c__mm512_xor_epi64 (reint va) (reint vb))
+
+external caml_mm512_xor_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_xor_pd" [@@noalloc] [@@builtin]
+external c__mm512_xor_pd : (float64x8[@unboxed]) -> (float64x8[@unboxed]) -> (float64x8[@unboxed]) = "" "ctest__mm512_xor_pd" [@@noalloc]
+let () = check512 "_mm512_xor_pd" (caml_mm512_xor_pd (reint va) (reint vb)) (c__mm512_xor_pd (reint va) (reint vb))
+
+external caml_mm512_xor_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_xor_ps" [@@noalloc] [@@builtin]
+external c__mm512_xor_ps : (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) = "" "ctest__mm512_xor_ps" [@@noalloc]
+let () = check512 "_mm512_xor_ps" (caml_mm512_xor_ps (reint va) (reint vb)) (c__mm512_xor_ps (reint va) (reint vb))
+
+external caml_mm512_xor_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "caml_vec512_unreachable" "caml_mm512_xor_si512" [@@noalloc] [@@builtin]
+external c__mm512_xor_si512 : (int32x16[@unboxed]) -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) = "" "ctest__mm512_xor_si512" [@@noalloc]
+let () = check512 "_mm512_xor_si512" (caml_mm512_xor_si512 (reint va) (reint vb)) (c__mm512_xor_si512 (reint va) (reint vb))
 
 let () = if !failures <> 0 then exit 1

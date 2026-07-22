@@ -118,3 +118,52 @@
    (<> %{system} macosx)))
  (action
   (diff empty.expected gen512.out)))
+
+(rule
+ (targets libmemstubs.a)
+ (deps mem_stubs.c (source_tree %{workspace_root}/runtime/caml))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (progn
+   (run clang -c -O2 -mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd
+     -I %{workspace_root}/runtime -o mem_stubs.o mem_stubs.c)
+   (run ar rcs libmemstubs.a mem_stubs.o))))
+
+(executable
+ (name mem)
+ (modules mem)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives memstubs))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   mem.out
+   (run ./mem.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected mem.out)))
