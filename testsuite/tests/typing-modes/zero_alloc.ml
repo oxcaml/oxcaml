@@ -1004,6 +1004,29 @@ Error: The value "Int64.add" is "alloc"
          which is expected to be "noalloc".
 |}]
 
+(* CR shsong: [int] arithmetic operator is an [alloc] value and rejected
+    conservatively, even though no allocation occurs. *)
+let (alloc_int_arith @ noalloc_strict) (a : int) = a + a
+[%%expect{|
+Line 1, characters 53-54:
+1 | let (alloc_int_arith @ noalloc_strict) (a : int) = a + a
+                                                         ^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 39-56
+         which is expected to be "noalloc_strict".
+|}]
+let (alloc_int_arith @ noalloc) (a : int) = a + a
+[%%expect{|
+Line 1, characters 46-47:
+1 | let (alloc_int_arith @ noalloc) (a : int) = a + a
+                                                  ^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 32-49
+         which is expected to be "noalloc".
+|}]
+
 (* CR-soon shsong: revisit exception handling after implementing the
     part that distinguishes noalloc_strict and noalloc *)
 (* Constructing an exception (an extensible variant) with an argument
