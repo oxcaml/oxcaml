@@ -1,0 +1,4 @@
+# Generated witness programs (main.exe -out DIR) are not hand-written source:
+# they use mode syntax ocamlformat cannot parse, and reformatting them would be
+# meaningless anyway.
+witnesses/*.ml

@@ -6,10 +6,19 @@
    terms, and a pretty-printer. A single program is emitted, carrying both
    annotations on the function under test (see [Sample]).
 
-   Tier A: construction of one layer -- tuples, records (int and float),
-   variants, lists, arrays -- plain vs [exclave_]-wrapped, plus mode-crossing
-   immediates, glued together with integer/float arithmetic, comparisons, [let],
-   and [if].
+   Types ([Ty]) mirror the compiler's split between type *expressions* and type
+   *declarations*: records and variants are nominal ([Ty.Constr] refers to them
+   by name, like [Ptyp_constr]), and their structure lives in declarations
+   ([Ty.Decl], like [Ptype_record] / [Ptype_variant] in [type_kind]). Every
+   generated program gets its own randomly generated declarations ([Ty.Tenv]),
+   printed as the prelude. Special layouts are not hard-coded but emerge from
+   the generated structure: a record whose fields are all [float] is a flat
+   float record, a variant whose constructors are all nullary is immediate, a
+   self-referential variant is a list/tree.
+
+   Tier A: construction -- tuples, records, variants, lists, arrays -- plain vs
+   [exclave_]-wrapped, plus mode-crossing immediates, glued together with
+   integer/float arithmetic, comparisons, [let], and [if].
 
    Tier B: closures, captures, and nesting -- arrow types can be [let]-bound and
    returned, and lambda bodies freely reference enclosing bindings.
@@ -53,14 +62,6 @@ module Sample = struct
   let to_string { source } = source
 end
 
-(* Shared type declarations emitted into both files. [r] is an
-   all-immediate-field record, [fr] a float record (flat float layout), [v] a
-   variant with an immediate and a boxed constructor. *)
-let prelude =
-  "type r = { a : int; b : int }\n\
-   type fr = { fx : float; fy : float }\n\
-   type v = A | B of int\n\n"
-
 (* How an argument is passed, mirroring the compiler's [Asttypes.arg_label].
    Part of the function type: it determines call-site syntax. For [Optional],
    the arrow's payload type is the type behind the [?] (whether the *binder* has
@@ -84,105 +85,162 @@ module Arg_label = struct
 end
 
 module Ty = struct
+  module Constant = struct
+    type t =
+      | Int
+      | Float
+    (* later: Char, Int64, and unboxed layouts (float#, int64#) *)
+
+    let equal a b =
+      match a, b with
+      | Int, Int | Float, Float -> true
+      | (Int | Float), _ -> false
+
+    let to_string = function Int -> "int" | Float -> "float"
+  end
+
+  (* Identifier (also the source name) of a user-declared nominal type. *)
+  module Id = struct
+    type t = string
+
+    let equal = String.equal
+
+    let name t = t
+  end
+
   type t =
-    | Int
-    | Float
-    | Pair of t * t
+    | Constant of Constant.t
+    | Tuple of t list (* invariant: at least two components *)
     | List of t
     | Array of t
-    (* CR shsong: need to improve how we generate user-defined types *)
-    | Record_int (* r *)
-    | Record_float (* fr *)
-    | Variant (* v *)
+    | Constr of Id.t (* a declared record / variant type, by name *)
     | Arrow of
         { label : Arg_label.t;
-          arg : t; (* payload type; for [Optional], the type behind the ? *)
-          ret : t (* possibly another [Arrow]: multi-parameter = a chain *)
+          arg : t;
+          ret : t
         }
 
   let rec equal t1 t2 =
     match t1, t2 with
-    | Int, Int | Float, Float -> true
-    | Record_int, Record_int | Record_float, Record_float | Variant, Variant ->
-      true
-    | Pair (a1, b1), Pair (a2, b2) -> equal a1 a2 && equal b1 b2
+    | Constant c1, Constant c2 -> Constant.equal c1 c2
+    | Tuple l1, Tuple l2 -> List.equal equal l1 l2
     | List a, List b | Array a, Array b -> equal a b
+    | Constr i1, Constr i2 -> Id.equal i1 i2
     | Arrow a1, Arrow a2 ->
       Arg_label.equal a1.label a2.label
       && equal a1.arg a2.arg && equal a1.ret a2.ret
-    | ( ( Int | Float | Pair _ | List _ | Array _ | Record_int | Record_float
-        | Variant | Arrow _ ),
-        _ ) ->
-      false
+    | (Constant _ | Tuple _ | List _ | Array _ | Constr _ | Arrow _), _ -> false
 
   let rec to_string = function
-    | Int -> "int"
-    | Float -> "float"
-    | Pair (a, b) -> "(" ^ to_string a ^ " * " ^ to_string b ^ ")"
+    | Constant c -> Constant.to_string c
+    | Tuple ts -> "(" ^ String.concat " * " (List.map to_string ts) ^ ")"
     | List t -> to_string t ^ " list"
     | Array t -> to_string t ^ " array"
-    | Record_int -> "r"
-    | Record_float -> "fr"
-    | Variant -> "v"
+    | Constr id -> Id.name id
     | Arrow { label; arg; ret } ->
       "(" ^ Arg_label.to_string label ^ to_string arg ^ " -> " ^ to_string ret
       ^ ")"
 
-  (* The arrow chain of a function type: one (label, payload) per parameter,
-     outermost first, plus the final non-arrow result. *)
   let rec arrows = function
     | Arrow { label; arg; ret } ->
       let params, result = arrows ret in
       (label, arg) :: params, result
     | ty -> [], ty
 
-  (* Types whose construction could plausibly be wrapped in [exclave_] (closures
-     are allocated too). This is distribution steering, not an allocation
-     prediction. *)
   let exclave_candidate = function
-    | Pair _ | List _ | Array _ | Record_int | Record_float | Variant | Arrow _
-      ->
-      true
-    | Int | Float -> false
+    | Tuple _ | List _ | Array _ | Constr _ | Arrow _ -> true
+    | Constant _ -> false
+
+  (* Type declarations: the structure behind each [Constr]. *)
+  module Decl = struct
+    type field =
+      { f_name : string;
+        f_ty : t;
+        f_mutable : bool
+            (* CR shsong: declared but assignments are not generated yet
+               (mutation wants a unit type and sequencing) *)
+      }
+
+    type constructor =
+      { c_name : string;
+        c_args : t list
+      }
+
+    type kind =
+      | Record of field list (* invariant: non-empty *)
+      | Variant of constructor list
+    (* invariants: non-empty, and at least one nullary base constructor so
+       values are constructible at exhausted fuel *)
+
+    type decl =
+      { id : Id.t;
+        kind : kind
+      }
+
+    let field_to_string { f_name; f_ty; f_mutable } =
+      (if f_mutable then "mutable " else "") ^ f_name ^ " : " ^ to_string f_ty
+
+    let constructor_to_string { c_name; c_args } =
+      match c_args with
+      | [] -> c_name
+      | args -> c_name ^ " of " ^ String.concat " * " (List.map to_string args)
+
+    let to_string { id; kind } =
+      "type " ^ Id.name id ^ " ="
+      ^
+      match kind with
+      | Record fields ->
+        " { " ^ String.concat "; " (List.map field_to_string fields) ^ " }"
+      | Variant constrs ->
+        " " ^ String.concat " | " (List.map constructor_to_string constrs)
+  end
+
+  (* The per-program type environment, in declaration order. *)
+  module Tenv = struct
+    type t = Decl.decl list
+
+    let empty = []
+
+    let decls t = t
+
+    let lookup t id =
+      (List.find (fun (d : Decl.decl) -> Id.equal d.id id) t).Decl.kind
+
+    let to_prelude t =
+      String.concat "" (List.map (fun d -> Decl.to_string d ^ "\n") t) ^ "\n"
+  end
 end
 
 module Expr = struct
+  (* CR shong: Consider to make it more comprehensive for completeness test. *)
+  type binop =
+    | Add
+    | Fadd
+    | Leq
+
   type t =
     | Var of string
     | Int_lit of int
     | Float_lit of float
-    (* CR shsong: consider to group bop to one variant *)
-    | Add of t * t (* int + int *)
-    | Fadd of t * t (* float +. float *)
-    | Leq of t * t (* int <= int, used only as an [If] condition *)
+    | Binop of binop * t * t
     | If of t * t * t
     | Let of string * t * t
-    | Pair of t * t
+    | Tuple of t list (* invariant: at least two components *)
     | Nil
     | Cons of t * t
     | Array_lit of t list
-    (* CR shsong: in the following four cases, user defined types are hard-coded
-       again. Improve this. *)
-    | Record_int of t * t (* { a; b } *)
-    | Record_float of t * t (* { fx; fy } *)
-    | Constr_a (* A -- immediate *)
-    | Constr_b of t (* B e -- boxed *)
-    | Exclave of t (* exclave_ e; only ever placed in tail position *)
+    | Record of (string * t) list
+      (* invariant: field names are globally unique, so no type annotation is
+         needed for disambiguation *)
+    | Construct of string * t list
+    | Exclave of t (* invariant: only ever placed in tail position *)
     | Lam of
         { params : param list;
-              (* n-ary: arity = length params. Function arity is syntactic since
-                 OCaml 5.2, so binding an arrow chain as one n-ary [Lam] (a
-                 single closure) or as nested unary [Lam]s (a closure allocating
-                 an inner closure per partial application) are different
-                 programs of the same type. *)
           body : t
         }
     | App of
         { f : t;
           args : (Arg_label.t * t) list
-              (* in parameter order; an [Optional] parameter simply has no entry
-                 when omitted (it is erased when the following positional
-                 argument is applied) *)
         }
 
   and param =
@@ -203,6 +261,8 @@ module Expr = struct
      CR shsong: the [None] case is NOT generated yet: the binder would have type
      [t option], which needs option types in [Ty]. *)
 
+  let binop_to_string = function Add -> " + " | Fadd -> " +. " | Leq -> " <= "
+
   (* Fully parenthesized: ugly but unambiguous, and shrinking (milestone 3) is
      the readability story, not the printer. *)
   let rec to_string = function
@@ -212,24 +272,26 @@ module Expr = struct
     | Float_lit f ->
       let s = Printf.sprintf "%F" f in
       if f < 0.0 then "(" ^ s ^ ")" else s
-    | Add (a, b) -> "(" ^ to_string a ^ " + " ^ to_string b ^ ")"
-    | Fadd (a, b) -> "(" ^ to_string a ^ " +. " ^ to_string b ^ ")"
-    | Leq (a, b) -> "(" ^ to_string a ^ " <= " ^ to_string b ^ ")"
+    | Binop (op, a, b) ->
+      "(" ^ to_string a ^ binop_to_string op ^ to_string b ^ ")"
     | If (c, t, e) ->
       "(if " ^ to_string c ^ " then " ^ to_string t ^ " else " ^ to_string e
       ^ ")"
     | Let (x, e1, e2) ->
       "(let " ^ x ^ " = " ^ to_string e1 ^ " in " ^ to_string e2 ^ ")"
-    | Pair (a, b) -> "(" ^ to_string a ^ ", " ^ to_string b ^ ")"
+    | Tuple es -> "(" ^ String.concat ", " (List.map to_string es) ^ ")"
     | Nil -> "[]"
     | Cons (h, t) -> "(" ^ to_string h ^ " :: " ^ to_string t ^ ")"
     | Array_lit es -> "[| " ^ String.concat "; " (List.map to_string es) ^ " |]"
-    | Record_int (a, b) ->
-      "{ a = " ^ to_string a ^ "; b = " ^ to_string b ^ " }"
-    | Record_float (a, b) ->
-      "{ fx = " ^ to_string a ^ "; fy = " ^ to_string b ^ " }"
-    | Constr_a -> "A"
-    | Constr_b e -> "(B " ^ to_string e ^ ")"
+    | Record fields ->
+      "{ "
+      ^ String.concat "; "
+          (List.map (fun (f, e) -> f ^ " = " ^ to_string e) fields)
+      ^ " }"
+    | Construct (c, []) -> c
+    | Construct (c, [e]) -> "(" ^ c ^ " " ^ to_string e ^ ")"
+    | Construct (c, es) ->
+      "(" ^ c ^ " (" ^ String.concat ", " (List.map to_string es) ^ "))"
     | Exclave e -> "exclave_ " ^ to_string e
     | Lam { params; body } ->
       "(fun "
@@ -256,18 +318,54 @@ module Expr = struct
     | Labelled l | Optional l -> "~" ^ l ^ ":" ^ to_string e
 end
 
-(* Generation context: PRNG state and a fresh-name supply. The typed environment
-   is threaded functionally so bindings scope correctly. *)
+(* Generation context: PRNG state, fresh-name supplies, and the per-program type
+   declarations. The typed *variable* environment is threaded functionally
+   through [gen_expr] so bindings scope correctly. *)
 type ctx =
   { rng : Random.State.t;
     mutable next_var : int;
+    mutable next_ty : int;
+    mutable next_field : int;
+    mutable next_constr : int;
+    mutable tenv : Ty.Tenv.t;
     mode : Mode.t
   }
 
+let fresh_name counter prefix ctx =
+  let n = counter ctx in
+  Printf.sprintf "%s%d" prefix n
+
 let fresh ctx =
-  let n = ctx.next_var in
-  ctx.next_var <- n + 1;
-  Printf.sprintf "v%d" n
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_var in
+      ctx.next_var <- n + 1;
+      n)
+    "v" ctx
+
+let fresh_ty_name ctx =
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_ty in
+      ctx.next_ty <- n + 1;
+      n)
+    "t" ctx
+
+let fresh_field ctx =
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_field in
+      ctx.next_field <- n + 1;
+      n)
+    "f" ctx
+
+let fresh_constr ctx =
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_constr in
+      ctx.next_constr <- n + 1;
+      n)
+    "C" ctx
 
 (* Pick among weighted alternatives; entries with weight 0 are disabled. *)
 let choose ctx options =
@@ -279,20 +377,101 @@ let choose ctx options =
   in
   pick (Random.State.int ctx.rng total) options
 
-(* Component types for pairs / lists / arrays are leaf types only: Tier A is
-   about one layer of construction, and it also guarantees the generator
-   terminates (composite children generated at exhausted fuel bottom out in
-   literals). *)
-let small_ty ctx =
+let pick_decl ctx =
+  let decls = Ty.Tenv.decls ctx.tenv in
+  List.nth decls (Random.State.int ctx.rng (List.length decls))
+
+(* Component types usable inside a type declaration: constants, strictly earlier
+   declarations (those already in [ctx.tenv] while [gen_decls] is running), and
+   -- for variant constructor arguments -- the declaring type itself, which is
+   what makes recursive variants (lists, trees) possible. *)
+let decl_component_ty ctx ~self =
+  let earlier = Ty.Tenv.decls ctx.tenv in
   choose ctx
-    [(3, fun () -> Ty.Int); (2, fun () -> Ty.Float); (2, fun () -> Ty.Variant)]
+    ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
+       (2, fun () -> Ty.Constant Ty.Constant.Float) ]
+    @ (if earlier = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
+    @ match self with None -> [] | Some id -> [(2, fun () -> Ty.Constr id)])
+
+let gen_record ctx =
+  (* All-float (flat float layout) and all-int (all-immediate fields) records
+     are the mode-crossing-adjacent layouts; soundness mode favors them. *)
+  let flavor =
+    choose ctx
+      [ (3, fun () -> `Mixed);
+        ( (match ctx.mode with Mode.Soundness -> 2 | Mode.Completeness -> 1),
+          fun () -> `All_float );
+        (1, fun () -> `All_int) ]
+  in
+  let n_fields = 1 + Random.State.int ctx.rng 3 in
+  Ty.Decl.Record
+    (List.init n_fields (fun _ ->
+         { Ty.Decl.f_name = fresh_field ctx;
+           f_ty =
+             (match flavor with
+             | `All_float -> Ty.Constant Ty.Constant.Float
+             | `All_int -> Ty.Constant Ty.Constant.Int
+             | `Mixed -> decl_component_ty ctx ~self:None);
+           f_mutable = Random.State.int ctx.rng 4 = 0
+         }))
+
+let gen_variant ctx ~id =
+  let n_constrs = 1 + Random.State.int ctx.rng 3 in
+  let constrs =
+    List.init n_constrs (fun _ ->
+        let n_args = Random.State.int ctx.rng 3 in
+        { Ty.Decl.c_name = fresh_constr ctx;
+          c_args =
+            List.init n_args (fun _ -> decl_component_ty ctx ~self:(Some id))
+        })
+  in
+  (* Constructibility invariant: guarantee a nullary base constructor, so
+     generation at exhausted fuel (and recursive constructor arguments) can
+     always bottom out. *)
+  let has_nullary =
+    List.exists
+      (fun (c : Ty.Decl.constructor) ->
+        match c.c_args with [] -> true | _ :: _ -> false)
+      constrs
+  in
+  let constrs =
+    if has_nullary
+    then constrs
+    else { Ty.Decl.c_name = fresh_constr ctx; c_args = [] } :: constrs
+  in
+  Ty.Decl.Variant constrs
+
+(* Generate this program's type declarations. Each may reference strictly
+   earlier ones (and variants may reference themselves), so every declared type
+   is constructible by induction on declaration order, with recursive variants
+   bottoming out at their nullary constructor. *)
+let gen_decls ctx =
+  let n = 2 + Random.State.int ctx.rng 3 in
+  for _ = 1 to n do
+    let id = fresh_ty_name ctx in
+    let kind =
+      choose ctx
+        [(1, fun () -> gen_record ctx); (1, fun () -> gen_variant ctx ~id)]
+    in
+    ctx.tenv <- ctx.tenv @ [{ Ty.Decl.id; kind }]
+  done
+
+(* Component types for tuples / lists / arrays / function payloads: constants
+   and declared types. Declared types are constructible in finitely many steps
+   (see [gen_decls]), which preserves the termination argument: composite
+   children generated at exhausted fuel still bottom out. *)
+let small_ty ctx =
+  let decls = Ty.Tenv.decls ctx.tenv in
+  choose ctx
+    ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
+       (2, fun () -> Ty.Constant Ty.Constant.Float) ]
+    @ if decls = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
 
 (* Function types, for [let]-bound and returned closures (Tiers B and C).
-   Components are leaf types, mirroring [small_ty]'s termination argument.
-   Parameter shapes come from a fixed list that respects the erasability
-   invariant: every [Optional] parameter is followed by a positional one
-   (otherwise it could never be omitted at a call site, and the definition trips
-   warning 16).
+   Components are [small_ty], mirroring its termination argument. Parameter
+   shapes come from a fixed list that respects the erasability invariant: every
+   [Optional] parameter is followed by a positional one (otherwise it could
+   never be omitted at a call site, and the definition trips warning 16).
 
    Labels come from a tiny fixed pool, distinct within a chain (duplicate labels
    in one type would break argument matching) but deliberately shared across
@@ -334,20 +513,27 @@ let fun_ty ctx =
     (fun label ret -> Ty.Arrow { label; arg = small_ty ctx; ret })
     labels (small_ty ctx)
 
-(* CR shsong: We should allow more flexibility of generated type here: 1. Avoid
+(* XCR shsong: We should allow more flexibility of generated type here: 1. Avoid
    having small_ty, i.e., allow other types in pair, list, array, and function
-   return type; 2. Allow more kinds of variant and record types. *)
+   return type; 2. Allow more kinds of variant and record types.
+
+   aide on behalf of shsong: part 2 is done -- records and variants are now
+   arbitrary generated declarations, picked here via [Ty.Constr]. Part 1 remains
+   open: [small_ty] still gates component types (it is also the current
+   termination argument, so lifting it needs a replacement bound). *)
 let goal_ty ctx =
-  let pair () = Ty.Pair (small_ty ctx, small_ty ctx) in
+  let tuple () =
+    let n = 2 + Random.State.int ctx.rng 2 in
+    Ty.Tuple (List.init n (fun _ -> small_ty ctx))
+  in
+  let constr () = Ty.Constr (pick_decl ctx).id in
   match ctx.mode with
   | Mode.Soundness ->
     choose ctx
-      [ (3, fun () -> Ty.Int);
-        (2, fun () -> Ty.Float);
-        (2, fun () -> Ty.Variant);
-        2, pair;
-        (2, fun () -> Ty.Record_float);
-        (1, fun () -> Ty.Record_int);
+      [ (3, fun () -> Ty.Constant Ty.Constant.Int);
+        (2, fun () -> Ty.Constant Ty.Constant.Float);
+        4, constr;
+        2, tuple;
         (1, fun () -> Ty.List (small_ty ctx));
         (1, fun () -> Ty.Array (small_ty ctx));
         (* returning a closure is prime soundness bait: the closure (and its
@@ -355,10 +541,10 @@ let goal_ty ctx =
         (2, fun () -> fun_ty ctx) ]
   | Mode.Completeness ->
     choose ctx
-      [ (6, fun () -> Ty.Int);
-        (2, fun () -> Ty.Float);
-        (2, fun () -> Ty.Variant);
-        1, pair;
+      [ (6, fun () -> Ty.Constant Ty.Constant.Int);
+        (2, fun () -> Ty.Constant Ty.Constant.Float);
+        2, constr;
+        1, tuple;
         (1, fun () -> Ty.List (small_ty ctx));
         (1, fun () -> fun_ty ctx) ]
 
@@ -369,8 +555,9 @@ let float_lit ctx =
 
 (* Generate a well-typed expression of type [ty] in environment [env]. Every
    recursive call decreases [fuel]; once fuel is exhausted only non-recursive
-   productions (and one-layer construction with literal children) remain, so
-   generation terminates. *)
+   productions (and construction whose children bottom out -- literals, nullary
+   constructors, strictly-earlier declarations) remain, so generation
+   terminates. *)
 let rec gen_expr ctx env ty fuel =
   let completeness =
     match ctx.mode with Mode.Completeness -> true | Mode.Soundness -> false
@@ -383,8 +570,11 @@ let rec gen_expr ctx env ty fuel =
     Expr.Var x
   in
   let let_in () =
-    (* CR shsong: bound_ty cannot be user-defined type here like a record or a
-       variant. *)
+    (* XCR shsong: bound_ty cannot be user-defined type here like a record or a
+       variant.
+
+       aide on behalf of shsong: [small_ty] now includes declared record /
+       variant types, so [let]-bound values cover them too. *)
     let bound_ty =
       choose ctx
         [ (4, fun () -> small_ty ctx);
@@ -396,9 +586,12 @@ let rec gen_expr ctx env ty fuel =
     Expr.Let (x, e1, e2)
   in
   let if_ () =
+    let int_ty = Ty.Constant Ty.Constant.Int in
     let c =
-      Expr.Leq
-        (gen_expr ctx env Ty.Int (fuel - 1), gen_expr ctx env Ty.Int (fuel - 1))
+      Expr.Binop
+        ( Expr.Leq,
+          gen_expr ctx env int_ty (fuel - 1),
+          gen_expr ctx env int_ty (fuel - 1) )
     in
     Expr.If (c, gen_expr ctx env ty (fuel - 1), gen_expr ctx env ty (fuel - 1))
   in
@@ -514,26 +707,27 @@ let rec gen_expr ctx env ty fuel =
   (* Productions specific to the goal type. *)
   let structural =
     match ty with
-    | Ty.Int ->
+    | Ty.Constant Ty.Constant.Int ->
       [ (2, fun () -> int_lit ctx);
         ( deep (if completeness then 4 else 2),
           fun () ->
-            Expr.Add
-              ( gen_expr ctx env Ty.Int (fuel - 1),
-                gen_expr ctx env Ty.Int (fuel - 1) ) ) ]
-    | Ty.Float ->
+            Expr.Binop
+              ( Expr.Add,
+                gen_expr ctx env ty (fuel - 1),
+                gen_expr ctx env ty (fuel - 1) ) ) ]
+    | Ty.Constant Ty.Constant.Float ->
       [ (2, fun () -> float_lit ctx);
         ( deep 2,
           fun () ->
-            Expr.Fadd
-              ( gen_expr ctx env Ty.Float (fuel - 1),
-                gen_expr ctx env Ty.Float (fuel - 1) ) ) ]
-    | Ty.Pair (t1, t2) ->
+            Expr.Binop
+              ( Expr.Fadd,
+                gen_expr ctx env ty (fuel - 1),
+                gen_expr ctx env ty (fuel - 1) ) ) ]
+    | Ty.Tuple ts ->
       [ ( 4,
           fun () ->
-            Expr.Pair
-              (gen_expr ctx env t1 (fuel - 1), gen_expr ctx env t2 (fuel - 1))
-        ) ]
+            Expr.Tuple (List.map (fun t -> gen_expr ctx env t (fuel - 1)) ts) )
+      ]
     | Ty.List t ->
       [ (2, fun () -> Expr.Nil);
         ( deep 3,
@@ -547,23 +741,34 @@ let rec gen_expr ctx env ty fuel =
             let n = Random.State.int ctx.rng 4 in
             Expr.Array_lit
               (List.init n (fun _ -> gen_expr ctx env t (fuel - 1))) ) ]
-    | Ty.Record_int ->
-      [ ( 4,
-          fun () ->
-            Expr.Record_int
-              ( gen_expr ctx env Ty.Int (fuel - 1),
-                gen_expr ctx env Ty.Int (fuel - 1) ) ) ]
-    | Ty.Record_float ->
-      [ ( 4,
-          fun () ->
-            Expr.Record_float
-              ( gen_expr ctx env Ty.Float (fuel - 1),
-                gen_expr ctx env Ty.Float (fuel - 1) ) ) ]
-    | Ty.Variant ->
-      [ (* Soundness mode favors the immediate constructor (mode crossing). *)
-        ((if completeness then 2 else 4), fun () -> Expr.Constr_a);
-        (deep 2, fun () -> Expr.Constr_b (gen_expr ctx env Ty.Int (fuel - 1)))
-      ]
+    | Ty.Constr id -> (
+      match Ty.Tenv.lookup ctx.tenv id with
+      | Ty.Decl.Record fields ->
+        [ ( 4,
+            fun () ->
+              Expr.Record
+                (List.map
+                   (fun (f : Ty.Decl.field) ->
+                     f.f_name, gen_expr ctx env f.f_ty (fuel - 1))
+                   fields) ) ]
+      | Ty.Decl.Variant constrs ->
+        (* One production per constructor. Soundness mode favors nullary
+           (immediate, mode-crossing) constructors; non-nullary ones recurse and
+           are fuel-gated, bottoming out at the guaranteed nullary base
+           constructor. *)
+        List.map
+          (fun (c : Ty.Decl.constructor) ->
+            match c.c_args with
+            | [] ->
+              ( (if completeness then 2 else 4),
+                fun () -> Expr.Construct (c.c_name, []) )
+            | args ->
+              ( deep 2,
+                fun () ->
+                  Expr.Construct
+                    ( c.c_name,
+                      List.map (fun t -> gen_expr ctx env t (fuel - 1)) args ) ))
+          constrs)
     (* Tier B: lambdas. Bind a prefix of [k] parameters in this [Lam]; k < chain
        length leaves a function-typed body, i.e. nested closures, while k =
        chain length is the n-ary single-closure form -- same type, different
@@ -574,7 +779,7 @@ let rec gen_expr ctx env ty fuel =
        type-side labels; a default expression may refer to earlier parameters of
        the same lambda. Not [deep]-gated: like construction, a lambda must be
        available at exhausted fuel (its body then bottoms out in leaves, since
-       [fun_ty] components are leaf types). *)
+       [fun_ty] components are [small_ty]). *)
     | Ty.Arrow _ ->
       [ ( 4,
           fun () ->
@@ -646,8 +851,20 @@ let maybe_exclave ctx ty body =
 let initial_fuel = 5
 
 let generate ~mode ~seed =
-  let ctx = { rng = Random.State.make [| seed |]; next_var = 0; mode } in
-  let env = ["x0", Ty.Int; "x1", Ty.Float] in
+  let ctx =
+    { rng = Random.State.make [| seed |];
+      next_var = 0;
+      next_ty = 0;
+      next_field = 0;
+      next_constr = 0;
+      tenv = Ty.Tenv.empty;
+      mode
+    }
+  in
+  gen_decls ctx;
+  let env =
+    ["x0", Ty.Constant Ty.Constant.Int; "x1", Ty.Constant Ty.Constant.Float]
+  in
   let ty = goal_ty ctx in
   let body = maybe_exclave ctx ty (gen_expr ctx env ty initial_fuel) in
   (* No return-type annotation is emitted since a plain [: ty] could interact
@@ -661,6 +878,7 @@ let generate ~mode ~seed =
     Printf.sprintf
       "%s%slet[@zero_alloc strict] (f @ noalloc_strict) (x0 : int) (x1 : \
        float) = %s\n"
-      prelude header body_str
+      (Ty.Tenv.to_prelude ctx.tenv)
+      header body_str
   in
   { Sample.source }
