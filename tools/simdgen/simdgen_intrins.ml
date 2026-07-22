@@ -644,7 +644,7 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
   let vals = List.filter (fun p -> not (is_imm p)) i.params in
   let nvals = List.length vals in
   match reorder ~binding ~zeroing i with
-  | None -> Error "phase 1: unhandled operand shape (follow-up)"
+  | None -> Error "unhandled operand shape"
   | Some perm -> (
     let has_z = binding.instr.flags.z in
     let pat =
@@ -707,7 +707,7 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
     match binding.instr.flags.r with
     | Rnd_er ->
       if List.length real_imms <> 1 || sae_imms <> []
-      then Error "phase 1: multi-imm (follow-up)"
+      then Error "float16 convert with rounding immediate (follow-up)"
       else
         let variants =
           [ "8", "Amd64_simd_defs.Rnd_near";
@@ -739,10 +739,10 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
              pat arms)
     | Rnd_sae -> (
       if List.length sae_imms <> 1
-      then Error "phase 1: multi-imm (follow-up)"
+      then Error "float16 convert with rounding immediate (follow-up)"
       else
         match real_imm_prefix () with
-        | None -> Error "phase 1: multi-imm (follow-up)"
+        | None -> Error "float16 convert with rounding immediate (follow-up)"
         | Some (prefix, iexpr) ->
           let cases =
             ["8", apply " ~sae:()" binding.bname has_z]
@@ -766,7 +766,7 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
                prefix pat arms))
     | Rnd_none -> (
       if sae_imms <> []
-      then Error "phase 1: multi-imm (follow-up)"
+      then Error "float16 convert with rounding immediate (follow-up)"
       else
         let bind_expr = apply "" binding.bname has_z in
         match binding.instr.imm, real_imms with
@@ -777,7 +777,7 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
                pat bind_expr reordered)
         | (Imm_spec | Imm_reg), [_] | (Imm_spec | Imm_reg), [_; _] -> (
           match real_imm_prefix () with
-          | None -> Error "phase 1: multi-imm (follow-up)"
+          | None -> Error "float16 convert with rounding immediate (follow-up)"
           | Some (prefix, iexpr) ->
             Ok
               (sprintf
@@ -794,16 +794,18 @@ let emit_register_arm ~by_mnem ~binding ~zeroing i =
                  "(match args with %s -> Sel.instr %s ~i:%d %s | _ -> \
                   Sel.bad_arity op)"
                  pat bind_expr imm reordered)
-          | None -> Error "phase 1: hardcoded predicate (follow-up)")
-        | Imm_none, _ :: _ -> Error "phase 1: multi-imm (follow-up)"
-        | (Imm_spec | Imm_reg), _ -> Error "phase 1: multi-imm (follow-up)"))
+          | None -> Error "unhandled hardcoded-predicate form")
+        | Imm_none, _ :: _ ->
+          Error "float16 convert with rounding immediate (follow-up)"
+        | (Imm_spec | Imm_reg), _ ->
+          Error "float16 convert with rounding immediate (follow-up)"))
 
 (* Flag-reader intrinsics (kortest/ktest z/c) map to a curated [Simd.Seq]
    pseudo-op: the KORTEST/KTEST instruction followed by a SETcc. The mask width
    comes from the chosen instruction's mnemonic binding. *)
 let emit_flag_reader i =
   match choose_instruction i with
-  | None -> Error "phase 1b: flag-reader (no instruction)"
+  | None -> Error "flag-reader without an instruction"
   | Some instr -> (
     let flavor =
       if contains ~needle:"kortestz" i.name
@@ -817,13 +819,319 @@ let emit_flag_reader i =
       else None
     in
     match flavor with
-    | None -> Error "phase 1b: flag-reader (unknown flavor)"
+    | None -> Error "flag-reader with unknown flavor"
     | Some flavor ->
       Ok
         (sprintf
            "(match args with [x0; x1] -> Sel.%s %s [x0; x1] | _ -> \
             Sel.bad_arity             op)"
            flavor instr.mnemonic))
+
+(* -------------------------------------------------------------------------- *)
+(* Memory-form matching and emission (loads/stores) *)
+(* -------------------------------------------------------------------------- *)
+
+let mem_token tok =
+  match strip_modifiers tok with
+  | "xmm" -> Some "XMM"
+  | "ymm" -> Some "YMM"
+  | "zmm" -> Some "ZMM"
+  | "k" -> Some "K"
+  | "m8" | "m16" | "m32" | "m64" | "m128" | "m256" | "m512" -> Some "MEM"
+  | "r32" -> Some "R32"
+  | "r64" -> Some "R64"
+  | "imm8" -> None
+  | other -> Some ("?" ^ other)
+
+(* Tokens a binding operand can match: its register class and/or MEM. *)
+let op_accepts (loc : loc) =
+  (match loc_regclass loc with Some c -> [c] | None -> [])
+  @ if loc_allows_mem loc then ["MEM"] else []
+
+(* Hardware operand order (dest first) as [loc]s, excluding the write mask. *)
+let mem_hw_locs (instr : instr_emit) =
+  let value_args =
+    Array.to_list instr.args |> List.filter arg_is_value
+    |> List.map (fun (a : arg) -> a.loc)
+  in
+  match instr.res with
+  | Res rr ->
+    Array.to_list rr |> List.map (fun (a : arg) -> a.loc) |> fun d ->
+    d @ value_args
+  | Arg _ | Res_none -> value_args
+
+let is_ptr_param p = String.contains p.ctype '*'
+
+(* Match a memory-form intrinsic to its binding. Returns [Some (binding,
+   is_load)]. *)
+let match_memory ~by_mnem i instr =
+  let xs = xml_shape_of_form instr.form in
+  if
+    contains ~needle:"gather" instr.mnemonic
+    || contains ~needle:"scatter" instr.mnemonic
+  then None
+  else
+    let xml_tokens = List.filter_map mem_token (form_tokens instr.form) in
+    let is_load =
+      String.length i.ret.ctype >= 3 && String.sub i.ret.ctype 0 3 = "__m"
+    in
+    let one_mem =
+      List.length (List.filter (String.equal "MEM") xml_tokens) = 1
+    in
+    if not one_mem
+    then None
+    else
+      let cands =
+        Hashtbl.find_opt by_mnem instr.mnemonic
+        |> Option.value ~default:[]
+        |> List.filter (fun b ->
+            let has_mask =
+              Array.exists
+                (fun (a : arg) -> match a.enc with Mask -> true | _ -> false)
+                b.instr.args
+            in
+            let locs = mem_hw_locs b.instr in
+            let res_has_mem =
+              match b.instr.res with
+              | Res rr ->
+                Array.exists (fun (a : arg) -> loc_allows_mem a.loc) rr
+              | Arg _ | Res_none -> false
+            in
+            Bool.equal has_mask xs.masked
+            (* [Isimd_mem] can only address a memory operand that lives in the
+               argument list, so reject bindings whose result is the memory. *)
+            && (not res_has_mem)
+            && List.length locs = List.length xml_tokens
+            && List.for_all2
+                 (fun tok loc -> List.mem tok (op_accepts loc))
+                 xml_tokens locs)
+      in
+      match cands with [b] -> Some (b, is_load) | _ -> None
+
+(* Emit a load/store arm: walk the binding operands, sending the pointer C arg
+   to the memory operand, the mask C arg to the write mask, and vector C args to
+   the register operands, then build an [Isimd_mem] load or store. *)
+let emit_mem_arm ~binding ~is_load ~zeroing i =
+  let params = i.params in
+  let tagged = List.mapi (fun j p -> p, sprintf "x%d" j) params in
+  let names = List.map snd tagged in
+  let ptr =
+    List.find_map (fun (p, n) -> if is_ptr_param p then Some n else None) tagged
+  in
+  let masks =
+    List.filter_map
+      (fun (p, n) -> if is_mask_param p then Some n else None)
+      tagged
+  in
+  let vectors =
+    List.filter_map
+      (fun (p, n) ->
+        if (not (is_ptr_param p)) && (not (is_mask_param p)) && not (is_imm p)
+        then Some n
+        else None)
+      tagged
+  in
+  match ptr with
+  | None -> Error "memory-form instruction without a pointer argument"
+  | Some ptr ->
+    let mask = ref masks and vec = ref vectors in
+    let pop r =
+      match !r with
+      | x :: t ->
+        r := t;
+        Some x
+      | [] -> None
+    in
+    let stored =
+      Array.to_list binding.instr.args
+      |> List.filter (fun (a : arg) -> not (arg_is_implicit a))
+    in
+    (* The merge (~z:false) variant prepends the destination as a source; the
+       stored operand list (shared with ~z:true) omits it. *)
+    let operand_locs =
+      if binding.instr.flags.z && not zeroing
+      then
+        match binding.instr.res with
+        | Res rr -> Array.to_list rr @ stored
+        | Arg _ | Res_none -> stored
+      else stored
+    in
+    let operands =
+      List.map
+        (fun (a : arg) ->
+          if loc_allows_mem a.loc
+          then Some ptr
+          else match a.enc with Mask -> pop mask | _ -> pop vec)
+        operand_locs
+    in
+    if List.exists Option.is_none operands || !mask <> [] || !vec <> []
+    then Error "scalar masked load/store (follow-up)"
+    else
+      let arglist =
+        "[" ^ String.concat "; " (List.filter_map Fun.id operands) ^ "]"
+      in
+      let has_z = binding.instr.flags.z in
+      let bind_expr =
+        if has_z
+        then sprintf "(%s ~z:%b)" binding.bname zeroing
+        else binding.bname
+      in
+      let pat = "[" ^ String.concat "; " names ^ "]" in
+      let f = if is_load then "Sel.simd_load" else "Sel.simd_store" in
+      Ok
+        (sprintf "(match args with %s -> %s %s %s | _ -> Sel.bad_arity op)" pat
+           f bind_expr arglist)
+
+(* -------------------------------------------------------------------------- *)
+(* Gather/scatter matching and emission *)
+(* -------------------------------------------------------------------------- *)
+
+(* Operand class for VSIB matching: VM temps keep their exact name. *)
+let gs_loc_class (loc : loc) =
+  match loc with
+  | Pin _ -> None
+  | Temp temps ->
+    Array.find_map
+      (fun t ->
+        match t with
+        | VM32X -> Some "VM32X"
+        | VM32Y -> Some "VM32Y"
+        | VM32Z -> Some "VM32Z"
+        | VM64X -> Some "VM64X"
+        | VM64Y -> Some "VM64Y"
+        | VM64Z -> Some "VM64Z"
+        | _ -> temp_regclass t)
+      temps
+
+let gs_token tok =
+  match strip_modifiers tok with
+  | "xmm" -> Some "XMM"
+  | "ymm" -> Some "YMM"
+  | "zmm" -> Some "ZMM"
+  | ("vm32x" | "vm32y" | "vm32z" | "vm64x" | "vm64y" | "vm64z") as vm ->
+    Some (String.uppercase_ascii vm)
+  | _ -> None
+
+(* AVX512 gathers/scatters have a single (mandatory-mask) binding per width. The
+   XML forms are unreliable here (several i64gather/scatter entries carry the
+   wrong vm token or destination width), so derive the match key from the C
+   types and the mnemonic instead: index width from the d/q in the mnemonic,
+   register classes from the C return/parameter types. *)
+let match_gs ~by_mnem i instr =
+  let is_gather =
+    String.length i.ret.ctype >= 3 && String.sub i.ret.ctype 0 3 = "__m"
+  in
+  let non_imm = List.filter (fun p -> not (is_imm p)) i.params in
+  let vec_classes =
+    List.filter_map
+      (fun p ->
+        if (not (is_ptr_param p)) && not (is_mask_param p)
+        then ctype_regclass p.ctype
+        else None)
+      non_imm
+  in
+  let index_width =
+    (* vpgatherDd vs vpgatherQd etc.: the letter after "gather"/"scatter" gives
+       the index element width. *)
+    let mnem = instr.mnemonic in
+    let after key =
+      let rec go i =
+        if i + String.length key > String.length mnem
+        then None
+        else if String.sub mnem i (String.length key) = key
+        then Some mnem.[i + String.length key]
+        else go (i + 1)
+      in
+      go 0
+    in
+    match after "gather", after "scatter" with
+    | Some c, _ | _, Some c -> (
+      match c with 'd' -> Some "32" | 'q' -> Some "64" | _ -> None)
+    | None, None -> None
+  in
+  let expected =
+    match index_width, is_gather, vec_classes, ctype_regclass i.ret.ctype with
+    (* gather masked: (src, vindex); plain: (vindex) -- dst from return type *)
+    | Some w, true, ([idx] | [_; idx]), Some dst ->
+      Some [dst; "VM" ^ w ^ String.sub idx 0 1]
+    (* scatter: (vindex, data) *)
+    | Some w, false, [idx; data], _ -> Some ["VM" ^ w ^ String.sub idx 0 1; data]
+    | _ -> None
+  in
+  match expected with
+  | None -> None
+  | Some expected -> (
+    let cands =
+      Hashtbl.find_opt by_mnem instr.mnemonic
+      |> Option.value ~default:[]
+      |> List.filter (fun b ->
+          let value_classes =
+            Array.to_list b.instr.args |> List.filter arg_is_value
+            |> List.filter_map (fun (a : arg) -> gs_loc_class a.loc)
+          in
+          try List.for_all2 String.equal expected value_classes
+          with Invalid_argument _ -> false)
+    in
+    match cands with [b] -> Some b | _ -> None)
+
+(* Emit a gather/scatter arm. The C scale immediate becomes the addressing-mode
+   scale; unmasked variants synthesize an all-ones mask (and, for gathers, a
+   zero destination) since the AVX512 instructions are mask-only. *)
+let emit_gs_arm ~binding i =
+  let is_gather =
+    String.length i.ret.ctype >= 3 && String.sub i.ret.ctype 0 3 = "__m"
+  in
+  let non_imm = List.filter (fun p -> not (is_imm p)) i.params in
+  let names = List.mapi (fun j p -> p, sprintf "x%d" j) non_imm in
+  let find f =
+    List.find_map (fun (p, n) -> if f p then Some n else None) names
+  in
+  let vectors =
+    List.filter_map
+      (fun (p, n) ->
+        if (not (is_ptr_param p)) && not (is_mask_param p) then Some n else None)
+      names
+  in
+  let base = find is_ptr_param in
+  let kexpr =
+    match find is_mask_param with Some k -> k | None -> "Sel.all_ones_mask"
+  in
+  let zero_dst () =
+    match gs_loc_class binding.instr.args.(0).loc with
+    | Some "XMM" -> Some "Sel.zero_vec128"
+    | Some "YMM" -> Some "Sel.zero_vec256"
+    | Some "ZMM" -> Some "Sel.zero_vec512"
+    | _ -> None
+  in
+  match base, is_gather, vectors with
+  | Some base, true, [src; vindex] ->
+    Ok
+      (sprintf
+         "(let scale, args = Sel.extract_scale args op in match args with [%s] \
+          -> Sel.simd_load_scaled %s ~scale [%s; %s; %s; %s] | _ -> \
+          Sel.bad_arity op)"
+         (String.concat "; " (List.map snd names))
+         binding.bname src base vindex kexpr)
+  | Some base, true, [vindex] -> (
+    match zero_dst () with
+    | None -> Error "unknown gather destination width"
+    | Some zero ->
+      Ok
+        (sprintf
+           "(let scale, args = Sel.extract_scale args op in match args with \
+            [%s] -> Sel.simd_load_scaled %s ~scale [%s; %s; %s; %s] | _ -> \
+            Sel.bad_arity op)"
+           (String.concat "; " (List.map snd names))
+           binding.bname zero base vindex kexpr))
+  | Some base, false, [vindex; data] ->
+    Ok
+      (sprintf
+         "(let scale, args = Sel.extract_scale args op in match args with [%s] \
+          -> Sel.simd_store_scaled %s ~scale [%s; %s; %s; %s] | _ -> \
+          Sel.bad_arity op)"
+         (String.concat "; " (List.map snd names))
+         binding.bname base vindex data kexpr)
+  | _ -> Error "unhandled gather/scatter shape"
 
 (* -------------------------------------------------------------------------- *)
 (* Disposition of each in-scope intrinsic *)
@@ -857,8 +1165,31 @@ let disposition ~by_mnem i : disposition =
   else
     match classify i with
     | No_instruction -> Skip "no instruction (cast/undefined)"
-    | Gather_scatter -> Skip "phase 3: gather/scatter"
-    | Memory -> Skip "phase 2: memory form"
+    | Gather_scatter -> (
+      match choose_instruction i with
+      | None -> Skip "unhandled multi-instruction gather/scatter"
+      | Some instr -> (
+        match match_gs ~by_mnem i instr with
+        | None -> Skip "no matching gather/scatter descriptor"
+        | Some binding -> (
+          match emit_gs_arm ~binding i with
+          | Ok body -> Emit_register { name = caml_name i; body }
+          | Error reason -> Skip reason)))
+    | Memory
+      when contains ~needle:"logather" i.name
+           || contains ~needle:"loscatter" i.name ->
+      Skip "lo gather/scatter variant (512-bit index arg; compose via cast)"
+    | Memory -> (
+      match choose_instruction i with
+      | None -> Skip "unhandled multi-instruction memory form"
+      | Some instr -> (
+        match match_memory ~by_mnem i instr with
+        | None -> Skip "memory form without a register-addressable descriptor"
+        | Some (binding, is_load) -> (
+          let zeroing = (xml_shape_of_form instr.form).zeroing in
+          match emit_mem_arm ~binding ~is_load ~zeroing i with
+          | Ok body -> Emit_register { name = caml_name i; body }
+          | Error reason -> Skip reason)))
     | Register
       when contains ~needle:"cvt" i.name
            && (contains ~needle:"lo_pd" i.name || contains ~needle:"pslo" i.name)
@@ -921,39 +1252,156 @@ let dispositions ~bindings intrinsics =
     intrinsics
 
 (* -------------------------------------------------------------------------- *)
-(* Generated C-oracle tests                                                    *)
+(* Generated C-oracle tests *)
 (* -------------------------------------------------------------------------- *)
 
-(* OCaml type for a 512-bit-vector / mask parameter, or [None] if the test
-   generator does not cover this shape (imm, 128/256, or scalar). *)
-let test_oty (p : param) =
-  match p.ctype with
-  | "__m512" -> Some "float32x16"
-  | "__m512d" -> Some "float64x8"
-  | "__m512i" -> (
-    match p.etype with
-    | "UI8" | "SI8" | "M8" -> Some "int8x64"
-    | "UI16" | "SI16" -> Some "int16x32"
-    | "UI64" | "SI64" -> Some "int64x8"
-    | _ -> Some "int32x16")
-  | "__mmask8" | "__mmask16" | "__mmask32" | "__mmask64" -> Some "mask"
+(* Kind of a testable C parameter/return value. *)
+type tkind =
+  | Vec of int (* 128 / 256 / 512 *)
+  | MaskT
+  | I32
+  | I64
+  | ISub (* sub-word integer, passed untagged *)
+
+let tkind_of_ctype ~etype ctype =
+  match ctype with
+  | "__m512" -> Some (Vec 512, "float32x16")
+  | "__m512d" -> Some (Vec 512, "float64x8")
+  | "__m512i" ->
+    Some
+      ( Vec 512,
+        match etype with
+        | "UI8" | "SI8" | "M8" -> "int8x64"
+        | "UI16" | "SI16" -> "int16x32"
+        | "UI64" | "SI64" -> "int64x8"
+        | _ -> "int32x16" )
+  | "__m256" -> Some (Vec 256, "float32x8")
+  | "__m256d" -> Some (Vec 256, "float64x4")
+  | "__m256i" ->
+    Some
+      ( Vec 256,
+        match etype with
+        | "UI8" | "SI8" | "M8" -> "int8x32"
+        | "UI16" | "SI16" -> "int16x16"
+        | "UI64" | "SI64" -> "int64x4"
+        | _ -> "int32x8" )
+  | "__m128" -> Some (Vec 128, "float32x4")
+  | "__m128d" -> Some (Vec 128, "float64x2")
+  | "__m128i" ->
+    Some
+      ( Vec 128,
+        match etype with
+        | "UI8" | "SI8" | "M8" -> "int8x16"
+        | "UI16" | "SI16" -> "int16x8"
+        | "UI64" | "SI64" -> "int64x2"
+        | _ -> "int32x4" )
+  | "__mmask8" | "__mmask16" | "__mmask32" | "__mmask64" -> Some (MaskT, "mask")
+  | "int" | "unsigned int" | "const int" -> Some (I32, "int32")
+  | "__int64" | "unsigned __int64" | "long long" | "unsigned long long" ->
+    Some (I64, "int64")
+  | "char" | "unsigned char" | "short" | "unsigned short" -> Some (ISub, "int")
   | _ -> None
+
+let tkind_of (p : param) = tkind_of_ctype ~etype:p.etype p.ctype
+
+let oty_with_attr (k, oty) =
+  match k with
+  | ISub -> sprintf "(%s[@untagged])" oty
+  | _ -> sprintf "(%s[@unboxed])" oty
 
 let is_mask_ctype c = String.length c >= 7 && String.sub c 0 7 = "__mmask"
 
-(* An emitted intrinsic is testable here when it has no immediate and every
-   parameter and the return value is a 512-bit vector or a mask. *)
+(* An emitted intrinsic is testable when every non-imm parameter and the return
+   value map to a register-passable kind (memory forms and gathers/scatters are
+   excluded by their pointer argument and are covered by hand-written tests). *)
 let testable i =
-  List.for_all (fun p -> not (is_imm p)) i.params
-  && Option.is_some (test_oty i.ret)
-  && List.for_all (fun p -> Option.is_some (test_oty p)) i.params
-  && i.params <> []
+  Option.is_some (tkind_of i.ret)
+  && List.for_all (fun p -> is_imm p || Option.is_some (tkind_of p)) i.params
+  && List.exists (fun p -> not (is_imm p)) i.params
 
 let test_intrinsics ~bindings intrinsics =
   dispositions ~bindings intrinsics
   |> List.filter_map (fun (i, d) ->
-      match d with Emit_register _ when testable i -> Some i | _ -> None)
-  |> List.sort_uniq (fun a b -> String.compare a.name b.name)
+      match d with
+      | Emit_register { body; _ } when testable i -> Some (i, body)
+      | _ -> None)
+  |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a.name b.name)
+
+(* Values enumerated for an immediate parameter. Rounding immediates follow the
+   dispatch in the generated arm: embedded-rounding arms accept the four
+   [_MM_FROUND_TO_*|_MM_FROUND_NO_EXC] combinations plus CUR_DIRECTION, sae arms
+   NO_EXC plus CUR_DIRECTION. *)
+let imm_values ~body (p : param) =
+  match p.immtype with
+  | Some "_CMP_" -> List.init 32 (fun v -> v)
+  | Some "_MM_CMPINT" -> List.init 8 (fun v -> v)
+  | Some "_MM_FROUND" ->
+    if contains ~needle:"Rnd_near" body then [8; 9; 10; 11; 4] else [8; 4]
+  | Some "_MM_FROUND_SAE" -> [8; 4]
+  | Some "_MM_MANTISSA_NORM" -> [0; 1; 2; 3]
+  | Some "_MM_MANTISSA_SIGN" -> [0; 1; 2]
+  | Some "_MM_PERM" -> [0; 27; 177; 255]
+  | _ ->
+    let max = imm_max p in
+    List.sort_uniq compare [0; 1; max / 2; max]
+
+let rec product = function
+  | [] -> [[]]
+  | vs :: rest ->
+    let tails = product rest in
+    List.concat_map (fun v -> List.map (fun t -> v :: t) tails) vs
+
+(* OCaml expression for the [idx]-th value argument of the given kind. Masks are
+   truncated to the parameter width (the OCaml<->C mask ABI passes the full
+   register, so upper bits must be zero for the C oracle). *)
+let value_expr ~idx (p : param) k =
+  match k with
+  | Vec 512 -> sprintf "(reint v%c)" "abc".[idx mod 3]
+  | Vec 256 -> sprintf "(reint v%c256)" "abc".[idx mod 3]
+  | Vec 128 -> sprintf "(reint v%c128)" "abc".[idx mod 3]
+  | Vec _ -> assert false
+  | MaskT ->
+    let pat =
+      if idx mod 2 = 0 then 0xA5A5A5A5A5A5A5A5L else 0x3C3C3C3C3C3C3C3CL
+    in
+    let width =
+      match p.ctype with
+      | "__mmask8" -> 0xFFL
+      | "__mmask16" -> 0xFFFFL
+      | "__mmask32" -> 0xFFFFFFFFL
+      | _ -> -1L
+    in
+    sprintf "(mask_of_int64 0x%LxL)" (Int64.logand pat width)
+  | I32 -> [| "0x12345678l"; "(-7l)"; "0x40000001l" |].(idx mod 3)
+  | I64 ->
+    [| "0x1122334455667788L"; "(-9L)"; "0x4000000000000001L" |].(idx mod 3)
+  | ISub -> [| "23"; "113"; "5" |].(idx mod 3)
+
+let check_fn (k, _) =
+  match k with
+  | Vec 512 -> "check512"
+  | Vec 256 -> "check256"
+  | Vec 128 -> "check128"
+  | Vec _ -> assert false
+  | MaskT -> "check_mask"
+  | I32 -> "check_i32"
+  | I64 -> "check_i64"
+  | ISub -> "check_int"
+
+(* clang (checked at 21.1) miscompiles the masked scalar sqrt intrinsics when
+   the rounding is CUR_DIRECTION (including the non-round forms): the DAG path
+   swaps the [a]/[b] operands, computing sqrt(a) with the upper bits from [b],
+   contradicting the Intel pseudocode and clang's own constant folder. Our
+   selection follows the spec, so skip the C-oracle comparison there. *)
+let oracle_bug i tuple =
+  match i.name with
+  | "_mm_mask_sqrt_ss" | "_mm_maskz_sqrt_ss" | "_mm_mask_sqrt_sd"
+  | "_mm_maskz_sqrt_sd" ->
+    true
+  | "_mm_mask_sqrt_round_ss" | "_mm_maskz_sqrt_round_ss"
+  | "_mm_mask_sqrt_round_sd" | "_mm_maskz_sqrt_round_sd" -> (
+    match tuple with [4] -> true | _ -> false)
+  | _ -> false
 
 let tests_ml_preamble =
   {ml|(* Generated by tools/simdgen/simdgen_intrins.ml: bit-for-bit checks of each
@@ -966,10 +1414,25 @@ external of_w :
   -> int64x8 = "" "vec512_of_int64s"
 [@@noalloc] [@@unboxed]
 
+external of_w256 : int64 -> int64 -> int64 -> int64 -> int64x4
+  = "" "vec256_of_int64s"
+[@@noalloc] [@@unboxed]
+
+external of_w128 : int64 -> int64 -> int64x2 = "" "vec128_of_int64s"
+[@@noalloc] [@@unboxed]
+
 external reint : 'a -> 'b = "%identity"
 
 external w : (int64x8[@unboxed]) -> (int[@untagged]) -> (int64[@unboxed])
   = "" "vec512_wi"
+[@@noalloc]
+
+external w256 : (int64x4[@unboxed]) -> (int[@untagged]) -> (int64[@unboxed])
+  = "" "vec256_wi"
+[@@noalloc]
+
+external w128 : (int64x2[@unboxed]) -> (int[@untagged]) -> (int64[@unboxed])
+  = "" "vec128_wi"
 [@@noalloc]
 
 external mask_of_int64 : int64 -> mask
@@ -982,22 +1445,45 @@ external int64_of_mask : mask -> int64
 
 let failures = ref 0
 
-let check512 name a b =
-  let a : int64x8 = reint a
-  and b : int64x8 = reint b in
+let fail name =
+  incr failures;
+  Printf.printf "MISMATCH %s\n" name
+
+let checkw n name a b =
   let ok = ref true in
-  for i = 0 to 7 do
+  for i = 0 to n - 1 do
     if not (Int64.equal (w a i) (w b i)) then ok := false
   done;
-  if not !ok then (
-    incr failures;
-    Printf.printf "MISMATCH %s\n" name)
+  if not !ok then fail name
+
+let check512 name a b = checkw 8 name (reint a) (reint b)
+
+let check256 name a b =
+  let a : int64x4 = reint a and b : int64x4 = reint b in
+  let ok = ref true in
+  for i = 0 to 3 do
+    if not (Int64.equal (w256 a i) (w256 b i)) then ok := false
+  done;
+  if not !ok then fail name
+
+let check128 name a b =
+  let a : int64x2 = reint a and b : int64x2 = reint b in
+  let ok = ref true in
+  for i = 0 to 1 do
+    if not (Int64.equal (w128 a i) (w128 b i)) then ok := false
+  done;
+  if not !ok then fail name
 
 let check_mask name (a : mask) (b : mask) =
-  if not (Int64.equal (int64_of_mask a) (int64_of_mask b)) then (
-    incr failures;
-    Printf.printf "MISMATCH %s: %Lx <> %Lx\n" name (int64_of_mask a)
-      (int64_of_mask b))
+  if not (Int64.equal (int64_of_mask a) (int64_of_mask b)) then fail name
+
+let check_i32 name (a : int32) (b : int32) =
+  if not (Int32.equal a b) then fail name
+
+let check_i64 name (a : int64) (b : int64) =
+  if not (Int64.equal a b) then fail name
+
+let check_int name (a : int) (b : int) = if a <> b then fail name
 
 let va = of_w 0x3f8000004048f5c3L 0xbff0000040a00000L 0x0000000100000002L
     0xfffffffe7fffffffL 0x8000000012345678L 0x40490fdbc0000000L
@@ -1011,74 +1497,100 @@ let vc = of_w 0x41000000c1a00000L 0x4048f5c33f800000L 0x0000000600000007L
     0xaaaaaaaa55555555L 0x0f0f0f0ff0f0f0f0L 0x400921fb54442d18L
     0xdeadbeefcafebabeL 0x0123456789abcdefL
 
+let va256 = of_w256 0x3f8000004048f5c3L 0xbff0000040a00000L
+    0x0000000100000002L 0xfffffffe7fffffffL
+
+let vb256 = of_w256 0x4000000040400000L 0x3fc00000c1200000L
+    0x00000003fffffffdL 0x000000057fffffffL
+
+let vc256 = of_w256 0x41000000c1a00000L 0x4048f5c33f800000L
+    0x0000000600000007L 0xaaaaaaaa55555555L
+
+let va128 = of_w128 0x3f8000004048f5c3L 0xbff0000040a00000L
+
+let vb128 = of_w128 0x4000000040400000L 0x3fc00000c1200000L
+
+let vc128 = of_w128 0x41000000c1a00000L 0x4048f5c33f800000L
 |ml}
 
-(* Renders the OCaml value expression passed for the [n]-th operand of the given
-   role, and the C argument name. *)
 let tests_ml ~bindings intrinsics =
-  let buf = Buffer.create 65536 in
+  let buf = Buffer.create 262144 in
   Buffer.add_string buf tests_ml_preamble;
-  let vecs = [| "va"; "vb"; "vc" |] in
   List.iter
-    (fun i ->
+    (fun (i, body) ->
       let name = caml_name i in
-      let oty p = Option.get (test_oty p) in
-      let sig_ =
-        String.concat " -> "
-          (List.map (fun p -> sprintf "(%s[@unboxed])" (oty p)) i.params
-          @ [sprintf "(%s[@unboxed])" (oty i.ret)])
-      in
-      Buffer.add_string buf
-        (sprintf
-           "\n\
-            external %s : %s = \"caml_vec512_unreachable\" %S [@@noalloc] \
-            [@@builtin]\n"
-           name sig_ name);
-      Buffer.add_string buf
-        (sprintf "external c_%s : %s = \"\" \"ctest_%s\" [@@noalloc]\n" i.name
-           sig_ i.name);
-      let vi = ref 0 and mi = ref 0 in
-      let mask_width c =
-        match c with
-        | "__mmask8" -> 0xFFL
-        | "__mmask16" -> 0xFFFFL
-        | "__mmask32" -> 0xFFFFFFFFL
-        | _ -> -1L (* __mmask64: all bits *)
-      in
-      let args =
-        List.map
-          (fun p ->
-            if is_mask_ctype p.ctype
-            then (
-              (* Pass a mask valid for this parameter width: the C oracle reads
-                 the full register, so upper bits must be zero. *)
-              let pat =
-                if !mi mod 2 = 0
-                then 0xA5A5A5A5A5A5A5A5L
-                else 0x3C3C3C3C3C3C3C3CL
+      let imms = List.filter is_imm i.params in
+      let tuples = product (List.map (imm_values ~body) imms) in
+      let all_bugged = List.for_all (oracle_bug i) tuples in
+      if all_bugged
+      then
+        Buffer.add_string buf
+          (sprintf "\n(* %s: C oracle miscompiled by clang; skipped. *)\n"
+             i.name)
+      else begin
+        let vals = List.filter (fun p -> not (is_imm p)) i.params in
+        let val_tys = List.map (fun p -> Option.get (tkind_of p)) vals in
+        let ret_ty = Option.get (tkind_of i.ret) in
+        (* builtin external: imm params leading (untagged), then value params *)
+        let bsig =
+          String.concat " -> "
+            (List.map (fun _ -> "(int[@untagged])") imms
+            @ List.map oty_with_attr val_tys
+            @ [oty_with_attr ret_ty])
+        in
+        Buffer.add_string buf
+          (sprintf
+             "\n\
+              external %s : %s = \"caml_vec512_unreachable\" %S [@@noalloc] \
+              [@@builtin]\n"
+             name bsig name);
+        let csig =
+          String.concat " -> "
+            (List.map oty_with_attr val_tys @ [oty_with_attr ret_ty])
+        in
+        let val_exprs =
+          List.mapi
+            (fun idx (p, (k, _)) -> value_expr ~idx p k)
+            (List.combine vals val_tys)
+          |> String.concat " "
+        in
+        let chk = check_fn ret_ty in
+        List.iter
+          (fun tuple ->
+            if oracle_bug i tuple
+            then
+              Buffer.add_string buf
+                (sprintf "(* %s%s: C oracle miscompiled by clang; skipped. *)\n"
+                   i.name
+                   (match tuple with
+                   | [] -> ""
+                   | t -> "_" ^ String.concat "_" (List.map string_of_int t)))
+            else begin
+              let suffix =
+                match tuple with
+                | [] -> ""
+                | t -> "_" ^ String.concat "_" (List.map string_of_int t)
               in
-              incr mi;
-              sprintf "(mask_of_int64 0x%LxL)"
-                (Int64.logand pat (mask_width p.ctype)))
-            else
-              let a = sprintf "(reint %s)" vecs.(!vi mod 3) in
-              incr vi;
-              a)
-          i.params
-        |> String.concat " "
-      in
-      let chk =
-        if is_mask_ctype i.ret.ctype then "check_mask" else "check512"
-      in
-      Buffer.add_string buf
-        (sprintf "let () = %s %S (%s %s) (c_%s %s)\n" chk i.name name args
-           i.name args))
+              Buffer.add_string buf
+                (sprintf
+                   "external c%s%s : %s = \"\" \"ctest%s%s\" [@@noalloc]\n"
+                   i.name suffix csig i.name suffix);
+              let imm_lits = List.map string_of_int tuple in
+              Buffer.add_string buf
+                (sprintf "let () = %s \"%s%s\" (%s %s%s%s) (c%s%s %s)\n" chk
+                   i.name suffix name
+                   (String.concat " " imm_lits)
+                   (if imm_lits = [] then "" else " ")
+                   val_exprs i.name suffix val_exprs)
+            end)
+          tuples
+      end)
     (test_intrinsics ~bindings intrinsics);
   Buffer.add_string buf "\nlet () = if !failures <> 0 then exit 1\n";
   print_string (Buffer.contents buf)
 
 let tests_c ~bindings intrinsics =
-  let buf = Buffer.create 65536 in
+  let buf = Buffer.create 262144 in
   Buffer.add_string buf
     "/* Generated by tools/simdgen/simdgen_intrins.ml. */\n\
      #include <caml/simd.h>\n\
@@ -1090,7 +1602,7 @@ let tests_c ~bindings intrinsics =
      BUILTIN(caml_int64_of_mask);\n";
   let intrs = test_intrinsics ~bindings intrinsics in
   List.iter
-    (fun i -> Buffer.add_string buf (sprintf "BUILTIN(caml%s);\n" i.name))
+    (fun (i, _) -> Buffer.add_string buf (sprintf "BUILTIN(caml%s);\n" i.name))
     intrs;
   Buffer.add_string buf
     "\n\
@@ -1099,24 +1611,81 @@ let tests_c ~bindings intrinsics =
      static int64_t vec512_extract(__m512i v, int i) { int64_t t[8]; \
      _mm512_storeu_si512((void *)t, v); return t[i]; }\n\
      int64_t vec512_wi(__m512i v, int i) { return vec512_extract(v, i); }\n\
+     int64_t vec256_wi(__m256i v, int i) { int64_t t[4]; \
+     _mm256_storeu_si256((void *)t, v); return t[i]; }\n\
+     int64_t vec128_wi(__m128i v, int i) { int64_t t[2]; \
+     _mm_storeu_si128((void *)t, v); return t[i]; }\n\
      __m512i vec512_of_int64s(int64_t a, int64_t b, int64_t c, int64_t d, \
      int64_t e, int64_t f, int64_t g, int64_t h) { return _mm512_set_epi64(h, \
-     g, f, e, d, c, b, a); }\n\n";
+     g, f, e, d, c, b, a); }\n\
+     __m256i vec256_of_int64s(int64_t a, int64_t b, int64_t c, int64_t d) { \
+     return _mm256_set_epi64x(d, c, b, a); }\n\
+     __m128i vec128_of_int64s(int64_t a, int64_t b) { return _mm_set_epi64x(b, \
+     a); }\n\n";
   List.iter
-    (fun i ->
+    (fun (i, body) ->
+      let imms = List.filter is_imm i.params in
+      let vals = List.filter (fun p -> not (is_imm p)) i.params in
+      (* Widen narrow returns: the OCaml side reads the full register. *)
+      let cret =
+        if is_mask_ctype i.ret.ctype
+        then "__mmask64"
+        else
+          match i.ret.ctype with
+          | "char" | "unsigned char" | "short" | "unsigned short" -> "int64_t"
+          | "int" | "unsigned int" | "const int" -> "int32_t"
+          | "__int64" | "unsigned __int64" | "long long" | "unsigned long long"
+            ->
+            "int64_t"
+          | c -> c
+      in
+      let cparam ctype =
+        (* The Intel data uses MSVC type names. *)
+        match ctype with
+        | "__int64" | "long long" -> "int64_t"
+        | "unsigned __int64" | "unsigned long long" -> "uint64_t"
+        | c -> c
+      in
       let params =
-        List.mapi (fun j p -> sprintf "%s p%d" p.ctype j) i.params
+        List.mapi (fun j p -> sprintf "%s p%d" (cparam p.ctype) j) vals
         |> String.concat ", "
       in
-      let args =
-        List.mapi (fun j _ -> sprintf "p%d" j) i.params |> String.concat ", "
-      in
-      let cret =
-        if is_mask_ctype i.ret.ctype then "__mmask64" else i.ret.ctype
-      in
-      Buffer.add_string buf
-        (sprintf "%s ctest_%s(%s) { return %s(%s); }\n" cret i.name params
-           i.name args))
+      List.iter
+        (fun tuple ->
+          if oracle_bug i tuple
+          then ()
+          else begin
+            let suffix =
+              match tuple with
+              | [] -> ""
+              | t -> "_" ^ String.concat "_" (List.map string_of_int t)
+            in
+            (* Rebuild the C argument list in original order, immediates
+               baked. *)
+            let tup = ref tuple in
+            let vidx = ref 0 in
+            let cargs =
+              List.map
+                (fun p ->
+                  if is_imm p
+                  then
+                    match !tup with
+                    | v :: rest ->
+                      tup := rest;
+                      string_of_int v
+                    | [] -> assert false
+                  else
+                    let a = sprintf "p%d" !vidx in
+                    incr vidx;
+                    a)
+                i.params
+              |> String.concat ", "
+            in
+            Buffer.add_string buf
+              (sprintf "%s ctest%s%s(%s) { return %s(%s); }\n" cret i.name
+                 suffix params i.name cargs)
+          end)
+        (product (List.map (imm_values ~body) imms)))
     intrs;
   Buffer.add_string buf "\n#endif\n";
   print_string (Buffer.contents buf)
@@ -1180,6 +1749,25 @@ module type Sel = sig
   val ktestz : Amd64_simd_instrs.instr -> expr list -> result
 
   val ktestc : Amd64_simd_instrs.instr -> expr list -> result
+
+  val simd_load : Amd64_simd_instrs.instr -> expr list -> result
+
+  val simd_store : Amd64_simd_instrs.instr -> expr list -> result
+
+  val extract_scale : expr list -> string -> int * expr list
+
+  val simd_load_scaled : Amd64_simd_instrs.instr -> scale:int -> expr list -> result
+
+  val simd_store_scaled :
+    Amd64_simd_instrs.instr -> scale:int -> expr list -> result
+
+  val all_ones_mask : expr
+
+  val zero_vec128 : expr
+
+  val zero_vec256 : expr
+
+  val zero_vec512 : expr
 end
 
 module Make (Sel : Sel) = struct

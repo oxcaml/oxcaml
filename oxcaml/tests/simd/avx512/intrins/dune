@@ -68,6 +68,41 @@
  (action
   (diff empty.expected smoke.out)))
 
+
+; The generated test sources are build-time rule targets (not checked in),
+; regenerated from the same data that produces the selection code.
+(rule
+ (targets gen512.ml)
+ (deps
+  (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
+  (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
+  (:xml %{workspace_root}/tools/simdgen/x86-intel.xml))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-stdout-to
+   gen512.ml
+   (run %{gen} intrins tests-ml %{csv} %{xml}))))
+
+(rule
+ (targets gen512_stubs.c)
+ (deps
+  (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
+  (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
+  (:xml %{workspace_root}/tools/simdgen/x86-intel.xml))
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-stdout-to
+   gen512_stubs.c
+   (run %{gen} intrins tests-c %{csv} %{xml}))))
+
 ; The C oracle for the generated tests must be compiled by clang: the host gcc
 ; (8.5) lacks many of the newer AVX512 intrinsic names.
 (rule
@@ -167,3 +202,141 @@
    (<> %{system} macosx)))
  (action
   (diff empty.expected mem.out)))
+
+; Internal-assembler variants: the same tests built with -internal-assembler,
+; cross-checking the binary emitter's EVEX encodings against GAS.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (copy smoke.ml smoke_ia.ml)))
+
+(executable
+ (name smoke_ia)
+ (modules smoke_ia)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
+   -internal-assembler))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs_intrins))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   smoke_ia.out
+   (run ./smoke_ia.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected smoke_ia.out)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (copy mem.ml mem_ia.ml)))
+
+(executable
+ (name mem_ia)
+ (modules mem_ia)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
+   -internal-assembler))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives memstubs))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   mem_ia.out
+   (run ./mem_ia.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected mem_ia.out)))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (copy gen512.ml gen512_ia.ml)))
+
+(executable
+ (name gen512_ia)
+ (modules gen512_ia)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
+   -internal-assembler))
+ (libraries stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives gen512stubs))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   gen512_ia.out
+   (run ./gen512_ia.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (diff empty.expected gen512_ia.out)))

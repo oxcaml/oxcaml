@@ -1120,6 +1120,96 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
+(* Generated selection for the AVX512 [caml_<intel-name>] intrinsics. The
+   functor is parameterized over the arch-independent selection primitives so
+   that the generated module (compiled on every arch) never mentions
+   arch-specific types; it is instantiated only here, on amd64. Extension gating
+   happens per arm: a disabled instruction selects [None], falling through to an
+   ordinary extcall (and a link error against the nonexistent C symbol), as with
+   the hand-written intrinsics. *)
+module Intrins = Amd64_simd_intrins.Make (struct
+  type expr = Cmm.expression
+
+  type result = (Operation.t * Cmm.expression list) option
+
+  let instr simd ?i args =
+    if Arch.Extension.enabled_instruction simd then instr simd ?i args else None
+
+  let none = None
+
+  let bad_arity op =
+    Misc.fatal_errorf "simd intrinsic %s: unexpected argument count" op
+
+  let bad_immediate op = bad_immediate "Invalid immediate for %s" op
+
+  let extract_constant args ~max op = extract_constant args op ~max
+
+  let kflag mk simd args =
+    if Arch.Extension.enabled_instruction simd
+    then cfg_operation (Simd.sequence (mk simd) None) args
+    else None
+
+  let kortestz simd args = kflag Simd.Seq.kortestz simd args
+
+  let kortestc simd args = kflag Simd.Seq.kortestc simd args
+
+  let ktestz simd args = kflag Simd.Seq.ktestz simd args
+
+  let ktestc simd args = kflag Simd.Seq.ktestc simd args
+
+  let simd_load_mode = simd_load
+
+  let simd_store_mode = simd_store
+
+  let simd_load simd args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_load_mode ~mode:Arch.identity_addressing simd args
+    else None
+
+  let simd_store simd args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_store_mode ~mode:Arch.identity_addressing simd args
+    else None
+
+  let extract_scale args op = extract_scale args op
+
+  let simd_load_scaled simd ~scale args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_load_mode ~mode:(Iindexed2scaled (scale, 0)) simd args
+    else None
+
+  let simd_store_scaled simd ~scale args =
+    if Arch.Extension.enabled_instruction simd
+    then simd_store_mode ~mode:(Iindexed2scaled (scale, 0)) simd args
+    else None
+
+  (* Constants synthesized for the unmasked gather/scatter intrinsics: the
+     AVX512 instructions always take a write mask, and gathers overwrite the
+     destination completely under an all-ones mask. *)
+  let all_ones_mask = Cmm_helpers.mask ~dbg:Debuginfo.none (-1L)
+
+  let zero_vec128 =
+    Cmm_helpers.vec128 ~dbg:Debuginfo.none { word0 = 0L; word1 = 0L }
+
+  let zero_vec256 =
+    Cmm_helpers.vec256 ~dbg:Debuginfo.none
+      { word0 = 0L; word1 = 0L; word2 = 0L; word3 = 0L }
+
+  let zero_vec512 =
+    Cmm_helpers.vec512 ~dbg:Debuginfo.none
+      { word0 = 0L;
+        word1 = 0L;
+        word2 = 0L;
+        word3 = 0L;
+        word4 = 0L;
+        word5 = 0L;
+        word6 = 0L;
+        word7 = 0L
+      }
+end)
+
+let select_operation_intrins ~dbg:_ op args = Intrins.select_operation op args
+
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
     match opt with Some x -> Some x | None -> try_ ~dbg op args
@@ -1140,6 +1230,7 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_avx2
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
+  |> or_else select_operation_intrins
 
 let rax = Proc.phys_reg Int (P RAX)
 
@@ -1203,7 +1294,8 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
         { id =
             ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
             | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
-            | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
+            | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y
+            | Kflag _ );
           instr
         } ->
       instr

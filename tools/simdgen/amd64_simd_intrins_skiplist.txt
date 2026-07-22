@@ -9,76 +9,18 @@ _ktest_mask16_u8	flag-reader with out-pointer (composable from z/c variants)
 _ktest_mask32_u8	flag-reader with out-pointer (composable from z/c variants)
 _ktest_mask64_u8	flag-reader with out-pointer (composable from z/c variants)
 _ktest_mask8_u8	flag-reader with out-pointer (composable from z/c variants)
-_load_mask16	phase 2: memory form
-_load_mask32	phase 2: memory form
-_load_mask64	phase 2: memory form
-_load_mask8	phase 2: memory form
+_load_mask16	scalar masked load/store (follow-up)
+_load_mask32	scalar masked load/store (follow-up)
+_load_mask64	scalar masked load/store (follow-up)
+_load_mask8	scalar masked load/store (follow-up)
 _mm256_broadcast_f32x4	sequence (library-level)
 _mm256_broadcast_f64x2	sequence (library-level)
 _mm256_broadcast_i32x4	sequence (library-level)
 _mm256_broadcast_i64x2	sequence (library-level)
-_mm256_i32scatter_epi32	phase 3: gather/scatter
-_mm256_i32scatter_epi64	phase 3: gather/scatter
-_mm256_i32scatter_pd	phase 3: gather/scatter
-_mm256_i32scatter_ps	phase 3: gather/scatter
-_mm256_i64scatter_epi32	phase 3: gather/scatter
-_mm256_i64scatter_epi64	phase 3: gather/scatter
-_mm256_i64scatter_pd	phase 3: gather/scatter
-_mm256_i64scatter_ps	phase 3: gather/scatter
-_mm256_load_epi32	phase 2: memory form
-_mm256_load_epi64	phase 2: memory form
-_mm256_loadu_epi16	phase 2: memory form
-_mm256_loadu_epi32	phase 2: memory form
-_mm256_loadu_epi64	phase 2: memory form
-_mm256_loadu_epi8	phase 2: memory form
 _mm256_mask_broadcast_f32x4	sequence (library-level)
 _mm256_mask_broadcast_f64x2	sequence (library-level)
 _mm256_mask_broadcast_i32x4	sequence (library-level)
 _mm256_mask_broadcast_i64x2	sequence (library-level)
-_mm256_mask_compressstoreu_epi32	phase 2: memory form
-_mm256_mask_compressstoreu_epi64	phase 2: memory form
-_mm256_mask_compressstoreu_pd	phase 2: memory form
-_mm256_mask_compressstoreu_ps	phase 2: memory form
-_mm256_mask_cvtepi16_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtepi32_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtepi32_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtepi64_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtepi64_storeu_epi32	phase 2: memory form
-_mm256_mask_cvtepi64_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtsepi16_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtsepi32_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtsepi32_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtsepi64_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtsepi64_storeu_epi32	phase 2: memory form
-_mm256_mask_cvtsepi64_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtusepi16_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtusepi32_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtusepi32_storeu_epi8	phase 2: memory form
-_mm256_mask_cvtusepi64_storeu_epi16	phase 2: memory form
-_mm256_mask_cvtusepi64_storeu_epi32	phase 2: memory form
-_mm256_mask_cvtusepi64_storeu_epi8	phase 2: memory form
-_mm256_mask_expandloadu_epi32	phase 2: memory form
-_mm256_mask_expandloadu_epi64	phase 2: memory form
-_mm256_mask_expandloadu_pd	phase 2: memory form
-_mm256_mask_expandloadu_ps	phase 2: memory form
-_mm256_mask_i32scatter_epi32	phase 3: gather/scatter
-_mm256_mask_i32scatter_epi64	phase 3: gather/scatter
-_mm256_mask_i32scatter_pd	phase 3: gather/scatter
-_mm256_mask_i32scatter_ps	phase 3: gather/scatter
-_mm256_mask_i64scatter_epi32	phase 3: gather/scatter
-_mm256_mask_i64scatter_epi64	phase 3: gather/scatter
-_mm256_mask_i64scatter_pd	phase 3: gather/scatter
-_mm256_mask_i64scatter_ps	phase 3: gather/scatter
-_mm256_mask_load_epi32	phase 2: memory form
-_mm256_mask_load_epi64	phase 2: memory form
-_mm256_mask_load_pd	phase 2: memory form
-_mm256_mask_load_ps	phase 2: memory form
-_mm256_mask_loadu_epi16	phase 2: memory form
-_mm256_mask_loadu_epi32	phase 2: memory form
-_mm256_mask_loadu_epi64	phase 2: memory form
-_mm256_mask_loadu_epi8	phase 2: memory form
-_mm256_mask_loadu_pd	phase 2: memory form
-_mm256_mask_loadu_ps	phase 2: memory form
 _mm256_mask_reduce_add_epi16	sequence (library-level)
 _mm256_mask_reduce_add_epi8	sequence (library-level)
 _mm256_mask_reduce_and_epi16	sequence (library-level)
@@ -95,42 +37,10 @@ _mm256_mask_reduce_mul_epi16	sequence (library-level)
 _mm256_mask_reduce_mul_epi8	sequence (library-level)
 _mm256_mask_reduce_or_epi16	sequence (library-level)
 _mm256_mask_reduce_or_epi8	sequence (library-level)
-_mm256_mask_store_epi32	phase 2: memory form
-_mm256_mask_store_epi64	phase 2: memory form
-_mm256_mask_store_pd	phase 2: memory form
-_mm256_mask_store_ps	phase 2: memory form
-_mm256_mask_storeu_epi16	phase 2: memory form
-_mm256_mask_storeu_epi32	phase 2: memory form
-_mm256_mask_storeu_epi64	phase 2: memory form
-_mm256_mask_storeu_epi8	phase 2: memory form
-_mm256_mask_storeu_pd	phase 2: memory form
-_mm256_mask_storeu_ps	phase 2: memory form
 _mm256_maskz_broadcast_f32x4	sequence (library-level)
 _mm256_maskz_broadcast_f64x2	sequence (library-level)
 _mm256_maskz_broadcast_i32x4	sequence (library-level)
 _mm256_maskz_broadcast_i64x2	sequence (library-level)
-_mm256_maskz_expandloadu_epi32	phase 2: memory form
-_mm256_maskz_expandloadu_epi64	phase 2: memory form
-_mm256_maskz_expandloadu_pd	phase 2: memory form
-_mm256_maskz_expandloadu_ps	phase 2: memory form
-_mm256_maskz_load_epi32	phase 2: memory form
-_mm256_maskz_load_epi64	phase 2: memory form
-_mm256_maskz_load_pd	phase 2: memory form
-_mm256_maskz_load_ps	phase 2: memory form
-_mm256_maskz_loadu_epi16	phase 2: memory form
-_mm256_maskz_loadu_epi32	phase 2: memory form
-_mm256_maskz_loadu_epi64	phase 2: memory form
-_mm256_maskz_loadu_epi8	phase 2: memory form
-_mm256_maskz_loadu_pd	phase 2: memory form
-_mm256_maskz_loadu_ps	phase 2: memory form
-_mm256_mmask_i32gather_epi32	phase 3: gather/scatter
-_mm256_mmask_i32gather_epi64	phase 3: gather/scatter
-_mm256_mmask_i32gather_pd	phase 3: gather/scatter
-_mm256_mmask_i32gather_ps	phase 3: gather/scatter
-_mm256_mmask_i64gather_epi32	phase 3: gather/scatter
-_mm256_mmask_i64gather_epi64	phase 3: gather/scatter
-_mm256_mmask_i64gather_pd	phase 3: gather/scatter
-_mm256_mmask_i64gather_ps	phase 3: gather/scatter
 _mm256_reduce_add_epi16	sequence (library-level)
 _mm256_reduce_add_epi8	sequence (library-level)
 _mm256_reduce_and_epi16	sequence (library-level)
@@ -147,14 +57,8 @@ _mm256_reduce_mul_epi16	sequence (library-level)
 _mm256_reduce_mul_epi8	sequence (library-level)
 _mm256_reduce_or_epi16	sequence (library-level)
 _mm256_reduce_or_epi8	sequence (library-level)
-_mm256_store_epi32	phase 2: memory form
-_mm256_store_epi64	phase 2: memory form
-_mm256_storeu_epi16	phase 2: memory form
-_mm256_storeu_epi32	phase 2: memory form
-_mm256_storeu_epi64	phase 2: memory form
-_mm256_storeu_epi8	phase 2: memory form
-_mm512_abs_pd	phase 2: memory form
-_mm512_abs_ps	phase 2: memory form
+_mm512_abs_pd	memory form without a register-addressable descriptor
+_mm512_abs_ps	memory form without a register-addressable descriptor
 _mm512_acos_pd	SVML (library-level)
 _mm512_acos_ps	SVML (library-level)
 _mm512_acosh_pd	SVML (library-level)
@@ -169,14 +73,14 @@ _mm512_atan_pd	SVML (library-level)
 _mm512_atan_ps	SVML (library-level)
 _mm512_atanh_pd	SVML (library-level)
 _mm512_atanh_ps	SVML (library-level)
-_mm512_broadcast_f32x4	phase 2: memory form
+_mm512_broadcast_f32x4	memory-form instruction without a pointer argument
 _mm512_broadcast_f32x8	sequence (library-level)
 _mm512_broadcast_f64x2	sequence (library-level)
-_mm512_broadcast_f64x4	phase 2: memory form
-_mm512_broadcast_i32x4	phase 2: memory form
+_mm512_broadcast_f64x4	memory form without a register-addressable descriptor
+_mm512_broadcast_i32x4	memory-form instruction without a pointer argument
 _mm512_broadcast_i32x8	sequence (library-level)
 _mm512_broadcast_i64x2	sequence (library-level)
-_mm512_broadcast_i64x4	phase 2: memory form
+_mm512_broadcast_i64x4	memory-form instruction without a pointer argument
 _mm512_castpd128_pd512	no instruction (cast/undefined)
 _mm512_castpd256_pd512	no instruction (cast/undefined)
 _mm512_castpd512_pd128	no instruction (cast/undefined)
@@ -209,14 +113,14 @@ _mm512_cosd_pd	SVML (library-level)
 _mm512_cosd_ps	SVML (library-level)
 _mm512_cosh_pd	SVML (library-level)
 _mm512_cosh_ps	SVML (library-level)
-_mm512_cvt_roundps_ph	phase 1: multi-imm (follow-up)
+_mm512_cvt_roundps_ph	float16 convert with rounding immediate (follow-up)
 _mm512_cvtepi32lo_pd	lo/hi convert variant (full-width arg, low/high half used)
 _mm512_cvtepu32lo_pd	lo/hi convert variant (full-width arg, low/high half used)
 _mm512_cvtpd_pslo	lo/hi convert variant (full-width arg, low/high half used)
-_mm512_cvtps_ph	phase 1: multi-imm (follow-up)
+_mm512_cvtps_ph	float16 convert with rounding immediate (follow-up)
 _mm512_cvtpslo_pd	lo/hi convert variant (full-width arg, low/high half used)
-_mm512_cvtsd_f64	phase 2: memory form
-_mm512_cvtss_f32	phase 2: memory form
+_mm512_cvtsd_f64	memory-form instruction without a pointer argument
+_mm512_cvtss_f32	memory-form instruction without a pointer argument
 _mm512_div_epi16	SVML (library-level)
 _mm512_div_epi32	SVML (library-level)
 _mm512_div_epi64	SVML (library-level)
@@ -245,40 +149,12 @@ _mm512_floor_pd	SVML (library-level)
 _mm512_floor_ps	SVML (library-level)
 _mm512_hypot_pd	SVML (library-level)
 _mm512_hypot_ps	SVML (library-level)
-_mm512_i32gather_epi32	phase 3: gather/scatter
-_mm512_i32gather_epi64	phase 3: gather/scatter
-_mm512_i32gather_pd	phase 3: gather/scatter
-_mm512_i32gather_ps	phase 3: gather/scatter
-_mm512_i32logather_epi64	phase 2: memory form
-_mm512_i32logather_pd	phase 2: memory form
-_mm512_i32loscatter_epi64	phase 2: memory form
-_mm512_i32loscatter_pd	phase 2: memory form
-_mm512_i32scatter_epi32	phase 3: gather/scatter
-_mm512_i32scatter_epi64	phase 3: gather/scatter
-_mm512_i32scatter_pd	phase 3: gather/scatter
-_mm512_i32scatter_ps	phase 3: gather/scatter
-_mm512_i64gather_epi32	phase 3: gather/scatter
-_mm512_i64gather_epi64	phase 3: gather/scatter
-_mm512_i64gather_pd	phase 3: gather/scatter
-_mm512_i64gather_ps	phase 3: gather/scatter
-_mm512_i64scatter_epi32	phase 3: gather/scatter
-_mm512_i64scatter_epi64	phase 3: gather/scatter
-_mm512_i64scatter_pd	phase 3: gather/scatter
-_mm512_i64scatter_ps	phase 3: gather/scatter
+_mm512_i32logather_epi64	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_i32logather_pd	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_i32loscatter_epi64	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_i32loscatter_pd	lo gather/scatter variant (512-bit index arg; compose via cast)
 _mm512_invsqrt_pd	SVML (library-level)
 _mm512_invsqrt_ps	SVML (library-level)
-_mm512_load_epi32	phase 2: memory form
-_mm512_load_epi64	phase 2: memory form
-_mm512_load_pd	phase 2: memory form
-_mm512_load_ps	phase 2: memory form
-_mm512_load_si512	phase 2: memory form
-_mm512_loadu_epi16	phase 2: memory form
-_mm512_loadu_epi32	phase 2: memory form
-_mm512_loadu_epi64	phase 2: memory form
-_mm512_loadu_epi8	phase 2: memory form
-_mm512_loadu_pd	phase 2: memory form
-_mm512_loadu_ps	phase 2: memory form
-_mm512_loadu_si512	phase 2: memory form
 _mm512_log10_pd	SVML (library-level)
 _mm512_log10_ps	SVML (library-level)
 _mm512_log1p_pd	SVML (library-level)
@@ -289,8 +165,8 @@ _mm512_log_pd	SVML (library-level)
 _mm512_log_ps	SVML (library-level)
 _mm512_logb_pd	SVML (library-level)
 _mm512_logb_ps	SVML (library-level)
-_mm512_mask_abs_pd	phase 2: memory form
-_mm512_mask_abs_ps	phase 2: memory form
+_mm512_mask_abs_pd	memory form without a register-addressable descriptor
+_mm512_mask_abs_ps	memory form without a register-addressable descriptor
 _mm512_mask_acos_pd	SVML (library-level)
 _mm512_mask_acos_ps	SVML (library-level)
 _mm512_mask_acosh_pd	SVML (library-level)
@@ -305,14 +181,14 @@ _mm512_mask_atan_pd	SVML (library-level)
 _mm512_mask_atan_ps	SVML (library-level)
 _mm512_mask_atanh_pd	SVML (library-level)
 _mm512_mask_atanh_ps	SVML (library-level)
-_mm512_mask_broadcast_f32x4	phase 2: memory form
+_mm512_mask_broadcast_f32x4	memory-form instruction without a pointer argument
 _mm512_mask_broadcast_f32x8	sequence (library-level)
 _mm512_mask_broadcast_f64x2	sequence (library-level)
-_mm512_mask_broadcast_f64x4	phase 2: memory form
-_mm512_mask_broadcast_i32x4	phase 2: memory form
+_mm512_mask_broadcast_f64x4	memory form without a register-addressable descriptor
+_mm512_mask_broadcast_i32x4	memory-form instruction without a pointer argument
 _mm512_mask_broadcast_i32x8	sequence (library-level)
 _mm512_mask_broadcast_i64x2	sequence (library-level)
-_mm512_mask_broadcast_i64x4	phase 2: memory form
+_mm512_mask_broadcast_i64x4	memory-form instruction without a pointer argument
 _mm512_mask_cbrt_pd	SVML (library-level)
 _mm512_mask_cbrt_ps	SVML (library-level)
 _mm512_mask_cdfnorm_pd	SVML (library-level)
@@ -321,40 +197,18 @@ _mm512_mask_cdfnorminv_pd	SVML (library-level)
 _mm512_mask_cdfnorminv_ps	SVML (library-level)
 _mm512_mask_ceil_pd	SVML (library-level)
 _mm512_mask_ceil_ps	SVML (library-level)
-_mm512_mask_compressstoreu_epi32	phase 2: memory form
-_mm512_mask_compressstoreu_epi64	phase 2: memory form
-_mm512_mask_compressstoreu_pd	phase 2: memory form
-_mm512_mask_compressstoreu_ps	phase 2: memory form
 _mm512_mask_cos_pd	SVML (library-level)
 _mm512_mask_cos_ps	SVML (library-level)
 _mm512_mask_cosd_pd	SVML (library-level)
 _mm512_mask_cosd_ps	SVML (library-level)
 _mm512_mask_cosh_pd	SVML (library-level)
 _mm512_mask_cosh_ps	SVML (library-level)
-_mm512_mask_cvt_roundps_ph	phase 1: multi-imm (follow-up)
-_mm512_mask_cvtepi16_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtepi32_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtepi32_storeu_epi8	phase 2: memory form
+_mm512_mask_cvt_roundps_ph	float16 convert with rounding immediate (follow-up)
 _mm512_mask_cvtepi32lo_pd	lo/hi convert variant (full-width arg, low/high half used)
-_mm512_mask_cvtepi64_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtepi64_storeu_epi32	phase 2: memory form
-_mm512_mask_cvtepi64_storeu_epi8	phase 2: memory form
 _mm512_mask_cvtepu32lo_pd	lo/hi convert variant (full-width arg, low/high half used)
 _mm512_mask_cvtpd_pslo	lo/hi convert variant (full-width arg, low/high half used)
-_mm512_mask_cvtps_ph	phase 1: multi-imm (follow-up)
+_mm512_mask_cvtps_ph	float16 convert with rounding immediate (follow-up)
 _mm512_mask_cvtpslo_pd	lo/hi convert variant (full-width arg, low/high half used)
-_mm512_mask_cvtsepi16_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtsepi32_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtsepi32_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtsepi64_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtsepi64_storeu_epi32	phase 2: memory form
-_mm512_mask_cvtsepi64_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtusepi16_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtusepi32_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtusepi32_storeu_epi8	phase 2: memory form
-_mm512_mask_cvtusepi64_storeu_epi16	phase 2: memory form
-_mm512_mask_cvtusepi64_storeu_epi32	phase 2: memory form
-_mm512_mask_cvtusepi64_storeu_epi8	phase 2: memory form
 _mm512_mask_div_epi32	SVML (library-level)
 _mm512_mask_div_epu32	SVML (library-level)
 _mm512_mask_erf_pd	SVML (library-level)
@@ -371,48 +225,18 @@ _mm512_mask_exp2_pd	SVML (library-level)
 _mm512_mask_exp2_ps	SVML (library-level)
 _mm512_mask_exp_pd	SVML (library-level)
 _mm512_mask_exp_ps	SVML (library-level)
-_mm512_mask_expandloadu_epi32	phase 2: memory form
-_mm512_mask_expandloadu_epi64	phase 2: memory form
-_mm512_mask_expandloadu_pd	phase 2: memory form
-_mm512_mask_expandloadu_ps	phase 2: memory form
 _mm512_mask_expm1_pd	SVML (library-level)
 _mm512_mask_expm1_ps	SVML (library-level)
 _mm512_mask_floor_pd	SVML (library-level)
 _mm512_mask_floor_ps	SVML (library-level)
 _mm512_mask_hypot_pd	SVML (library-level)
 _mm512_mask_hypot_ps	SVML (library-level)
-_mm512_mask_i32gather_epi32	phase 3: gather/scatter
-_mm512_mask_i32gather_epi64	phase 3: gather/scatter
-_mm512_mask_i32gather_pd	phase 3: gather/scatter
-_mm512_mask_i32gather_ps	phase 3: gather/scatter
-_mm512_mask_i32logather_epi64	phase 2: memory form
-_mm512_mask_i32logather_pd	phase 2: memory form
-_mm512_mask_i32loscatter_epi64	phase 2: memory form
-_mm512_mask_i32loscatter_pd	phase 2: memory form
-_mm512_mask_i32scatter_epi32	phase 3: gather/scatter
-_mm512_mask_i32scatter_epi64	phase 3: gather/scatter
-_mm512_mask_i32scatter_pd	phase 3: gather/scatter
-_mm512_mask_i32scatter_ps	phase 3: gather/scatter
-_mm512_mask_i64gather_epi32	phase 3: gather/scatter
-_mm512_mask_i64gather_epi64	phase 3: gather/scatter
-_mm512_mask_i64gather_pd	phase 3: gather/scatter
-_mm512_mask_i64gather_ps	phase 3: gather/scatter
-_mm512_mask_i64scatter_epi32	phase 3: gather/scatter
-_mm512_mask_i64scatter_epi64	phase 3: gather/scatter
-_mm512_mask_i64scatter_pd	phase 3: gather/scatter
-_mm512_mask_i64scatter_ps	phase 3: gather/scatter
+_mm512_mask_i32logather_epi64	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_mask_i32logather_pd	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_mask_i32loscatter_epi64	lo gather/scatter variant (512-bit index arg; compose via cast)
+_mm512_mask_i32loscatter_pd	lo gather/scatter variant (512-bit index arg; compose via cast)
 _mm512_mask_invsqrt_pd	SVML (library-level)
 _mm512_mask_invsqrt_ps	SVML (library-level)
-_mm512_mask_load_epi32	phase 2: memory form
-_mm512_mask_load_epi64	phase 2: memory form
-_mm512_mask_load_pd	phase 2: memory form
-_mm512_mask_load_ps	phase 2: memory form
-_mm512_mask_loadu_epi16	phase 2: memory form
-_mm512_mask_loadu_epi32	phase 2: memory form
-_mm512_mask_loadu_epi64	phase 2: memory form
-_mm512_mask_loadu_epi8	phase 2: memory form
-_mm512_mask_loadu_pd	phase 2: memory form
-_mm512_mask_loadu_ps	phase 2: memory form
 _mm512_mask_log10_pd	SVML (library-level)
 _mm512_mask_log10_ps	SVML (library-level)
 _mm512_mask_log1p_pd	SVML (library-level)
@@ -466,16 +290,6 @@ _mm512_mask_sind_pd	SVML (library-level)
 _mm512_mask_sind_ps	SVML (library-level)
 _mm512_mask_sinh_pd	SVML (library-level)
 _mm512_mask_sinh_ps	SVML (library-level)
-_mm512_mask_store_epi32	phase 2: memory form
-_mm512_mask_store_epi64	phase 2: memory form
-_mm512_mask_store_pd	phase 2: memory form
-_mm512_mask_store_ps	phase 2: memory form
-_mm512_mask_storeu_epi16	phase 2: memory form
-_mm512_mask_storeu_epi32	phase 2: memory form
-_mm512_mask_storeu_epi64	phase 2: memory form
-_mm512_mask_storeu_epi8	phase 2: memory form
-_mm512_mask_storeu_pd	phase 2: memory form
-_mm512_mask_storeu_ps	phase 2: memory form
 _mm512_mask_svml_round_pd	SVML (library-level)
 _mm512_mask_tan_pd	SVML (library-level)
 _mm512_mask_tan_ps	SVML (library-level)
@@ -485,30 +299,16 @@ _mm512_mask_tanh_pd	SVML (library-level)
 _mm512_mask_tanh_ps	SVML (library-level)
 _mm512_mask_trunc_pd	SVML (library-level)
 _mm512_mask_trunc_ps	SVML (library-level)
-_mm512_maskz_broadcast_f32x4	phase 2: memory form
+_mm512_maskz_broadcast_f32x4	memory-form instruction without a pointer argument
 _mm512_maskz_broadcast_f32x8	sequence (library-level)
 _mm512_maskz_broadcast_f64x2	sequence (library-level)
-_mm512_maskz_broadcast_f64x4	phase 2: memory form
-_mm512_maskz_broadcast_i32x4	phase 2: memory form
+_mm512_maskz_broadcast_f64x4	memory form without a register-addressable descriptor
+_mm512_maskz_broadcast_i32x4	memory-form instruction without a pointer argument
 _mm512_maskz_broadcast_i32x8	sequence (library-level)
 _mm512_maskz_broadcast_i64x2	sequence (library-level)
-_mm512_maskz_broadcast_i64x4	phase 2: memory form
-_mm512_maskz_cvt_roundps_ph	phase 1: multi-imm (follow-up)
-_mm512_maskz_cvtps_ph	phase 1: multi-imm (follow-up)
-_mm512_maskz_expandloadu_epi32	phase 2: memory form
-_mm512_maskz_expandloadu_epi64	phase 2: memory form
-_mm512_maskz_expandloadu_pd	phase 2: memory form
-_mm512_maskz_expandloadu_ps	phase 2: memory form
-_mm512_maskz_load_epi32	phase 2: memory form
-_mm512_maskz_load_epi64	phase 2: memory form
-_mm512_maskz_load_pd	phase 2: memory form
-_mm512_maskz_load_ps	phase 2: memory form
-_mm512_maskz_loadu_epi16	phase 2: memory form
-_mm512_maskz_loadu_epi32	phase 2: memory form
-_mm512_maskz_loadu_epi64	phase 2: memory form
-_mm512_maskz_loadu_epi8	phase 2: memory form
-_mm512_maskz_loadu_pd	phase 2: memory form
-_mm512_maskz_loadu_ps	phase 2: memory form
+_mm512_maskz_broadcast_i64x4	memory-form instruction without a pointer argument
+_mm512_maskz_cvt_roundps_ph	float16 convert with rounding immediate (follow-up)
+_mm512_maskz_cvtps_ph	float16 convert with rounding immediate (follow-up)
 _mm512_mullox_epi64	sequence (library-level)
 _mm512_nearbyint_pd	SVML (library-level)
 _mm512_nearbyint_ps	SVML (library-level)
@@ -580,22 +380,7 @@ _mm512_sind_pd	SVML (library-level)
 _mm512_sind_ps	SVML (library-level)
 _mm512_sinh_pd	SVML (library-level)
 _mm512_sinh_ps	SVML (library-level)
-_mm512_store_epi32	phase 2: memory form
-_mm512_store_epi64	phase 2: memory form
-_mm512_store_pd	phase 2: memory form
-_mm512_store_ps	phase 2: memory form
-_mm512_store_si512	phase 2: memory form
-_mm512_storeu_epi16	phase 2: memory form
-_mm512_storeu_epi32	phase 2: memory form
-_mm512_storeu_epi64	phase 2: memory form
-_mm512_storeu_epi8	phase 2: memory form
-_mm512_storeu_pd	phase 2: memory form
-_mm512_storeu_ps	phase 2: memory form
-_mm512_storeu_si512	phase 2: memory form
-_mm512_stream_load_si512	phase 2: memory form
-_mm512_stream_pd	phase 2: memory form
-_mm512_stream_ps	phase 2: memory form
-_mm512_stream_si512	phase 2: memory form
+_mm512_stream_si512	memory form without a register-addressable descriptor
 _mm512_svml_round_pd	SVML (library-level)
 _mm512_tan_pd	SVML (library-level)
 _mm512_tan_ps	SVML (library-level)
@@ -617,66 +402,6 @@ _mm512_zextsi128_si512	no instruction (cast/undefined)
 _mm512_zextsi256_si512	no instruction (cast/undefined)
 _mm_comi_round_sd	flag-reader: comi predicate+sae (curated follow-up)
 _mm_comi_round_ss	flag-reader: comi predicate+sae (curated follow-up)
-_mm_i32scatter_epi32	phase 3: gather/scatter
-_mm_i32scatter_epi64	phase 3: gather/scatter
-_mm_i32scatter_pd	phase 3: gather/scatter
-_mm_i32scatter_ps	phase 3: gather/scatter
-_mm_i64scatter_epi32	phase 3: gather/scatter
-_mm_i64scatter_epi64	phase 3: gather/scatter
-_mm_i64scatter_pd	phase 3: gather/scatter
-_mm_i64scatter_ps	phase 3: gather/scatter
-_mm_load_epi32	phase 2: memory form
-_mm_load_epi64	phase 2: memory form
-_mm_loadu_epi16	phase 2: memory form
-_mm_loadu_epi32	phase 2: memory form
-_mm_loadu_epi64	phase 2: memory form
-_mm_loadu_epi8	phase 2: memory form
-_mm_mask_compressstoreu_epi32	phase 2: memory form
-_mm_mask_compressstoreu_epi64	phase 2: memory form
-_mm_mask_compressstoreu_pd	phase 2: memory form
-_mm_mask_compressstoreu_ps	phase 2: memory form
-_mm_mask_cvtepi16_storeu_epi8	phase 2: memory form
-_mm_mask_cvtepi32_storeu_epi16	phase 2: memory form
-_mm_mask_cvtepi32_storeu_epi8	phase 2: memory form
-_mm_mask_cvtepi64_storeu_epi16	phase 2: memory form
-_mm_mask_cvtepi64_storeu_epi32	phase 2: memory form
-_mm_mask_cvtepi64_storeu_epi8	phase 2: memory form
-_mm_mask_cvtsepi16_storeu_epi8	phase 2: memory form
-_mm_mask_cvtsepi32_storeu_epi16	phase 2: memory form
-_mm_mask_cvtsepi32_storeu_epi8	phase 2: memory form
-_mm_mask_cvtsepi64_storeu_epi16	phase 2: memory form
-_mm_mask_cvtsepi64_storeu_epi32	phase 2: memory form
-_mm_mask_cvtsepi64_storeu_epi8	phase 2: memory form
-_mm_mask_cvtusepi16_storeu_epi8	phase 2: memory form
-_mm_mask_cvtusepi32_storeu_epi16	phase 2: memory form
-_mm_mask_cvtusepi32_storeu_epi8	phase 2: memory form
-_mm_mask_cvtusepi64_storeu_epi16	phase 2: memory form
-_mm_mask_cvtusepi64_storeu_epi32	phase 2: memory form
-_mm_mask_cvtusepi64_storeu_epi8	phase 2: memory form
-_mm_mask_expandloadu_epi32	phase 2: memory form
-_mm_mask_expandloadu_epi64	phase 2: memory form
-_mm_mask_expandloadu_pd	phase 2: memory form
-_mm_mask_expandloadu_ps	phase 2: memory form
-_mm_mask_i32scatter_epi32	phase 3: gather/scatter
-_mm_mask_i32scatter_epi64	phase 3: gather/scatter
-_mm_mask_i32scatter_pd	phase 3: gather/scatter
-_mm_mask_i32scatter_ps	phase 3: gather/scatter
-_mm_mask_i64scatter_epi32	phase 3: gather/scatter
-_mm_mask_i64scatter_epi64	phase 3: gather/scatter
-_mm_mask_i64scatter_pd	phase 3: gather/scatter
-_mm_mask_i64scatter_ps	phase 3: gather/scatter
-_mm_mask_load_epi32	phase 2: memory form
-_mm_mask_load_epi64	phase 2: memory form
-_mm_mask_load_pd	phase 2: memory form
-_mm_mask_load_ps	phase 2: memory form
-_mm_mask_load_sd	phase 2: memory form
-_mm_mask_load_ss	phase 2: memory form
-_mm_mask_loadu_epi16	phase 2: memory form
-_mm_mask_loadu_epi32	phase 2: memory form
-_mm_mask_loadu_epi64	phase 2: memory form
-_mm_mask_loadu_epi8	phase 2: memory form
-_mm_mask_loadu_pd	phase 2: memory form
-_mm_mask_loadu_ps	phase 2: memory form
 _mm_mask_reduce_add_epi16	sequence (library-level)
 _mm_mask_reduce_add_epi8	sequence (library-level)
 _mm_mask_reduce_and_epi16	sequence (library-level)
@@ -693,42 +418,10 @@ _mm_mask_reduce_mul_epi16	sequence (library-level)
 _mm_mask_reduce_mul_epi8	sequence (library-level)
 _mm_mask_reduce_or_epi16	sequence (library-level)
 _mm_mask_reduce_or_epi8	sequence (library-level)
-_mm_mask_store_epi32	phase 2: memory form
-_mm_mask_store_epi64	phase 2: memory form
-_mm_mask_store_pd	phase 2: memory form
-_mm_mask_store_ps	phase 2: memory form
-_mm_mask_store_sd	phase 2: memory form
-_mm_mask_store_ss	phase 2: memory form
-_mm_mask_storeu_epi16	phase 2: memory form
-_mm_mask_storeu_epi32	phase 2: memory form
-_mm_mask_storeu_epi64	phase 2: memory form
-_mm_mask_storeu_epi8	phase 2: memory form
-_mm_mask_storeu_pd	phase 2: memory form
-_mm_mask_storeu_ps	phase 2: memory form
-_mm_maskz_expandloadu_epi32	phase 2: memory form
-_mm_maskz_expandloadu_epi64	phase 2: memory form
-_mm_maskz_expandloadu_pd	phase 2: memory form
-_mm_maskz_expandloadu_ps	phase 2: memory form
-_mm_maskz_load_epi32	phase 2: memory form
-_mm_maskz_load_epi64	phase 2: memory form
-_mm_maskz_load_pd	phase 2: memory form
-_mm_maskz_load_ps	phase 2: memory form
-_mm_maskz_load_sd	phase 2: memory form
-_mm_maskz_load_ss	phase 2: memory form
-_mm_maskz_loadu_epi16	phase 2: memory form
-_mm_maskz_loadu_epi32	phase 2: memory form
-_mm_maskz_loadu_epi64	phase 2: memory form
-_mm_maskz_loadu_epi8	phase 2: memory form
-_mm_maskz_loadu_pd	phase 2: memory form
-_mm_maskz_loadu_ps	phase 2: memory form
-_mm_mmask_i32gather_epi32	phase 3: gather/scatter
-_mm_mmask_i32gather_epi64	phase 3: gather/scatter
-_mm_mmask_i32gather_pd	phase 3: gather/scatter
-_mm_mmask_i32gather_ps	phase 3: gather/scatter
-_mm_mmask_i64gather_epi32	phase 3: gather/scatter
-_mm_mmask_i64gather_epi64	phase 3: gather/scatter
-_mm_mmask_i64gather_pd	phase 3: gather/scatter
-_mm_mmask_i64gather_ps	phase 3: gather/scatter
+_mm_mask_store_sd	memory form without a register-addressable descriptor
+_mm_mask_store_ss	memory form without a register-addressable descriptor
+_mm_maskz_load_sd	scalar masked load/store (follow-up)
+_mm_maskz_load_ss	scalar masked load/store (follow-up)
 _mm_reduce_add_epi16	sequence (library-level)
 _mm_reduce_add_epi8	sequence (library-level)
 _mm_reduce_and_epi16	sequence (library-level)
@@ -745,13 +438,7 @@ _mm_reduce_mul_epi16	sequence (library-level)
 _mm_reduce_mul_epi8	sequence (library-level)
 _mm_reduce_or_epi16	sequence (library-level)
 _mm_reduce_or_epi8	sequence (library-level)
-_mm_store_epi32	phase 2: memory form
-_mm_store_epi64	phase 2: memory form
-_mm_storeu_epi16	phase 2: memory form
-_mm_storeu_epi32	phase 2: memory form
-_mm_storeu_epi64	phase 2: memory form
-_mm_storeu_epi8	phase 2: memory form
-_store_mask16	phase 2: memory form
-_store_mask32	phase 2: memory form
-_store_mask64	phase 2: memory form
-_store_mask8	phase 2: memory form
+_store_mask16	memory form without a register-addressable descriptor
+_store_mask32	memory form without a register-addressable descriptor
+_store_mask64	memory form without a register-addressable descriptor
+_store_mask8	memory form without a register-addressable descriptor

@@ -271,3 +271,57 @@
      never
      -error-style
      short)))))
+
+; AVX512 negative tests: bad immediates are compile-time errors. The filename is
+; passed literally (not via %{ml}) so the error's location line is stable.
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps avx512imm.expected avx512imm.corrected avx512rnd.expected avx512rnd.corrected)
+ (action
+  (progn
+   (diff avx512imm.expected avx512imm.corrected)
+   (diff avx512rnd.expected avx512rnd.corrected))))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets avx512imm.corrected)
+ (deps avx512imm.ml)
+ (action
+  (with-outputs-to
+   avx512imm.corrected
+   (with-accepted-exit-codes
+    2
+    (run
+     %{bin:ocamlopt.opt}
+     avx512imm.ml
+     -extension
+     simd_alpha
+     -favx512f
+     -color
+     never
+     -error-style
+     short)))))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets avx512rnd.corrected)
+ (deps avx512rnd.ml)
+ (action
+  (with-outputs-to
+   avx512rnd.corrected
+   (with-accepted-exit-codes
+    2
+    (run
+     %{bin:ocamlopt.opt}
+     avx512rnd.ml
+     -extension
+     simd_alpha
+     -favx512f
+     -color
+     never
+     -error-style
+     short)))))

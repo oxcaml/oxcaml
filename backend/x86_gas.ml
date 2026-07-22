@@ -133,6 +133,27 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
       (if evex_z then "{z}" else ""), rounding, broadcast
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
+  let mem_suffix =
+    (* GAS cannot infer the operand size of a memory (e.g. spilled) source for
+       the narrowing converts and vfpclass, whose other operands do not
+       determine it; disambiguate with the x/y/z length suffix. *)
+    if not has_mem
+    then ""
+    else
+      let len_letter ~z =
+        match instr.enc.prefix with
+        | Evex { evex_ll = Ll_len L128; _ } -> "x"
+        | Evex { evex_ll = Ll_len L256; _ } -> "y"
+        | Evex { evex_ll = Ll_len L512; _ } -> if z then "z" else ""
+        | Evex { evex_ll = Ll_round _; _ } | Legacy _ | Vex _ -> ""
+      in
+      match instr.mnemonic with
+      | "vcvtpd2dq" | "vcvttpd2dq" | "vcvtpd2udq" | "vcvttpd2udq" | "vcvtpd2ps"
+      | "vcvtqq2ps" | "vcvtuqq2ps" ->
+        len_letter ~z:false
+      | "vfpclassps" | "vfpclasspd" -> len_letter ~z:true
+      | _ -> ""
+  in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
   (* [emit_simd_instr] passes the immediate first, then the writemask, then the
      remaining operands in AT&T order. *)
@@ -147,17 +168,29 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     then Some args.(0), Array.sub args 1 (Array.length args - 1)
     else None, args
   in
-  bprintf b "\t%s\t" instr.mnemonic;
-  (* The assembler requires the rounding mode to follow the immediate. *)
-  (match imm with
-  | Some imm -> bprintf b "%a, " arg imm
-  | None -> ());
-  Buffer.add_string b rounding;
+  bprintf b "\t%s%s\t" instr.mnemonic mem_suffix;
+  (* The assembler requires the rounding mode to follow the immediate, except
+     for the GPR-source converts (vcvtsi2ss etc.), where it must follow the GPR
+     operand instead. *)
+  let rounding_after_gpr =
+    match args with
+    | [||] -> false
+    | args -> (
+      match args.(0) with
+      | Reg32 _ | Reg64 _ -> true
+      | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _ | Mem _
+      | Mem64_RIP _ ->
+        false)
+  in
+  (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
+  if not rounding_after_gpr then Buffer.add_string b rounding;
   let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
       if i > 0 then Buffer.add_string b ", ";
       arg b a;
+      if i = 0 && rounding_after_gpr && String.length rounding > 0
+      then bprintf b ", %s" (String.sub rounding 0 (String.length rounding - 2));
       if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
       if i = last then bprintf b "%a%s" mask writemask zeroing)
     args
