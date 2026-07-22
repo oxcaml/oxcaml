@@ -15,6 +15,8 @@
 #ifndef CAML_ADDRMAP_H
 #define CAML_ADDRMAP_H
 
+#include "config.h"
+#include "misc.h"
 #include "mlvalues.h"
 
 #ifdef __cplusplus

@@ -38,6 +38,9 @@ CAMLextern void caml_record_backtraces(int);
 #ifdef CAML_INTERNALS
 
 #include "exec.h"
+#include <stddef.h>
+#include "domain_state.h"
+#include "misc.h"
 
 /* Runtime support for backtrace generation.
  *

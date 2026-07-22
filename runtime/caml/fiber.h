@@ -27,6 +27,9 @@
 #include "dynamic.h"
 #include "roots.h"
 #include "platform.h"
+#include <stddef.h>
+#include <stdint.h>
+#include "config.h"
 
 struct stack_info;
 
