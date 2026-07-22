@@ -64,6 +64,11 @@ type member = private
 (** Alias for [member] for clarity when referring to header metadata. *)
 type member_header = member
 
+(** [is_archive buf] tells whether [buf] starts with the ar archive magic
+    string. It validates nothing else about the contents (use [read] for that)
+    and never raises. *)
+val is_archive : Owee_buf.t -> bool
+
 (** [read buf] reads an ar archive from the given buffer. Returns the archive
     handle and a list of members. The buffer should contain the entire archive
     (e.g., via memory mapping).
