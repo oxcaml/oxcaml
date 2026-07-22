@@ -16,11 +16,14 @@
 #ifndef CAML_STARTUP_H
 #define CAML_STARTUP_H
 
+#include "mlvalues.h"
+
 #ifdef CAML_INTERNALS
 
-#include "mlvalues.h"
 #include "exec.h"
 #include "startup_aux.h"
+#include <stdint.h>
+#include "misc.h"
 
 CAMLextern void caml_startup_code(
            code_t code, asize_t code_size,

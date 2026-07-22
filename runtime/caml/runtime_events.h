@@ -28,7 +28,10 @@
 #ifndef CAML_RUNTIME_EVENTS_H
 #define CAML_RUNTIME_EVENTS_H
 
+#include "misc.h"
 #include "mlvalues.h"
+#include <stdint.h>
+#include "camlatomic.h"
 
 #ifdef CAML_INSTR
 #define CAML_EV_ALLOC(s) caml_ev_alloc(s)

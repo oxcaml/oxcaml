@@ -18,6 +18,7 @@
 #ifndef CAML_CALLBACK_H
 #define CAML_CALLBACK_H
 
+#include "misc.h"
 #include "mlvalues.h"
 #include "memory.h"
 

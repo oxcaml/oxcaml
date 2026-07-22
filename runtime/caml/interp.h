@@ -22,6 +22,7 @@
 
 #include "misc.h"
 #include "mlvalues.h"
+#include "config.h"
 
 CAMLextern
 value caml_bytecode_interpreter (code_t prog, asize_t prog_size,
