@@ -3,9 +3,11 @@
  flambda2;
  setup-ocamlopt.byte-build-env;
  unset OCAMLPARAM;
- ocamlopt_byte_exit_status = "2";
- ocamlopt.byte;
+ ocamlopt.byte with dump-simplify;
  check-ocamlopt.byte-output;
+ check-fexpr-dump;
+ run;
+ check-program-output;
 *)
 
 let[@unboxable] ret_local : unit -> float @ local = fun () -> exclave_ 1.0

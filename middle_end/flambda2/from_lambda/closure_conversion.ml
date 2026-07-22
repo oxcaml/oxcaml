@@ -2919,8 +2919,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
-    | Alloc_heap -> false
-    | Alloc_local -> true
+    | Alloc_heap -> true
+    | Alloc_local -> false
   in
   let main_code =
     Code.create main_code_id ~params_and_body
