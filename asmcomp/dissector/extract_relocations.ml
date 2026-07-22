@@ -146,9 +146,9 @@ let record_relocation ~seen ~acc ~num ~sym_index ~symbol_name =
    compiled with -nodynlink, which is incompatible with the dissector. *)
 let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
   Rela.iteri_rela_entries ~rela_body ~f:(fun ~index:_ entry ->
-      (* Check for PC32 relocations to undefined symbols - these are an error *)
-      if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
-      then
+      match entry.r_type with
+      (* PC32 relocations to undefined symbols are an error *)
+      | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.pc32 -> (
         match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
         | Some sym when Rela.Section_index.is_undef sym.Elf.st_shndx ->
           let symbol_name =
@@ -160,11 +160,10 @@ let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
              The dissector requires code to be compiled without -nodynlink \
              (i.e., with dynamic linking support enabled)."
             symbol_name entry.r_offset
-        | _ -> ()
-      else if
-        Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-        || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-      then
+        | _ -> ())
+      | rt
+        when Rela.Reloc_type.equal rt Rela.Reloc_type.plt32
+             || Rela.Reloc_type.equal rt Rela.Reloc_type.rex_gotpcrelx -> (
         (* Only process relocations for undefined symbols *)
         match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
         | None ->
@@ -184,6 +183,7 @@ let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
           if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
           then record_plt ~sym_index:entry.r_sym ~symbol_name
           else record_got ~sym_index:entry.r_sym ~symbol_name)
+      | _ -> ())
 
 let extract_from_rela_text_sections ~symbols sections =
   (* Symbols are deduplicated, keyed on the symbol table index. One "seen"
@@ -203,6 +203,8 @@ let extract_from_rela_text_sections ~symbols sections =
     record_relocation ~seen:got_seen ~acc:got_symbols ~num:num_got ~sym_index
       ~symbol_name
   in
+  (* CR sspies: Consider rewriting this accumulation as a fold (possibly with
+     TMC) so that the refs and the final reversals are not needed. See #6447. *)
   List.iter
     (fun ((rela_section : Elf.section), rela_body) ->
       log_verbose "  processing section %s" rela_section.sh_name_str;

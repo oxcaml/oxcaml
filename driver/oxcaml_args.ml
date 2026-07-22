@@ -460,9 +460,9 @@ let mk_dissector_partition_size f =
 
 let mk_dissector_max_linker_parallelism f =
   ( "-dissector-max-linker-parallelism",
-    Arg.String f,
-    "<n|none>  Run at most <n> partial links concurrently in the dissector \
-     pass (default: none, i.e. no limit)" )
+    Arg.Int f,
+    "<n>  Run at most <n> partial links concurrently in the dissector pass; 0 \
+     means no limit (default: 0)" )
 
 let mk_ddissector f =
   ("-ddissector", Arg.Unit f, " Print verbose logging from the dissector pass")
@@ -1351,7 +1351,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
-  val dissector_max_linker_parallelism : string -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -1683,18 +1683,16 @@ let set_dissector_partition_size f =
          "-dissector-partition-size must be greater than 0 and less than 2 GiB");
   Clflags.dissector_partition_size := Some f
 
-let set_dissector_max_linker_parallelism v =
+let set_dissector_max_linker_parallelism n =
   let bound =
-    match v with
-    | "none" -> Misc.Maybe_bounded.Unbounded
-    | v -> (
-        match int_of_string_opt v with
-        | Some n when n >= 1 -> Misc.Maybe_bounded.Bounded { bound = n }
-        | Some _ | None ->
-            raise
-              (Arg.Bad
-                 "-dissector-max-linker-parallelism must be a positive integer \
-                  or \"none\""))
+    match n with
+    | 0 -> Misc.Maybe_bounded.Unbounded
+    | n when n >= 1 -> Misc.Maybe_bounded.Bounded { bound = n }
+    | _ ->
+        raise
+          (Arg.Bad
+             "-dissector-max-linker-parallelism must be a nonnegative integer \
+              (0 means no limit)")
   in
   Oxcaml_flags.dissector_max_linker_parallelism := bound
 
@@ -2726,9 +2724,14 @@ module Extra_params = struct
         | None ->
             raise
               (Arg.Bad (Printf.sprintf "Expected float for %s, got %S" name v)))
-    | "dissector-max-linker-parallelism" ->
-        set_dissector_max_linker_parallelism v;
-        true
+    | "dissector-max-linker-parallelism" -> (
+        match int_of_string_opt v with
+        | Some n ->
+            set_dissector_max_linker_parallelism n;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected int for %s, got %S" name v)))
     | "ddissector" -> set' Clflags.ddissector
     | "ddissector-sizes" -> set' Clflags.ddissector_sizes
     | "ddissector-verbose" -> set' Clflags.ddissector_verbose

@@ -249,6 +249,8 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
    the list does not affect the output. *)
 let rewrite_rela_section ~rela_body ~symbols ~symbol_to_index ~plt_rewrite_map
     ~got_rewrite_map =
+  (* CR sspies: Consider folding over the rela entries instead of accumulating
+     the changed entries through a ref. See #6447. *)
   let changed_entries = ref [] in
   Rela.iteri_rela_entries ~rela_body ~f:(fun ~index entry ->
       (* Look up the original symbol for this relocation *)
@@ -258,12 +260,12 @@ let rewrite_rela_section ~rela_body ~symbols ~symbol_to_index ~plt_rewrite_map
         let sym_name = sym.Elf.name in
         (* Check if this relocation type/symbol should be rewritten *)
         let rewrite_to =
-          if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-          then String.Tbl.find_opt plt_rewrite_map sym_name
-          else if
-            Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-          then String.Tbl.find_opt got_rewrite_map sym_name
-          else None
+          match entry.r_type with
+          | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.plt32 ->
+            String.Tbl.find_opt plt_rewrite_map sym_name
+          | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.rex_gotpcrelx ->
+            String.Tbl.find_opt got_rewrite_map sym_name
+          | _ -> None
         in
         match rewrite_to with
         | Some new_sym_name -> (
