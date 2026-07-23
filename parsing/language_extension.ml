@@ -75,6 +75,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Let_mutable -> (module Unit)
   | Layout_poly -> (module Maturity)
   | Runtime_metaprogramming -> (module Unit)
+  | Type_directed_disambiguation -> (module Unit)
 
 (* We'll do this in a more principled way later. *)
 (* CR layouts: Note that layouts is only "mostly" erasable, because of annoying
@@ -88,7 +89,7 @@ let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts | Layout_poly -> true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Small_numbers | Instances | Let_mutable
-  | Runtime_metaprogramming ->
+  | Runtime_metaprogramming | Type_directed_disambiguation ->
     false
 
 let maturity_of_unique_for_drf = Stable
@@ -114,6 +115,7 @@ module Exist_pair = struct
     | Pair (Let_mutable, ()) -> Stable
     | Pair (Layout_poly, m) -> m
     | Pair (Runtime_metaprogramming, ()) -> Beta
+    | Pair (Type_directed_disambiguation, ()) -> Stable
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -129,7 +131,8 @@ module Exist_pair = struct
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
-           | Let_mutable | Runtime_metaprogramming ) as ext),
+           | Let_mutable | Runtime_metaprogramming
+           | Type_directed_disambiguation ) as ext),
           _ ) ->
       to_string ext
 
@@ -165,6 +168,8 @@ module Exist_pair = struct
     | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
     | "layout_poly_beta" -> Some (Pair (Layout_poly, Beta))
     | "runtime_metaprogramming" -> Some (Pair (Runtime_metaprogramming, ()))
+    | "type_directed_disambiguation" ->
+      Some (Pair (Type_directed_disambiguation, ()))
     | _ -> None
 end
 
@@ -187,7 +192,8 @@ let all_extensions =
     Pack Instances;
     Pack Let_mutable;
     Pack Layout_poly;
-    Pack Runtime_metaprogramming ]
+    Pack Runtime_metaprogramming;
+    Pack Type_directed_disambiguation ]
 
 (**********************************)
 (* string conversions *)
@@ -228,10 +234,11 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Let_mutable, Let_mutable -> Some Refl
   | Layout_poly, Layout_poly -> Some Refl
   | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
+  | Type_directed_disambiguation, Type_directed_disambiguation -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
-      | Runtime_metaprogramming ),
+      | Runtime_metaprogramming | Type_directed_disambiguation ),
       _ ) ->
     None
 

@@ -221,6 +221,17 @@ let () = test_char "untagged decimal char" #'\222'
 untagged decimal char: '\222'
 |}]
 
+let () = test_int32 "type_directed_int32" 0
+let () = test_int64 "type_directed_int64" 100
+let () = test_nativeint "type_directed_nativeint" (-42)
+let () = test_int "type_directed_int" 0xFF
+[%%expect{|
+type_directed_int32: 0
+type_directed_int64: 100
+type_directed_nativeint: -42
+type_directed_int: 255
+|}]
+
 (*****************************************)
 (* Patterns *)
 
@@ -235,6 +246,21 @@ f #4L;;
 [%%expect {|
 val f : int64# -> [> `Five | `Four | `Other ] = <fun>
 - : [> `Five | `Four | `Other ] = `Four
+|}];;
+
+let f_tydi (x : nativeint#) =
+  match x with
+  | 4 -> `Four
+  | 5 -> `Five
+  | _ -> `Other
+;;
+
+f_tydi 5;;
+f_tydi 6;;
+[%%expect {|
+val f_tydi : nativeint# -> [> `Five | `Four | `Other ] = <fun>
+- : [> `Five | `Four | `Other ] = `Five
+- : [> `Five | `Four | `Other ] = `Other
 |}];;
 
 let f x =
