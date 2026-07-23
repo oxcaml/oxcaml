@@ -2340,8 +2340,8 @@ let of_attribute ~context
   of_annotated_const ~context ~annotation:(mk_annot name) ~const
     ~const_loc:attribute.loc
 
-let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
-    ~transl env (decl : Parsetree.type_declaration) =
+let of_type_decl_gen ?(use_abstract_jkinds = true) ~context ~transl env
+    (decl : Parsetree.type_declaration) =
   let context = Context_with_transl.Left_jkind (transl, context) in
   let jkind_of_annotation =
     decl.ptype_jkind_annotation
@@ -2361,8 +2361,8 @@ let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
-let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
-  of_type_decl_gen ?use_abstract_jkinds ?warn ~context
+let of_type_decl ?use_abstract_jkinds ~context ~transl_type env decl =
+  of_type_decl_gen ?use_abstract_jkinds ~context
     ~transl:(Context_with_transl.Transl_type transl_type) env decl
 
 let of_type_decl_overapproximate_unknown ~context env
