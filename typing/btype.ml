@@ -1274,17 +1274,14 @@ module Jkind0 = struct
        manifest: the scannable axes are met, and a pending [addressable] mark
        is applied to the root (an override of the root's addressability, not
        a meet). [a] is [Addressable] when the [addressable] operator is
-       pending and [Id] otherwise. *)
+       pending and [Id] otherwise; when the manifest is itself abstract, the
+       pending actions compose. *)
     let apply_pending_axes (base : Jkind_types.Layout.Const.t jkind_base) sa
         (a : Jkind_types.Addressability.Action.t) :
         Jkind_types.Layout.Const.t jkind_base =
       match base with
       | Kconstr (p, sa', a') ->
-        let a' =
-          match a with
-          | Addressable -> a
-          | Id -> a'
-        in
+        let a' = Jkind_types.Addressability.Action.compose a a' in
         Kconstr (p, Jkind_types.Scannable_axes.meet sa sa', a')
       | Layout l ->
         let l = Jkind_types.Layout.Const.meet_root_scannable_axes l sa in

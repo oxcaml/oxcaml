@@ -653,16 +653,12 @@ module Layout = struct
        equated.) *)
     let meet_addressability t1 t2 = Addressability.meet (claim t1) (claim t2) in
     (* The intersection of two products is marked addressable iff either
-       input is. An unmarked result derives its addressability from its
-       intersected components, which carry the inputs' component meets, so
-       stamping a merely-derived addressability as a mark would only lose
+       input is - the join of the marks, which coincides with
+       [Action.compose]. An unmarked result derives its addressability from
+       its intersected components, which carry the inputs' component meets,
+       so stamping a merely-derived addressability as a mark would only lose
        structure. *)
-    let product_root_slot (a1 : Addressability.Action.t)
-        (a2 : Addressability.Action.t) : Addressability.Action.t =
-      match a1, a2 with
-      | Addressable, _ | _, Addressable -> Addressable
-      | Id, Id -> Id
-    in
+    let product_root_slot = Addressability.Action.compose in
     match t1, t2 with
     | _, Any (sa2, a2) ->
       Option.map

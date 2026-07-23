@@ -91,6 +91,14 @@ module Addressability : sig
 
     val equal : t -> t -> bool
 
+    (** [compose a a'] is the action [a] applied after [a']: [Addressable] if
+        either is. Actions form a monoid with [Id] the identity; the operator
+        is idempotent, so composition is commutative and coincides with the
+        join. Used when expanding an abstract kind composes its pending action
+        with its manifest's, and when an intersection of products is marked
+        iff either input is. *)
+    val compose : t -> t -> t
+
     (** Only [Addressable] is ever printed in user-facing output. *)
     val to_string : t -> string
 

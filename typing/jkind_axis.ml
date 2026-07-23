@@ -137,6 +137,13 @@ module Addressability = struct
       | Id, Id | Addressable, Addressable -> true
       | (Id | Addressable), _ -> false
 
+    (* The operator is idempotent, so composition is commutative and
+       coincides with the join of the two actions. *)
+    let compose a1 a2 =
+      match a1, a2 with
+      | Addressable, _ | _, Addressable -> Addressable
+      | Id, Id -> Id
+
     let to_string = function Id -> "id" | Addressable -> "addressable"
 
     let print ppf t = Fmt.fprintf ppf "%s" (to_string t)

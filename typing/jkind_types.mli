@@ -141,6 +141,8 @@ module Addressability : sig
 
     val equal : t -> t -> bool
 
+    val compose : t -> t -> t
+
     val to_string : t -> string
 
     val print : Format_doc.formatter -> t -> unit
