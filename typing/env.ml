@@ -230,7 +230,7 @@ let map_summary f = function
   | Env_jkind (s, id, d) -> Env_jkind (f s, id, d)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * module_representation * int
 
@@ -1108,7 +1108,8 @@ end
 (* Print addresses *)
 
 let rec print_address ppf = function
-  | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
+  | Aunit (cu, _) ->
+    Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
   | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
@@ -1117,7 +1118,7 @@ type address_head =
   | AHlocal of Ident.t
 
 let rec address_head = function
-  | Aunit cu -> AHunit cu
+  | Aunit (cu, _) -> AHunit cu
   | Alocal id -> AHlocal id
   | Adot (a, _, _) -> address_head a
 

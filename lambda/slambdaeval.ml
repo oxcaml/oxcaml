@@ -147,7 +147,25 @@ module CU_data = struct
   let print = print
 end
 
-type ctx = { cu_static_data : Compilation_unit.t -> CU_data.t option }
+module Ctx = struct
+  type t =
+    { cu_static_data_getter : Compilation_unit.t -> CU_data.t option;
+      cu_static_data : value Or_missing.t Compilation_unit.Tbl.t
+    }
+
+  let create ~cu_static_data =
+    { cu_static_data_getter = cu_static_data;
+      cu_static_data = Compilation_unit.Tbl.create 0
+    }
+
+  let cu_static_data t cu =
+    Compilation_unit.Tbl.memoize t.cu_static_data
+      (fun cu ->
+        match t.cu_static_data_getter cu with
+        | Some cu -> cu
+        | None -> Or_missing.Missing)
+      cu
+end
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -202,9 +220,7 @@ let rec eval_slam ctx env slam : value Or_missing.t =
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
-  | SLglobal cu ->
-    begin match ctx.cu_static_data cu with Some v -> v | None -> Missing
-    end
+  | SLglobal cu -> Ctx.cu_static_data ctx cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam ctx env slet_value in
@@ -658,7 +674,8 @@ let do_eval ctx slam =
 
 let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
-      let { slv_comptime; slv_runtime } = do_eval { cu_static_data } slam in
+      let ctx = Ctx.create ~cu_static_data in
+      let { slv_comptime; slv_runtime } = do_eval ctx slam in
       (try assert_no_splices slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
