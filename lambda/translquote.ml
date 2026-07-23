@@ -3935,10 +3935,10 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_lazy exp ->
       let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.lazy_ loc exp
-    | Texp_quotation exp ->
+    | Texp_quote exp ->
       let exp = quote_expression ~scopes ~transl (stage + 1) exp in
       Exp_desc.quote loc exp
-    | Texp_antiquotation exp ->
+    | Texp_splice exp ->
       if stage > 0
       then
         let exp = quote_expression ~scopes ~transl (stage - 1) exp in

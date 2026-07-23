@@ -727,8 +727,8 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-  | Texp_quotation of expression
-  | Texp_antiquotation of expression
+  | Texp_quote of expression
+  | Texp_splice of expression
 
 and meth =
     Tmeth_name of string
