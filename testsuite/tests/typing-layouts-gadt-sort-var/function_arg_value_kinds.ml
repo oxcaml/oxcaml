@@ -18,9 +18,9 @@ let fst2 (p : int * int) = match p with a, _b -> a
 [%%expect{|
 (let
   (fst2 =
-     (function {nlocal = 0}
-       p[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>] : int
-       (field_imm 0 p)))
+     (function {nlocal = 1}
+       p[L][value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : int (field_imm 0 p)))
   (apply (field_imm 1 (global Toploop!)) "fst2" fst2))
 val fst2 : int * int -> int = <fun>
 |}]
@@ -31,7 +31,7 @@ let get (o : int option) = match o with Some x -> x | None -> 0
 [%%expect{|
 (let
   (get =
-     (function {nlocal = 0} o[value<(consts (0)) (non_consts ([0: ?]))>]
+     (function {nlocal = 1} o[L][value<(consts (0)) (non_consts ([0: ?]))>]
        : int (if o (field_imm 0 o) 0)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : int option -> int = <fun>

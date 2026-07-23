@@ -1,32 +1,43 @@
 let code fact_0 deleted in
 let $camlUnroll__fact_1 =
   closure fact_0_1 @fact &toplevel.alloc_region
-and code rec loopify(never) size(23) newer_version_of(fact_0)
+and code rec loopify(never) size(26) newer_version_of(fact_0)
       fact_0_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %phys_eq (n, 0) in
-  switch prim
-    | 0 -> k2
-    | 1 -> k (1)
-    where k2 =
-      ((let int_sub = %int_barith.sub (n, 1) in
-        apply direct(fact_0_1 &my_alloc_region)
-          ($camlUnroll__fact_1 ~ depth my_depth -> succ my_depth
-           : _ -> imm tagged)
-            (int_sub)
-            -> k2 * k1)
-         where k2 (apply_result : imm tagged) =
-           let int_mul = %int_barith.mul (n, apply_result) in
-           cont k (int_mul))
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let prim = %phys_eq (n, 0) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k2 (1)
+     where k3 =
+       ((let int_sub = %int_barith.sub (n, 1) in
+         apply direct(fact_0_1 &my_alloc_region &`region` &ghost_region)
+           ($camlUnroll__fact_1 ~ depth my_depth -> succ my_depth
+            : _ -> imm tagged)
+             (int_sub)
+             -> k3 * k1)
+          where k3 (apply_result : imm tagged) =
+            let int_mul = %int_barith.mul (n, apply_result) in
+            cont k2 (int_mul)))
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
+      cont k (region_return)
 in
-apply direct(fact_0_1 &toplevel.alloc_region) inlining_state(depth(40))
+let `region` = %begin_region () in
+let ghost_region = %begin_ghost_region () in
+apply direct(fact_0_1 &toplevel.alloc_region &`region` &ghost_region)
+       inlining_state(depth(40))
   ($camlUnroll__fact_1 ~ depth unroll 1 3 -> unroll 0 4 : _ -> imm tagged)
     (2)
     -> k * error
   where k (apply_result : imm tagged) =
     let int_mul = %int_barith.mul (3, apply_result) in
+    let `unit` = %end_region (`region`) in
+    let unit_1 = %end_ghost_region (ghost_region) in
     let int_mul_1 = %int_barith.mul (4, int_mul) in
     let int_mul_2 = %int_barith.mul (5, int_mul_1) in
     let int_mul_3 = %int_barith.mul (6, int_mul_2) in

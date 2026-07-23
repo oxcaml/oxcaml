@@ -147,10 +147,12 @@ let module_ret_unique =
   ()
 [%%expect{|
 module Mk : sig val mk : unit -> t end
-Line 6, characters 20-30:
+Line 6, characters 6-9:
 6 |   let use () = free (Mk.mk ()) in
-                        ^^^^^^^^^^
-Error: This value is "aliased" but is expected to be "unique".
+          ^^^
+Warning 26 [unused-var]: unused variable "use".
+
+val module_ret_unique : unit = ()
 |}]
 
 module Unique_array = struct

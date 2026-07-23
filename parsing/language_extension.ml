@@ -64,6 +64,8 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Mode -> (module Maturity)
   | Unique -> (module Maturity)
   | Overwriting -> (module Unit)
+  | Mode_polymorphism -> (module Maturity)
+  | Mode_polymorphism_printing -> (module Unit)
   | Include_functor -> (module Unit)
   | Polymorphic_parameters -> (module Unit)
   | Immutable_arrays -> (module Unit)
@@ -84,8 +86,11 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
 
    But we've decided to punt on this issue in the short term.
 *)
+(* CR ageorges: is mode polymorphism erasable? *)
 let is_erasable : type a. a t -> bool = function
-  | Mode | Unique | Overwriting | Layouts | Layout_poly -> true
+  | Mode | Unique | Overwriting | Layouts | Layout_poly | Mode_polymorphism
+  | Mode_polymorphism_printing ->
+    true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Small_numbers | Instances | Let_mutable
   | Runtime_metaprogramming ->
@@ -98,22 +103,24 @@ let maturity_of_unique_for_destruction = Alpha
 module Exist_pair = struct
   type t = Pair : 'a language_extension * 'a -> t
 
-  let maturity : t -> Maturity.t = function
-    | Pair (Comprehensions, ()) -> Beta
-    | Pair (Mode, m) -> m
-    | Pair (Unique, m) -> m
-    | Pair (Overwriting, ()) -> Alpha
-    | Pair (Include_functor, ()) -> Stable
-    | Pair (Polymorphic_parameters, ()) -> Stable
-    | Pair (Immutable_arrays, ()) -> Stable
-    | Pair (Module_strengthening, ()) -> Stable
-    | Pair (Layouts, m) -> m
-    | Pair (SIMD, m) -> m
-    | Pair (Small_numbers, m) -> m
-    | Pair (Instances, ()) -> Stable
-    | Pair (Let_mutable, ()) -> Stable
-    | Pair (Layout_poly, m) -> m
-    | Pair (Runtime_metaprogramming, ()) -> Beta
+  let maturity : t -> Maturity.t option = function
+    | Pair (Comprehensions, ()) -> Some Beta
+    | Pair (Mode, m) -> Some m
+    | Pair (Unique, m) -> Some m
+    | Pair (Overwriting, ()) -> Some Alpha
+    | Pair (Mode_polymorphism, m) -> Some m
+    | Pair (Mode_polymorphism_printing, ()) -> None
+    | Pair (Include_functor, ()) -> Some Stable
+    | Pair (Polymorphic_parameters, ()) -> Some Stable
+    | Pair (Immutable_arrays, ()) -> Some Stable
+    | Pair (Module_strengthening, ()) -> Some Stable
+    | Pair (Layouts, m) -> Some m
+    | Pair (SIMD, m) -> Some m
+    | Pair (Small_numbers, m) -> Some m
+    | Pair (Instances, ()) -> Some Stable
+    | Pair (Let_mutable, ()) -> Some Stable
+    | Pair (Layout_poly, m) -> Some m
+    | Pair (Runtime_metaprogramming, ()) -> Some Beta
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -126,10 +133,13 @@ module Exist_pair = struct
     | Pair (SIMD, m) -> to_string SIMD ^ "_" ^ maturity_to_string m
     | Pair (Layout_poly, m) ->
       to_string Layout_poly ^ "_" ^ maturity_to_string m
+    | Pair (Mode_polymorphism, m) ->
+      to_string Mode_polymorphism ^ "_" ^ maturity_to_string m
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
-           | Let_mutable | Runtime_metaprogramming ) as ext),
+           | Let_mutable | Runtime_metaprogramming | Mode_polymorphism_printing
+             ) as ext),
           _ ) ->
       to_string ext
 
@@ -143,6 +153,11 @@ module Exist_pair = struct
     | "mode" -> Some (Pair (Mode, Stable))
     | "mode_beta" -> Some (Pair (Mode, Beta))
     | "mode_alpha" -> Some (Pair (Mode, Alpha))
+    | "mode_polymorphism" -> Some (Pair (Mode_polymorphism, Stable))
+    | "mode_polymorphism_beta" -> Some (Pair (Mode_polymorphism, Beta))
+    | "mode_polymorphism_alpha" -> Some (Pair (Mode_polymorphism, Alpha))
+    | "mode_polymorphism_printing" ->
+      Some (Pair (Mode_polymorphism_printing, ()))
     | "unique" -> Some (Pair (Unique, Stable))
     | "unique_beta" -> Some (Pair (Unique, Beta))
     | "unique_alpha" -> Some (Pair (Unique, Alpha))
@@ -176,6 +191,8 @@ let all_extensions =
   [ Pack Comprehensions;
     Pack Mode;
     Pack Unique;
+    Pack Mode_polymorphism;
+    Pack Mode_polymorphism_printing;
     Pack Overwriting;
     Pack Include_functor;
     Pack Polymorphic_parameters;
@@ -217,6 +234,8 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Mode, Mode -> Some Refl
   | Unique, Unique -> Some Refl
   | Overwriting, Overwriting -> Some Refl
+  | Mode_polymorphism, Mode_polymorphism -> Some Refl
+  | Mode_polymorphism_printing, Mode_polymorphism_printing -> Some Refl
   | Include_functor, Include_functor -> Some Refl
   | Polymorphic_parameters, Polymorphic_parameters -> Some Refl
   | Immutable_arrays, Immutable_arrays -> Some Refl
@@ -231,7 +250,8 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
-      | Runtime_metaprogramming ),
+      | Runtime_metaprogramming | Mode_polymorphism | Mode_polymorphism_printing
+        ),
       _ ) ->
     None
 
@@ -324,14 +344,14 @@ end = struct
     | Alpha -> "flag -extension-universe alpha (default CLI option)"
 
   let is_allowed_in t extn_pair =
-    match t with
-    | No_extensions -> false
-    | Upstream_compatible ->
-      Exist_pair.is_erasable extn_pair
-      && Maturity.compare (Exist_pair.maturity extn_pair) Stable <= 0
-    | Stable -> Maturity.compare (Exist_pair.maturity extn_pair) Stable <= 0
-    | Beta -> Maturity.compare (Exist_pair.maturity extn_pair) Beta <= 0
-    | Alpha -> true
+    match t, Exist_pair.maturity extn_pair with
+    | No_extensions, _ -> false
+    | _, None -> true
+    | Upstream_compatible, Some maturity ->
+      Exist_pair.is_erasable extn_pair && Maturity.compare maturity Stable <= 0
+    | Stable, Some maturity -> Maturity.compare maturity Stable <= 0
+    | Beta, Some maturity -> Maturity.compare maturity Beta <= 0
+    | Alpha, Some _ -> true
 
   let is_allowed extn_pair = is_allowed_in !universe extn_pair
 
@@ -351,7 +371,11 @@ end = struct
     let maximal_in_universe (Pack extn) =
       let (module Ops) = get_level_ops extn in
       let allowed_levels =
-        Ops.all |> List.filter (fun lvl -> is_allowed_in t (Pair (extn, lvl)))
+        Ops.all
+        |> List.filter (fun lvl ->
+            match Exist_pair.maturity (Pair (extn, lvl)) with
+            | None -> false
+            | Some _ -> is_allowed_in t (Pair (extn, lvl)))
       in
       match allowed_levels with
       | [] -> None
@@ -467,6 +491,14 @@ let is_at_least (type a) (extn : a t) (value : a) =
       | None -> check es)
   in
   check !extensions
+
+let mode_polymorphism_debug_enabled () = true
+(* Sys.getenv_opt "OXCAML_MODE_POLYMORPHISM_DEBUG" = Some "1" *)
+
+let is_at_least_mode_poly (value : maturity) =
+  if mode_polymorphism_debug_enabled ()
+  then true
+  else is_at_least Mode_polymorphism value
 
 let is_enabled extn =
   let rec check : extn_pair list -> bool = function

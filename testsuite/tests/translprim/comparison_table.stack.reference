@@ -1,13 +1,13 @@
 (let
   (gen_cmp = (function {nlocal = 0} x y : int (caml_compare x y))
    int_cmp =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_compare x y))
    bool_cmp =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_compare x y))
    intlike_cmp =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_compare x y))
    float_cmp =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
@@ -24,11 +24,14 @@
        (%nativeint_compare x y))
    gen_eq = (function {nlocal = 0} x y : int (caml_equal x y))
    int_eq =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%eq x y))
    bool_eq =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%eq x y))
    intlike_eq =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%eq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%eq x y))
    float_eq =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
        (%float_ordered_and_equal x y))
@@ -44,11 +47,14 @@
        (%nativeint_equal x y))
    gen_ne = (function {nlocal = 0} x y : int (caml_notequal x y))
    int_ne =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%noteq x y))
    bool_ne =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%noteq x y))
    intlike_ne =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int (%noteq x y))
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
+       (%noteq x y))
    float_ne =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
        (%float_unordered_or_notequal x y))
@@ -64,13 +70,13 @@
        (%nativeint_notequal x y))
    gen_lt = (function {nlocal = 0} x y : int (caml_lessthan x y))
    int_lt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessthan x y))
    bool_lt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessthan x y))
    intlike_lt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessthan x y))
    float_lt =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
@@ -87,13 +93,13 @@
        (%nativeint_lessthan x y))
    gen_gt = (function {nlocal = 0} x y : int (caml_greaterthan x y))
    int_gt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterthan x y))
    bool_gt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterthan x y))
    intlike_gt =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterthan x y))
    float_gt =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
@@ -111,13 +117,13 @@
        (%nativeint_greaterthan x y))
    gen_le = (function {nlocal = 0} x y : int (caml_lessequal x y))
    int_le =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessequal x y))
    bool_le =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessequal x y))
    intlike_le =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_lessequal x y))
    float_le =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int
@@ -134,13 +140,13 @@
        (%nativeint_lessequal x y))
    gen_ge = (function {nlocal = 0} x y : int (caml_greaterequal x y))
    int_ge =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterequal x y))
    bool_ge =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterequal x y))
    intlike_ge =
-     (function {nlocal = 0} x[value<int>] y[value<int>] : int
+     (function {nlocal = 1} x[L][value<int>] y[L][value<int>] : int
        (%int_greaterequal x y))
    float_ge =
      (function {nlocal = 0} x[value<float>] y[value<float>] : int

@@ -33,7 +33,7 @@ let example_1 () =
   | { a = true; b = Either.Left y } -> Result.Ok y;;
 (let
   (example_1/0 =
-     (function {nlocal = 0} param/0[value<int>]
+     (function {nlocal = 1} param/0[L][value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let
@@ -88,7 +88,7 @@ let example_2 () =
   | { a = true; b = { mut = Either.Left y } } -> Result.Ok y;;
 (let
   (example_2/0 =
-     (function {nlocal = 0} param/1[value<int>]
+     (function {nlocal = 1} param/1[L][value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let
@@ -146,7 +146,7 @@ let example_3 () =
   | { mut = (true, Either.Left y) } -> Result.Ok y;;
 (let
   (example_3/0 =
-     (function {nlocal = 0} param/2[value<int>]
+     (function {nlocal = 1} param/2[L][value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
        (region
          (let

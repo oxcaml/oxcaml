@@ -14,7 +14,7 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : 'a @ local -> unit end
+module M : sig val f : 'a -> unit end
 |}]
 
 (* Mode crossing in coercions should treat argument and return positions

@@ -1,11 +1,11 @@
 let $camlTests14__first_const = Block 0 () in
-(let code size(5)
+(let code size(2)
        set_0 (t : val)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let Psetfield = %block_set.`imm`.[`0`] (t, 42) in
+   let Psetfield = %block_set.`imm`.lassign.[`0`] (t, 42) in
    cont k1 (Psetfield)
  in
  let code size(7)

@@ -25,7 +25,7 @@ let get (type t : value mod non_float) (xs : t array) i = xs.(i)
 [%%expect{|
 (let
   (get =
-     (function {nlocal = 0} xs[value<addrarray>] i[value<int>]
+     (function {nlocal = 1} xs[L][value<addrarray>] i[L][value<int>]
        (array.get[addr indexed by int] xs i)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : ('t : value non_float). 't array -> int -> 't = <fun>
@@ -36,8 +36,8 @@ let set (type t : value mod non_float) (xs : t array) x i = xs.(i) <- x
 [%%expect{|
 (let
   (set =
-     (function {nlocal = 0} xs[value<addrarray>] x i[value<int>] : int
-       (array.set[addr indexed by int] xs i x)))
+     (function {nlocal = 1} xs[L][value<addrarray>] x i[L][value<int>] : int
+       (array.set[addr(local) indexed by int] xs i x)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
 val set : ('t : value non_float). 't array -> 't -> int -> unit = <fun>
 |}]

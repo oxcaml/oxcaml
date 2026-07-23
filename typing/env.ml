@@ -3256,7 +3256,7 @@ let enter_unbound_module name reason env =
 let read_signature modname cmi =
   let mty, mode = read_pers_mod modname cmi in
   (* [mode] read from the cmi is always a constant *)
-  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
+  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor_exn mode).staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname

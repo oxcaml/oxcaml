@@ -344,7 +344,7 @@ module type Solver_mono = sig
     copy_from_level:int ->
     copy_below_level:int ->
     ?copy_to_level:int ->
-    ?persistent:bool ->
+    ?cause:[`Save | `Restore | `Neither] ->
     'a obj ->
     ('a, 'l * 'r) mode ->
     ('a, 'l * 'r) mode
@@ -390,11 +390,46 @@ module type Solver_mono = sig
   val print :
     ?verbose:bool -> 'a obj -> Fmt.formatter -> ('a, 'l * 'r) mode -> unit
 
-  (** Returns true iff the mode has the given level or is a constant *)
-  val check_level : ('a, 'l * 'r) mode -> int -> bool
+  (** Returns true if the mode includes a mode variable at generic level *)
+  val check_generic : ('a, 'l * 'r) mode -> bool
 
-  (** Returns true iff the mode is a variable at the given level *)
-  val check_level_var : ('a, 'l * 'r) mode -> int -> bool
+  type var_iterator =
+    { iter : 'a. 'a obj -> ('a, allowed * allowed) mode -> unit }
+  [@@unboxed]
+
+  val mode_iter : 'a obj -> ('a, 'l * 'r) mode -> var_iterator -> unit
+
+  type 'b packed_morph = Packed_morph : ('a, 'b, 'd) morph -> 'b packed_morph
+
+  (** Applies an iterator over every reachable covariant (left-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_covariant :
+    'a obj ->
+    ('a, allowed * 'r) mode ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, allowed * disallowed) mode ->
+    unit) ->
+    unit
+
+  (** Applies an iterator over every reachable contravariant (right-) constraint
+      variable. The iterator is only applied to constraint variables at level 0,
+      and exposes the int identifier of the constraint variable. WARNING: the
+      iterator is only applied once per constraint, even when it appears as a
+      constraint multiple times via different morphisms *)
+  val iter_contravariant :
+    'a obj ->
+    ('a, 'l * allowed) mode ->
+    (id:int ->
+    level:int ->
+    morph:'a packed_morph ->
+    ('a, disallowed * allowed) mode ->
+    unit) ->
+    unit
 
   (** Apply a monotone morphism explained by an optional hint *)
   val apply :
@@ -462,6 +497,52 @@ module type Solver_mono = sig
     val apply :
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
+
+  (** The exposed description of modes *)
+  module Desc : sig
+    module Var : sig
+      type 'a t
+
+      type ('b, 'd) t_with_morph =
+        | Amorphvar : 'a t * ('a, 'b, 'd) morph -> ('b, 'd) t_with_morph
+
+      module Head : sig
+        type 'a t =
+          { desc_id : int;
+            desc_upper : 'a;
+            desc_lower : 'a;
+            desc_vlower : ('a, left_only) t_with_morph list;
+            desc_level : int
+          }
+
+        val equal : 'a t -> 'b t -> bool
+
+        val hash : 'a t -> int
+      end
+
+      val force : 'a obj -> 'a t -> 'a Head.t
+    end
+
+    type ('b, 'd) morphvar =
+      | Amorphvar : 'a Var.Head.t * ('a, 'b, 'd) morph -> ('b, 'd) morphvar
+
+    type ('a, 'd) t =
+      | Amode : 'a -> ('a, 'l * 'r) t
+      | Amodevar : ('a, 'd) morphvar -> ('a, 'd) t
+      | Amodejoin :
+          'a * ('a, 'l * disallowed) morphvar list
+          -> ('a, 'l * disallowed) t
+      | Amodemeet :
+          'a * ('a, disallowed * 'r) morphvar list
+          -> ('a, disallowed * 'r) t
+
+    val equal : 'a obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
+    val print : 'a obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
+  end
+
+  (** Returns the description of a mode. *)
+  val desc : 'a obj -> ('a, 'd) mode -> ('a, 'd) Desc.t
 end
 
 (** Hint module to be provided by the user of the solver. *)

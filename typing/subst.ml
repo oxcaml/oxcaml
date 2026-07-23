@@ -40,7 +40,7 @@ type kind_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_mode : For_copy.copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr;
         prepare_modality : Mode.Modality.t -> Mode.Modality.t
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
@@ -301,8 +301,11 @@ let with_additional_action =
         in
         (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
-        let prepare_mode mode =
-          Mode.Alloc.(mode |> to_const_exn |> of_const)
+        (* if a mode is generic we copy it persistently for saving *)
+        let prepare_mode copy_scope mode =
+          if Mode.Alloc.check_generic mode
+          then For_copy.mode_copy_for_saving copy_scope mode
+          else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
@@ -508,7 +511,8 @@ let apply_type_function params args body =
           let t = newgenstub ~scope:(get_scope ty)
             (Jkind.Builtin.any ~why:Dummy_jkind) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-          let desc' = copy_type_desc copy desc in
+          let copy_mode m = For_copy.mode_copy_generic copy_scope m in
+          let desc' = copy_type_desc copy copy_mode desc in
           Transient_expr.set_stub_desc t desc';
           t
     in
@@ -743,9 +747,17 @@ let rec typexp copy_scope s ty =
           Tlink (typexp copy_scope s t2)
       | Tarrow ((label, marg, mret), arg, ret, comm) ->
           let marg, mret =
+            if get_id ty < 0 then
+              For_copy.mode_copy_for_restoring copy_scope marg,
+              For_copy.mode_copy_for_restoring copy_scope mret
+            else
             match s.additional_action with
             | Prepare_for_saving { prepare_mode; _ } ->
-              prepare_mode marg, prepare_mode mret
+              prepare_mode copy_scope marg,
+              prepare_mode copy_scope mret
+            | Duplicate_variables ->
+              For_copy.mode_copy_generic copy_scope marg,
+              For_copy.mode_copy_generic copy_scope mret
             | _ -> marg, mret
           in
           let arg = typexp copy_scope s arg in
@@ -753,7 +765,8 @@ let rec typexp copy_scope s ty =
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
       | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
-      | _ -> copy_type_desc (typexp copy_scope s) desc
+      | _ ->
+        copy_type_desc (typexp copy_scope s) (fun _ -> assert false) desc
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
@@ -792,7 +805,8 @@ let jkind copy_scope s loc jk =
 *)
 let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
-  For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
+  For_copy.with_scope (fun copy_scope ->
+    typexp copy_scope s loc ty)
 
 let label_declaration copy_scope s l =
   {
