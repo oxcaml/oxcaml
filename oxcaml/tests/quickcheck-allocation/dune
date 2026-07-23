@@ -10,12 +10,14 @@
 
 ; No enabled_if on the executable: it must be enabled in the boot ("default")
 ; context so ocamllsp/Merlin, which uses that context, can resolve the modules.
-; No library dependencies (stdlib only): the boot compiler cannot build unix/str
-; from this repo's sources, so depending on them would break the LSP.
+; ocamlcommon (the compiler's Parsetree / Ast_helper / Pprintast) is fine in
+; both contexts -- chamelon links it the same way. unix/str would NOT be: the
+; boot compiler cannot build them from this repo's sources.
 
 (executable
  (name main)
- (modules gen oracle shrink fuzzer main))
+ (modules gen oracle shrink fuzzer main)
+ (libraries ocamlcommon))
 
 ; The fuzz loop, however, must run against the freshly-built "main" compiler
 ; (the boot compiler lacks the Allocation axis), so the alias is gated to it.

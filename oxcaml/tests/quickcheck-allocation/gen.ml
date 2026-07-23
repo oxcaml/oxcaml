@@ -2,9 +2,12 @@
 
    Structure follows the in-repo precedent of
    testsuite/tests/comprehensions/quickcheck_lists_arrays_haskell_python.ml: a
-   typed AST ([Expr]), a type-directed generator that only produces well-typed
-   terms, and a pretty-printer. A single program is emitted, carrying both
-   annotations on the function under test (see [Sample]).
+   type-directed generator that only produces well-typed terms. Expressions are
+   built directly as the compiler's own untyped AST ([Parsetree], via
+   [Ast_helper]; see [Expr]) and printed with [Pprintast], so there is no
+   hand-written printer to maintain and new syntax comes with printing for free.
+   A single program is emitted, carrying both annotations on the function under
+   test (see [Sample]).
 
    Types ([Ty]) mirror the compiler's split between type *expressions* and type
    *declarations*: records and variants are nominal ([Ty.Constr] refers to them
@@ -62,26 +65,19 @@ module Sample = struct
   let to_string { source } = source
 end
 
-(* How an argument is passed, mirroring the compiler's [Asttypes.arg_label].
-   Part of the function type: it determines call-site syntax. For [Optional],
-   the arrow's payload type is the type behind the [?] (whether the *binder* has
-   a default is an expression-side property; see [Expr.param_kind]). *)
 module Arg_label = struct
-  type t =
-    | Nolabel (* t1 -> ... call: f e *)
-    | Labelled of string (* ~l:t1 -> ... call: f ~l:e *)
-    | Optional of string (* ?l:t1 -> ... call: f ~l:e, or omitted *)
+  type t = Asttypes.arg_label =
+    | Nolabel
+    | Labelled of string
+    | Optional of string
 
+  (* CR shsong: Can this be replaced by some existing function in the
+     compiler? *)
   let equal a b =
     match a, b with
     | Nolabel, Nolabel -> true
     | Labelled l1, Labelled l2 | Optional l1, Optional l2 -> String.equal l1 l2
     | (Nolabel | Labelled _ | Optional _), _ -> false
-
-  let to_string = function
-    | Nolabel -> ""
-    | Labelled l -> l ^ ":"
-    | Optional l -> "?" ^ l ^ ":"
 end
 
 module Ty = struct
@@ -89,14 +85,15 @@ module Ty = struct
     type t =
       | Int
       | Float
-    (* later: Char, Int64, and unboxed layouts (float#, int64#) *)
+    (* CR shsong: extend to support Char, Int64, and unboxed layouts (float#,
+       int64#) *)
 
     let equal a b =
       match a, b with
       | Int, Int | Float, Float -> true
       | (Int | Float), _ -> false
 
-    let to_string = function Int -> "int" | Float -> "float"
+    let name = function Int -> "int" | Float -> "float"
   end
 
   (* Identifier (also the source name) of a user-declared nominal type. *)
@@ -131,15 +128,19 @@ module Ty = struct
       && equal a1.arg a2.arg && equal a1.ret a2.ret
     | (Constant _ | Tuple _ | List _ | Array _ | Constr _ | Arrow _), _ -> false
 
-  let rec to_string = function
-    | Constant c -> Constant.to_string c
-    | Tuple ts -> "(" ^ String.concat " * " (List.map to_string ts) ^ ")"
-    | List t -> to_string t ^ " list"
-    | Array t -> to_string t ^ " array"
-    | Constr id -> Id.name id
+  let rec to_core_type ty =
+    let constr name args =
+      Ast_helper.Typ.constr (Location.mknoloc (Longident.Lident name)) args
+    in
+    match ty with
+    | Constant c -> constr (Constant.name c) []
+    | Tuple ts ->
+      Ast_helper.Typ.tuple (List.map (fun t -> None, to_core_type t) ts)
+    | List t -> constr "list" [to_core_type t]
+    | Array t -> constr "array" [to_core_type t]
+    | Constr id -> constr (Id.name id) []
     | Arrow { label; arg; ret } ->
-      "(" ^ Arg_label.to_string label ^ to_string arg ^ " -> " ^ to_string ret
-      ^ ")"
+      Ast_helper.Typ.arrow label (to_core_type arg) (to_core_type ret) [] []
 
   let rec arrows = function
     | Arrow { label; arg; ret } ->
@@ -177,22 +178,34 @@ module Ty = struct
         kind : kind
       }
 
-    let field_to_string { f_name; f_ty; f_mutable } =
-      (if f_mutable then "mutable " else "") ^ f_name ^ " : " ^ to_string f_ty
-
-    let constructor_to_string { c_name; c_args } =
-      match c_args with
-      | [] -> c_name
-      | args -> c_name ^ " of " ^ String.concat " * " (List.map to_string args)
-
-    let to_string { id; kind } =
-      "type " ^ Id.name id ^ " ="
-      ^
-      match kind with
-      | Record fields ->
-        " { " ^ String.concat "; " (List.map field_to_string fields) ^ " }"
-      | Variant constrs ->
-        " " ^ String.concat " | " (List.map constructor_to_string constrs)
+    let to_structure_item { id; kind } =
+      let kind =
+        match kind with
+        | Record fields ->
+          Parsetree.Ptype_record
+            (List.map
+               (fun { f_name; f_ty; f_mutable } ->
+                 Ast_helper.Type.field
+                   ~mut:
+                     (if f_mutable then Asttypes.Mutable else Asttypes.Immutable)
+                   (Location.mknoloc f_name) (to_core_type f_ty))
+               fields)
+        | Variant constrs ->
+          Parsetree.Ptype_variant
+            (List.map
+               (fun { c_name; c_args } ->
+                 Ast_helper.Type.constructor
+                   ~args:
+                     (Parsetree.Pcstr_tuple
+                        (List.map
+                           (fun t ->
+                             Ast_helper.Type.constructor_arg (to_core_type t))
+                           c_args))
+                   (Location.mknoloc c_name))
+               constrs)
+      in
+      Ast_helper.Str.type_ Asttypes.Recursive
+        [Ast_helper.Type.mk ~kind (Location.mknoloc (Id.name id))]
   end
 
   (* The per-program type environment, in declaration order. *)
@@ -206,116 +219,118 @@ module Ty = struct
     let lookup t id =
       (List.find (fun (d : Decl.decl) -> Id.equal d.id id) t).Decl.kind
 
-    let to_prelude t =
-      String.concat "" (List.map (fun d -> Decl.to_string d ^ "\n") t) ^ "\n"
+    let to_structure_items t = List.map Decl.to_structure_item t
   end
 end
 
+(* Expression builders over the compiler's own untyped AST: every builder
+   returns a [Parsetree.expression], constructed with [Ast_helper] and printed
+   with [Pprintast]. Well-typedness is still the generator's job ([gen_expr]);
+   this module only knows how to build each node. *)
 module Expr = struct
+  let mknoloc = Location.mknoloc
+
+  let lid s = mknoloc (Longident.Lident s)
+
+  let var x = Ast_helper.Exp.ident (lid x)
+
+  let int_lit n = Ast_helper.Exp.constant (Ast_helper.Const.int n)
+
+  let float_lit f =
+    Ast_helper.Exp.constant (Ast_helper.Const.float (Printf.sprintf "%F" f))
+
   (* CR shong: Consider to make it more comprehensive for completeness test. *)
   type binop =
     | Add
     | Fadd
     | Leq
 
-  type t =
-    | Var of string
-    | Int_lit of int
-    | Float_lit of float
-    | Binop of binop * t * t
-    | If of t * t * t
-    | Let of string * t * t
-    | Tuple of t list (* invariant: at least two components *)
-    | Nil
-    | Cons of t * t
-    | Array_lit of t list
-    | Record of (string * t) list
-      (* invariant: field names are globally unique, so no type annotation is
-         needed for disambiguation *)
-    | Construct of string * t list
-    | Exclave of t (* invariant: only ever placed in tail position *)
-    | Lam of
-        { params : param list;
-          body : t
-        }
-    | App of
-        { f : t;
-          args : (Arg_label.t * t) list
-        }
+  let binop_name = function Add -> "+" | Fadd -> "+." | Leq -> "<="
 
-  and param =
-    { var : string;
-          (* binder, always fresh -- never shadows, and independent of the
-             type-side label *)
-      p_ty : Ty.t; (* payload type (matches the corresponding [Ty.Arrow.arg]) *)
-      kind : param_kind
+  let binop op a b =
+    Ast_helper.Exp.apply
+      (var (binop_name op))
+      [Arg_label.Nolabel, a; Arg_label.Nolabel, b]
+
+  let if_ c t e = Ast_helper.Exp.ifthenelse c t (Some e)
+
+  let let_ x e1 e2 =
+    Ast_helper.Exp.let_ Asttypes.Immutable Asttypes.Nonrecursive
+      [Ast_helper.Vb.mk (Ast_helper.Pat.var (mknoloc x)) e1]
+      e2
+
+  let tuple es = Ast_helper.Exp.tuple (List.map (fun e -> None, e) es)
+
+  let nil = Ast_helper.Exp.construct (lid "[]") None
+
+  let cons h t = Ast_helper.Exp.construct (lid "::") (Some (tuple [h; t]))
+
+  let array_lit es = Ast_helper.Exp.array Asttypes.Mutable es
+
+  (* Field names are globally unique, so no type annotation is needed for
+     disambiguation. *)
+  let record fields =
+    Ast_helper.Exp.record (List.map (fun (f, e) -> lid f, e) fields) None
+
+  let construct c args =
+    Ast_helper.Exp.construct (lid c)
+      (match args with [] -> None | [e] -> Some e | es -> Some (tuple es))
+
+  (* The parser's encoding of [exclave_ e]: an application of the
+     [%extension.exclave] extension node (see [mkexp_exclave] in parser.mly). *)
+  let exclave e =
+    Ast_helper.Exp.apply
+      (Ast_helper.Exp.mk
+         (Parsetree.Pexp_extension
+            (mknoloc "extension.exclave", Parsetree.PStr [])))
+      [Arg_label.Nolabel, e]
+
+  (* Parameters of a [lam]. Binders are always fresh -- never shadowing, and
+     independent of the type-side label. The annotations pin the payload type
+     [ty] so inference cannot generalize differently from the generator's
+     bookkeeping. *)
+
+  let typed_pat x ty =
+    Ast_helper.Pat.constraint_
+      (Ast_helper.Pat.var (mknoloc x))
+      (Some (Ty.to_core_type ty))
+      []
+
+  let param label default pat =
+    { Parsetree.pparam_loc = Location.none;
+      pparam_desc = Parsetree.Pparam_val (label, default, pat)
     }
 
-  and param_kind =
-    | Positional (* (var : t) *)
-    | Labelled of string (* ~label:(var : t) *)
-    | Opt of string * t option
-  (* [Some d]: ?label:(var = (d : t)), binder has type [t] in the body. [None]:
-     ?label:(var : t option)
+  let param_positional x ty = param Arg_label.Nolabel None (typed_pat x ty)
 
-     CR shsong: the [None] case is NOT generated yet: the binder would have type
-     [t option], which needs option types in [Ty]. *)
+  let param_labelled l x ty = param (Arg_label.Labelled l) None (typed_pat x ty)
 
-  let binop_to_string = function Add -> " + " | Fadd -> " +. " | Leq -> " <= "
+  (* The default is mandatory here, so the binder has type [ty] in the body. A
+     default-free optional parameter would bind [ty option] instead.
 
-  (* Fully parenthesized: ugly but unambiguous, and shrinking (milestone 3) is
-     the readability story, not the printer. *)
-  let rec to_string = function
-    | Var x -> x
-    | Int_lit n ->
-      if n < 0 then "(" ^ string_of_int n ^ ")" else string_of_int n
-    | Float_lit f ->
-      let s = Printf.sprintf "%F" f in
-      if f < 0.0 then "(" ^ s ^ ")" else s
-    | Binop (op, a, b) ->
-      "(" ^ to_string a ^ binop_to_string op ^ to_string b ^ ")"
-    | If (c, t, e) ->
-      "(if " ^ to_string c ^ " then " ^ to_string t ^ " else " ^ to_string e
-      ^ ")"
-    | Let (x, e1, e2) ->
-      "(let " ^ x ^ " = " ^ to_string e1 ^ " in " ^ to_string e2 ^ ")"
-    | Tuple es -> "(" ^ String.concat ", " (List.map to_string es) ^ ")"
-    | Nil -> "[]"
-    | Cons (h, t) -> "(" ^ to_string h ^ " :: " ^ to_string t ^ ")"
-    | Array_lit es -> "[| " ^ String.concat "; " (List.map to_string es) ^ " |]"
-    | Record fields ->
-      "{ "
-      ^ String.concat "; "
-          (List.map (fun (f, e) -> f ^ " = " ^ to_string e) fields)
-      ^ " }"
-    | Construct (c, []) -> c
-    | Construct (c, [e]) -> "(" ^ c ^ " " ^ to_string e ^ ")"
-    | Construct (c, es) ->
-      "(" ^ c ^ " (" ^ String.concat ", " (List.map to_string es) ^ "))"
-    | Exclave e -> "exclave_ " ^ to_string e
-    | Lam { params; body } ->
-      "(fun "
-      ^ String.concat " " (List.map param_to_string params)
-      ^ " -> " ^ to_string body ^ ")"
-    | App { f; args } ->
-      "(" ^ to_string f ^ " "
-      ^ String.concat " " (List.map arg_to_string args)
-      ^ ")"
+     CR shsong: default-free optional parameters are NOT generated yet: the
+     binder would have type [t option], which needs option types in [Ty]. *)
+  let param_optional l x ty ~default =
+    let default =
+      Ast_helper.Exp.constraint_ default (Some (Ty.to_core_type ty)) []
+    in
+    param (Arg_label.Optional l) (Some default) (Ast_helper.Pat.var (mknoloc x))
 
-  and param_to_string { var; p_ty; kind } =
-    match kind with
-    | Positional -> "(" ^ var ^ " : " ^ Ty.to_string p_ty ^ ")"
-    | Labelled l -> "~" ^ l ^ ":(" ^ var ^ " : " ^ Ty.to_string p_ty ^ ")"
-    | Opt (l, Some d) ->
-      "?" ^ l ^ ":(" ^ var ^ " = (" ^ to_string d ^ " : " ^ Ty.to_string p_ty
-      ^ "))"
-    | Opt (l, None) ->
-      "?" ^ l ^ ":(" ^ var ^ " : " ^ Ty.to_string p_ty ^ " option)"
+  let no_function_constraint =
+    { Parsetree.mode_annotations = [];
+      ret_mode_annotations = [];
+      ret_type_constraint = None
+    }
 
-  and arg_to_string (label, e) =
-    match (label : Arg_label.t) with
-    | Nolabel -> to_string e
-    | Labelled l | Optional l -> "~" ^ l ^ ":" ^ to_string e
+  (* n-ary: arity = length params. Function arity is syntactic since OCaml 5.2,
+     so binding an arrow chain as one n-ary [lam] (a single closure) or as
+     nested unary [lam]s (a closure allocating an inner closure per partial
+     application) are different programs of the same type. *)
+  let lam params body =
+    Ast_helper.Exp.function_ params no_function_constraint
+      (Parsetree.Pfunction_body body)
+
+  let app f args = Ast_helper.Exp.apply f args
 end
 
 (* Generation context: PRNG state, fresh-name supplies, and the per-program type
@@ -548,10 +563,10 @@ let goal_ty ctx =
         (1, fun () -> Ty.List (small_ty ctx));
         (1, fun () -> fun_ty ctx) ]
 
-let int_lit ctx = Expr.Int_lit (Random.State.int ctx.rng 13 - 3)
+let int_lit ctx = Expr.int_lit (Random.State.int ctx.rng 13 - 3)
 
 let float_lit ctx =
-  Expr.Float_lit (float_of_int (Random.State.int ctx.rng 13 - 3) *. 0.5)
+  Expr.float_lit (float_of_int (Random.State.int ctx.rng 13 - 3) *. 0.5)
 
 (* Generate a well-typed expression of type [ty] in environment [env]. Every
    recursive call decreases [fuel]; once fuel is exhausted only non-recursive
@@ -567,7 +582,7 @@ let rec gen_expr ctx env ty fuel =
   let vars = List.filter (fun (_, ty') -> Ty.equal ty' ty) env in
   let use_var () =
     let x, _ = List.nth vars (Random.State.int ctx.rng (List.length vars)) in
-    Expr.Var x
+    Expr.var x
   in
   let let_in () =
     (* XCR shsong: bound_ty cannot be user-defined type here like a record or a
@@ -583,17 +598,16 @@ let rec gen_expr ctx env ty fuel =
     let x = fresh ctx in
     let e1 = gen_expr ctx env bound_ty (fuel - 1) in
     let e2 = gen_expr ctx ((x, bound_ty) :: env) ty (fuel - 1) in
-    Expr.Let (x, e1, e2)
+    Expr.let_ x e1 e2
   in
   let if_ () =
     let int_ty = Ty.Constant Ty.Constant.Int in
     let c =
-      Expr.Binop
-        ( Expr.Leq,
-          gen_expr ctx env int_ty (fuel - 1),
-          gen_expr ctx env int_ty (fuel - 1) )
+      Expr.binop Expr.Leq
+        (gen_expr ctx env int_ty (fuel - 1))
+        (gen_expr ctx env int_ty (fuel - 1))
     in
-    Expr.If (c, gen_expr ctx env ty (fuel - 1), gen_expr ctx env ty (fuel - 1))
+    Expr.if_ c (gen_expr ctx env ty (fuel - 1)) (gen_expr ctx env ty (fuel - 1))
   in
   (* Tier C: apply an in-scope function. Argument matching follows OCaml's
      rules, so an application may skip parameters and supply them later: -
@@ -695,7 +709,7 @@ let rec gen_expr ctx env ty fuel =
       end
       else args
     in
-    Expr.App { f = Expr.Var f; args }
+    Expr.app (Expr.var f) args
   in
   let generic =
     [ (if vars = [] then 0 else 3), use_var;
@@ -711,42 +725,40 @@ let rec gen_expr ctx env ty fuel =
       [ (2, fun () -> int_lit ctx);
         ( deep (if completeness then 4 else 2),
           fun () ->
-            Expr.Binop
-              ( Expr.Add,
-                gen_expr ctx env ty (fuel - 1),
-                gen_expr ctx env ty (fuel - 1) ) ) ]
+            Expr.binop Expr.Add
+              (gen_expr ctx env ty (fuel - 1))
+              (gen_expr ctx env ty (fuel - 1)) ) ]
     | Ty.Constant Ty.Constant.Float ->
       [ (2, fun () -> float_lit ctx);
         ( deep 2,
           fun () ->
-            Expr.Binop
-              ( Expr.Fadd,
-                gen_expr ctx env ty (fuel - 1),
-                gen_expr ctx env ty (fuel - 1) ) ) ]
+            Expr.binop Expr.Fadd
+              (gen_expr ctx env ty (fuel - 1))
+              (gen_expr ctx env ty (fuel - 1)) ) ]
     | Ty.Tuple ts ->
       [ ( 4,
           fun () ->
-            Expr.Tuple (List.map (fun t -> gen_expr ctx env t (fuel - 1)) ts) )
+            Expr.tuple (List.map (fun t -> gen_expr ctx env t (fuel - 1)) ts) )
       ]
     | Ty.List t ->
-      [ (2, fun () -> Expr.Nil);
+      [ (2, fun () -> Expr.nil);
         ( deep 3,
           fun () ->
-            Expr.Cons
-              (gen_expr ctx env t (fuel - 1), gen_expr ctx env ty (fuel - 1)) )
-      ]
+            Expr.cons
+              (gen_expr ctx env t (fuel - 1))
+              (gen_expr ctx env ty (fuel - 1)) ) ]
     | Ty.Array t ->
       [ ( 3,
           fun () ->
             let n = Random.State.int ctx.rng 4 in
-            Expr.Array_lit
+            Expr.array_lit
               (List.init n (fun _ -> gen_expr ctx env t (fuel - 1))) ) ]
     | Ty.Constr id -> (
       match Ty.Tenv.lookup ctx.tenv id with
       | Ty.Decl.Record fields ->
         [ ( 4,
             fun () ->
-              Expr.Record
+              Expr.record
                 (List.map
                    (fun (f : Ty.Decl.field) ->
                      f.f_name, gen_expr ctx env f.f_ty (fuel - 1))
@@ -761,13 +773,12 @@ let rec gen_expr ctx env ty fuel =
             match c.c_args with
             | [] ->
               ( (if completeness then 2 else 4),
-                fun () -> Expr.Construct (c.c_name, []) )
+                fun () -> Expr.construct c.c_name [] )
             | args ->
               ( deep 2,
                 fun () ->
-                  Expr.Construct
-                    ( c.c_name,
-                      List.map (fun t -> gen_expr ctx env t (fuel - 1)) args ) ))
+                  Expr.construct c.c_name
+                    (List.map (fun t -> gen_expr ctx env t (fuel - 1)) args) ))
           constrs)
     (* Tier B: lambdas. Bind a prefix of [k] parameters in this [Lam]; k < chain
        length leaves a function-typed body, i.e. nested closures, while k =
@@ -819,23 +830,22 @@ let rec gen_expr ctx env ty fuel =
             let rev_params, env' =
               List.fold_left
                 (fun (params, env) ((label : Arg_label.t), arg_ty) ->
-                  let var = fresh ctx in
-                  let kind =
+                  let x = fresh ctx in
+                  let param =
                     match label with
-                    | Nolabel -> Expr.Positional
-                    | Labelled l -> Expr.Labelled l
+                    | Nolabel -> Expr.param_positional x arg_ty
+                    | Labelled l -> Expr.param_labelled l x arg_ty
                     | Optional l ->
-                      (* always with a default for now; see [Expr.param_kind] *)
-                      Expr.Opt (l, Some (gen_expr ctx env arg_ty (fuel - 1)))
+                      (* always with a default for now; see
+                         [Expr.param_optional] *)
+                      Expr.param_optional l x arg_ty
+                        ~default:(gen_expr ctx env arg_ty (fuel - 1))
                   in
-                  ( { Expr.var; p_ty = arg_ty; kind } :: params,
-                    (var, arg_ty) :: env ))
+                  param :: params, (x, arg_ty) :: env)
                 ([], env) prefix
             in
-            Expr.Lam
-              { params = List.rev rev_params;
-                body = gen_expr ctx env' (ret_after k ty) (fuel - 1)
-              } ) ]
+            Expr.lam (List.rev rev_params)
+              (gen_expr ctx env' (ret_after k ty) (fuel - 1)) ) ]
   in
   choose ctx (generic @ structural)
 
@@ -845,7 +855,7 @@ let maybe_exclave ctx ty body =
   match ctx.mode with
   | Mode.Soundness
     when Ty.exclave_candidate ty && Random.State.int ctx.rng 3 = 0 ->
-    Expr.Exclave body
+    Expr.exclave body
   | Mode.Soundness | Mode.Completeness -> body
 
 let initial_fuel = 5
@@ -862,23 +872,41 @@ let generate ~mode ~seed =
     }
   in
   gen_decls ctx;
-  let env =
-    ["x0", Ty.Constant Ty.Constant.Int; "x1", Ty.Constant Ty.Constant.Float]
-  in
+  let int_ty = Ty.Constant Ty.Constant.Int in
+  let float_ty = Ty.Constant Ty.Constant.Float in
+  let env = ["x0", int_ty; "x1", float_ty] in
   let ty = goal_ty ctx in
   let body = maybe_exclave ctx ty (gen_expr ctx env ty initial_fuel) in
   (* No return-type annotation is emitted since a plain [: ty] could interact
-     with mode inference. Both annotations go on the same function: [@
-     noalloc_strict] drives the frontend check (and forces the body's
-     allocations local), and [@zero_alloc strict] makes the backend check
-     exactly that typed program. *)
-  let header = Printf.sprintf "(* goal: %s *)\n" (Ty.to_string ty) in
-  let body_str = Expr.to_string body in
-  let source =
-    Printf.sprintf
-      "%s%slet[@zero_alloc strict] (f @ noalloc_strict) (x0 : int) (x1 : \
-       float) = %s\n"
-      (Ty.Tenv.to_prelude ctx.tenv)
-      header body_str
+     with mode inference. Both annotations go on the same function: [(f @
+     noalloc_strict)] -- which the parser encodes as [pvb_modes] on the value
+     binding, with a plain variable pattern -- drives the frontend check (and
+     forces the body's allocations local), and the [@zero_alloc strict]
+     attribute on the binding makes the backend check exactly that typed
+     program. *)
+  let zero_alloc =
+    Ast_helper.Attr.mk
+      (Location.mknoloc "zero_alloc")
+      (Parsetree.PStr
+         [ Ast_helper.Str.eval
+             (Ast_helper.Exp.ident
+                (Location.mknoloc (Longident.Lident "strict"))) ])
   in
+  let binding =
+    Ast_helper.Vb.mk ~attrs:[zero_alloc]
+      ~modes:[Location.mknoloc (Parsetree.Mode "noalloc_strict")]
+      (Ast_helper.Pat.var (Location.mknoloc "f"))
+      (Expr.lam
+         [Expr.param_positional "x0" int_ty; Expr.param_positional "x1" float_ty]
+         body)
+  in
+  let structure =
+    Ty.Tenv.to_structure_items ctx.tenv
+    @ [Ast_helper.Str.value Asttypes.Nonrecursive [binding]]
+  in
+  let header =
+    Printf.sprintf "(* goal: %s *)\n"
+      (Format.asprintf "%a" Pprintast.core_type (Ty.to_core_type ty))
+  in
+  let source = header ^ Format.asprintf "%a@." Pprintast.structure structure in
   { Sample.source }
