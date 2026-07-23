@@ -156,7 +156,6 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_INT64 [@symbol "int64"]
 %token KWD_INVALID [@symbol "invalid"]
 %token KWD_LET   [@symbol "let"]
-%token KWD_LOCAL [@symbol "local"]
 %token KWD_LOOPIFY [@symbol "loopify"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
@@ -177,6 +176,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_RERAISE [@symbol "reraise"]
 %token KWD_SET_OF_CLOSURES [@symbol "set_of_closures"]
 %token KWD_SIZE   [@symbol "size"]
+%token KWD_STACK  [@symbol "stack"]
 %token KWD_SUCC   [@symbol "succ"]
 %token KWD_STUB   [@symbol "stub"]
 %token KWD_SWITCH [@symbol "switch"]
@@ -303,7 +303,7 @@ code:
     MINUSGREATER; ret_cont = continuation_id;
     exn_cont = exn_continuation_id;
     ret_arity = return_arity;
-    result_mode = boption(KWD_LOCAL);
+    result_mode = boption(KWD_STACK);
     EQUAL; body = expr;
     { let
         recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,

@@ -48,7 +48,7 @@ let code loopify(never) size(36) newer_version_of(f_0)
    let int_add_2 = %int_barith.add (x, 6) in
    let int_add_3 = %int_barith.add (x, 5) in
    let Pmakeblock =
-     %block.[`0`].my_alloc_region.`local`[`region`]
+     %block.[`0`].my_alloc_region.local[`region`]
        (int_add_3, int_add_2, int_add_1, int_add)
    in
    apply direct(large_2_1 &my_alloc_region)
