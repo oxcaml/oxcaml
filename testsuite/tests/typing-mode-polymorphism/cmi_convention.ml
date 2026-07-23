@@ -18,8 +18,6 @@
  all_modules = "cmi_convention_lib.cmx cmi_convention_mid.cmx cmi_convention.cmx";
  program = "${test_build_directory}/cmi_convention.exe";
  ocamlopt.byte;
- (* BUG: the program currently dies with SIGSEGV. *)
- exit_status = "-11";
  run;
  check-program-output;
 *)

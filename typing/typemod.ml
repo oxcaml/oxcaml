@@ -4588,6 +4588,16 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
+          (* Zap the residual mode variables of the inferred signature before
+             [optimise_allocations], exactly as the no-[.mli] path does via
+             [check_nongen_signature] and the toplevel does explicitly.
+             Without this, the convention modes of exported functions reach
+             [optimise_allocations] unbounded (in particular when [dclsig]
+             comes from an inferred [.cmi] containing generic mode variables)
+             and its ceiling-zap makes them Local, so the implementation is
+             compiled with a stack-allocating currying convention that its
+             callers do not expect. *)
+          remove_mode_and_jkind_variables initial_env sg;
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();

@@ -1,6 +1,6 @@
 (let
   (render =
-     (function {nlocal = 4} tag to_string sep x?
+     (function {nlocal = 1} tag to_string[L] sep x[L]?
        (apply (field_imm 27 (global Stdlib!)) tag
          (apply (field_imm 27 (global Stdlib!)) (apply to_string x) sep))))
   (makeblock 0 render))
