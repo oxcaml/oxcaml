@@ -1053,7 +1053,11 @@ module Layout = struct
 
      [Sort] nodes (and the [Const.Base], [Const.Univar], and [Const.Genvar]
      snapshots) carry a full [Addressability.t], whose third value
-     [Id_or_addressable] denotes the JOIN of the layout and its marked form.
+     [Id_or_addressable] denotes the JOIN of the layout and its marked form -
+     over a product sort, the top of the whole fiber of kinds at that sort,
+     the marks being unknown deeply through the components
+     ([Addressability.decomposed_component] regenerates the join on each
+     fabricated component).
      The join is introduced only for flexible bounds - fresh sort variables
      ([of_new_sort_var]), transfers of an [any] bound's action onto a
      variable, and the components fabricated when decomposing or flattening
