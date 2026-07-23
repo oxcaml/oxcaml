@@ -43,9 +43,10 @@ The language feature includes these predefined types:
 ```ocaml
 type ('a, 'b : any) idx_imm : bits64
 type ('a, 'b : any) idx_mut : bits64
+type ('a, 'b : any) idx_atomic : bits64
 ```
 
-Given `('a, 'b) idx_imm` or `('a, 'b) idx_mut`, we refer to `'a` as the "base
+Given an `('a, 'b) idx_imm` (or other index type), we refer to `'a` as the "base
 type" and `'b` as the "element type." A block index thus represents the position
 of an element type within the base type. For example,
 `(.q.#y) : (line, int) idx_imm` in the example above represents the position of
@@ -66,23 +67,22 @@ Block accesses take the following forms:
 Unboxed accesses take the following forms:
 - Unboxed record field: `.#bar`
 
-If the block access is mutable (mutable record fields and mutable block
-indices), then an `idx_mut` is created, and if the block access is immutable
-(immutable record fields and immutable block indices), then an `idx_imm` is
-created.
+The type of the index that gets created is determined by the kind of block access:
+- If the block access is atomic (atomic record fields), then an `idx_atomic` is created.
+- If the block access is mutable (mutable record fields and mutable block indices), then an `idx_mut` is created.
+- If the block access is immutable (immutable record fields and immutable block indices), then an `idx_imm` is created.
 
-**Array indices.** Array indices are created via functions in
-`Stdlib_stable`, rather than syntax:
+**Array indices.** Array indices are created via functions in `Stdlib_stable`:
 - `Idx_mut.unsafe_create_into_array : int -> ('a array, 'a) idx_mut`
 - `Idx_imm.unsafe_create_into_iarray : int -> ('a iarray, 'a) idx_imm`
+- Atomic array indices are not currently supported.
 
 These functions are marked `unsafe` because they cannot check array bounds, so
 using the index later could perform an unchecked out-of-bounds access.
 
-**Using indices.** Naturally, block indices can be used to read and write
-within blocks. This can be done via the `Idx_imm.get`, `Idx_mut.get`, and
-`Idx_mut.set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
-).
+**Using indices.** Block indices can be used to read and write values within blocks.
+[`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable)
+exposes `get` and `set` functions for `idx_imm`, `idx_mut`, and `idx_atomic`.
 
 _A key advantage of block indices is that these accessor functions are
 polymorphic in both the base type and element type._ Index reading roughly
@@ -94,6 +94,8 @@ signature `'a -> ('a, 'b) idx -> 'b -> unit`.
 access so that indices can be _deepened_. For example, given
 `idx : ('a, pt#) idx_imm`, one may obtain
 `(.idx_imm(idx).#y) : ('a, int) idx_imm`.
+
+Deepening atomic indices is not currently supported.
 
 # Example use cases
 
@@ -144,7 +146,7 @@ let drop_last_to_y_axis (s : line Stack.t) =
 4. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
    must have the identity modality, while the composition of modalities of the
-   accesses of an `idx_mut` must the the modality
+   accesses of an `idx_mut` must have the modality
    `global many aliased unyielding`.
 
 # Representation of block indices
