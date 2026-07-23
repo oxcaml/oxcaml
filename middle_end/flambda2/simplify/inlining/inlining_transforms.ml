@@ -28,7 +28,7 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
     | None ->
       (* CR ncourant: maybe instead of [None] for the callee we need something
          that allows the rec-info to be stored? *)
-      None, Rec_info_expr.do_not_inline
+      None, Rec_info_expr.do_not_inline ()
     | Some callee -> (
       match unroll_to with
       | None -> Some callee, rec_info
@@ -129,7 +129,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     match T.meet_rec_info (DE.typing_env denv) (FT.rec_info function_decl) with
     | Known_result rec_info -> rec_info
     | Need_meet -> Rec_info_expr.unknown
-    | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
+    | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline ()
   in
   match region_inlined_into, Code.result_mode code with
   | Heap, Alloc_local ->

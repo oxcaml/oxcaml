@@ -49,7 +49,7 @@ module type S = sig
 
   val unknown : t
 
-  val do_not_inline : t
+  val do_not_inline : unit -> t
 
   val const : depth:int Or_infinity.t -> unrolling:Unrolling_state.t -> t
 
@@ -127,7 +127,11 @@ struct
 
   let unknown = Const { depth = Infinity; unrolling = Not_unrolling }
 
-  let do_not_inline = Const { depth = Infinity; unrolling = Do_not_unroll }
+  let do_not_inline () =
+    Const
+      { depth = Infinity;
+        unrolling = Sys.opaque_identity Unrolling_state.Do_not_unroll
+      }
 
   let const ~depth ~unrolling = Const { depth; unrolling }
 

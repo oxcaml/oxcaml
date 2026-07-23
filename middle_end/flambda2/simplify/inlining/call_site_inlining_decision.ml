@@ -272,7 +272,7 @@ let get_rec_info dacc ~function_type =
   match Flambda2_types.meet_rec_info (DA.typing_env dacc) rec_info with
   | Known_result rec_info -> rec_info
   | Need_meet -> Rec_info_expr.unknown
-  | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
+  | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline ()
 
 let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =

@@ -306,7 +306,7 @@ let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
         (fun dv env_inside_functions ->
           let name = Name.var dv in
           DE.add_equation_on_name env_inside_functions name
-            (T.this_rec_info Rec_info_expr.do_not_inline))
+            (T.this_rec_info (Rec_info_expr.do_not_inline ())))
         free_depth_variables denv_inside_functions
     in
     denv_inside_functions, free_depth_variables

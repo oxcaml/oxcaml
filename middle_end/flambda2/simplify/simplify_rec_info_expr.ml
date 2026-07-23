@@ -102,7 +102,7 @@ let rec simplify_rec_info_expr0 denv orig ~on_unknown : Rec_info_expr.t =
         TE.get_canonical_simple_exn (DE.typing_env denv)
           ~min_name_mode:Name_mode.normal (Simple.var dv)
       with
-      | exception Not_found -> Rec_info_expr.do_not_inline
+      | exception Not_found -> Rec_info_expr.do_not_inline ()
       | _canonical -> normal_case ()
     else normal_case ()
   | Succ ri -> (
