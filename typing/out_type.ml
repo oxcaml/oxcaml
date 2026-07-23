@@ -1353,19 +1353,12 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     { diff with forkable; yielding; contention; portability }
   in
   (* Step 2: Print the modes *)
-  let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
-  let modes =
-    [ print_to_string_opt Mode.Locality.Const.print diff.areality
-    ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
-    ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
-    ; print_to_string_opt Mode.Portability.Const.print diff.portability
-    ; print_to_string_opt Mode.Contention.Const.print diff.contention
-    ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
-    ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
-    ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
-    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
-  in
-  List.filter_map (fun x -> x) modes
+  List.filter_map
+    (fun (Mode.Alloc.Axis.P ax) ->
+      diff
+      |> Mode.Alloc.Const.Option.proj ax
+      |> Option.map (Fmt.asprintf "%a" (Mode.Alloc.Const.print_axis ax)))
+    Mode.Alloc.Axis.all
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)

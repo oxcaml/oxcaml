@@ -509,11 +509,11 @@ type nested_fn =
     (int @ local once portable -> int @ local once portable) @ once
     portable -> int @ local once portable
 type ('a, 'b) labeled_fn =
-    a:'a @ local unique portable contended ->
+    a:'a @ local portable unique contended ->
     ?b:'b @ local once portable contended ->
     'a @ local portable contended ->
-    (int -> 'b @ local unique once) @ portable
-type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
+    (int -> 'b @ local once unique) @ portable
+type typvar_fn = a:('a. 'a) @ local portable unique contended -> unit
 |}]
 
 (* kitchen sink, with new @ syntax *)
