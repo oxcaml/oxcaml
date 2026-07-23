@@ -566,7 +566,7 @@ and eval_lam_shallow ctx env lam =
       eval_slam ctx env slam |> expect_not_missing |> expect Thalves
     in
     halves.slv_runtime
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     (* These constructors only exist in tlambda, fracturing has removed them
        (and replaced them with SLtemplate and SLinstantiate). *)
     Lambda.fatal_error_invalid_constructor lam
@@ -869,7 +869,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
