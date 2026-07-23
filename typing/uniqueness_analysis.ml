@@ -2675,11 +2675,11 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
   (* CR metaprogramming aivaskovic:
-     it might be reasonable to treat `Texp_quotation e` as `e` *)
-  | Texp_quotation e ->
+     it might be reasonable to treat `Texp_quote e` as `e` *)
+  | Texp_quote e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.quote uf
-  | Texp_antiquotation e ->
+  | Texp_splice e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
 
