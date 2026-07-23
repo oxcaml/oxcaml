@@ -3140,7 +3140,7 @@ let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
-let add_zero_alloc_lock ~loc:_ env = add_lock Zero_alloc_lock env
+let add_zero_alloc_lock env = add_lock Zero_alloc_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
@@ -3806,7 +3806,6 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
    everything up to and including the last such lock, and [inner] is the
    locks pushed inside the innermost [zero_alloc_] region. *)
 let split_at_last_zero_alloc_lock locks =
-  (* Printf.eprintf "ZA locks: %d\n" (List.length locks); *)
   let rec go acc found = function
     | [] -> found
     | (Zero_alloc_lock as l) :: rest ->
@@ -3834,10 +3833,11 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   match split_at_last_zero_alloc_lock locks with
   | None -> List.fold_left walk_one mode locks
   | Some (outer, inner) ->
-      (* CR dkalinichenko: Mask the allocation axis while walking the locks outside the [zero_alloc_] region:
-         the region neither constrains enclosing closures on that axis, nor is
-         constrained by them. The axis is then restored, so that the locks
-         inside the region still apply. *)
+      (* CR dkalinichenko: Mask the allocation axis while walking the
+         locks outside the [zero_alloc_] region: the region neither
+         constrains enclosing closures on that axis, nor is constrained
+         by them. The axis is then restored, so that the locks inside
+         the region still apply. *)
       let masked =
         Mode.Value.meet_const_with Allocation
           Mode.Allocation.Const.Noalloc_strict mode

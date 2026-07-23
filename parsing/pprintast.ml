@@ -1017,7 +1017,7 @@ and expression ctxt f x =
       (attributes ctxt) x.pexp_attributes
   else match x.pexp_desc with
     | Pexp_function _ | Pexp_match _ | Pexp_try _ | Pexp_sequence _
-    | Pexp_newtype _
+    | Pexp_newtype _ | Pexp_zero_alloc _
       when ctxt.pipe || ctxt.semi ->
         paren true (expression reset_ctxt) f x
     | Pexp_ifthenelse _ | Pexp_sequence _ when ctxt.ifthenelse ->

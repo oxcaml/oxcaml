@@ -829,6 +829,12 @@ let f x y = zero_alloc_ (x, y)
 val f : 'a -> 'b -> 'a * 'b = <fun>
 |}]
 
+let g r = (zero_alloc_ incr r); !r
+
+[%%expect{|
+val g : int ref -> int = <fun>
+|}]
+
 
 type t = { a : int }
 let f a =

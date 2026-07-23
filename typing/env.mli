@@ -602,7 +602,7 @@ val add_exclave_lock : t -> t
 (* CR dkalinichenko: Add a lock recording entry into a [zero_alloc_]
    expression: the allocation axis is unconstrained across this lock in
    both directions. *)
-val add_zero_alloc_lock : loc:Location.t -> t -> t
+val add_zero_alloc_lock : t -> t
 
 (* CR dkalinichenko: The allocation ceiling demanded by the innermost
    enclosing noalloc function, up to the nearest enclosing [zero_alloc_]

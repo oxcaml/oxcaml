@@ -5275,9 +5275,7 @@ let rec is_nonexpansive exp =
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
-  (* CR dkalinichenko: A zero-alloc expression cannot create fresh
-     mutable state: *)
-  | Texp_zero_alloc _ -> true
+  | Texp_zero_alloc e -> is_nonexpansive e
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
      and just allocate a new cell for exp2: *)
@@ -5470,7 +5468,7 @@ let rec check_captures_comonadic env (exp : expression) =
       match def with
       | Kept _ -> assert false
       | Overridden (_, e) -> check e) fields
-  | Texp_apply_layout (e, _) | Texp_exclave e -> check e
+  | Texp_apply_layout (e, _) | Texp_exclave e | Texp_zero_alloc e -> check e
   | _ -> fail ()
 
 let annotate_recursive_bindings env valbinds =
@@ -5851,7 +5849,7 @@ let check_partial_application ~statement exp =
             | Texp_construct _ | Texp_variant _ | Texp_record _
             | Texp_atomic_loc _
             | Texp_record_unboxed_product _ | Texp_unboxed_field _
-            | Texp_overwrite _ | Texp_hole _ | Texp_zero_alloc _
+            | Texp_overwrite _ | Texp_hole _
             | Texp_field _ | Texp_setfield _ | Texp_array _ | Texp_idx _
             | Texp_list_comprehension _ | Texp_array_comprehension _
             | Texp_while _ | Texp_for _ | Texp_instvar _
@@ -5875,7 +5873,7 @@ let check_partial_application ~statement exp =
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
-            | Texp_exclave e ->
+            | Texp_exclave e | Texp_zero_alloc e ->
                 check e
             | Texp_apply _ | Texp_send _ | Texp_new _ | Texp_letop _ ->
                 Location.prerr_warning exp_loc
@@ -8577,7 +8575,7 @@ and type_expect_
              (Env.enclosing_noalloc_ceiling env))
           expected_mode
       in
-      let new_env = Env.add_zero_alloc_lock ~loc env in
+      let new_env = Env.add_zero_alloc_lock env in
       let body =
         type_expect ~recarg new_env body_mode sbody ty_expected_explained
       in

@@ -2285,9 +2285,14 @@ val za_exempt : (unit -> record_t) -> unit -> record_t = <fun>
    [int ref] is function-free data, crosses the allocation axis, and so
    flows out of the inner region into the [noalloc_strict] closure [g]
    (exactly as g could capture an [alloc] int ref). *)
+(* CR dkalinichenko: under [-principal] the type of [ref 0] is not yet
+   resolved when the exit check runs, so it does not cross the
+   allocation axis and the exit is rejected. *)
 let za_nested_intervening () =
   zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ (ref 0) in g ())
 [%%expect{|
+val za_nested_intervening : unit -> int ref = <fun>
+|}, Principal{|
 Line 2, characters 57-64:
 2 |   zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ (ref 0) in g ())
                                                              ^^^^^^^
@@ -2315,13 +2320,27 @@ Line 2, characters 14-15:
 Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-(* CR dkalinichenko: [zero_alloc_] is transparent for type inference. *)
+(* CR dkalinichenko: [zero_alloc_] is transparent for type inference; in
+   particular the value restriction still applies. *)
 let za_infer = zero_alloc_ (ref [])
 let () = za_infer := [1]
 let za_contents = !za_infer
 [%%expect{|
-val za_infer : 'a list ref = {contents = []}
-val za_contents : 'a list = [<poly>]
+val za_infer : '_weak1 list ref = {contents = []}
+val za_contents : int list = [1]
+|}]
+
+(* [zero_alloc_] is transparent to the ignored-partial-application
+   warning. *)
+let za_partial (r : int ref) = (zero_alloc_ List.map succ); !r
+[%%expect{|
+Line 1, characters 44-57:
+1 | let za_partial (r : int ref) = (zero_alloc_ List.map succ); !r
+                                                ^^^^^^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
+val za_partial : int ref -> int = <fun>
 |}]
 
 (* CR dkalinichenko: [zero_alloc_] under quotation. *)
