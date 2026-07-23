@@ -578,14 +578,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ~body_layout:(layout_exp arg_sort arg) e arg
         (Some (pat_expr_list, partial, arg_sort)) exn_pat_expr_list
         eff_pat_expr_list
-  | Texp_try(body, pat_expr_list, []) ->
+  | Texp_try(body, _, pat_expr_list, []) ->
       let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
       Ltrywith(transl_exp ~scopes layout body, id, id_duid,
                Matching.for_trywith ~scopes ~return_layout:layout
                  e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes layout pat_expr_list),
                layout)
-  | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
+  | Texp_try(body, _, exn_pat_expr_list, eff_pat_expr_list) ->
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
   | Texp_unboxed_unit ->

@@ -238,6 +238,11 @@ type texp_match_identifier = Jkind.sort
 let mkTexp_match ?id:(sort = Jkind.Sort.scannable) (e, cases, partial) =
   Texp_match (e, sort, cases, [], partial)
 
+type texp_try_identifier = Jkind.sort
+
+let mkTexp_try ?id:(sort = Jkind.Sort.scannable) (e, cases) =
+  Texp_try (e, sort, cases, [])
+
 let mkTexp_assert e loc = Texp_assert (e, loc)
 
 type matched_expression_desc =

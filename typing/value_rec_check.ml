@@ -983,7 +983,7 @@ let rec expression : Typedtree.expression -> term_judg =
       modexp mexp
     | Texp_object (clsstrct, _) ->
       class_structure clsstrct
-    | Texp_try (e, cases, eff_cases) ->
+    | Texp_try (e, _, cases, eff_cases) ->
       (*
         G |- e: m      (Gi; _ |- pi -> ei : m)^i
         --------------------------------------------

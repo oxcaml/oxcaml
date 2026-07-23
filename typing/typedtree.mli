@@ -543,11 +543,11 @@ and expression_desc =
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], [(P4, E4)], _)]
          *)
-  | Texp_try of expression * value case list * value case list
+  | Texp_try of expression * Jkind.sort * value case list * value case list
         (** try E with
           | P1 -> E1
           | effect P2 k -> E2
-          [Texp_try (E, [(P1, E1)], [(P2, E2)])]
+          [Texp_try (E, sort_of_result, [(P1, E1)], [(P2, E2)])]
         *)
   | Texp_unboxed_unit
         (** #() *)

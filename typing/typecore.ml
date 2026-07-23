@@ -315,6 +315,7 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
@@ -4641,7 +4642,7 @@ let rec final_subexpression exp =
   match exp.exp_desc with
     Texp_let (_, _, e)
   | Texp_sequence (_, _, e)
-  | Texp_try (e, _, _)
+  | Texp_try (e, _, _, _)
   | Texp_ifthenelse (_, e, _)
   | Texp_match (_, _, {c_rhs=e} :: _, _, _)
   | Texp_letmodule (_, _, _, _, e)
@@ -5889,7 +5890,7 @@ let check_partial_application ~statement exp =
             | Texp_match (_, _, cases, eff_cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases;
                 List.iter (fun {c_rhs; _} -> check c_rhs) eff_cases
-            | Texp_try (e, cases, eff_cases) ->
+            | Texp_try (e, _, cases, eff_cases) ->
                 check e;
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases;
                 List.iter (fun {c_rhs; _} -> check c_rhs) eff_cases
@@ -6076,6 +6077,14 @@ let check_absent_variant env =
       unify_pat env {pat with pat_type = newty (Tvariant row')}
                      (duplicate_type pat.pat_type)
     | _ -> () }
+
+let check_effect_handler_result_value env loc ty_expected =
+  let value = Jkind.Builtin.value_or_null ~why:Effect_handler_result in
+  match Ctype.constrain_type_jkind env ty_expected value with
+  | Ok () -> ()
+  | Error err ->
+      raise
+        (Error (loc, env, Effect_handler_result_not_value (ty_expected, err)))
 
 (* To find reasonable names for let-bound and lambda-bound idents *)
 
@@ -7337,6 +7346,8 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
+      if eff_caselist <> [] then
+        check_effect_handler_result_value env loc ty_expected;
       let env, arg_pat_mode, arg_expected_mode, expected_mode =
         match eff_caselist with
         | [] ->
@@ -7400,6 +7411,8 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
+      if eff_caselist <> [] then
+        check_effect_handler_result_value env loc ty_expected;
       let env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
         | [] ->
@@ -7427,8 +7440,19 @@ and type_expect_
             type_effect_cases Value env expected_mode ty_expected_explained loc
               eff_caselist eff_conts
       in
+      let result_sort =
+        match Ctype.type_sort ~why:Match ~fixed:true env ty_expected with
+        | Ok sort -> sort
+        | Error _ -> (
+            match eff_cases with
+            | [] -> Jkind.Sort.scannable
+            | _ :: _ ->
+                Misc.fatal_error
+                  "Typecore.type_expect_: result of a try expression with \
+                   effect handlers has no sort")
+      in
       re {
-        exp_desc = Texp_try(body, exn_cases, eff_cases);
+        exp_desc = Texp_try(body, result_sort, exn_cases, eff_cases);
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
@@ -13348,6 +13372,13 @@ let report_error ~loc env =
   | Function_type_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Function arguments and returns must be representable.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
+  | Effect_handler_result_not_value (ty,violation) ->
+      Location.errorf ~loc
+        "@[The result of a match or try expression with effect handlers@ \
+          must have a value layout.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
