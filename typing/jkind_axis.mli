@@ -69,13 +69,13 @@ end
     [L] and [L addressable]. It is stored only on [Sort] nodes and the constant
     snapshots of sorts and layout variables ([Const.Base], [Const.Univar],
     [Const.Genvar]), where it arises for flexible bounds: a fresh sort
-    variable's bound (or a component fabricated when decomposing a product
-    whose own root slot is the join; see [decomposed_component]) must admit
-    both [L] and [L addressable] for whatever [L] the variable resolves to, and
-    it persists after the variable resolves, since resolving a sort determines
+    variable's bound (or a component fabricated when decomposing a product whose
+    own root slot is the join; see [decomposed_component]) must admit both [L]
+    and [L addressable] for whatever [L] the variable resolves to, and it
+    persists after the variable resolves, since resolving a sort determines
     neither branch of the join. [t] is also the result type of addressability
-    *readings* of a kind: there [Addressable] means definitely addressable,
-    [Id] definitely not (the identity action on an intrinsically unaddressable
+    *readings* of a kind: there [Addressable] means definitely addressable, [Id]
+    definitely not (the identity action on an intrinsically unaddressable
     carrier), and [Id_or_addressable] not (yet) determined.
 
     As an order on readings this is flat and partial: [Addressable] and [Id] are
