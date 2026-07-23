@@ -161,7 +161,6 @@ type static_data =
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 type static_data_binding =

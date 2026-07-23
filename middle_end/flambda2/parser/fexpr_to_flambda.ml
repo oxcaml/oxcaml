@@ -643,8 +643,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (SC.immutable_vec512_array
                (List.map (or_variable vec512 env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
-        | Mutable_string { initial_value = s } ->
-          static_const (SC.mutable_string ~initial_value:s)
         | Immutable_string s -> static_const (SC.immutable_string s))
       | Set_of_closures { bindings; elements } ->
         let fun_decls =

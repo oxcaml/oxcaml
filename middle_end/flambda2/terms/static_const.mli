@@ -64,7 +64,6 @@ type t = private
           representation (currently using custom blocks) from regular arrays of
           values. This affects all operations, most importantly the computation
           of the length of the array. *)
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 include Container_types.S with type t := t
@@ -155,8 +154,6 @@ val immutable_vec512_array :
 val immutable_value_array : Simple.With_debuginfo.t list -> t
 
 val empty_array : Empty_array_kind.t -> t
-
-val mutable_string : initial_value:string -> t
 
 val immutable_string : string -> t
 

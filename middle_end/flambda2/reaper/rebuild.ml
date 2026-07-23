@@ -665,7 +665,7 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Immutable_vec512_array fields ->
     SC.immutable_vec512_array
       (rewrite_or_variables Vector_types.Vec512.Bit_pattern.zero env fields)
-  | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
+  | Empty_array _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access ?(mut : Mutability.t = Immutable) base field
