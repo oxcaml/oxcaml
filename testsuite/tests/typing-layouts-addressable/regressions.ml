@@ -96,3 +96,35 @@ type ok' = ok reqa
 type ok = #{ x : int64#; y : string; }
 type ok' = ok reqa
 |}]
+
+(**********************************************************************)
+(* A sort variable marked [addressable] and resolved to a product sort
+   denotes the whole-marked product; the mark does not distribute to the
+   components. So a component-marked kind must be rejected, exactly as
+   the explicit [(bits8 & bits16) addressable] bound rejects it, while
+   the whole-marked kind is accepted. *)
+
+type t_cm : bits8 addressable & bits16 addressable
+type t_wm : (bits8 & bits16) addressable
+
+let gm (x : t_cm) =
+  let r = magic x in
+  (r : ('c : any addressable))
+
+[%%expect{|
+type t_cm : bits8 addressable & bits16 addressable
+type t_wm : (bits8 & bits16) addressable
+val gm : ('c : (bits8 & bits16) addressable). t_cm -> 'c = <fun>
+|}]
+
+let use_wm (x : t_cm) : t_wm = gm x
+
+[%%expect{|
+val use_wm : t_cm -> t_wm = <fun>
+|}]
+
+let use_cm (x : t_cm) : t_cm = gm x
+
+[%%expect{|
+val use_cm : t_cm -> t_cm = <fun>
+|}]
