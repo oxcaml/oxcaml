@@ -1326,14 +1326,14 @@ let lazy_val_requires_forward env loc ty =
     Jkind.Layout.Const.of_sort_const
       Jkind.Sort.Const.for_lazy_body
       (* The scannable axes and addressability don't matter for the rest of
-         the computation, so setting them to [max] is totally fine. *)
+         the computation, so unconstrained values are totally fine. *)
       Jkind_types.Scannable_axes.max
-      Jkind_types.Addressability.max
+      Jkind_types.Addressability.Id_or_addressable
   in
   let classify_product _ layouts =
     let layout =
       Jkind_types.Layout.Const.Product
-        (layouts, Jkind_types.Addressability.Maybe_addressable)
+        (layouts, Jkind_types.Addressability.Action.Id)
     in
     raise (Error (loc, Unsupported_product_in_lazy layout))
   in

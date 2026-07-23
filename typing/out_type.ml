@@ -1258,7 +1258,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     let addressable_words =
       match (a : Jkind.Addressability.t) with
       | Addressable -> ["addressable"]
-      | Unaddressable | Maybe_addressable -> []
+      | Id | Id_or_addressable -> []
     in
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
@@ -1277,14 +1277,14 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     let mark_is_informative =
       (* A mark on a product whose components already imply addressability is
          not worth printing. *)
-      match (a : Jkind.Addressability.t) with
-      | Unaddressable | Maybe_addressable -> false
+      match (a : Jkind.Addressability.Action.t) with
+      | Id -> false
       | Addressable ->
         List.exists
           (fun l ->
             match Jkind.Desc.layout_addressability l with
             | Jkind.Addressability.Addressable -> false
-            | Unaddressable | Maybe_addressable -> true)
+            | Id | Id_or_addressable -> true)
           lays
     in
     if not mark_is_informative

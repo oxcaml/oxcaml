@@ -1242,9 +1242,9 @@ let transl_declaration env sdecl (id, uid) =
                labels' kinds are unconstrained by it (products do not make
                their components addressable), but the product as a whole is
                still required to be addressable. *)
-            match (a : Jkind.Addressability.t) with
+            match (a : Jkind.Addressability.Action.t) with
             | Addressable -> Jkind.Layout.set_root_addressable default_layout
-            | Unaddressable | Maybe_addressable -> default_layout
+            | Id -> default_layout
           in
           Jkind.set_layout jkind default_layout
         | _ -> jkind
@@ -2332,7 +2332,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
                   | Error _ ->
                       Jkind.Layout.Any
                         ( Jkind_types.Scannable_axes.max,
-                          Jkind_types.Addressability.max )
+                          Jkind_types.Addressability.Action.Id )
                 in
                 lbl, ty, layout)
             lbls jkinds
@@ -3242,7 +3242,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
             | None ->
               Jkind_types.Layout.Const.Any
                 ( Jkind_types.Scannable_axes.max,
-                  Jkind_types.Addressability.max )
+                  Jkind_types.Addressability.Action.Id )
             | Some l -> l
           in
           Contained (contained_parameters tyl layout), parents
@@ -5341,9 +5341,9 @@ module Reaching_path = struct
         let strs =
           Jkind.Scannable_axes.to_string_list sa
           @
-          match (a : Jkind.Addressability.t) with
+          match (a : Jkind.Addressability.Action.t) with
           | Addressable -> ["addressable"]
-          | Unaddressable | Maybe_addressable -> []
+          | Id -> []
         in
         (match strs with
          | [] -> Printtyp.path ppf p

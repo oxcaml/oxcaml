@@ -1838,6 +1838,11 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             in
             (match v_opt with
             | Some v ->
+              (* The variable is a rigid stand-in for the abstract kind, so
+                 an unapplied action ([Id]) arguably warrants a rigid [Id]
+                 slot; we conservatively transfer it as the lenient join.
+                 CR-someday rtjoa: consider tightening this to [Id]. *)
+              let a = Jkind.Addressability.of_action_on_undetermined a in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
                 = Layout (Sort (Var v, sa, a)) in
               let desc = {desc with base} in

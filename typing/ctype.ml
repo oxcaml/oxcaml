@@ -2086,8 +2086,15 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       sort
     in
     (* The scannable axes and addressability constraints of the [any] bound
-       carry over to the sort variable's layout. *)
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa, a)) in
+       carry over to the sort variable's layout. A plain [any] bound (action
+       [Id]) is the top kind, which on the variable becomes the join
+       [Id_or_addressable]: the variable must admit both [L] and
+       [L addressable] for whatever layout [L] it resolves to. *)
+    let jkind =
+      Jkind.set_layout jkind
+        (Jkind.Layout.Sort
+           (sort, sa, Jkind.Addressability.of_action_on_undetermined a))
+    in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -2897,7 +2904,7 @@ let apply_layout_wrapping_l ~env
     | Ok l -> l
     | Error _ ->
       Jkind_types.Layout.Any
-        (Jkind_types.Scannable_axes.max, Jkind_types.Addressability.max)
+        (Jkind_types.Scannable_axes.max, Jkind_types.Addressability.Action.Id)
   in
   match or_null with
   | Some { prev; _ } ->

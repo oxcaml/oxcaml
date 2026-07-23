@@ -1012,13 +1012,14 @@ end
 module Addressability0 = struct
   include Jkind_axis.Addressability
 
-  (* The intrinsic addressability of each base sort: whether its types store
-     all of their information in the data portion of a block when boxed.
-     Kinds boxed as tagged immediates or as float blocks are unaddressable. *)
+  (* The intrinsic addressability of each base sort, as a reading: whether
+     its types store all of their information in the data portion of a block
+     when boxed. Kinds boxed as tagged immediates or as float blocks are not
+     addressable ([Id]: only the identity action keeps them so). *)
   let of_base : Sort.base -> t = function
     | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 -> Addressable
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
-      Unaddressable
+      Id
 
   (* The intrinsic addressability of a sort, insofar as it is determined: the
      addressability of an unfilled sort variable is not yet known. *)
@@ -1026,7 +1027,7 @@ module Addressability0 = struct
     let rec go : Sort.t -> t = function
       | Base b -> of_base b
       | Product sorts -> combine_product (List.map go sorts)
-      | Var _ | Univar _ -> Maybe_addressable
+      | Var _ | Univar _ -> Id_or_addressable
     in
     (* [Sort.get] is deep, so a returned [Var] is guaranteed unfilled. *)
     go (Sort.get s)
@@ -1038,65 +1039,72 @@ module Layout = struct
   open Jkind_axis
   module Addressability = Addressability0
 
-  (* Each node carries an [Addressability.t] slot, tracking applications of
-     the [addressable] kind operator. Invariants on the stored slot:
+  (* Addressability slots track applications of the [addressable] kind
+     operator.
 
-     - On a [Sort] of a base (and on [Const.Base]): [Addressable] when the
-       base is intrinsically addressable ([Addressability.of_base]; e.g.
-       [bits64 addressable] IS [bits64]) or when the [addressable] operator
-       was applied; [Unaddressable] for a plain unaddressable base (e.g. a
-       user-written [bits8]); [Maybe_addressable] in unconstrained-bound
-       positions (fresh sort variable bounds and product decompositions, the
-       analog of [Scannable_axes.max] there). A slot of [Unaddressable] never
-       appears together with an intrinsically addressable base.
+     [Any] and [Product] nodes (and [Types.Kconstr], and the [Const]
+     counterparts below) carry a two-state [Addressability.Action.t]: either
+     the operator was applied to the node ([Addressable]) or it wasn't
+     ([Id]). An [Id] product root means the product is unmarked; its
+     addressability is derived from its components at read time (a product of
+     addressable kinds is addressable). Marking a whole product (e.g.
+     [(bits8 & bits16) addressable]) is distinct from marking its components.
+     [Id] on [Any] is the top kind [any].
 
-     - On a [Sort] of an unfilled variable: [Addressable] if constrained to
-       be addressable, otherwise [Maybe_addressable]. Never [Unaddressable]
-       (there is no operator that makes a kind unaddressable). The slot can go
-       stale in one direction: filling the variable with an intrinsically
-       addressable sort leaves a stored [Maybe_addressable] even though the
-       kind is known addressable, so readers refine the slot via
-       [Addressability.of_sort].
+     [Sort] nodes (and [Const.Base]) carry a full [Addressability.t], whose
+     third value [Id_or_addressable] denotes the JOIN of the layout and its
+     marked form. The join is introduced only as the flexible bound of a
+     fresh sort variable ([of_new_sort_var], product decompositions and
+     flattenings, and transfers of an [any] bound's action onto a variable),
+     which must admit both [L] and [L addressable] for whatever [L] the
+     variable resolves to. The join persists after its variable resolves:
+     sorts do not carry addressability, so filling the variable with [bits8]
+     leaves the kind the join of [bits8] and [bits8 addressable]. Readers
+     collapse the join only when the resolved sort is intrinsically
+     addressable, where the two branches denote the same kind (see
+     [Jkind.Layout.addressability]).
 
-     - On [Product]: [Addressable] when the whole product was marked (e.g.
-       [(bits8 & bits16) addressable] - distinct from marking the
-       components!); otherwise [Maybe_addressable], meaning the product's
-       addressability is derived from its components at read time (a product
-       of addressable kinds is addressable). Never [Unaddressable].
-
-     - On [Any]: [Addressable] for [any addressable], the top of all
-       addressable kinds; [Maybe_addressable] for [any]. Never
-       [Unaddressable]. *)
+     Construction invariants:
+     - A [Sort]/[Const.Base] node of an intrinsically addressable base
+       ([Addressability.of_base]) normalizes its slot to [Addressable]
+       (e.g. [bits64 addressable] IS [bits64]); see [Const.Static.of_base].
+     - On an unaddressable base, [Id] and [Addressable] mean exactly the
+       plain and the marked kind.
+     - On an unfilled variable the slot is [Id_or_addressable] or, once
+       constrained, [Addressable]; a bare [Id] on an unfilled variable is
+       never built (rigid stand-ins for abstract kinds conservatively use the
+       join too; see [Typetexp]). *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
-    | Product of 'sort t list * Addressability.t
-    | Any of Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.Action.t
+    | Any of Scannable_axes.t * Addressability.Action.t
 
   module Const = struct
     type t =
-      | Any of Scannable_axes.t * Addressability.t
+      | Any of Scannable_axes.t * Addressability.Action.t
       | Base of Sort.base * Scannable_axes.t * Addressability.t
-      | Product of t list * Addressability.t
+      | Product of t list * Addressability.Action.t
       | Univar of Sort.univar
       | Genvar of Sort.var
 
-    let max = Any (Scannable_axes.max, Addressability.max)
+    let max = Any (Scannable_axes.max, Addressability.Action.Id)
 
-    (* The addressability of a constant layout: a [Maybe_addressable] slot on
-       a base is refined by the base's intrinsic addressability, and an
-       unmarked product derives its addressability from its components. *)
+    (* The addressability reading of a constant layout. A join slot on a base
+       is collapsed to the base's intrinsic addressability (a snapshot-level
+       convention: an undetermined bound prints and compares like the plain
+       base), and an unmarked product derives its reading from its
+       components. *)
     let rec addressability : t -> Addressability.t = function
       | Base (b, _, a) -> (
         match a with
-        | Maybe_addressable -> Addressability.of_base b
-        | Addressable | Unaddressable -> a)
-      | Any (_, a) -> a
+        | Id_or_addressable -> Addressability.of_base b
+        | Addressable | Id -> a)
+      | Any (_, a) -> Addressability.of_action_on_undetermined a
       | Product (ts, a) -> (
-        match a with
-        | Addressable -> a
-        | Maybe_addressable | Unaddressable ->
-          Addressability.combine_product (List.map addressability ts))
-      | Univar _ | Genvar _ -> Addressability.max
+        match (a : Addressability.Action.t) with
+        | Addressable -> Addressability.Addressable
+        | Id -> Addressability.combine_product (List.map addressability ts))
+      | Univar _ | Genvar _ -> Addressability.Id_or_addressable
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -1108,7 +1116,7 @@ module Layout = struct
         Sort.equal_base b1 b2
         && Addressability.equal (addressability c1) (addressability c2)
       | Any (sa1, a1), Any (sa2, a2) ->
-        Scannable_axes.equal sa1 sa2 && Addressability.equal a1 a2
+        Scannable_axes.equal sa1 sa2 && Addressability.Action.equal a1 a2
       | (Product (cs1, _) as c1), (Product (cs2, _) as c2) ->
         List.equal equal cs1 cs2
         (* Comparing the roots distinguishes a marked product of
@@ -1168,9 +1176,9 @@ module Layout = struct
        layouts are dropped (these are alpha-gated). *)
     let set_root_addressable t =
       match t with
-      | Any (sa, _) -> Any (sa, Addressability.Addressable)
+      | Any (sa, _) -> Any (sa, Addressability.Action.Addressable)
       | Base (b, sa, _) -> Base (b, sa, Addressability.Addressable)
-      | Product (ts, _) -> Product (ts, Addressability.Addressable)
+      | Product (ts, _) -> Product (ts, Addressability.Action.Addressable)
       | Univar _ | Genvar _ -> t
 
     module Static = struct
@@ -1236,25 +1244,26 @@ module Layout = struct
 
       (* For all non-[Scannable] layouts, the scannable axes are ignored. We
          have to pick something, though, so we pick [Scannable_axes.max].
-         The addressability slot of these constants is the base's intrinsic
-         addressability ([Addressability.of_base]). *)
+         The addressability slot of these constants is [Id] on intrinsically
+         unaddressable bases (the plain, unmarked kind) and [Addressable] on
+         intrinsically addressable ones ([Addressability.of_base]). *)
 
-      let void = Base (Sort.Void, Scannable_axes.max, Unaddressable)
+      let void = Base (Sort.Void, Scannable_axes.max, Id)
 
-      let float64 = Base (Sort.Float64, Scannable_axes.max, Unaddressable)
+      let float64 = Base (Sort.Float64, Scannable_axes.max, Id)
 
-      let float32 = Base (Sort.Float32, Scannable_axes.max, Unaddressable)
+      let float32 = Base (Sort.Float32, Scannable_axes.max, Id)
 
       let word = Base (Sort.Word, Scannable_axes.max, Addressable)
 
       let untagged_immediate =
-        Base (Sort.Untagged_immediate, Scannable_axes.max, Unaddressable)
+        Base (Sort.Untagged_immediate, Scannable_axes.max, Id)
 
-      let bits8 = Base (Sort.Bits8, Scannable_axes.max, Unaddressable)
+      let bits8 = Base (Sort.Bits8, Scannable_axes.max, Id)
 
-      let bits16 = Base (Sort.Bits16, Scannable_axes.max, Unaddressable)
+      let bits16 = Base (Sort.Bits16, Scannable_axes.max, Id)
 
-      let bits32 = Base (Sort.Bits32, Scannable_axes.max, Unaddressable)
+      let bits32 = Base (Sort.Bits32, Scannable_axes.max, Id)
 
       let bits64 = Base (Sort.Bits64, Scannable_axes.max, Addressable)
 
@@ -1268,8 +1277,8 @@ module Layout = struct
           =
         (* The addressability slot is normalized to [Addressable] on
            intrinsically addressable bases: applying [addressable] to such a
-           kind does nothing (e.g. [bits64 addressable] IS [bits64]), and a
-           [Maybe_addressable] slot on them describes no other kind. *)
+           kind does nothing (e.g. [bits64 addressable] IS [bits64]), and
+           both branches of a join on them denote the same kind. *)
         match b, a with
         | Scannable, _ -> (
           match sa with
@@ -1318,16 +1327,16 @@ module Layout = struct
         | Vec128, _ -> vec128
         | Vec256, _ -> vec256
         | Vec512, _ -> vec512
-        | Void, Unaddressable -> void
-        | Untagged_immediate, Unaddressable -> untagged_immediate
-        | Float64, Unaddressable -> float64
-        | Float32, Unaddressable -> float32
-        | Bits8, Unaddressable -> bits8
-        | Bits16, Unaddressable -> bits16
-        | Bits32, Unaddressable -> bits32
+        | Void, Id -> void
+        | Untagged_immediate, Id -> untagged_immediate
+        | Float64, Id -> float64
+        | Float32, Id -> float32
+        | Bits8, Id -> bits8
+        | Bits16, Id -> bits16
+        | Bits32, Id -> bits32
         | ( ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
             | Bits32 ),
-            ((Addressable | Maybe_addressable) as a) ) ->
+            ((Addressable | Id_or_addressable) as a) ) ->
           Base (b, Scannable_axes.max, a)
     end
 
@@ -1339,18 +1348,20 @@ module Layout = struct
         | Base b -> Some (Static.of_base b sa a)
         | Product sorts ->
           Option.map
-            (fun x -> Product (x, a))
+            (fun x -> Product (x, Addressability.forget_join a))
             (* [Sort.get] is deep, so no need to repeat it here *)
             (* In all cases where sort products are turned into layout
                products, [Scannable_axes.max] and
-               [Addressability.Maybe_addressable] are used for the components.
+               [Addressability.Id_or_addressable] are used for the components.
                The sort product doesn't store enough information to make any
                other choice. The node's addressability slot stays on the
-               product root: it marks the product as a whole, not its
-               components. *)
+               product root as an action: it marks the product as a whole, not
+               its components. A join slot (a flexible variable's bound later
+               filled with a product sort) becomes an unmarked root deriving
+               from the join components, which reads the same. *)
             (Misc.Stdlib.List.map_option
                (fun s ->
-                 of_sort s Scannable_axes.max Addressability.Maybe_addressable)
+                 of_sort s Scannable_axes.max Addressability.Id_or_addressable)
                sorts)
         | Univar uv -> Some (Univar uv)
       in
@@ -1371,13 +1382,15 @@ module Layout = struct
     | Any (sa, a) -> Any (sa, a)
     | Base (b, sa, a) -> Sort (Sort.of_base b, sa, a)
     | Product (cs, a) -> Product (List.map of_const cs, a)
-    | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max, Addressability.max)
-    | Genvar v -> Sort (Sort.Var v, Scannable_axes.max, Addressability.max)
+    | Univar uv ->
+      Sort (Sort.Univar uv, Scannable_axes.max, Addressability.Id_or_addressable)
+    | Genvar v ->
+      Sort (Sort.Var v, Scannable_axes.max, Addressability.Id_or_addressable)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
     | [lay] -> lay
-    | lays -> Product (lays, Addressability.Maybe_addressable)
+    | lays -> Product (lays, Addressability.Action.Id)
 
   let rec get_const of_sort : _ t -> Const.t option = function
     | Any (sa, a) -> Some (Any (sa, a))
@@ -1393,5 +1406,5 @@ module Layout = struct
 
   let of_new_sort_var ~level sa =
     let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa, Addressability.Maybe_addressable), sort
+    Sort (sort, sa, Addressability.Id_or_addressable), sort
 end

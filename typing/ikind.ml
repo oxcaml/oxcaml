@@ -1122,7 +1122,7 @@ let fast_sub_of_any_super : type r.
       (Jkind_types.Layout.Sort
          (_sub_sort, { nullability = _; separability = _ }, _)) ->
     (* Any addressability on the sub side is fine: these fast paths only
-       apply under supers whose addressability slot is [Maybe_addressable]
+       apply under supers whose addressability slot admits everything
        (see [fast_sub]). *)
     fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
   | Types.Layout _ | Types.Kconstr _ -> false
@@ -1150,10 +1150,12 @@ let fast_sub : type r1 l2.
     bool =
  fun ~context:_ _env (sub : (Allowance.allowed * r1) Types.jkind)
      (super : (l2 * Allowance.allowed) Types.jkind) ->
-  (* The super-side patterns require an unconstrained addressability slot
-     ([Maybe_addressable]): [Any (_, Addressable)] ([any addressable]) is
-     NOT the top layout, and a constrained sort bound likewise rejects some
-     addressabilities. Those cases take the slow path. *)
+  (* The super-side patterns require an addressability slot that admits
+     everything: the join [Id_or_addressable] on a [Sort] bound, and the
+     unmarked action [Id] on [Any] (the top). [Any (_, Addressable)]
+     ([any addressable]) is NOT the top layout, and a constrained sort bound
+     likewise rejects some addressabilities. Those cases take the slow
+     path. *)
   match super.jkind with
   | { base =
         (* CR rtjoa for jujacobs: I guessed you want [max] here? *)
@@ -1163,7 +1165,7 @@ let fast_sub : type r1 l2.
                { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
                },
-               Jkind_axis.Addressability.Maybe_addressable ));
+               Jkind_axis.Addressability.Id_or_addressable ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } ->
@@ -1174,7 +1176,7 @@ let fast_sub : type r1 l2.
              ( { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
                },
-               Jkind_axis.Addressability.Maybe_addressable ));
+               Jkind_axis.Addressability.Action.Id ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } ->

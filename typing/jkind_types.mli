@@ -130,13 +130,26 @@ module Scannable_axes : sig
   val meet : t -> t -> t
 end
 
+(** See [Jkind_axis.Addressability] for an overview of actions ([Action.t], on
+    [Any]/[Product]/[Kconstr] nodes) vs the full [t] with the join
+    [Id_or_addressable] (on [Sort] nodes, also the type of readings). *)
 module Addressability : sig
-  type t = Jkind_axis.Addressability.t =
-    | Addressable
-    | Unaddressable
-    | Maybe_addressable
+  module Action : sig
+    type t = Jkind_axis.Addressability.Action.t =
+      | Id
+      | Addressable
 
-  val max : t
+    val equal : t -> t -> bool
+
+    val to_string : t -> string
+
+    val print : Format_doc.formatter -> t -> unit
+  end
+
+  type t = Jkind_axis.Addressability.t =
+    | Id
+    | Addressable
+    | Id_or_addressable
 
   val equal : t -> t -> bool
 
@@ -148,19 +161,23 @@ module Addressability : sig
 
   val combine_product : t list -> t
 
+  val of_action_on_undetermined : Action.t -> t
+
+  val forget_join : t -> Action.t
+
   val to_string : t -> string
 
   val print : Format_doc.formatter -> t -> unit
 
-  (** The intrinsic addressability of a base sort; never [Maybe_addressable].
-      [Scannable], [Word], [Bits64], and the vector bases are boxed as blocks
-      with all data in the body; the others are boxed as tagged immediates or
-      float blocks. *)
+  (** The intrinsic addressability of a base sort, as a reading; either
+      [Addressable] or [Id] (not addressable). [Scannable], [Word], [Bits64],
+      and the vector bases are boxed as blocks with all data in the body; the
+      others are boxed as tagged immediates or float blocks. *)
   val of_base : Sort.base -> t
 
   (** The intrinsic addressability of a sort, insofar as it is determined: the
       addressability of an unfilled sort variable is not yet known
-      ([Maybe_addressable]). *)
+      ([Id_or_addressable]). *)
   val of_sort : Sort.t -> t
 end
 
@@ -176,26 +193,27 @@ module Layout : sig
       layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
       [float64]. See [Layout.Const.get_root_scannable_axes].
 
-      3. Each node also carries an [Addressability.t] slot, tracking
-      applications of the [addressable] kind operator. On a base, the slot is
-      [Addressable] when the base is intrinsically addressable or was marked by
-      the operator, [Unaddressable] for a plain unaddressable base, and
-      [Maybe_addressable] in unconstrained-bound positions (fresh sort variable
-      bounds and product decompositions, the analog of [Scannable_axes.max]
-      there). On a [Product], the slot is [Addressable] only when the whole
-      product was marked; otherwise the product's addressability is derived from
-      its components at read time. See the comment on the implementation's
-      [Layout.t] for the full invariants. *)
+      3. Each node also carries an addressability slot, tracking applications of
+      the [addressable] kind operator. [Product] and [Any] nodes carry a
+      two-state action: marked ([Addressable]) or unmarked ([Id]; an unmarked
+      product derives its addressability from its components at read time, and
+      an unmarked [any] is the top kind). [Sort] nodes (and [Const.Base]) carry
+      a full [Addressability.t]: [Addressable] when the base is intrinsically
+      addressable or the node was marked, [Id] for a plain unaddressable base,
+      and [Id_or_addressable] - the join of the layout and its marked form - for
+      flexible sort-variable bounds (fresh variables and product decompositions,
+      the analog of [Scannable_axes.max] there). See the comment on the
+      implementation's [Layout.t] for the full invariants. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
-    | Product of 'sort t list * Addressability.t
-    | Any of Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.Action.t
+    | Any of Scannable_axes.t * Addressability.Action.t
 
   module Const : sig
     type t =
-      | Any of Scannable_axes.t * Addressability.t
+      | Any of Scannable_axes.t * Addressability.Action.t
       | Base of Sort.base * Scannable_axes.t * Addressability.t
-      | Product of t list * Addressability.t
+      | Product of t list * Addressability.Action.t
       | Univar of Sort.univar
       | Genvar of Sort.var
           (** A layout variable bound by a surrounding [val_lpoly]. It's a
@@ -218,10 +236,11 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    (** The addressability of a constant layout: a [Maybe_addressable] slot on a
-        base is refined by the base's intrinsic addressability, and an unmarked
-        product derives its addressability from its components.
-        [Univar]/[Genvar] layouts are [Maybe_addressable]. *)
+    (** The addressability reading of a constant layout: a join
+        ([Id_or_addressable]) slot on a base is collapsed to the base's
+        intrinsic addressability, and an unmarked product derives its reading
+        from its components. [Univar]/[Genvar] layouts read as
+        [Id_or_addressable]. *)
     val addressability : t -> Addressability.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.

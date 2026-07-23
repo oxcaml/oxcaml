@@ -427,12 +427,12 @@ module Jkind0 : sig
 
     (** Applies the pending operations of an expanded [Kconstr] to its
         manifest: the scannable axes are met, and a pending [addressable] mark
-        (the [Addressability.t] argument being [Addressable]) is applied to
+        (the action argument being [Addressable]) is applied to
         the root. *)
     val apply_pending_axes :
       Jkind_types.Layout.Const.t jkind_base ->
       Jkind_types.Scannable_axes.t ->
-      Jkind_types.Addressability.t ->
+      Jkind_types.Addressability.Action.t ->
       Jkind_types.Layout.Const.t jkind_base
 
     val try_allow_l :

@@ -125,59 +125,79 @@ module Separability = struct
 end
 
 module Addressability = struct
-  type t =
-    | Addressable
-    | Unaddressable
-    | Maybe_addressable
+  (* See the .mli for an overview of actions vs readings and where each type
+     is stored. *)
+  module Action = struct
+    type t =
+      | Id
+      | Addressable
 
-  let max = Maybe_addressable
+    let equal a1 a2 =
+      match a1, a2 with
+      | Id, Id | Addressable, Addressable -> true
+      | (Id | Addressable), _ -> false
+
+    let to_string = function Id -> "id" | Addressable -> "addressable"
+
+    let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+  end
+
+  type t =
+    | Id
+    | Addressable
+    | Id_or_addressable
 
   let equal a1 a2 =
     match a1, a2 with
-    | Addressable, Addressable
-    | Unaddressable, Unaddressable
-    | Maybe_addressable, Maybe_addressable ->
+    | Id, Id | Addressable, Addressable | Id_or_addressable, Id_or_addressable
+      ->
       true
-    | (Addressable | Unaddressable | Maybe_addressable), _ -> false
+    | (Id | Addressable | Id_or_addressable), _ -> false
 
   let less_or_equal a1 a2 : Misc.Le_result.t =
     match a1, a2 with
-    | Addressable, Addressable
-    | Unaddressable, Unaddressable
-    | Maybe_addressable, Maybe_addressable ->
+    | Id, Id | Addressable, Addressable | Id_or_addressable, Id_or_addressable
+      ->
       Equal
-    | (Addressable | Unaddressable), Maybe_addressable -> Less
-    | Maybe_addressable, (Addressable | Unaddressable)
-    | Addressable, Unaddressable
-    | Unaddressable, Addressable ->
+    | (Id | Addressable), Id_or_addressable -> Less
+    | Id_or_addressable, (Id | Addressable) | Id, Addressable | Addressable, Id
+      ->
       Not_le
 
   let le a1 a2 = Misc.Le_result.is_le (less_or_equal a1 a2)
 
   let meet a1 a2 =
     match a1, a2 with
-    | Maybe_addressable, a | a, Maybe_addressable -> Some a
+    | Id_or_addressable, a | a, Id_or_addressable -> Some a
     | Addressable, Addressable -> Some Addressable
-    | Unaddressable, Unaddressable -> Some Unaddressable
-    | Addressable, Unaddressable | Unaddressable, Addressable -> None
+    | Id, Id -> Some Id
+    | Addressable, Id | Id, Addressable -> None
 
   let combine_product ts =
-    (* Note that the implicit order here ([Addressable] absorbed by
-       [Maybe_addressable] absorbed by [Unaddressable]) is not the subkind
-       order, under which [Addressable] and [Unaddressable] are
-       incomparable. *)
+    (* Combines component *readings* into a product's reading. Note that the
+       implicit order here ([Addressable] absorbed by [Id_or_addressable]
+       absorbed by [Id]) is not the subkind order, under which [Addressable]
+       and [Id] are incomparable. *)
     List.fold_left
       (fun acc t ->
         match acc, t with
-        | Unaddressable, _ | _, Unaddressable -> Unaddressable
-        | Maybe_addressable, _ | _, Maybe_addressable -> Maybe_addressable
+        | Id, _ | _, Id -> Id
+        | Id_or_addressable, _ | _, Id_or_addressable -> Id_or_addressable
         | Addressable, Addressable -> Addressable)
       Addressable ts
 
+  let of_action_on_undetermined : Action.t -> t = function
+    | Id -> Id_or_addressable
+    | Addressable -> Addressable
+
+  let forget_join : t -> Action.t = function
+    | Addressable -> Addressable
+    | Id | Id_or_addressable -> Id
+
   let to_string = function
     | Addressable -> "addressable"
-    | Unaddressable -> "unaddressable"
-    | Maybe_addressable -> "maybe_addressable"
+    | Id -> "id"
+    | Id_or_addressable -> "id_or_addressable"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 end

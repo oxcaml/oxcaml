@@ -96,11 +96,24 @@ module Scannable_axes : sig
   val to_string_list : t -> string list
 end
 
+(** See [Jkind_axis.Addressability] for an overview: [Action.t] (marked or not)
+    is stored on [Any]/[Product]/[Kconstr] nodes, while [Sort] nodes carry the
+    full [t], whose extra value [Id_or_addressable] is the join of a layout and
+    its marked form (flexible sort-variable bounds). [t] is also the type of
+    addressability readings. *)
 module Addressability : sig
+  module Action : sig
+    type t = Jkind_types.Addressability.Action.t =
+      | Id
+      | Addressable
+  end
+
   type t = Jkind_types.Addressability.t =
+    | Id
     | Addressable
-    | Unaddressable
-    | Maybe_addressable
+    | Id_or_addressable
+
+  val of_action_on_undetermined : Action.t -> t
 end
 
 (* The layout of a type describes its memory layout. A layout is either the
@@ -108,8 +121,8 @@ end
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
-    | Product of 'sort t list * Addressability.t
-    | Any of Scannable_axes.t * Addressability.t
+    | Product of 'sort t list * Addressability.Action.t
+    | Any of Scannable_axes.t * Addressability.Action.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t

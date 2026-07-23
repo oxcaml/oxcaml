@@ -57,23 +57,48 @@ module Separability : sig
   val upper_bound_if_is_always_gc_ignorable : unit -> t
 end
 
-(** The addressability of a kind: whether its types store all of their
-    information in the data portion of a block when boxed, making it possible to
-    take interior pointers to them.
+(** Tracking of the [addressable] kind operator: a kind is addressable when its
+    types store all of their information in the data portion of a block when
+    boxed, making it possible to take interior pointers to them.
 
-    Unlike the axes above, this is not a total order: [Addressable] and
-    [Unaddressable] are incomparable (applying the [addressable] kind operator
-    is a modifier, not a narrowing), and both are below [Maybe_addressable],
-    which describes an unconstrained or not-yet-known addressability.
-    Accordingly, [meet] is partial. This is also not an [Axis.t]: it is not part
-    of the mod- or with-bounds, but rather a component of layouts. *)
+    [Action.t] records what was applied to a kind node: the [addressable]
+    operator ([Addressable]) or nothing ([Id]). [Any], [Product], and [Kconstr]
+    nodes store exactly an action.
+
+    [t] adds a third value, [Id_or_addressable], denoting the *join* of a layout
+    [L] and [L addressable]. It is stored only on [Sort] nodes (and their
+    [Const.Base] snapshots), where it arises as the flexible bound of a fresh
+    sort variable: such a bound must admit both [L] and [L addressable] for
+    whatever [L] the variable resolves to, and it persists after the variable
+    resolves, since resolving a sort determines neither branch of the join. [t]
+    is also the result type of addressability *readings* of a kind: there
+    [Addressable] means definitely addressable, [Id] definitely not (the
+    identity action on an intrinsically unaddressable carrier), and
+    [Id_or_addressable] not (yet) determined.
+
+    As an order on readings this is flat and partial: [Addressable] and [Id] are
+    incomparable (the operator is a modifier, not a narrowing), and both are
+    below [Id_or_addressable]. Accordingly, [meet] is partial. This is also not
+    an [Axis.t]: it is not part of the mod- or with-bounds, but rather a
+    component of layouts. *)
 module Addressability : sig
-  type t =
-    | Addressable
-    | Unaddressable
-    | Maybe_addressable
+  module Action : sig
+    type t =
+      | Id
+      | Addressable
 
-  val max : t
+    val equal : t -> t -> bool
+
+    (** Only [Addressable] is ever printed in user-facing output. *)
+    val to_string : t -> string
+
+    val print : Format_doc.formatter -> t -> unit
+  end
+
+  type t =
+    | Id
+    | Addressable
+    | Id_or_addressable
 
   val equal : t -> t -> bool
 
@@ -81,15 +106,27 @@ module Addressability : sig
 
   val le : t -> t -> bool
 
-  (** [meet Addressable Unaddressable] is [None]; [Maybe_addressable] is the
-      identity. *)
+  (** [meet Addressable Id] is [None]; [Id_or_addressable] is the identity. *)
   val meet : t -> t -> t option
 
-  (** The addressability of a product of kinds with the given addressabilities:
-      [Addressable] iff all components are addressable, [Unaddressable] if any
-      component is unaddressable, and otherwise [Maybe_addressable]. This is not
-      the [meet] of the components. *)
+  (** The reading of a product of kinds from its components' readings: [Id] (not
+      addressable) if any component is, otherwise [Id_or_addressable] if any
+      component is undetermined, otherwise [Addressable]. This is not the [meet]
+      of the components. *)
   val combine_product : t list -> t
+
+  (** The reading of an action stored on a node whose carrier's intrinsic
+      addressability is undetermined ([any], an abstract kind, or an unfilled
+      sort variable): applying no action leaves the addressability undetermined.
+      Also the slot a flexible sort-variable bound gets when an [any] bound's
+      action is transferred onto it. *)
+  val of_action_on_undetermined : Action.t -> t
+
+  (** The action recorded in a [Sort] node's slot, forgetting the join. Used
+      when flattening a product sort into a [Product] node, whose root carries
+      only an action: the join, if any, moves onto the fabricated components
+      instead. *)
+  val forget_join : t -> Action.t
 
   (** Only [Addressable] is ever printed in user-facing output. *)
   val to_string : t -> string
