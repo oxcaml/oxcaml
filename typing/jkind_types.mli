@@ -201,13 +201,15 @@ module Layout : sig
       the [addressable] kind operator. [Product] and [Any] nodes carry a
       two-state action: marked ([Addressable]) or unmarked ([Id]; an unmarked
       product derives its addressability from its components at read time, and
-      an unmarked [any] is the top kind). [Sort] nodes (and [Const.Base]) carry
-      a full [Addressability.t]: [Addressable] when the base is intrinsically
-      addressable or the node was marked, [Id] for a plain unaddressable base,
-      and [Id_or_addressable] - the join of the layout and its marked form - for
-      flexible sort-variable bounds (fresh variables and product decompositions,
-      the analog of [Scannable_axes.max] there). See the comment on the
-      implementation's [Layout.t] for the full invariants. *)
+      an unmarked [any] is the top kind). [Sort] nodes (and the [Const.Base],
+      [Const.Univar], and [Const.Genvar] snapshots) carry a full
+      [Addressability.t]: [Addressable] when the base is intrinsically
+      addressable or the node was marked, [Id] for an exactly-plain kind, and
+      [Id_or_addressable] - the join of the layout and its marked form - for
+      flexible bounds (fresh variables, and the components of decomposed
+      products whose own root is the join; the analog of [Scannable_axes.max]
+      there). See the comment on the implementation's [Layout.t] for the full
+      invariants. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t

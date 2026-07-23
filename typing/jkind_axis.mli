@@ -66,15 +66,17 @@ end
     nodes store exactly an action.
 
     [t] adds a third value, [Id_or_addressable], denoting the *join* of a layout
-    [L] and [L addressable]. It is stored only on [Sort] nodes (and their
-    [Const.Base] snapshots), where it arises as the flexible bound of a fresh
-    sort variable: such a bound must admit both [L] and [L addressable] for
-    whatever [L] the variable resolves to, and it persists after the variable
-    resolves, since resolving a sort determines neither branch of the join. [t]
-    is also the result type of addressability *readings* of a kind: there
-    [Addressable] means definitely addressable, [Id] definitely not (the
-    identity action on an intrinsically unaddressable carrier), and
-    [Id_or_addressable] not (yet) determined.
+    [L] and [L addressable]. It is stored only on [Sort] nodes and the constant
+    snapshots of sorts and layout variables ([Const.Base], [Const.Univar],
+    [Const.Genvar]), where it arises for flexible bounds: a fresh sort
+    variable's bound (or a component fabricated when decomposing a product
+    whose own root slot is the join; see [decomposed_component]) must admit
+    both [L] and [L addressable] for whatever [L] the variable resolves to, and
+    it persists after the variable resolves, since resolving a sort determines
+    neither branch of the join. [t] is also the result type of addressability
+    *readings* of a kind: there [Addressable] means definitely addressable,
+    [Id] definitely not (the identity action on an intrinsically unaddressable
+    carrier), and [Id_or_addressable] not (yet) determined.
 
     As an order on readings this is flat and partial: [Addressable] and [Id] are
     incomparable (the operator is a modifier, not a narrowing), and both are

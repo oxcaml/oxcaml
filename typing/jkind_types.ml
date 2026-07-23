@@ -1051,18 +1051,21 @@ module Layout = struct
      [(bits8 & bits16) addressable]) is distinct from marking its components.
      [Id] on [Any] is the top kind [any].
 
-     [Sort] nodes (and [Const.Base]) carry a full [Addressability.t], whose
-     third value [Id_or_addressable] denotes the JOIN of the layout and its
-     marked form. The join is introduced only as the flexible bound of a
-     fresh sort variable ([of_new_sort_var], product decompositions and
-     flattenings, and transfers of an [any] bound's action onto a variable),
-     which must admit both [L] and [L addressable] for whatever [L] the
-     variable resolves to. The join persists after its variable resolves:
-     sorts do not carry addressability, so filling the variable with [bits8]
-     leaves the kind the join of [bits8] and [bits8 addressable]. Readers
-     collapse the join only when the resolved sort is intrinsically
-     addressable, where the two branches denote the same kind (see
-     [Jkind.Layout.addressability]).
+     [Sort] nodes (and the [Const.Base], [Const.Univar], and [Const.Genvar]
+     snapshots) carry a full [Addressability.t], whose third value
+     [Id_or_addressable] denotes the JOIN of the layout and its marked form.
+     The join is introduced only for flexible bounds - fresh sort variables
+     ([of_new_sort_var]), transfers of an [any] bound's action onto a
+     variable, and the components fabricated when decomposing or flattening
+     a product whose root slot is itself the join
+     ([Addressability.decomposed_component]; exact roots get exactly-plain
+     components) - which must admit both [L] and [L addressable] for
+     whatever [L] the variable resolves to. The join persists after its
+     variable resolves: sorts do not carry addressability, so filling the
+     variable with [bits8] leaves the kind the join of [bits8] and
+     [bits8 addressable]. Readers collapse the join only when the resolved
+     sort is intrinsically addressable, where the two branches denote the
+     same kind (see [Jkind.Layout.addressability]).
 
      Construction invariants:
      - A [Sort]/[Const.Base] node of an intrinsically addressable base
