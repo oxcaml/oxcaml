@@ -3080,6 +3080,7 @@ module Format_history = struct
     | Class_field -> fprintf ppf "it's the type of a class field"
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
+    | Unboxed_variant -> fprintf ppf "it's an unboxed variant type"
     | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"
     | Primitive id ->
@@ -4100,6 +4101,7 @@ module Debug_printers = struct
     | Class_field -> fprintf ppf "Class_field"
     | Boxed_record -> fprintf ppf "Boxed_record"
     | Boxed_variant -> fprintf ppf "Boxed_variant"
+    | Unboxed_variant -> fprintf ppf "Unboxed_variant"
     | Boxed -> fprintf ppf "Boxed"
     | Extensible_variant -> fprintf ppf "Extensible_variant"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)

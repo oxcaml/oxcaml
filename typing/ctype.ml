@@ -3084,21 +3084,28 @@ and estimate_unboxed_product_jkind
   Jkind.Builtin.product ~why tys_modalities layouts
 
 let rec estimate_type_jkind_unwrapped
-      level ~expand_components env ~unwrapped_ty =
+      level ~expand_components ~ignore_mod_bounds env ~unwrapped_ty =
   match
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds:false env
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds env
       unwrapped_ty.ty
     |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
   with
   | Ok jkind -> jkind
   | Error prev_unwrapped_ty ->
-    estimate_type_jkind_unwrapped level ~expand_components env
-      ~unwrapped_ty:prev_unwrapped_ty
+    estimate_type_jkind_unwrapped level ~expand_components ~ignore_mod_bounds
+      env ~unwrapped_ty:prev_unwrapped_ty
 
-let type_jkind env ty =
+let type_jkind ~ignore_mod_bounds env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
-    ~expand_components:true env
+    ~expand_components:true ~ignore_mod_bounds env
+
+let type_jkind_base env ty =
+  let jkind = type_jkind ~ignore_mod_bounds:true env ty in
+  jkind.jkind.base
+
+let type_jkind env ty =
+  type_jkind ~ignore_mod_bounds:false env ty
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)

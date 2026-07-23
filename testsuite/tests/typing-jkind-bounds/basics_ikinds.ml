@@ -1139,8 +1139,8 @@ type t : any mod portable = Foo of t_value [@@unboxed]
 Line 1, characters 0-54:
 1 | type t : any mod portable = Foo of t_value [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the definition of t_value at line 1, characters 0-20.
+Error: The kind of type "t" is value mod everything mod dynamic with t_value
+         because it's an unboxed variant type.
        But the kind of type "t" must be a subkind of any mod portable
          because of the annotation on the declaration of the type t.
 |}]
@@ -1161,8 +1161,7 @@ Lines 1-2, characters 0-66:
 1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
 2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
 Error: The layout of type "t" is value
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+         because it's an unboxed variant type.
        But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -1211,7 +1210,7 @@ Lines 1-2, characters 0-65:
 1 | type ('a : value mod external_) t : immediate =
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
 Error: The layout of type "t" is value
-         because of the annotation on 'a in the declaration of the type t.
+         because it's an unboxed variant type.
        But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
@@ -1537,9 +1536,8 @@ type 'a t : value mod global = Foo of 'a [@@unboxed]
 Line 1, characters 0-52:
 1 | type 'a t : value mod global = Foo of 'a [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because it instantiates an unannotated type parameter of t,
-         chosen to have kind value.
+Error: The kind of type "t" is value mod everything mod dynamic with 'a
+         because it's an unboxed variant type.
        But the kind of type "t" must be a subkind of value mod global
          because of the annotation on the declaration of the type t.
 |}]
