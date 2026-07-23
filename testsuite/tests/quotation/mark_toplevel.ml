@@ -3,8 +3,8 @@
  expect;
 *)
 
-(* Test the [#mark_toplevel_in_quotations] directive,
-   intended for making names available as top-level in quotation tests. *)
+(* Test the [#mark_persistent_in_quotations] directive,
+   intended for making names available as persistent in quotation tests. *)
 
 #syntax quotations on
 
@@ -13,7 +13,7 @@ type t = int
 [%%expect {|
 type t = int
 |}];;
-(* Fails, as [t] is not top-level *)
+(* Fails, as [t] is not persistent *)
 let (x : <[t]> expr) = <[42]>
 [%%expect {|
 Line 1, characters 11-12:
@@ -23,9 +23,9 @@ Error: Identifier "t" is used at line 1, characters 11-12,
        inside a quotation (<[ ... ]>);
        it is introduced at line 1, characters 0-12, outside any quotations.
 |}];;
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
-(* [t] is now considered top-level *)
+(* [t] is now considered persistent *)
 let (x : <[t]> expr) = <[42]>
 [%%expect {|
 val x : <[t]> expr = <[42]>
@@ -64,7 +64,7 @@ Error: Identifier "M" is used at line 1, characters 14-15,
        inside a quotation (<[ ... ]>);
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 let id (x : <[M.t]> expr) = x
 [%%expect {|
@@ -105,7 +105,7 @@ Error: Constructor "X" used at line 1, characters 11-12
        "X" is not defined inside a quotation (<[ ... ]>).
 Hint: Constructor "X" is defined outside any quotations.
 |}];;
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 let r = <[ { x = 42 } ]>
 [%%expect {|

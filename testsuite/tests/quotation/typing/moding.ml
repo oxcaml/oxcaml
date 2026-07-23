@@ -33,7 +33,7 @@ module M :
     val send : 'a @ portable -> unit
   end
 |}]
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 (** Splicing non-legacy expressions **)
 

@@ -14,7 +14,7 @@ end = struct
   let of_local _ = <[()]>
   let of_global _ = <[()]>
 end
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 [%%expect{|
 module M :
   sig

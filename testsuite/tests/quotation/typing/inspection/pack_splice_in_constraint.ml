@@ -11,7 +11,7 @@ module type S = sig
   val x : t
   val i : int
 end
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 [%%expect {|
 type t
 module type S = sig type t val x : t val i : int end
