@@ -1311,7 +1311,12 @@ let out_jkind_option_of_jkind ~ignore_null env jkind =
   let elide =
     Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
     || (match desc.base with
-        | Layout (Sort (Var _, _, _)) -> not !Clflags.verbose_types (* X1 *)
+        | Layout (Sort (Var _, _, a)) -> (
+          (* X1; but an [addressable] constraint is load-bearing, so it is
+             shown even when unconstrained sort-variable kinds are elided. *)
+          match (a : Jkind.Addressability.t) with
+          | Addressable -> false
+          | Id | Id_or_addressable -> not !Clflags.verbose_types)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)

@@ -136,10 +136,12 @@ module Addressability : sig
   val forget_join : t -> Action.t
 
   (** The slot fabricated for the components of a decomposed sort-backed product
-      whose root slot is the argument: a flexible root (the join) constrains its
-      components not at all, while an exact root has exactly-plain components
-      ([Id] is the plain product, and [Addressable] is the whole-product mark,
-      which does not distribute to the components). *)
+      whose root slot is the argument. An [Id] root is exactly the plain
+      product, so its components are exactly plain. The other roots put no
+      constraint on individual components: the join admits everything, and
+      [Addressable] - the constraint that the kind be addressable - is enforced
+      by the root check rather than distributed, since both a whole-marked
+      product and one whose components are all addressable satisfy it. *)
   val decomposed_component : t -> t
 
   (** Only [Addressable] is ever printed in user-facing output. *)

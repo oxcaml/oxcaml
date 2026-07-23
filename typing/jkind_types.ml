@@ -1074,14 +1074,23 @@ module Layout = struct
      - On an unaddressable base, [Id] and [Addressable] mean exactly the
        plain and the marked kind.
      - On an unfilled *flexible* variable the slot is [Id_or_addressable]
-       or, once constrained, [Addressable]. An [Id] slot on an unfilled
-       variable arises only from *rigid* stand-ins (lpoly layout variables;
-       see [Typetexp]) and the instance copies used to match them, and means
-       exactly the plain kind: [x] and [x addressable] are incomparable
-       while [x] is unknown, and readers collapse either to the marked kind
-       once [x] resolves intrinsically addressable. Meets treat the
-       rigid-unknown mismatch as "not definitely disjoint"
-       ([Jkind.Layout.has_intersection]). *)
+       or, once constrained, [Addressable] - the latter being the upper
+       bound "some addressable kind at this sort", which at a product sort
+       admits both the whole-marked product and any product of addressable
+       components (see [Addressability.decomposed_component]). An [Id] slot
+       on an unfilled variable arises only from *rigid* stand-ins (lpoly
+       layout variables; see [Typetexp]) and the instance copies used to
+       match them, and means exactly the plain kind: [x] and
+       [x addressable] are incomparable while [x] is unknown, and readers
+       collapse either to the marked kind once [x] resolves intrinsically
+       addressable. Meets treat the rigid-unknown mismatch as "not
+       definitely disjoint" ([Jkind.Layout.has_intersection]).
+       CR-someday rtjoa: a rigid [x addressable] transfers as [Addressable]
+       too, where it ought to mean exactly the whole-marked product once [x]
+       is instantiated at a product sort; the exact and upper-bound readings
+       of [Addressable] will need to be distinguished (e.g. a fourth slot
+       value) when instantiating layout variables at products becomes
+       supported. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t
