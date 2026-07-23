@@ -362,10 +362,12 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
       let _, _, newenv = type_open_ Override env loc {txt;loc} in
       newenv
     with
-    | Typetexp.Error.In_context _
+    | (Typetexp.Error.In_context _
     | Cmi_format.Error _
     | Env.Error.In_context _
-    | Persistent_env.Error _ when !Clflags.typing_recovery -> env
+      | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
+        Typing_recovery.log_or_raise exn;
+        env
   in
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
@@ -3546,17 +3548,26 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
           | _ -> Includemod.Anonymous_functor
         in
-        raise(Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args})
+        Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args}
       in
       begin match app_view with
-      | { arg = None; _ } -> apply_error ()
+      | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
+          Typing_recovery.log_or_raise (apply_error ());
+          { mod_desc = Tmod_apply_unit(funct);
+            mod_type = mty_res;
+            mod_env = env;
+            mod_attributes = app_attributes;
+            mod_loc = app_loc;
+            mod_mode = Value.(disallow_right min), None }, funct_shape
       | { loc = app_loc; attributes = app_attributes;
           arg = Some { shape = arg_shape; path = arg_path; arg } } ->
           let coercion =
             try Includemod.modtypes ~loc:arg.mod_loc ~mark:true env
                   arg.mod_type mty_param
                   ~modes:(Specific (arg.mod_mode, mm_param))
-            with Includemod.Error _ -> apply_error ()
+            with Includemod.Error _ ->
+              Typing_recovery.log_or_raise (apply_error ());
+              Tcoerce_none
           in
           let mty_appl =
             match arg_path with

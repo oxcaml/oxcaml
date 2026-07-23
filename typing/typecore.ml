@@ -341,8 +341,10 @@ module Error : sig
 end = struct
   type exn += In_context of Location.t * Env.t * error
 
-  let deep_copy_package copy pack_path pack_constraints =
-    (pack_path, List.map (fun (l, tl) -> l, copy tl) pack_constraints)
+  let deep_copy_package copy {pack_path; pack_cstrs} =
+    {pack_path;
+     pack_cstrs =
+       List.map (fun (l, tl) -> l, copy tl) pack_cstrs}
 
   (* The goal of [deep_copy_desc/deep_copy] is to obtain a fully
      independent copy of a type, including all nested structure,
@@ -384,10 +386,8 @@ end = struct
         Tobject (copy t1, ref r)
     | Tfield (s,fk,t1,t2) -> Tfield (s, fk, copy t1, copy t2)
     | Tpoly (t,tl) -> Tpoly (copy t, List.map copy tl)
-    | Tpackage {pack_path; pack_cstrs} ->
-        let (pack_path, pack_cstrs) =
-          deep_copy_package copy pack_path pack_cstrs in
-        Tpackage {pack_path; pack_cstrs}
+    | Tpackage package ->
+        Tpackage (deep_copy_package copy package)
     | Tquote t -> Tquote (copy t)
     | Tsplice t -> Tsplice (copy t)
     | Tquote_eval t -> Tquote_eval (copy t)
@@ -5049,76 +5049,82 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
     | [] -> ty_fun, mode_fun, List.rev rev_args
     | (lbl, sarg) :: rest ->
         let (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res) =
-          let ty_fun = expand_head env ty_fun in
-          match get_desc ty_fun with
-          | Tvar { jkind; _ } ->
-              let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
-              let ty_arg = newmono ty_arg_mono in
-              let ty_res =
-                newvar (Jkind.of_new_sort ~why:Function_result
-                          ~level:(Ctype.get_current_level ()))
-              in
-              if ret_tvar &&
-                 not (is_prim ~name:"%identity" funct) &&
-                 not (is_prim ~name:"%obj_magic" funct) &&
-                 (not !Clflags.typing_recovery
-                  || not (Typing_recovery_state.erroneous_expr_check funct))
-              then
-                Location.prerr_warning sarg.pexp_loc
-                  Warnings.Ignored_extra_argument;
-              let mode_arg = Alloc.newvar () in
-              let mode_ret = Alloc.newvar () in
-              let kind = (lbl, mode_arg, mode_ret) in
-              begin try
-                unify env ty_fun
-                  (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
-              with
-              | Unify _ ->
-                (* need to calculate a location containing the function
-                   and any arguments already processed *)
-                let locs =
-                  funct.exp_loc :: sarg.pexp_loc ::
-                  List.filter_map get_arg_loc rev_args
+          try
+            let ty_fun = expand_head env ty_fun in
+            match get_desc ty_fun with
+            | Tvar { jkind; _ } ->
+                let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
+                let ty_arg = newmono ty_arg_mono in
+                let ty_res =
+                  newvar (Jkind.of_new_sort ~why:Function_result
+                            ~level:(Ctype.get_current_level ()))
                 in
-                let loc = Location.merge ~ghost:false locs in
-                let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
-                Error.log_and_raise loc env
-                  (Impossible_function_jkind
-                     { some_args_ok; ty_fun; jkind })
-              end;
-              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
-        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
-          when labels_match ~param:l ~arg:lbl ->
-            let sort_arg =
-              match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
-              with
-              | Ok sort -> sort
-              | Error err ->
-                  Error.log_and_raise funct.exp_loc env
-                    (Function_type_not_rep (ty_arg,err))
-            in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
-        | td ->
-            let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
-            let ty_res =
-              remaining_function_type_for_error ty_fun mode_fun rev_args
-            in
-            match get_desc ty_res with
-            | Tarrow _ ->
-                if !Clflags.classic || not (has_label lbl ty_fun) then
-                  Error.log_and_raise sarg.pexp_loc env
-                    (Apply_wrong_label(lbl, ty_res, false))
-                else
-                  Error.log_and_raise funct.exp_loc env Incoherent_label_order
-            | _ ->
-                Error.log_and_raise funct.exp_loc env
-                  (Apply_non_function {
-                      funct;
-                      func_ty = expand_head env funct.exp_type;
-                      res_ty = expand_head env ty_res;
-                      previous_arg_loc = previous_arg_loc rev_args ~funct;
-                      extra_arg_loc = sarg.pexp_loc; })
+                if ret_tvar &&
+                   not (is_prim ~name:"%identity" funct) &&
+                   not (is_prim ~name:"%obj_magic" funct) &&
+                   (not !Clflags.typing_recovery
+                    || not (Typing_recovery_state.erroneous_expr_check funct))
+                then
+                  Location.prerr_warning sarg.pexp_loc
+                    Warnings.Ignored_extra_argument;
+                let mode_arg = Alloc.newvar () in
+                let mode_ret = Alloc.newvar () in
+                let kind = (lbl, mode_arg, mode_ret) in
+                begin try
+                  unify env ty_fun
+                    (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
+                with
+                | Unify _ ->
+                    (* need to calculate a location containing the function
+                       and any arguments already processed *)
+                    let locs =
+                      funct.exp_loc :: sarg.pexp_loc ::
+                      List.filter_map get_arg_loc rev_args
+                    in
+                    let loc = Location.merge ~ghost:false locs in
+                    let some_args_ok = not (Misc.Stdlib.List.is_empty rev_args) in
+                    Error.log_and_raise loc env
+                      (Impossible_function_jkind
+                         { some_args_ok; ty_fun; jkind })
+                end;
+                (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
+            | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
+              when labels_match ~param:l ~arg:lbl ->
+                let sort_arg =
+                  match
+                    type_sort ~why:Function_argument ~fixed:false env ty_arg
+                  with
+                  | Ok sort -> sort
+                  | Error err ->
+                      Error.log_and_raise funct.exp_loc env
+                        (Function_type_not_rep (ty_arg,err))
+                in
+                (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+            | td ->
+                let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
+                let ty_res =
+                  remaining_function_type_for_error ty_fun mode_fun rev_args
+                in
+                match get_desc ty_res with
+                | Tarrow _ ->
+                    if !Clflags.classic || not (has_label lbl ty_fun) then
+                      Error.log_and_raise sarg.pexp_loc env
+                        (Apply_wrong_label(lbl, ty_res, false))
+                    else
+                      Error.log_and_raise funct.exp_loc env Incoherent_label_order
+                | _ ->
+                    Error.log_and_raise funct.exp_loc env
+                      (Apply_non_function {
+                          funct;
+                          func_ty = expand_head env funct.exp_type;
+                          res_ty = expand_head env ty_res;
+                          previous_arg_loc = previous_arg_loc rev_args ~funct;
+                          extra_arg_loc = sarg.pexp_loc; })
+          with Error.In_context _ when !Clflags.typing_recovery ->
+            Typing_recovery.erroneous_type_register ty_fun;
+            let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
+            kind_arg, Mode.Alloc.newvar (), ty_arg,
+            Mode.Alloc.newvar (), ty_fun
         in
         let arg =
           Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }
@@ -10252,7 +10258,7 @@ and type_label_exp
   if is_poly then check_univars env "field value" arg label.lbl_arg vars;
   (lid, label, {arg with exp_type = instance arg.exp_type})
 
-and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
+and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
       ty_expected' ty_expected =
   (* ty_expected' may be generic *)
   let no_labels ty =
@@ -10451,7 +10457,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       in
       Location.prerr_warning texp.exp_loc
         (Warnings.Eliminated_optional_arguments
-           (List.map (fun (l, _) -> Printtyp.string_of_label l) args));
+            (List.map (fun (l, _) -> Printtyp.string_of_label l) args));
       if warn then Location.prerr_warning texp.exp_loc
           (Warnings.Non_principal_labels "eliminated omittable argument");
       (* let-expand to have side effects *)
@@ -10480,6 +10486,48 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         (mk_expected ?explanation ty_expected') in
       unify_exp ~sexp:sarg env texp ty_expected;
       texp
+
+and type_argument ?explanation ?recarg ~overwrite env mode sarg ty_expected' ty_expected =
+  let delayed () =
+    type_argument_ ?explanation ?recarg ~overwrite env mode
+      sarg ty_expected' ty_expected
+  in
+  if !Clflags.typing_recovery then
+    Typing_recovery_state.with_saved_types (fun () ->
+        try delayed ()
+        with exn when Typing_recovery.is_recoverable exn ->
+          Typing_recovery.erroneous_type_register ty_expected;
+          let loc = sarg.pexp_loc in
+          let exp =
+            Texp_ident
+              { path = Path.Pident (Ident.create_local "*type-error*");
+                lid = Location.mkloc (Longident.Lident "*type-error*") loc;
+                desc = {
+                  val_type = ty_expected;
+                  val_kind =
+                    Val_reg (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
+                  val_lpoly = Lpoly.determined [];
+                  val_loc = loc;
+                  val_attributes = [];
+                  val_uid = Uid.internal_not_actually_unique;
+                  val_zero_alloc = Zero_alloc.default;
+                  val_modalities = Modality.of_const Modality.Const.id
+                };
+                kind = Id_value;
+                unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
+                              Linearity.disallow_right Linearity.legacy);
+                mode = Mode.Value.disallow_right Mode.Value.legacy
+              }
+          in
+          { exp_desc = exp;
+            exp_loc = loc;
+            exp_extra = [];
+            exp_type = ty_expected;
+            exp_env = env;
+            exp_attributes =
+              Typing_recovery_state.recovery_attributes sarg.pexp_attributes
+          })
+  else delayed ()
 
 (* See Note [Type-checking applications] for an overview *)
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
