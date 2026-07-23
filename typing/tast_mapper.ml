@@ -910,13 +910,14 @@ let module_expr sub x =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
-    | Tmod_functor (arg, mexpr) ->
-        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
-    | Tmod_apply (mexp1, mexp2, c) ->
+    | Tmod_functor (arg, mexpr, s) ->
+        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr, s)
+    | Tmod_apply (mexp1, mexp2, c, s) ->
         Tmod_apply (
           sub.module_expr sub mexp1,
           sub.module_expr sub mexp2,
-          sub.module_coercion sub c
+          sub.module_coercion sub c,
+          s
         )
     | Tmod_apply_unit mexp1 ->
         Tmod_apply_unit (sub.module_expr sub mexp1)

@@ -631,8 +631,9 @@ and functor_parameter =
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr
-  | Tmod_apply of module_expr * module_expr * module_coercion
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
+  | Tmod_apply of module_expr * module_expr * module_coercion *
+                  Mode.Staticity.r
   | Tmod_apply_unit of module_expr
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion

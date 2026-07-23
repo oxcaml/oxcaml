@@ -386,7 +386,7 @@ module M : sig val x : bool @@ dynamic end
 let x = Random.bool ()
 
 (* functor can always be defined to be static, even if close over dynamic things *)
-module (F @ static) (M : sig end) = struct
+module (F @ static) (M : sig end @ static) = struct
     let x = x
 end
 [%%expect{|
@@ -418,17 +418,187 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
-(* functor application are always dynamic. *)
-(* CR-soon zqian: remove this restriction *)
-module F (X : sig end) = struct
-end
+(* Staticity interacts with functors in two ways:
+   - a functor's own staticity, equal to its parameter's (generative functors
+     are always dynamic).
+   - the staticity of an application's result, which is the join of the
+     functor's staticity and its declared return staticity - so the result is
+     static only if both are. *)
+
+(* A static functor takes a static parameter. *)
+module (F @ static) (X : sig end @ static) = struct end
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+|}]
+
+(* Static functor, dynamic (unannotated) parameter: a contradiction. The error
+   relates the functor and its parameter. *)
+module (F @ static) (X : sig end) = struct end
+[%%expect{|
+Line 1, characters 20-46:
+1 | module (F @ static) (X : sig end) = struct end
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module is "dynamic"
+         because it shares the staticity of the functor parameter at line 1, characters 21-22
+         which is "dynamic".
+       However, the module highlighted is expected to be "static".
+|}]
+
+(* Likewise with an explicitly dynamic parameter. *)
+module (F @ static) (X : sig end @ dynamic) = struct end
+[%%expect{|
+Line 1, characters 20-56:
+1 | module (F @ static) (X : sig end @ dynamic) = struct end
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module is "dynamic"
+         because it shares the staticity of the functor parameter at line 1, characters 21-22
+         which is "dynamic".
+       However, the module highlighted is expected to be "static".
+|}]
+
+(* [@ dynamic] is only an upper bound; a static parameter still typechecks. *)
+module (F @ dynamic) (X : sig end @ static) = struct end
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+|}]
+
+(* Generative functors are always dynamic. *)
+module (F @ static) () = struct end
+[%%expect{|
+Line 1, characters 20-35:
+1 | module (F @ static) () = struct end
+                        ^^^^^^^^^^^^^^^
+Error: The module is "dynamic" because generative functors are always dynamic.
+       However, the module highlighted is expected to be "static".
+|}]
+
+(* A functor type declares its return's staticity independently of the
+   functor's own: a dynamic functor returning a static result... *)
+module F : functor (X : sig end) -> sig end @ static =
+  functor (X : sig end) -> struct end
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+|}]
+
+(* ...and a static functor returning a dynamic result. *)
+module F : functor (X : sig end @ static) -> sig end @ dynamic =
+  functor (X : sig end @ static) -> struct end
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+|}]
+
+(* A [module (_ @ static)] binding checks the result. Here
+   the return is not static, so the result is dynamic though F is static, and
+   the binding fails. *)
+module (F @ static) (X : sig end @ static) = struct end
+module (Y @ static) = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+Line 2, characters 22-35:
+2 | module (Y @ static) = F(struct end)
+                          ^^^^^^^^^^^^^
+Error: The module is "dynamic" but is expected to be "static".
+|}]
+
+(* Dually, a static return does not help when the functor is
+   dynamic: the result joins in the functor's staticity, so it stays dynamic. *)
+module F : functor (X : sig end) -> sig end @ static =
+  functor (X : sig end) -> struct end
 module (Y @ static) = F(struct end)
 [%%expect{|
 module F : functor (X : sig end) -> sig end
 Line 3, characters 22-35:
 3 | module (Y @ static) = F(struct end)
                           ^^^^^^^^^^^^^
+Error: The module is "dynamic"
+         because it shares the staticity of the functor parameter at line 2, characters 11-12
+         which is "dynamic".
+       However, the module highlighted is expected to be "static".
+|}]
+
+(* With both a static functor and a static return, the
+   result is static; still usable at a dynamic binding. *)
+module F : functor (X : sig end @ static) -> sig end @ static =
+  functor (X : sig end @ static) -> struct end
+module Y = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* A dynamic binding accepts a result of any staticity. *)
+module (F @ static) (X : sig end @ static) = struct end
+module Y = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* Applying a dynamic functor succeeds; binding its dynamic
+   result at [static] is what fails. *)
+module F (X : sig end) = struct end
+module (Y @ static) = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+Line 2, characters 22-35:
+2 | module (Y @ static) = F(struct end)
+                          ^^^^^^^^^^^^^
 Error: The module is "dynamic" but is expected to be "static".
+|}]
+
+(* The intermediate functor (the outer functor's return) is
+   dynamic by default, so it cannot satisfy the static inner parameter. *)
+module (F @ static) (A : sig end @ static) (B : sig end @ static) = struct end
+module (Y @ static) = F(struct end)(struct end)
+[%%expect{|
+module F : functor (A : sig end) (B : sig end) -> sig end
+Line 2, characters 22-35:
+2 | module (Y @ static) = F(struct end)(struct end)
+                          ^^^^^^^^^^^^^
+Error: The functor is "dynamic"
+       but is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
+|}]
+
+(* The intermediate functor is dynamic by default, matching
+   the dynamic inner parameter, so both applications succeed. *)
+module (F @ static) (A : sig end @ static) (B : sig end) = struct end
+module Y = F(struct end)(struct end)
+[%%expect{|
+module F : functor (A : sig end) (B : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* Declaring each return static makes the intermediate
+   functor and result static, so the whole curried application is static. *)
+module F :
+  functor (A : sig end @ static)
+  -> (functor (B : sig end @ static) -> sig end @ static) @ static =
+  functor (A : sig end @ static) (B : sig end @ static) -> struct end
+module (Y @ static) = F(struct end)(struct end)
+[%%expect{|
+module F : functor (A : sig end) (B : sig end) -> sig end
+module Y : sig end
+|}]
+
+(* The functor's value is dynamic (implementation takes a
+   dynamic parameter) but its type promises a static parameter, so applying it
+   fails - even at a dynamic binding. *)
+module F : functor (X : sig end @ static) -> sig end =
+  functor (X : sig end) -> struct end
+module Y = F(struct end)
+[%%expect{|
+module F : functor (X : sig end) -> sig end
+Line 3, characters 11-12:
+3 | module Y = F(struct end)
+               ^
+Error: The functor is "dynamic"
+         because it shares the staticity of the functor parameter at line 2, characters 11-12
+         which is "dynamic".
+       However, the functor highlighted is expected to be "static"
+         because it shares the staticity of a functor parameter
+         which is expected to be "static".
 |}]
 
 (* persistent modules are currently dynamic. *)

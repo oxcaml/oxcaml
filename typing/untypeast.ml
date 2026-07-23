@@ -1013,10 +1013,10 @@ let module_expr (sub : mapper) mexpr =
         let desc = match mexpr.mod_desc with
             Tmod_ident (_p, lid) -> Pmod_ident (map_loc sub lid)
           | Tmod_structure st -> Pmod_structure (sub.structure sub st)
-          | Tmod_functor (arg, mexpr) ->
+          | Tmod_functor (arg, mexpr, _) ->
               Pmod_functor
                 (functor_parameter sub arg, sub.module_expr sub mexpr)
-          | Tmod_apply (mexp1, mexp2, _) ->
+          | Tmod_apply (mexp1, mexp2, _, _) ->
               Pmod_apply (sub.module_expr sub mexp1,
                           sub.module_expr sub mexp2)
           | Tmod_apply_unit mexp1 ->

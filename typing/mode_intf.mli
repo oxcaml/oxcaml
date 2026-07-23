@@ -205,6 +205,10 @@ module type Common_axis = sig
   type 'd hint_const constraint 'd = 'l * 'r
 
   val of_const : ?hint:'d hint_const -> Const.t -> 'd t
+
+  type 'd hint_morph constraint 'd = 'l * 'r
+
+  val apply_hint : 'd hint_morph -> 'd t -> 'd t
 end
 
 module type Axis = sig
@@ -360,6 +364,7 @@ module type S = sig
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_const := 'd pos_hint_const
+         and type 'd hint_morph := 'd pos_hint_morph
   end
 
   module type Common_axis_neg = sig
@@ -370,6 +375,7 @@ module type S = sig
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
          and type 'd hint_const := 'd neg_hint_const
+         and type 'd hint_morph := 'd neg_hint_morph
   end
 
   module Locality : sig
