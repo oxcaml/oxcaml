@@ -40,8 +40,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
           | 0 -> k4
           | 1 -> k5)
          where k5 =
-           let Pmakeblock =
-             %block.[`0`].my_alloc_region.`local`[`region`] (a)
+           let Pmakeblock = %block.[`0`].my_alloc_region.local[`region`] (a)
            in
            cont k3
                   (Pmakeblock,
@@ -58,7 +57,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                | 1 -> k5)
               where k5 =
                 let Pmakeblock =
-                  %block.[`0`].my_alloc_region.`local`[`region`] (b)
+                  %block.[`0`].my_alloc_region.local[`region`] (b)
                 in
                 cont k3
                        (Pmakeblock,
@@ -69,7 +68,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                         b)
               where k4 =
                 let Pmakeblock =
-                  %block.[`1`].my_alloc_region.`local`[`region`] (a, b)
+                  %block.[`1`].my_alloc_region.local[`region`] (a, b)
                 in
                 cont k3
                        (Pmakeblock,

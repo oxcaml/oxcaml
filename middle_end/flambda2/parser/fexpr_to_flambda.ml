@@ -175,14 +175,15 @@ let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
 let alloc_mode_for_applications env
     (alloc : Fexpr.region Fexpr.alloc_mode_for_applications) =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = find_region env alloc_region in
-    Alloc_mode.For_applications.heap ~alloc_region
-  | Local { alloc_region; region; ghost_region } ->
+    Alloc_mode.For_applications.not_alloc_stack ~alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = find_region env alloc_region in
     let region = find_region env region in
     let ghost_region = find_region env ghost_region in
-    Alloc_mode.For_applications.local ~alloc_region ~region ~ghost_region
+    Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+      ~ghost_region
 
 let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
@@ -720,12 +721,12 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           in
           let my_alloc_mode, env =
             match region_vars with
-            | Heap { alloc_region } ->
+            | Not_alloc_stack { alloc_region } ->
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
               in
-              Alloc_mode.For_applications.heap ~alloc_region, env
-            | Local { alloc_region; region; ghost_region } ->
+              Alloc_mode.For_applications.not_alloc_stack ~alloc_region, env
+            | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
               let alloc_region, _duid, env =
                 fresh_var env alloc_region Flambda_kind.region
               in
@@ -735,8 +736,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let ghost_region, _duid, env =
                 fresh_var env ghost_region Flambda_kind.region
               in
-              ( Alloc_mode.For_applications.local ~alloc_region ~region
-                  ~ghost_region,
+              ( Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region
+                  ~region ~ghost_region,
                 env )
           in
           let my_depth, _my_depth, env =
@@ -770,8 +771,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         in
         let result_mode =
           match result_mode with
-          | Heap -> Lambda.alloc_heap
-          | Local -> Lambda.alloc_local
+          | Not_alloc_stack -> Lambda.not_alloc_stack
+          | Maybe_alloc_stack -> Lambda.maybe_alloc_stack
         in
         let recursive = convert_recursive_flag recursive in
         let inline =
@@ -839,7 +840,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         arities
       } ->
     let continuation = find_result_cont env continuation in
-    let alloc_mode = alloc_mode_for_applications env alloc_mode in
+    let return_mode = alloc_mode_for_applications env alloc_mode in
     let call_kind, args_arity, return_arity =
       match call_kind with
       | Function (Direct { code_id; function_slot = _ }) ->
@@ -936,8 +937,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~alloc_mode Debuginfo.none ~inlined
-        ~inlining_state ~probe:None ~position:Normal
+        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
+        ~inlined ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply

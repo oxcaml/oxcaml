@@ -224,7 +224,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_10)
   let `region` = %begin_region () in
   let prim = %untag_imm (n) in
   let prim_1 = %num_conv.[`imm`].[`int64`] (prim) in
-  let b = %box_num.`int64`.my_alloc_region.`local`[`region`] (prim_1) in
+  let b = %box_num.`int64`.my_alloc_region.local[`region`] (prim_1) in
   let read = closure read_11_1 @read &my_alloc_region &`region`
   with { b = b }
   in
@@ -266,7 +266,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_not_unboxed_12
   let `region` = %begin_region () in
   let prim = %untag_imm (n) in
   let prim_1 = %num_conv.[`imm`].[`int64`] (prim) in
-  let b = %box_num.`int64`.my_alloc_region.`local`[`region`] (prim_1) in
+  let b = %box_num.`int64`.my_alloc_region.local[`region`] (prim_1) in
   let read = closure read_13_1 @read_1 &my_alloc_region &`region`
   with { b_1 = b }
   in

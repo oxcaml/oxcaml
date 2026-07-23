@@ -315,8 +315,8 @@ let function_params_and_body_free_names fpb =
       in
       let regions =
         match (my_alloc_mode : Alloc_mode.For_applications.t) with
-        | Heap { alloc_region } -> [alloc_region]
-        | Local { alloc_region; region; ghost_region } ->
+        | Not_alloc_stack { alloc_region } -> [alloc_region]
+        | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
           [alloc_region; region; ghost_region]
       in
       List.fold_left
@@ -1250,7 +1250,7 @@ let rebuild_apply env apply =
              the call kind and produce an invalid. *)
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
             exn_continuation ~args ~args_arity ~return_arity ~call_kind
-            ~alloc_mode:(Apply.alloc_mode apply) (Apply.dbg apply)
+            ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1385,7 +1385,7 @@ let rebuild_apply env apply =
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
-          ~return_arity ~call_kind ~alloc_mode:(Apply.alloc_mode apply)
+          ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
           (Apply.dbg apply) ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -2189,8 +2189,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let rebuild_body () =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
-      | Heap { alloc_region } -> [alloc_region]
-      | Local { alloc_region; region; ghost_region } ->
+      | Not_alloc_stack { alloc_region } -> [alloc_region]
+      | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
         [alloc_region; region; ghost_region]
     in
     let all_vars = region_vars @ (my_closure :: Bound_parameters.vars params) in

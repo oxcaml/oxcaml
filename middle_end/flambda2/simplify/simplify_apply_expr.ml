@@ -302,7 +302,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
               ~arg_types:
                 (T.unknown_types_from_arity result_arity
                    ~alloc_mode:
-                     (Apply.alloc_mode apply
+                     (Apply.return_mode apply
                     |> Alloc_mode.For_applications.as_type)
                    ~machine_width:(DE.machine_width (DA.denv dacc)))
           in
@@ -357,7 +357,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                       (VB.create result_var result_uid NM.in_types)
                       (T.unknown_with_subkind kind
                          ~alloc_mode:
-                           (Apply.alloc_mode apply
+                           (Apply.return_mode apply
                           |> Alloc_mode.For_applications.as_type)
                          ~machine_width:(DE.machine_width denv)))
                   denv result_arity results
@@ -468,36 +468,41 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
     Function_slot.create compilation_unit ~name:"partial_app_closure"
       ~is_always_immediate:false K.value
   in
-  (* The allocation mode of the closure is directly determined by the alloc_mode
-     of the application. We check here that it is consistent with
-     [first_complex_local_param]. *)
+  (* The allocation mode of the closure is directly determined by
+     [first_complex_local_param]. We check that it is consistent with the
+     return_mode of the application *)
   let new_closure_alloc_mode_and_first_complex_local_param : _ Or_bottom.t =
     match (first_complex_local_param : First_complex_local_param.t) with
     | Index index when num_non_unarized_args <= index ->
       (* At this point, we *have* to allocate the closure on the heap, even if
-         the alloc_mode of the application was local. Indeed, consider a
-         three-argument function, of type [string -> string -> string ->
-         string], coerced to [string -> local_ t] where [type t = string ->
+         the return_mode of the application was maybe_alloc_stack. Indeed,
+         consider a three-argument function, of type [string -> string -> string
+         -> string], coerced to [string -> local_ t] where [type t = string ->
          string -> string].
 
          If we apply this function twice to single arguments, the first
-         application will have a local alloc_mode. However, the second
-         application has a heap alloc_mode, and contains a reference to the
-         partial closure made by the first application. Due to this, the first
-         application must have a closure allocated on the heap as well, even
-         though it was with a local alloc_mode. *)
+         application will have a maybe_alloc_stack return_mode. However, the
+         second application has a not_alloc_stack return_mode, and contains a
+         reference to the partial closure made by the first application. Due to
+         this, the first application must have a closure allocated on the heap
+         as well, even though it was with a maybe_alloc_stack return_mode. *)
       let alloc_region =
-        match Apply_expr.alloc_mode apply with
-        | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region
+        match Apply_expr.return_mode apply with
+        | Not_alloc_stack { alloc_region }
+        | Maybe_alloc_stack { alloc_region; _ } ->
+          alloc_region
       in
       Ok
-        ( Alloc_mode.For_applications.heap ~alloc_region,
+        ( Alloc_mode.For_allocations.heap ~alloc_region,
           First_complex_local_param.Index (index - num_non_unarized_args) )
     | Index _ -> (
-      match Apply_expr.alloc_mode apply with
-      | Heap _ -> (* This can happen in dead GADT match cases. *) Bottom
-      | Local _ as apply_alloc_mode ->
-        Ok (apply_alloc_mode, First_complex_local_param.Index 0))
+      match Apply_expr.return_mode apply with
+      | Not_alloc_stack _ ->
+        (* This can happen in dead GADT match cases. *) Bottom
+      | Maybe_alloc_stack { alloc_region; region; _ } ->
+        Ok
+          ( Alloc_mode.For_allocations.local ~alloc_region ~region,
+            First_complex_local_param.Index 0 ))
     | Never_partially_applied ->
       Misc.fatal_errorf
         "Partial application of %a, whose code metadata states that it is \
@@ -515,12 +520,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       | Heap_or_local -> ()
       | Heap -> ()
       | Local -> (
-        match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
+        match (new_closure_alloc_mode : Alloc_mode.For_allocations.t) with
         | Local _ -> ()
         | Heap _ ->
           Misc.fatal_errorf
-            "New closure alloc mode cannot be [Heap] when existing closure \
-             alloc mode is [Local]: direct partial application:@ %a"
+            "New closure alloc mode cannot be [Not_alloc_stack] when existing \
+             closure alloc mode is [Local]: direct partial application:@ %a"
             Apply.print apply));
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
       let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
@@ -604,16 +609,18 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           | Some applied_callee -> applied_callee :: applied_unarized_args
         in
         let contains_no_escaping_local_allocs =
-          match result_mode with Alloc_heap -> true | Alloc_local -> false
+          match result_mode with
+          | Not_alloc_stack -> true
+          | Maybe_alloc_stack -> false
         in
         let my_closure = Variable.create "my_closure" K.value in
         let my_alloc_mode =
           if contains_no_escaping_local_allocs
           then
-            Alloc_mode.For_applications.heap
+            Alloc_mode.For_applications.not_alloc_stack
               ~alloc_region:(Variable.create "my_alloc_region" K.region)
           else
-            Alloc_mode.For_applications.local
+            Alloc_mode.For_applications.maybe_alloc_stack
               ~alloc_region:(Variable.create "my_alloc_region" K.region)
               ~region:(Variable.create "my_region" K.region)
               ~ghost_region:(Variable.create "my_ghost_region" K.region)
@@ -639,7 +646,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
-              ~return_arity:result_arity ~call_kind ~alloc_mode:my_alloc_mode
+              ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
               dbg ~inlined:Default_inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
@@ -752,13 +759,6 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                 Some (value_slot, value))
             applied_values
           |> Value_slot.Map.of_list
-        in
-        let new_closure_alloc_mode =
-          match (new_closure_alloc_mode : Alloc_mode.For_applications.t) with
-          | Heap { alloc_region } ->
-            Alloc_mode.For_allocations.heap ~alloc_region
-          | Local { alloc_region; region; ghost_region = _ } ->
-            Alloc_mode.For_allocations.local ~alloc_region ~region
         in
         ( Set_of_closures.create ~value_slots function_decls,
           new_closure_alloc_mode,
@@ -1051,7 +1051,7 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id
@@ -1246,7 +1246,8 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         (Apply.exn_continuation apply)
         ~args ~args_arity:(Apply.args_arity apply)
         ~return_arity:(Apply.return_arity apply)
-        ~call_kind:(Apply.call_kind apply) ~alloc_mode:(Apply.alloc_mode apply)
+        ~call_kind:(Apply.call_kind apply)
+        ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined:(Apply.inlined apply) ~inlining_state
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1290,7 +1291,7 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~arg_types:
         (T.unknown_types_from_arity (Apply.return_arity apply)
            ~alloc_mode:
-             (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+             (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
            ~machine_width:(DE.machine_width denv))
   in
   let dacc, exn_cont_use_id =
@@ -1342,7 +1343,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
           let from_arity =
             T.unknown_types_from_arity return_arity
               ~alloc_mode:
-                (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
               ~machine_width:(DE.machine_width (DA.denv dacc))
           in
           match return_types with
@@ -1422,7 +1423,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id

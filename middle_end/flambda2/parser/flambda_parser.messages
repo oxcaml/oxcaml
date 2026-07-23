@@ -565,7 +565,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT LBRACK TILDE
 ##
 ## Ends in an error in state: 7.
 ##
-## subkind -> LBRACK . ctors RBRACK [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> LBRACK . ctors RBRACK [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## LBRACK
@@ -626,8 +626,8 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_VEC512 TILDE
 ##
 ## Ends in an error in state: 13.
 ##
-## naked_number_kind -> KWD_VEC512 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_VEC512 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_VEC512 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_VEC512 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_VEC512
@@ -639,8 +639,8 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_VEC256 TILDE
 ##
 ## Ends in an error in state: 15.
 ##
-## naked_number_kind -> KWD_VEC256 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_VEC256 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_VEC256 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_VEC256 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_VEC256
@@ -652,8 +652,8 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_VEC128 TILDE
 ##
 ## Ends in an error in state: 17.
 ##
-## naked_number_kind -> KWD_VEC128 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_VEC128 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_VEC128 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_VEC128 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_VEC128
@@ -665,8 +665,8 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_VAL TILDE
 ##
 ## Ends in an error in state: 19.
 ##
-## subkind -> KWD_VAL . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_VAL . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_VAL . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_VAL . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_VAL
@@ -678,7 +678,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_PRODUCT TILDE
 ##
 ## Ends in an error in state: 23.
 ##
-## subkind -> KWD_PRODUCT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_PRODUCT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_PRODUCT
@@ -690,9 +690,9 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_NATIVEINT TILDE
 ##
 ## Ends in an error in state: 25.
 ##
-## naked_number_kind -> KWD_NATIVEINT . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_NATIVEINT . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_NATIVEINT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_NATIVEINT . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_NATIVEINT . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_NATIVEINT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_NATIVEINT
@@ -704,7 +704,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_INT8 TILDE
 ##
 ## Ends in an error in state: 28.
 ##
-## subkind -> KWD_INT8 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_INT8 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INT8
@@ -716,9 +716,9 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_INT64 TILDE
 ##
 ## Ends in an error in state: 30.
 ##
-## naked_number_kind -> KWD_INT64 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_INT64 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_INT64 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_INT64 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_INT64 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_INT64 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INT64
@@ -730,9 +730,9 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_INT32 TILDE
 ##
 ## Ends in an error in state: 33.
 ##
-## naked_number_kind -> KWD_INT32 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_INT32 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_INT32 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_INT32 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_INT32 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_INT32 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INT32
@@ -744,7 +744,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_INT16 TILDE
 ##
 ## Ends in an error in state: 36.
 ##
-## subkind -> KWD_INT16 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_INT16 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INT16
@@ -756,7 +756,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_INT TILDE
 ##
 ## Ends in an error in state: 38.
 ##
-## subkind -> KWD_INT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_INT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INT
@@ -768,9 +768,9 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_IMM TILDE
 ##
 ## Ends in an error in state: 40.
 ##
-## naked_number_kind -> KWD_IMM . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_IMM . KWD_TAGGED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_IMM . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_IMM . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_IMM . KWD_TAGGED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_IMM . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_IMM
@@ -782,9 +782,9 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_FLOAT32 TILDE
 ##
 ## Ends in an error in state: 43.
 ##
-## naked_number_kind -> KWD_FLOAT32 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_FLOAT32 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_FLOAT32 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_FLOAT32 . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT32 . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT32 . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_FLOAT32
@@ -796,10 +796,10 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_FLOAT TILDE
 ##
 ## Ends in an error in state: 46.
 ##
-## naked_number_kind -> KWD_FLOAT . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_FLOAT . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_FLOAT . CARET plain_int [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
-## subkind -> KWD_FLOAT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## naked_number_kind -> KWD_FLOAT . [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT . KWD_BOXED [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT . CARET plain_int [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_FLOAT
@@ -811,7 +811,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_FLOAT CARET TILDE
 ##
 ## Ends in an error in state: 49.
 ##
-## subkind -> KWD_FLOAT CARET . plain_int [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_FLOAT CARET . plain_int [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_FLOAT CARET
@@ -823,7 +823,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_ANY TILDE
 ##
 ## Ends in an error in state: 52.
 ##
-## subkind -> KWD_ANY . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL DOT COMMA ]
+## subkind -> KWD_ANY . KWD_ARRAY [ STAR RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL DOT COMMA ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_ANY
@@ -835,8 +835,8 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT LBRACK INT KWD_OF KWD_FLOAT DOT
 ##
 ## Ends in an error in state: 58.
 ##
-## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind . [ RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL ]
-## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind . STAR separated_nonempty_list(STAR,kind_with_subkind) [ RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL ]
+## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind . [ RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL ]
+## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind . STAR separated_nonempty_list(STAR,kind_with_subkind) [ RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL ]
 ##
 ## The known suffix of the stack is as follows:
 ## kind_with_subkind
@@ -855,7 +855,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT LBRACK INT KWD_OF KWD_FLOAT STAR TILDE
 ##
 ## Ends in an error in state: 59.
 ##
-## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind STAR . separated_nonempty_list(STAR,kind_with_subkind) [ RPAREN RBRACK PIPE MINUSGREATER KWD_LOCAL EQUAL ]
+## separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind STAR . separated_nonempty_list(STAR,kind_with_subkind) [ RPAREN RBRACK PIPE MINUSGREATER KWD_STACK EQUAL ]
 ##
 ## The known suffix of the stack is as follows:
 ## kind_with_subkind STAR
@@ -3061,7 +3061,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 449.
 ##
-## code -> code_header . kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header . kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header
@@ -3143,7 +3143,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT RPA
 ##
 ## Ends in an error in state: 460.
 ##
-## code -> code_header kinded_args . variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args . variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args
@@ -3155,7 +3155,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
 ##
 ## Ends in an error in state: 461.
 ##
-## code -> code_header kinded_args variable . alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable . alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable
@@ -3229,7 +3229,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 468.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params . variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params . variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params
@@ -3241,7 +3241,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 469.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable . MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable . MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params variable
@@ -3253,7 +3253,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 470.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER . continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER . continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER
@@ -3265,7 +3265,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 472.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id . exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id . exn_continuation_id return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id
@@ -3277,7 +3277,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 473.
 ##
-## exn_continuation_id -> STAR . continuation_id [ KWD_LOCAL EQUAL COLON ]
+## exn_continuation_id -> STAR . continuation_id [ KWD_STACK EQUAL COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## STAR
@@ -3289,7 +3289,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 475.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id . return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id . return_arity boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id
@@ -3301,7 +3301,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 476.
 ##
-## return_arity -> COLON . kinds_with_subkinds [ KWD_LOCAL EQUAL ]
+## return_arity -> COLON . kinds_with_subkinds [ KWD_STACK EQUAL ]
 ##
 ## The known suffix of the stack is as follows:
 ## COLON
@@ -3313,7 +3313,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 480.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity . boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity . boption(KWD_STACK) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity
@@ -3331,14 +3331,14 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_LOCAL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_STACK TILDE
 ##
 ## Ends in an error in state: 482.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) . EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) . EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL)
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK)
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -3347,10 +3347,10 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT 
 ##
 ## Ends in an error in state: 483.
 ##
-## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL . expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL . expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_STACK) EQUAL
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>

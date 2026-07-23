@@ -61,12 +61,12 @@ let code loopify(never) size(62) newer_version_of(i_3)
      | 0 -> k5
      | 1 -> k4)
     where k5 =
-      let ifnot_result = %array.mut.my_alloc_region.`local`[`region`] (x) in
+      let ifnot_result = %array.mut.my_alloc_region.local[`region`] (x) in
       cont k3 (ifnot_result)
     where k4 =
       let prim = %unbox_num.`float` (x) in
       let ifso_result =
-        %array.`float`.mut.my_alloc_region.`local`[`region`] (prim)
+        %array.`float`.mut.my_alloc_region.local[`region`] (prim)
       in
       cont k3 (ifso_result)
     where k3 (if_then_else_result) =

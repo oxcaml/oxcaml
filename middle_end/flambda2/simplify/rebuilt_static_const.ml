@@ -473,7 +473,7 @@ module Group = struct
          ~free_names_of_body:Unknown
          ~my_closure:(Variable.create "my_closure" Flambda_kind.value)
          ~my_alloc_mode:
-           (Alloc_mode.For_applications.heap
+           (Alloc_mode.For_applications.not_alloc_stack
               ~alloc_region:
                 (Variable.create "my_alloc_region" Flambda_kind.region))
          ~my_depth:(Variable.create "my_depth" Flambda_kind.rec_info))

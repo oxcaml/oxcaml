@@ -194,14 +194,14 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
-    Heap { alloc_region }
-  | Local { alloc_region; region; ghost_region } ->
+    Not_alloc_stack { alloc_region }
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     let region = Env.find_region_exn env region in
     let ghost_region = Env.find_region_exn env ghost_region in
-    Local { alloc_region; region; ghost_region }
+    Maybe_alloc_stack { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -472,10 +472,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let closure_var, env = Env.bind_var env my_closure in
             let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
               match my_alloc_mode with
-              | Heap { alloc_region } ->
+              | Not_alloc_stack { alloc_region } ->
                 let alloc_region, env = Env.bind_var env alloc_region in
-                Heap { alloc_region }, env
-              | Local
+                Not_alloc_stack { alloc_region }, env
+              | Maybe_alloc_stack
                   { alloc_region = my_alloc_region;
                     region = my_region;
                     ghost_region = my_ghost_region
@@ -483,7 +483,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 let alloc_region, env = Env.bind_var env my_alloc_region in
                 let region, env = Env.bind_var env my_region in
                 let ghost_region, env = Env.bind_var env my_ghost_region in
-                Local { alloc_region; region; ghost_region }, env
+                Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -500,10 +500,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let code_size =
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
-      let result_mode : Fexpr.alloc_mode_for_assignments =
+      let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Not_alloc_stack
+        | Maybe_alloc_stack -> Maybe_alloc_stack
       in
       Code
         { id = code_id;
@@ -634,7 +634,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
