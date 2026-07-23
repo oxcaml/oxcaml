@@ -6,6 +6,16 @@ ws_boot   = --root=. --workspace=duneconf/boot.ws
 ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
 ws_main   = --root=. --workspace=duneconf/main.ws
 
+# Native executables built in the main workspace link the runtime archive
+# (libasmrun.a) via Load_path from a separate workspace's install dir, so dune
+# cannot track it as a dependency and would not relink them when the runtime C
+# code changes. We pass its digest in RUNTIME_STAMP to every main-workspace
+# dune invocation below, and the affected executables depend on it via
+# (link_deps (env_var RUNTIME_STAMP)). Must be '=' (expanded at recipe time).
+runtime_stamp = RUNTIME_STAMP="$$(md5sum \
+  _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/libasmrun.a \
+  | cut -d' ' -f1)"
+
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
   ocaml_subdirs_to_ignore=otherlibs
@@ -116,7 +126,8 @@ runtime-stdlib-hacking: boot-compiler
 	$(dune) build -w $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
 
 compiler: runtime-stdlib
-	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+	$(runtime_stamp) \
+          SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           $(dune) build $(ws_main) \
           --only-package=ocaml @install \
@@ -132,7 +143,8 @@ compiler: runtime-stdlib
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler runtime-stdlib
-	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+	$(runtime_stamp) \
+          SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           ./_build/default/chamelon/chamelon.exe dune build \
           $(ws_main) \
@@ -157,13 +169,20 @@ minimize-stdlib: boot-minimizer boot-compiler
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
+	$(runtime_stamp) \
+          OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) \
+          OXCAML_POLL_INSERTION=$(POLL_INSERTION) \
+          $(dune) runtest $(ws_main)
 
 runtest-llvmize: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
+	$(runtime_stamp) \
+          OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) \
+          $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
+	$(runtime_stamp) \
+          OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) \
+          $(dune) build @runtest-dwarf $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -490,7 +509,7 @@ hacking-emacs-builder: _build/_bootinstall
 
 .PHONY: debug-printers
 debug-printers: runtime-stdlib # required for $(ws_main) to work
-	 $(dune) build $(ws_main) $(ocamldir)/tools/debug_printers
+	 $(runtime_stamp) $(dune) build $(ws_main) $(ocamldir)/tools/debug_printers
 	@echo
 	@echo To load into ocamldebug, use:
 	@echo source \"$$(realpath _build/main/$(ocamldir)/tools/debug_printers)\"
