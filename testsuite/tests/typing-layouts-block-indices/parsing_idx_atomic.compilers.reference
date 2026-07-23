@@ -1,0 +1,4 @@
+File "parsing_idx_atomic.ml", line 8, characters 20-21:
+8 | let _ = (.idx_atomic(0))
+                        ^
+Error: Syntax error: .idx_atomic block accesses are not supported.
