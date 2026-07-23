@@ -85,3 +85,27 @@ let () =
   print_multiple () ~f32:#41.0s ~f64:#50.0;
   print_multiple () ~i64:#40L ~f32:#41.0s ~f64:#50.0 ~u:#()
 ;;
+
+module M : sig
+  val print_f64 : ?f:float# -> unit -> unit
+end = struct
+  let print_f64 ?(f = #6.0) () = pr (Float_u.to_string f)
+end
+
+let () =
+  pr "\n--- Printing through a signature ---";
+  M.print_f64 ();
+  M.print_f64 () ?f:None;
+  M.print_f64 () ?f:(Some #60.0);
+  M.print_f64 () ~f:#61.0
+;;
+
+(* Eliminating an optional argument by coercion to a less general function
+   type (the eta-expansion path in [Typecore.type_argument]) *)
+
+let apply (h : unit -> unit) = h ()
+
+let () =
+  pr "\n--- Eliminating an optional argument ---";
+  apply M.print_f64
+;;

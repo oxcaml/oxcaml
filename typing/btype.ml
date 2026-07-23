@@ -2074,6 +2074,22 @@ module Jkind0 = struct
          quality = Not_best
        }
 
+    let of_new_sort_var ~why ~level =
+      let layout, sort =
+        Jkind_types.Layout.of_new_sort_var ~level
+          Jkind_types.Scannable_axes.max
+      in
+      ( fresh_jkind
+          { base = Layout layout;
+            mod_bounds = Mod_bounds.max;
+            with_bounds = No_with_bounds
+          }
+          ~annotation:None
+          ~why:(Concrete_creation why),
+        sort )
+
+    let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
+
     (* every context where this is used actually wants an [option] *)
     let mk_annot name =
       Some

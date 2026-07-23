@@ -2275,11 +2275,8 @@ let unsafely_set_bounds (type l r) env ~(from : (l * r) jkind) t =
 (******************************)
 (* construction *)
 
-let of_new_sort_var ~why ~level =
-  let jkind, sort = Jkind_desc.of_new_sort_var ~level Scannable_axes.max in
-  fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
-
-let of_new_sort ~why ~level = fst (of_new_sort_var ~why ~level)
+(* [of_new_sort_var] and [of_new_sort] are provided by [Jkind0.Jkind] so that
+   [Predef] can use them. *)
 
 let rec instance_layout : Sort.t Layout.t -> Sort.t Layout.t = function
   | Sort (s, sa) -> Sort (Sort.instance s, sa)
@@ -2884,6 +2881,7 @@ module Format_history = struct
     | External_result ->
       fprintf ppf "it's the type of the result of an external declaration"
     | Statement -> fprintf ppf "it's the type of a statement"
+    | Optional_argument -> fprintf ppf "it's the type of an optional argument"
     | Optional_arg_default ->
       fprintf ppf "it's the type of an optional argument default"
     | Unboxed_tuple_element ->
@@ -3963,6 +3961,7 @@ module Debug_printers = struct
     | External_argument -> fprintf ppf "External_argument"
     | External_result -> fprintf ppf "External_result"
     | Statement -> fprintf ppf "Statement"
+    | Optional_argument -> fprintf ppf "Optional_argument"
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"

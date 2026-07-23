@@ -663,6 +663,19 @@ module Jkind0 : sig
       why:Jkind_intf.History.creation_reason ->
       ('a * 'b) jkind
 
+    (** Create a fresh sort variable, packed into a jkind, returning both the
+        resulting kind and the sort. *)
+    val of_new_sort_var :
+      why:Jkind_intf.History.concrete_creation_reason ->
+      level:int ->
+      'd jkind * Jkind_types.Sort.t
+
+    (** Create a fresh sort variable, packed into a jkind. *)
+    val of_new_sort :
+      why:Jkind_intf.History.concrete_creation_reason ->
+      level:int ->
+      'd jkind
+
     val mk_annot : string -> Parsetree.jkind_annotation option
 
     val mark_best : ('l * 'r) jkind -> ('l * disallowed) jkind

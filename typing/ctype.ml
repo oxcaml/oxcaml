@@ -5687,7 +5687,8 @@ let filter_arrow env t l ~force_tpoly =
           if is_optional l then
             newty2 ~level
               (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
+                       [newvar2 level
+                          (Predef.optional_argument_jkind ~level)],
                        ref Mnil))
           else if is_position l then
             newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))

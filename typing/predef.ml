@@ -554,6 +554,13 @@ let option_argument_sort = None
 let option_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
+(* The jkind of an optional argument, as opposed to [option_argument_jkind],
+   the jkind of the argument to the [option] type. It must be representable
+   in order to build the [Some], and it's a fresh sort variable because it's
+   the jkind of _this_ optional argument. *)
+let optional_argument_jkind ~level =
+  Jkind.of_new_sort ~why:Optional_argument ~level
+
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;

@@ -1572,8 +1572,10 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 (* Approximate the type of the constructor to allow recursive use *)
 (* of optional parameters                                         *)
 
-let var_option =
-  Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
+let var_option () =
+  Predef.type_option
+    (Ctype.newvar
+       (Predef.optional_argument_jkind ~level:(Ctype.get_current_level ())))
 
 let rec approx_declaration cl =
   match cl.pcl_desc with
@@ -1581,7 +1583,7 @@ let rec approx_declaration cl =
       let l, _ = Typetexp.transl_label_from_pat l pat in
       let arg =
         match l with
-        | Optional _ -> Ctype.instance var_option
+        | Optional _ -> Ctype.instance (var_option ())
         | Position _ -> Ctype.instance Predef.type_lexing_position
         | Labelled _ | Nolabel ->
           Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
@@ -1603,7 +1605,7 @@ let rec approx_description ct =
     Pcty_arrow (l, core_type, ct) ->
       let l = transl_label l (Some core_type) in
       let arg =
-        if Btype.is_optional l then Ctype.instance var_option
+        if Btype.is_optional l then Ctype.instance (var_option ())
         else Ctype.newvar (Jkind.Builtin.value ~why:Class_term_argument)
         (* CR layouts: use of value here may be relaxed when we
            relax jkinds in classes *)
