@@ -3821,6 +3821,18 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
       (Mode.Value.disallow_right mode) None locks
     : Mode.Value.l)
 
+(** Re-walks the enclosing locks with an application's return [mode] on the
+    allocation axis (forcing every closure to be [>= mode] there). Used to stop
+    an [alloc] value from being laundered out of a fully-applied zero_alloc
+    function through a [noalloc] closure. *)
+let walk_locks_for_zero_alloc_return ~env ~loc mode =
+  let pp : Mode.Hint.pinpoint = (loc, Zero_alloc_func_appl) in
+  ignore
+    (walk_locks_with_mode_constraint ~env pp
+       ~mode:(Mode.Value.min_with_comonadic Allocation
+                (Mode.Value.proj_comonadic Allocation mode))
+     : Mode.Value.l)
+
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.

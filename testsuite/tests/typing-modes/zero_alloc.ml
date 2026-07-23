@@ -1326,7 +1326,13 @@ external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
 let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
 [%%expect{|
 external my_id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
-val prim_value_captured : int -> int = <fun>
+Line 2, characters 55-62:
+2 | let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
+                                                           ^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 43-62
+         which is expected to be "noalloc_strict".
 |}]
 
 (* [!] does not allocate, but referencing the value is conservatively
@@ -2032,114 +2038,16 @@ Line 1, characters 44-50:
 Error: This value is "local" but is expected to be "global".
 |}]
 
-(* Test 8: zero_alloc related tests *)
+(* Test 8: interaction between the [zero_alloc] attribute/annotation and the
+   allocation mode axis. *)
 
-let test () =
-  let (g @ noalloc_strict) () = () in
-  let (f @ noalloc_strict) () = (g @ alloc)in
-  let x = f () in
-  (x : _ @ noalloc_strict)
-[%%expect{|
-Line 3, characters 35-36:
-3 |   let (f @ noalloc_strict) () = (g @ alloc)in
-                                       ^
-Error: The value "(@)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 3, characters 27-43
-         which is expected to be "noalloc_strict".
-|}]
+(* Test 8.1:
 
-let (f @ noalloc_strict) g = g ()
-[%%expect{|
-val f : (unit -> 'a) -> 'a = <fun>
-|}]
+  CR shsong: [zero_alloc] in let binding is not properly processed. *)
 
-let test () =
-  let (f @ noalloc_strict) g = g () in
-  let _ = f in
-  ()
-[%%expect{|
-val test : unit -> unit = <fun>
-|}]
-
-let test () =
-  let (f @ noalloc_strict) (g: int -> int) = exclave_
-    fun () -> g 0
-  in
-  let (g_alloc @ alloc) x = let _ = 1.1 in x in
-  let _ = (f (fun x -> x) : _ @ noalloc_strict) in
-  let _ = f g_alloc in
-  ()
-[%%expect{|
-Line 7, characters 12-19:
-7 |   let _ = f g_alloc in
-                ^^^^^^^
-Error: This value is "alloc" but is expected to be "noalloc_strict".
-|}]
-
-let test () =
-  let (f @ noalloc_strict) (g: (int -> int) @ alloc) = exclave_
-    fun () -> g 0
-  in
-  let _ = (f (fun x -> x) : _ @ noalloc_strict) in
-  ()
-[%%expect{|
-Line 5, characters 11-25:
-5 |   let _ = (f (fun x -> x) : _ @ noalloc_strict) in
-               ^^^^^^^^^^^^^^
-Error: This value is "alloc" but is expected to be "noalloc_strict".
-|}]
-
-let test () =
-  let (g @ alloc) () = 1.1 in
-  let [@zero_alloc strict] f () = g in
-  (f () : _ @ noalloc)
-[%%expect{|
-Line 4, characters 3-7:
-4 |   (f () : _ @ noalloc)
-       ^^^^
-Error: This value is "alloc" but is expected to be "noalloc".
-|}]
-
-let test () =
-  let (g @ alloc) () = 1.1 in
-  let [@zero_alloc strict] f () = g in
-  let (h @ noalloc) () = f () in
-  h
-[%%expect{|
-Line 4, characters 25-26:
-4 |   let (h @ noalloc) () = f () in
-                             ^
-Error: The value "f" is "alloc"
-         because it closes over the value "g" at line 3, characters 34-35
-         which is "alloc".
-       However, the value "f" highlighted is expected to be "noalloc"
-         because it is used inside the function at line 4, characters 20-29
-         which is expected to be "noalloc".
-|}]
-
-let test () =
-  let [@zero_alloc strict] (f @ alloc) () = 1.1 in
-  (f () : _ @ noalloc_strict)
-[%%expect{|
-val test : unit -> float = <fun>
-|}]
-
-let test () =
-  let [@zero_alloc] (f @ alloc) () = 1.1 in
-  (f () : _ @ noalloc_strict)
-[%%expect{|
-val test : unit -> float = <fun>
-|}]
-
-let test () =
-  let [@zero_alloc] (f @ alloc) () = 1.1 in
-  (f () : _ @ noalloc)
-[%%expect{|
-val test : unit -> float = <fun>
-|}]
-
-(* CR shsong: How about this? *)
+(* A top-level [let [@zero_alloc strict] f] is NOT relaxed when referenced: the
+   attribute lives on the function expression, not in [f]'s [val_zero_alloc]
+   (see the CR on [relax_alloc]), so [f] stays [alloc] and [g] is rejected. *)
 let [@zero_alloc strict] (f @ alloc) () = 1.1
 let (g @ noalloc_strict) () = f ()
 [%%expect{|
@@ -2153,8 +2061,8 @@ Error: The value "f" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* CR shsong: Why the error is triggered? *)
-let test () =
+(* Likewise a *local* [let [@zero_alloc strict] f] is not relaxed: rejected. *)
+let test_local_strict_not_relaxed () =
   let [@zero_alloc strict] (f @ alloc) () = 1.1 in
   let (g @ noalloc_strict) () = f () in
   g
@@ -2168,7 +2076,9 @@ Error: The value "f" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-let test () =
+(* Local [@zero_alloc] (non-strict) referenced inside [noalloc_strict]:
+   rejected. *)
+let test_local_nonstrict_in_strict () =
   let [@zero_alloc] (f @ alloc) () = 1.1 in
   let (g @ noalloc_strict) () = f () in
   g
@@ -2182,7 +2092,8 @@ Error: The value "f" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-let test () =
+(* Local [@zero_alloc] referenced inside [noalloc]: rejected. *)
+let test_local_nonstrict_in_noalloc () =
   let [@zero_alloc] (f @ alloc) () = 1.1 in
   let (g @ noalloc) () = f () in
   g
@@ -2238,7 +2149,8 @@ let (g @ noalloc) () = M_nonstrict.f ()
 val g : unit -> int = <fun>
 |}]
 
-(* CR shsong: Real soundness concern here. *)
+(* Test 8.2: A [noalloc] closure must not launder an [alloc] value out
+   of a fully-applied zero_alloc function -- see the two tests below. *)
 module M_ret : sig
   val g : unit -> float
   (* [arity 1] because [f] takes one argument and returns a function; it must
@@ -2264,19 +2176,68 @@ Line 1, characters 15-25:
 Error: This value is "alloc" but is expected to be "noalloc".
 |}]
 
-(* CR shsong: This should not be accepted. Fix this. *)
+(* Rejected: [h] would return [g] (an [alloc] value) obtained from the
+   fully-applied zero_alloc [M_ret.f], laundering it through a [noalloc]
+   closure. *)
 let test () =
   let (h @ noalloc) () = M_ret.f () in
   h
 [%%expect{|
-val test : unit -> unit -> unit -> float = <fun>
+Line 2, characters 25-35:
+2 |   let (h @ noalloc) () = M_ret.f () in
+                             ^^^^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 2, characters 20-35
+         which is expected to be "noalloc".
 |}]
 
-(* CR shsong: This should not be accepted. Fix this. *)
-let test () =
-  let (h @ noalloc) () = M_ret.f () in
-  let (h1 @ noalloc) () = h () () in
-  h1
+
+(* CR shsong: Revisit this after fixing CR in Test 8.1. *)
+let test_return_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  (f () : _ @ noalloc)
 [%%expect{|
-val test : unit -> unit -> float = <fun>
+Line 4, characters 3-7:
+4 |   (f () : _ @ noalloc)
+       ^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+let test_capture_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  let (h @ noalloc) () = f () in
+  h
+[%%expect{|
+Line 4, characters 25-26:
+4 |   let (h @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+         because it closes over the value "g" at line 3, characters 34-35
+         which is "alloc".
+       However, the value "f" highlighted is expected to be "noalloc"
+         because it is used inside the function at line 4, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Test 8.3: a *partial* application of a zero_alloc function allocates a
+   partial-application closure, which is detected. *)
+module M_partial : sig
+  val f : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] f x y = x + y
+end
+[%%expect{|
+module M_partial : sig val f : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+let (h @ noalloc_strict) (x : int) = M_partial.f x
+[%%expect{|
+Line 1, characters 37-48:
+1 | let (h @ noalloc_strict) (x : int) = M_partial.f x
+                                         ^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
 |}]

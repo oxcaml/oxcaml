@@ -6517,6 +6517,13 @@ let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
   | "%boolnot" | "%sequand" | "%sequor" -> true
   | _ -> false
 
+(* CR shsong: [zero_alloc] is read from [val_zero_alloc], which is populated for
+   signature [val]s but NOT for local [let [@zero_alloc]] bindings: there the
+   attribute is a binding attribute ([pvb_attributes]) applied to the function
+   expression and is never stored on the bound variable. So a local zero_alloc
+   function is not relaxed here. Supporting it would require [type_let] to
+   propagate the binding's zero_alloc into the pattern variable's
+   [val_zero_alloc]. *)
 let relax_alloc (desc : Types.value_description) mode =
   match desc.val_kind with
   | Val_prim prim ->
@@ -6524,18 +6531,8 @@ let relax_alloc (desc : Types.value_description) mode =
       Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
     else mode
   | _ ->
-    let za : Zero_alloc.const =
-      match Zero_alloc.get desc.val_zero_alloc with
-      | Default_zero_alloc ->
-        (* Local [let [@zero_alloc]] bindings keep [val_zero_alloc = default]
-           (that field is only populated for signature values), but the attribute
-           survives in [val_attributes], so consult it too. *)
-        Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
-          ~on_application:false ~default_arity:0 desc.val_attributes
-      | za -> za
-    in
-    match za with
     (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
+    match Zero_alloc.get desc.val_zero_alloc with
     | Check { strict; opt = false; _ } | Assume { strict; _ } ->
       let c =
         if strict then Allocation.Const.Noalloc_strict
@@ -6543,6 +6540,24 @@ let relax_alloc (desc : Types.value_description) mode =
       in
       Value.meet_const_with Allocation c mode
     | Check _ | Default_zero_alloc | Ignore_assert_all -> mode
+
+(* Whether [funct] is an identifier that [relax_alloc] relaxes AND is fully
+   applied ([applied_arity] arguments cover its arity). Only then must the
+   application's return value be re-walked through the locks. *)
+let funct_relaxed_by_relax_alloc funct ~applied_arity =
+  match funct.exp_desc with
+  | Texp_ident { desc; _ } ->
+    (match desc.val_kind with
+     | Val_prim prim ->
+       prim_is_noalloc_when_fully_applied prim
+       && prim.prim_arity > 0
+       && applied_arity >= prim.prim_arity
+     | _ ->
+       (match Zero_alloc.get desc.val_zero_alloc with
+        | Check { opt = false; arity; _ } | Assume { arity; _ } ->
+          applied_arity >= arity
+        | Check _ | Default_zero_alloc | Ignore_assert_all -> false))
+  | _ -> false
 
 let register_alloc_for_prim (prim : Primitive.description) applied_arity =
   not (prim_is_noalloc_when_fully_applied prim) ||
@@ -7345,12 +7360,15 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      (* CR shsong: check whether sfunct is a zero_alloc function and is being fully applied, i.e.,
-      its walk_locks for the function identifier in type_ident it skipped in type_ident.
-      If so, walk_locks using its return value's mode. *)
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      (* A fully-applied zero_alloc function (or non-allocating primitive) had
+         its identifier lock-walk relaxed in [type_ident]. Re-walk the enclosing
+         locks with the return value's mode: this forces each closure's Allocation axis to be
+         [>= mode_ret]. *)
+      if funct_relaxed_by_relax_alloc funct ~applied_arity:(List.length sargs)
+      then Env.walk_locks_for_zero_alloc_return ~env ~loc mode_ret;
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -9234,6 +9252,10 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
        end;
        [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
+       (* CR shsong: I should avoid the case where a noalloc function
+          marked as zero_alloc, partially applied, to trigger this walk.
+          On solution is to only relax_mode when zero_alloc function is
+          fully applied, and remove this one. *)
        if regsiter_alloc_for_zero_alloc desc applied_arity then
          register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
        let lvars = Lpoly.get_exn desc.val_lpoly in
