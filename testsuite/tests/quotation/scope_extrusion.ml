@@ -24,12 +24,17 @@ val gensym_ref : unit -> <[int]> expr = <fun>
 (* caught by printing *)
 let e = gensym_ref ()
 [%%expect {|
-val e : <[int]> expr = <[x]>
+val e : <[int]> expr =
+  Uncaught exception: Failure("Identifier x bound at file , line 3, characters 271-309\nis extruded outside its scope:\nit is used at file , line 3, characters 297-298\ninside the quote at file , line 3, characters 295-300")
+
 |}];;
 
 (* caught by splicing *)
 let () = ignore <[ $(gensym_ref ()) ]>
 [%%expect {|
+Exception:
+Failure
+ "Identifier x bound at file , line 3, characters 271-309\nis extruded outside its scope:\nit is used at file , line 3, characters 297-298\ninside the quote at file , line 3, characters 295-300".
 |}];;
 
 (* Scope extrusion with an exception *)
@@ -55,6 +60,9 @@ Error: This value is "once" but is expected to be "many".
 (* caught by splicing *)
 let () = ignore <[ $(gensym_exn ()) ]>
 [%%expect {|
+Exception:
+Failure
+ "Identifier x bound at file , line 3, characters 1156-1194\nis extruded outside its scope:\nit is used at file , line 3, characters 1189-1190\ninside the quote at file , line 3, characters 1187-1192".
 |}];;
 
 (* should be caught early if we splice the [expr] earlier *)
@@ -65,10 +73,12 @@ let gensym_exn () =
 gensym_exn ()
 [%%expect {|
 val gensym_exn : unit -> <[int]> expr @ once = <fun>
-- : <[int]> expr = <[x]>
+Exception:
+Failure
+ "Identifier x bound at file , line 2, characters 1918-1956\nis extruded outside its scope:\nit is used at file , line 2, characters 1951-1952\ninside the quote at file , line 2, characters 1949-1954".
 |}];;
 
-(* No scope extrusion in effect handler *)
+(* No scope extrusion in continuing effect handler *)
 
 type _ Effect.t += Extrude : <[int]> expr -> <[int]> expr Effect.t
 [%%expect {|

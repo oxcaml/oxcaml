@@ -69,10 +69,10 @@ module Loc = struct
     | Known { file; start_line; start_col; end_line; end_col } ->
       if start_line = end_line
       then
-        Format.fprintf fmt "File %s, line %d, characters %d-%d" file start_line
+        Format.fprintf fmt "file %s, line %d, characters %d-%d" file start_line
           start_col end_col
       else
-        Format.fprintf fmt "File %s, lines %d-%d, characters %d-%d" file
+        Format.fprintf fmt "file %s, lines %d-%d, characters %d-%d" file
           start_line end_line start_col end_col
 end
 
@@ -88,6 +88,10 @@ module Level : sig
       attached location. *)
   val with_fresh : Loc.t -> (t -> 'a) -> 'a
 
+  (** [check t] is [true] if the point on the call stack associated with [t] is
+      still present, otherwise it is [false]. *)
+  val check : t -> bool
+
   (** [compare] is a total order on levels. *)
   val compare : t -> t -> int
 
@@ -96,24 +100,26 @@ module Level : sig
 end = struct
   type t =
     { stamp : Stamp.t;
-      mutable _valid : bool;
+      mutable valid : bool;
       loc : Loc.t
     }
 
   let fresh loc =
     let stamp = Stamp.fresh () in
-    let _valid = true in
-    { stamp; _valid; loc }
+    let valid = true in
+    { stamp; valid; loc }
 
   let with_fresh loc f =
     let level = fresh loc in
     try
       let r = f level in
-      level._valid <- false;
+      level.valid <- false;
       r
     with e ->
-      level._valid <- false;
+      level.valid <- false;
       raise e
+
+  let check t = t.valid
 
   let compare t1 t2 = Stamp.compare t1.stamp t2.stamp
 
@@ -274,6 +280,10 @@ module Var : sig
 
   (** [loc t] is [Level.loc (level t)]. *)
   val loc : t -> Loc.t
+
+  (** [valid t] is [true] if [t]'s binding is still open, and [false] otherwise.
+      Once [t]'s binding has been closed there is no valid way to use [t]. *)
+  val valid : t -> bool
 
   module Set : sig
     (** [t] is the type of sets of variables. *)
@@ -447,6 +457,8 @@ end = struct
       match Hashtbl.find_opt name_env (Name.base_name var.name) with
       | Some v -> dict_update_and_print (v + 1)
       | None -> dict_update_and_print 0)
+
+  let valid t = Level.check t.level
 
   module Module = struct
     type var = t
@@ -650,6 +662,10 @@ module With_free_vars : sig
       [None]. *)
   val optional : 'a t option -> 'a option t
 
+  (** [check ~invalid t] runs [invalid] on any variables paired with [t] that
+      are not valid. *)
+  val check : invalid:(Var.t -> Loc.t -> unit) -> 'a t -> unit
+
   (** [value ~free t] is the value of [t]. [t] is expected to have no free
       variables. [free] is run on any variables paired with [t]. *)
   val value : free:(Var.t -> Loc.t -> unit) -> 'a t -> 'a
@@ -731,6 +747,11 @@ end = struct
     { vars; v }
 
   let optional = function None -> return None | Some t -> map Option.some t
+
+  let check ~invalid { vars; v = _ } =
+    Var.Map.iter
+      (fun var loc -> if not (Var.valid var) then invalid var loc)
+      vars
 
   let value ~free t =
     Var.Map.iter free t.vars;
@@ -2174,11 +2195,16 @@ module Binding_error = struct
     in
     failwith msg
 
-  let code_not_closed var loc =
+  let scope_extrusion ?loc var use_loc =
     let msg =
       Format.asprintf
-        "The code built at %a is not closed: identifier %s bound at %a is free"
-        Loc.print loc (Var.name var) Loc.print (Var.loc var)
+        "Identifier %s bound at %a@ is extruded outside its scope:@ it is used \
+         at %a"
+        (Var.name var) Loc.print (Var.loc var) Loc.print use_loc
+      ^
+      match loc with
+      | Some loc -> Format.asprintf "@ inside the quote at %a" Loc.print loc
+      | None -> ""
     in
     failwith msg
 end
@@ -2735,46 +2761,51 @@ module Comprehension = struct
 end
 
 module Code = struct
-  type code_rep =
-    { exp : Ast.expression;
-      _loc : Loc.t
+  type 'exp code_rep =
+    { exp : 'exp;
+      loc : Loc.t
     }
 
-  type t = code_rep With_free_vars.t
+  type t = Ast.expression With_free_vars.t code_rep
 
-  let ( let+ ) m f = With_free_vars.map f m
+  let to_exp code = code.exp
 
-  let to_exp code =
-    let+ { exp; _ } = code in
-    exp
+  let of_exp loc exp = { exp; loc }
 
-  let of_exp _loc exp =
-    let+ exp = exp in
-    { exp; _loc }
+  let of_exp_with_type_vars loc names body =
+    let exp = With_free_vars.type_var_bindings loc names body in
+    { exp; loc }
 
-  let of_exp_with_type_vars _loc names body =
-    let+ exp = With_free_vars.type_var_bindings _loc names body in
-    { exp; _loc }
+  let exp_close ?loc exp =
+    With_free_vars.value ~free:(Binding_error.scope_extrusion ?loc) exp
 
   module Closed = struct
     type exp = t
 
-    type t = code_rep
+    type t = Ast.expression code_rep
 
-    let close code =
-      With_free_vars.value ~free:Binding_error.code_not_closed code
+    let close { exp; loc } =
+      let exp = exp_close ~loc exp in
+      { exp; loc }
 
-    let open_ = With_free_vars.return
+    let open_ { exp; loc } =
+      let exp = With_free_vars.return exp in
+      { exp; loc }
 
-    let to_exp code = code |> open_ |> to_exp
+    let to_exp code = With_free_vars.return code.exp
 
-    let print fmt c =
-      Format.fprintf fmt "@[<2><[@,%a@]@,]>" (Ast.print_exp (new_env ())) c.exp
+    let exp_print fmt exp =
+      Format.fprintf fmt "%a" (Ast.print_exp (new_env ())) exp
+
+    let print fmt code =
+      Format.fprintf fmt "@[<2><[@,%a@]@,]>" exp_print code.exp
   end
 
-  let print fmt c =
-    let ast_exp = With_free_vars.value ~free:(fun _ _ -> ()) c in
-    Closed.print fmt ast_exp
+  let exp_print fmt exp = Closed.exp_print fmt (exp_close exp)
+
+  let print fmt { exp; loc } =
+    let exp = exp_close ~loc exp in
+    Closed.print fmt { exp; loc }
 end
 
 module Exp_desc = struct
@@ -3069,9 +3100,13 @@ module Exp_desc = struct
     let+ exp = exp in
     Ast.Splice exp
 
-  let unquote code =
-    let+ exp = Code.to_exp code in
-    Ast.(exp.desc)
+  let unquote Code.{ exp; loc } =
+    let exp_desc =
+      let+ exp = exp in
+      Ast.(exp.desc)
+    in
+    With_free_vars.check ~invalid:(Binding_error.scope_extrusion ~loc) exp_desc;
+    exp_desc
 end
 
 module Exp = struct
@@ -3083,7 +3118,5 @@ module Exp = struct
     let+ desc = exp_desc in
     ({ desc; attributes } : Ast.expression)
 
-  let print fmt exp =
-    let ast = With_free_vars.value ~free:(fun _ _ -> ()) exp in
-    Ast.print_exp (new_env ()) fmt ast
+  let print = Code.exp_print
 end
