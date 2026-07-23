@@ -4366,20 +4366,8 @@ let boxed_vec256_alias_to ~naked_vec256 =
 let boxed_vec512_alias_to ~naked_vec512 =
   box_vec512 (Naked_vec512 (TD.create_equals (Simple.var naked_vec512)))
 
-let this_immutable_string str ~machine_width =
-  let size = Target_ocaml_int.of_int machine_width (String.length str) in
-  let string_info =
-    String_info.Set.singleton
-      (String_info.create ~contents:(Contents str) ~size)
-  in
-  non_null_value (String string_info)
-
-let mutable_string ~size ~machine_width =
-  let size = Target_ocaml_int.of_int machine_width size in
-  let string_info =
-    String_info.Set.singleton
-      (String_info.create ~contents:Unknown_or_mutable ~size)
-  in
+let this_immutable_string str =
+  let string_info = String_info.Set.singleton str in
   non_null_value (String string_info)
 
 let array_of_length ~element_kind ~length alloc_mode =

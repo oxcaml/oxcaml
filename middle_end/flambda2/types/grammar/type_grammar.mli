@@ -431,11 +431,7 @@ val mutable_block : Alloc_mode.For_types.t -> t
 val create_closures : Alloc_mode.For_types.t -> row_like_for_closures -> t
 
 (** Note this assumes the allocation mode is [Heap] *)
-val this_immutable_string :
-  string -> machine_width:Target_system.Machine_width.t -> t
-
-val mutable_string :
-  size:int -> machine_width:Target_system.Machine_width.t -> t
+val this_immutable_string : string -> t
 
 val array_of_length :
   element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->

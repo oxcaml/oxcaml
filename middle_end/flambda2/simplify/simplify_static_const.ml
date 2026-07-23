@@ -281,8 +281,7 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
         array_kind,
       dacc )
   | Immutable_string str ->
-    let machine_width = DE.machine_width (DA.denv dacc) in
-    let ty = T.this_immutable_string str ~machine_width in
+    let ty = T.this_immutable_string str in
     let dacc = bind_result_sym ty in
     ( Rebuilt_static_const.create_immutable_string
         (DA.are_rebuilding_terms dacc)
