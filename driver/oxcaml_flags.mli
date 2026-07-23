@@ -127,6 +127,8 @@ val cached_generic_functions_path : string ref
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
+val dissector_max_linker_parallelism : Misc.Maybe_bounded.t ref
+
 val manual_module_init : bool ref
 
 val symbol_visibility_protected : bool ref

@@ -133,7 +133,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       then
         raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
       ( file_name :: full_paths,
-        object_file_name :: objfiles,
+        { Linkenv.path = object_file_name; units = info.ui_defines } :: objfiles,
         unit :: tolink,
         cached_genfns_imports )
     | Library (file_name, infos) ->
@@ -151,7 +151,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         && not !Clflags.uses_metaprogramming
       then
         raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
-      let objfiles =
+      let objfiles units_of_lib =
         let obj_file =
           Filename.chop_suffix file_name Backend.ext_flambda_lib
           ^ Backend.ext_lib
@@ -162,13 +162,17 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
            case where a user has manually added things to the .a/.lib file *)
         if infos.lib_units = [] && not (Sys.file_exists obj_file)
         then objfiles
-        else obj_file :: objfiles
+        else
+          { Linkenv.path = obj_file;
+            units = List.concat_map (fun u -> u.defines) units_of_lib
+          }
+          :: objfiles
       in
       (* [file_name] is always returned irrespective of the [objfiles]
-         calculation above and the units calculation below: the aim is to know
-         the full set of files which were provided on the command line. *)
-      ( file_name :: full_paths,
-        objfiles,
+         calculation above and the [units_of_lib] calculation below: the aim is
+         to know the full set of files which were provided on the command
+         line. *)
+      let units_of_lib =
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
@@ -228,7 +232,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               Linkenv.check_consistency linkenv ~unit [||] [||];
               unit :: reqd)
             else reqd)
-          infos.lib_units tolink,
+          infos.lib_units []
+      in
+      ( file_name :: full_paths,
+        objfiles units_of_lib,
+        units_of_lib @ tolink,
         cached_genfns_imports )
 
   (* Second pass: generate the startup file and link it with everything else *)
@@ -253,8 +261,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
-        Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
-          ~units_tolink)
+        Backend.link_shared
+          (List.map (fun f -> f.Linkenv.path) ml_objfiles)
+          output_name ~ppf_dump ~genfns ~units_tolink)
 
   (* Main entry point *)
 

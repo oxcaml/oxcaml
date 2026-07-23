@@ -47,12 +47,12 @@ let () =
     | _ -> None)
 
 type file_origin =
-  | OCaml
+  | OCaml of { required_symbols : Asm_targets.Asm_symbol.t list }
   | Startup
   | Cached_genfns
 
 let string_of_origin = function
-  | OCaml -> "OCaml"
+  | OCaml _ -> "OCaml"
   | Startup -> "Startup"
   | Cached_genfns -> "Cached_genfns"
 
@@ -107,6 +107,11 @@ module File_size = struct
   let has_probes t = t.has_probes
 
   let origin t = t.origin
+
+  let required_symbols t =
+    match t.origin with
+    | OCaml { required_symbols } -> required_symbols
+    | Startup | Cached_genfns -> []
 end
 
 let measure_files (unix : (module Compiler_owee.Unix_intf.S)) ~files =

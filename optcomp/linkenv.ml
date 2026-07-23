@@ -28,6 +28,11 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+type objfile_to_link =
+  { path : string;
+    units : Compilation_unit.t list
+  }
+
 module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
 module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
