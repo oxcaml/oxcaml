@@ -15,7 +15,8 @@ module type S = sig
   val f : layout_ x. ('a : x) ('b : x addressable). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ l. ('a : l) ('b : l). 'a -> 'b end
+module type S =
+  sig val f : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b end
 |}]
 
 (* [x <= x addressable] must not hold. *)
@@ -28,11 +29,11 @@ Line 3, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val f : layout_ l. ('a : l addressable). 'a -> 'a end
        is not included in
          sig val f : layout_ l. ('a : l). 'a -> 'a end
        Values do not match:
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val f : layout_ l. ('a : l addressable). 'a -> 'a
        is not included in
          val f : layout_ l. ('a : l). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
@@ -56,11 +57,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val f : layout_ l. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ l. ('a : l). 'a -> 'a end
+         sig val f : layout_ l. ('a : l addressable). 'a -> 'a end
        Values do not match:
          val f : layout_ l. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ l. ('a : l). 'a -> 'a
+         val f : layout_ l. ('a : l addressable). 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
        The layout of 'a is '_representable_layout_2 addressable
          because of the definition of f at line 2, characters 2-51.

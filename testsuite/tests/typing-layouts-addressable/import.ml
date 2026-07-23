@@ -33,10 +33,43 @@ val import_marked : unit -> Import_defs.t8_plain = <fun>
 
 module F (M : Import_defs.S_marked) : Import_defs.S_plain = M
 [%%expect{|
-module F : functor (M : Import_defs.S_marked) -> Import_defs.S_plain
+Line 1, characters 60-61:
+1 | module F (M : Import_defs.S_marked) : Import_defs.S_plain = M
+                                                                ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
+       is not included in
+         Import_defs.S_plain
+       Values do not match:
+         val g : layout_ l. ('a : l addressable). 'a -> 'a
+       is not included in
+         val g : layout_ l. ('a : l). 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is '_representable_layout_1.
+       But the layout of 'a must be a sublayout of
+           '_representable_layout_1 addressable.
+       File "import_defs.ml", line 24, characters 2-39: Expected declaration
+       File "import_defs.ml", line 28, characters 2-51: Actual declaration
 |}]
 
 module G (M : Import_defs.S_plain) : Import_defs.S_marked = M
 [%%expect{|
-module G : functor (M : Import_defs.S_plain) -> Import_defs.S_marked
+Line 1, characters 60-61:
+1 | module G (M : Import_defs.S_plain) : Import_defs.S_marked = M
+                                                                ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l). 'a -> 'a end
+       is not included in
+         Import_defs.S_marked
+       Values do not match:
+         val g : layout_ l. ('a : l). 'a -> 'a
+       is not included in
+         val g : layout_ l. ('a : l addressable). 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is '_representable_layout_2 addressable.
+       But the layout of 'a must be a sublayout of '_representable_layout_2.
+       File "import_defs.ml", line 28, characters 2-51: Expected declaration
+       File "import_defs.ml", line 24, characters 2-39: Actual declaration
 |}]
