@@ -62,20 +62,31 @@ let [@ocamlformat "disable"] print ppf
     prefix Flambda_kind.Standard_int.print_lowercase kind result
 
 let convert_result_compared_to_tagged_zero
-    ({ lhs; rhs; kind; signed; tagged_or_untagged } as t) (op : _ P.comparison)
-    : P.t =
+    ({ lhs; rhs; kind; signed; tagged_or_untagged } as t)
+    (op : P.signed_or_unsigned P.comparison) : P.t option =
   (match tagged_or_untagged with
   | Tagged -> ()
   | Untagged ->
     Misc.fatal_errorf "Comparing untagged result with tagged zero: %a" print t);
-  let new_op : _ P.comparison =
+  (* The compare-function result is in [{-1, 0, 1}], so a *signed* comparison of
+     it against zero recovers the original comparison of [lhs] and [rhs] (with
+     the original comparison's signedness). This equivalence does not hold for
+     an *unsigned* outer comparison: e.g. [compare x y <u 0] is always [false]
+     since [-1] is the largest unsigned value, whereas [x < y] is not. So we
+     only rewrite unsigned outer comparisons when they are (in)equalities, for
+     which signedness is irrelevant. *)
+  let new_op : P.signed_or_unsigned P.comparison option =
     match op with
-    | Eq -> Eq
-    | Neq -> Neq
-    | Lt _ -> Lt signed
-    | Gt _ -> Gt signed
-    | Le _ -> Le signed
-    | Ge _ -> Ge signed
+    | Eq -> Some Eq
+    | Neq -> Some Neq
+    | Lt Signed -> Some (Lt signed)
+    | Gt Signed -> Some (Gt signed)
+    | Le Signed -> Some (Le signed)
+    | Ge Signed -> Some (Ge signed)
+    | Lt Unsigned | Gt Unsigned | Le Unsigned | Ge Unsigned -> None
   in
-  let prim : P.binary_primitive = Int_comp (kind, Yielding_bool new_op) in
-  Binary (prim, lhs, rhs)
+  match new_op with
+  | None -> None
+  | Some new_op ->
+    let prim : P.binary_primitive = Int_comp (kind, Yielding_bool new_op) in
+    Some (Binary (prim, lhs, rhs))
