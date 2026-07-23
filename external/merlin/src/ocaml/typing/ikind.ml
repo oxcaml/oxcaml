@@ -428,7 +428,6 @@ module Solver = struct
       | Types.Tunivar { name = _name; jkind } ->
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
-      | Types.Tmod (ty, _) -> kind ~use_tables:true ctx ty
       | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions

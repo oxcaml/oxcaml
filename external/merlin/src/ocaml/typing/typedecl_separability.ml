@@ -149,7 +149,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       (* these should only occur under Tobject and not at the toplevel,
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
-  | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty | Tmod (ty, _) -> [ty]
+  | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
@@ -468,8 +468,7 @@ let check_type
        variable cannot be extracted by constraints (this would be
        a scope violation), so they could be ignored if they occur
        under a separating type constructor. *)
-    | (Tpoly(pty,_)       , m      )
-    | (Tmod(pty,_)        , m      ) ->
+    | (Tpoly(pty,_)       , m      ) ->
         check_type hyps pty m
     | (Trepr(_pty,_)       , _m    ) ->
         assert false

@@ -285,8 +285,6 @@ module Type_shape = struct
         in
         let type_shape =
           match desc with
-          | Tmod (ty, _) ->
-            of_type_expr_go ~depth ~visited ty subst shape_for_constr
           | Tconstr (path, constrs, _) ->
             let args = of_expr_list constrs in
             let shape = shape_for_constr path ~args in
@@ -320,7 +318,7 @@ module Type_shape = struct
                 | Tnil | Tvar _
                 | Tarrow (_, _, _, _)
                 | Ttuple _ | Tunboxed_tuple _
-                | Tconstr (_, _, _) | Tmod _
+                | Tconstr (_, _, _)
                 | Tobject (_, _)
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _

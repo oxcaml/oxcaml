@@ -114,7 +114,7 @@ let compute_variance env visited vari ty =
             | _ -> ())
           (row_fields row);
         compute_same (row_more row)
-    | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _) ->
+    | Tpoly (ty, _) | Trepr (ty, _) ->
         compute_same ty
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
     | Tpackage pack ->

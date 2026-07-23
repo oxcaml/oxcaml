@@ -76,10 +76,8 @@ let lookup_env f x env =
 let rec methods_of_type env ?(acc = []) type_expr =
   let open Types in
   match get_desc type_expr with
-  | Tlink type_expr
-  | Tobject (type_expr, _)
-  | Tpoly (type_expr, _)
-  | Tmod (type_expr, _) -> methods_of_type env ~acc type_expr
+  | Tlink type_expr | Tobject (type_expr, _) | Tpoly (type_expr, _) ->
+    methods_of_type env ~acc type_expr
   | Tfield (name, _, ty, rest) ->
     methods_of_type env ~acc:((name, ty) :: acc) rest
   | Tconstr (path, _, _) ->
@@ -345,7 +343,6 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
     let rec arrow_arity n t =
       match Types.get_desc t with
       | Types.Tarrow (_, _, rhs, _) -> arrow_arity (n + 1) rhs
-      | Types.Tmod (t, _) -> arrow_arity n t
       | _ -> n
     in
     let rec nth_arrow n t =
@@ -353,7 +350,6 @@ let get_candidates ?get_doc ?target_type ?prefix_path ~prefix kind ~validate env
       else
         match Types.get_desc t with
         | Types.Tarrow (_, _, rhs, _) -> nth_arrow (n - 1) rhs
-        | Types.Tmod (t, _) -> nth_arrow n t
         | _ -> t
     in
     let type_check =
@@ -815,7 +811,6 @@ let labels_of_application ~prefix = function
     let rec labels t =
       match Types.get_desc t with
       | Types.Tarrow ((label, _, _), lhs, rhs, _) -> (label, lhs) :: labels rhs
-      | Types.Tmod (t, _) -> labels t
       | _ ->
         let t' = Ctype.full_expand ~may_forget_scope:true exp_env t in
         if
@@ -846,7 +841,6 @@ let labels_of_application ~prefix = function
             match Types.get_desc ty with
             | Types.Tconstr (path, [ ty ], _)
               when Path.same path Predef.path_option -> ty
-            | Types.Tmod (ty, _) -> ty
             | _ -> ty
           in
           Some ("?" ^ str, ty))

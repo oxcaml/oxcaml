@@ -366,7 +366,6 @@ let deep_copy () =
         | Ttuple tl -> Ttuple (List.map (fun (l, t) -> l, copy t) tl)
         | Tunboxed_tuple tl -> Tunboxed_tuple (List.map (fun (l, t) -> l, copy t) tl)
         | Tconstr (p, tl, _) -> Tconstr (p, List.map copy tl, ref Mnil)
-        | Tmod (t, bounds) -> Tmod (copy t, bounds)
         | Tobject (t1, r) ->
           let r = match !r with
             | None -> None

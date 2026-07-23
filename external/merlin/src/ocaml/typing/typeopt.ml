@@ -265,7 +265,7 @@ let classify ~classify_product env ty layout : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tmod _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
       Addr
   (* Quotes are not representable, but it's safe to say they are [Any].
      Unreduced splices and evals might stand for anything. *)
@@ -768,7 +768,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
                because [scrape_ty] looks though them. *)
             unknown ()
           end
-        | Tvar _ | Tarrow _ | Ttuple _ | Tmod _ | Tobject _ | Tfield _ | Tnil
+        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
         | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
           unknown ()

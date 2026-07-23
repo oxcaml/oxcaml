@@ -44,7 +44,7 @@ let sherlodoc_type_of _env typ =
       let p = p in
       let name = Format.asprintf "%a" Printtyp.path p in
       Type_parsed.Tycon (name, List.map ~f:aux args)
-    | Types.Tpoly (typ, []) | Types.Tmod (typ, _) -> aux typ
+    | Types.Tpoly (typ, []) -> aux typ
     | _ -> Type_parsed.Unhandled
   in
   typ |> aux |> Type_expr.normalize_type_parameters
@@ -56,7 +56,6 @@ let make_constructible path desc =
       let rec aux acc t =
         match Types.get_desc t with
         | Types.Tarrow ((l, _, _), _, b, _) -> aux (acc ^ with_label l) b
-        | Types.Tmod (t, _) -> aux acc t
         | _ -> acc
       and with_label l =
         match l with

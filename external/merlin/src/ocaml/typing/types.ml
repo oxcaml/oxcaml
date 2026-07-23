@@ -150,7 +150,6 @@ and type_desc =
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
-  | Tmod of type_expr * mod_bounds
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
@@ -1370,10 +1369,9 @@ let best_effort_compare_type_expr te1 te2 =
         | Ttuple _ -> 2
         | Tunboxed_tuple _ -> 3
         | Tconstr (_, _, _) -> 5
-        | Tmod (_, _) -> 6
-        | Tpoly (_, _) -> 7
-        | Tof_kind _ -> 8
-        | Trepr (_, _) -> 9
+        | Tpoly (_, _) -> 6
+        | Tof_kind _ -> 7
+        | Trepr (_, _) -> 8
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1392,9 +1390,6 @@ let best_effort_compare_type_expr te1 te2 =
         if p = 0
         then List.compare (aux (depth + 1)) args1 args2
         else p
-      | Tmod (t1, mod_bounds1), Tmod (t2, mod_bounds2) ->
-        let c = aux (depth + 1) t1 t2 in
-        if c = 0 then Stdlib.compare mod_bounds1 mod_bounds2 else c
       | Tpoly (t1, ts1), Tpoly (t2, ts2) ->
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)
