@@ -144,14 +144,14 @@ module Layout = struct
       | Product consts ->
         (* The addressability slot stays on the product root as an action: it
            marks the product as a whole, not its components. A join slot
-           becomes an unmarked root deriving from the join components, which
-           reads the same. (The scannable axes are pushed into the
-           components, as before; they are ignored on non-scannable layouts
-           anyway.) *)
+           becomes an unmarked root deriving from join components, which
+           reads the same; an exact slot has exactly-plain components
+           ([Addressability.decomposed_component]). (The scannable axes are
+           pushed into the components, as before; they are ignored on
+           non-scannable layouts anyway.) *)
+        let component_slot = Addressability.decomposed_component a in
         Product
-          ( List.map
-              (fun s -> of_sort_const s sa Addressability.Id_or_addressable)
-              consts,
+          ( List.map (fun s -> of_sort_const s sa component_slot) consts,
             Addressability.forget_join a )
       | Univar uv -> Univar (uv, sa, a)
       | Genvar v -> Genvar (v, sa, a)
@@ -331,13 +331,13 @@ module Layout = struct
       | Product sorts ->
         (* The node's addressability slot stays on the product root as an
            action. A join slot (a flexible variable's bound filled with a
-           product sort) becomes an unmarked root deriving from the join
-           components, which reads the same. *)
+           product sort) becomes an unmarked root deriving from join
+           components, which reads the same; an exact slot has exactly-plain
+           components ([Addressability.decomposed_component]). *)
+        let component_slot = Addressability.decomposed_component a in
         Product
           ( List.map
-              (fun s ->
-                flatten_sort s Scannable_axes.max
-                  Addressability.Id_or_addressable)
+              (fun s -> flatten_sort s Scannable_axes.max component_slot)
               sorts,
             Addressability.forget_join a )
       | Univar x -> Sort (Univar x, sa, a)
@@ -438,16 +438,14 @@ module Layout = struct
             (conservatively) concludes that they are not equal. *)
       then Scannable_axes.equal sa1 sa2
       else true
-    | (Product (ts, _) as prod), (Sort (sort, _, _) as srt)
-    | (Sort (sort, _, _) as srt), (Product (ts, _) as prod) -> (
+    | (Product (ts, _) as prod), (Sort (sort, _, sslot) as srt)
+    | (Sort (sort, _, sslot) as srt), (Product (ts, _) as prod) -> (
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
       | Some sorts ->
+        let component_slot = Addressability.decomposed_component sslot in
         let sorts =
-          List.map
-            (fun x ->
-              Sort (x, Scannable_axes.max, Addressability.Id_or_addressable))
-            sorts
+          List.map (fun x -> Sort (x, Scannable_axes.max, component_slot)) sorts
         in
         List.equal (equate_or_equal ~allow_mutation) ts sorts
         && addressability_equal prod srt)
@@ -607,38 +605,31 @@ module Layout = struct
           in
           Misc.Le_result.combine components (addressability_sub t1 t2)
         else Not_le
-      | Product (ts1, _), Sort (s2, _, _) -> (
+      | Product (ts1, _), Sort (s2, _, sslot2) -> (
         match Sort.decompose_into_product s2 (List.length ts1) with
         | None -> Not_le
         | Some ss2 ->
+          let component_slot = Addressability.decomposed_component sslot2 in
           let components =
             Misc.Le_result.combine_list
               (List.map2
                  (fun t1 s2 ->
-                   sub t1
-                     (Sort
-                        ( s2,
-                          Scannable_axes.max,
-                          Addressability.Id_or_addressable )))
+                   sub t1 (Sort (s2, Scannable_axes.max, component_slot)))
                  ts1 ss2)
           in
           Misc.Le_result.combine components (addressability_sub t1 t2))
-      | Sort (s1, _, _), Product (ts2, _) -> (
+      | Sort (s1, _, sslot1), Product (ts2, _) -> (
         match Sort.decompose_into_product s1 (List.length ts2) with
         | None -> Not_le
         | Some ss1 ->
+          let component_slot = Addressability.decomposed_component sslot1 in
           (* The components must be compared before the roots: their sort
              equations refine the left's addressability reading. *)
           let components =
             Misc.Le_result.combine_list
               (List.map2
                  (fun s1 t2 ->
-                   sub
-                     (Sort
-                        ( s1,
-                          Scannable_axes.max,
-                          Addressability.Id_or_addressable ))
-                     t2)
+                   sub (Sort (s1, Scannable_axes.max, component_slot)) t2)
                  ss1 ts2)
           in
           Misc.Le_result.combine components (addressability_sub t1 t2))
@@ -704,13 +695,13 @@ module Layout = struct
         match Sort.decompose_into_product sort (List.length ts) with
         | None -> None
         | Some sorts ->
+          let component_slot = Addressability.decomposed_component sa in
           products
             ~root_addressability:
               (product_root_slot pa (Addressability.forget_join sa))
             ts
             (List.map
-               (fun x ->
-                 Sort (x, Scannable_axes.max, Addressability.Id_or_addressable))
+               (fun x -> Sort (x, Scannable_axes.max, component_slot))
                sorts)))
 
   let intersection t1 t2 = intersection_gen ~claim:addressability t1 t2
@@ -3325,18 +3316,18 @@ let get_annotation jk = jk.annotation
 
 let decompose_product env jk =
   let mk_jkind layout = set_layout jk layout in
-  let deal_with_sort : Sort.t -> _ = function
+  let deal_with_sort ~component_slot : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts ->
       Some
         (List.map
            (fun sort ->
-             (* As with the scannable axes, the components are given
-                flexible join ([Id_or_addressable]) slots; the sort product
-                doesn't store enough information for any other choice. *)
-             mk_jkind
-               (Sort (sort, Scannable_axes.max, Addressability.Id_or_addressable)))
+             (* The components' slots follow the root's: exactly-plain under
+                an exact root, the flexible join under a flexible one. The
+                scannable axes are unconstrained; the sort product doesn't
+                store enough information for any other choice. *)
+             mk_jkind (Sort (sort, Scannable_axes.max, component_slot)))
            sorts)
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
@@ -3353,7 +3344,10 @@ let decompose_product env jk =
          relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
          introduce product histories. *)
       Some (List.map mk_jkind layouts)
-    | Sort (s, _, _) -> deal_with_sort (Sort.get s))
+    | Sort (s, _, a) ->
+      deal_with_sort
+        ~component_slot:(Addressability.decomposed_component a)
+        (Sort.get s))
 
 (*********************************)
 (* pretty printing *)

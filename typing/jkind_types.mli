@@ -167,6 +167,8 @@ module Addressability : sig
 
   val forget_join : t -> Action.t
 
+  val decomposed_component : t -> t
+
   val to_string : t -> string
 
   val print : Format_doc.formatter -> t -> unit
@@ -240,11 +242,13 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    (** The addressability reading of a constant layout: a join
-        ([Id_or_addressable]) slot on a base is collapsed to the base's
-        intrinsic addressability, and an unmarked product derives its reading
-        from its components. [Univar]/[Genvar] layouts read as
-        [Id_or_addressable]. *)
+    (** The addressability reading of a constant layout. A join
+        ([Id_or_addressable]) slot on a base collapses only when the base is
+        intrinsically addressable, where its branches coincide, and is otherwise
+        preserved - the join is information (a flexible [bits8] bound still
+        admits [bits8 addressable]) and must survive [equal]; only printing
+        elides it. An unmarked product derives its reading from its components;
+        [Univar]/[Genvar] layouts read their stored slot. *)
     val addressability : t -> Addressability.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
@@ -261,8 +265,7 @@ module Layout : sig
 
     (** Apply the [addressable] kind operator: an override of the root slot to
         [Addressable], not a meet. This does nothing to an already-addressable
-        kind. Applications to [Univar]/[Genvar] layouts are dropped (these are
-        alpha-gated). *)
+        kind. *)
     val set_root_addressable : t -> t
   end
 

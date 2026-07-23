@@ -1374,21 +1374,20 @@ module Layout = struct
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa a)
         | Product sorts ->
+          let component_slot = Addressability.decomposed_component a in
           Option.map
             (fun x -> Product (x, Addressability.forget_join a))
             (* [Sort.get] is deep, so no need to repeat it here *)
-            (* In all cases where sort products are turned into layout
-               products, [Scannable_axes.max] and
-               [Addressability.Id_or_addressable] are used for the components.
-               The sort product doesn't store enough information to make any
-               other choice. The node's addressability slot stays on the
-               product root as an action: it marks the product as a whole, not
-               its components. A join slot (a flexible variable's bound later
-               filled with a product sort) becomes an unmarked root deriving
-               from the join components, which reads the same. *)
+            (* The sort product doesn't constrain the components' scannable
+               axes, so they get [Scannable_axes.max]. The addressability
+               slot stays on the product root as an action: it marks the
+               product as a whole, not its components. A join slot (a
+               flexible variable's bound later filled with a product sort)
+               becomes an unmarked root deriving from join components, which
+               reads the same; an exact slot has exactly-plain components
+               ([Addressability.decomposed_component]). *)
             (Misc.Stdlib.List.map_option
-               (fun s ->
-                 of_sort s Scannable_axes.max Addressability.Id_or_addressable)
+               (fun s -> of_sort s Scannable_axes.max component_slot)
                sorts)
         | Univar uv -> Some (Univar (uv, sa, a))
       in

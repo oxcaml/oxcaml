@@ -130,8 +130,15 @@ module Addressability : sig
   (** The action recorded in a [Sort] node's slot, forgetting the join. Used
       when flattening a product sort into a [Product] node, whose root carries
       only an action: the join, if any, moves onto the fabricated components
-      instead. *)
+      instead ([decomposed_component]). *)
   val forget_join : t -> Action.t
+
+  (** The slot fabricated for the components of a decomposed sort-backed product
+      whose root slot is the argument: a flexible root (the join) constrains its
+      components not at all, while an exact root has exactly-plain components
+      ([Id] is the plain product, and [Addressable] is the whole-product mark,
+      which does not distribute to the components). *)
+  val decomposed_component : t -> t
 
   (** Only [Addressable] is ever printed in user-facing output. *)
   val to_string : t -> string
