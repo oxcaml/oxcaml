@@ -1074,26 +1074,27 @@ module Layout = struct
      - On an unaddressable base, [Id] and [Addressable] mean exactly the
        plain and the marked kind.
      - On an unfilled *flexible* variable the slot is [Id_or_addressable]
-       or, once constrained, [Addressable] - the latter being the upper
-       bound "some addressable kind at this sort", which at a product sort
-       admits both the whole-marked product and any product of addressable
-       components (see [Addressability.decomposed_component]). An [Id] slot
-       on an unfilled variable arises only from *rigid* stand-ins (lpoly
-       layout variables; see [Typetexp]) and the instance copies used to
-       match them, and means exactly the plain kind: [x] and
+       or, once constrained by [any addressable], [Addressable]. The latter
+       is a COMMITMENT, in the same family as sort defaulting: the variable's
+       kind becomes exactly the marked kind of whatever sort it resolves to.
+       At a base sort this loses nothing (there is exactly one addressable
+       kind per unaddressable base), so the commitment is complete there. At
+       a product sort it is deliberately incomplete: only the whole-marked
+       product satisfies it, and a component-marked product - a different,
+       incomparable addressable kind - is rejected (see
+       [Addressability.decomposed_component] and
+       testsuite/tests/typing-layouts-addressable/instantiate.ml). This
+       keeps every question the checker asks about an EXACT kind; asking
+       "is this some addressable kind at this sort?" would require a fourth
+       slot value distinguishing the constraint from the mark, which can
+       recover the completeness at products if it is ever needed. An [Id]
+       slot on an unfilled variable arises only from *rigid* stand-ins
+       (lpoly layout variables; see [Typetexp]) and the instance copies used
+       to match them, and means exactly the plain kind: [x] and
        [x addressable] are incomparable while [x] is unknown, and readers
        collapse either to the marked kind once [x] resolves intrinsically
        addressable. Meets treat the rigid-unknown mismatch as "not
-       definitely disjoint" ([Jkind.Layout.has_intersection]).
-       CR rtjoa: a rigid [x addressable] transfers as [Addressable] too,
-       where it ought to mean exactly the whole-marked product once [x] is
-       instantiated at a product sort. This is observable at typing today:
-       applying a functor parameter's lpoly val instantiates [x] through
-       flexible instance copies, whose [Addressable] slot then gets the
-       upper-bound reading and wrongly admits component-marked products
-       (testsuite/tests/typing-layouts-addressable/instantiate.ml). The
-       exact and upper-bound readings of [Addressable] need to be
-       distinguished, e.g. by a fourth slot value. *)
+       definitely disjoint" ([Jkind.Layout.has_intersection]). *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t

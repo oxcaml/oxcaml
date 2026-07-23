@@ -206,8 +206,8 @@ module Addressability = struct
     | Id | Id_or_addressable -> Id
 
   let decomposed_component : t -> t = function
-    | Id -> Id
-    | Addressable | Id_or_addressable -> Id_or_addressable
+    | Id | Addressable -> Id
+    | Id_or_addressable -> Id_or_addressable
 
   let to_string = function
     | Addressable -> "addressable"
