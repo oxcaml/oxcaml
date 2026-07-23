@@ -2382,8 +2382,6 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
     | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
     | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
-    (* CR metaprogramming aivaskovic:
-      consider implementing in CamlinternalQuote *)
     | Const_untagged_char _ | Const_int8 _ | Const_int16 _
     | Const_untagged_int _ | Const_untagged_int8 _ | Const_untagged_int16 _ ->
       fatal_errorf "Translquote: cannot quote constant %s"

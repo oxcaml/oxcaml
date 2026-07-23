@@ -280,7 +280,6 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_try _
     | Texp_override _
     | Texp_letop _
-    (* CR metaprogramming aivaskovic: verify for quotations and splices *)
     | Texp_quote _
     | Texp_splice _ ->
         Dynamic
