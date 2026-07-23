@@ -304,12 +304,12 @@ type r = string @ local once unique -> string
 
 type r = local_ string @ unique once portable contended -> string
 [%%expect{|
-type r = string @ local once portable unique contended -> string
+type r = string @ local once unique portable contended -> string
 |}]
 
 type r = string @ local unique once portable contended -> string
 [%%expect{|
-type r = string @ local once portable unique contended -> string
+type r = string @ local once unique portable contended -> string
 |}]
 
 type r = string @ local unique once nonportable uncontended -> string

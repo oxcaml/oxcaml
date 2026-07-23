@@ -1416,7 +1416,7 @@ Error: Annotating types with kinds
 (* Expression constraints *)
 <[ fun x -> (x : _  @ unique portable)]>
 [%%expect {|
-- : <[$('a) @ portable unique -> $('a)]> expr =
+- : <[$('a) @ unique portable -> $('a)]> expr =
 <[fun x -> (x : _ @ unique portable)]>
 |}];;
 
