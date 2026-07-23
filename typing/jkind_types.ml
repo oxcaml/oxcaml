@@ -1085,12 +1085,15 @@ module Layout = struct
        collapse either to the marked kind once [x] resolves intrinsically
        addressable. Meets treat the rigid-unknown mismatch as "not
        definitely disjoint" ([Jkind.Layout.has_intersection]).
-       CR-someday rtjoa: a rigid [x addressable] transfers as [Addressable]
-       too, where it ought to mean exactly the whole-marked product once [x]
-       is instantiated at a product sort; the exact and upper-bound readings
-       of [Addressable] will need to be distinguished (e.g. a fourth slot
-       value) when instantiating layout variables at products becomes
-       supported. *)
+       CR rtjoa: a rigid [x addressable] transfers as [Addressable] too,
+       where it ought to mean exactly the whole-marked product once [x] is
+       instantiated at a product sort. This is observable at typing today:
+       applying a functor parameter's lpoly val instantiates [x] through
+       flexible instance copies, whose [Addressable] slot then gets the
+       upper-bound reading and wrongly admits component-marked products
+       (testsuite/tests/typing-layouts-addressable/instantiate.ml). The
+       exact and upper-bound readings of [Addressable] need to be
+       distinguished, e.g. by a fourth slot value. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t

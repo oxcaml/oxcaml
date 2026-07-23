@@ -1,0 +1,13 @@
+type p_plain : bits8 & bits16
+type p_whole : (bits8 & bits16) addressable
+type p_components : bits8 addressable & bits16 addressable
+module Use :
+  functor
+    (M : sig
+           val f : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b -> unit
+         end)
+    ->
+    sig
+      val ok : p_plain -> p_whole -> unit
+      val questionable : p_plain -> p_components -> unit
+    end
