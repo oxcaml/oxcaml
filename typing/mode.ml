@@ -1492,6 +1492,7 @@ module Lattices_mono = struct
           _ ) ->
         Is_not_eq
 
+    (** Used by [compare] below. *)
     let ord : type p r. (p, r) t -> int = function
       | Areality -> 0
       | Forkable -> 1
@@ -1504,6 +1505,8 @@ module Lattices_mono = struct
       | Contention -> 8
       | Staticity -> 9
 
+    (** Compare two axes in implication order. If A implies B, then A is before
+        B. This is also observed by [printtyp]. *)
     let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
      fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
