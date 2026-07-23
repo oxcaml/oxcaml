@@ -1603,10 +1603,6 @@ val min_mode_with_locks : mode_with_locks
 (** Get the mode, asserting no held locks. *)
 val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
-(** Fold over the antiquotations in an expression. This function defines the
-    evaluation order of antiquotations. *)
-val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
-
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
 
