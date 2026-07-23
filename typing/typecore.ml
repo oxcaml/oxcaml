@@ -8723,7 +8723,7 @@ and type_expect_
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let new_env =
         env
-        |> Env.enter_quotation
+        |> Env.enter_quote
         |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in

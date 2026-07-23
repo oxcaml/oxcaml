@@ -3099,7 +3099,7 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
-let enter_quotation env =
+let enter_quote env =
   add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
 let enter_splice ~loc env =
