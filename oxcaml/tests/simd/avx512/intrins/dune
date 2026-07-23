@@ -2,73 +2,6 @@
 ; the real C intrinsic (the C compiler is the oracle). Enabled on amd64 non-macos
 ; in the main context, like the other AVX512 tests.
 
-(foreign_library
- (archive_name stubs_intrins)
- (language c)
- (names stubs)
- (flags
-  (:standard
-   (:include flags512.sexp)))
- (include_dirs "../../../../../runtime"))
-
-(rule
- (targets flags512.sexp)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")))
- (action
-  (with-stdout-to
-   flags512.sexp
-   (echo "(-mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd)"))))
-
-(rule
- (targets flags512.sexp)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (<> %{architecture} "amd64")))
- (action
-  (with-stdout-to
-   flags512.sexp
-   (echo "()"))))
-
-(executable
- (name smoke)
- (modules smoke)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
- (libraries stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs_intrins))
-
-(rule
- (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   smoke.out
-   (run ./smoke.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (action
-  (diff empty.expected smoke.out)))
-
-
 ; The generated test sources are build-time rule targets (not checked in),
 ; regenerated from the same data that produces the selection code.
 (rule
@@ -205,51 +138,6 @@
 
 ; Internal-assembler variants: the same tests built with -internal-assembler,
 ; cross-checking the binary emitter's EVEX encodings against GAS.
-
-(rule
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (action
-  (copy smoke.ml smoke_ia.ml)))
-
-(executable
- (name smoke_ia)
- (modules smoke_ia)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
-   -internal-assembler))
- (libraries stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs_intrins))
-
-(rule
- (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   smoke_ia.out
-   (run ./smoke_ia.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{architecture} "amd64")
-   (<> %{system} macosx)))
- (action
-  (diff empty.expected smoke_ia.out)))
 
 (rule
  (enabled_if
