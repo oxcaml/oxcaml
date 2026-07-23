@@ -183,8 +183,16 @@ module Addressability : sig
 
   (** The intrinsic addressability of a sort, insofar as it is determined: the
       addressability of an unfilled sort variable is not yet known
-      ([Id_or_addressable]). *)
+      ([Id_or_addressable]). This is a mark-free question - the addressability
+      of the *plain* kind of the sort - so it can be definite ([Id]) even while
+      the marks over the sort are undetermined. *)
   val of_sort : Sort.t -> t
+
+  (** Whether every kind with this sort is addressable, whatever its marks: the
+      plain kind is intrinsically addressable, so the plain, marked, and join
+      forms all coincide, and readers may collapse unmarked and join slots to
+      [Addressable]. *)
+  val sort_is_always_addressable : Sort.t -> bool
 end
 
 module Layout : sig

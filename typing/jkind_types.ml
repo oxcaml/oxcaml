@@ -1022,7 +1022,10 @@ module Addressability0 = struct
       Id
 
   (* The intrinsic addressability of a sort, insofar as it is determined: the
-     addressability of an unfilled sort variable is not yet known. *)
+     addressability of an unfilled sort variable is not yet known. This is a
+     mark-free question - the addressability of the *plain* kind of the sort
+     - so it can be definite ([Id]) even while the marks over the sort are
+     undetermined. *)
   let of_sort s =
     let rec go : Sort.t -> t = function
       | Base b -> of_base b
@@ -1031,6 +1034,15 @@ module Addressability0 = struct
     in
     (* [Sort.get] is deep, so a returned [Var] is guaranteed unfilled. *)
     go (Sort.get s)
+
+  (* Whether every kind with this sort is addressable, whatever its marks:
+     the plain kind is intrinsically addressable, so marking is a no-op and
+     the plain, marked, and join forms all coincide. Readers use this to
+     collapse unmarked and join slots to [Addressable]. [false] means the
+     forms either differ or are not yet known to coincide (an unfilled
+     variable in the sort). *)
+  let sort_is_always_addressable s =
+    match of_sort s with Addressable -> true | Id | Id_or_addressable -> false
 end
 
 module Addressability = Addressability0

@@ -374,10 +374,8 @@ module Layout = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Addressable -> a
-      | Id | Id_or_addressable -> (
-        match Addressability.of_sort s with
-        | Addressable -> Addressable
-        | Id | Id_or_addressable -> a))
+      | Id | Id_or_addressable ->
+        if Addressability.sort_is_always_addressable s then Addressable else a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressability.Addressable
@@ -419,10 +417,8 @@ module Layout = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Addressable | Id_or_addressable -> a
-      | Id -> (
-        match Addressability.of_sort s with
-        | Addressable -> Addressable
-        | Id | Id_or_addressable -> a))
+      | Id ->
+        if Addressability.sort_is_always_addressable s then Addressable else a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressability.Addressable
@@ -2858,10 +2854,12 @@ module Desc = struct
   (* CR layouts v2.8: This will probably need to be overhauled with
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
      algorithm. Internal ticket 5096. *)
-  let flat_sort_intrinsic_addressability : Sort.Flat.t -> Addressability.t =
-    function
-    | Base b -> Addressability.of_base b
-    | Var _ | Genvar _ | Univar _ -> Addressability.Id_or_addressable
+  let flat_sort_is_always_addressable : Sort.Flat.t -> bool = function
+    | Base b -> (
+      match Addressability.of_base b with
+      | Addressable -> true
+      | Id | Id_or_addressable -> false)
+    | Var _ | Genvar _ | Univar _ -> false
 
   (* As [Layout.addressability], over flat sorts. *)
   let rec layout_addressability : Sort.Flat.t Layout.t -> Addressability.t =
@@ -2870,10 +2868,10 @@ module Desc = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Addressable -> a
-      | Id | Id_or_addressable -> (
-        match flat_sort_intrinsic_addressability s with
-        | Addressable -> Addressable
-        | Id | Id_or_addressable -> a))
+      | Id | Id_or_addressable ->
+        if flat_sort_is_always_addressable s
+        then Addressability.Addressable
+        else a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressability.Addressable
