@@ -207,8 +207,24 @@ let flambda_to_flambda0 : type m.
         then (
           let flambda, free_names, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
-                Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-                  ~final_typing_env flambda)
+                (* These two branches are exactly the same but spelt
+                   differently. In the future, LTO support will split pre- and
+                   post- traverse work between separate processes. *)
+                if Flambda_features.support_lto ()
+                then
+                  let traverse_result =
+                    Flambda2_reaper.Reaper.Staged.traverse flambda
+                  in
+                  let solved_dep =
+                    Flambda2_reaper.Reaper.Staged.solve traverse_result
+                  in
+                  let unit_metadata = Flambda_unit.metadata flambda in
+                  Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+                    ~traverse_result ~solved_dep ~machine_width ~cmx_loader
+                    ~all_code ~final_typing_env
+                else
+                  Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
+                    ~all_code ~final_typing_env flambda)
           in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
