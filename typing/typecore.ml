@@ -2090,7 +2090,13 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
      that [containing_type] has no arguments (or only variables as
      arguments). *)
   let vars_and_ty_args, ty_res =
-    Ctype.instance_labels ~fixed:false representative_label.lbl_all
+    let representative =
+      if !Clflags.typing_recovery then
+        Some representative_label
+      else None
+    in
+    Ctype.instance_labels ~fixed:false ?representative
+      representative_label.lbl_all
   in
   unify_exp_types loc env containing_type ty_res;
   let sorts, rep =

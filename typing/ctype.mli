@@ -253,7 +253,8 @@ val instance_label:
 (* Same, for a label *)
 val instance_labels:
   fixed:bool ->
-  _ Data_types.gen_label_description array ->
+  ?representative:'a Data_types.gen_label_description ->
+  'a Data_types.gen_label_description array ->
   (type_expr list * type_expr) array * type_expr
 (* Same, for a whole list of labels *)
 val instance_label_declarations:
