@@ -1086,6 +1086,12 @@ module Instruction_name : sig
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | STLUR :
+        ( pair,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Mem of [`Offset_nine_signed_unscaled]] )
+        t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -1738,6 +1744,11 @@ module DSL : sig
     [`Mem of [> `Offset_twelve_unsigned_scaled | `Offset_nine_signed_unscaled]]
     Operand.t
     mem_offset_result
+
+  val mem_offset_unscaled :
+    base:[`GP of [< `X | `SP]] Reg.t ->
+    offset:int ->
+    [`Mem of [> `Offset_nine_signed_unscaled]] Operand.t
 
   val mem_symbol :
     base:[`GP of [< `X | `SP]] Reg.t ->
