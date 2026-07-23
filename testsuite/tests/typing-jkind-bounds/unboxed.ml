@@ -82,3 +82,35 @@ type 'k access : void mod everything
 type ('a, 'k) unpacked = #(('a, 'k) data * 'k access)
 type 'a t = P : ('a, 'k) unpacked -> 'a t [@@unboxed]
 |}]
+
+(*********************************************************)
+(* Local kind bounds within gadts should be respected. *)
+
+type 'a t : immutable_data =
+  | T : ('a : immutable_data). 'a -> 'a t
+[@@unboxed]
+[%%expect {|
+Lines 1-3, characters 0-11:
+1 | type 'a t : immutable_data =
+2 |   | T : ('a : immutable_data). 'a -> 'a t
+3 | [@@unboxed]
+Error: The kind of type "t" is
+           value mod everything non_float mod dynamic with 'a
+         because it's an unboxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+type 'a t : value mod portable =
+  | T : ('a : value mod portable). { foo : 'a } -> 'a t
+[@@unboxed]
+[%%expect {|
+Lines 1-3, characters 0-11:
+1 | type 'a t : value mod portable =
+2 |   | T : ('a : value mod portable). { foo : 'a } -> 'a t
+3 | [@@unboxed]
+Error: The kind of type "t" is value mod everything mod dynamic with 'a
+         because it's an unboxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
