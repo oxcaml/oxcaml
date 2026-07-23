@@ -194,6 +194,15 @@ module type Solver_mono = sig
 
   type pinpoint
 
+  (** Represents a sequence of local changes to the copying scope of a mode
+      variable. Copying a mode takes a [copy_scope], and it is up to the caller
+      to create a new copy scope, and reset it once all copies have been made *)
+  type copy_scope
+
+  (** Runs a function [f] in a fresh mode copy scope, which gets cleaned up once
+      [f] is finished *)
+  val with_copy_scope : (copy_scope -> 'a) -> 'a
+
   type 'd hint_morph constraint 'd = 'l * 'r
 
   type 'd hint_const constraint 'd = 'l * 'r
@@ -316,6 +325,29 @@ module type Solver_mono = sig
     ('a, 'l * 'r) mode ->
     log:changes ref option ->
     unit
+
+  (** Resets the counter used to allocate the (negative) ids of persistent
+      copies of mode variables. Mirrors [Subst.reset_additional_action_id] for
+      types, and is called at the start of every cmi save. *)
+  val reset_persistent_id : unit -> unit
+
+  (** If the variable has not yet been copied within the same [copy_scope],
+      [copy] copies all reachable variables whose level lies within the window
+      \[[copy_from_level], [copy_below_level]). If [copy_to_level] is given, the
+      copies are placed at that level; this is only allowed for windows of size
+      1). If not given, copies keep the levels of their originals. If
+      [persistent] (default false), copies receive negative ids from a dedicated
+      counter (see [reset_persistent_id]). Returns either the freshly copied
+      mode, or the copy cached in [copy_scope]. *)
+  val copy :
+    copy_scope:copy_scope ->
+    copy_from_level:int ->
+    copy_below_level:int ->
+    ?copy_to_level:int ->
+    ?persistent:bool ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    ('a, 'l * 'r) mode
 
   (** Creates a new mode variable above the given mode and returns [true]. In
       the speical case where the given mode is top, returns the constant top and
