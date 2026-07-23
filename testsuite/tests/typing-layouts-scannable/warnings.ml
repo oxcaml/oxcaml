@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -w +183..184";
+ flags = "-extension layouts_alpha";
  expect;
 *)
 
@@ -28,24 +28,8 @@ Error: A type declaration's layout can be given at most once.
        This declaration has an layout annotation (value non_pointer) and a layout attribute ([@@immediate]).
 |}]
 
-(* CR layouts-scannable: The following errors should only print ONCE.
-   They are disabled by default because of the triple printing
-   but enabled locally in this test file. Once this is fixed, adjust this! *)
-
 type t : value separable
 [%%expect{|
-Line 1, characters 15-24:
-1 | type t : value separable
-                   ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
-Line 1, characters 15-24:
-1 | type t : value separable
-                   ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
 Line 1, characters 15-24:
 1 | type t : value separable
                    ^^^^^^^^^
@@ -69,47 +53,11 @@ Line 1, characters 34-49:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value_or_null maybe_null".
 
-Line 1, characters 23-33:
-1 | type t : value_or_null maybe_null maybe_separable
-                           ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value_or_null".
-
-Line 1, characters 34-49:
-1 | type t : value_or_null maybe_null maybe_separable
-                                      ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value_or_null maybe_null".
-
-Line 1, characters 23-33:
-1 | type t : value_or_null maybe_null maybe_separable
-                           ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value_or_null".
-
-Line 1, characters 34-49:
-1 | type t : value_or_null maybe_null maybe_separable
-                                      ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value_or_null maybe_null".
-
 type t : value_or_null
 |}]
 
 type t : immediate non_pointer
 [%%expect{|
-Line 1, characters 19-30:
-1 | type t : immediate non_pointer
-                       ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "immediate".
-
-Line 1, characters 19-30:
-1 | type t : immediate non_pointer
-                       ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "immediate".
-
 Line 1, characters 19-30:
 1 | type t : immediate non_pointer
                        ^^^^^^^^^^^
@@ -133,47 +81,11 @@ Line 1, characters 24-34:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value non_null".
 
-Line 1, characters 15-23:
-1 | type t : value non_null maybe_null
-                   ^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
-Line 1, characters 24-34:
-1 | type t : value non_null maybe_null
-                            ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_null".
-
-Line 1, characters 15-23:
-1 | type t : value non_null maybe_null
-                   ^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
-Line 1, characters 24-34:
-1 | type t : value non_null maybe_null
-                            ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_null".
-
 type t
 |}]
 
 type t : value maybe_separable non_pointer
 [%%expect{|
-Line 1, characters 15-30:
-1 | type t : value maybe_separable non_pointer
-                   ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
-Line 1, characters 15-30:
-1 | type t : value maybe_separable non_pointer
-                   ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value".
-
 Line 1, characters 15-30:
 1 | type t : value maybe_separable non_pointer
                    ^^^^^^^^^^^^^^^
@@ -191,18 +103,6 @@ Line 1, characters 27-36:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value non_pointer".
 
-Line 1, characters 27-36:
-1 | type t : value non_pointer separable
-                               ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 27-36:
-1 | type t : value non_pointer separable
-                               ^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
 type t : value non_pointer
 |}]
 
@@ -214,47 +114,11 @@ Line 1, characters 27-38:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value non_pointer".
 
-Line 1, characters 27-38:
-1 | type t : value non_pointer non_pointer
-                               ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 27-38:
-1 | type t : value non_pointer non_pointer
-                               ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
 type t : value non_pointer
 |}]
 
 type t : value non_pointer maybe_separable non_pointer
 [%%expect{|
-Line 1, characters 27-42:
-1 | type t : value non_pointer maybe_separable non_pointer
-                               ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 43-54:
-1 | type t : value non_pointer maybe_separable non_pointer
-                                               ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_separable".
-
-Line 1, characters 27-42:
-1 | type t : value non_pointer maybe_separable non_pointer
-                               ^^^^^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 43-54:
-1 | type t : value non_pointer maybe_separable non_pointer
-                                               ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_separable".
-
 Line 1, characters 27-42:
 1 | type t : value non_pointer maybe_separable non_pointer
                                ^^^^^^^^^^^^^^^
@@ -290,57 +154,11 @@ Line 1, characters 50-60:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "value non_pointer maybe_null non_pointer".
 
-Line 1, characters 27-37:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                               ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 38-49:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                                          ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_null".
-
-Line 1, characters 50-60:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                                                      ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_null non_pointer".
-
-Line 1, characters 27-37:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                               ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 38-49:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                                          ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_null".
-
-Line 1, characters 50-60:
-1 | type t : value non_pointer maybe_null non_pointer maybe_null
-                                                      ^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer maybe_null non_pointer".
-
 type t : value non_pointer
 |}]
 
 type t : void non_pointer
 [%%expect{|
-Line 1, characters 9-25:
-1 | type t : void non_pointer
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
-
-Line 1, characters 9-25:
-1 | type t : void non_pointer
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
-
 Line 1, characters 9-25:
 1 | type t : void non_pointer
              ^^^^^^^^^^^^^^^^
@@ -356,31 +174,11 @@ Line 1, characters 9-34:
              ^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
 
-Line 1, characters 9-34:
-1 | type t : void non_pointer non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
-
-Line 1, characters 9-34:
-1 | type t : void non_pointer non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer non_null" have no effect on the kind "void".
-
 type t : void
 |}]
 
 type t : void non_pointer maybe_separable
 [%%expect{|
-Line 1, characters 9-41:
-1 | type t : void non_pointer maybe_separable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
-
-Line 1, characters 9-41:
-1 | type t : void non_pointer maybe_separable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer maybe_separable" have no effect on the kind "void".
-
 Line 1, characters 9-41:
 1 | type t : void non_pointer maybe_separable
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -415,16 +213,6 @@ Line 1, characters 9-36:
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
 
-Line 1, characters 9-36:
-1 | type t : (value & value) non_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
-
-Line 1, characters 9-36:
-1 | type t : (value & value) non_pointer
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
-
 type t : value & value
 |}]
 
@@ -439,18 +227,6 @@ type t : value non_pointer
 
 type t : (value) non_pointer non_pointer
 [%%expect{|
-Line 1, characters 29-40:
-1 | type t : (value) non_pointer non_pointer
-                                 ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
-Line 1, characters 29-40:
-1 | type t : (value) non_pointer non_pointer
-                                 ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "value non_pointer".
-
 Line 1, characters 29-40:
 1 | type t : (value) non_pointer non_pointer
                                  ^^^^^^^^^^^
