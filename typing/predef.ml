@@ -419,6 +419,21 @@ and path_unboxed_float16x32 = Path.unboxed_version path_float16x32
 and path_unboxed_float32x16 = Path.unboxed_version path_float32x16
 and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
 
+let path_of_scalar (scalar : 'a Scalar.t) =
+  let value : 'a. 'a Scalar.Width.t -> Path.t = function
+    | Integral (Taggable Int8) -> path_int8
+    | Integral (Taggable Int16) -> path_int16
+    | Integral (Taggable Int) -> path_int
+    | Integral (Boxable (Int32 _)) -> path_int32
+    | Integral (Boxable (Int64 _)) -> path_int64
+    | Integral (Boxable (Nativeint _)) -> path_nativeint
+    | Floating (Float32 _) -> path_float32
+    | Floating (Float64 _) -> path_float
+  in
+  match scalar with
+  | Value width -> value width
+  | Naked width -> Path.unboxed_version (value width)
+
 let path_of_type_constr typ =
   Pident (ident_of_type_constr typ)
 

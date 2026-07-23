@@ -210,6 +210,11 @@ let _ : int8 = 128s
 - : int8 = -128s
 |}]
 
+let _ : int8 = 12
+[%%expect{|
+- : int8 = 12s
+|}]
+
 let _ : int8 = 129s
 [%%expect{|
 Line 1, characters 15-19:
@@ -344,6 +349,16 @@ let _ : int =
 - : int = 2
 |}]
 
+let _ : int =
+  match (12 : int8) with
+  | 12 -> 0
+  | 11s -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
 (* Partial match *)
 let _ : int =
   match 1s with
@@ -409,6 +424,11 @@ let _ : int16 = 32768S
 - : int16 = 32767S
 - : int16 = -32768S
 - : int16 = -32768S
+|}]
+
+let _ : int16 = 300
+[%%expect{|
+- : int16 = 300S
 |}]
 
 let _ : int16 = 32769S
@@ -543,6 +563,16 @@ let _ : int =
 ;;
 [%%expect{|
 - : int = 2
+|}]
+
+let _ : int =
+  match (300 : int16) with
+  | 300 -> 0
+  | 200S -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
 |}]
 
 (* Partial match *)
@@ -764,6 +794,16 @@ let _ : int =
 - : int = 2
 |}]
 
+let _ : int =
+  match (12 : int8#) with
+  | 12 -> 0
+  | #11s -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
+|}]
+
 (* Partial match *)
 let _ : int =
   match #1s with
@@ -893,6 +933,16 @@ let _ : int =
 ;;
 [%%expect{|
 - : int = 2
+|}]
+
+let _ : int =
+  match (300 : int16#) with
+  | 300 -> 0
+  | #200S -> 1
+  | _ -> 2
+;;
+[%%expect{|
+- : int = 0
 |}]
 
 (* Partial match *)
