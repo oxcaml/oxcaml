@@ -2031,3 +2031,252 @@ Line 1, characters 44-50:
                                                 ^^^^^^
 Error: This value is "local" but is expected to be "global".
 |}]
+
+(* Test 8: zero_alloc related tests *)
+
+let test () =
+  let (g @ noalloc_strict) () = () in
+  let (f @ noalloc_strict) () = (g @ alloc)in
+  let x = f () in
+  (x : _ @ noalloc_strict)
+[%%expect{|
+Line 3, characters 35-36:
+3 |   let (f @ noalloc_strict) () = (g @ alloc)in
+                                       ^
+Error: The value "(@)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-43
+         which is expected to be "noalloc_strict".
+|}]
+
+let (f @ noalloc_strict) g = g ()
+[%%expect{|
+val f : (unit -> 'a) -> 'a = <fun>
+|}]
+
+let test () =
+  let (f @ noalloc_strict) g = g () in
+  let _ = f in
+  ()
+[%%expect{|
+val test : unit -> unit = <fun>
+|}]
+
+let test () =
+  let (f @ noalloc_strict) (g: int -> int) = exclave_
+    fun () -> g 0
+  in
+  let (g_alloc @ alloc) x = let _ = 1.1 in x in
+  let _ = (f (fun x -> x) : _ @ noalloc_strict) in
+  let _ = f g_alloc in
+  ()
+[%%expect{|
+Line 7, characters 12-19:
+7 |   let _ = f g_alloc in
+                ^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+let test () =
+  let (f @ noalloc_strict) (g: (int -> int) @ alloc) = exclave_
+    fun () -> g 0
+  in
+  let _ = (f (fun x -> x) : _ @ noalloc_strict) in
+  ()
+[%%expect{|
+Line 5, characters 11-25:
+5 |   let _ = (f (fun x -> x) : _ @ noalloc_strict) in
+               ^^^^^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+let test () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  (f () : _ @ noalloc)
+[%%expect{|
+Line 4, characters 3-7:
+4 |   (f () : _ @ noalloc)
+       ^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+let test () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  let (h @ noalloc) () = f () in
+  h
+[%%expect{|
+Line 4, characters 25-26:
+4 |   let (h @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+         because it closes over the value "g" at line 3, characters 34-35
+         which is "alloc".
+       However, the value "f" highlighted is expected to be "noalloc"
+         because it is used inside the function at line 4, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+let test () =
+  let [@zero_alloc strict] (f @ alloc) () = 1.1 in
+  (f () : _ @ noalloc_strict)
+[%%expect{|
+val test : unit -> float = <fun>
+|}]
+
+let test () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  (f () : _ @ noalloc_strict)
+[%%expect{|
+val test : unit -> float = <fun>
+|}]
+
+let test () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  (f () : _ @ noalloc)
+[%%expect{|
+val test : unit -> float = <fun>
+|}]
+
+(* CR shsong: How about this? *)
+let [@zero_alloc strict] (f @ alloc) () = 1.1
+let (g @ noalloc_strict) () = f ()
+[%%expect{|
+val f : unit -> float [@@zero_alloc strict] = <fun>
+Line 2, characters 30-31:
+2 | let (g @ noalloc_strict) () = f ()
+                                  ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 25-34
+         which is expected to be "noalloc_strict".
+|}]
+
+(* CR shsong: Why the error is triggered? *)
+let test () =
+  let [@zero_alloc strict] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+let test () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+let test () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc) () = f () in
+  g
+[%%expect{|
+Line 3, characters 25-26:
+3 |   let (g @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 3, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Signature-sourced zero_alloc functions: unlike a local [let], a [val] in a
+   signature populates [val_zero_alloc], so [relax_alloc] can see it. These
+   replicate the [f () inside a noalloc function] cases above. *)
+module M_strict : sig
+  val f : unit -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] (f @ alloc) () = 42
+end
+[%%expect{|
+module M_strict : sig val f : unit -> int [@@zero_alloc strict] end @@
+  stateless
+|}]
+
+(* [strict] function referenced inside a [noalloc_strict] function: accepted. *)
+let (g @ noalloc_strict) () = M_strict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+module M_nonstrict : sig
+  val f : unit -> int [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f () = 42
+end
+[%%expect{|
+module M_nonstrict : sig val f : unit -> int [@@zero_alloc] end @@ stateless
+  noalloc_strict
+|}]
+
+(* Non-strict function referenced inside [noalloc_strict]: still rejected, but
+   because [f] is [noalloc] (not [alloc]). *)
+let (g @ noalloc_strict) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* Non-strict function referenced inside [noalloc]: accepted. *)
+let (g @ noalloc) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* CR shsong: Real soundness concern here. *)
+module M_ret : sig
+  val g : unit -> float
+  (* [arity 1] because [f] takes one argument and returns a function; it must
+     match the impl's syntactic arity. *)
+  val f : unit -> (unit -> float) [@@zero_alloc strict arity 1]
+end = struct
+  let g () = 1.1
+  let[@zero_alloc strict] f () = g
+end
+[%%expect{|
+module M_ret :
+  sig
+    val g : unit -> float
+    val f : unit -> unit -> float [@@zero_alloc strict arity 1]
+  end @@ stateless noalloc_strict
+|}]
+
+let test () = (M_ret.f () : _ @ noalloc)
+[%%expect{|
+Line 1, characters 15-25:
+1 | let test () = (M_ret.f () : _ @ noalloc)
+                   ^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+(* CR shsong: This should not be accepted. Fix this. *)
+let test () =
+  let (h @ noalloc) () = M_ret.f () in
+  h
+[%%expect{|
+val test : unit -> unit -> unit -> float = <fun>
+|}]
+
+(* CR shsong: This should not be accepted. Fix this. *)
+let test () =
+  let (h @ noalloc) () = M_ret.f () in
+  let (h1 @ noalloc) () = h () () in
+  h1
+[%%expect{|
+val test : unit -> unit -> float = <fun>
+|}]

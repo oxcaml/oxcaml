@@ -6517,11 +6517,66 @@ let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
   | "%boolnot" | "%sequand" | "%sequor" -> true
   | _ -> false
 
-let relax_alloc desc mode =
+let relax_alloc (desc : Types.value_description) mode =
+  match desc.val_kind with
+  | Val_prim prim ->
+    if prim_is_noalloc_when_fully_applied prim then
+      Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+    else mode
+  | _ ->
+    let za : Zero_alloc.const =
+      match Zero_alloc.get desc.val_zero_alloc with
+      | Default_zero_alloc ->
+        (* Local [let [@zero_alloc]] bindings keep [val_zero_alloc = default]
+           (that field is only populated for signature values), but the attribute
+           survives in [val_attributes], so consult it too. *)
+        Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
+          ~on_application:false ~default_arity:0 desc.val_attributes
+      | za -> za
+    in
+    match za with
+    (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
+    | Check { strict; opt = false; _ } | Assume { strict; _ } ->
+      let c =
+        if strict then Allocation.Const.Noalloc_strict
+        else Allocation.Const.Noalloc
+      in
+      Value.meet_const_with Allocation c mode
+    | Check _ | Default_zero_alloc | Ignore_assert_all -> mode
+
+let register_alloc_for_prim (prim : Primitive.description) applied_arity =
+  not (prim_is_noalloc_when_fully_applied prim) ||
+    prim.prim_arity = 0 || applied_arity < prim.prim_arity
+
+let regsiter_alloc_for_zero_alloc desc applied_arity =
+  match Zero_alloc.get desc.val_zero_alloc with
+  (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
+  | Check { opt = false; arity; _ } | Assume { arity; _ } ->
+    applied_arity > 0 && applied_arity < arity
+  | Check _ | Default_zero_alloc | Ignore_assert_all -> false
+
+(* let relax_prim_alloc desc mode =
   match desc.val_kind with
   | Val_prim prim when prim_is_noalloc_when_fully_applied prim ->
     Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
   | _ -> mode
+
+let relax_zero_alloc desc mode =
+  match Zero_alloc.get desc.val_zero_alloc with
+  (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
+  | Check { strict; opt = false; arity; _ } | Assume { strict; arity; _ } ->
+    let need_register_closure_allocation =
+      fun applied_arity -> applied_arity > 0 && applied_arity < arity
+    in
+    let c =
+      if strict then Allocation.Const.Noalloc_strict
+      else Allocation.Const.Noalloc
+    in
+    Value.meet_const_with Allocation c mode,
+    need_register_closure_allocation
+  | Check _ | Default_zero_alloc | Ignore_assert_all ->
+    let no_need_register_allocation = fun _ -> false in
+    mode, no_need_register_allocation *)
 
 let unrelax_alloc orig_mode actual_mode =
   Value.join
@@ -7290,6 +7345,9 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
+      (* CR shsong: check whether sfunct is a zero_alloc function and is being fully applied, i.e.,
+      its walk_locks for the function identifier in type_ident it skipped in type_ident.
+      If so, walk_locks using its return value's mode. *)
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
@@ -9156,8 +9214,7 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
-       if not (prim_is_noalloc_when_fully_applied prim) ||
-          prim.prim_arity = 0 || applied_arity < prim.prim_arity then begin
+       if register_alloc_for_prim prim applied_arity then begin
          match prim.prim_native_repr_res, mode with
          (* Poly result: register an allocation at the result's locality
             for further optimization. *)
@@ -9177,6 +9234,8 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
        end;
        [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
+       if regsiter_alloc_for_zero_alloc desc applied_arity then
+         register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with
        | [] -> ()
