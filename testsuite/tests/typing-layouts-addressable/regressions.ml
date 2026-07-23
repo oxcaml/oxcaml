@@ -137,3 +137,60 @@ Error: This expression has type "('a : (bits8 & bits16) addressable)"
            (bits8 & bits16) addressable
          because of the definition of gm at lines 4-6, characters 7-30.
 |}]
+
+(**********************************************************************)
+(* A layout-poly external bounded by [any addressable] must accept every
+   addressable kind, including a product that is addressable via its
+   components: the bound is a constraint, not a whole-product mark. *)
+
+external[@layout_poly] id_addressable :
+  ('a : any addressable). 'a -> 'a = "%identity"
+
+let poly_component_marked (x : t_cm) = id_addressable x
+
+[%%expect{|
+external id_addressable : ('a : any addressable). 'a -> 'a = "%identity"
+  [@@layout_poly]
+Line 4, characters 54-55:
+4 | let poly_component_marked (x : t_cm) = id_addressable x
+                                                          ^
+Error: The value "x" has type "t_cm" but an expression was expected of type
+         "('a : (bits8 & bits16) addressable)"
+       The layout of t_cm is bits8 addressable & bits16 addressable
+         because of the definition of t_cm at line 1, characters 0-50.
+       But the layout of t_cm must be a sublayout of
+           (bits8 & bits16) addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+(**********************************************************************)
+(* An [addressable] constraint on a variable must stay visible in
+   signature mismatch errors, even though unconstrained sort-variable
+   kinds are elided from printed types. *)
+
+module M_elide : sig
+  val h : unit -> unit
+end = struct
+  let h () (x : ('x : any addressable)) = ()
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let h () (x : ('x : any addressable)) = ()
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val h : unit -> 'x -> unit end
+       is not included in
+         sig val h : unit -> unit end
+       Values do not match:
+         val h : unit -> 'x -> unit
+       is not included in
+         val h : unit -> unit
+       The type "unit -> 'a -> unit" is not compatible with the type
+         "unit -> unit"
+       Hint: Did you forget to provide "()" as argument?
+|}]
