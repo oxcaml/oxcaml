@@ -7265,7 +7265,8 @@ and type_expect_
            let all_args = args @ extra_args in
            type_sfunct ~applied_arity:(List.length all_args) sfunct, all_args
         | _ ->
-           type_sfunct ~applied_arity:(List.length extra_args) sfunct, extra_args
+           type_sfunct ~applied_arity:(List.length extra_args) sfunct,
+           extra_args
       in
       let (rt, funct), sargs =
         let rt, funct = type_sfunct ~applied_arity:(List.length sargs) sfunct in
@@ -9118,8 +9119,8 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (relax_mode, locks)
   in
-  (* We need to restore Allocation mode axis for primitives: they cannot be noalloc
-     since they allocates when partially applied. *)
+  (* We need to restore Allocation mode axis for primitives: they cannot
+     be noalloc since they allocates when partially applied. *)
   let actual_mode = unrelax_alloc mode actual_mode in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
