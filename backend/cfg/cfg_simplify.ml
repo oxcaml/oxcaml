@@ -30,47 +30,9 @@ module C = Cfg
 module CL = Cfg_with_layout
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-module Eliminate_dead_code : sig
-  val run : Cfg_with_layout.t -> Label.Set.t
+module Validator : sig
+  val validate_reachability : Cfg.t -> unit
 end = struct
-  module Domain = struct
-    type t =
-      | Reachable
-      | Unreachable
-
-    let bot = Unreachable
-
-    let less_equal left right =
-      match left, right with
-      | Reachable, Reachable -> true
-      | Reachable, Unreachable -> false
-      | Unreachable, Reachable -> true
-      | Unreachable, Unreachable -> true
-
-    let join left right =
-      match left, right with
-      | Reachable, (Reachable | Unreachable) | Unreachable, Reachable ->
-        Reachable
-      | Unreachable, Unreachable -> Unreachable
-  end
-
-  module Transfer = struct
-    type domain = Domain.t
-
-    type context = unit
-
-    type image =
-      { normal : domain;
-        exceptional : domain
-      }
-
-    let basic value _ _ = value
-
-    let terminator value _ _ = { normal = value; exceptional = value }
-  end
-
-  module Dataflow = Cfg_dataflow.Forward (Domain) (Transfer)
-
   let z3_code_of_cfg (cfg : Cfg.t) =
     let width =
       match Label.Tbl.length cfg.blocks with
@@ -121,8 +83,7 @@ end = struct
         if not (Cfg.is_never_terminator value.terminator.desc)
         then Format.fprintf fmt "(rule (is-node %s))\n" id;
         Cfg.successor_labels ~exn:true ~normal:true value
-        |> Label.Set.to_list
-        |> List.iter (fun succ_label ->
+        |> Label.Set.iter (fun succ_label ->
             let succ_id = get_id succ_label in
             Format.fprintf fmt "(rule (edge %s %s))\n" id succ_id))
       cfg.blocks;
@@ -147,15 +108,60 @@ end = struct
         ~stdout:output_file
     in
     let ret = Ccomp.command command in
-    let output = In_channel.with_open_text output_file In_channel.input_all in
     if ret <> 0 then Misc.fatal_errorf "Z3 failed with return code %d" ret;
+    let output = In_channel.with_open_text output_file In_channel.input_all in
     output
 
   let validate_reachability (cfg : Cfg.t) =
     let z3_code = z3_code_of_cfg cfg in
     let z3_output = run_z3 z3_code |> String.trim in
     if not (String.equal z3_output "unsat")
-    then Misc.fatal_errorf "unreachable blocks found in cfg: %s" cfg.fun_name
+    then
+      Misc.fatal_errorf
+        "validate_reachability: unreachable blocks found in cfg '%s'@.%a"
+        cfg.fun_name Printcfg.cfg cfg
+end
+
+module Eliminate_dead_code : sig
+  val run : Cfg_with_layout.t -> Label.Set.t
+end = struct
+  module Domain = struct
+    type t =
+      | Reachable
+      | Unreachable
+
+    let bot = Unreachable
+
+    let less_equal left right =
+      match left, right with
+      | Reachable, Reachable -> true
+      | Reachable, Unreachable -> false
+      | Unreachable, Reachable -> true
+      | Unreachable, Unreachable -> true
+
+    let join left right =
+      match left, right with
+      | Reachable, (Reachable | Unreachable) | Unreachable, Reachable ->
+        Reachable
+      | Unreachable, Unreachable -> Unreachable
+  end
+
+  module Transfer = struct
+    type domain = Domain.t
+
+    type context = unit
+
+    type image =
+      { normal : domain;
+        exceptional : domain
+      }
+
+    let basic value _ _ = value
+
+    let terminator value _ _ = { normal = value; exceptional = value }
+  end
+
+  module Dataflow = Cfg_dataflow.Forward (Domain) (Transfer)
 
   let run : Cfg_with_layout.t -> Label.Set.t =
    fun cfg_with_layout ->
@@ -189,7 +195,10 @@ end = struct
           block.terminator <- { block.terminator with desc = Cfg_intf.S.Never };
           block.exn <- None)
         unreachable_labels;
-      Profile.record "validate_reachability" validate_reachability cfg;
+      if !Oxcaml_flags.cfg_eliminate_dead_code_validate
+      then
+        Profile.record ~accumulate:true "validate_reachability"
+          Validator.validate_reachability cfg;
       unreachable_labels
 end
 

@@ -167,6 +167,16 @@ let mk_no_cfg_eliminate_dead_trap_handlers f =
     Arg.Unit f,
     " Do not eliminate dead trap handlers" )
 
+let mk_cfg_eliminate_dead_code_validate f =
+  ( "-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Validate the eliminate dead code pass" )
+
+let mk_no_cfg_eliminate_dead_code_validate f =
+  ( "-no-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Do not validate the eliminate dead code pass" )
+
 let mk_cfg_prologue_validate f =
   ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
 
@@ -1287,6 +1297,8 @@ module type Oxcaml_options = sig
   val cfg_stack_checks_threshold : int -> unit
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_eliminate_dead_code_validate : unit -> unit
+  val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -1473,6 +1485,9 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
       mk_no_cfg_eliminate_dead_trap_handlers
         F.no_cfg_eliminate_dead_trap_handlers;
+      mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
+      mk_no_cfg_eliminate_dead_code_validate
+        F.no_cfg_eliminate_dead_code_validate;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
@@ -1805,6 +1820,12 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_eliminate_dead_trap_handlers =
     clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+
+  let cfg_eliminate_dead_code_validate =
+    set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let no_cfg_eliminate_dead_code_validate =
+    clear' Oxcaml_flags.cfg_eliminate_dead_code_validate
 
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
@@ -2369,6 +2390,8 @@ module Extra_params = struct
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+    | "cfg-eliminate-dead-code-validate" ->
+        set' Oxcaml_flags.cfg_eliminate_dead_code_validate
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
