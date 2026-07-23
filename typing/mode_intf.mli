@@ -1209,9 +1209,6 @@ module type S = sig
         of [t0] on [ax], and [right] is the projection of [t1] on [ax]. *)
     val sub : t -> t -> (unit, error) Result.t
 
-    (** [update_level n t] updates the level of mode variables in [t] to [n] *)
-    val update_level : int -> t -> unit
-
     (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
         [t0 <= t1] and [t1 <= t0]. *)
     val equate : t -> t -> (unit, equate_error) Result.t
