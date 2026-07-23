@@ -1,7 +1,7 @@
 let $camlArgument_types_useful__first_const = Block 0 () in
 (let code size(4)
        unbox_int_and_add_one_0 (param : [ 0 of imm tagged ])
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -11,7 +11,7 @@ let $camlArgument_types_useful__first_const = Block 0 () in
  in
  let code inline(always) size(5)
        unbox_int_and_add_one_wrapper_1 (x : [ 0 of imm tagged ])
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -19,12 +19,12 @@ let $camlArgument_types_useful__first_const = Block 0 () in
      %project_value_slot.[unbox_int_and_add_one_wrapper].[unbox_int_and_add_one]
        (my_closure)
    in
-   apply direct(unbox_int_and_add_one_0)
+   apply direct(unbox_int_and_add_one_0 &my_alloc_region)
      (unbox_int_and_add_one : _ -> imm tagged) (x) -> k1 * k2
  in
  let code size(11)
        box_int_then_call_unbox_int_and_add_one_wrapper_2 (x : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -32,26 +32,28 @@ let $camlArgument_types_useful__first_const = Block 0 () in
      %project_value_slot.[box_int_then_call_unbox_int_and_add_one_wrapper].[unbox_int_and_add_one_wrapper]
        (my_closure)
    in
-   let Pmakeblock = %block.[`0`] (x) in
-   apply direct(unbox_int_and_add_one_wrapper_1)
+   let Pmakeblock = %block.[`0`].my_alloc_region (x) in
+   apply direct(unbox_int_and_add_one_wrapper_1 &my_alloc_region)
      (unbox_int_and_add_one_wrapper : _ -> imm tagged)
        (Pmakeblock)
        -> k1 * k2
  in
  let unbox_int_and_add_one =
    closure unbox_int_and_add_one_0 @unbox_int_and_add_one
+     &toplevel.alloc_region
  in
  let unbox_int_and_add_one_wrapper =
    closure unbox_int_and_add_one_wrapper_1 @unbox_int_and_add_one_wrapper
+     &toplevel.alloc_region
  with { unbox_int_and_add_one = unbox_int_and_add_one }
  in
  let box_int_then_call_unbox_int_and_add_one_wrapper =
    closure box_int_then_call_unbox_int_and_add_one_wrapper_2
-     @box_int_then_call_unbox_int_and_add_one_wrapper
+     @box_int_then_call_unbox_int_and_add_one_wrapper &toplevel.alloc_region
  with { unbox_int_and_add_one_wrapper = unbox_int_and_add_one_wrapper }
  in
  let Pmakeblock =
-   %block.[`0`]
+   %block.[`0`].`toplevel`
      (unbox_int_and_add_one,
       unbox_int_and_add_one_wrapper,
       box_int_then_call_unbox_int_and_add_one_wrapper)
