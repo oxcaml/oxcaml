@@ -170,7 +170,7 @@ type module_unbound_reason =
       { container : string option; unbound : string }
 
 type stage_lock =
-  | Quotation_lock
+  | Quote_lock
   | Splice_lock
 
 type lock =
@@ -3100,7 +3100,7 @@ let add_exclave_lock env = add_lock Exclave_lock env
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
-  add_stage_lock Quotation_lock {env with stage = env.stage + 1}
+  add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
 let enter_splice ~loc env =
   if env.stage = 0 then
@@ -3125,7 +3125,7 @@ let stage_locks_offset locks =
   List.fold_right
     (fun lock rel_stage ->
        match lock with
-       | Quotation_lock -> rel_stage + 1
+       | Quote_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1)
     locks 0
 
