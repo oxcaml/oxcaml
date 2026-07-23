@@ -70,7 +70,11 @@ Error: Signature mismatch:
 
 (* A GADT match on an equality between kinds [x] and [x addressable] must
    NOT be refutable: at addressable instantiations of [x] (e.g. [bits64])
-   the two kinds coincide, so [Refl] is possible. *)
+   the two kinds coincide, so [Refl] is possible. Term-level layout
+   polymorphism is currently rejected outright, so this only documents the
+   blocker; the requirement above is enforced by the lenient reading in
+   [Jkind.Layout.has_intersection] and must get a real test when the
+   annotation below is supported. *)
 type ('a : any, 'b : any) eq = Refl : ('a : any). ('a, 'a) eq
 
 let no_refute : layout_ x. ('a : x) ('b : x addressable) 'r. ('a, 'b) eq -> 'r
