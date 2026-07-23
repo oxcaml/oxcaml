@@ -115,10 +115,15 @@ module Addressability : sig
       of the components. *)
   val combine_product : t list -> t
 
+  (** The exact embedding: the slot a *rigid* sort-variable bound (an lpoly
+      layout variable, which stands for one specific unknown layout) gets when a
+      pending action is transferred onto it. *)
+  val of_action : Action.t -> t
+
   (** The reading of an action stored on a node whose carrier's intrinsic
       addressability is undetermined ([any], an abstract kind, or an unfilled
       sort variable): applying no action leaves the addressability undetermined.
-      Also the slot a flexible sort-variable bound gets when an [any] bound's
+      Also the slot a *flexible* sort-variable bound gets when an [any] bound's
       action is transferred onto it. *)
   val of_action_on_undetermined : Action.t -> t
 

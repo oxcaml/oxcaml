@@ -1070,10 +1070,14 @@ module Layout = struct
        (e.g. [bits64 addressable] IS [bits64]); see [Const.Static.of_base].
      - On an unaddressable base, [Id] and [Addressable] mean exactly the
        plain and the marked kind.
-     - On an unfilled variable the slot is [Id_or_addressable] or, once
-       constrained, [Addressable]; a bare [Id] on an unfilled variable is
-       never built (rigid stand-ins for abstract kinds conservatively use the
-       join too; see [Typetexp]). *)
+     - On an unfilled *flexible* variable the slot is [Id_or_addressable]
+       or, once constrained, [Addressable]. An [Id] slot on an unfilled
+       variable occurs only for *rigid* stand-ins (lpoly layout variables;
+       see [Typetexp]) and means exactly the plain kind: [x] and
+       [x addressable] are incomparable while [x] is unknown, and readers
+       collapse either to the marked kind once [x] resolves intrinsically
+       addressable. Meets treat the rigid-unknown mismatch as "not definitely
+       disjoint" ([Jkind.Layout.has_intersection]). *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t

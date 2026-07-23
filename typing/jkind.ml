@@ -346,25 +346,26 @@ module Layout = struct
       true
 
   (* The addressability reading of the kind a layout describes, insofar as it
-     is known ([~intrinsic] gives the intrinsic addressability of a sort). A
-     join slot ([Id_or_addressable]) is collapsed only when the sort is
-     intrinsically addressable, where its two branches denote the same kind:
-     this matters when a sort variable was filled after the slot was created,
-     e.g. [Sort (v, _, Id_or_addressable)] with [v] filled by [bits64] IS
-     [bits64], which is addressable. The collapse must NOT go the other way:
-     sorts do not carry addressability, so resolving a sort to [bits8] pins
-     nothing - the kind is still the join of [bits8] and [bits8 addressable],
-     and only the stored slot records which. Use this for the left of a
-     subkind check and for equality. *)
+     is known ([~intrinsic] gives the intrinsic addressability of a sort). An
+     unmarked slot ([Id], on a rigid layout variable, or the join
+     [Id_or_addressable], on a flexible bound) is collapsed to [Addressable]
+     only when the sort is intrinsically addressable, where the plain and the
+     marked kinds denote the same kind: this matters when a sort variable was
+     filled after the slot was created, e.g. [Sort (v, _, Id_or_addressable)]
+     with [v] filled by [bits64] IS [bits64], which is addressable. The
+     collapse must NOT go the other way: sorts do not carry addressability,
+     so resolving a sort to [bits8] pins nothing - a join is still the join
+     of [bits8] and [bits8 addressable], and only the stored slot records
+     which. Use this for the left of a subkind check and for equality. *)
   let rec addressability_gen ~intrinsic : _ t -> Addressability.t = function
     | Any (_, a) -> Addressability.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Id_or_addressable -> (
+      | Addressable -> a
+      | Id | Id_or_addressable -> (
         match (intrinsic s : Addressability.t) with
         | Addressable -> Addressable
-        | Id | Id_or_addressable -> Id_or_addressable)
-      | Addressable | Id -> a)
+        | Id | Id_or_addressable -> a))
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressability.Addressable
@@ -379,10 +380,20 @@ module Layout = struct
      right of a subkind check). Unlike [addressability], a join slot is not
      collapsed by the sort: a fresh sort-variable bound (e.g. from
      [of_new_sort_var] or a product decomposition) admits any addressability,
-     even once the subkind check itself fills its sort variable. *)
-  let rec addressability_of_bound : _ t -> Addressability.t = function
+     even once the subkind check itself fills its sort variable. An [Id]
+     bound (exactly the plain kind: a rigid layout variable [x]) is strict
+     while [x] is unknown - [x addressable <= x] must not hold - but accepts
+     marked claims once [x] resolves intrinsically addressable, where the
+     plain and marked kinds coincide. *)
+  let rec addressability_of_bound : Sort.t t -> Addressability.t = function
     | Any (_, a) -> Addressability.of_action_on_undetermined a
-    | Sort (_, _, a) -> a
+    | Sort (s, _, a) -> (
+      match (a : Addressability.t) with
+      | Addressable | Id_or_addressable -> a
+      | Id -> (
+        match Addressability.of_sort s with
+        | Addressable -> Addressable
+        | Id | Id_or_addressable -> a))
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressability.Addressable
@@ -491,7 +502,7 @@ module Layout = struct
      product of such kinds) fails, while an undetermined kind (a join, or a
      product with undetermined components) accepts the mark - even once its
      sort has resolved, since sorts don't pin addressability. *)
-  let meet_root_addressability t (a : Addressability.Action.t) =
+  let meet_root_addressability_gen ~claim t (a : Addressability.Action.t) =
     match a with
     | Id ->
       (* A plain [any] bound is the top: no constraint. *)
@@ -505,9 +516,9 @@ module Layout = struct
       | Sort (s, sa, _) ->
         Option.map
           (fun a -> Sort (s, sa, a))
-          (Addressability.meet Addressability.Addressable (addressability t))
+          (Addressability.meet Addressability.Addressable (claim t))
       | Product (ts, _) -> (
-        match addressability t with
+        match (claim t : Addressability.t) with
         | Addressable ->
           (* Already addressable (marked, or derived from the components);
              in particular, don't turn a derived addressability into a
@@ -623,23 +634,21 @@ module Layout = struct
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
-  let rec intersection t1 t2 =
+  let rec intersection_gen ~claim t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ~root_addressability ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
+      let components = List.map2 (intersection_gen ~claim) ts1 ts2 in
       Option.map
         (fun x -> Product (x, root_addressability))
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
     in
-    (* The slot meets use the collapsed [addressability] readings of both
-       sides. A join slot stays undetermined whether or not its sort has
-       resolved (sorts don't pin addressability), so the reads don't depend
-       on the sort equations this operation performs. (Note that, as for the
+    (* The slot meets use the collapsed [~claim] readings of both sides. A
+       join slot stays undetermined whether or not its sort has resolved
+       (sorts don't pin addressability), so the reads don't depend on the
+       sort equations this operation performs. (Note that, as for the
        scannable axes in [sub], sorts equated by a failing intersection stay
        equated.) *)
-    let meet_addressability t1 t2 =
-      Addressability.meet (addressability t1) (addressability t2)
-    in
+    let meet_addressability t1 t2 = Addressability.meet (claim t1) (claim t2) in
     (* The intersection of two products is marked addressable iff either
        input is. An unmarked result derives its addressability from its
        intersected components, which carry the inputs' component meets, so
@@ -655,11 +664,11 @@ module Layout = struct
     | _, Any (sa2, a2) ->
       Option.map
         (fun t1 -> meet_root_scannable_axes t1 sa2)
-        (meet_root_addressability t1 a2)
+        (meet_root_addressability_gen ~claim t1 a2)
     | Any (sa1, a1), _ ->
       Option.map
         (fun t2 -> meet_root_scannable_axes t2 sa1)
-        (meet_root_addressability t2 a1)
+        (meet_root_addressability_gen ~claim t2 a1)
     | Sort (s1, sa1, _), Sort (s2, sa2, _) -> (
       match meet_addressability t1 t2 with
       | None -> None
@@ -691,6 +700,40 @@ module Layout = struct
                (fun x ->
                  Sort (x, Scannable_axes.max, Addressability.Id_or_addressable))
                sorts)))
+
+  let intersection t1 t2 = intersection_gen ~claim:addressability t1 t2
+
+  (* Like [addressability], but a rigid unknown - an [Id] slot on an unfilled
+     sort variable, i.e. a plain lpoly layout variable [x] - reads as
+     undetermined rather than as unaddressable: at intrinsically addressable
+     instantiations of [x], the kinds [x] and [x addressable] coincide. *)
+  let rec lenient_addressability : Sort.t t -> Addressability.t = function
+    | Any (_, a) -> Addressability.of_action_on_undetermined a
+    | Sort (s, _, a) -> (
+      match (a : Addressability.t) with
+      | Addressable -> a
+      | Id | Id_or_addressable -> (
+        match Addressability.of_sort s with
+        | Addressable -> Addressable
+        | Id -> a
+        | Id_or_addressable -> Id_or_addressable))
+    | Product (ts, a) -> (
+      match (a : Addressability.Action.t) with
+      | Addressable -> Addressability.Addressable
+      | Id ->
+        Addressability.combine_product (List.map lenient_addressability ts))
+
+  (* Whether two layouts may have an intersection. Unlike (the [Some]-ness
+     of) [intersection], an addressability mismatch involving a rigid
+     unknown answers "maybe": [x] and [x addressable] are not *definitely*
+     disjoint, since they coincide at intrinsically addressable
+     instantiations of [x]. This distinction matters because callers (via
+     [Jkind.may_have_intersection]) use a negative answer as proof of GADT
+     -case unreachability in [Ctype.mcomp]; over-approximating with the
+     lenient reading only makes that check more conservative. Like
+     [intersection], this equates sorts. *)
+  let has_intersection t1 t2 =
+    Option.is_some (intersection_gen ~claim:lenient_addressability t1 t2)
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
     | Any (sa, a) -> Any (sa, a)
@@ -1067,7 +1110,7 @@ module Base = struct
      [Base.expand_until_comparable]. See comment on that function. *)
   let has_intersection_expanded base1 base2 =
     match base1, base2 with
-    | Layout l1, Layout l2 -> Option.is_some (Layout.intersection l1 l2)
+    | Layout l1, Layout l2 -> Layout.has_intersection l1 l2
     | Kconstr _, Kconstr _ -> true
     | Kconstr _, Layout (Layout.Any _) -> true
     | Layout (Layout.Any _), Kconstr _ -> true

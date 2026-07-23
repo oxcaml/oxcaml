@@ -186,6 +186,10 @@ module Addressability = struct
         | Addressable, Addressable -> Addressable)
       Addressable ts
 
+  let of_action : Action.t -> t = function
+    | Id -> Id
+    | Addressable -> Addressable
+
   let of_action_on_undetermined : Action.t -> t = function
     | Id -> Id_or_addressable
     | Addressable -> Addressable

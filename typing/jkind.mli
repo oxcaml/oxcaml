@@ -113,6 +113,8 @@ module Addressability : sig
     | Addressable
     | Id_or_addressable
 
+  val of_action : Action.t -> t
+
   val of_action_on_undetermined : Action.t -> t
 end
 
