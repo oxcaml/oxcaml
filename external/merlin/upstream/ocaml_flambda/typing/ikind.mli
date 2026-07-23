@@ -13,9 +13,7 @@
 (**************************************************************************)
 
 val type_declaration_ikind_gated :
-  env:Env.t option ->
-  path:Path.t ->
-  Types.type_ikind
+  env:Env.t option -> path:Path.t -> Types.type_ikind
 
 val type_declaration_ikind_of_jkind :
   env:Env.t option ->
@@ -64,8 +62,9 @@ val sub_or_error :
   ('l2 * Allowance.allowed) Types.jkind ->
   (unit, Jkind.Violation.t) result
 
-(** Apply a [lookup_result] substitution to a constructor ikind. *)
+(** Apply path substitutions to a constructor ikind. *)
 val substitute_decl_ikind_with_lookup :
-  lookup:(Path.t -> Subst.Ikind_substitution.lookup_result) ->
+  lookup_type:(Path.t -> Subst.Ikind_substitution.type_lookup_result) ->
+  lookup_jkind:(Path.t -> Subst.Ikind_substitution.jkind_lookup_result) ->
   Types.type_ikind ->
   Types.type_ikind

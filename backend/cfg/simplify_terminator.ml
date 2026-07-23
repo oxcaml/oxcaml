@@ -27,7 +27,7 @@
 
 open! Int_replace_polymorphic_compare
 module C = Cfg
-module Dll = Oxcaml_utils.Doubly_linked_list
+module Dll = Doubly_linked_list
 
 (* Convert simple [Switch] to branches. *)
 let simplify_switch (block : C.basic_block) labels =
@@ -112,7 +112,7 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      in the future; care is needed as some may clobber registers beyond
      [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
      writing only to the destination). *)
-  | Imul | Imulh _ | Idiv | Imod | Iclz | Ictz | Ipopcnt | Icomp _ -> None
+  | Imul | Imulh _ | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ -> None
 
 let eval_float_op op (left : float) (right : float option) : float option =
   match (op : Operation.float_operation) with
@@ -422,7 +422,9 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
           then Some (Array.unsafe_get labels idx)
           else None
         else None)
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
   | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None

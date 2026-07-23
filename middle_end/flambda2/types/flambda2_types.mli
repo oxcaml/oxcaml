@@ -77,9 +77,19 @@ module Typing_env_extension : sig
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
 
-  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
-  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
   val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
@@ -123,7 +133,7 @@ module Typing_env : sig
       used_value_slots:Value_slot.Set.t ->
       t * (Simple.t -> Simple.t)
 
-    val find_or_missing : t -> Name.t -> flambda_type option
+    val find : t -> Name.t -> flambda_type
   end
 
   module Serializable : sig
@@ -159,7 +169,6 @@ module Typing_env : sig
   val create :
     machine_width:Target_system.Machine_width.t ->
     resolver:(Compilation_unit.t -> Serializable.t option) ->
-    get_imported_names:(unit -> Name.Set.t) ->
     t
 
   val machine_width : t -> Target_system.Machine_width.t
@@ -203,8 +212,6 @@ module Typing_env : sig
   val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 
   val find : t -> Name.t -> Flambda_kind.t option -> flambda_type
-
-  val find_or_missing : t -> Name.t -> flambda_type option
 
   val find_params : t -> Bound_parameters.t -> flambda_type list
 
@@ -640,6 +647,7 @@ val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   t list
@@ -993,6 +1001,10 @@ module Rewriter : sig
     val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
     val closure : 'a closure_field list -> 'a t
+
+    (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+        matching the type of its (unboxed) contents. *)
+    val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
   end
 
   type 'a expr
@@ -1009,8 +1021,6 @@ module Rewriter : sig
     val var : 'a -> 'a t
 
     val unknown : Flambda_kind.t -> 'a t
-
-    val bottom : Flambda_kind.t -> 'a t
 
     val tag_immediate : 'a t -> 'a t
 

@@ -53,8 +53,8 @@ module Make
     end)
     () =
 struct
-  module Instruction_id = Oxcaml_utils.Id_counter.Make ()
-  module Block_id = Oxcaml_utils.Id_counter.Make ()
+  module Instruction_id = Id_counter.Make ()
+  module Block_id = Id_counter.Make ()
 
   type usage_count = int
 

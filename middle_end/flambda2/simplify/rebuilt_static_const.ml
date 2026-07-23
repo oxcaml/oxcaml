@@ -104,13 +104,9 @@ let create_code' code =
     }
 
 let create_set_of_closures are_rebuilding ~find_code_metadata set =
-  (* Even if the set of closures was locally allocated, this allocation is
-     global. This will not cause leaks, as lifted constants are static and
-     therefore only allocated once. *)
   let set =
     Set_of_closures.create
       ~value_slots:(Set_of_closures.value_slots set)
-      Alloc_mode.For_allocations.heap
       (Set_of_closures.function_decls set)
   in
   let free_names = Set_of_closures.free_names set in
@@ -441,6 +437,11 @@ module Group = struct
       t.free_names <- Known free_names;
       free_names
 
+  let cost_metrics t =
+    List.fold_left
+      (fun cm const -> Cost_metrics.( + ) cm (cost_metrics const))
+      Cost_metrics.zero t.consts
+
   let to_named t =
     ListLabels.map t.consts ~f:(fun (const : rebuilt_static_const) ->
         match const with
@@ -471,7 +472,10 @@ module Group = struct
          ~body:(Expr.create_invalid Code_not_rebuilt)
          ~free_names_of_body:Unknown
          ~my_closure:(Variable.create "my_closure" Flambda_kind.value)
-         ~my_alloc_mode:Alloc_mode.For_applications.heap
+         ~my_alloc_mode:
+           (Alloc_mode.For_applications.heap
+              ~alloc_region:
+                (Variable.create "my_alloc_region" Flambda_kind.region))
          ~my_depth:(Variable.create "my_depth" Flambda_kind.rec_info))
 
   let pieces_of_code_including_those_not_rebuilt t =

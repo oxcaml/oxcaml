@@ -100,8 +100,20 @@ val equal : t -> t -> bool
 val compare : t -> t -> int
 (** [compare u u'] is [Stdlib.compare u u']. *)
 
+val seeded_hash : int -> t -> int
+(** [seeded_hash seed u] A seeded hash function with the same output value as
+    {!Hashtbl.seeded_hash}. This function allows this module to be passed as an
+    argument to the functor {!Hashtbl.MakeSeeded}.
+
+    @since 5.3 *)
+
 val hash : t -> int
-(** [hash u] associates a non-negative integer to [u]. *)
+(** An unseeded hash function with the same output value as {!Hashtbl.hash}.
+    This function allows this module to be passed as an argument to the functor
+    {!Hashtbl.Make}.
+    @before 5.3 The hashing algorithm was different.
+    Use [Hashtbl.rebuild] for stored tables which used this hashing
+    function *)
 
 (** {1:utf UTF codecs tools}
 
@@ -136,6 +148,20 @@ val utf_decode_invalid : int -> utf_decode
     elements from the source to error. [n] must be positive and
     smaller or equal to [4] (this is not checked by the module). The
     resulting decode has {!rep} as the decoded Unicode character. *)
+
+val utf_8_decode_length_of_byte : char -> int
+(** [utf_8_decode_length_of_byte byte] is the number of bytes, from 1
+    to {!max_utf_8_decode_length}, that a valid UTF-8 decode starting
+    with byte [byte] would consume or [0] if [byte] cannot start a
+    valid decode.
+
+    @since 5.4 *)
+
+val max_utf_8_decode_length : int
+(** [max_utf_8_decode_length] is [4], the maximal number of bytes
+    a valid or invalid UTF-8 decode can consume.
+
+    @since 5.4 *)
 
 val utf_8_byte_length : t -> int
 (** [utf_8_byte_length u] is the number of bytes needed to encode

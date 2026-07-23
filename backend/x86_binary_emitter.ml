@@ -29,7 +29,7 @@ module Asm_symbol = Asm_targets.Asm_symbol
 
 
 type section = {
-  sec_name : string;
+  sec_name : Section_name.t;
   mutable sec_instrs : asm_line array;
 }
 
@@ -163,22 +163,16 @@ let str_int64L s pos v =
   str_int32L s pos v;
   str_int32L s (pos + 4) (Int64.shift_right_logical v 32)
 
-(* When a jump has to be generated, we compare the offset between the
-   source instruction and the target instruction, in number of
-   instructions.
-
-   If the offset is less than [short_jump_threshold] instructions,
-   we generate a short jump during the first pass. 16 is a "safe"
-   value, as most instructions are shorter than 8 bytes: [REX] +
-   [OPCODE] + [MODRM] + [SIB] + [IMM32] *)
+(* Forward local jumps are sized by fixed-point iteration. We first emit the
+   short form for code size. During relocation resolution, any jump whose 8-bit
+   displacement does not fit is recorded in [forced_long_jumps], and the
+   section is reassembled with that jump in long form. *)
 
 let local_relocs = ref []
 
 let local_labels = String.Tbl.create 100
 
 let forced_long_jumps = ref IntSet.empty
-
-let instr_size = ref 4
 
 let new_buffer sec =
   {
@@ -643,10 +637,10 @@ let emit_MOV b dst src =
       buf_int8 b 0x66;
       emit_mod_rm_reg b no_rex [ 0x8B ] rm (rd_of_reg64 reg)
   (* movl *)
-  | Reg32 reg32, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg32 reg32, ((Mem _ | Mem64_RIP _) as rm) ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x8B ] rm reg
-  | ((Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
+  | ((Reg32 _ | Mem _ | Mem64_RIP _) as rm), Reg32 reg32 ->
       let reg = rd_of_reg64 reg32 in
       emit_mod_rm_reg b 0 [ 0x89 ] rm reg
   | (Mem { typ = DWORD } as rm), ((Imm _ | Sym _) as n) ->
@@ -669,9 +663,9 @@ let emit_MOV b dst src =
       buf_int8 b (0xB8 lor reg7 reg);
       buf_int32_imm b n
   (* movq *)
-  | Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm) ->
+  | Reg64 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       emit_mod_rm_reg b rexw [ 0x8B ] rm (rd_of_reg64 reg)
-  | ((Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
+  | ((Reg64 _ | Mem _ | Mem64_RIP _) as rm), Reg64 reg ->
       emit_mod_rm_reg b rexw [ 0x89 ] rm (rd_of_reg64 reg)
   | Reg64 r64, Imm n when not (is_imm32L n) ->
       (* MOVNoneQ *)
@@ -860,10 +854,6 @@ type simple_encoding = {
   r64_rm64 : int list;
   al_imm8 : int list;
   rax_imm32 : int list;
-  rm8_imm8 : int list;
-  rm16_imm16 : int list;
-  rm64_imm32 : int list;
-  rm64_imm8 : int list;
   reg : int;
 }
 
@@ -906,24 +896,24 @@ let emit_simple_encoding enc b dst src =
   | { r64_rm64 = opcodes }, Reg16 reg, ((Mem _ | Mem64_RIP _) as rm) ->
       buf_int8 b 0x66;
       emit_mod_rm_reg b 0 opcodes rm (rd_of_reg64 reg)
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem { typ = NONE | QWORD | REAL8; arch = X64 }) as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x83 ] rm reg;
       buf_int8L b n
-  | ( { rm8_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg8L _ | Reg8H _ | Mem { typ = BYTE; arch = X64 }) as rm),
       Imm n ) ->
       assert (is_imm8L n);
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x80 ] rm reg;
       buf_int8L b n
-  | ( { rm64_imm8 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = DWORD | REAL4 } | Mem { typ = NONE; arch = X86 })
       as rm),
       Imm n )
     when is_imm8L n ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
       buf_int8L b n
   | { rax_imm32 = opcodes }, Reg64 RAX, ((Imm _ | Sym _) as n) ->
       emit_rex b rexw;
@@ -932,23 +922,29 @@ let emit_simple_encoding enc b dst src =
   | { rax_imm32 = opcodes }, Reg32 RAX, ((Imm _ | Sym _) as n) ->
       buf_opcodes b opcodes;
       buf_int32_imm b n
-  | ( { rm16_imm16 = opcodes; reg },
-      ((Reg16 _ | Mem { typ = WORD })
-      as rm),
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
+      Imm n )
+    when is_imm8L n ->
+      buf_int8 b 0x66;
+      emit_mod_rm_reg b 0 [ 0x83 ] rm reg;
+      buf_int8L b n
+  | ( { reg },
+      ((Reg16 _ | Mem { typ = WORD } | Mem64_RIP (WORD, _, _)) as rm),
       (Imm _ as n) ) ->
       buf_int8 b 0x66;
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int16_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg32 _ | Mem { typ = NONE; arch = X86 } | Mem { typ = DWORD | REAL4 })
       as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b 0 opcodes rm reg;
+      emit_mod_rm_reg b 0 [ 0x81 ] rm reg;
       buf_int32_imm b n
-  | ( { rm64_imm32 = opcodes; reg },
+  | ( { reg },
       ((Reg64 _ | Mem _ | Mem64_RIP _) as rm),
       ((Imm _ | Sym _) as n) ) ->
-      emit_mod_rm_reg b rexw opcodes rm reg;
+      emit_mod_rm_reg b rexw [ 0x81 ] rm reg;
       buf_int32_imm b n
   | _ ->
       Format.eprintf "src=%a dst=%a@." print_old_arg src print_old_arg dst;
@@ -963,10 +959,6 @@ let emit_simple_encoding base reg =
       r64_rm64 = [ base + 3 ];
       al_imm8 = [ base + 4 ];
       rax_imm32 = [ base + 5 ];
-      rm8_imm8 = [ 0x80 ];
-      rm16_imm16 = [ 0x81 ];
-      rm64_imm32 = [ 0x81 ];
-      rm64_imm8 = [ 0x83 ];
       reg;
     }
 
@@ -1094,6 +1086,13 @@ let emit_idiv b dst =
       emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
   | _ -> assert false
 
+let emit_div b dst =
+  let reg = 6 in
+  match dst with
+  | (Reg64 _ | Reg32 _ | Mem _ | Mem64_RIP _) as rm ->
+      emit_mod_rm_reg b rexw [ 0xF7 ] rm reg
+  | _ -> assert false
+
 let emit_shift reg b dst src =
   match (dst, src) with
   | ((Reg64 _ | Reg32 _ | Mem _) as rm), Imm 1L ->
@@ -1124,8 +1123,11 @@ let emit_reloc_jump near_opcodes far_opcodes b loc symbol =
     let target_loc = String.Tbl.find local_labels symbol in
     if target_loc < loc then (
       (* backward *)
-      (* The target position is known, and so is the actual offset.  We can
-         thus decide locally if a short jump can be used. *)
+      (* The target position is known, and so is the actual offset.  Even so,
+         once a backward jump has been promoted to the long form in a prior pass
+         we keep it long for all subsequent passes to ensure growth is
+         monotonic. This avoids oscillating layouts and matches common assembler
+         behavior. *)
       let target_pos =
         try label_pos b symbol with Not_found -> assert false
       in
@@ -1135,36 +1137,27 @@ let emit_reloc_jump near_opcodes far_opcodes b loc symbol =
       let togo_short =
         Int64.sub togo (Int64.of_int (1 + List.length near_opcodes))
       in
-
-      (*      Printf.printf "%s/%i: backward  togo_short=%Ld\n%!" symbol loc togo_short; *)
-      if Int64.compare togo_short (-128L)  >= 0 && Int64.compare togo_short 128L < 0 then (
+      let force_far = IntSet.mem loc !forced_long_jumps in
+      let short_fits =
+        Int64.compare togo_short (-128L) >= 0
+        && Int64.compare togo_short 128L < 0
+      in
+      if (not force_far) && short_fits then (
         buf_opcodes b near_opcodes;
         buf_int8L b togo_short)
       else (
+        if not force_far then
+          forced_long_jumps := IntSet.add loc !forced_long_jumps;
         buf_opcodes b far_opcodes;
         buf_int32L b
           (Int64.sub togo (Int64.of_int (4 + List.length far_opcodes)))))
     else
       (* forward *)
-      (* Is the target too far forward (in term of instruction count)
-         or have we detected previously that this jump instruction needs
-         to be a long one?
-
-         The str_size constant (see below) is chosen to avoid a second
-         pass most oftenm while not being overly pessimistic. *)
-
-      (*
-      if Int64.of_int ((target_loc - loc) * !instr_size) >= 120L then
-        Printf.printf "%s/%i: probably too far (%i)\n%!" symbol loc target_loc
-      else if IntSet.mem loc !forced_long_jumps then
-        Printf.printf "%s/%i: forced long jump\n%!" symbol loc
-      else
-        Printf.printf "%s/%i: short\n%!" symbol loc;
-*)
-      let force_far =
-        Int64.compare (Int64.of_int ((target_loc - loc) * !instr_size)) 120L >= 0
-        || IntSet.mem loc !forced_long_jumps
-      in
+      (* Have we detected previously that this jump instruction needs
+         to be a long one?  If not, optimistically emit a short jump and
+         let the retry mechanism upgrade it on a later pass if the actual
+         offset turns out to exceed the 8-bit range. *)
+      let force_far = IntSet.mem loc !forced_long_jumps in
       if force_far then (
         buf_opcodes b far_opcodes;
         record_local_reloc b (RelocLongJump symbol);
@@ -1462,6 +1455,7 @@ let assemble_instr b loc = function
   | IMUL (src, dst) -> emit_imul b dst src
   | MUL src -> emit_mul b ~src
   | IDIV dst -> emit_idiv b dst
+  | DIV dst -> emit_div b dst
   | J (condition, dst) -> emit_j b !loc condition dst
   | JMP dst -> emit_jmp b !loc dst
   | LEAVE -> emit_leave b
@@ -1497,6 +1491,9 @@ let assemble_instr b loc = function
   | SBB (src, dst) -> emit_SBB b dst src
   | SET (condition, dst) -> emit_set b condition dst
   | TEST (src, dst) -> emit_test b dst src
+  | UD2 ->
+      buf_int8 b 0x0F;
+      buf_int8 b 0x0B
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
   | SIMD (instr, args) -> emit_simd b instr args
@@ -1530,6 +1527,45 @@ let[@warning "+4"] constant b cst
       Sixty_four ) ->
     record_local_reloc b (RelocConstant (cst, B64));
     buf_int64L b 0L
+
+let emit_single_nop b n =
+  match n with
+  | 0 -> ()
+  | 1 -> buf_int8 b 0x90
+  | 2 -> buf_opcodes b [ 0x66; 0x90 ]
+  | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
+  | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
+  | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
+  | 6 ->
+      buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
+      buf_int16L b 0L
+  | 7 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
+      buf_int32L b 0L
+  | 8 ->
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | 9 ->
+      buf_int8 b 0x66;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | n when n >= 10 && n <= 15 ->
+      for _ = 10 to n do
+        buf_int8 b 0x66
+      done;
+      buf_int8 b 0x2e;
+      buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
+      buf_int32L b 0L
+  | _ ->
+      invalid_arg
+        (Printf.sprintf "emit_single_nop: unsupported length %d" n)
+
+let emit_nop b n =
+  if n < 0 then invalid_arg (Printf.sprintf "emit_nop: negative length %d" n);
+  for _ = 1 to n / 15 do
+    emit_single_nop b 15
+  done;
+  emit_single_nop b (n mod 15)
 
 let assemble_line b loc ins =
   try
@@ -1589,31 +1625,14 @@ let assemble_line b loc ins =
             for _ = 1 to n do
               buf_int8 b 0x00
             done
-          | Asm_targets.Asm_directives.Nop ->
-            match n with
-            | 0 -> ()
-            | 1 -> buf_int8 b 0x90
-            | 2 -> buf_opcodes b [ 0x66; 0x90 ]
-            | 3 -> buf_opcodes b [ 0x0f; 0x1f; 0x00 ]
-            | 4 -> buf_opcodes b [ 0x0f; 0x1f; 0x40; 0x00 ]
-            | 5 -> buf_opcodes b [ 0x0f; 0x1f; 0x44; 0x00; 0x00 ]
-            | 6 ->
-                buf_opcodes b [ 0x66; 0x0f; 0x1f; 0x44 ];
-                buf_int16L b 0L
-            | 7 ->
-                buf_opcodes b [ 0x0f; 0x1f; 0x80 ];
-                buf_int32L b 0L
-            | _ ->
-                for _ = 9 to n do
-                  buf_int8 b 0x66
-                done;
-                buf_opcodes b [ 0x0f; 0x1f; 0x84; 0x00 ];
-                buf_int32L b 0L)
+          | Asm_targets.Asm_directives.Nop -> emit_nop b n)
     | Directive (D.Space { bytes = n }) ->
-        (* TODO: in text section, should be NOP *)
-        for _ = 1 to n do
-          buf_int8 b 0
-        done
+        if Section_name.is_text_like b.sec.sec_name then
+          emit_nop b n
+        else
+          for _ = 1 to n do
+            buf_int8 b 0
+          done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
     | Directive
         (D.Reloc
@@ -1628,7 +1647,7 @@ let assemble_line b loc ins =
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      let dll = Doubly_linked_list.make_single ins in
       X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
@@ -1649,16 +1668,14 @@ let rec assemble_section arch section =
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf
       "\nContext is: x86 binary emission of section %s:\n%!"
-      section.sec_name;
+      (Section_name.to_string section.sec_name);
     let dll =
-      Oxcaml_utils.Doubly_linked_list.of_list
-        (Array.to_list section.sec_instrs)
+      Doubly_linked_list.of_list (Array.to_list section.sec_instrs)
     in
     X86_gas.generate_asm Out_channel.stderr dll;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
-and assemble_section0 arch section =
-  (match arch with X86 -> instr_size := 5 | X64 -> instr_size := 6);
+and assemble_section0 _arch section =
   forced_long_jumps := IntSet.empty;
   String.Tbl.clear local_labels;
 

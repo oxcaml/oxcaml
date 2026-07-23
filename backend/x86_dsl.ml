@@ -124,6 +124,8 @@ module I = struct
 
   let idiv x = emit (IDIV x)
 
+  let div x = emit (DIV x)
+
   let imul x y = emit (IMUL (x, y))
 
   let mul x = emit (MUL x)
@@ -215,6 +217,8 @@ module I = struct
   let sbb x y = emit (SBB (x, y))
 
   let test x y = emit (TEST (x, y))
+
+  let ud2 () = emit UD2
 
   let xchg x y = emit (XCHG (x, y))
 

@@ -62,6 +62,7 @@ type discriminant =
   | Block of Tag.t option
   | Array
   | Closure
+  | Boxed_number of K.Boxable_number.t
 
 type accessor =
   | Untag_imm
@@ -72,6 +73,7 @@ type accessor =
   | Value_slot of Value_slot.t
   | Function_slot of Function_slot.t
   | Rec_info of Function_slot.t
+  | Unbox_number of K.Boxable_number.t
 
 module Accessor = struct
   module T0 = struct
@@ -100,6 +102,9 @@ module Accessor = struct
       | Rec_info function_slot ->
         Format.fprintf ppf "@[<hov 1>(rec_info@ %a)@]" Function_slot.print
           function_slot
+      | Unbox_number boxable_number ->
+        Format.fprintf ppf "@[<hov 1>(unbox_number@ %a)@]"
+          K.Boxable_number.print boxable_number
 
     let equal accessor1 accessor2 =
       match accessor1, accessor2 with
@@ -112,8 +117,9 @@ module Accessor = struct
       | Function_slot slot1, Function_slot slot2 ->
         Function_slot.equal slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.equal slot1 slot2
+      | Unbox_number bn1, Unbox_number bn2 -> K.Boxable_number.equal bn1 bn2
       | ( ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
-          | Value_slot _ | Function_slot _ | Rec_info _ ),
+          | Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _ ),
           _ ) ->
         false
 
@@ -130,23 +136,27 @@ module Accessor = struct
       | Function_slot slot1, Function_slot slot2 ->
         Function_slot.compare slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.compare slot1 slot2
+      | Unbox_number bn1, Unbox_number bn2 -> K.Boxable_number.compare bn1 bn2
       | ( Untag_imm,
           ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ) )
+          | Function_slot _ | Rec_info _ | Unbox_number _ ) )
       | ( Is_int,
           ( Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ) )
+          | Function_slot _ | Rec_info _ | Unbox_number _ ) )
       | ( Get_tag,
           ( Block_field _ | Array_field _ | Value_slot _ | Function_slot _
-          | Rec_info _ ) )
+          | Rec_info _ | Unbox_number _ ) )
       | ( Block_field _,
-          (Array_field _ | Value_slot _ | Function_slot _ | Rec_info _) )
-      | Array_field _, (Value_slot _ | Function_slot _ | Rec_info _)
-      | Value_slot _, (Function_slot _ | Rec_info _)
-      | Function_slot _, Rec_info _ ->
+          ( Array_field _ | Value_slot _ | Function_slot _ | Rec_info _
+          | Unbox_number _ ) )
+      | ( Array_field _,
+          (Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _) )
+      | Value_slot _, (Function_slot _ | Rec_info _ | Unbox_number _)
+      | Function_slot _, (Rec_info _ | Unbox_number _)
+      | Rec_info _, Unbox_number _ ->
         -1
       | ( ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ),
+          | Function_slot _ | Rec_info _ | Unbox_number _ ),
           _ ) ->
         1
 
@@ -160,6 +170,8 @@ module Accessor = struct
       | Value_slot slot -> Hashtbl.hash (2, Value_slot.hash slot)
       | Function_slot slot -> Hashtbl.hash (3, Function_slot.hash slot)
       | Rec_info slot -> Hashtbl.hash (4, Function_slot.hash slot)
+      | Unbox_number boxable_number ->
+        Hashtbl.hash (5, K.Boxable_number.hash boxable_number)
   end
 
   include T0
@@ -174,6 +186,8 @@ let unknown_accessor ~machine_width = function
   | Function_slot function_slot ->
     MTC.unknown (Function_slot.kind function_slot)
   | Rec_info _ -> MTC.unknown K.rec_info
+  | Unbox_number boxable_number ->
+    MTC.unknown (K.Boxable_number.unboxed_kind boxable_number)
 
 let bottom_accessor ~machine_width accessor =
   MTC.bottom_like (unknown_accessor ~machine_width accessor)
@@ -284,9 +298,31 @@ and destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
       | Bottom -> bottom_accessor ~machine_width accessor
       | Unknown -> unknown_accessor ~machine_width accessor
       | Ok function_type -> TG.Function_type.rec_info function_type))
-  | ( (Tagged_immediate | Block _ | Array | Closure),
+  (* The type returned here must have the kind stored in the accessor (the
+     [Boxed_number] discriminant and [Unbox_number] accessor kinds always match
+     when built via [Pattern.boxed_number], but the accessor's kind is the
+     authoritative one). *)
+  | Boxed_number _, Unbox_number boxable_number, head -> (
+    match boxable_number, head with
+    | Naked_float32, Boxed_float32 (ty, _alloc_mode)
+    | Naked_float, Boxed_float (ty, _alloc_mode)
+    | Naked_int32, Boxed_int32 (ty, _alloc_mode)
+    | Naked_int64, Boxed_int64 (ty, _alloc_mode)
+    | Naked_nativeint, Boxed_nativeint (ty, _alloc_mode)
+    | Naked_vec128, Boxed_vec128 (ty, _alloc_mode)
+    | Naked_vec256, Boxed_vec256 (ty, _alloc_mode)
+    | Naked_vec512, Boxed_vec512 (ty, _alloc_mode) ->
+      ty
+    | ( ( Naked_float32 | Naked_float | Naked_int32 | Naked_int64
+        | Naked_nativeint | Naked_vec128 | Naked_vec256 | Naked_vec512 ),
+        ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
+        | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
+        | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) )
+      ->
+      bottom_accessor ~machine_width accessor)
+  | ( (Tagged_immediate | Block _ | Array | Closure | Boxed_number _),
       ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
-      | Value_slot _ | Function_slot _ | Rec_info _ ),
+      | Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _ ),
       ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
       | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
       | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
@@ -405,6 +441,8 @@ module Pattern : sig
   val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
   val closure : 'a closure_field list -> 'a t
+
+  val boxed_number : K.Boxable_number.t -> 'a t -> 'a t
 end = struct
   type 'a t = 'a pattern
 
@@ -448,6 +486,10 @@ end = struct
   let array fields = unbox Array fields
 
   let closure fields = unbox Closure fields
+
+  let boxed_number boxable_number t =
+    unbox (Boxed_number boxable_number)
+      [accessor (Unbox_number boxable_number) t]
 end
 
 let rec fold_destructuring ~f destructuring env ty acc =
@@ -504,7 +546,6 @@ end
 type 'a expr =
   | Identity of 'a
   | Unknown of K.With_subkind.t
-  | Bottom of K.t
   | Tag_imm of 'a expr
   | Block of
       { is_unique : bool;
@@ -530,7 +571,6 @@ module Expr = struct
     | Identity x -> pp ppf x
     | Unknown kind ->
       Format.fprintf ppf "@[<hv 1>(unknown@ %a)@]" K.With_subkind.print kind
-    | Bottom kind -> Format.fprintf ppf "@[<hv 1>(bottom@ %a)@]" K.print kind
     | Tag_imm expr ->
       Format.fprintf ppf "@[<hv 1>(tag_imm@ %a)@]" (print pp) expr
     | Block _ -> Format.fprintf ppf "@[<hv 1>(block)@]"
@@ -592,8 +632,6 @@ module Expr = struct
   let var var = Identity var
 
   let unknown kind = Unknown (K.With_subkind.anything kind)
-
-  let bottom kind = Bottom kind
 
   let unknown_with_subkind kind = Unknown kind
 
@@ -799,7 +837,6 @@ struct
       | Some ty -> ty
       | None -> Misc.fatal_errorf "Variable is not defined: %a" Var.print var)
     | Unknown kind -> MTC.unknown_with_subkind ~machine_width kind
-    | Bottom kind -> MTC.bottom kind
     | Tag_imm field ->
       TG.tag_immediate (rewrite_expr ~machine_width sigma field)
     | Block { is_unique; tag; shape; alloc_mode; fields } ->
@@ -889,7 +926,7 @@ struct
                     not
                       (Compilation_unit.equal
                          (Variable.compilation_unit variable)
-                         (Compilation_unit.get_current_exn ()))
+                         (Current_unit.get_cu_exn ()))
                   then variable
                   else
                     let canonical_var, acc =
@@ -918,7 +955,7 @@ struct
               not
                 (Compilation_unit.equal
                    (Name.compilation_unit name)
-                   (Compilation_unit.get_current_exn ()))
+                   (Current_unit.get_cu_exn ()))
             then canonical, acc
             else
               let canonical_name, acc =
@@ -1040,11 +1077,12 @@ struct
 
   and rewrite_head_of_kind_naked_immediate
       (head : TG.head_of_kind_naked_immediate) : _ Or_unknown.t =
-    match head with
-    | Naked_immediates _ -> Or_unknown.Known head
-    | Is_int _ | Get_tag _ | Is_null _ ->
-      (* CR bclement: replace with prove. *)
-      Or_unknown.Unknown
+    match TG.Head_of_kind_naked_immediate.descr head with
+    | { naked_immediates; inverse_relations = _ } ->
+      (* CR bclement: keep inverse_relations *)
+      Or_unknown.Known
+        (TG.Head_of_kind_naked_immediate.from_descr_non_empty
+           { naked_immediates; inverse_relations = TG.Relation.Map.empty })
 
   and rewrite_head_of_kind_naked_float32 head : _ Or_unknown.t =
     Or_unknown.Known head
@@ -1273,7 +1311,6 @@ struct
       =
     let base_env =
       TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =
@@ -1300,7 +1337,8 @@ struct
     let env =
       ME.use_meet_env env ~f:(fun env ->
           ME.add_env_extension_with_extra_variables
-            ~meet_type:(Meet.meet_type ()) env extension)
+            ~meet_expanded_head:(Meet.meet_expanded_head ())
+            env extension)
     in
     let sbs, base_env, new_types, acc =
       Variable.Map.fold
@@ -1351,7 +1389,8 @@ struct
       ME.use_meet_env base_env ~f:(fun env ->
           Name.Map.fold
             (fun name ty env ->
-              ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+              ME.add_equation env name ty
+                ~meet_expanded_head:(Meet.meet_expanded_head ()))
             new_types env)
     in
     let subst var =
@@ -1376,7 +1415,6 @@ struct
        [rewrite_env_extension_with_extra_variables] above. *)
     let base_env =
       TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =
@@ -1421,6 +1459,7 @@ struct
     ME.use_meet_env base_env ~f:(fun env ->
         Name.Map.fold
           (fun name ty env ->
-            ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+            ME.add_equation env name ty
+              ~meet_expanded_head:(Meet.meet_expanded_head ()))
           new_types env)
 end

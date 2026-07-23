@@ -30,6 +30,7 @@ type unsupported_feature =
   | Extensible_variants
   | With_null_variants
   | Unboxed_products
+  | Field_of_kind_any
   | Other of string
 
 exception Vicuna_unsupported of unsupported_feature
@@ -72,7 +73,6 @@ let scrape_ty env ty =
   let ty = match get_desc ty with Tpoly (ty, _) -> ty | _ -> ty in
   match get_desc ty with
   | Tconstr _ -> (
-    let ty = Ctype.correct_levels ty in
     let ty' = Ctype.expand_head_opt env ty in
     match get_desc ty' with
     | Tconstr (p, _, _) -> (
@@ -87,16 +87,6 @@ let scrape_poly env ty =
   let ty = scrape_ty env ty in
   match get_desc ty with Tpoly (ty, _) -> get_desc ty | d -> d
 
-(* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
-let is_always_gc_ignorable env ty =
-  let ext : Jkind_axis.Externality.t =
-    (* We check that we're compiling to (64-bit) native code before counting
-       External64 types as gc_ignorable, because bytecode is intended to be
-       platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64 then External64 else External
-  in
-  Ctype.check_type_externality env ty ext
-
 type classification =
   | Int (* any immediate type *)
   | Float
@@ -110,7 +100,7 @@ let classify env ty : classification =
   (* NOTE: this call is redundant, but also does not hurt.
      It is inherited from the original definition. *)
   let ty = scrape_ty env ty in
-  if is_always_gc_ignorable env ty
+  if Ctype.is_always_gc_ignorable env ty
   then Int
   else
     match get_desc ty with
@@ -161,6 +151,8 @@ let classify env ty : classification =
         (Vicuna_unsupported (Other "Unexpected type constructor Tquote_eval"))
     | Trepr _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
+    | Tbox _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tbox"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -235,12 +227,10 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           value_kind_record env subst ~visited ~depth labels rep
-        | Type_record_unboxed_product
-            ([{ ld_type; _ }], Record_unboxed_product, _) ->
+        | Type_record_unboxed_product ([{ ld_type; _ }], _, _) ->
           let depth = depth + 1 in
           value_kind env subst ~visited ~depth ld_type
-        | Type_record_unboxed_product
-            (([] | _ :: _ :: _), Record_unboxed_product, _) ->
+        | Type_record_unboxed_product (([] | _ :: _ :: _), _, _) ->
           raise (Vicuna_unsupported Unboxed_product_records)
         | Type_abstract _ -> Value
         | Type_open ->
@@ -295,6 +285,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote_eval"))
   | Trepr _ ->
     raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
+  | Tbox _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tbox"))
   | Tpackage _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth
@@ -375,6 +367,8 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+    raise (Vicuna_unsupported Field_of_kind_any)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type
@@ -382,7 +376,8 @@ and value_kind_record env subst ~visited ~depth
       raise
         (Vicuna_unsupported
            (Other "Unboxed record should have exactly one field")))
-  | _ ->
+  | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+  | Record_dummy _ ->
     let fields =
       List.map
         (fun (label : Types.label_declaration) ->
@@ -394,7 +389,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_inlined (Ordinary { runtime_tag; _ }, _, _) ->
         Block (Some (runtime_tag, fields))
       | Record_float -> FloatArray
-      | Record_boxed _ -> Block (Some (0, fields))
+      | Record_boxed -> Block (Some (0, fields))
       | Record_inlined (Extension _, _, _) -> Block (Some (0, fields))
       | Record_inlined (Null, _, _) ->
         raise (Vicuna_unsupported With_null_variants)
@@ -404,6 +399,8 @@ and value_kind_record env subst ~visited ~depth
              (Other "Record_unboxed should have been handled above"))
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
+      | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+      | Record_variable -> Misc.fatal_error "unexpected variable representation"
     in
     non_consts
 

@@ -219,7 +219,7 @@ L1:
 L123:
   store i64 61, ptr %13
   store i64 1, ptr %14
-  %58 = ptrtoint ptr @camlData_decl__immstring35 to i64
+  %58 = ptrtoint ptr @camlData_decl__immstring38 to i64
   store i64 %58, ptr %15
   %59 = ptrtoint ptr @camlStdlib__print_endline_138 to i64
   store i64 %59, ptr %16
@@ -316,9 +316,9 @@ L131:
   store ptr addrspace(1) %114, ptr %30
   %115 = load ptr addrspace(1), ptr %30
   store ptr addrspace(1) %115, ptr %31
-  %116 = ptrtoint ptr @camlData_decl__float327 to i64
+  %116 = ptrtoint ptr @camlData_decl__float328 to i64
   store i64 %116, ptr %32
-  %117 = ptrtoint ptr @camlData_decl__immstring38 to i64
+  %117 = ptrtoint ptr @camlData_decl__immstring41 to i64
   store i64 %117, ptr %33
   %118 = load i64, ptr %33
   %119 = inttoptr i64 %118 to ptr addrspace(1)
@@ -343,10 +343,10 @@ L134:
   store ptr addrspace(1) %130, ptr %34
   %131 = load ptr addrspace(1), ptr %34
   store ptr addrspace(1) %131, ptr %35
-  %132 = ptrtoint ptr @camlData_decl__const_block54 to i64
+  %132 = ptrtoint ptr @camlData_decl__const_block57 to i64
   store i64 %132, ptr %36
   store i64 1, ptr %37
-  %133 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %133 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %133, ptr %38
   %134 = load i64, ptr %38
   store i64 %134, ptr %4
@@ -372,7 +372,7 @@ L135:
   store ptr addrspace(1) %146, ptr %39
   %147 = load ptr addrspace(1), ptr %39
   store ptr addrspace(1) %147, ptr %40
-  %148 = ptrtoint ptr @camlData_decl__float4 to i64
+  %148 = ptrtoint ptr @camlData_decl__float5 to i64
   store i64 %148, ptr %41
   %149 = load i64, ptr %41
   store i64 %149, ptr %4
@@ -417,10 +417,10 @@ L137:
   store i64 %171, ptr %45
   %172 = load i64, ptr %45
   store i64 %172, ptr %46
-  %173 = ptrtoint ptr @camlData_decl__const_block67 to i64
+  %173 = ptrtoint ptr @camlData_decl__const_block70 to i64
   store i64 %173, ptr %47
   store i64 1, ptr %48
-  %174 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %174 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %174, ptr %49
   %175 = load i64, ptr %49
   store i64 %175, ptr %4
@@ -499,40 +499,40 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlData_decl__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlData_decl = global i64 4864, section ".data", align 8
-@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float4, ptr @camlData_decl__float327, ptr @camlData_decl__f_2, ptr @camlData_decl__g_3 }, section ".data", align 8
+@camlData_decl = global { ptr, ptr, ptr, ptr } { ptr @camlData_decl__float5, ptr @camlData_decl__float328, ptr @camlData_decl__f_2, ptr @camlData_decl__g_3 }, section ".data", align 8
 @header.camlData_decl__g_3 = global i64 7159, section ".data", align 8
 @camlData_decl__g_3 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855885, ptr @camlData_decl__g_HIDE_STAMP }, section ".data", align 8
 @header.camlData_decl__f_2 = global i64 4345, section ".data", align 8
 @camlData_decl__f_2 = global { ptr, i64 } { ptr @camlData_decl__f_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlData_decl__float4 = global i64 2045, section ".data", align 8
-@camlData_decl__float4 = global { double } { double 0x400921fb54442d18 }, section ".data", align 8
-@header.camlData_decl__float327 = global i64 3071, section ".data", align 8
-@camlData_decl__float327 = global { ptr, float } { ptr @caml_float32_ops, float 0x4005bf0a80000000 }, section ".data", align 8
-@header.camlData_decl__immstring35 = global i64 5116, section ".data", align 8
-@camlData_decl__immstring35 = global { [ 30 x i8 ], [ 1 x i8 ], i8 } { [ 30 x i8 ] c"\6f\6e\65\20\6f\66\20\74\68\65\20\73\74\72\69\6e\67\73\0a\6f\66\20\61\6c\6c\20\74\69\6d\65", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
-@header.camlData_decl__immstring38 = global i64 2044, section ".data", align 8
-@camlData_decl__immstring38 = global { [ 5 x i8 ], [ 2 x i8 ], i8 } { [ 5 x i8 ] c"\25\2e\31\30\67", [ 2 x i8 ] zeroinitializer, i8 2 }, section ".data", align 8
-@header.camlData_decl__const_block54 = global i64 4872, section ".data", align 8
-@camlData_decl__const_block54 = global { ptr, i64, ptr, ptr } { ptr @camlData_decl__const_block44, i64 1, ptr @camlData_decl__const_block46, ptr @camlData_decl__const_block52 }, section ".data", align 8
-@header.camlData_decl__const_block52 = global i64 2828, section ".data", align 8
-@camlData_decl__const_block52 = global { i64, ptr } { i64 65, ptr @camlData_decl__const_block50 }, section ".data", align 8
-@header.camlData_decl__const_block50 = global i64 2818, section ".data", align 8
-@camlData_decl__const_block50 = global { i64, ptr } { i64 1, ptr @camlData_decl__const_block48 }, section ".data", align 8
-@header.camlData_decl__const_block46 = global i64 1792, section ".data", align 8
-@camlData_decl__const_block46 = global { i64 } { i64 41 }, section ".data", align 8
-@header.camlData_decl__const_block44 = global i64 2816, section ".data", align 8
-@camlData_decl__const_block44 = global { i64, i64 } { i64 1, i64 1 }, section ".data", align 8
-@header.camlData_decl__const_block67 = global i64 2827, section ".data", align 8
-@camlData_decl__const_block67 = global { ptr, ptr } { ptr @camlData_decl__immstring63, ptr @camlData_decl__const_block65 }, section ".data", align 8
-@header.camlData_decl__const_block65 = global i64 4868, section ".data", align 8
-@camlData_decl__const_block65 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlData_decl__const_block48 }, section ".data", align 8
-@header.camlData_decl__const_block48 = global i64 2828, section ".data", align 8
-@camlData_decl__const_block48 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
-@header.camlData_decl__immstring63 = global i64 4092, section ".data", align 8
-@camlData_decl__immstring63 = global { [ 20 x i8 ], [ 3 x i8 ], i8 } { [ 20 x i8 ] c"\6d\75\74\75\61\6c\6c\79\5f\72\65\63\75\72\73\69\76\65\3a\20", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
+@header.camlData_decl__float5 = global i64 2045, section ".data", align 8
+@camlData_decl__float5 = global { double } { double 0x400921fb54442d18 }, section ".data", align 8
+@header.camlData_decl__float328 = global i64 3071, section ".data", align 8
+@camlData_decl__float328 = global { ptr, float } { ptr @caml_float32_ops, float 0x4005bf0a80000000 }, section ".data", align 8
+@header.camlData_decl__immstring38 = global i64 5116, section ".data", align 8
+@camlData_decl__immstring38 = global { [ 30 x i8 ], [ 1 x i8 ], i8 } { [ 30 x i8 ] c"\6f\6e\65\20\6f\66\20\74\68\65\20\73\74\72\69\6e\67\73\0a\6f\66\20\61\6c\6c\20\74\69\6d\65", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
+@header.camlData_decl__immstring41 = global i64 2044, section ".data", align 8
+@camlData_decl__immstring41 = global { [ 5 x i8 ], [ 2 x i8 ], i8 } { [ 5 x i8 ] c"\25\2e\31\30\67", [ 2 x i8 ] zeroinitializer, i8 2 }, section ".data", align 8
+@header.camlData_decl__const_block57 = global i64 4872, section ".data", align 8
+@camlData_decl__const_block57 = global { ptr, i64, ptr, ptr } { ptr @camlData_decl__const_block47, i64 1, ptr @camlData_decl__const_block49, ptr @camlData_decl__const_block55 }, section ".data", align 8
+@header.camlData_decl__const_block55 = global i64 2828, section ".data", align 8
+@camlData_decl__const_block55 = global { i64, ptr } { i64 65, ptr @camlData_decl__const_block53 }, section ".data", align 8
+@header.camlData_decl__const_block53 = global i64 2818, section ".data", align 8
+@camlData_decl__const_block53 = global { i64, ptr } { i64 1, ptr @camlData_decl__const_block51 }, section ".data", align 8
+@header.camlData_decl__const_block49 = global i64 1792, section ".data", align 8
+@camlData_decl__const_block49 = global { i64 } { i64 41 }, section ".data", align 8
+@header.camlData_decl__const_block47 = global i64 2816, section ".data", align 8
+@camlData_decl__const_block47 = global { i64, i64 } { i64 1, i64 1 }, section ".data", align 8
+@header.camlData_decl__const_block70 = global i64 2827, section ".data", align 8
+@camlData_decl__const_block70 = global { ptr, ptr } { ptr @camlData_decl__immstring66, ptr @camlData_decl__const_block68 }, section ".data", align 8
+@header.camlData_decl__const_block68 = global i64 4868, section ".data", align 8
+@camlData_decl__const_block68 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlData_decl__const_block51 }, section ".data", align 8
+@header.camlData_decl__const_block51 = global i64 2828, section ".data", align 8
+@camlData_decl__const_block51 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
+@header.camlData_decl__immstring66 = global i64 4092, section ".data", align 8
+@camlData_decl__immstring66 = global { [ 20 x i8 ], [ 3 x i8 ], i8 } { [ 20 x i8 ] c"\6d\75\74\75\61\6c\6c\79\5f\72\65\63\75\72\73\69\76\65\3a\20", [ 3 x i8 ] zeroinitializer, i8 3 }, section ".data", align 8
 @temp.Data_decl.0 = global { ptr } { ptr @caml_format_float32 }, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 = external global ptr
 @camlStdlib__print_endline_138 = external global ptr
 @caml_apply2 = external global ptr
 @caml_c_call = external global ptr

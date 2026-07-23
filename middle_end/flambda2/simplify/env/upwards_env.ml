@@ -70,9 +70,9 @@ let check_shortcut_transitivity t cont shortcut_to =
       Continuation.print shortcut_to Continuation.print cont print t
 
 let find_continuation_shortcut t cont =
-  match Continuation.Map.find cont t.continuation_shortcuts with
-  | exception Not_found -> None
-  | shortcut_to ->
+  match Continuation.Map.find_or_null cont t.continuation_shortcuts with
+  | Null -> None
+  | This shortcut_to ->
     check_shortcut_transitivity t cont
       (Continuation_shortcut.continuation shortcut_to);
     Some shortcut_to
@@ -101,14 +101,14 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
       "Cannot add continuation shortcut %a (as shortcut to %a); the target \
        continuation is itself a shortcut"
       Continuation.print cont Continuation.print shortcut_to;
-  match Continuation.Map.find cont t.continuation_shortcuts with
-  | existing_shortcut ->
+  match Continuation.Map.find_or_null cont t.continuation_shortcuts with
+  | This existing_shortcut ->
     Misc.fatal_errorf
       "Cannot add continuation shortcut %a (as shortcut to%a); the source \
        continuation is already deemed to be a shortcut (to %a)"
       Continuation.print cont Continuation.print shortcut_to Continuation.print
       (Continuation_shortcut.continuation existing_shortcut)
-  | exception Not_found ->
+  | Null ->
     let shortcut = Continuation_shortcut.create ~params shortcut_to args in
     (* For now we keep the pre-existing check for aliases, but ideally we should
        check that the arities match after applying the substitution. However it
@@ -162,6 +162,4 @@ let replace_apply_cont_rewrite t cont rewrite =
   { t with apply_cont_rewrites }
 
 let find_apply_cont_rewrite t cont =
-  match Continuation.Map.find cont t.apply_cont_rewrites with
-  | exception Not_found -> None
-  | rewrite -> Some rewrite
+  Continuation.Map.find_opt cont t.apply_cont_rewrites

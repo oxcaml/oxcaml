@@ -34,6 +34,7 @@
 #include "caml/prims.h"
 #include "caml/signals.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/domain.h"
 #include "caml/globroots.h"
 #include "caml/startup.h"
@@ -47,7 +48,7 @@
         Caml_state->trap_sp_off offset to the current trap frame
         extra_args number of extra arguments provided by the caller
 
-sp is a local copy of the global variable Caml_state->extern_sp. */
+sp is a local copy of the global variable Caml_state->current_stack->sp. */
 
 /* Instruction decoding */
 
@@ -64,9 +65,11 @@ sp is a local copy of the global variable Caml_state->extern_sp. */
 #  else
 #    define Next goto *(void *)(jumptbl_base + *pc++)
 #  endif
+#  define Fallthrough ((void) 0)
 #else
 #  define Instruct(name) case name
 #  define Next break
+#  define Fallthrough fallthrough
 #endif
 
 /* GC interface */
@@ -154,7 +157,8 @@ Caml_inline void check_trap_barrier_for_effect
     if (parent_stack != NULL
         && parent_stack->id == domain_state->trap_barrier_block
         && parent_stack->sp + 2 - Stack_high (parent_stack)
-              /* Note: +2 is the same constant as in debugger.c:552 */
+              /* Note: +2 is the same constant as in the REQ_UP_FRAME
+                 case in caml_debugger() in debugger.c */
            == domain_state->trap_barrier_off){
       caml_debugger(TRAP_BARRIER, Val_unit);
     }
@@ -209,7 +213,7 @@ Caml_inline void check_trap_barrier_for_effect
 #define ACCU_REG asm("%r16")
 #endif
 #ifdef __mc68000__
-#define PC_REG asm("a5")
+#define PC_REG asm("a3")
 #define SP_REG asm("a4")
 #define ACCU_REG asm("d7")
 #endif
@@ -242,13 +246,22 @@ Caml_inline void check_trap_barrier_for_effect
 static CAMLthread_local intnat caml_bcodcount;
 #endif
 
-static value raise_unhandled_effect;
+/* What to do on the resumed stack after a context switch to a continuation */
+enum resume_action {
+  Resume_call_fn, /* run [resume_fn] on the resumed stack */
+  Resume_return,  /* return [resume_arg] to the perform site */
+  Resume_raise,   /* raise [resume_arg] at the perform site */
+  Resume_reraise  /* reraise [resume_arg], preserving the restored backtrace */
+};
+
+extern value caml_restore_raw_backtrace(value exn, value backtrace);
 
 /* The interpreter itself */
 
 CAMLno_tsan /* No need to TSan-instrument this (and pay a slowdown) function as
                TSan is not supported for bytecode. */
-value caml_interprete(code_t prog, asize_t prog_size)
+value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
+                                value initial_env, intnat initial_extra_args)
 {
 #ifdef PC_REG
   register code_t pc PC_REG;
@@ -261,9 +274,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
 #endif
 #if defined(THREADED_CODE) && defined(ARCH_SIXTYFOUR) && !defined(ARCH_CODE32)
 #ifdef JUMPTBL_BASE_REG
-  register char * jumptbl_base JUMPTBL_BASE_REG;
+  register const char * jumptbl_base JUMPTBL_BASE_REG;
 #else
-  register char * jumptbl_base;
+  register const char * jumptbl_base;
 #endif
 #endif
   value env;
@@ -276,6 +289,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
   volatile value raise_async_exn_bucket = Val_unit;
   struct longjmp_buffer raise_buf, raise_async_buf;
   value resume_fn, resume_arg;
+  enum resume_action resume_action;
   struct stack_info* resume_tail;
   caml_domain_state* domain_state = Caml_state;
   struct caml_exception_context exception_ctx =
@@ -289,32 +303,15 @@ value caml_interprete(code_t prog, asize_t prog_size)
 #endif
 
 #ifdef THREADED_CODE
-  static void * jumptable[] = {
+  static const void * const jumptable[] = {
 #    include "caml/jumptbl.h"
   };
 #endif
 
   if (prog == NULL) {           /* Interpreter is initializing */
-    static opcode_t raise_unhandled_effect_code[] = { ACC, 0, RAISE };
-    value raise_unhandled_effect_closure;
-
-    caml_register_code_fragment(
-      (char *) raise_unhandled_effect_code,
-      (char *) raise_unhandled_effect_code +
-      sizeof(raise_unhandled_effect_code),
-      DIGEST_IGNORE, NULL);
 #ifdef THREADED_CODE
     caml_init_thread_code(jumptable, Jumptbl_base);
-    caml_thread_code(raise_unhandled_effect_code,
-                     sizeof(raise_unhandled_effect_code));
 #endif
-    raise_unhandled_effect_closure = caml_alloc_small (2, Closure_tag);
-    Code_val(raise_unhandled_effect_closure) =
-      (code_t)raise_unhandled_effect_code;
-    Closinfo_val(raise_unhandled_effect_closure) = Make_closinfo(0, 2, 1);
-    raise_unhandled_effect = raise_unhandled_effect_closure;
-    caml_register_generational_global_root(&raise_unhandled_effect);
-    caml_global_data = Val_unit;
     caml_register_generational_global_root(&caml_global_data);
     caml_init_callbacks();
     return Val_unit;
@@ -383,8 +380,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
   sp = domain_state->current_stack->sp;
   pc = prog;
-  extra_args = 0;
-  env = Atom(0);
+  extra_args = initial_extra_args;
+  env = initial_env;
   accu = Val_int(0);
 
 #ifdef THREADED_CODE
@@ -459,7 +456,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHACC):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(ACC):
       accu = sp[*pc++];
       Next;
@@ -494,7 +491,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHENVACC):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(ENVACC):
       accu = Field(env, *pc++);
       Next;
@@ -562,11 +559,10 @@ value caml_interprete(code_t prog, asize_t prog_size)
       int nargs = *pc++;
       int slotsize = *pc;
       value * newsp;
-      int i;
       /* Slide the nargs bottom words of the current frame to the top
          of the frame, and discard the remainder of the frame */
       newsp = sp + slotsize - nargs;
-      for (i = nargs - 1; i >= 0; i--) newsp[i] = sp[i];
+      for (int i = nargs - 1; i >= 0; i--) newsp[i] = sp[i];
       sp = newsp;
       pc = Code_val(accu);
       env = accu;
@@ -629,7 +625,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
         domain_state->current_stack = parent_stack;
         sp = domain_state->current_stack->sp;
         caml_free_stack(old_stack);
-        caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+        caml_dynamic_cache_flush(domain_state->dynamic_bindings);
 
         domain_state->trap_sp_off = Long_val(sp[0]);
         extra_args = Long_val(sp[1]);
@@ -651,9 +647,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(RESTART): {
       int num_args = Wosize_val(env) - 3;
-      int i;
       sp -= num_args;
-      for (i = 0; i < num_args; i++) sp[i] = Field(env, i + 3);
+      for (int i = 0; i < num_args; i++) sp[i] = Field(env, i + 3);
       env = Field(env, 2);
       extra_args += num_args;
       Next;
@@ -665,11 +660,11 @@ value caml_interprete(code_t prog, asize_t prog_size)
         extra_args -= required;
         Next;
       } else {
-        mlsize_t num_args, i;
+        mlsize_t num_args;
         num_args = 1 + extra_args; /* arg1 + extra args */
         Alloc_small(accu, num_args + 3, Closure_tag, Enter_gc);
         Field(accu, 2) = env;
-        for (i = 0; i < num_args; i++) Field(accu, i + 3) = sp[i];
+        for (mlsize_t i = 0; i < num_args; i++) Field(accu, i + 3) = sp[i];
         Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
         Closinfo_val(accu) = Make_closinfo(0, 2, 1);
         sp += num_args;
@@ -679,18 +674,18 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(CLOSURE): {
       int nvars = *pc++;
-      int i;
       if (nvars > 0) *--sp = accu;
       if (nvars <= Max_young_wosize - 2) {
         /* nvars + 2 <= Max_young_wosize, can allocate in minor heap */
         Alloc_small(accu, 2 + nvars, Closure_tag, Enter_gc);
-        for (i = 0; i < nvars; i++) Field(accu, i + 2) = sp[i];
+        for (int i = 0; i < nvars; i++) Field(accu, i + 2) = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
         accu = caml_alloc_shr(2 + nvars, Closure_tag);
-        for (i = 0; i < nvars; i++) caml_initialize(&Field(accu, i + 2), sp[i]);
+        for (int i = 0; i < nvars; i++)
+          caml_initialize(&Field(accu, i + 2), sp[i]);
       }
       /* The code pointer is not in the heap, so no need to go through
          caml_initialize. */
@@ -706,20 +701,19 @@ value caml_interprete(code_t prog, asize_t prog_size)
       int nvars = *pc++;
       mlsize_t envofs = nfuncs * 3 - 1;
       mlsize_t blksize = envofs + nvars;
-      int i;
       volatile value * p;
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
         Alloc_small(accu, blksize, Closure_tag, Enter_gc);
         p = &Field(accu, envofs);
-        for (i = 0; i < nvars; i++, p++) *p = sp[i];
+        for (int i = 0; i < nvars; i++, p++) *p = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
         accu = caml_alloc_shr(blksize, Closure_tag);
         p = &Field(accu, envofs);
-        for (i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
+        for (int i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
       }
       sp += nvars;
       /* The code pointers and infix headers are not in the heap,
@@ -728,7 +722,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       p = &Field(accu, 0);
       *p++ = (value) (pc + pc[0]);
       *p++ = Make_closinfo(0, envofs, nfuncs < 2);
-      for (i = 1; i < nfuncs; i++) {
+      for (int i = 1; i < nfuncs; i++) {
         *p++ = Make_header(i * 3, Infix_tag, 0); /* color irrelevant */
         *--sp = (value) p;
         *p++ = (value) (pc + pc[i]);
@@ -741,20 +735,20 @@ value caml_interprete(code_t prog, asize_t prog_size)
     }
 
     Instruct(PUSHOFFSETCLOSURE):
-      *--sp = accu; /* fallthrough */
+      *--sp = accu; Fallthrough;
     Instruct(OFFSETCLOSURE):
       accu = env + *pc++ * sizeof(value); Next;
 
     Instruct(PUSHOFFSETCLOSUREM3):
-      *--sp = accu; /* fallthrough */
+      *--sp = accu; Fallthrough;
     Instruct(OFFSETCLOSUREM3):
       accu = env - 3 * sizeof(value); Next;
     Instruct(PUSHOFFSETCLOSURE0):
-      *--sp = accu; /* fallthrough */
+      *--sp = accu; Fallthrough;
     Instruct(OFFSETCLOSURE0):
       accu = env; Next;
     Instruct(PUSHOFFSETCLOSURE3):
-      *--sp = accu; /* fallthrough */
+      *--sp = accu; Fallthrough;
     Instruct(OFFSETCLOSURE3):
       accu = env + 3 * sizeof(value); Next;
 
@@ -763,7 +757,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHGETGLOBAL):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(GETGLOBAL):
       accu = Field(caml_global_data, *pc);
       pc++;
@@ -771,7 +765,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHGETGLOBALFIELD):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(GETGLOBALFIELD): {
       accu = Field(caml_global_data, *pc);
       pc++;
@@ -791,29 +785,29 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHATOM0):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(ATOM0):
       accu = Atom(0); Next;
 
     Instruct(PUSHATOM):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(ATOM):
       accu = Atom(*pc++); Next;
 
     Instruct(MAKEBLOCK): {
       mlsize_t wosize = *pc++;
       tag_t tag = *pc++;
-      mlsize_t i;
       value block;
       if (wosize <= Max_young_wosize) {
         Alloc_small(block, wosize, tag, Enter_gc);
         Field(block, 0) = accu;
-        for (i = 1; i < wosize; i++) Field(block, i) = *sp++;
+        for (mlsize_t i = 1; i < wosize; i++) Field(block, i) = *sp++;
       } else {
         block = caml_alloc_shr(wosize, tag);
         caml_initialize(&Field(block, 0), accu);
-        for (i = 1; i < wosize; i++) caml_initialize(&Field(block, i), *sp++);
+        for (mlsize_t i = 1; i < wosize; i++)
+          caml_initialize(&Field(block, i), *sp++);
       }
       accu = block;
       Next;
@@ -868,7 +862,6 @@ value caml_interprete(code_t prog, asize_t prog_size)
     }
     Instruct(MAKEFLOATBLOCK): {
       mlsize_t size = *pc++;
-      mlsize_t i;
       value block;
       if (size <= Max_young_wosize / Double_wosize) {
         Alloc_small(block, size * Double_wosize, Double_array_tag, Enter_gc);
@@ -876,7 +869,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
         block = caml_alloc_shr(size * Double_wosize, Double_array_tag);
       }
       Store_double_flat_field(block, 0, Double_val(accu));
-      for (i = 1; i < size; i++){
+      for (mlsize_t i = 1; i < size; i++){
         Store_double_flat_field(block, i, Double_val(*sp));
         ++ sp;
       }
@@ -1051,7 +1044,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
           old_stack->sp = sp;
           domain_state->current_stack = parent_stack;
           sp = domain_state->current_stack->sp;
-          caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+          caml_dynamic_cache_flush(domain_state->dynamic_bindings);
           caml_free_stack(old_stack);
 
           domain_state->trap_sp_off = Long_val(sp[0]);
@@ -1080,12 +1073,12 @@ value caml_interprete(code_t prog, asize_t prog_size)
     check_stacks:
       if (sp < Stack_threshold_ptr(domain_state->current_stack)) {
         domain_state->current_stack->sp = sp;
-        if (!caml_try_realloc_stack(Stack_threshold / sizeof(value))) {
+        if (!caml_try_realloc_stack(Stack_threshold_words)) {
           Setup_for_c_call; caml_raise_stack_overflow();
         }
         sp = domain_state->current_stack->sp;
       }
-      /* Fall through CHECK_SIGNALS */
+      Fallthrough; /* CHECK_SIGNALS */
 
 /* Signal handling */
 
@@ -1169,7 +1162,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
     Instruct(PUSHCONSTINT):
       *--sp = accu;
-      /* Fallthrough */
+      Fallthrough;
     Instruct(CONSTINT):
       accu = Val_int(*pc);
       pc++;
@@ -1306,7 +1299,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       *--sp = accu;
       accu = Val_int(*pc);
       pc += 2;
-      /* Fallthrough */
+      Fallthrough;
 #endif
     Instruct(GETDYNMET): {
       /* accu == tag, sp[0] == object, *pc == cache */
@@ -1346,21 +1339,6 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
 /* Context switching */
 
-    Instruct(RESUME):
-      resume_fn = sp[0];
-      resume_arg = sp[1];
-      resume_tail = Ptr_val(Field(accu, 1));
-      Setup_for_c_call;
-      accu = caml_continuation_use_noexc(accu);
-      Restore_after_c_call;
-      sp -= 2;
-      sp[0] = Val_long(domain_state->trap_sp_off);
-      sp[1] = Val_long(0);
-      sp[2] = (value)pc;
-      sp[3] = env;
-      sp[4] = Val_long(extra_args);
-      goto do_resume;
-
 do_resume: {
       struct stack_info* stk = Ptr_val(accu);
       if (stk == NULL) {
@@ -1375,20 +1353,98 @@ do_resume: {
       domain_state->current_stack->sp = sp;
       domain_state->current_stack = stk;
       sp = domain_state->current_stack->sp;
-      caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
-      sp[0] = resume_arg;
-      accu = resume_fn;
-      pc = Code_val(accu);
-      env = accu;
-      extra_args = 0;
-      goto check_stacks;
+      switch (resume_action) {
+      case Resume_call_fn:
+        /* Run [resume_fn resume_arg] on the resumed stack; the argument is
+           passed on the stack, replacing the trap-offset slot. */
+        sp[0] = resume_arg;
+        accu = resume_fn;
+        pc = Code_val(accu);
+        env = accu;
+        extra_args = 0;
+        goto check_stacks;
+      case Resume_return:
+        accu = resume_arg; /* value */
+        pc = (code_t) sp[1];
+        env = sp[2];
+        extra_args = Long_val(sp[3]);
+        sp += 4;
+        goto check_stacks;
+      case Resume_raise:
+        accu = resume_arg;
+        check_trap_barrier_for_exception (domain_state);
+        if (domain_state->backtrace_active) {
+          caml_stash_backtrace(accu, sp, /*reraise=*/ 0);
+        }
+        goto raise_notrace;
+      case Resume_reraise:
+        accu = resume_arg;
+        check_trap_barrier_for_exception (domain_state);
+        if (domain_state->backtrace_active)
+          caml_stash_backtrace(accu, sp, /*reraise=*/ 1);
+        goto raise_notrace;
+      default:
+        caml_fatal_error("do_resume: invalid resume_action");
+      }
+    }
+    Instruct(CONTINUE):
+      /* accu = continuation, sp[0] = value */
+      resume_action = Resume_return;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 4;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE):
+      /* accu = continuation, sp[0] = exn */
+      resume_action = Resume_raise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 4;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE_WITH_BACKTRACE): {
+      /* accu = continuation, sp[0] = exn, sp[1] = backtrace */
+      value bt = sp[1];
+      resume_action = Resume_reraise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      caml_restore_raw_backtrace(resume_arg, bt);
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp -= 3;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(0);
+      sp[2] = (value)pc;
+      sp[3] = env;
+      sp[4] = Val_long(extra_args);
+      goto do_resume;
     }
 
-    Instruct(RESUMETERM):
-      resume_fn = sp[0];
-      resume_arg = sp[1];
+    Instruct(CONTINUETERM):
+      /* accu = continuation, sp[0] = value */
+      resume_action = Resume_return;
+      resume_arg = sp[0];
       resume_tail = Ptr_val(Field(accu, 1));
       Setup_for_c_call;
       accu = caml_continuation_use_noexc(accu);
@@ -1397,6 +1453,35 @@ do_resume: {
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(extra_args);
       goto do_resume;
+
+    Instruct(DISCONTINUETERM):
+      /* accu = continuation, sp[0] = exn */
+      resume_action = Resume_raise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp = sp + *pc - 2;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(extra_args);
+      goto do_resume;
+
+    Instruct(DISCONTINUE_WITH_BACKTRACETERM): {
+      /* accu = continuation, sp[0] = exn, sp[1] = backtrace */
+      value bt = sp[1];
+      resume_action = Resume_reraise;
+      resume_arg = sp[0];
+      resume_tail = Ptr_val(Field(accu, 1));
+      Setup_for_c_call;
+      caml_restore_raw_backtrace(resume_arg, bt);
+      accu = caml_continuation_use_noexc(accu);
+      Restore_after_c_call;
+      sp = sp + *pc - 2;
+      sp[0] = Val_long(domain_state->trap_sp_off);
+      sp[1] = Val_long(extra_args);
+      goto do_resume;
+    }
 
     Instruct(PERFORM): {
       value cont;
@@ -1421,11 +1506,11 @@ do_resume: {
 
       old_stack->sp = sp;
       domain_state->current_stack = parent_stack;
-      caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
       Field(cont, 0) = Val_ptr(old_stack);
-      Field(cont, 1) = Val_long(0);
+      Field(cont, 1) = Val_ptr(old_stack);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);
@@ -1457,7 +1542,9 @@ do_resume: {
         resume_arg = caml_make_unhandled_effect_exn(eff);
         accu = caml_continuation_use(cont);
         Restore_after_c_call;
-        resume_fn = raise_unhandled_effect;
+        /* Deliver Effect.Unhandled by raising it at the perform site on
+           the continuation's stack. */
+        resume_action = Resume_raise;
         resume_tail = cont_tail;
 
         goto do_resume;
@@ -1466,11 +1553,12 @@ do_resume: {
       self->sp = sp;
       domain_state->current_stack = parent;
       sp = parent->sp;
-      caml_dynamic_flush_thread(domain_state->dynamic_bindings);
+      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
 
       CAMLassert(Stack_parent(cont_tail) == NULL);
       Stack_parent(self) = NULL;
       Stack_parent(cont_tail) = self;
+      Field(cont, 1) = Val_ptr(self);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);
@@ -1493,6 +1581,7 @@ do_resume: {
       accu = caml_alloc_stack(valuec, exnc, effc);
       Restore_after_c_call;
       CAMLnoalloc;
+      resume_action = Resume_call_fn;
       resume_fn = sp[2];
       resume_arg = sp[3];
       resume_tail = NULL;
@@ -1505,20 +1594,20 @@ do_resume: {
       goto do_resume;
     }
 
-    Instruct(WITH_STACK_BIND): {
+    Instruct(WITH_STACK_PREEMPTIBLE): {
       value valuec = accu;
       value exnc = sp[0];
       value effc = sp[1];
-      value dyn = sp[2];
-      value bind = sp[3];
+      value htick = sp[2];
       Setup_for_c_call;
-      accu = caml_alloc_stack_bind(valuec, exnc, effc, dyn, bind);
+      accu = caml_alloc_stack_preemptible(valuec, exnc, effc, htick);
       Restore_after_c_call;
       CAMLnoalloc;
-      resume_fn = sp[4];
-      resume_arg = sp[5];
+      resume_action = Resume_call_fn;
+      resume_fn = sp[3];
+      resume_arg = sp[4];
       resume_tail = NULL;
-      sp += 6 /* args */ - 5 /* values to be pushed */;
+      sp += 5 /* args */ - 5 /* values to be pushed */;
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(0);
       sp[2] = (value)pc;
@@ -1530,7 +1619,7 @@ do_resume: {
 #ifndef THREADED_CODE
     default:
 #ifdef _MSC_VER
-      __assume(0);
+      CAMLunreachable();
 #else
       caml_fatal_error("bad opcode (%"
                            ARCH_INTNAT_PRINTF_FORMAT "x)",

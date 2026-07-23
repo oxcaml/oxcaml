@@ -30,7 +30,7 @@
    architecture-specific emitters (X86_binary_emitter, Arm64_binary_emitter). *)
 
 module String_map = Map.Make (String)
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* Packed sections with their Binary_emitter.S module, hiding the
    architecture-specific types using an existential. *)
@@ -64,7 +64,7 @@ let register callback =
             (fun map (name, instrs) ->
               let name_str = X86_proc.Section_name.to_string name in
               let section =
-                { X86_binary_emitter.sec_name = name_str;
+                { X86_binary_emitter.sec_name = name;
                   sec_instrs = DLL.to_array instrs
                 }
               in

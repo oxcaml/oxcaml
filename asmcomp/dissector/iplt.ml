@@ -61,6 +61,7 @@ end
 
 type t =
   { entries : Entry.t list;
+    num_entries : int;
     by_original_symbol : Entry.t String.Tbl.t;
     section_data : bytes
   }
@@ -73,7 +74,7 @@ let iplt_symbol_name ~prefix ~symbol =
    NOP instructions (90 90) for padding to reach 8 bytes. *)
 let plt_entry_template =
   let section =
-    { X86_binary_emitter.sec_name = ".text.iplt";
+    { X86_binary_emitter.sec_name = X86_proc.Section_name.of_string ".text.iplt";
       sec_instrs =
         [| X86_ast.Ins
              (X86_ast.JMP (X86_ast.Mem64_RIP (X86_ast.QWORD, "dummy", 0)));
@@ -134,9 +135,11 @@ let build ~prefix ~igot ~symbols =
     Bytes.blit_string plt_entry_template 0 section_data (i * entry_size)
       entry_size
   done;
-  { entries; by_original_symbol; section_data }
+  { entries; num_entries; by_original_symbol; section_data }
 
 let entries t = t.entries
+
+let num_entries t = t.num_entries
 
 let section_data t = t.section_data
 

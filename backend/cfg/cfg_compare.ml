@@ -35,7 +35,7 @@ open! Int_replace_polymorphic_compare
       instruction's result that remain after removing the equations for the
       matching results of two matched instructions. *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* A set of (old_reg, new_reg) pairs asserting that these registers hold equal
    values at a given program point. Represented as two [Reg.Set.t Reg.Map.t]
@@ -263,8 +263,8 @@ let compare_body ~ppf_m ~map_label ~old_cfg ~new_cfg ~ol ~nl old_body new_body =
         Format.fprintf ppf_m
           "Instruction mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
           Label.format ol InstructionId.print oi.id Label.format nl
-          InstructionId.print ni.id Cfg.dump_basic oi.desc Cfg.dump_basic
-          ni.desc
+          InstructionId.print ni.id Printcfg.basic_desc oi.desc
+          Printcfg.basic_desc ni.desc
       else compare_instruction_fields ~ppf_m ~kind:"Instruction" ~ol ~nl oi ni;
       loop (DLL.next oc) (DLL.next nc)
   in
@@ -454,9 +454,9 @@ let collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg =
             "Terminator mismatch at old=%a(id:%a) new=%a(id:%a): %a vs %a@."
             Label.format ol InstructionId.print ob.terminator.id Label.format nl
             InstructionId.print nb.terminator.id
-            (Cfg.dump_terminator ~sep:"")
+            (Printcfg.terminator_desc ~sep:"")
             ob.terminator.desc
-            (Cfg.dump_terminator ~sep:"")
+            (Printcfg.terminator_desc ~sep:"")
             nb.terminator.desc
         else
           compare_instruction_fields ~ppf_m ~kind:"Terminator" ~ol ~nl

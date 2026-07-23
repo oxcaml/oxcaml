@@ -29,18 +29,18 @@ type result =
 let rec print_result fmt result =
   match result with
   | Resolved uid ->
-      Format.fprintf fmt "@[Resolved: %a@]@;" Uid.print uid
+      Format.fprintf fmt "@[Resolved:@ %a@]" Uid.print uid
   | Resolved_alias (uid, r) ->
-      Format.fprintf fmt "@[Alias: %a -> %a@]@;"
+      Format.fprintf fmt "@[Alias:@ %a@] ->@ %a"
         Uid.print uid print_result r
   | Unresolved shape ->
-      Format.fprintf fmt "@[Unresolved: %a@]@;" print shape
+      Format.fprintf fmt "@[Unresolved:@ %a@]" print shape
   | Approximated (Some uid) ->
-      Format.fprintf fmt "@[Approximated: %a@]@;" Uid.print uid
+      Format.fprintf fmt "@[Approximated:@ %a@]" Uid.print uid
   | Approximated None ->
-      Format.fprintf fmt "@[Approximated: No uid@]@;"
+      Format.fprintf fmt "Approximated: No uid"
   | Internal_error_missing_uid ->
-      Format.fprintf fmt "@[Missing uid@]@;"
+      Format.fprintf fmt "Missing uid"
 
 module Diagnostics = struct
   type diagnostics =
@@ -198,10 +198,17 @@ end) = struct
   let approx_nf nf = { nf with approximated = true }
 
   let rec equal_local_env t1 t2 =
-    t1.depth = t2.depth &&
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
+    (* Normal forms are heavily shared, and without these [==] short
+       circuits [equal] re-traverses shared sub-terms as a tree, which is
+       exponential on functor-heavy signatures.  Sound while all the
+       equalities below are reflexive (in particular, no float fields
+       compared with [=]). *)
+    t1 == t2 ||
+    (t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
+    t1 == t2 ||
     match t1, t2 with
     | Thunk (l1, t1), Thunk (l2, t2) ->
       if equal t1 t2 then equal_local_env l1 l2
@@ -283,8 +290,8 @@ end) = struct
         | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
-    if not (Option.equal Uid.equal t1.uid t2.uid) then false
-    else equal_nf_desc t1.desc t2.desc
+    t1 == t2 ||
+    (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
   module ReduceMemoTable = Hashtbl.Make(struct
       type nonrec t = local_env * t

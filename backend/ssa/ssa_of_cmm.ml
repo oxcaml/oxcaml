@@ -429,7 +429,7 @@ module Make (Builder : Ssa.Make_builder_result) = struct
     | Int_test _ | Switch _ | Raise _ | Tailcall_self _ | Tailcall_func _
     | Invalid _ ->
       Misc.fatal_errorf "Ssa_of_cmm: unexpected terminator (%a)"
-        (Cfg.dump_terminator ~sep:"")
+        (Printcfg.terminator_desc ~sep:"")
         new_op
 
   and emit_expr_op env c op args dbg : result =
@@ -476,8 +476,8 @@ module Make (Builder : Ssa.Make_builder_result) = struct
         emit_call env c ~ty ~nontail term arg_instrs dbg
       | Basic (Op op) -> Ok (emit_op_res c ~dbg op ty arg_instrs)
       | Basic basic ->
-        Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)" Cfg.dump_basic
-          basic)
+        Misc.fatal_errorf "Ssa_of_cmm: unexpected basic (%a)"
+          Printcfg.basic_desc basic)
 
   and emit_ifthenelse env c ~tail econd eif eelse : result =
     let cond, earg = Sel.select_condition econd in

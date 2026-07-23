@@ -1,11 +1,10 @@
 (* TEST
 hassysthreads;
 include systhreads;
-not-windows;
+not-target-windows;
 poll-insertion;
 no-tsan;
-runtime5;
-multidomain;
+multicore;
 {
   bytecode;
 }{

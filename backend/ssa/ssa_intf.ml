@@ -48,9 +48,9 @@ end
 module type Graph_shared_sig = sig
   type usage_count
 
-  module Instruction_id : Oxcaml_utils.Id_counter.S
+  module Instruction_id : Id_counter.S
 
-  module Block_id : Oxcaml_utils.Id_counter.S
+  module Block_id : Id_counter.S
 
   type op = Operation.t
 
@@ -155,7 +155,7 @@ end
 module type Block_shared_sig = sig
   type param
 
-  module Id : Oxcaml_utils.Id_counter.S
+  module Id : Id_counter.S
 
   type t
 
@@ -185,7 +185,7 @@ end
 module type Instruction_shared_sig = sig
   type t
 
-  module Id : Oxcaml_utils.Id_counter.S
+  module Id : Id_counter.S
 
   val equal : t -> t -> bool
 

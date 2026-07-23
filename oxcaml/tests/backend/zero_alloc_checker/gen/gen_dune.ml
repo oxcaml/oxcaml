@@ -44,15 +44,18 @@ let () =
     Buffer.output_buffer Out_channel.stdout buf
   in
   let print_test_expected_output ?(filter = "filter.sh")
-      ?(extra_flags = "-zero-alloc-check default") ?output ~cutoff ~extra_dep
-      ~exit_code name =
+      ?(extra_flags = "-zero-alloc-check default") ?output ~cutoff ~extra_deps
+      ~extra_sources ~exit_code name =
+    let extra_sources =
+      if extra_sources = []
+      then Printf.sprintf {|(:ml %s.ml)|} name
+      else
+        Printf.sprintf {|(:ml %s %s.ml)|} (String.concat " " extra_sources) name
+    in
     let extra_deps =
-      match extra_dep with
-      | None -> Printf.sprintf {|(:ml %s.ml)|} name
-      | Some s ->
-        if String.ends_with ~suffix:".ml" s || String.ends_with ~suffix:".mli" s
-        then Printf.sprintf {|(:ml %s %s.ml)|} s name
-        else Printf.sprintf {|%s (:ml %s.ml)|} s name
+      if extra_deps = []
+      then extra_sources
+      else String.concat " " extra_deps ^ " " ^ extra_sources
     in
     let output = Option.value output ~default:(name ^ ".output") in
     let subst = function
@@ -97,79 +100,98 @@ let () =
   print_test "t5.ml test_assume.ml";
   print_test "test_match_on_mutable_state.ml";
   print_test "test_flambda.ml";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail1";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail2";
-  print_test_expected_output ~cutoff:0 ~extra_dep:(Some "t3.ml") ~exit_code:2
-    "fail3";
-  print_test_expected_output ~cutoff:0 ~extra_dep:(Some "t4.ml") ~exit_code:2
-    "fail4";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail5";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail6";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail7";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:0 "fail8";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail9";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail10";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "fail12";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail13";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail14";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail15";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail16";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail17";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2 "fail18";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail1";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail2";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:["t3.ml"]
+    ~exit_code:2 "fail3";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:["t4.ml"]
+    ~exit_code:2 "fail4";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail5";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail6";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail7";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:0 "fail8";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail9";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail10";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "fail12";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail13";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail14";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail15";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail16";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail17";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "fail18";
   (* test printing detailed error message only in flambda because the exact
      output depends on optimization level. *)
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:(Some "dep19.ml")
-    ~exit_code:2 "fail19";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "fail20";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "fail21";
-  print_test_expected_output ~cutoff:0 ~extra_dep:None ~exit_code:2
-    "test_attribute_error_duplicate";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_attr_unused";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:["dep19.ml"] ~exit_code:2 "fail19";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "fail20";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "fail21";
+  print_test_expected_output ~cutoff:0 ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "test_attribute_error_duplicate";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_attr_unused";
   (* Checks that the warning is printed and compilation is successful. *)
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:0
-    "t6";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:0 "t6";
   (* Check that entry function and functors are ignored with [@@@zero_alloc
      all] *)
   print_test "t7.ml";
   (* Check that compiler generated stubs are ignored with [@@@zero_alloc all] *)
   print_test "test_stub_dep.ml test_stub.ml";
   (* generates an indirect call. *)
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "t1";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "t1";
   (* deleting dead functions works *)
-  print_test_expected_output ~cutoff:default_cutoff
-    ~extra_dep:(Some "test_warning199.mli") ~exit_code:0 "test_warning199";
-  print_test_expected_output ~cutoff:default_cutoff
-    ~extra_dep:(Some "test_warning199_disabled.mli") ~exit_code:0
-    "test_warning199_disabled";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:0
-    "test_never_returns_normally";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:["test_warning199.mli"] ~exit_code:0 "test_warning199";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:["test_warning199_disabled.mli"]
+    ~exit_code:0 "test_warning199_disabled";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:0 "test_never_returns_normally";
   print_test_expected_output ~extra_flags:"-zero-alloc-check opt"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail22";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail22";
   print_test_expected_output ~extra_flags:"-zero-alloc-check opt"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail23";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail23";
   print_test ~extra_flags:"-zero-alloc-check opt" "test_zero_alloc_opt1.ml";
   print_test ~extra_flags:"-zero-alloc-check opt" "test_zero_alloc_opt2.ml";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_fail" ~extra_flags:"-directory repo/root/relative/dir";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_on_call" ~extra_flags:"-no-zero-alloc-checker-details-extra";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_misplaced_assume";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_assume_fail"
+    ~extra_flags:"-directory repo/root/relative/dir";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_assume_on_call"
+    ~extra_flags:"-no-zero-alloc-checker-details-extra";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_misplaced_assume";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "test_attr_check";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_attr_check_all";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_attr_check_opt";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:0
-    "test_attr_check_none";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "fail24";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "test_attr_check";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_attr_check_all";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_attr_check_opt";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:0 "test_attr_check_none";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "fail24";
   print_test
     ~extra_flags:"-zero-alloc-check default -function-layout topological"
     "test_raise_message.ml";
@@ -177,125 +199,133 @@ let () =
     ~extra_flags:
       "-zero-alloc-check default -disable-precise-zero-alloc-checker \
        -function-layout source"
-    ~extra_dep:None ~exit_code:2 "fail25";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2 "fail25";
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_flags:
       "-zero-alloc-check default -disable-zero-alloc-checker -function-layout \
        source"
-    ~extra_dep:None ~exit_code:2 "fail26";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2 "fail26";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_flags:"-zero-alloc-check default" ~extra_dep:None ~exit_code:2
-    "test_all_opt";
+    ~extra_flags:"-zero-alloc-check default" ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "test_all_opt";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_flags:"-zero-alloc-check all" ~extra_dep:None ~exit_code:2
-    "test_all_opt2";
+    ~extra_flags:"-zero-alloc-check all" ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "test_all_opt2";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_flags:"-zero-alloc-check opt" ~extra_dep:None ~exit_code:2
-    "test_all_opt3";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_arity";
+    ~extra_flags:"-zero-alloc-check opt" ~extra_deps:[] ~extra_sources:[]
+    ~exit_code:2 "test_all_opt3";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_arity";
   print_cmi_target "stop_after_typing.ml";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_signatures_functors";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_signatures_first_class_modules";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_signatures_functors";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_signatures_first_class_modules";
   print_cmi_target "test_signatures_separate_a.ml";
   print_test_expected_output ~cutoff:default_cutoff
     ~output:"test_signatures_separate.output"
-    ~extra_dep:(Some "test_signatures_separate_a.cmi") ~exit_code:2
-    "test_signatures_separate_b";
+    ~extra_deps:["test_signatures_separate_a.cmi"]
+    ~extra_sources:[] ~exit_code:2 "test_signatures_separate_b";
   print_test_expected_output ~cutoff:default_cutoff
     ~output:"test_signatures_separate.opt.output"
     ~extra_flags:"-zero-alloc-check all"
-    ~extra_dep:(Some "test_signatures_separate_a.cmi") ~exit_code:2
-    "test_signatures_separate_b";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_inlining";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_error";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_assume_stub";
+    ~extra_deps:["test_signatures_separate_a.cmi"]
+    ~extra_sources:[] ~exit_code:2 "test_signatures_separate_b";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_assume_inlining";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_assume_error";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_assume_stub";
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join -2"
-    ~extra_dep:None ~exit_code:2 ~filter:"filter_fatal_error.sh"
-    "test_bounded_join";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    ~filter:"filter_fatal_error.sh" "test_bounded_join";
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join 2"
-    ~extra_dep:None ~exit_code:2 "test_bounded_join2";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2 "test_bounded_join2";
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join 0"
-    ~extra_dep:None ~exit_code:2 "test_bounded_join3";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2 "test_bounded_join3";
   print_test_expected_output ~cutoff:3
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join 0"
-    ~extra_dep:None ~exit_code:2 "test_bounded_join4";
+    ~extra_deps:[] ~extra_sources:[] ~exit_code:2 "test_bounded_join4";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_inference.output" ~extra_dep:(Some "test_inference.mli")
+    ~output:"test_inference.output" ~extra_deps:[]
+    ~extra_sources:["test_inference.mli"] ~exit_code:2 "test_inference";
+  print_test_expected_output ~cutoff:default_cutoff
+    ~output:"test_inference.opt.output" ~extra_deps:[]
+    ~extra_sources:["test_inference.mli"] ~extra_flags:"-zero-alloc-check all"
     ~exit_code:2 "test_inference";
-  print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_inference.opt.output" ~extra_dep:(Some "test_inference.mli")
-    ~extra_flags:"-zero-alloc-check all" ~exit_code:2 "test_inference";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    ~extra_flags:
-      "-flambda2-expert-cont-lifting-budget 0 \
-       -flambda2-expert-cont-specialization-budget 0"
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 ~extra_flags:"-no-flambda2-match-in-match"
     "test_remove_inferred_assume";
   print_test "test_remove_inferred_assume_workaround.ml";
   print_test_expected_output ~extra_flags:"-zero-alloc-assert all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail27";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail27";
   print_test_expected_output
     ~extra_flags:"-zero-alloc-assert all_opt -zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail27_opt";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail27_opt";
   print_test_expected_output
     ~extra_flags:"-zero-alloc-assert default -zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail27_default";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail27_default";
   print_test_expected_output ~extra_flags:"-zero-alloc-check default"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail28";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail28";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "fail28_opt";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "fail28_opt";
   print_cmi_target "fail29.mli";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_dep:(Some "fail29.cmi") ~exit_code:2 "fail29";
+    ~extra_deps:["fail29.cmi"; "fail29.mli"]
+    ~extra_sources:[] ~exit_code:2 "fail29";
   print_cmi_target "fail29_opt.mli";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_dep:(Some "fail29_opt.cmi") ~exit_code:2 "fail29_opt";
+    ~extra_deps:["fail29_opt.cmi"; "fail29_opt.mli"]
+    ~extra_sources:[] ~exit_code:2 "fail29_opt";
   print_cmi_target "fail29_opt2.mli";
   print_test_expected_output ~cutoff:default_cutoff
-    ~extra_flags:"-zero-alloc-check all" ~extra_dep:(Some "fail29_opt2.cmi")
-    ~exit_code:2 "fail29_opt2";
+    ~extra_flags:"-zero-alloc-check all"
+    ~extra_deps:["fail29_opt2.cmi"; "fail29_opt2.mli"]
+    ~extra_sources:[] ~exit_code:2 "fail29_opt2";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2 "test_assume_unless_opt";
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
+    "test_assume_unless_opt";
   print_test "test_assume_unless_opt.ml";
   print_test_expected_output ~extra_flags:"-zero-alloc-check default"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:0
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:0
     "test_assume_unless_opt_sig";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
     "test_assume_unless_opt_sig2";
   print_test_expected_output ~extra_flags:"-zero-alloc-check default"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
     "test_assume_unless_opt_on_call";
   print_test_expected_output ~extra_flags:"-zero-alloc-check all"
-    ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+    ~cutoff:default_cutoff ~extra_deps:[] ~extra_sources:[] ~exit_code:2
     "test_assume_unless_opt_on_call2";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg.output" ~extra_dep:None
+    ~output:"test_custom_error_msg.output" ~extra_deps:[] ~extra_sources:[]
     ~extra_flags:"-zero-alloc-check default" ~exit_code:2
     "test_custom_error_msg";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg.opt.output" ~extra_dep:None
+    ~output:"test_custom_error_msg.opt.output" ~extra_deps:[] ~extra_sources:[]
     ~extra_flags:"-zero-alloc-check all" ~exit_code:2 "test_custom_error_msg";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg_sig.output"
-    ~extra_dep:(Some "test_custom_error_msg_sig.mli")
+    ~output:"test_custom_error_msg_sig.output" ~extra_deps:[]
+    ~extra_sources:["test_custom_error_msg_sig.mli"]
     ~extra_flags:"-zero-alloc-check default" ~exit_code:2
     "test_custom_error_msg_sig";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg_sig.opt.output"
-    ~extra_dep:(Some "test_custom_error_msg_sig.mli")
+    ~output:"test_custom_error_msg_sig.opt.output" ~extra_deps:[]
+    ~extra_sources:["test_custom_error_msg_sig.mli"]
     ~extra_flags:"-zero-alloc-check all" ~exit_code:2
     "test_custom_error_msg_sig";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_arch_specific_witness";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
-    "test_sort_witnesses";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_arch_specific_witness";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_sort_witnesses";
   ()

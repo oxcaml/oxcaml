@@ -162,8 +162,9 @@ and type_desc =
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
   | Trepr of type_expr * Jkind_types.Sort.univar list
-  | Tpackage of Path.t * (Longident.t * type_expr) list
+  | Tpackage of package
   | Tof_kind of jkind_lr
+  | Tbox of type_expr
 
 and arg_label =
   | Nolabel
@@ -173,6 +174,10 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+
+and package =
+    { pack_path : Path.t;
+      pack_cstrs : (string list * type_expr) list }
 
 and row_desc =
     { row_fields: (label * row_field) list;
@@ -187,13 +192,14 @@ and fixed_explanation =
   | Rigid
   | Fixed_existential
 and row_field = [`some] row_field_gen
+and row_field_cell = [`some | `none] row_field_gen ref
 and _ row_field_gen =
     RFpresent : type_expr option -> [> `some] row_field_gen
   | RFeither :
       { no_arg: bool;
         arg_type: type_expr list;
         matched: bool;
-        ext: [`some | `none] row_field_gen ref} -> [> `some] row_field_gen
+        ext: row_field_cell} -> [> `some] row_field_gen
   | RFabsent : [> `some] row_field_gen
   | RFnone : [> `none] row_field_gen
 
@@ -237,7 +243,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t
+  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -339,18 +345,25 @@ and method_privacy =
      0 <= may_pos <= pos
      0 <= may_weak <= may_neg <= neg
      0 <= inj
+   may_pos/may_neg mean possible positive/negative occurrences;
+     thus, may_pos + may_neg = invariant
    Additionally, the following implications are valid
      pos => inj
      neg => inj
    Examples:
-     type 'a t        : may_pos + may_neg + may_weak
+     type 'a t        : may_pos + may_neg
+     type +'a t       : may_pos
+     type -'a t       : may_neg
+     type +-'a t      : null (no occurrence of 'a assured)
+     type !'a t       : may_pos + may_neg + inj
+     type +!'a t      : may_pos + inj
+     type -!'a t      : may_neg + inj
+     type +-!'a t     : inj
      type 'a t = 'a   : pos
      type 'a t = 'a -> unit : neg
      type 'a t = ('a -> unit) -> unit : pos + may_weak
      type 'a t = A of (('a -> unit) -> unit) : pos
      type +'a p = ..  : may_pos + inj
-     type +!'a t      : may_pos + inj
-     type -!'a t      : may_neg + inj
      type 'a t = A    : inj
  *)
 
@@ -376,6 +389,7 @@ module Variance = struct
   let unknown = 7
   let full = single Inv
   let covariant = single Pos
+  let contravariant = single Neg
   let swap f1 f2 v v' =
     set_if (mem f2 v) f1 (set_if (mem f1 v) f2 v')
   let conjugate v =
@@ -459,12 +473,14 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation * unsafe_mode_crossing option
+  | Type_record of
+      'lbl list * record_representation * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
       record_unboxed_product_representation *
       unsafe_mode_crossing option
-  | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
+  | Type_variant of
+      'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
 
 and tag = Ordinary of {src_index: int;     (* Unique name (per type) *)
@@ -478,7 +494,7 @@ and type_origin =
   | Existential of string
 
 and mixed_block_element =
-  | Scannable
+  | Scannable of Jkind_types.Scannable_axes.t
   | Float_boxed
   | Float64
   | Float32
@@ -501,24 +517,34 @@ and module_representation = Jkind_types.Sort.t array
 and record_representation =
   | Record_unboxed
   | Record_inlined of tag * constructor_representation * variant_representation
-  | Record_boxed of Jkind_types.Sort.Const.t array
+  | Record_boxed
   | Record_float
   | Record_ufloat
   | Record_mixed of mixed_product_shape
+  | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
+  | Record_variable
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
+  | Record_unboxed_product_variable
 
 and variant_representation =
   | Variant_unboxed
-  | Variant_boxed of (constructor_representation *
-                      Jkind_types.Sort.Const.t array) array
+  | Variant_boxed of cstr_layout array
   | Variant_extensible
   | Variant_with_null
+
+and cstr_layout =
+  | Cstr_layout_known of
+      { shape : constructor_representation;
+        sorts : Jkind_types.Sort.Const.t array;
+      }
+  | Cstr_layout_variable
 
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_variable
 
 and label_declaration =
   {
@@ -526,7 +552,7 @@ and label_declaration =
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
-    ld_sort: Jkind_types.Sort.Const.t;
+    ld_sort: Jkind_types.Sort.Const.t option;
     ld_loc: Location.t;
     ld_attributes: Parsetree.attributes;
     ld_uid: Uid.t;
@@ -546,7 +572,7 @@ and constructor_argument =
   {
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
-    ca_sort: Jkind_types.Sort.Const.t;
+    ca_sort: Jkind_types.Sort.Const.t option;
     ca_loc: Location.t;
   }
 
@@ -650,6 +676,8 @@ module Lpoly = struct
     | Pending _ -> Misc.fatal_error "layout is pending generalization"
     | Determined l -> l
 
+  let is_empty_exn t = List.is_empty @@ get_exn t
+
   let determined l = ref (Determined l)
   let pending ~loc = ref (Pending loc)
 
@@ -687,6 +715,8 @@ module type Wrapped = sig
   | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
+
+  and persistent_signature = signature * Mode.Staticity.Const.t
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -817,46 +847,6 @@ end
 
 include Make_wrapped(struct type 'a t = 'a end)
 
-(* Constructor and record label descriptions inserted held in typing
-   environments *)
-
-type constructor_description =
-  { cstr_name: string;                  (* Constructor name *)
-    cstr_res: type_expr;                (* Type of the result *)
-    cstr_existentials: type_expr list;  (* list of existentials *)
-    cstr_args: constructor_argument list; (* Type of the arguments *)
-    cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: tag;                      (* Tag for heap blocks *)
-    cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;
-    (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
-       payload. (Or equivalently, if it's represented as either a tagged int or
-       the null pointer) *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-    cstr_generalized: bool;             (* Constrained return type? *)
-    cstr_private: private_flag;         (* Read-only constructor? *)
-    cstr_loc: Location.t;
-    cstr_attributes: Parsetree.attributes;
-    cstr_inlined: type_declaration option;
-    cstr_uid: Uid.t;
-  }
-
-let array_equal eq_elt l1 l2 =
-  (* Basically inlines [Array.for_all2] to avoid the [raise] *)
-  let n = Array.length l1 in
-  Int.equal n (Array.length l2) &&
-  let rec loop i =
-    if Int.equal i n then
-      true
-    else if eq_elt (Array.unsafe_get l1 i) (Array.unsafe_get l2 i) then
-      loop (succ i)
-    else
-      false
-  in
-  loop 0
-
 let equal_tag t1 t2 =
   match (t1, t2) with
   | Ordinary {src_index=i1}, Ordinary {src_index=i2} ->
@@ -876,9 +866,9 @@ let compare_tag t1 t2 =
   | Extension _, Null -> -1
   | Null, Extension _ -> 1
 
-let rec equal_mixed_block_element e1 e2 =
+let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable
+  | Scannable _, Scannable _
   | Float64, Float64 | Float32, Float32 | Float_boxed, Float_boxed
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16
@@ -887,15 +877,21 @@ let rec equal_mixed_block_element e1 e2 =
   | Void, Void
     -> true
   | Product es1, Product es2
-    -> Misc.Stdlib.Array.equal equal_mixed_block_element es1 es2
-  | ( Scannable | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
+    -> Misc.Stdlib.Array.equal
+         equal_mixed_block_element_up_to_scannable_axes es1 es2
+  | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
     | Product _ | Void ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
   match e1, e2 with
-  | Scannable, Scannable | Float_boxed, Float_boxed
+  | Scannable sa1, Scannable sa2 -> (
+    match Jkind_types.Scannable_axes.less_or_equal sa1 sa2 with
+    | Less -> -1
+    | Equal -> 0
+    | Not_le -> 1)
+  | Float_boxed, Float_boxed
   | Float64, Float64 | Float32, Float32
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
@@ -904,8 +900,8 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
-  | Scannable, _ -> -1
-  | _, Scannable -> 1
+  | Scannable _, _ -> -1
+  | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
   | _, Float_boxed -> 1
   | Float64, _ -> -1
@@ -933,32 +929,40 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
-let equal_mixed_product_shape r1 r2 = r1 == r2 ||
-  array_equal equal_mixed_block_element r1 r2
+let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
-let equal_constructor_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
-      equal_mixed_product_shape mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Constructor_variable, Constructor_variable -> true
+  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
+    -> false
 
-let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
+let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
+  match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
-  | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-      array_equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
-          equal_constructor_representation cstr1 cstr2
-          && array_equal Jkind_types.Sort.Const.equal
-               sorts1 sorts2)
-        cstrs_and_sorts1
-        cstrs_and_sorts2
+  | Variant_boxed layouts1, Variant_boxed layouts2 ->
+      Misc.Stdlib.Array.equal
+        (fun l1 l2 -> match l1, l2 with
+           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_known { shape = s1; sorts = ss1 },
+             Cstr_layout_known { shape = s2; sorts = ss2 } ->
+             equal_constructor_representation_up_to_scannable_axes s1 s2
+             && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
+           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+        layouts1
+        layouts2
   | Variant_extensible, Variant_extensible ->
       true
   | Variant_with_null, Variant_with_null -> true
   | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
       false
 
-let equal_record_representation r1 r2 = match r1, r2 with
+let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
@@ -966,66 +970,38 @@ let equal_record_representation r1 r2 = match r1, r2 with
          constructor representation. *)
       ignore (cr1 : constructor_representation);
       ignore (cr2 : constructor_representation);
-      equal_tag tag1 tag2 && equal_variant_representation vr1 vr2
-  | Record_boxed sorts1, Record_boxed sorts2 ->
-      array_equal Jkind_types.Sort.Const.equal sorts1 sorts2
+      equal_tag tag1 tag2 &&
+        equal_variant_representation_up_to_scannable_axes vr1 vr2
+  | Record_boxed, Record_boxed ->
+      true
   | Record_float, Record_float ->
       true
   | Record_ufloat, Record_ufloat ->
       true
-  | Record_mixed mx1, Record_mixed mx2 -> equal_mixed_product_shape mx1 mx2
-  | (Record_unboxed | Record_inlined _ | Record_boxed _ | Record_float
-    | Record_ufloat | Record_mixed _), _ ->
+  | Record_mixed mx1, Record_mixed mx2 ->
+      equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Record_dummy { represent_as_float_array = a1; flatten_floats = b1 },
+    Record_dummy { represent_as_float_array = a2; flatten_floats = b2 } ->
+      Bool.equal a1 a2 && Bool.equal b1 b2
+  | Record_variable, Record_variable -> true
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->
       false
 
-let equal_record_unboxed_product_representation r1 r2 = match r1, r2 with
-  | Record_unboxed_product, Record_unboxed_product -> true
+let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
+  match r1, r2 with
+  | Record_unboxed_product, Record_unboxed_product
+  | Record_unboxed_product_variable, Record_unboxed_product_variable -> true
+  | (Record_unboxed_product | Record_unboxed_product_variable), _ -> false
 
-let may_equal_constr c1 c2 =
-  c1.cstr_arity = c2.cstr_arity
-  && (match c1.cstr_tag,c2.cstr_tag with
-     | Extension _, Extension _ ->
-         (* extension constructors may be rebindings of each other *)
-         true
-     | tag1, tag2 ->
-         equal_tag tag1 tag2)
-
-type 'a gen_label_description =
-  { lbl_name: string;                   (* Short name *)
-    lbl_res: type_expr;                 (* Type of the result *)
-    lbl_arg: type_expr;                 (* Type of the argument *)
-    lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Const.t;(* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
-    lbl_repres: 'a;                     (* Representation for outer record *)
-    lbl_private: private_flag;          (* Read-only field? *)
-    lbl_loc: Location.t;
-    lbl_attributes: Parsetree.attributes;
-    lbl_uid: Uid.t;
-  }
-
-type label_description = record_representation gen_label_description
-
-type unboxed_label_description =
-  record_unboxed_product_representation gen_label_description
-
-type _ record_form =
-  | Legacy : record_representation record_form
-  | Unboxed_product : record_unboxed_product_representation record_form
-
-type record_form_packed =
-  | P : _ record_form -> record_form_packed
-
-let record_form_to_string (type rep) (record_form : rep record_form) =
-  match record_form with
-  | Legacy -> "record"
-  | Unboxed_product -> "unboxed record"
-
+(* The scannable axes in the resulting  are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
-  | Base Scannable -> Scannable
+  (* CR layouts-scannable: since sorts do not store scannable axis information,
+     we are forced to default to max. It would be good to store the scannable
+     axis information, but doing so takes a sizable refactor. See the comment
+     on [Sort] in [jkind_intf.ml] *)
+  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
   | Base Bits8 -> Bits8
   | Base Bits16 -> Bits16
   | Base Bits32 -> Bits32
@@ -1045,18 +1021,23 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 
 let find_unboxed_type decl =
   match decl.type_kind with
-    Type_record ([{ld_type = arg; ld_modalities = ms; _}], Record_unboxed, _)
+    Type_record
+      ([{ld_type = arg; ld_modalities = ms; _}],
+       Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }], Record_inlined (_, _, Variant_unboxed), _)
+      ([{ld_type = arg; ld_modalities = ms; _ }],
+       Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }], Record_unboxed_product, _)
+      ([{ld_type = arg; ld_modalities = ms; _ }],
+       (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
-                    | Record_boxed _ | Record_float | Record_ufloat
-                    | Record_mixed _), _)
-  | Type_record_unboxed_product (_, Record_unboxed_product, _)
+                    | Record_boxed | Record_float | Record_ufloat
+                    | Record_mixed _ | Record_dummy _ | Record_variable), _)
+  | Type_record_unboxed_product
+      (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)
   | Type_abstract _ | Type_open ->
@@ -1102,7 +1083,7 @@ let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
 let rec mixed_block_element_to_string = function
-  | Scannable -> "Scannable"
+  | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"
   | Float32 -> "Float32"
   | Float64 -> "Float64"
@@ -1123,7 +1104,7 @@ let rec mixed_block_element_to_string = function
   | Void -> "Void"
 
 let mixed_block_element_to_lowercase_string = function
-  | Scannable -> "value"
+  | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
   | Float64 -> "float64"
@@ -1370,11 +1351,12 @@ let best_effort_compare_type_expr te1 te2 =
         | Tfield (_, _, _, _)
         | Tnil
         | Tvariant _
-        | Tpackage (_, _)
+        | Tpackage _
         | Tarrow (_, _, _, _)
         | Tquote _
         | Tsplice _
         | Tquote_eval _
+        | Tbox _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in
@@ -1641,8 +1623,7 @@ let match_row_field ~present ~absent ~either (f : row_field) =
         | RFnone -> None
         | RFeither _ | RFpresent _ | RFabsent as e -> Some e
       in
-      either no_arg arg_type matched e
-
+      either no_arg arg_type matched (ext,e)
 
 (**** Some type creators ****)
 
@@ -1650,12 +1631,9 @@ let new_id = Local_store.s_ref (-1)
 
 let create_expr = Transient_expr.create
 
-let newty3 ~level ~scope desc  =
+let proto_newty3 ~level ~scope desc  =
   incr new_id;
   create_expr desc ~level ~scope ~id:!new_id
-
-let newty2 ~level desc =
-  newty3 ~level ~scope:Ident.lowest_scope desc
 
                   (**********************************)
                   (*  Utilities for backtracking    *)

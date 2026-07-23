@@ -28,7 +28,7 @@ open! Int_replace_polymorphic_compare
 module String = Misc.Stdlib.String
 module Section_name = X86_proc.Section_name
 module StringMap = X86_binary_emitter.StringMap
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let isprefix s1 s2 =
   String.length s1 <= String.length s2
@@ -141,9 +141,10 @@ let parse_flags flags =
   in
   inner 0L (String.to_seq flags ())
 
-let make_custom_section sections name raw_section sh_string_table =
+let make_custom_section sections name raw_section ~align sh_string_table =
   let flags = parse_flags (X86_proc.Section_name.flags name) in
-  let align = X86_proc.Section_name.alignment name in
+  let args_align = X86_proc.Section_name.alignment name in
+  let align = Int64.max args_align align in
   make_section sections name
     ~size:(Int64.of_int (X86_binary_emitter.size raw_section))
     ~align ~flags
@@ -175,7 +176,7 @@ let assemble_one_section ~name instructions =
   in
   align,
   X86_binary_emitter.assemble_section X64
-    { X86_binary_emitter.sec_name = X86_proc.Section_name.to_string name;
+    { X86_binary_emitter.sec_name = name;
       sec_instrs = DLL.to_array instructions
     }
 
@@ -211,11 +212,12 @@ let make_compiler_sections section_table compiler_sections symbol_table
           sh_string_table
       else if Section_name.is_note_like name
       then
-        make_custom_section section_table name raw_section ~sh_type:7
-          (* SHT_NOTE *) sh_string_table
+        make_custom_section section_table name raw_section
+          ~align:(Int64.of_int align) ~sh_type:7 (* SHT_NOTE *) sh_string_table
       else
-        make_custom_section section_table name raw_section ~sh_type:1
-          (* SHT_PROGBITS *) sh_string_table;
+        make_custom_section section_table name raw_section
+          ~align:(Int64.of_int align) ~sh_type:1 (* SHT_PROGBITS *)
+          sh_string_table;
       Section_name.Tbl.add section_symbols name
         (Symbol_table.make_section_symbol symbol_table
            (Section_table.num_sections section_table - 1)

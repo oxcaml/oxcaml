@@ -16,7 +16,6 @@
 (* Translation of primitives *)
 
 open Primitive
-open Types
 open Typedtree
 open Typeopt
 open Lambda
@@ -55,6 +54,10 @@ let unboxed_product_uninitialized_array_check loc array_kind =
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Translprim.unboxed_product_uninitialized_array_check: \
+       Punspecializedarray"
 
 (* Insertion of debugging events *)
 
@@ -107,7 +110,7 @@ type loc_kind =
 type atomic_kind =
   | Ref   (* operation on an atomic reference (takes only a pointer) *)
   | Field (* operation on an atomic field (takes a pointer and an offset) *)
-  | Loc (* operation on a first-class field (takes a (pointer, offset) pair *)
+  | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
 
 type atomic_op =
   | Load
@@ -144,7 +147,7 @@ type prim =
   | Poke of Lambda.peek_or_poke option
     (* For [Peek] and [Poke] the [option] is [None] until the primitive
        specialization code (below) has been run. *)
-  | Unsupported of Lambda.primitive
+  | Unsupported of Lambda.primitive [@warning "-unused-constructor"]
 
 let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
@@ -163,6 +166,8 @@ let clear_used_primitives () = Hashtbl.clear units_with_used_primitives
 let get_units_with_used_primitives () =
   Hashtbl.fold (fun path _ acc -> path :: acc) units_with_used_primitives []
 
+(* For the [%obj_*] primitives, which re-use the array primitives but should
+   not be specialized, we resolve the array kind right away. *)
 let gen_array_kind =
   if Config.flat_float_array then Pgenarray else Paddrarray
 
@@ -492,11 +497,6 @@ let indexing_primitives =
 let array_vec_primitives =
   let array_types_and_primitives =
     [
-      ("float_array",
-       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
-         Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed }),
-       (fun ~size ~unsafe ~index_kind ~boxed ->
-         Pfloat_array_set_vec { size; unsafe; index_kind; boxed }));
       ("floatarray",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }),
@@ -585,8 +585,12 @@ let array_vec_primitives =
   |> List.to_seq
   |> String.Map.of_seq
 
-let lookup_primitive loc ~poly_mode ~poly_sort pos p =
-  let runtime5 = Config.runtime5 in
+(* Resolve a primitive according to its name. The return value is unspecialized
+   in the sense that the array kind in the various primitives that deal with
+   arrays is set to [Punspecializedarray{,_ref,set}]. The caller is meant to
+   then specialize the array kind based on the context.
+*)
+let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
     List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
@@ -698,8 +702,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%addint" -> binary (Integral (int, Add))
     | "%subint" -> binary (Integral (int, Sub))
     | "%mulint" -> binary (Integral (int, Mul))
-    | "%divint" -> binary (Integral (int, Div Safe))
-    | "%modint" -> binary (Integral (int, Mod Safe))
+    | "%divint" -> binary (Integral (int, Div (Safe, Signed)))
+    | "%modint" -> binary (Integral (int, Mod (Safe, Signed)))
     | "%andint" -> binary (Integral (int, And))
     | "%orint" -> binary (Integral (int, Or))
     | "%xorint" -> binary (Integral (int, Xor))
@@ -754,153 +758,162 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%bytes_safe_set" -> Primitive (Pbytessets, 3)
     | "%bytes_unsafe_get" -> Primitive (Pbytesrefu, 2)
     | "%bytes_unsafe_set" -> Primitive (Pbytessetu, 3)
-    | "%array_length" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%array_length" -> Primitive ((Parraylength Punspecializedarray), 1)
     | "%array_safe_get" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Ptagged_int_index, Mutable)), 2)
     | "%array_safe_set" ->
       Primitive
-        (Parraysets (gen_array_set_kind (get_first_arg_mode ()), Ptagged_int_index),
+        (Parraysets (Punspecializedarray_set (get_first_arg_mode ()),
+                     Ptagged_int_index),
          3)
     | "%array_unsafe_get" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable), 2)
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Ptagged_int_index, Mutable), 2)
     | "%array_unsafe_set" ->
       Primitive
-        ((Parraysetu (gen_array_set_kind (get_first_arg_mode ()), Ptagged_int_index)),
+        ((Parraysetu (Punspecializedarray_set (get_first_arg_mode ()),
+                      Ptagged_int_index)),
         3)
     | "%array_safe_get_indexed_by_int64#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_int64,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int64#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int64),
          3)
     | "%array_unsafe_get_indexed_by_int64#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_int64,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int64#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int64)),
         3)
     | "%array_safe_get_indexed_by_int32#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_int32,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int32#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int32),
          3)
     | "%array_unsafe_get_indexed_by_int32#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_int32,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int32#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_int32)),
         3)
     | "%array_safe_get_indexed_by_int16#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Untagged_int16,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int16#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int16),
          3)
     | "%array_unsafe_get_indexed_by_int16#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Untagged_int16,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int16#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int16)),
         3)
     | "%array_safe_get_indexed_by_int8#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Untagged_int8,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int8#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int8),
          3)
     | "%array_unsafe_get_indexed_by_int8#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Untagged_int8,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int8#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Untagged_int8)),
         3)
     | "%array_safe_get_indexed_by_nativeint#" ->
       Primitive
-        ((Parrayrefs (gen_array_ref_kind mode,
+        ((Parrayrefs (Punspecializedarray_ref mode,
                       Punboxed_or_untagged_integer_index Unboxed_nativeint,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_nativeint#" ->
       Primitive
         (Parraysets
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_nativeint),
          3)
     | "%array_unsafe_get_indexed_by_nativeint#" ->
       Primitive
-        (Parrayrefu (gen_array_ref_kind mode,
+        (Parrayrefu (Punspecializedarray_ref mode,
                      Punboxed_or_untagged_integer_index Unboxed_nativeint,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_nativeint#" ->
       Primitive
         ((Parraysetu
-          (gen_array_set_kind (get_first_arg_mode ()),
+          (Punspecializedarray_set (get_first_arg_mode ()),
            Punboxed_or_untagged_integer_index Unboxed_nativeint)),
         3)
     | "%makearray_dynamic" ->
-      Primitive (Pmakearray_dynamic (gen_array_kind, mode, With_initializer), 2)
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, With_initializer), 2)
     | "%makearray_dynamic_uninit" ->
-      Primitive (Pmakearray_dynamic (gen_array_kind, mode, Uninitialized), 1)
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, Uninitialized), 1)
     | "%arrayblit" ->
       Primitive (Parrayblit {
         src_mutability = Mutable;
-        dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
       }, 5);
     | "%arrayblit_src_immut" ->
       Primitive (Parrayblit {
         src_mutability = Immutable;
-        dst_array_set_kind = gen_array_set_kind (get_third_arg_mode ())
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
       }, 5);
     | "%array_element_size_in_bytes" ->
       (* The array kind will be filled in later *)
-      Primitive (Parray_element_size_in_bytes Pgenarray, 1)
-    | "%obj_size" -> Primitive ((Parraylength Pgenarray), 1)
-    | "%obj_field" -> Primitive ((Parrayrefu (Pgenarray_ref mode, Ptagged_int_index, Mutable)), 2)
+      Primitive (Parray_element_size_in_bytes Punspecializedarray, 1)
+    | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%obj_field" ->
+      Primitive
+        ((Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
     | "%obj_set_field" ->
       Primitive
-        ((Parraysetu (Pgenarray_set (get_first_arg_mode ()), Ptagged_int_index)), 3)
+        ((Parraysetu
+            (gen_array_set_kind (get_first_arg_mode ()),Ptagged_int_index)), 3)
     | "%floatarray_length" -> Primitive ((Parraylength Pfloatarray), 1)
     | "%floatarray_safe_get" ->
       Primitive ((Parrayrefs (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
@@ -919,8 +932,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%nativeint_add" -> binary (Integral (nativeint, Add))
     | "%nativeint_sub" -> binary (Integral (nativeint, Sub))
     | "%nativeint_mul" -> binary (Integral (nativeint, Mul))
-    | "%nativeint_div" -> binary (Integral (nativeint, Div Safe))
-    | "%nativeint_mod" -> binary (Integral (nativeint, Mod Safe))
+    | "%nativeint_div" -> binary (Integral (nativeint, Div (Safe, Signed)))
+    | "%nativeint_mod" -> binary (Integral (nativeint, Mod (Safe, Signed)))
     | "%nativeint_and" -> binary (Integral (nativeint, And))
     | "%nativeint_or" -> binary (Integral (nativeint, Or))
     | "%nativeint_xor" -> binary (Integral (nativeint, Xor))
@@ -933,8 +946,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%int32_add" -> binary (Integral (int32, Add))
     | "%int32_sub" -> binary (Integral (int32, Sub))
     | "%int32_mul" -> binary (Integral (int32, Mul))
-    | "%int32_div" -> binary (Integral (int32, Div Safe))
-    | "%int32_mod" -> binary (Integral (int32, Mod Safe))
+    | "%int32_div" -> binary (Integral (int32, Div (Safe, Signed)))
+    | "%int32_mod" -> binary (Integral (int32, Mod (Safe, Signed)))
     | "%int32_and" -> binary (Integral (int32, And))
     | "%int32_or" -> binary (Integral (int32, Or))
     | "%int32_xor" -> binary (Integral (int32, Xor))
@@ -947,8 +960,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%int64_add" -> binary (Integral (int64, Add))
     | "%int64_sub" -> binary (Integral (int64, Sub))
     | "%int64_mul" -> binary (Integral (int64, Mul))
-    | "%int64_div" -> binary (Integral (int64, Div Safe))
-    | "%int64_mod" -> binary (Integral (int64, Mod Safe))
+    | "%int64_div" -> binary (Integral (int64, Div (Safe, Signed)))
+    | "%int64_mod" -> binary (Integral (int64, Mod (Safe, Signed)))
     | "%int64_and" -> binary (Integral (int64, And))
     | "%int64_or" -> binary (Integral (int64, Or))
     | "%int64_xor" -> binary (Integral (int64, Xor))
@@ -1129,17 +1142,14 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%with_stack" ->
-      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
-    | "%with_stack_bind" ->
-      if runtime5 then Primitive (Pwith_stack_bind, 7)
-      else Unsupported Pwith_stack_bind
-    | "%reperform" ->
-      if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
-    | "%perform" ->
-      if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
-    | "%resume" ->
-      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
+    | "%with_stack" -> Primitive (Pwith_stack, 5)
+    | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
+    | "%reperform" -> Primitive (Preperform, 3)
+    | "%perform" -> Primitive (Pperform, 1)
+    | "%continue" -> Primitive (Pcontinue, 2)
+    | "%discontinue" -> Primitive (Pdiscontinue, 2)
+    | "%discontinue_with_backtrace" ->
+      Primitive (Pdiscontinue_with_backtrace, 3)
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
@@ -1177,31 +1187,31 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind, Ptagged_int_index,
+        (Punspecializedarray, Ptagged_int_index,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int8#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Untagged_int8,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int16#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Untagged_int16,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int32#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_int32,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_int64#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_int64,
          Value generic_value, []), 1)
     | "%unsafe_array_idx_indexed_by_nativeint#" ->
       Primitive(Pmake_idx_array
-        (gen_array_kind,
+        (Punspecializedarray,
          Punboxed_or_untagged_integer_index Unboxed_nativeint,
          Value generic_value, []), 1)
     | "%unsafe_get_ptr_imm" ->
@@ -1216,6 +1226,13 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%unsafe_set_ptr" ->
       let layout = List.nth (get_arg_layouts ()) 1 in
       Primitive(Pset_ptr (layout, get_first_arg_mode ()), 2)
+    | "%unsafe_get_ext_ptr_imm" ->
+      Primitive(Pget_ext_ptr (layout, Immutable), 1)
+    | "%unsafe_get_ext_ptr" ->
+      Primitive(Pget_ext_ptr (layout, Mutable), 1)
+    | "%unsafe_set_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
     | s when String.length s > 0 && s.[0] = '%' ->
@@ -1238,11 +1255,6 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | _ -> External lambda_prim
   in
   prim
-
-let lookup_primitive_and_mark_used loc ~poly_mode ~poly_sort pos p env path =
-  match lookup_primitive loc ~poly_mode ~poly_sort pos p with
-  | External _ as e -> add_used_primitive loc env path; e
-  | x -> x
 
 let simplify_constant_constructor = function
   | Equal -> true
@@ -1272,7 +1284,9 @@ and glb_scannable_kind kind1 kind2 =
 
 (* The following function computes the greatest lower bound of array kinds:
 
-        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint}
+          unspecialized
+          /           \
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint,vec*}
          |
       /------\
       |      |
@@ -1282,7 +1296,9 @@ and glb_scannable_kind kind1 kind2 =
       |
     int
 
-   For product kinds, we take the product of this lattice.
+   [unspecialized] sits above every other kind and is the placeholder used
+   for primitives that have not been specialized yet. For product kinds, we
+   take the product of this lattice.
 
    Note that the GLB is not guaranteed to exist.
    In case of array kinds working with layout value, we return
@@ -1298,58 +1314,51 @@ let glb_array_type loc t1 t2 =
       (Printlambda.array_kind t1) (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which should only match with themselves.
-
-     However, a cheat is added just for [Pgenarray] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] is the top of the lattice: it is the marker placed
+     on primitives before specialization, and so the GLB with any other
+     array kind is that other kind. *)
+  | Punspecializedarray, x | x, Punspecializedarray -> x
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                  | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray | Punboxedfloatarray Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray Unboxed_float64, Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray Unboxed_float64
-  | (Pgenarray | Punboxedfloatarray Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray Unboxed_float32, Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray Unboxed_float32
   | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int),
+  | Punboxedoruntaggedintarray Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray Untagged_int
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int8),
+  | Punboxedoruntaggedintarray Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray Untagged_int8
-  | (Pgenarray | Punboxedoruntaggedintarray Untagged_int16),
+  | Punboxedoruntaggedintarray Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray Untagged_int16
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int32),
+  | Punboxedoruntaggedintarray Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray Unboxed_int32
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_int64),
+  | Punboxedoruntaggedintarray Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray Unboxed_int64
-  | (Pgenarray | Punboxedoruntaggedintarray Unboxed_nativeint),
+  | Punboxedoruntaggedintarray Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray Unboxed_nativeint
   | Punboxedoruntaggedintarray _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec128),
-    Punboxedvectorarray Unboxed_vec128 ->
+  | Punboxedvectorarray Unboxed_vec128, Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray Unboxed_vec128
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec256),
-    Punboxedvectorarray Unboxed_vec256 ->
+  | Punboxedvectorarray Unboxed_vec256, Punboxedvectorarray Unboxed_vec256 ->
     Punboxedvectorarray Unboxed_vec256
-  | (Pgenarray | Punboxedvectorarray Unboxed_vec512),
-    Punboxedvectorarray Unboxed_vec512 ->
+  | Punboxedvectorarray Unboxed_vec512, Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray,
-    ((Pgcignorableproductarray _ | Pgcscannableproductarray _) as k) -> k
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray kinds1) as k, Pgcignorableproductarray kinds2 ->
     if List.equal equal_ignorable_product_element_kind kinds1 kinds2
     then k
@@ -1392,61 +1401,58 @@ let glb_array_ref_type loc t1 t2 =
       Printlambda.array_ref_kind t1 (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which should only match with themselves.
-
-     However, a cheat is added just for [Pgenarray_ref] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] / [Punspecializedarray_ref] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_ref m, t2 -> Lambda.array_ref_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                        | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray_ref _ | Punboxedfloatarray_ref Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray_ref Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray_ref Unboxed_float64
-  | (Pgenarray_ref _ | Punboxedfloatarray_ref Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray_ref Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray_ref Unboxed_float32
   | Punboxedfloatarray_ref _, _
   | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int),
+  | Punboxedoruntaggedintarray_ref Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_ref Untagged_int
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int8),
+  | Punboxedoruntaggedintarray_ref Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_ref Untagged_int8
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Untagged_int16),
+  | Punboxedoruntaggedintarray_ref Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray_ref Untagged_int16
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int32),
+  | Punboxedoruntaggedintarray_ref Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_ref Unboxed_int32
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_int64),
+  | Punboxedoruntaggedintarray_ref Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_ref Unboxed_int64
-  | (Pgenarray_ref _ | Punboxedoruntaggedintarray_ref Unboxed_nativeint),
+  | Punboxedoruntaggedintarray_ref Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_ref Unboxed_nativeint
   | Punboxedoruntaggedintarray_ref _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec128),
+  | Punboxedvectorarray_ref Unboxed_vec128,
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_ref Unboxed_vec128
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec256),
+  | Punboxedvectorarray_ref Unboxed_vec256,
     Punboxedvectorarray Unboxed_vec256 ->
     Punboxedvectorarray_ref Unboxed_vec256
-  | (Pgenarray_ref _ | Punboxedvectorarray_ref Unboxed_vec512),
+  | Punboxedvectorarray_ref Unboxed_vec512,
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray_ref _, Pgcignorableproductarray kinds ->
-    Pgcignorableproductarray_ref kinds
-  | Pgenarray_ref _, Pgcscannableproductarray kinds ->
-    Pgcscannableproductarray_ref kinds
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray_ref kinds1) as k,
     Pgcignorableproductarray kinds2 ->
     if kinds1 = kinds2 then k
@@ -1502,61 +1508,58 @@ let glb_array_set_type loc t1 t2 =
       Printlambda.array_set_kind t1 (Printlambda.array_kind t2)
   in
   match t1, t2 with
-  (* Handle unboxed array kinds which can only match with themselves.
-
-     However, a cheat is added just for [Pgenarray_set] to allow the [%array_*]
-     primitives to work with unboxed types.
-
-     WARNING: This trick will stop working when [Config.flat_float_array]
-     becomes [false].*)
+  (* [Punspecializedarray] / [Punspecializedarray_set] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_set m, t2 -> Lambda.array_set_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
                      | Punboxedvectorarray _) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
-  | (Pgenarray_set _ | Punboxedfloatarray_set Unboxed_float64), Punboxedfloatarray Unboxed_float64 ->
+  | Punboxedfloatarray_set Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
     Punboxedfloatarray_set Unboxed_float64
-  | (Pgenarray_set _ | Punboxedfloatarray_set Unboxed_float32), Punboxedfloatarray Unboxed_float32 ->
+  | Punboxedfloatarray_set Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
     Punboxedfloatarray_set Unboxed_float32
   | Punboxedfloatarray_set _, _
   | _, Punboxedfloatarray _ ->
     unexpected ()
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int),
+  | Punboxedoruntaggedintarray_set Untagged_int,
     Punboxedoruntaggedintarray Untagged_int ->
     Punboxedoruntaggedintarray_set Untagged_int
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int8),
+  | Punboxedoruntaggedintarray_set Untagged_int8,
     Punboxedoruntaggedintarray Untagged_int8 ->
     Punboxedoruntaggedintarray_set Untagged_int8
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Untagged_int16),
+  | Punboxedoruntaggedintarray_set Untagged_int16,
     Punboxedoruntaggedintarray Untagged_int16 ->
     Punboxedoruntaggedintarray_set Untagged_int16
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int32),
+  | Punboxedoruntaggedintarray_set Unboxed_int32,
     Punboxedoruntaggedintarray Unboxed_int32 ->
     Punboxedoruntaggedintarray_set Unboxed_int32
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_int64),
+  | Punboxedoruntaggedintarray_set Unboxed_int64,
     Punboxedoruntaggedintarray Unboxed_int64 ->
     Punboxedoruntaggedintarray_set Unboxed_int64
-  | (Pgenarray_set _ | Punboxedoruntaggedintarray_set Unboxed_nativeint),
+  | Punboxedoruntaggedintarray_set Unboxed_nativeint,
     Punboxedoruntaggedintarray Unboxed_nativeint ->
     Punboxedoruntaggedintarray_set Unboxed_nativeint
   | Punboxedoruntaggedintarray_set _, _ | _, Punboxedoruntaggedintarray _ ->
     unexpected ()
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec128),
+  | Punboxedvectorarray_set Unboxed_vec128,
     Punboxedvectorarray Unboxed_vec128 ->
     Punboxedvectorarray_set Unboxed_vec128
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec256),
+  | Punboxedvectorarray_set Unboxed_vec256,
     Punboxedvectorarray Unboxed_vec256 ->
-  Punboxedvectorarray_set Unboxed_vec256
-  | (Pgenarray_set _ | Punboxedvectorarray_set Unboxed_vec512),
+    Punboxedvectorarray_set Unboxed_vec256
+  | Punboxedvectorarray_set Unboxed_vec512,
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
     unexpected ()
 
-  (* Unboxed product arrays. Same cheat as above for Pgenarray. *)
-  | Pgenarray_set _, Pgcignorableproductarray kinds ->
-    Pgcignorableproductarray_set kinds
-  | Pgenarray_set m, Pgcscannableproductarray kinds ->
-    Pgcscannableproductarray_set (m, kinds)
+  (* Unboxed product arrays. *)
   | (Pgcignorableproductarray_set kinds1) as k,
     Pgcignorableproductarray kinds2 ->
     if kinds1 = kinds2 then k
@@ -1634,8 +1637,9 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
 let should_specialize_primitive p =
   match p.prim_name with
   | "%obj_size" | "%obj_field" | "%obj_set_field" ->
-    (* The obj primitives re-use the array primitives (see [lookup_primitive]),
-       but we shouldn't specialize their array kinds.
+    (* The obj primitives re-use the array primitives (see
+       [lookup_primitive_unspecialized]), but we shouldn't specialize
+       their array kinds.
        CR layouts v4: we should just make separate object primitives. *)
     false
   | _ ->
@@ -1652,6 +1656,13 @@ let layout_of_ty_for_idx_set env loc ty =
     thing. *)
   let jkind = Ctype.type_jkind env ty in
   let mbe = Typedecl.mixed_block_element env ty jkind in
+  let mbe =
+    match mbe with
+    | Some mbe -> mbe
+    | None ->
+      Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
+        Printtyp.type_expr ty
+  in
   let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
@@ -1888,6 +1899,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))
+  | Primitive (Pset_ext_ptr (_, m), arity), (_ :: p2 :: _) ->
+    let l = layout_of_ty_for_idx_set env loc p2 in
+    Some (Primitive (Pset_ext_ptr (l, m), arity))
   | Primitive (Pmake_idx_array (_, ik, _mbe, path), arity), _ ->
     let loc = to_location loc in
     let err () =
@@ -1912,10 +1926,14 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     in
     let jkind = Ctype.type_jkind env elt_ty in
     let mbe = Typedecl.mixed_block_element env elt_ty jkind in
-    let mbe = transl_mixed_block_element env loc elt_ty mbe in
-    if Lambda.will_be_reordered mbe then
+    let mbe = Option.map (transl_mixed_block_element env loc elt_ty) mbe in
+    begin match mbe with
+    | Some mbe when not (Lambda.will_be_reordered mbe) ->
+      Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
+    | _ ->
+      (* Either something known to get reordered or an [any] that might be *)
       raise (Error (loc, Element_would_be_reordered_in_record));
-    Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
+    end
   | _ -> None
 
 let caml_equal =
@@ -2077,7 +2095,7 @@ let lambda_of_loc kind sloc =
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
-    let name = Compilation_unit.get_current () in
+    let name = Current_unit.get_cu () in
     let module_name =
       match name with
       | None -> "//"^filename^"//"
@@ -2317,7 +2335,8 @@ let check_primitive_arity loc p =
      to lie here. *)
   let sort = Some (Jkind.Sort.of_base Scannable) in
   let prim =
-    lookup_primitive loc ~poly_mode:mode ~poly_sort:sort Rc_normal p
+    lookup_primitive_unspecialized loc
+      ~poly_mode:mode ~poly_sort:sort Rc_normal p
   in
   let ok =
     match prim with
@@ -2341,19 +2360,34 @@ let check_primitive_arity loc p =
 
 (* Eta-expand a primitive *)
 
+let transl_primitive_common loc ~poly_mode ~poly_sort
+      pos p env ty path arg_exps =
+  let prim =
+    let loc = to_location loc in
+    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
+    | External _ as e -> add_used_primitive loc env path; e
+    | x -> x
+  in
+  let has_constant_constructor =
+    match arg_exps with
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+        cstr_constant
+    | [_; {exp_desc = Texp_variant(_, None)}]
+    | [{exp_desc = Texp_variant(_, None)}; _] -> true
+    | _ -> false
+  in
+  if should_specialize_primitive p then
+    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    | None -> prim
+    | Some prim -> prim
+  else
+    prim
+
 let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   let prim =
-    lookup_primitive_and_mark_used
-      (to_location loc) ~poly_mode ~poly_sort Rc_normal p env path
-  in
-  let has_constant_constructor = false in
-  let prim =
-    if should_specialize_primitive p then
-      match specialize_primitive env loc ty ~has_constant_constructor prim with
-      | None -> prim
-      | Some prim -> prim
-    else
-      prim
+    transl_primitive_common loc
+      ~poly_mode ~poly_sort Rc_normal p env ty path []
   in
   let to_locality = to_locality ~poly:poly_mode in
   let error_loc = to_location loc in
@@ -2490,12 +2524,12 @@ let lambda_primitive_needs_event_after = function
   | Pbigstring_load_vec _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
+  | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
@@ -2505,7 +2539,10 @@ let lambda_primitive_needs_event_after = function
   | Preinterpret_tuple_as_boxed_vector _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
+  | Pget_ext_ptr _ | Pset_ext_ptr _
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Preperform
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
@@ -2556,6 +2593,10 @@ let lambda_primitive_needs_event_after = function
   | Pbox_vector (_, _)
   | Punbox_unit
     -> false
+  | Pmakearray (Punspecializedarray, _, _)
+  | Pmakearray_dynamic (Punspecializedarray, _, _) ->
+    Misc.fatal_error
+      "Translprim.lambda_primitive_needs_event_after: Punspecializedarray"
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function
@@ -2571,8 +2612,8 @@ let primitive_needs_event_after = function
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =
   let prim =
-    lookup_primitive_and_mark_used
-      (to_location loc) ~poly_mode ~poly_sort pos p env (Some path)
+    transl_primitive_common
+      loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
   in
   if stack then begin
     match prim with
@@ -2597,22 +2638,6 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let has_constant_constructor =
-    match arg_exps with
-    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _)}]
-    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _)}; _] -> cstr_constant
-    | [_; {exp_desc = Texp_variant(_, None)}]
-    | [{exp_desc = Texp_variant(_, None)}; _] -> true
-    | _ -> false
-  in
-  let prim =
-    if should_specialize_primitive p then
-      match specialize_primitive env loc ty ~has_constant_constructor prim with
-      | None -> prim
-      | Some prim -> prim
-    else
-      prim
-  in
   let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
   let lam =
     if primitive_needs_event_after prim then begin

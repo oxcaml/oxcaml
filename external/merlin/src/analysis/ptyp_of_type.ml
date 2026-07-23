@@ -74,6 +74,9 @@ and core_type type_expr =
   | Tquote_eval ty ->
     let loc = Untypeast.lident_of_path Predef.path_eval |> Location.mknoloc in
     Typ.constr loc [ Typ.quote (core_type ty) ]
+  | Tbox ty ->
+    let loc = Untypeast.lident_of_path Predef.path_box |> Location.mknoloc in
+    Typ.constr loc [ core_type ty ]
   | Tobject (type_expr, _class_) ->
     let rec aux acc type_expr =
       match get_desc type_expr with
@@ -136,12 +139,13 @@ and core_type type_expr =
   | Trepr (ty, _) ->
     (* CR modes: We should do something proper here. Internal ticket 6601. *)
     core_type ty
-  | Tpackage (path, lids_type_exprs) ->
+  | Tpackage { pack_path = path; pack_cstrs = lids_type_exprs } ->
     let loc = mknoloc (Untypeast.lident_of_path path) in
     let args =
-      List.map lids_type_exprs ~f:(fun (id, t) -> (mknoloc id, core_type t))
+      List.map lids_type_exprs ~f:(fun (id, t) ->
+          (mknoloc (Longident.unflatten id |> Option.get), core_type t))
     in
-    Typ.package loc args
+    Typ.package (Typ.package_type loc args)
 
 and modtype_declaration id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
@@ -159,7 +163,7 @@ and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
       Option.map jkind_manifest ~f:(fun _ : Parsetree.jkind_annotation ->
           (* CR modes: this is terrible. Internal ticket 6599 *)
           { pjka_desc =
-              Pjk_abbreviation ({ txt = Lident "any"; loc = Location.none }, []);
+              Pjk_abbreviation { txt = Lident "any"; loc = Location.none };
             pjka_loc = Location.none
           });
     pjkind_attributes = jkind_attributes;
@@ -176,11 +180,11 @@ and modes mode =
   let snapshot = Btype.snapshot () in
   let mode = Mode.Alloc.zap_to_legacy mode in
   Btype.backtrack snapshot;
-  Printtyp.tree_of_modes mode
+  Out_type.tree_of_modes mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
 
 and const_modalities ~mut modality =
-  Printtyp.tree_of_modalities mut modality
+  Out_type.tree_of_modalities mut modality
   |> List.map ~f:(fun modality ->
       Location.mknoloc (Parsetree.Modality modality))
 

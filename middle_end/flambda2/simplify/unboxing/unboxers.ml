@@ -36,7 +36,7 @@ module type Number_S = sig
 
   val unboxing_prim : Simple.t -> P.t
 
-  val unboxer : Target_system.Machine_width.t -> unboxer
+  val unboxer : unboxer
 end
 
 module Immediate = struct
@@ -48,11 +48,11 @@ module Immediate = struct
 
   let unboxing_prim simple = P.(Unary (Untag_immediate, simple))
 
-  let unboxer machine_width =
+  let unboxer =
     { var_name = "naked_immediate";
       var_kind = K.naked_immediate;
       poison_const =
-        Const.naked_immediate (Target_ocaml_int.of_int machine_width 0xabcd);
+        Const.const_poison K.naked_immediate "variant_unboxing_naked_immediate";
       unboxing_prim;
       prove_simple = T.meet_tagging_of_simple
     }
@@ -67,11 +67,11 @@ module Float32 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_float32, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_float32";
       var_kind = K.naked_float32;
       poison_const =
-        Const.naked_float32 Numeric_types.Float32_by_bit_pattern.zero;
+        Const.const_poison K.naked_float32 "variant_unboxing_float32";
       unboxing_prim;
       prove_simple = T.meet_boxed_float32_containing_simple
     }
@@ -86,10 +86,10 @@ module Float = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_float, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_float";
       var_kind = K.naked_float;
-      poison_const = Const.naked_float Numeric_types.Float_by_bit_pattern.zero;
+      poison_const = Const.const_poison K.naked_float "variant_unboxing_float";
       unboxing_prim;
       prove_simple = T.meet_boxed_float_containing_simple
     }
@@ -104,10 +104,10 @@ module Int32 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_int32, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_int32";
       var_kind = K.naked_int32;
-      poison_const = Const.naked_int32 Int32.(div 0xabcd0l 2l);
+      poison_const = Const.const_poison K.naked_int32 "variant_unboxing_int32";
       unboxing_prim;
       prove_simple = T.meet_boxed_int32_containing_simple
     }
@@ -122,10 +122,10 @@ module Int64 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_int64, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_int64";
       var_kind = K.naked_int64;
-      poison_const = Const.naked_int64 Int64.(div 0xdcba0L 2L);
+      poison_const = Const.const_poison K.naked_int64 "variant_unboxing_int64";
       unboxing_prim;
       prove_simple = T.meet_boxed_int64_containing_simple
     }
@@ -140,10 +140,11 @@ module Nativeint = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_nativeint, simple))
 
-  let unboxer machine_width =
+  let unboxer =
     { var_name = "unboxed_nativeint";
       var_kind = K.naked_nativeint;
-      poison_const = Const.naked_nativeint (Targetint_32_64.zero machine_width);
+      poison_const =
+        Const.const_poison K.naked_nativeint "variant_unboxing_nativeint";
       unboxing_prim;
       prove_simple = T.meet_boxed_nativeint_containing_simple
     }
@@ -158,10 +159,10 @@ module Vec128 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_vec128, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_vec128";
       var_kind = K.naked_vec128;
-      poison_const = Const.naked_vec128 Vector_types.Vec128.Bit_pattern.zero;
+      poison_const = Const.const_poison K.naked_vec128 "variant_unboxing_vec128";
       unboxing_prim;
       prove_simple = T.meet_boxed_vec128_containing_simple
     }
@@ -176,10 +177,10 @@ module Vec256 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_vec256, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_vec256";
       var_kind = K.naked_vec256;
-      poison_const = Const.naked_vec256 Vector_types.Vec256.Bit_pattern.zero;
+      poison_const = Const.const_poison K.naked_vec256 "variant_unxboing_vec256";
       unboxing_prim;
       prove_simple = T.meet_boxed_vec256_containing_simple
     }
@@ -194,10 +195,10 @@ module Vec512 = struct
 
   let unboxing_prim simple = P.(Unary (Unbox_number Naked_vec512, simple))
 
-  let unboxer _machine_width =
+  let unboxer =
     { var_name = "unboxed_vec512";
       var_kind = K.naked_vec512;
-      poison_const = Const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero;
+      poison_const = Const.const_poison K.naked_vec512 "variant_unboxing_vec512";
       unboxing_prim;
       prove_simple = T.meet_boxed_vec512_containing_simple
     }
@@ -225,11 +226,13 @@ module Closure_field = struct
     P.Unary
       (Project_value_slot { project_from = function_slot; value_slot }, closure)
 
-  let unboxer machine_width function_slot value_slot =
+  let unboxer function_slot value_slot =
     { var_name = "closure_field_at_use";
       var_kind = Value_slot.kind value_slot;
       poison_const =
-        Const.of_int_of_kind machine_width (Value_slot.kind value_slot) 0;
+        Const.const_poison
+          (Value_slot.kind value_slot)
+          "variant_unboxing_closure_field";
       unboxing_prim =
         (fun closure -> unboxing_prim function_slot ~closure value_slot);
       prove_simple =

@@ -89,6 +89,7 @@ build/latex/Stdlib.tex: $(ALL_COMPILED_DOC) | build/latex
 	$(V_OCAMLDOC)$(OCAMLDOC_RUN) -latex -o build/latex/all.tex \
 	-hide Stdlib -lib Stdlib $(DOC_ALL_INCLUDES) \
 	-sepfiles \
+	-latex-escape-underscore "false" \
 	-latextitle "1,subsection*" \
 	-latextitle "2,subsubsection*" \
 	-latex-type-prefix "TYP" \

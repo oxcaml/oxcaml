@@ -87,5 +87,5 @@ Error: The value "x" is "local" to the parent region
 <[ fun x -> (<[ ($x [@magic_staged_modes]) ]> [@magic_staged_modes]) ]>
 [%%expect{|
 - : <[$('a) expr -> $('a) expr @ once]> expr =
-<[fun x -> (<[($x [@magic_staged_modes])]> [@magic_staged_modes])]>
+<[fun x -> ((<[(($x) [@magic_staged_modes])]>) [@magic_staged_modes])]>
 |}];;

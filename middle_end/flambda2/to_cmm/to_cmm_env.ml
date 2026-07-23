@@ -361,7 +361,8 @@ let gen_variable ~debug_uid v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v ~debug_uid)
+           ~location:Debuginfo.none ~original_ident:v ~debug_uid
+           ~is_parameter:Is_parameter.local)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -998,6 +999,23 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
       | Possible env ->
         let env = remove_binding env var in
         will_inline_simple env res binding))
+
+let find_pure_bound_cmm_expr env var =
+  let var = resolve_alias env var in
+  match Variable.Map.find var env.bindings with
+  | exception Not_found -> None
+  | Binding binding -> (
+    match To_cmm_effects.classify_by_effects_and_coeffects binding.effs with
+    | Effect | Coeffect_only | Generative_immutable -> None
+    | Pure ->
+      let cmm_expr_of_bound_expr (type a) (b : a bound_expr) =
+        match b with
+        | Simple { cmm_expr; free_vars = _ } | Split { cmm_expr; free_vars = _ }
+          ->
+          Some cmm_expr
+        | Splittable_prim _ -> None
+      in
+      cmm_expr_of_bound_expr binding.bound_expr)
 
 (* Handling of aliases between variables *)
 

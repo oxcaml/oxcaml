@@ -19,8 +19,6 @@ open! Flambda.Import
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 type t
@@ -34,13 +32,13 @@ val create :
   round:int ->
   machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
-  get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_region:Variable.t ->
   toplevel_my_ghost_region:Variable.t ->
+  toplevel_my_alloc_region:Variable.t ->
   t
 
 val all_code : t -> Code.t Code_id.Map.t
@@ -65,6 +63,8 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
+
+val unit_toplevel_alloc_region : t -> Variable.t
 
 val increment_continuation_scope : t -> t
 
@@ -200,6 +200,7 @@ val enter_closure :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_closure:Variable.t ->
+  my_alloc_region:Variable.t ->
   t ->
   t
 

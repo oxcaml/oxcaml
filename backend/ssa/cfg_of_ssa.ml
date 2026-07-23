@@ -34,7 +34,7 @@ open! Int_replace_polymorphic_compare
     fused-branch consumers — otherwise [fuse_comparison] splices it directly
     into the terminator and we drop the body Op. *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Make (Ssa_graph : Ssa.Finished_graph) = struct
   open Ssa_graph

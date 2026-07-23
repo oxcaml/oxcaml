@@ -8,7 +8,7 @@
  ocamlc.byte;
  module = "source_jane_street.ml";
  ocamlc_byte_exit_status = "2";
- flags = "-I ${test_build_directory} -w -26 -extension-universe alpha -ppx ${program}";
+ flags = "-I ${test_build_directory} -w -26-181 -extension-universe alpha -ppx ${program}";
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)

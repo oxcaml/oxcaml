@@ -289,28 +289,30 @@ module Analysis (S : Ssa.Finished_graph) = struct
       is_header_param l.header l.accu_index a
     | _ -> false
 
-  (* A chain of [k] reversing loops reverses [k] times, so its result is a single
-     reversing loop only for an odd count. Fuse the largest odd prefix whose
-     later element computations are all clonable and whose last loop exits in a
-     re-targetable shape; the remaining loops (if any) keep consuming the fused
-     loop's output unchanged. Returns the prefix to fuse (producer-first). *)
+  (* A chain of [k] reversing loops reverses [k] times, so its result is a
+     single reversing loop only for an odd count. Fuse the largest odd prefix
+     whose later element computations are all clonable and whose last loop exits
+     in a re-targetable shape; the remaining loops (if any) keep consuming the
+     fused loop's output unchanged. Returns the prefix to fuse
+     (producer-first). *)
   let fusable_chains () : t list list =
     IV.analyze () |> List.filter_map classify |> chains
     |> List.filter_map (fun chain ->
-           let k = List.length chain in
-           let rec pick m =
-             if m < 3
-             then None
-             else
-               let prefix = List.filteri (fun i _ -> i < m) chain in
-               if exit_ok (List.nth prefix (m - 1))
-                  && List.for_all
-                       (fun (l : t) -> clonable ~head:l.head l.car)
-                       (List.tl prefix)
-               then Some prefix
-               else pick (m - 2)
-           in
-           pick (if k mod 2 = 1 then k else k - 1))
+        let k = List.length chain in
+        let rec pick m =
+          if m < 3
+          then None
+          else
+            let prefix = List.filteri (fun i _ -> i < m) chain in
+            if
+              exit_ok (List.nth prefix (m - 1))
+              && List.for_all
+                   (fun (l : t) -> clonable ~head:l.head l.car)
+                   (List.tl prefix)
+            then Some prefix
+            else pick (m - 2)
+        in
+        pick (if k mod 2 = 1 then k else k - 1))
 end
 
 let run (input : (module Ssa.Finished_graph)) :
@@ -414,8 +416,9 @@ let run (input : (module Ssa.Finished_graph)) :
                 Misc.fatal_error "Loop_fusion: first loop exit has no accu arg")
             | _ -> Misc.fatal_error "Loop_fusion: first loop exit is not a Goto"
           in
-          (* Re-target the last fused loop's exit (return or single forward) onto
-             the first loop's accumulator, which now holds the composed result. *)
+          (* Re-target the last fused loop's exit (return or single forward)
+             onto the first loop's accumulator, which now holds the composed
+             result. *)
           let lm = List.nth chain (List.length chain - 1) in
           let term : C.Terminator.t =
             match lm.AA.exit.terminator with

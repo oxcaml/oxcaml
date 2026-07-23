@@ -31,74 +31,49 @@ module CU = Compilation_unit
 
 type error =
   | Missing_intf_for_quote of CU.Name.t
-  | Missing_impl_for_quote of CU.Name.t
+  | Missing_impl_for_quote of CU.t
+(* This is currently unused as we can't ensure the cmx files are always
+   available, specifically compiler-libs doesn't ship its cmx files. We should
+   emit this again once all of the compiler artifacts do. *)
 
 exception Error of error
 
-let no_such_module = CU.Name.of_string "No_such_module"
-
-let cmi_bundle ~quoted_globals =
-  let rec loop cmis missing_globals =
-    match missing_globals with
-    | [] -> cmis
-    | global :: missing_globals ->
-      if CU.Name.Map.mem global cmis || CU.Name.equal global no_such_module
-      then loop cmis missing_globals
-      else
-        let path =
-          try Load_path.find_normalized (CU.Name.to_string global ^ ".cmi")
-          with Not_found -> raise (Error (Missing_intf_for_quote global))
-        in
-        let cmi = Cmi_format.read_cmi path in
-        let missing_globals =
-          Array.fold_left
-            (fun missing_globals import ->
-              Import_info.name import :: missing_globals)
-            missing_globals cmi.cmi_crcs
-        in
-        let new_cmis = CU.Name.Map.add global cmi cmis in
-        loop new_cmis missing_globals
-  in
-  loop CU.Name.Map.empty (CU.Name.Set.elements quoted_globals)
+let cmi_bundle ~quoted_cmi =
+  CU.Name.Map.of_set
+    (fun name ->
+      let path =
+        try Load_path.find_normalized (CU.Name.to_string name ^ ".cmi")
+        with Not_found -> raise (Error (Missing_intf_for_quote name))
+      in
+      Cmi_format.read_cmi path)
+    quoted_cmi
 
 (* We can't populate this during scan_file because a cmxa contains less
    information than a cmx. *)
-let cmx_bundle ~quoted_globals =
-  let rec loop cmxs missing_globals =
-    match missing_globals with
-    | [] -> cmxs
-    | global :: missing_globals ->
-      if CU.Name.Map.mem global cmxs || CU.Name.equal global no_such_module
-      then loop cmxs missing_globals
-      else
-        let path =
-          try Load_path.find_normalized (CU.Name.to_string global ^ ".cmx")
-          with Not_found -> raise (Error (Missing_impl_for_quote global))
-        in
+let cmx_bundle ~quoted_cmx =
+  let cmxes = CU.Tbl.create 100 in
+  let visited = CU.Tbl.create 100 in
+  let rec find_all_cmxes cu =
+    if CU.Tbl.mem visited cu
+    then ()
+    else begin
+      CU.Tbl.add visited cu ();
+      match Load_path.find_normalized (CU.base_filename cu ^ ".cmx") with
+      | exception Not_found -> ()
+      | path -> begin
         let unit_info, _crc = Compilenv.read_unit_info path in
-        let missing_globals =
-          List.fold_left
-            (fun missing_globals import ->
-              Import_info.name import :: missing_globals)
-            missing_globals unit_info.ui_imports_cmx
-        in
-        let new_cmxs = CU.Name.Map.add global unit_info cmxs in
-        loop new_cmxs missing_globals
+        CU.Tbl.add cmxes cu unit_info;
+        List.iter
+          (fun import -> find_all_cmxes (Import_info.cu import))
+          unit_info.ui_imports_cmx
+        end
+    end
   in
-  let unit_infos =
-    loop CU.Name.Map.empty (CU.Name.Set.elements quoted_globals)
-  in
-  ListLabels.map (CU.Name.Map.data unit_infos)
-    ~f:(fun (info : Cmx_format.unit_infos) ->
-      let raw_export_info, sections =
-        match info.ui_export_info with
-        | None -> None, Oxcaml_utils.File_sections.empty
-        | Some info ->
-          let info, sections = Flambda2_cmx.Flambda_cmx_format.to_raw info in
-          Some info, sections
-      in
+  CU.Set.iter find_all_cmxes quoted_cmx;
+  ListLabels.map (CU.Tbl.to_list cmxes)
+    ~f:(fun ((_, info) : CU.t * Cmx_format.unit_infos) ->
       let serialized_sections, toc, total_length =
-        Oxcaml_utils.File_sections.serialize sections
+        File_sections.serialize info.ui_file_sections
       in
       let raw_info : Cmx_format.unit_infos_raw =
         { uir_unit = info.ui_unit;
@@ -106,10 +81,11 @@ let cmx_bundle ~quoted_globals =
           uir_arg_descr = info.ui_arg_descr;
           uir_imports_cmi = Array.of_list info.ui_imports_cmi;
           uir_imports_cmx = Array.of_list info.ui_imports_cmx;
-          uir_quoted_globals = Array.of_list info.ui_quoted_globals;
+          uir_quoted_cmi = Array.of_list info.ui_quoted_cmi;
+          uir_quoted_cmx = Array.of_list info.ui_quoted_cmx;
           uir_format = info.ui_format;
           uir_generic_fns = info.ui_generic_fns;
-          uir_export_info = raw_export_info;
+          uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
@@ -120,7 +96,7 @@ let cmx_bundle ~quoted_globals =
       in
       raw_info, serialized_sections)
 
-let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
+let make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx ~output_name
     ~named_startup_file =
   let bundled_cm =
     if named_startup_file
@@ -130,10 +106,14 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
   let sourcefile_for_dwarf =
     Some (if named_startup_file then bundled_cm else ".bundled_cm")
   in
+  (* CR xclerc for xclerc: one would expect [Config.ext_obj] rather than ".cmx"
+     below, since the file contains object code; double check whether the
+     extension is used on purpose (e.g. by scripts or for statistics) before
+     changing it. *)
   let bundled_cm_obj = Filename.temp_file "bundled_cm" ".cmx" in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:bundled_cm
-    ~keep_asm:true (* TODO *)
-    ~obj_filename:bundled_cm_obj ~may_reduce_heap:true ~ppf_dump (fun () ->
+    ~keep_asm:!Clflags.keep_startup_file ~obj_filename:bundled_cm_obj
+    ~may_reduce_heap:true ~ppf_dump (fun () ->
       Location.input_name := "caml_bundled_cm";
       let bundle_comp_unit =
         CU.create CU.Prefix.empty (CU.Name.of_string "_bundled_cm")
@@ -151,12 +131,8 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
         let string = Marshal.to_string value [] in
         Cmm_helpers.emit_string_constant symbol string cont
       in
-      let cont =
-        bundle_cm "caml_bundled_cmis" (cmi_bundle ~quoted_globals) []
-      in
-      let cont =
-        bundle_cm "caml_bundled_cmxs" (cmx_bundle ~quoted_globals) cont
-      in
+      let cont = bundle_cm "caml_bundled_cmis" (cmi_bundle ~quoted_cmi) [] in
+      let cont = bundle_cm "caml_bundled_cmxs" (cmx_bundle ~quoted_cmx) cont in
       Asmgen.compile_phrase ~ppf_dump (Cmm.Cdata cont);
       Emit.end_assembly ());
   bundled_cm_obj

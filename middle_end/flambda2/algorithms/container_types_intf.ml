@@ -228,6 +228,8 @@ module type Map = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val find_or_null : key -> 'a t -> 'a Or_null.t
+
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t

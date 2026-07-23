@@ -28,14 +28,14 @@
   (:conf ../Makefile.config)
   (:c domainstate.ml.c)
   (:tbl
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/domain_state.tbl)
+   ../runtime/caml/domain_state.tbl)
   (glob_files
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s}.h))
+   ../runtime/caml/{config,m,s,compatibility}.h))
  (action
   (with-stdout-to
    %{targets}
    (bash
-    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
 
 (rule
  (targets domainstate.mli)
@@ -44,51 +44,13 @@
   (:conf ../Makefile.config)
   (:c domainstate.mli.c)
   (:tbl
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/domain_state.tbl)
+   ../runtime/caml/domain_state.tbl)
   (glob_files
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s}.h))
+   ../runtime/caml/{config,m,s,compatibility}.h))
  (action
   (with-stdout-to
    %{targets}
    (bash
-    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml %{c}"))))
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime/caml %{c}"))))
 
 (include_subdirs unqualified)
-
-(library
- (name oxcaml_utils)
- ; FIXME Fix warning 27
- (flags
-  (:standard -w -27))
- (ocamlopt_flags
-  (:standard
-   (:include %{project_root}/ocamlopt_flags.sexp)
-   -O3))
- (libraries ocamlcommon)
- (modules doubly_linked_list file_sections id_counter lru))
-
-(install
- (files
-  (oxcaml_utils.a as compiler-libs/oxcaml_utils.a)
-  (oxcaml_utils.cma as compiler-libs/oxcaml_utils.cma)
-  (oxcaml_utils.cmxa as compiler-libs/oxcaml_utils.cmxa)
-  (.oxcaml_utils.objs/byte/oxcaml_utils.cmi
-   as
-   compiler-libs/oxcaml_utils.cmi)
-  (.oxcaml_utils.objs/byte/oxcaml_utils__Doubly_linked_list.cmi
-   as
-   compiler-libs/oxcaml_utils__Doubly_linked_list.cmi)
-  (.oxcaml_utils.objs/byte/oxcaml_utils__Doubly_linked_list.cmti
-   as
-   compiler-libs/oxcaml_utils__Doubly_linked_list.cmti)
-  (.oxcaml_utils.objs/byte/oxcaml_utils__Doubly_linked_list.cmt
-   as
-   compiler-libs/oxcaml_utils__Doubly_linked_list.cmt)
-  (.oxcaml_utils.objs/native/oxcaml_utils__Doubly_linked_list.cmx
-   as
-   compiler-libs/oxcaml_utils__Doubly_linked_list.cmx)
-  (.oxcaml_utils.objs/native/oxcaml_utils__Doubly_linked_list.o
-   as
-   compiler-libs/oxcaml_utils__Doubly_linked_list.o))
- (section lib)
- (package ocaml))

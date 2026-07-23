@@ -58,6 +58,8 @@ val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
 
+val frametables_in_rodata : bool ref
+
 val default_heap_reduction_threshold : int
 val heap_reduction_threshold : int ref
 val dump_zero_alloc : bool ref
@@ -102,6 +104,7 @@ val disable_poll_insertion : bool ref
 val allow_long_frames : bool ref
 val max_long_frames_threshold : int
 val long_frames_threshold : int ref
+val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
 
 val use_ssa : bool ref
@@ -172,6 +175,7 @@ module Flambda2 : sig
     val reaper_change_calling_conventions : bool
     val unicode : bool
     val kind_checks : bool
+    val match_in_match : bool
   end
 
   (* CR-someday lmaurer: We could eliminate most of the per-flag boilerplate using GADTs
@@ -195,6 +199,7 @@ module Flambda2 : sig
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   val default_for_opt_level : opt_level or_default -> flags
@@ -217,6 +222,7 @@ module Flambda2 : sig
   val reaper_change_calling_conventions : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
+  val match_in_match : bool or_default ref
 
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
@@ -246,7 +252,7 @@ module Flambda2 : sig
       val max_function_simplify_run : int
       val shorten_symbol_names : bool
       val cont_lifting_budget : int
-      val cont_spec_budget : int
+      val cont_spec_threshold : float
     end
 
     type flags = {
@@ -260,7 +266,7 @@ module Flambda2 : sig
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
-      cont_spec_budget : int;
+      cont_spec_threshold : float;
     }
 
     val default_for_opt_level : opt_level or_default -> flags
@@ -275,7 +281,7 @@ module Flambda2 : sig
     val max_function_simplify_run : int or_default ref
     val shorten_symbol_names : bool or_default ref
     val cont_lifting_budget : int or_default ref
-    val cont_spec_budget : int or_default ref
+    val cont_spec_threshold : float or_default ref
   end
 
   module Debug : sig

@@ -96,6 +96,7 @@ let array_kind = function
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
     "ignorableproduct " ^ ignorable_product_element_kinds kinds
+  | Punspecializedarray -> "unspecialized"
 
 let array_mut = function
   | Mutable -> "array"
@@ -122,6 +123,7 @@ let array_ref_kind ppf k =
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Punspecializedarray_ref mode -> fprintf ppf "unspecialized%a" pp_mode mode
 
 let array_index_kind ppf k =
   match k with
@@ -151,6 +153,7 @@ let array_set_kind ppf k =
       (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_set kinds ->
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
+  | Punspecializedarray_set mode -> fprintf ppf "unspecialized%a" pp_mode mode
 
 let locality_mode_if_local = function
   | Alloc_heap -> ""
@@ -320,6 +323,8 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
+  | Record_dummy _ -> fprintf ppf "dummy"
+  | Record_variable -> fprintf ppf "variable"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
@@ -519,9 +524,11 @@ let primitive ppf = function
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
   | Pwith_stack -> fprintf ppf "with_stack"
-  | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
+  | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
   | Pperform -> fprintf ppf "perform"
-  | Presume -> fprintf ppf "resume"
+  | Pcontinue -> fprintf ppf "continue"
+  | Pdiscontinue -> fprintf ppf "discontinue"
+  | Pdiscontinue_with_backtrace -> fprintf ppf "discontinue_with_backtrace"
   | Preperform -> fprintf ppf "reperform"
   | Pmake_unboxed_product layouts ->
       fprintf ppf "make_unboxed_product #(%a)"
@@ -765,10 +772,6 @@ let primitive ppf = function
      fprintf ppf "floatarray.%sget%s%s%s"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
-  | Pfloat_array_load_vec {size; unsafe; mode; boxed} ->
-     fprintf ppf "float_array.%sget%s%s%s"
-      (if unsafe then "unsafe_" else "") (vector_width size)
-      (if boxed then "" else "#") (locality_kind mode)
   | Pint_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "int_array.%sget%s%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
@@ -803,10 +806,6 @@ let primitive ppf = function
       (if boxed then "" else "#") (locality_kind mode)
   | Pfloatarray_set_vec {size; unsafe; boxed} ->
      fprintf ppf "floatarray.%sset%s%s"
-      (if unsafe then "unsafe_" else "") (vector_width size)
-      (if boxed then "" else "#")
-  | Pfloat_array_set_vec {size; unsafe; boxed} ->
-     fprintf ppf "float_array.%sset%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pint_array_set_vec {size; unsafe; boxed} ->
@@ -870,9 +869,9 @@ let primitive ppf = function
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
+  | Ppoll -> fprintf ppf "poll"
   | Ptls_get -> fprintf ppf "tls_get"
   | Pdomain_index -> fprintf ppf "domain_index"
-  | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
@@ -918,6 +917,16 @@ let primitive ppf = function
         layout l
   | Pset_ptr (l, mode) ->
       fprintf ppf "(set_ptr%s@ %a)"
+        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
+        layout l
+  | Pget_ext_ptr (l, Mutable) ->
+      fprintf ppf "(get_ext_ptr@ %a)"
+        layout l
+  | Pget_ext_ptr (l, Immutable) ->
+      fprintf ppf "(get_ext_ptr_imm@ %a)"
+        layout l
+  | Pset_ext_ptr (l, mode) ->
+      fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
 
@@ -1018,7 +1027,6 @@ let name_of_primitive = function
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
   | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
   | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
-  | Pfloat_array_load_vec _ -> "Pfloat_array_load_vec"
   | Pint_array_load_vec _ -> "Pint_array_load_vec"
   | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
   | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
@@ -1028,7 +1036,6 @@ let name_of_primitive = function
   | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
   | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
   | Pfloatarray_set_vec _ -> "Pfloatarray_set_vec"
-  | Pfloat_array_set_vec _ -> "Pfloat_array_set_vec"
   | Pint_array_set_vec _ -> "Pint_array_set_vec"
   | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
   | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"
@@ -1067,14 +1074,16 @@ let name_of_primitive = function
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"
-  | Pwith_stack_bind -> "Pwith_stack_bind"
-  | Presume -> "Presume"
+  | Pwith_stack_preemptible -> "Pwith_stack_preemptible"
+  | Pcontinue -> "Pcontinue"
+  | Pdiscontinue -> "Pdiscontinue"
+  | Pdiscontinue_with_backtrace -> "Pdiscontinue_with_backtrace"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
+  | Ppoll -> "Ppoll"
   | Ptls_get -> "Ptls_get"
   | Pdomain_index -> "Pdomain_index"
-  | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"
@@ -1100,6 +1109,8 @@ let name_of_primitive = function
   | Pset_idx _ -> "Pset_idx"
   | Pget_ptr _ -> "Pget_ptr"
   | Pset_ptr _ -> "Pset_ptr"
+  | Pget_ext_ptr _ -> "Pget_ext_ptr"
+  | Pset_ext_ptr _ -> "Pset_ext_ptr"
 
 let zero_alloc_attribute ppf check =
   match check with

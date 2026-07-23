@@ -41,12 +41,12 @@ L129:
   %27 = icmp ugt i64 %26, 17
   br i1 %27, label %L104, label %L106
 L104:
-  %28 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  %28 = ptrtoint ptr @camlSwitch__Pmakeblock22 to i64
   store i64 %28, ptr %8
   %29 = load i64, ptr %8
   store i64 %29, ptr %4
   %30 = load i64, ptr %ds
-  %31 = add i64 %30, 240
+  %31 = add i64 %30, 272
   %32 = inttoptr i64 %31 to ptr
   store i64 0, ptr %32
   %33 = load i64, ptr %4
@@ -94,12 +94,12 @@ L109:
   %49 = insertvalue { { i64, i64 }, { i64 } } %48, i64 %44, 1, 0
   ret { { i64, i64 }, { i64 } } %49
 L111:
-  %50 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  %50 = ptrtoint ptr @camlSwitch__Pmakeblock22 to i64
   store i64 %50, ptr %12
   %51 = load i64, ptr %12
   store i64 %51, ptr %4
   %52 = load i64, ptr %ds
-  %53 = add i64 %52, 240
+  %53 = add i64 %52, 272
   %54 = inttoptr i64 %53 to ptr
   store i64 0, ptr %54
   %55 = load i64, ptr %4
@@ -123,12 +123,12 @@ L113:
   %67 = insertvalue { { i64, i64 }, { i64 } } %66, i64 %62, 1, 0
   ret { { i64, i64 }, { i64 } } %67
 L115:
-  %68 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  %68 = ptrtoint ptr @camlSwitch__Pmakeblock22 to i64
   store i64 %68, ptr %14
   %69 = load i64, ptr %14
   store i64 %69, ptr %4
   %70 = load i64, ptr %ds
-  %71 = add i64 %70, 240
+  %71 = add i64 %70, 272
   %72 = inttoptr i64 %71 to ptr
   store i64 0, ptr %72
   %73 = load i64, ptr %4
@@ -152,12 +152,12 @@ L117:
   %85 = insertvalue { { i64, i64 }, { i64 } } %84, i64 %80, 1, 0
   ret { { i64, i64 }, { i64 } } %85
 L119:
-  %86 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  %86 = ptrtoint ptr @camlSwitch__Pmakeblock22 to i64
   store i64 %86, ptr %16
   %87 = load i64, ptr %16
   store i64 %87, ptr %4
   %88 = load i64, ptr %ds
-  %89 = add i64 %88, 240
+  %89 = add i64 %88, 272
   %90 = inttoptr i64 %89 to ptr
   store i64 0, ptr %90
   %91 = load i64, ptr %4
@@ -181,12 +181,12 @@ L121:
   %103 = insertvalue { { i64, i64 }, { i64 } } %102, i64 %98, 1, 0
   ret { { i64, i64 }, { i64 } } %103
 L123:
-  %104 = ptrtoint ptr @camlSwitch__Pmakeblock20 to i64
+  %104 = ptrtoint ptr @camlSwitch__Pmakeblock22 to i64
   store i64 %104, ptr %18
   %105 = load i64, ptr %18
   store i64 %105, ptr %4
   %106 = load i64, ptr %ds
-  %107 = add i64 %106, 240
+  %107 = add i64 %106, 272
   %108 = inttoptr i64 %107 to ptr
   store i64 0, ptr %108
   %109 = load i64, ptr %4
@@ -307,7 +307,7 @@ L146:
   store i64 %65, ptr %16
   %66 = load i64, ptr %16
   store i64 %66, ptr %17
-  %67 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %67 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %67, ptr %18
   %68 = load i64, ptr %18
   %69 = inttoptr i64 %68 to ptr addrspace(1)
@@ -358,7 +358,7 @@ L138:
   store i64 1, ptr %22
   %95 = load i64, ptr %22
   store i64 %95, ptr %23
-  %96 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %96 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %96, ptr %24
   %97 = load i64, ptr %24
   store i64 %97, ptr %25
@@ -367,10 +367,10 @@ L138:
   store ptr addrspace(1) %99, ptr %12
   br label %L153
 L153:
-  %100 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %100 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %100, ptr %26
   store i64 1, ptr %27
-  %101 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %101 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %101, ptr %28
   %102 = load i64, ptr %28
   store i64 %102, ptr %4
@@ -673,7 +673,7 @@ L178:
   store i64 %231, ptr %16
   %232 = load i64, ptr %16
   store i64 %232, ptr %17
-  %233 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %233 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %233, ptr %18
   %234 = load i64, ptr %18
   %235 = inttoptr i64 %234 to ptr addrspace(1)
@@ -724,7 +724,7 @@ L170:
   store i64 1, ptr %22
   %261 = load i64, ptr %22
   store i64 %261, ptr %23
-  %262 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %262 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %262, ptr %24
   %263 = load i64, ptr %24
   store i64 %263, ptr %25
@@ -733,10 +733,10 @@ L170:
   store ptr addrspace(1) %265, ptr %11
   br label %L185
 L185:
-  %266 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %266 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %266, ptr %26
   store i64 1, ptr %27
-  %267 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %267 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %267, ptr %28
   %268 = load i64, ptr %28
   store i64 %268, ptr %4
@@ -845,7 +845,7 @@ L201:
   store i64 %329, ptr %39
   %330 = load i64, ptr %39
   store i64 %330, ptr %40
-  %331 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %331 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %331, ptr %41
   %332 = load i64, ptr %41
   %333 = inttoptr i64 %332 to ptr addrspace(1)
@@ -896,7 +896,7 @@ L193:
   store i64 1, ptr %45
   %359 = load i64, ptr %45
   store i64 %359, ptr %46
-  %360 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %360 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %360, ptr %47
   %361 = load i64, ptr %47
   store i64 %361, ptr %48
@@ -905,10 +905,10 @@ L193:
   store ptr addrspace(1) %363, ptr %34
   br label %L208
 L208:
-  %364 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %364 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %364, ptr %49
   store i64 1, ptr %50
-  %365 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %365 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %365, ptr %51
   %366 = load i64, ptr %51
   store i64 %366, ptr %4
@@ -1017,7 +1017,7 @@ L224:
   store i64 %427, ptr %62
   %428 = load i64, ptr %62
   store i64 %428, ptr %63
-  %429 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %429 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %429, ptr %64
   %430 = load i64, ptr %64
   %431 = inttoptr i64 %430 to ptr addrspace(1)
@@ -1068,7 +1068,7 @@ L216:
   store i64 1, ptr %68
   %457 = load i64, ptr %68
   store i64 %457, ptr %69
-  %458 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %458 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %458, ptr %70
   %459 = load i64, ptr %70
   store i64 %459, ptr %71
@@ -1077,10 +1077,10 @@ L216:
   store ptr addrspace(1) %461, ptr %57
   br label %L231
 L231:
-  %462 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %462 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %462, ptr %72
   store i64 1, ptr %73
-  %463 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %463 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %463, ptr %74
   %464 = load i64, ptr %74
   store i64 %464, ptr %4
@@ -1189,7 +1189,7 @@ L247:
   store i64 %525, ptr %85
   %526 = load i64, ptr %85
   store i64 %526, ptr %86
-  %527 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %527 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %527, ptr %87
   %528 = load i64, ptr %87
   %529 = inttoptr i64 %528 to ptr addrspace(1)
@@ -1240,7 +1240,7 @@ L239:
   store i64 1, ptr %91
   %555 = load i64, ptr %91
   store i64 %555, ptr %92
-  %556 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %556 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %556, ptr %93
   %557 = load i64, ptr %93
   store i64 %557, ptr %94
@@ -1249,10 +1249,10 @@ L239:
   store ptr addrspace(1) %559, ptr %80
   br label %L254
 L254:
-  %560 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %560 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %560, ptr %95
   store i64 1, ptr %96
-  %561 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %561 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %561, ptr %97
   %562 = load i64, ptr %97
   store i64 %562, ptr %4
@@ -1361,7 +1361,7 @@ L270:
   store i64 %623, ptr %108
   %624 = load i64, ptr %108
   store i64 %624, ptr %109
-  %625 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %625 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %625, ptr %110
   %626 = load i64, ptr %110
   %627 = inttoptr i64 %626 to ptr addrspace(1)
@@ -1412,7 +1412,7 @@ L262:
   store i64 1, ptr %114
   %653 = load i64, ptr %114
   store i64 %653, ptr %115
-  %654 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %654 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %654, ptr %116
   %655 = load i64, ptr %116
   store i64 %655, ptr %117
@@ -1421,10 +1421,10 @@ L262:
   store ptr addrspace(1) %657, ptr %103
   br label %L277
 L277:
-  %658 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %658 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %658, ptr %118
   store i64 1, ptr %119
-  %659 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %659 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %659, ptr %120
   %660 = load i64, ptr %120
   store i64 %660, ptr %4
@@ -1533,7 +1533,7 @@ L293:
   store i64 %721, ptr %131
   %722 = load i64, ptr %131
   store i64 %722, ptr %132
-  %723 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %723 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %723, ptr %133
   %724 = load i64, ptr %133
   %725 = inttoptr i64 %724 to ptr addrspace(1)
@@ -1584,7 +1584,7 @@ L285:
   store i64 1, ptr %137
   %751 = load i64, ptr %137
   store i64 %751, ptr %138
-  %752 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %752 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %752, ptr %139
   %753 = load i64, ptr %139
   store i64 %753, ptr %140
@@ -1593,10 +1593,10 @@ L285:
   store ptr addrspace(1) %755, ptr %126
   br label %L300
 L300:
-  %756 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %756 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %756, ptr %141
   store i64 1, ptr %142
-  %757 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %757 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %757, ptr %143
   %758 = load i64, ptr %143
   store i64 %758, ptr %4
@@ -1705,7 +1705,7 @@ L316:
   store i64 %819, ptr %154
   %820 = load i64, ptr %154
   store i64 %820, ptr %155
-  %821 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %821 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %821, ptr %156
   %822 = load i64, ptr %156
   %823 = inttoptr i64 %822 to ptr addrspace(1)
@@ -1756,7 +1756,7 @@ L308:
   store i64 1, ptr %160
   %849 = load i64, ptr %160
   store i64 %849, ptr %161
-  %850 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %850 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %850, ptr %162
   %851 = load i64, ptr %162
   store i64 %851, ptr %163
@@ -1765,10 +1765,10 @@ L308:
   store ptr addrspace(1) %853, ptr %149
   br label %L323
 L323:
-  %854 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %854 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %854, ptr %164
   store i64 1, ptr %165
-  %855 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %855 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %855, ptr %166
   %856 = load i64, ptr %166
   store i64 %856, ptr %4
@@ -1877,7 +1877,7 @@ L339:
   store i64 %917, ptr %177
   %918 = load i64, ptr %177
   store i64 %918, ptr %178
-  %919 = ptrtoint ptr @camlStdlib__Int__immstring64 to i64
+  %919 = ptrtoint ptr @camlStdlib__Int__immstring72 to i64
   store i64 %919, ptr %179
   %920 = load i64, ptr %179
   %921 = inttoptr i64 %920 to ptr addrspace(1)
@@ -1928,7 +1928,7 @@ L331:
   store i64 1, ptr %183
   %947 = load i64, ptr %183
   store i64 %947, ptr %184
-  %948 = ptrtoint ptr @camlSwitch__immstring38 to i64
+  %948 = ptrtoint ptr @camlSwitch__immstring41 to i64
   store i64 %948, ptr %185
   %949 = load i64, ptr %185
   store i64 %949, ptr %186
@@ -1937,10 +1937,10 @@ L331:
   store ptr addrspace(1) %951, ptr %172
   br label %L346
 L346:
-  %952 = ptrtoint ptr @camlSwitch__const_block54 to i64
+  %952 = ptrtoint ptr @camlSwitch__const_block57 to i64
   store i64 %952, ptr %187
   store i64 1, ptr %188
-  %953 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 to i64
+  %953 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
   store i64 %953, ptr %189
   %954 = load i64, ptr %189
   store i64 %954, ptr %4
@@ -2024,28 +2024,28 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlSwitch__test_next_3 = global { ptr, i64 } { ptr @camlSwitch__test_next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlSwitch__next_2 = global i64 3063, section ".data", align 8
 @camlSwitch__next_2 = global { ptr, i64 } { ptr @camlSwitch__next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlSwitch__const_block54 = global i64 2827, section ".data", align 8
-@camlSwitch__const_block54 = global { ptr, ptr } { ptr @camlSwitch__immstring42, ptr @camlSwitch__const_block52 }, section ".data", align 8
-@header.camlSwitch__const_block52 = global i64 4868, section ".data", align 8
-@camlSwitch__const_block52 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlSwitch__const_block50 }, section ".data", align 8
-@header.camlSwitch__const_block50 = global i64 2827, section ".data", align 8
-@camlSwitch__const_block50 = global { ptr, ptr } { ptr @camlSwitch__immstring44, ptr @camlSwitch__const_block48 }, section ".data", align 8
-@header.camlSwitch__const_block48 = global i64 2818, section ".data", align 8
-@camlSwitch__const_block48 = global { i64, ptr } { i64 1, ptr @camlSwitch__const_block46 }, section ".data", align 8
-@header.camlSwitch__const_block46 = global i64 2828, section ".data", align 8
-@camlSwitch__const_block46 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
-@header.camlSwitch__immstring44 = global i64 2044, section ".data", align 8
-@camlSwitch__immstring44 = global { [ 3 x i8 ], [ 4 x i8 ], i8 } { [ 3 x i8 ] c"\20\3d\20", [ 4 x i8 ] zeroinitializer, i8 4 }, section ".data", align 8
-@header.camlSwitch__immstring42 = global i64 2044, section ".data", align 8
-@camlSwitch__immstring42 = global { [ 5 x i8 ], [ 2 x i8 ], i8 } { [ 5 x i8 ] c"\6e\65\78\74\20", [ 2 x i8 ] zeroinitializer, i8 2 }, section ".data", align 8
-@header.camlSwitch__immstring38 = global i64 3068, section ".data", align 8
-@camlSwitch__immstring38 = global { [ 9 x i8 ], [ 6 x i8 ], i8 } { [ 9 x i8 ] c"\6e\6f\74\20\66\6f\75\6e\64", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
-@header.camlSwitch__Pmakeblock20 = global i64 2816, section ".data", align 8
-@camlSwitch__Pmakeblock20 = global { ptr, ptr } { ptr @caml_exn_Match_failure, ptr @camlSwitch__const_block17 }, section ".data", align 8
-@header.camlSwitch__const_block17 = global i64 3840, section ".data", align 8
-@camlSwitch__const_block17 = global { ptr, i64, i64 } { ptr @camlSwitch__immstring15, i64 5, i64 5 }, section ".data", align 8
-@header.camlSwitch__immstring15 = global i64 3068, section ".data", align 8
-@camlSwitch__immstring15 = global { [ 9 x i8 ], [ 6 x i8 ], i8 } { [ 9 x i8 ] c"\73\77\69\74\63\68\2e\6d\6c", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
+@header.camlSwitch__const_block57 = global i64 2827, section ".data", align 8
+@camlSwitch__const_block57 = global { ptr, ptr } { ptr @camlSwitch__immstring45, ptr @camlSwitch__const_block55 }, section ".data", align 8
+@header.camlSwitch__const_block55 = global i64 4868, section ".data", align 8
+@camlSwitch__const_block55 = global { i64, i64, i64, ptr } { i64 1, i64 1, i64 1, ptr @camlSwitch__const_block53 }, section ".data", align 8
+@header.camlSwitch__const_block53 = global i64 2827, section ".data", align 8
+@camlSwitch__const_block53 = global { ptr, ptr } { ptr @camlSwitch__immstring47, ptr @camlSwitch__const_block51 }, section ".data", align 8
+@header.camlSwitch__const_block51 = global i64 2818, section ".data", align 8
+@camlSwitch__const_block51 = global { i64, ptr } { i64 1, ptr @camlSwitch__const_block49 }, section ".data", align 8
+@header.camlSwitch__const_block49 = global i64 2828, section ".data", align 8
+@camlSwitch__const_block49 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
+@header.camlSwitch__immstring47 = global i64 2044, section ".data", align 8
+@camlSwitch__immstring47 = global { [ 3 x i8 ], [ 4 x i8 ], i8 } { [ 3 x i8 ] c"\20\3d\20", [ 4 x i8 ] zeroinitializer, i8 4 }, section ".data", align 8
+@header.camlSwitch__immstring45 = global i64 2044, section ".data", align 8
+@camlSwitch__immstring45 = global { [ 5 x i8 ], [ 2 x i8 ], i8 } { [ 5 x i8 ] c"\6e\65\78\74\20", [ 2 x i8 ] zeroinitializer, i8 2 }, section ".data", align 8
+@header.camlSwitch__immstring41 = global i64 3068, section ".data", align 8
+@camlSwitch__immstring41 = global { [ 9 x i8 ], [ 6 x i8 ], i8 } { [ 9 x i8 ] c"\6e\6f\74\20\66\6f\75\6e\64", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
+@header.camlSwitch__Pmakeblock22 = global i64 2816, section ".data", align 8
+@camlSwitch__Pmakeblock22 = global { ptr, ptr } { ptr @caml_exn_Match_failure, ptr @camlSwitch__const_block19 }, section ".data", align 8
+@header.camlSwitch__const_block19 = global i64 3840, section ".data", align 8
+@camlSwitch__const_block19 = global { ptr, i64, i64 } { ptr @camlSwitch__immstring17, i64 5, i64 5 }, section ".data", align 8
+@header.camlSwitch__immstring17 = global i64 3068, section ".data", align 8
+@camlSwitch__immstring17 = global { [ 9 x i8 ], [ 6 x i8 ], i8 } { [ 9 x i8 ] c"\73\77\69\74\63\68\2e\6d\6c", [ 6 x i8 ] zeroinitializer, i8 6 }, section ".data", align 8
 @camlSwitch__entry.recover_rbp_asm.L367 = external global ptr
 @camlSwitch__entry.recover_rbp_var.L367 = global ptr zeroinitializer, section ".data", align 8
 @camlSwitch__entry.recover_rbp_asm.L371 = external global ptr
@@ -2065,8 +2065,8 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @camlSwitch__test_next_HIDE_STAMP.recover_rbp_asm.L158 = external global ptr
 @camlSwitch__test_next_HIDE_STAMP.recover_rbp_var.L158 = global ptr zeroinitializer, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1499$2c4$2d$2d59$5d_529 = external global ptr
-@camlStdlib__Int__immstring64 = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 = external global ptr
+@camlStdlib__Int__immstring72 = external global ptr
 @caml_apply2 = external global ptr
 @caml_c_call = external global ptr
 @caml_exn_Match_failure = external global ptr

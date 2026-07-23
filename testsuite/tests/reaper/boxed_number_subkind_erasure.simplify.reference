@@ -1,0 +1,61 @@
+let code merge_usages_1 deleted in
+let code f_0 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(merge_usages_1)
+      merge_usages_1_1 (u) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k (u)
+in
+let $camlBoxed_number_subkind_erasure__merge_usages_3 =
+  closure merge_usages_1_1 @merge_usages &toplevel.alloc_region
+in
+let code loopify(never) size(65) newer_version_of(f_0)
+      f_0_1 (b : imm tagged, x : int32 boxed, y : int64 boxed)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : int64 boxed =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`int64` (y) in
+      let prim_1 = %int_barith.`int64`.add (prim, prim) in
+      let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
+      let prim_2 = %unbox_num.`int32` (x) in
+      let prim_3 = %int_barith.`int32`.add (prim_2, prim_2) in
+      let int32_add = %box_num.`int32`.my_alloc_region (prim_3) in
+      cont k2 (int32_add, int64_add)
+    where k3 =
+      let prim = %unbox_num.`int64` (y) in
+      let prim_1 = %int_barith.`int64`.mul (prim, prim) in
+      let int64_mul = %box_num.`int64`.my_alloc_region (prim_1) in
+      let prim_2 = %unbox_num.`int32` (x) in
+      let prim_3 = %int_barith.`int32`.mul (prim_2, prim_2) in
+      let int32_mul = %box_num.`int32`.my_alloc_region (prim_3) in
+      cont k2 (int32_mul, int64_mul)
+    where k2 (a : int32 boxed, b_1 : int64 boxed) =
+      (apply direct(merge_usages_1_1 &my_alloc_region)
+         ($camlBoxed_number_subkind_erasure__merge_usages_3
+          : _ -> int32 boxed)
+           (a)
+           -> k3 * k1
+         where k3 (param) =
+           cont k2
+         where k2 =
+           (apply direct(merge_usages_1_1 &my_alloc_region)
+              ($camlBoxed_number_subkind_erasure__merge_usages_3
+               : _ -> int64 boxed)
+                (b_1)
+                -> k2 * k1
+              where k2 (b_2 : int64 boxed) =
+                let prim = %unbox_num.`int64` (b_2) in
+                let prim_1 = %int_barith.`int64`.add (prim, prim) in
+                let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
+                cont k (int64_add)))
+in
+let $camlBoxed_number_subkind_erasure__f_2 =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let $camlBoxed_number_subkind_erasure =
+  Block 0 ($camlBoxed_number_subkind_erasure__f_2)
+in
+cont done ($camlBoxed_number_subkind_erasure)

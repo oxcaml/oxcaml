@@ -142,6 +142,7 @@ With index 0 only the first type is shown:
     val compare_length_with : 'a list -> int -> int @@ portable
     val is_empty : 'a list -> bool @@ portable
     val cons : 'a -> 'a list -> 'a list @@ portable
+    val singleton : 'a -> 'a list @@ portable
     val hd : 'a list -> 'a @@ portable
     val tl : 'a list -> 'a list @@ portable
     val nth : 'a list -> int -> 'a @@ portable
@@ -192,6 +193,10 @@ With index 0 only the first type is shown:
     val filter : ('a -> bool) -> 'a list -> 'a list @@ portable
     val find_all : ('a -> bool) -> 'a list -> 'a list @@ portable
     val filteri : (int -> 'a -> bool) -> 'a list -> 'a list @@ portable
+    val take : int -> 'a list -> 'a list @@ portable
+    val drop : int -> 'a list -> 'a list @@ portable
+    val take_while : ('a -> bool) -> 'a list -> 'a list @@ portable
+    val drop_while : ('a -> bool) -> 'a list -> 'a list @@ portable
     val partition : ('a -> bool) -> 'a list -> 'a list * 'a list @@ portable
     val partition_map :
       ('a -> ('b, 'c) Either.t) -> 'a list -> 'b list * 'c list @@ portable

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -181";
  expect;
 *)
 
@@ -84,7 +85,7 @@ let fail = Or_null.This (Or_null.This 5)
 Line 1, characters 24-40:
 1 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This expression has type "'a Or_null.t" = "'a or_null"
+Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The layout of 'a Or_null.t is value_or_null
          because it is the primitive type or_null.
@@ -105,7 +106,7 @@ module Or_null :
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This expression has type "'a Or_null.t" = "'a or_null"
+Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
        The layout of 'a Or_null.t is value_or_null
          because it is the primitive type or_null.
@@ -169,7 +170,7 @@ module Or_null :
 Line 4, characters 24-40:
 4 | let fail = Or_null.This (Or_null.This 5)
                             ^^^^^^^^^^^^^^^^
-Error: This expression has type "'a Or_null.t" = "'a or_null"
+Error: This constructor has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value_maybe_separable)"
        The layout of 'a Or_null.t is value_or_null
          because it is the primitive type or_null.

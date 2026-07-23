@@ -22,7 +22,12 @@ let applicative_functors = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
-let open_modules        = ref []
+
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
+let open_args           = ref ([] : open_arg list)
 let parameters          = ref ([] : string list)
 let as_parameter        = ref false
 let as_argument_for     = ref None
@@ -30,7 +35,7 @@ let zero_alloc_check    = ref Zero_alloc_annotations.Check.Check_default
 let zero_alloc_assert   = ref Zero_alloc_annotations.Assert.Assert_default
 let infer_with_bounds   = ref false
 let kind_verbosity = ref 0
-let ikinds = ref false
+let ikinds = ref true
 
 let annotations         = ref false
 let binary_annotations  = ref true
@@ -46,6 +51,7 @@ let keep_docs           = ref false
 let transparent_modules = ref true
 let for_package         = ref None
 let debug               = ref false
+let unsafe              = ref false
 let opaque              = ref false
 let unboxed_types       = ref false
 let profile_columns     = ref []
@@ -56,3 +62,10 @@ let gdwarf_config_max_evaluation_steps_per_variable = ref None
 let locs = ref true
 let locations = ref true
 let ikinds_debug = ref false
+let no_alias_deps = ref false
+let unique_ids = ref false
+let dump_dir = ref None
+let verbose_types = ref false
+let canonical_ids = ref false
+let print_variance = ref false
+let error_style = ref (Some Misc.Error_style.Merlin)

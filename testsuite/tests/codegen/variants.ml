@@ -1,10 +1,6 @@
 (* TEST
  flags += " -O3";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  only-default-codegen;
  expect.opt;
 *)
@@ -130,7 +126,7 @@ let map_to_constants (t : t) : int =
   | D -> 7
 [%%expect_asm X86_64{|
 map_to_constants:
-  movq  camlTOP7__switch_block207@GOTPCREL(%rip), %rbx
+  movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -143,7 +139,7 @@ let map_to_float_constants (t : t) : float# =
   | D -> #7.0
 [%%expect_asm X86_64{|
 map_to_float_constants:
-  movq  camlTOP8__switch_block235@GOTPCREL(%rip), %rbx
+  movq  <hidden PC-relative offset>(%rip), %rbx
   vmovsd -4(%rbx,%rax,4), %xmm0
   ret
 |}]
@@ -205,30 +201,30 @@ let unnecessary_match = function
 [%%expect_asm X86_64{|
 unnecessary_match:
   sarq  $1, %rax
-  leaq  .L135(%rip), %rdx
+  leaq  <hidden PC-relative offset>(%rip), %rdx
   movslq (%rdx,%rax,4), %rax
   addq  %rax, %rdx
   jmp   *%rdx
 .L0:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  16(%rax), %rbx
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L1:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  16(%rax), %rbx
   movl  $3, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L2:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  16(%rax), %rbx
   movl  $5, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L3:
-  movq  camlTOP15__unnecessary_match_21@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  16(%rax), %rbx
   movl  $7, %eax
   movq  (%rbx), %rdi

@@ -1,7 +1,7 @@
-let type_expr : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_type_expr
+let type_expr : _ Format_doc.format_printer = Rawprinttyp.type_expr
 let type_set : _ Format_doc.format_printer = Btype.TypeSet.debug_print
-let row_field : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_field
-let row_desc : _ Format_doc.format_printer = Format_doc.compat Printtyp.raw_row_desc
+let row_field : _ Format_doc.format_printer = Rawprinttyp.row_field
+let row_desc : _ Format_doc.format_printer = Rawprinttyp.row_desc
 let ident : _ Format_doc.format_printer = Format_doc.compat Ident.print_with_scope
 let path : _ Format_doc.format_printer = Format_doc.compat Path.print
 let ctype_global_state : _ Format_doc.format_printer = Ctype.print_global_state
@@ -25,3 +25,6 @@ let mod_bounds : _ Format_doc.format_printer = Btype.Jkind0.Mod_bounds.debug_pri
 let with_bounds : _ Format_doc.format_printer = Jkind.With_bounds.debug_print
 let with_bounds_types : _ Format_doc.format_printer = Jkind.With_bounds.debug_print_types
 let modalities : _ Format_doc.format_printer = Format_doc.compat Mode.Modality.Const.print
+let compilation_unit : _ Format_doc.format_printer = Format_doc.compat Compilation_unit.print
+let compilation_unit_name : _ Format_doc.format_printer = Format_doc.compat Compilation_unit.Name.print
+let import_info : _ Format_doc.format_printer = Format_doc.compat Import_info.print

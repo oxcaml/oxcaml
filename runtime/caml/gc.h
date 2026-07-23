@@ -50,7 +50,6 @@
 struct caml_local_arena {
   char* base;
   uintnat length;
-  void* alloc_block;
 };
 typedef struct caml_local_arenas {
   int count;

@@ -29,14 +29,18 @@
 
 type error = private
   | Missing_intf_for_quote of Compilation_unit.Name.t
-  | Missing_impl_for_quote of Compilation_unit.Name.t
+  | Missing_impl_for_quote of Compilation_unit.t
 
 exception Error of error
 
+(** Returns the path to a temporary object file containing the bundled cmi and
+    cmx data; the caller is expected to remove that file once linking has
+    completed. *)
 val make_bundled_cm_file :
   (module Compiler_owee.Unix_intf.S) ->
   ppf_dump:Format.formatter ->
-  quoted_globals:Compilation_unit.Name.Set.t ->
+  quoted_cmi:Compilation_unit.Name.Set.t ->
+  quoted_cmx:Compilation_unit.Set.t ->
   output_name:string ->
   named_startup_file:bool ->
   string

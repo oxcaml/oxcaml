@@ -2,9 +2,8 @@
    modules = "preemption_util.ml";
    include unix;
    hasunix;
-   runtime5;
    poll_insertion;
-   flags += "-alert -unsafe_multidomain -w -21";
+   flags += "-w -21";
    { native; }
 *)
 
@@ -15,7 +14,7 @@ let () =
   let iters = ref 0 in
 
   ignore (run_with_tick_handler
-    ~interval:0.05
+    ~interval_usec:50_000
     ~repeating:true
     ~on_preemption:(fun _resume -> incr count; Resume)
     (fun () ->

@@ -165,6 +165,44 @@ module Context = struct
       ~pass () =
     { args; depth; unrolling_depth; cost_metrics; are_rebuilding_terms; pass }
 
+  let print_cost_metrics ppf c =
+    let Removed_operations.
+          { call;
+            alloc;
+            prim;
+            branch;
+            direct_call_of_indirect;
+            specialized_poly_compare;
+            requested_inline
+          } =
+      Cost_metrics.removed c
+    in
+    let table =
+      [ [ `String "Call";
+          `String "Alloc";
+          `String "Prim";
+          `String "Branch";
+          `String "Direct call of indirect";
+          `String "Specialized poly compare";
+          `String "Requested inline" ];
+        [ `Int call;
+          `Int alloc;
+          `Int prim;
+          `Int branch;
+          `Int direct_call_of_indirect;
+          `Int specialized_poly_compare;
+          `Int requested_inline ] ]
+      |> Table.create
+    in
+    Format.fprintf ppf
+      "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a@]@,\
+       @,\
+       @[<h>Benefits@ of@ inlining@ this@ call:@;\
+       @]@,\
+       @[<h>%a@]@]@,\
+       @,"
+      Code_size.print (Cost_metrics.size c) Table.print table
+
   let print ppf
       { args;
         cost_metrics;
@@ -212,43 +250,7 @@ module Context = struct
     in
     let print_cost_metrics ppf = function
       | None -> ()
-      | Some c ->
-        let Removed_operations.
-              { call;
-                alloc;
-                prim;
-                branch;
-                direct_call_of_indirect;
-                specialized_poly_compare;
-                requested_inline
-              } =
-          Cost_metrics.removed c
-        in
-        let table =
-          [ [ `String "Call";
-              `String "Alloc";
-              `String "Prim";
-              `String "Branch";
-              `String "Direct call of indirect";
-              `String "Specialized poly compare";
-              `String "Requested inline" ];
-            [ `Int call;
-              `Int alloc;
-              `Int prim;
-              `Int branch;
-              `Int direct_call_of_indirect;
-              `Int specialized_poly_compare;
-              `Int requested_inline ] ]
-          |> Table.create
-        in
-        Format.fprintf ppf
-          "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a@]@,\
-           @,\
-           @[<h>Benefits@ of@ inlining@ this@ call:@;\
-           @]@,\
-           @[<h>%a@]@]@,\
-           @,"
-          Code_size.print (Cost_metrics.size c) Table.print table
+      | Some c -> print_cost_metrics ppf c
     in
     let print_depth ppf = function
       | None -> ()
@@ -703,7 +705,7 @@ let output_then_forget_decisions ~output_prefix =
          (that is not one of the numbered warnings)? *)
       Format.eprintf "WARNING: inlining report output failed@.")
     (fun () ->
-      let compilation_unit = Compilation_unit.get_current_exn () in
+      let compilation_unit = Current_unit.get_cu_exn () in
       let tree =
         lazy
           (List.fold_left

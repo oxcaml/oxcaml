@@ -72,12 +72,6 @@ module Scannable_axes = struct
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
-  let meet { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    { nullability = Nullability.meet n1 n2;
-      separability = Separability.meet s1 s2
-    }
-
   (* A scannable axis annotation can only lower, so [base] is only a valid
      prefix when [actual <= base] on every axis. If it's not, return [None]. *)
   let to_string_list_diff
@@ -132,18 +126,6 @@ module Layout = struct
       | Univar uv -> Univar uv
       | Genvar v -> Genvar v
 
-    (* if so, scannable axis annotations should not trigger a warning *)
-    let is_scannable_or_any = function
-      | Any _ | Base (Scannable, _) -> true
-      | Base
-          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
-            _ ) ->
-        false
-      | Product _ -> false
-      | Univar _ -> false
-      | Genvar _ -> false
-
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
@@ -157,23 +139,6 @@ module Layout = struct
         uv1 == uv2
       | Genvar v1, Genvar v2 -> v1 == v2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
-
-    (* Returns [None] if the root has no meaningful scannable axes. *)
-    let get_root_scannable_axes t =
-      match t with
-      | Any sa -> Some sa
-      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
-      | Product _ -> None
-      | Univar _ -> None
-      | Genvar _ -> None
-
-    let set_root_scannable_axes t sa =
-      match t with
-      | Any _ -> Any sa
-      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
-      | Product _ -> t
-      | Univar _ -> t
-      | Genvar _ -> t
 
     (* Compute how to print the layout [scannable sa] *)
     let format_scannable_layout ~include_redundant_scannable_axes
@@ -511,7 +476,6 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
-    | Abstract_kind_with_kind_modifier
 
   exception User_error of Location.t * t
 end
@@ -717,7 +681,11 @@ type jkind_context =
 module Base = struct
   let to_string layout_to_string = function
     | Layout l -> layout_to_string l
-    | Kconstr p -> Path.name p
+    | Kconstr (p, sa) -> (
+      match Scannable_axes.to_string_list sa with
+      | [] -> Path.name p
+      | _ :: _ as sa_strs ->
+        Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
 
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
@@ -725,10 +693,15 @@ module Base = struct
   let sub_expanded base1 base2 =
     match base1, base2 with
     | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr k1, Kconstr k2 when Path.same k1 k2 -> Sub_result.Equal
-    | Kconstr _, Layout (Layout.Any sa)
-      when Scannable_axes.equal sa Scannable_axes.max ->
-      Sub_result.Less
+    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
+      match Scannable_axes.less_or_equal sa1 sa2 with
+      | Equal -> Sub_result.Equal
+      | Less -> Sub_result.Less
+      | Not_le -> Sub_result.Not_le [Layout_disagreement])
+    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+      match Scannable_axes.less_or_equal sa_k sa_any with
+      | Equal | Less -> Sub_result.Less
+      | Not_le -> Sub_result.Not_le [Layout_disagreement])
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
       Sub_result.Not_le [Layout_disagreement]
 
@@ -743,21 +716,27 @@ module Base = struct
     | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
 
   let map_layout ~f b =
-    match b with Layout l -> Layout (f l) | Kconstr b -> Kconstr b
+    match b with Layout l -> Layout (f l) | Kconstr (p, sa) -> Kconstr (p, sa)
 
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
-    | Kconstr p -> Format.fprintf ppf "%s" (Path.name p)
+    | Kconstr (p, sa) -> (
+      let sa_strs = Scannable_axes.to_string_list sa in
+      match sa_strs with
+      | [] -> Format.fprintf ppf "%s" (Path.name p)
+      | _ :: _ ->
+        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " sa_strs))
 
   let expand_once (type a) env (t : a jkind_base) :
       Layout.Const.t jkind_base option =
     match t with
     | Layout _ -> None
-    | Kconstr p -> (
+    | Kconstr (p, sa) -> (
       match Env.find_jkind p env with
       | (exception Not_found) | { jkind_manifest = None; _ } -> None
-      | { jkind_manifest = Some { base; _ }; _ } -> Some base)
+      | { jkind_manifest = Some { base; _ }; _ } ->
+        Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
     let of_const = map_layout ~f:Layout.of_const in
@@ -789,14 +768,17 @@ module Base = struct
   let rec expand_until_comparable env t1 t2 =
     match t1, t2 with
     | Layout _, Layout _ -> Some (t1, t2)
-    | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> Some (t1, t2)
-    | Kconstr _, Layout (Layout.Any sa)
-      when Scannable_axes.equal sa Scannable_axes.max ->
-      Some (t1, t2)
+    | Kconstr (p1, _), Kconstr (p2, _) when Path.same p1 p2 -> Some (t1, t2)
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
-      | None -> None
-      | Some (t1, t2) -> expand_until_comparable env t1 t2)
+      | Some (t1, t2) -> expand_until_comparable env t1 t2
+      | None -> (
+        (* Stuck on an abstract [Kconstr] with no manifest. [sub_expanded] can
+           still decide [Kconstr _, Layout (Any _)] via the stored [sa] upper
+           bound; other stuck cases fail. *)
+        match t1, t2 with
+        | Kconstr _, Layout (Layout.Any _) -> Some (t1, t2)
+        | _ -> None))
 end
 
 module Base_and_axes = struct
@@ -824,7 +806,7 @@ module Base_and_axes = struct
       (l * r) jkind_const_desc expand_result =
     match t.base with
     | Layout _ -> Not_expanded
-    | Kconstr p -> (
+    | Kconstr (p, sa) -> (
       match Env.find_jkind p env with
       | exception Not_found -> Missing_cmi p
       | { jkind_manifest = None; _ } -> Not_expanded
@@ -835,13 +817,26 @@ module Base_and_axes = struct
         if
           With_bounds.is_empty t.with_bounds
           && Mod_bounds.equal mod_bounds jkind.mod_bounds
+          &&
+          let sa_won't_strengthen_jkind =
+            match jkind.base with
+            | Kconstr (_, sa') -> Scannable_axes.le sa' sa
+            | Layout l -> (
+              match Layout.Const.get_root_scannable_axes l with
+              | None -> true
+              | Some sa' -> Scannable_axes.le sa' sa)
+          in
+          sa_won't_strengthen_jkind
         then
           (* If the expanded base is equal to the original jkind, don't allocate
              a new one. *)
           Expanded jkind
         else
           Expanded
-            { base = jkind.base; mod_bounds; with_bounds = t.with_bounds })
+            { base = meet_scannable_axes jkind.base sa;
+              mod_bounds;
+              with_bounds = t.with_bounds
+            })
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
@@ -1176,7 +1171,7 @@ module Base_and_axes = struct
              belong in the next case. What is the right behaviour here? *)
           | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -1408,6 +1403,13 @@ module Jkind_desc = struct
     | No_intersection
     | Unknown
 
+  (* Precondition: [jk] is fully expanded, if we are to take the stored [sa]
+     from a [Kconstr] . *)
+  let get_scannable_axes_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.get_root_scannable_axes l
+    | Kconstr (_, sa) -> Some sa
+
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
     { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
@@ -1446,8 +1448,10 @@ module Jkind_desc = struct
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
-    | Kconstr p1, Kconstr p2
-      when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
+    | Kconstr (p1, sa1), Kconstr (p2, sa2)
+      when Path.same p1 p2
+           && Scannable_axes.equal sa1 sa2
+           && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
@@ -1533,10 +1537,11 @@ module Jkind_desc = struct
       match Layout.intersection l1 l2 with
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
-    | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
-    | (Layout (Layout.Any sa), base | base, Layout (Layout.Any sa))
-      when Scannable_axes.equal sa Scannable_axes.max ->
-      make_intersection base
+    | Kconstr (p1, sa1), Kconstr (p2, sa2) when Path.same p1 p2 ->
+      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2))
+    | Kconstr (p, sa_k), Layout (Layout.Any sa_any)
+    | Layout (Layout.Any sa_any), Kconstr (p, sa_k) ->
+      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any))
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> Unknown
@@ -1548,10 +1553,15 @@ module Jkind_desc = struct
     | Some (t1, t2) -> (
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub l1 l2
-      | Kconstr _, Kconstr _ -> Sub_result.Equal
-      | Kconstr _, Layout (Layout.Any sa)
-        when Scannable_axes.equal sa Scannable_axes.max ->
-        Sub_result.Less
+      | Kconstr (_, sa1), Kconstr (_, sa2) -> (
+        match Scannable_axes.less_or_equal sa1 sa2 with
+        | Equal -> Sub_result.Equal
+        | Less -> Sub_result.Less
+        | Not_le -> Sub_result.Not_le [Layout_disagreement])
+      | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+        match Scannable_axes.less_or_equal sa_k sa_any with
+        | Equal | Less -> Sub_result.Less
+        | Not_le -> Sub_result.Not_le [Layout_disagreement])
       | Kconstr _, Layout _ | Layout _, Kconstr _ ->
         Misc.fatal_error
           "Jkind.sub_layout: [expand_until_comparable] spec wrong")
@@ -1585,12 +1595,19 @@ end
 (*** constant jkinds ***)
 
 module Context_with_transl = struct
+  type transl_with_bound_types =
+    | Transl_type of (Parsetree.core_type -> Types.type_expr)
+    | Overapproximate_to_top
+        (** Instead of translating each [with]-bound's type, over-approximate it
+            by raising the bounds of its base to top. Used during the
+            recursive-module approximation pass. *)
+
   type 'd t =
     | Right_jkind :
         ('l * allowed) History.annotation_context
         -> ('l * allowed) t
     | Left_jkind :
-        (Parsetree.core_type -> Types.type_expr)
+        transl_with_bound_types
         * (allowed * disallowed) History.annotation_context
         -> (allowed * disallowed) t
 
@@ -1629,6 +1646,15 @@ end
 module Const = struct
   include Jkind0.Const
 
+  (* Precondition: [jk] is fully expanded (e.g. via
+     [Base_and_axes.fully_expand_aliases_const]), otherwise the stored [sa] on
+     a [Kconstr] is just the user-written upper bound and may not reflect a
+     tighter manifest. *)
+  let get_scannable_axes_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.Const.get_root_scannable_axes l
+    | Kconstr (_, sa) -> Some sa
+
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
     | Expanded t -> Some t
@@ -1638,10 +1664,15 @@ module Const = struct
    fun env t ->
     match t.base with
     | Layout l -> Ok l
-    | Kconstr p -> (
+    | Kconstr (p, sa) -> (
       match Env.find_jkind_expansion p env with
       | exception Not_found -> Error p
-      | jkind -> get_layout_result env jkind)
+      | jkind ->
+        (* Propagate the scannable axes upper bound. *)
+        let jkind =
+          { jkind with base = Base_and_axes.meet_scannable_axes jkind.base sa }
+        in
+        get_layout_result env jkind)
 
   let equal env t1 t2 =
     Jkind_desc.equate_or_equal ~allow_mutation:false env
@@ -1726,12 +1757,10 @@ module Const = struct
     (* Returns [None] if [actual] has any scannable axis strictly greater
        than [base], and thus can't be printed in terms of [base] *)
     let get_scannable_axes_diff ~base actual =
-      let base_sa = Layout.Const.get_root_scannable_axes base in
-      let actual_sa = Layout.Const.get_root_scannable_axes actual in
-      match base_sa, actual_sa with
+      match base, actual with
       | None, _ | _, None -> Some []
-      | Some base_sa, Some actual_sa ->
-        Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
+      | Some base, Some actual ->
+        Scannable_axes.to_string_list_diff ~base actual
 
     let modalities_of_ignored_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
@@ -1764,20 +1793,14 @@ module Const = struct
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
       let matching_layouts =
         match base_jkind.base, actual.base with
-        | Kconstr p1, Kconstr p2 -> Path.same p1 p2
+        | Kconstr (p1, _), Kconstr (p2, _) -> Path.same p1 p2
         | Layout l1, Layout l2 -> Layout.Const.equal_up_to_scannable_axes l1 l2
         | (Kconstr _ | Layout _), _ -> false
       in
       let scannable_axes =
-        match actual.base with
-        | Layout l ->
-          if Layout.Const.is_scannable_or_any l
-          then
-            match base_jkind.base with
-            | Layout base_l -> get_scannable_axes_diff ~base:base_l l
-            | Kconstr _ -> Some []
-          else Some []
-        | Kconstr _ -> Some []
+        get_scannable_axes_diff
+          ~base:(get_scannable_axes_of_fully_expanded base_jkind)
+          (get_scannable_axes_of_fully_expanded actual)
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
@@ -1965,30 +1988,48 @@ module Const = struct
       Option.map (Location.map (fun x -> Separability x))
   end
 
-  let apply_scannable_axis ?prior_annot env
+  let apply_scannable_axis ?prior_annot ~warn env
       (axis : Scannable_axis.t Location.loc option) t =
     match axis with
     | None -> t
     | Some { txt = axis; loc } -> (
+      let update_sa sa =
+        let sa' = Scannable_axis.lower_axes sa axis in
+        (match prior_annot with
+        | Some (base, rev_axes) when warn && Scannable_axes.equal sa sa' ->
+          Location.prerr_warning loc
+            (Warnings.Redundant_kind_modifier
+               (Format.asprintf "%a%s" Pprintast.jkind_annotation base
+                  (String.concat ""
+                     (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+        | _ -> ());
+        sa'
+      in
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
-      | Kconstr _ -> raise ~loc Abstract_kind_with_kind_modifier
+      | Kconstr (p, sa) -> { t with base = Kconstr (p, update_sa sa) }
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
         | Some sa ->
-          let sa' = Scannable_axis.lower_axes sa axis in
-          (match prior_annot with
-          | Some (abbrev, rev_axes) when Scannable_axes.equal sa sa' ->
-            Location.prerr_warning loc
-              (Warnings.Redundant_kind_modifier
-                 (Format.asprintf "%a%s" Pprintast.longident abbrev
-                    (String.concat ""
-                       (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
-          | _ -> ());
           { t with
-            base = Layout (Layout.Const.set_root_scannable_axes layout sa')
+            base =
+              Layout
+                (Layout.Const.set_root_scannable_axes layout (update_sa sa))
           }))
+
+  let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
+    if
+      sa_annot <> []
+      &&
+      match get_layout_result env base_jkind with
+      | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
+      | Error _ -> false
+    then
+      Location.prerr_warning loc
+        (Warnings.Ignored_kind_modifier
+           ( Format.asprintf "%a" Pprintast.jkind_annotation base,
+             List.map Location.get_txt sa_annot ))
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -2032,41 +2073,21 @@ module Const = struct
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
+      warn:bool ->
       _ ->
       (l * r) Context_with_transl.t ->
       Parsetree.jkind_annotation ->
       (l * r) t =
-   fun ~use_abstract_jkinds env context jkind ->
+   fun ~use_abstract_jkinds ~warn env context jkind ->
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
-    | Pjk_abbreviation (name, sa_annot) ->
+    | Pjk_abbreviation name ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
-      let jkind_without_sa = of_path p in
-      if
-        sa_annot <> []
-        &&
-        match get_layout_result env jkind_without_sa with
-        | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
-        | Error _ -> false
-      then
-        Location.prerr_warning jkind.pjka_loc
-          (Warnings.Ignored_kind_modifier
-             ( Format.asprintf "%a" Pprintast.longident name.txt,
-               List.map Location.get_txt sa_annot ));
-      let jkind, _abbrev =
-        List.fold_left
-          (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(name.txt, rev_axes) env
-                (Some (transl_scannable_axis axis))
-                jkind,
-              axis.Location.txt :: rev_axes ))
-          (jkind_without_sa, []) sa_annot
-      in
-      allow_left jkind |> allow_right
+      allow_left (of_path p) |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
       (* for each mode, lower the corresponding modal bound to be that
          mode *)
@@ -2077,44 +2098,82 @@ module Const = struct
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
-      |> apply_scannable_axis env
+      |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_nullability_annot nullability)
-      |> apply_scannable_axis env
+      |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_separability_annot separability)
+    | Pjk_operator (base, sa_annot) ->
+      let base_jkind =
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
+      in
+      if warn then warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
+      let jkind, _ =
+        List.fold_left
+          (fun (jkind, rev_axes) axis ->
+            ( apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
+                (Some (transl_scannable_axis axis))
+                jkind,
+              axis.Location.txt :: rev_axes ))
+          (base_jkind, []) sa_annot
+      in
+      jkind
     | Pjk_product ts ->
       let jkinds =
         List.map
-          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-             context)
+          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+             env context)
           ts
       in
       jkind_of_product_annotations ~loc env jkinds
     | Pjk_with (base, type_, modalities) -> (
       let base =
-        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
-          context base
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
+          env context base
       in
       match context with
       | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
-      | Left_jkind (transl_type, _) ->
-        let type_ = transl_type type_ in
-        let modality, externality =
-          Typemode.transl_with_bound_modifiers modalities
-        in
-        let relevant_axes =
-          let axes = Mod_bounds.relevant_axes_of_modality ~modality in
-          match externality with
-          | None -> axes
-          | Some ext ->
-            let is_top =
-              Per_axis.le (Nonmodal Externality) Externality.max ext
-            in
-            if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
-        in
-        { base = base.base;
-          mod_bounds = base.mod_bounds;
-          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
-        })
+      | Left_jkind (transl_type, _) -> (
+        match transl_type with
+        | Transl_type transl_type ->
+          let type_ = transl_type type_ in
+          let modality, externality =
+            Typemode.transl_with_bound_modifiers modalities
+          in
+          let relevant_axes =
+            let axes = Mod_bounds.relevant_axes_of_modality ~modality in
+            match externality with
+            | None -> axes
+            | Some ext ->
+              let is_top =
+                Per_axis.le (Nonmodal Externality) Externality.max ext
+              in
+              if is_top
+              then axes
+              else Axis_set.remove axes (Nonmodal Externality)
+          in
+          { base = base.base;
+            mod_bounds = base.mod_bounds;
+            with_bounds =
+              With_bounds.add type_ { relevant_axes } base.with_bounds
+          }
+        | Overapproximate_to_top ->
+          (* A with-bound weakens the mod-bounds, so a safe approximation is to
+             drop the with-bounds and raise the mod-bounds to [max]. *)
+          let expanded = Base_and_axes.fully_expand_aliases_const env base in
+          let base =
+            match expanded.base with
+            | Layout _ as b -> b
+            | Kconstr (_, sa) ->
+              (* However, we can't raise the mod-bounds of a truly-abstract
+                 [Kconstr] because its mod-bounds can be further narrowed by
+                 substitution. Instead, we approximate the layout as [any]. *)
+              Layout (Layout.Const.Any sa)
+          in
+          { base;
+            mod_bounds = Mod_bounds.max;
+            with_bounds = expanded.with_bounds
+          }))
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2148,11 +2207,11 @@ module Const = struct
        that needs a different extension level. *)
     | Layout l -> scan_layout l
 
-  let of_user_written_annotation ~use_abstract_jkinds env ~context
+  let of_user_written_annotation ~use_abstract_jkinds ~warn env ~context
       (annot : Parsetree.jkind_annotation) =
     Env.check_no_open_quotations annot.pjka_loc env Jkind_annotation_qt;
     let const =
-      of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
+      of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn env
         context annot
     in
     let required_layouts_level = get_required_layouts_level context const in
@@ -2162,8 +2221,9 @@ module Const = struct
         (Insufficient_level { jkind = annot; required_layouts_level });
     const
 
-  let of_annotation ?(use_abstract_jkinds = true) ~context env annot =
-    of_user_written_annotation env ~use_abstract_jkinds
+  let of_annotation ?(use_abstract_jkinds = true) ?(warn = true) ~context env
+      annot =
+    of_user_written_annotation env ~use_abstract_jkinds ~warn
       ~context:(Right_jkind context) annot
 end
 
@@ -2258,16 +2318,19 @@ let of_annotated_const ~context ~annotation ~const ~const_loc =
     ~why:(Annotated (context, const_loc))
     const ~quality:Not_best ~ran_out_of_fuel_during_normalize:false
 
-let of_annotation_lr ~use_abstract_jkinds ~context env
+let of_annotation_lr ~use_abstract_jkinds ~warn ~context env
     (annot : Parsetree.jkind_annotation) =
   let const =
-    Const.of_user_written_annotation ~use_abstract_jkinds ~context env annot
+    Const.of_user_written_annotation ~use_abstract_jkinds ~warn ~context env
+      annot
   in
   of_annotated_const ~annotation:(Some annot) ~const ~const_loc:annot.pjka_loc
     ~context
 
-let of_annotation ?(use_abstract_jkinds = true) ~context env annot =
-  of_annotation_lr ~use_abstract_jkinds ~context:(Right_jkind context) env annot
+let of_annotation ?(use_abstract_jkinds = true) ?(warn = true) ~context env
+    annot =
+  of_annotation_lr ~use_abstract_jkinds ~warn ~context:(Right_jkind context) env
+    annot
 
 let of_annotation_option_default ?use_abstract_jkinds ~default ~context env =
   function
@@ -2282,13 +2345,13 @@ let of_attribute ~context
   of_annotated_const ~context ~annotation:(mk_annot name) ~const
     ~const_loc:attribute.loc
 
-let of_type_decl ?(use_abstract_jkinds = true) ~context ~transl_type env
-    (decl : Parsetree.type_declaration) =
-  let context = Context_with_transl.Left_jkind (transl_type, context) in
+let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
+    ~transl env (decl : Parsetree.type_declaration) =
+  let context = Context_with_transl.Left_jkind (transl, context) in
   let jkind_of_annotation =
     decl.ptype_jkind_annotation
     |> Option.map (fun annot ->
-        of_annotation_lr ~use_abstract_jkinds ~context env annot, annot)
+        of_annotation_lr ~use_abstract_jkinds ~warn ~context env annot, annot)
   in
   let jkind_of_attribute =
     Builtin_attributes.jkind decl.ptype_attributes
@@ -2303,41 +2366,23 @@ let of_type_decl ?(use_abstract_jkinds = true) ~context ~transl_type env
     raise ~loc:decl.ptype_loc
       (Multiple_jkinds { from_annotation; from_attribute })
 
+let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
+  of_type_decl_gen ?use_abstract_jkinds ?warn ~context
+    ~transl:(Context_with_transl.Transl_type transl_type) env decl
+
 let of_type_decl_overapproximate_unknown ~context env
     (decl : Parsetree.type_declaration) =
-  (* CR with-kinds: we could avoid this syntactic check and instead return
-     [None] if [transl_type] is ever called. However, then we end up parsing
-     the jkind annotation multiple times. We should refactor the code to
-     avoid passing the unparsed annotation around. *)
-  let rec has_with_bounds (jkind : Parsetree.jkind_annotation) =
-    match jkind.pjka_desc with
-    | Pjk_with _ -> true
-    | Pjk_mod (base, _) -> has_with_bounds base
-    | Pjk_product jkinds -> List.exists has_with_bounds jkinds
-    | Pjk_abbreviation _ -> false
-    | Pjk_default | Pjk_kind_of _ ->
-      raise ~loc:jkind.pjka_loc Unimplemented_syntax
-  in
-  let transl_type sty =
-    Misc.fatal_errorf
-      "@[Unexpected call to [transl_type] in \
-       [of_type_decl_overapproximate_unknown]. Please report this to the Jane \
-       Street OCaml Language team."
-      Pprintast.core_type sty
-  in
-  match decl.ptype_jkind_annotation with
-  | Some annot when has_with_bounds annot ->
-    (* CR with-kinds: we could still compute the layout here. *)
-    Some (Builtin.any ~why:Overapproximation_of_with_bounds)
-  | _ ->
-    of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl
-    |> Option.map fst
+  (* Warnings are emitted in [of_type_decl] rather than here *)
+  of_type_decl_gen ~use_abstract_jkinds:false ~warn:false ~context
+    ~transl:Context_with_transl.Overapproximate_to_top env decl
+  |> Option.map fst
 
-let for_unboxed_record lbls layouts =
+let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun lbl -> lbl.ld_type, lbl.ld_modalities) lbls
+    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
+  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
@@ -2460,6 +2505,12 @@ let for_array_element_sort ~level =
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
     sort )
 
+let for_effect_arg ident =
+  let why : History.value_creation_reason =
+    Type_argument { parent_path = Path.Pident ident; position = 1; arity = 1 }
+  in
+  Builtin.value ~why
+
 (******************************)
 (* elimination and defaulting *)
 
@@ -2493,10 +2544,13 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
   (* Don't use [fully_expand_aliases] to avoid computing anything on bounds *)
   match t.jkind.base with
   | Layout l -> Ok l
-  | Kconstr p -> (
+  | Kconstr (p, sa) -> (
     match Env.find_jkind_expansion p env with
     | exception Not_found -> Error p
-    | jkind -> Const.get_layout_result env jkind |> Result.map Layout.of_const)
+    | jkind ->
+      Const.get_layout_result env jkind
+      |> Result.map Layout.of_const
+      |> Result.map (fun l -> Layout.meet_root_scannable_axes l sa))
 
 let extract_layout_opt env t = extract_layout env t |> Result.to_option
 
@@ -2522,20 +2576,30 @@ let get t = Jkind_desc.get t.jkind
 
 (* CR layouts: this function is suspect; it seems likely to reisenberg
    that refactoring could get rid of it *)
-let sort_of_jkind env (t : jkind_l) : sort =
+let sort_option_of_jkind env (t : jkind_l) : sort option =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
-    | Sort (s, _) -> s
-    | Product ls -> Sort.Product (List.map sort_of_layout ls)
+    | Any _ -> None
+    | Sort (s, _) -> Some s
+    | Product ls -> (
+      match Misc.Stdlib.List.map_option sort_of_layout ls with
+      | None -> None
+      | Some sorts -> Some (Sort.Product sorts))
   in
-  let layout =
-    match extract_layout env t with
-    | Ok l -> l
-    | Error _ ->
-      Misc.fatal_error "Jkind.sort_of_jkind: unable to expand jkind abbrev"
-  in
-  sort_of_layout layout
+  match extract_layout env t with
+  | Ok layout -> sort_of_layout layout
+  | Error _ ->
+    (* CR-someday lmaurer: This assumes that the only reason [extract_layout]
+       would return an [Error] is because of an abstract kind, which is not
+       true: there could be worse problems like a path missing from the
+       environment. Unfortunately, being more careful would require changing
+       [Env.find_jkind_expansion] (see comment there). *)
+    None
+
+let sort_of_jkind env (t : jkind_l) : sort =
+  match sort_option_of_jkind env t with
+  | Some sort -> sort
+  | None -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
 
 let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
   let jk, _ =
@@ -2585,45 +2649,10 @@ let set_externality_upper_bound jk externality_upper_bound =
       }
   }
 
-let get_root_scannable_axes jk =
-  match jk.jkind.base with
-  | Layout l -> Layout.get_root_scannable_axes l
-  | Kconstr _ -> None
-
 let get_nullability env jk =
-  let sa =
-    match get_root_scannable_axes jk with
-    | Some _ as sa -> sa
-    | None -> (
-      (* Expand abstract kinds (Kconstr) to access the layout *)
-      let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
-      match expanded.base with
-      | Layout l -> Layout.get_root_scannable_axes l
-      | Kconstr _ -> None)
-  in
+  let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
+  let sa = Jkind_desc.get_scannable_axes_of_fully_expanded expanded in
   Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
-
-let set_root_nullability jk nullability =
-  { jk with
-    jkind =
-      { jk.jkind with
-        base =
-          Base.map_layout
-            ~f:(fun l -> Layout.set_root_nullability l nullability)
-            jk.jkind.base
-      }
-  }
-
-let set_root_separability jk separability =
-  { jk with
-    jkind =
-      { jk.jkind with
-        base =
-          Base.map_layout
-            ~f:(fun l -> Layout.set_root_separability l separability)
-            jk.jkind.base
-      }
-  }
 
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
@@ -2651,30 +2680,44 @@ let apply_modality_r modality jk =
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
-let apply_or_null_l jkind =
-  match get_root_scannable_axes jkind with
+let apply_or_null_l env jkind =
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Non_null; separability } ->
-    let jkind = set_root_nullability jkind Maybe_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Maybe_separable
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
+    begin match jkind.jkind.base with
+    | Kconstr _ -> Error ()
+    | Layout l ->
+      let l = Layout.set_root_nullability l Maybe_null in
+      let l =
+        match separability with
+        | Maybe_separable -> l
+        | Separable -> Layout.set_root_separability l Maybe_separable
+        | Non_float | Non_pointer64 | Non_pointer -> l
+      in
+      Ok (set_layout jkind l)
+    end
   | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
 
-let apply_or_null_r jkind =
-  match get_root_scannable_axes jkind with
+let apply_or_null_r env jkind =
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match Jkind_desc.get_scannable_axes_of_fully_expanded jkind.jkind with
   | Some { nullability = Maybe_null; separability } ->
-    let jkind = set_root_nullability jkind Non_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Non_float
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
+    begin match jkind.jkind.base with
+    | Kconstr _ -> Error ()
+    | Layout l ->
+      let l = Layout.set_root_nullability l Non_null in
+      let l =
+        match separability with
+        | Maybe_separable -> l
+        | Separable -> Layout.set_root_separability l Non_float
+        | Non_float | Non_pointer64 | Non_pointer -> l
+      in
+      Ok (set_layout jkind l)
+    end
   | Some { nullability = Non_null; separability = _ } -> Error ()
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
@@ -2807,16 +2850,28 @@ module Format_history = struct
   let format_concrete_creation_reason ppf :
       History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
-    | Constructor_declaration _ ->
-      fprintf ppf "it's the type of a constructor field"
-    | Label_declaration lbl ->
-      fprintf ppf "it is the type of record field %s" (Ident.name lbl)
+    | Extension_constructor_declaration _ ->
+      fprintf ppf "it's the type of an argument to an extension constructor"
+    | Extension_label_declaration lbl ->
+      fprintf ppf "it is the type of field %s of an extension constructor"
+        (Ident.name lbl)
     | Record_projection ->
       fprintf ppf "it's the record type used in a projection"
     | Record_assignment ->
       fprintf ppf "it's the record type used in an assignment"
     | Record_functional_update ->
       fprintf ppf "it's the record type used in a functional update"
+    | Field_projection ->
+      fprintf ppf "it's the type of a field in a record being projected from"
+    | Field_assignment ->
+      fprintf ppf "it's the type of a field being assigned a value"
+    | Field_functional_update ->
+      fprintf ppf "it's the type of a field involved in a functional update"
+    | Constructor_arg_projection ->
+      fprintf ppf "it's the type of a constructor argument being projected"
+    | Constructor_arg_assignment ->
+      fprintf ppf
+        "it's the type of a constructor argument being assigned a value"
     | Let_binding -> fprintf ppf "it's the type of a variable bound by a `let`"
     | Function_argument ->
       fprintf ppf "we must know concretely how to pass a function argument"
@@ -2840,12 +2895,15 @@ module Format_history = struct
          representable at call sites)"
     | Peek_or_poke ->
       fprintf ppf "it's the type being used for a peek or poke primitive"
-    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
         "it's the element type (the second type parameter) for a@ block index \
-         (idx or mut_idx)"
+         (idx_imm or idx_mut)"
+    | Field_in_indexed_record ->
+      fprintf ppf
+        "it's the type of a field in a record type into which a@ block index \
+         (idx_imm or idx_mut) is being created"
     | Structure_item ->
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
@@ -2916,13 +2974,10 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s any"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf
-        "the compiler failed to deduce its exact kind@ due to with-bound \
-         checking limitations"
     | Inside_quote ->
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
+    | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -2969,6 +3024,11 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload _parent_path ->
+      fprintf ppf
+        "an [@@@@or_null] type gets its %s by applying or_null to its@ payload \
+         %s"
+        layout_or_kind layout_or_kind
     | Recmod_fun_arg ->
       fprintf ppf
         "it's the type of the first argument to a function in a recursive \
@@ -2994,6 +3054,7 @@ module Format_history = struct
     | Class_field -> fprintf ppf "it's the type of a class field"
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
+    | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"
     | Primitive id ->
       fprintf ppf "it is the primitive value type %s" (Ident.name id)
@@ -3001,6 +3062,9 @@ module Format_history = struct
       fprintf ppf "the %stype argument of %a has %s value"
         (format_position ~arity position)
         !printtyp_path parent_path layout_or_kind
+    | Or_null_payload parent_path ->
+      fprintf ppf "the payload of %a has %s value" !printtyp_path parent_path
+        layout_or_kind
     | Tuple -> fprintf ppf "it's a tuple type"
     | Row_variable -> format_with_notify_js ppf "it's a row variable"
     | Polymorphic_variant -> fprintf ppf "it's a polymorphic variant type"
@@ -3533,7 +3597,7 @@ module Violation = struct
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
-    report_fuel ppf t.violation
+    if not !Clflags.ikinds then report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
 
@@ -3880,13 +3944,18 @@ module Debug_printers = struct
   let concrete_creation_reason ppf : History.concrete_creation_reason -> unit =
     function
     | Match -> fprintf ppf "Match"
-    | Constructor_declaration idx ->
-      fprintf ppf "Constructor_declaration %d" idx
-    | Label_declaration lbl ->
-      fprintf ppf "Label_declaration %a" Ident.print lbl
+    | Extension_constructor_declaration idx ->
+      fprintf ppf "Extension_constructor_declaration %d" idx
+    | Extension_label_declaration lbl ->
+      fprintf ppf "Extension_label_declaration %a" Ident.print lbl
     | Record_projection -> fprintf ppf "Record_projection"
     | Record_assignment -> fprintf ppf "Record_assignment"
     | Record_functional_update -> fprintf ppf "Record_functional_update"
+    | Field_projection -> fprintf ppf "Field_projection"
+    | Field_assignment -> fprintf ppf "Field_assignment"
+    | Field_functional_update -> fprintf ppf "Field_functional_update"
+    | Constructor_arg_projection -> fprintf ppf "Constructor_arg_projection"
+    | Constructor_arg_assignment -> fprintf ppf "Constructor_arg_assignment"
     | Let_binding -> fprintf ppf "Let_binding"
     | Function_argument -> fprintf ppf "Function_argument"
     | Function_result -> fprintf ppf "Function_result"
@@ -3898,9 +3967,9 @@ module Debug_printers = struct
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
-    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
+    | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
@@ -3953,10 +4022,9 @@ module Debug_printers = struct
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)
         parent_path
-    | Overapproximation_of_with_bounds ->
-      fprintf ppf "Overapproximation_of_with_bounds"
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
+    | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -3988,6 +4056,10 @@ module Debug_printers = struct
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)
         parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
@@ -4002,10 +4074,15 @@ module Debug_printers = struct
     | Class_field -> fprintf ppf "Class_field"
     | Boxed_record -> fprintf ppf "Boxed_record"
     | Boxed_variant -> fprintf ppf "Boxed_variant"
+    | Boxed -> fprintf ppf "Boxed"
     | Extensible_variant -> fprintf ppf "Extensible_variant"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
+        (Fmt.compat !printtyp_path)
+        parent_path
+    | Or_null_payload parent_path ->
+      fprintf ppf "Or_null_payload of %a"
         (Fmt.compat !printtyp_path)
         parent_path
     | Tuple -> fprintf ppf "Tuple"
@@ -4173,9 +4250,6 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
-  | Abstract_kind_with_kind_modifier ->
-    Location.errorf ~loc
-      "Abstract kinds with kind modifiers are not yet supported."
 
 let () =
   Location.register_error_of_exn (function

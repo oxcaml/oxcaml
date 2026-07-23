@@ -1,16 +1,11 @@
 (* TEST
-   modules = "preemption_util.ml";
-   include unix;
-   hasunix;
-   runtime5;
    poll_insertion;
-   flags += "-alert -unsafe_multidomain -w -21";
+   flags += "-w -21";
    { native; }
 *)
 
 open Effect
 open Effect.Deep
-open Preemption_util
 
 let alloc () =
   let r @ global = ref "hello" in
@@ -29,7 +24,7 @@ let alloc () =
 
 let () =
   Gc.set { (Gc.get ()) with minor_heap_size = 1024 };
-  with_preemption_setup ~interval:0.001 ~repeating:true (fun () ->
+  Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
     let bang = Atomic.make false in
     let weird = ref [] in
     let f () =
@@ -49,4 +44,6 @@ let () =
         continue k ())
       | _ -> None
     in
-    try_with f () { effc })
+    Preemptible.try_with
+      ~on_tick:(fun () -> Preempt)
+      f () { effc })

@@ -170,10 +170,6 @@ let destroyed_by_plt_stub_set = Reg.set_of_array destroyed_by_plt_stub
 
 let stack_slot slot ty = Reg.create_at_location ty (Stack slot)
 
-(* Instruction selection *)
-
-let word_addressed = false
-
 (* Calling conventions *)
 
 let size_domainstate_args = 64 * size_int
@@ -324,7 +320,7 @@ let win64_float_external_arguments = Regs.[| MM0; MM1; MM2; MM3 |]
 let win64_loc_external_arguments arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
   let reg = ref 0
-  and ofs = ref (if Config.runtime5 then 0 else 32) in
+  and ofs = ref 0 in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
     let arguments, size =
@@ -364,12 +360,10 @@ let domainstate_ptr_dwarf_register_number = 14
 (* Registers destroyed by operations *)
 
 let int_regs_destroyed_at_c_call_win64 =
-  if Config.runtime5
-  then Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
-  else Regs.[|RAX;      RDX; RCX; R8; R9; R10; R11     |]
+  Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
 
 let int_regs_destroyed_at_c_call =
-  if Config.runtime5 && not Config.no_stack_checks
+  if not Config.no_stack_checks
   then (* Clobbers R13 to hold stack pointer. See emit.ml *)
        Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
   else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
@@ -501,7 +495,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_reloadretaddr
   | Pushtrap _ ->
     destroyed_at_pushtrap
-  | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
+  | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
     destroyed_at_single_float64_store
@@ -577,7 +571,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.destroyed_at_terminator: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _}
@@ -604,7 +600,9 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
 (* note: keep this function in sync with `destroyed_at_terminator` above. *)
 let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.is_destruction_point: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _} ->
@@ -707,7 +705,7 @@ let operation_supported = function
     Arch.Extension.enabled_vec512 ()
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _

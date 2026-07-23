@@ -89,16 +89,14 @@ Some notes:
 
 (** Utility functions. *)
 
-let string_is_prefix sub str =
-  let sublen = String.length sub in
-  String.length str >= sublen && String.sub str 0 sublen = sub
-
-let rec lident_of_path = function
+let rec lident_of_path =
+  let noloc_lident_of_path p = mknoloc (lident_of_path p) in
+  function
   | Path.Pident id -> Longident.Lident (Ident.name id)
   | Path.Papply (p1, p2) ->
-      Longident.Lapply (lident_of_path p1, lident_of_path p2)
+      Longident.Lapply (noloc_lident_of_path p1, noloc_lident_of_path p2)
   | Path.Pdot (p, s) | Path.Pextra_ty (p, Pcstr_ty s) ->
-      Longident.Ldot (lident_of_path p, s)
+      Longident.Ldot (noloc_lident_of_path p, mknoloc s)
   | Path.Pextra_ty (p, _) -> lident_of_path p
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
@@ -124,25 +122,31 @@ let rec extract_letop_patterns n pat =
 (** Mapping functions. *)
 
 let constant = function
-  | Const_char c -> Pconst_char c
-  | Const_untagged_char c -> Pconst_untagged_char c
-  | Const_string (s,loc,d) -> Pconst_string (s,loc,d)
-  | Const_int i -> Pconst_integer (Int.to_string i, None)
-  | Const_int8 i -> Pconst_integer (Int.to_string i, Some 's')
-  | Const_int16 i -> Pconst_integer (Int.to_string i, Some 'S')
-  | Const_int32 i -> Pconst_integer (Int32.to_string i, Some 'l')
-  | Const_int64 i -> Pconst_integer (Int64.to_string i, Some 'L')
-  | Const_nativeint i -> Pconst_integer (Nativeint.to_string i, Some 'n')
-  | Const_float f -> Pconst_float (f,None)
-  | Const_float32 f -> Pconst_float (f, Some 's')
-  | Const_unboxed_float f -> Pconst_unboxed_float (f, None)
-  | Const_unboxed_float32 f -> Pconst_unboxed_float (f, Some 's')
-  | Const_untagged_int i -> Pconst_unboxed_integer (Int.to_string i, 'm')
-  | Const_untagged_int8 i -> Pconst_unboxed_integer (Int.to_string i, 's')
-  | Const_untagged_int16 i -> Pconst_unboxed_integer (Int.to_string i, 'S')
-  | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
-  | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
-  | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
+  | Const_char c -> Const.char c
+  | Const_untagged_char c -> Const.mk (Pconst_untagged_char c)
+  | Const_string (s,loc,d) -> Const.string ?quotation_delimiter:d ~loc s
+  | Const_int i -> Const.integer (Int.to_string i)
+  | Const_int8 i -> Const.integer ~suffix:'s' (Int.to_string i)
+  | Const_int16 i -> Const.integer ~suffix:'S' (Int.to_string i)
+  | Const_int32 i -> Const.integer ~suffix:'l' (Int32.to_string i)
+  | Const_int64 i -> Const.integer ~suffix:'L' (Int64.to_string i)
+  | Const_nativeint i -> Const.integer ~suffix:'n' (Nativeint.to_string i)
+  | Const_float f -> Const.float f
+  | Const_float32 f -> Const.float ~suffix:'s' f
+  | Const_unboxed_float f -> Const.mk (Pconst_unboxed_float (f, None))
+  | Const_unboxed_float32 f -> Const.mk (Pconst_unboxed_float (f, Some 's'))
+  | Const_untagged_int i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 'm'))
+  | Const_untagged_int8 i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 's'))
+  | Const_untagged_int16 i ->
+    Const.mk (Pconst_unboxed_integer (Int.to_string i, 'S'))
+  | Const_unboxed_int32 i ->
+    Const.mk (Pconst_unboxed_integer (Int32.to_string i, 'l'))
+  | Const_unboxed_int64 i ->
+    Const.mk (Pconst_unboxed_integer (Int64.to_string i, 'L'))
+  | Const_unboxed_nativeint i ->
+    Const.mk (Pconst_unboxed_integer (Nativeint.to_string i, 'n'))
 
 let attribute sub a = {
     attr_name = map_loc sub a.attr_name;
@@ -386,13 +390,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_unboxed_bool b -> Ppat_unboxed_bool b
     | Tpat_tuple list ->
         Ppat_tuple
-          ( List.map (fun (label, p) -> label, sub.pat sub p) list
-          , Closed)
+          (List.map (fun (label, p) -> label, sub.pat sub p) list, Closed)
     | Tpat_unboxed_tuple list ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
            Closed)
-    | Tpat_construct (lid, _, args, vto) ->
+    | Tpat_construct (lid, _, _, args, vto) ->
         let tyo =
           match vto with
             None -> None
@@ -405,8 +408,11 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         let arg =
           match args with
             []    -> None
-          | [arg] -> Some (sub.pat sub arg)
-          | args  -> Some (Pat.tuple ~loc (List.map (fun p -> None, sub.pat sub p) args) Closed)
+          | [(_, arg)] -> Some (sub.pat sub arg)
+          | args  ->
+              Some (Pat.tuple ~loc
+                      (List.map (fun (_, p) -> None, sub.pat sub p) args)
+                      Closed)
         in
         Ppat_construct (map_loc sub lid,
           match tyo, arg with
@@ -417,10 +423,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
-    | Tpat_record (list, closed) ->
+    | Tpat_record (list, _, _, closed) ->
         Ppat_record (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
-    | Tpat_record_unboxed_product (list, closed) ->
+    | Tpat_record_unboxed_product (list, _, _, closed) ->
         Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
@@ -476,20 +482,22 @@ let value_binding sub vb =
     match pat.ppat_desc with
     | Ppat_constraint (pat, Some ({ ptyp_desc = Ptyp_poly _; _ } as cty),
                        modes) ->
-      let constr = Pvc_constraint {locally_abstract_univars = []; typ = cty } in
+      let constr =
+        Pvc_constraint { locally_abstract_univars = []; typ = cty }
+      in
       pat, Some constr, modes
     | _ -> pat, None, []
   in
   Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
 
 let block_access sub : block_access -> Parsetree.block_access = function
-  | Baccess_field (lid, _) ->
+  | Baccess_field (lid, _, _) ->
     Baccess_field (map_loc sub lid)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
 let unboxed_access sub : unboxed_access -> Parsetree.unboxed_access = function
-  | Uaccess_unboxed_field (lid, _) ->
+  | Uaccess_unboxed_field (lid, _, _) ->
     Uaccess_unboxed_field (map_loc sub lid)
 
 let comprehension sub comp =
@@ -633,10 +641,32 @@ let expression sub exp =
               | Omitted _ -> list
               | Arg (exp, _) -> (label, sub.expr sub exp) :: list
           ) list [])
-    | Texp_match (exp, _, cases, _) ->
-      Pexp_match (sub.expr sub exp, List.map (sub.case sub) cases)
-    | Texp_try (exp, cases) ->
-        Pexp_try (sub.expr sub exp, List.map (sub.case sub) cases)
+    | Texp_match (exp, _, cases, eff_cases, _) ->
+      let merged_cases = List.map (sub.case sub) cases
+        @ List.map
+          (fun c ->
+            let uc = sub.case sub c in
+            let pat = { uc.pc_lhs
+                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
+                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
+            in
+            { uc with pc_lhs = pat })
+          eff_cases
+      in
+      Pexp_match (sub.expr sub exp, merged_cases)
+    | Texp_try (exp, exn_cases, eff_cases) ->
+        let merged_cases = List.map (sub.case sub) exn_cases
+        @ List.map
+          (fun c ->
+            let uc = sub.case sub c in
+            let pat = { uc.pc_lhs
+                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
+                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
+            in
+            { uc with pc_lhs = pat })
+          eff_cases
+        in
+        Pexp_try (sub.expr sub exp, merged_cases)
     | Texp_unboxed_unit -> Pexp_unboxed_unit
     | Texp_unboxed_bool b -> Pexp_unboxed_bool b
     | Texp_tuple (list, _) ->
@@ -644,46 +674,47 @@ let expression sub exp =
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
-    | Texp_construct (lid, _, args, _) ->
+    | Texp_construct (lid, _, _, args, _) ->
         Pexp_construct (map_loc sub lid,
           (match args with
               [] -> None
-          | [ arg ] -> Some (sub.expr sub arg)
+          | [ (_, arg) ] -> Some (sub.expr sub arg)
           | args ->
               Some
-                (Exp.tuple ~loc (List.map (fun e -> None, sub.expr sub e) args))
+                (Exp.tuple ~loc
+                   (List.map (fun (_, e) -> None, sub.expr sub e) args))
           ))
     | Texp_variant (label, expo) ->
         Pexp_variant (label, Option.map (fun (e, _) -> sub.expr sub e) expo)
     | Texp_record { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
-            | _, Kept _ -> l
-            | _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+            | _, _, Kept _ -> l
+            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
-            | _, Kept _ -> l
-            | _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+            | _, _, Kept _ -> l
+            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
-    | Texp_atomic_loc (exp, _, lid, _label, _) ->
+    | Texp_atomic_loc { record = exp; lid; _ } ->
         Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
                         PStr [ Str.eval ~loc
                                  (Exp.field ~loc
                                     (sub.expr sub exp)
                                     (map_loc sub lid))
                              ])
-    | Texp_field (exp, _sort, lid, _label, _, _) ->
+    | Texp_field { record = exp; lid; _ } ->
         Pexp_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_unboxed_field (exp, _, lid, _label, _) ->
+    | Texp_unboxed_field { record = exp; lid; _ } ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield (exp1, _, lid, _label, exp2) ->
+    | Texp_setfield { record = exp1; lid; newval = exp2 } ->
         Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->
@@ -740,7 +771,7 @@ let expression sub exp =
     | Texp_object (cl, _) ->
         Pexp_object (sub.class_structure sub cl)
     | Texp_pack (mexpr) ->
-        Pexp_pack (sub.module_expr sub mexpr)
+        Pexp_pack (sub.module_expr sub mexpr, None)
     | Texp_letop {let_; ands; body; _} ->
         let pat, and_pats =
           extract_letop_patterns (List.length ands) body.c_lhs
@@ -766,7 +797,7 @@ let expression sub exp =
                   Pstr_eval
                     ( { pexp_desc=(Pexp_apply (
                         { pexp_desc=(Pexp_constant
-                                       (Pconst_string(name,loc,None)))
+                                       (Const.string ~loc name))
                         ; pexp_loc=loc
                         ; pexp_loc_stack =[]
                         ; pexp_attributes=[]
@@ -786,7 +817,7 @@ let expression sub exp =
                { pstr_desc=
                    Pstr_eval
                      ( { pexp_desc=(Pexp_constant
-                                      (Pconst_string(name,loc,None)))
+                                      (Const.string ~loc name))
                        ; pexp_loc=loc
                        ; pexp_loc_stack =[]
                        ; pexp_attributes=[]
@@ -822,9 +853,10 @@ let binding_op sub bop pat =
   {pbop_op; pbop_pat; pbop_exp; pbop_loc}
 
 let package_type sub pack =
-  (map_loc sub pack.pack_txt,
-    List.map (fun (s, ct) ->
-        (s, sub.typ sub ct)) pack.pack_fields)
+  { ppt_path = map_loc sub pack.tpt_txt;
+    ppt_cstrs = List.map (fun (s, ct) -> (s, sub.typ sub ct)) pack.tpt_cstrs;
+    ppt_attrs = [];
+    ppt_loc = sub.location sub pack.tpt_txt.loc }
 
 let module_type_declaration sub mtd =
   let loc = sub.location sub mtd.mtd_loc in
@@ -1078,7 +1110,7 @@ let core_type sub ct =
   let loc = sub.location sub ct.ctyp_loc in
   let attrs = sub.attributes sub ct.ctyp_attributes in
   let desc = match ct.ctyp_desc with
-    | Ttyp_var (None, jkind) -> Ptyp_any jkind
+      Ttyp_var (None, jkind) -> Ptyp_any jkind
     | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
     | Ttyp_arrow (arg_label, ct1, modes1, ct2, modes2) ->
         let modes1 = Typemode.untransl_mode modes1 in
@@ -1086,10 +1118,10 @@ let core_type sub ct =
         Ptyp_arrow
           (label arg_label, sub.typ sub ct1, sub.typ sub ct2, modes1, modes2)
     | Ttyp_tuple list ->
-        Ptyp_tuple (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
+        Ptyp_tuple (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
     | Ttyp_unboxed_tuple list ->
         Ptyp_unboxed_tuple
-          (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
+          (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
     | Ttyp_constr (_path, lid, list) ->
         Ptyp_constr (map_loc sub lid,
           List.map (sub.typ sub) list)
@@ -1125,7 +1157,7 @@ let core_type sub ct =
 let class_structure sub cs =
   let rec remove_self = function
     | { pat_desc = Tpat_alias { pattern = p; id; _ } }
-      when string_is_prefix "selfpat-" (Ident.name id) ->
+      when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
   in
@@ -1155,7 +1187,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
 
 and is_self_pat = function
   | { pat_desc = Tpat_alias { id; _ } } ->
-      string_is_prefix "self-" (Ident.name id)
+      String.starts_with ~prefix:"self-" (Ident.name id)
   | _ -> false
 
 (* [Typeclass] adds a [self] parameter to initializers and methods that isn't

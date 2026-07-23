@@ -56,8 +56,10 @@ type context_switch =
   | Perform
   | Reperform
   | With_stack
-  | With_stack_bind
-  | Resume
+  | With_stack_preemptible
+  | Continue
+  | Discontinue
+  | Discontinue_with_backtrace
 
 type comparison = Instruct.comparison =
   | Eq

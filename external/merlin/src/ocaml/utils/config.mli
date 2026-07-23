@@ -43,8 +43,17 @@ val max_tag: int
 val flat_float_array: bool
 
 val reserved_header_bits : int
-val runtime5 : bool
 val syntax_quotations : bool
+
+val default_keyword_edition : (int * int) option * string list
+
+type name_mangling_scheme =
+  | Flat
+  | Structured
+
+exception Invalid_name_mangling_scheme of string
+
+val name_mangling_scheme : name_mangling_scheme
 
 (** Access to configuration values *)
 val print_config : out_channel -> unit

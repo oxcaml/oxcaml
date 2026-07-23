@@ -97,7 +97,7 @@ let f4_1 (x : t_untagged_immediate) = x, false;;
 Line 1, characters 38-39:
 1 | let f4_1 (x : t_untagged_immediate) = x, false;;
                                           ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -110,7 +110,7 @@ let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 Line 1, characters 44-45:
 1 | let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
                                                 ^
-Error: This expression has type
+Error: The value "x" has type
          "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
@@ -124,7 +124,7 @@ let f4_3 (x : int#) = x, false;;
 Line 1, characters 22-23:
 1 | let f4_3 (x : int#) = x, false;;
                           ^
-Error: This expression has type "int#" but an expression was expected of type
+Error: The value "x" has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -263,7 +263,7 @@ let f7_1 (x : t_untagged_immediate) = `A x;;
 Line 1, characters 41-42:
 1 | let f7_1 (x : t_untagged_immediate) = `A x;;
                                              ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -276,7 +276,7 @@ let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
 Line 1, characters 47-48:
 1 | let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
                                                    ^
-Error: This expression has type
+Error: The value "x" has type
          "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
@@ -290,7 +290,7 @@ let f7_3 (x : int#) = `A x;;
 Line 1, characters 25-26:
 1 | let f7_3 (x : int#) = `A x;;
                              ^
-Error: This expression has type "int#" but an expression was expected of type
+Error: The value "x" has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
@@ -452,7 +452,7 @@ external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-22:
 1 | external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -461,7 +461,7 @@ external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-33:
 1 | external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
                                  ^^^^
-Error: Don't know how to untag this type. Only "int" and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -659,7 +659,7 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_untagged_immediate"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -695,7 +695,7 @@ let f13_1 (x : t_untagged_immediate) = x = x;;
 Line 1, characters 39-40:
 1 | let f13_1 (x : t_untagged_immediate) = x = x;;
                                            ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -707,7 +707,7 @@ let f13_2 (x : t_untagged_immediate) = compare x x;;
 Line 1, characters 47-48:
 1 | let f13_2 (x : t_untagged_immediate) = compare x x;;
                                                    ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -719,7 +719,7 @@ let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
 Line 1, characters 56-57:
 1 | let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
                                                             ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
@@ -731,7 +731,7 @@ let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
 Line 1, characters 52-53:
 1 | let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
                                                         ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.

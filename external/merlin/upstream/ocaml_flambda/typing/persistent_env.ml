@@ -125,7 +125,7 @@ type import_info =
 type pers_name = {
   pn_import : import;
   pn_global : Global_module.t;
-  pn_sign : Subst.Lazy.signature;
+  pn_sign : Subst.Lazy.persistent_signature;
 }
 
 (* What a global identifier is actually bound to in Lambda code *)
@@ -154,7 +154,8 @@ type 'a t = {
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
   imported_units: CU.Name.Set.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
-  quoted_globals: CU.Name.Set.t ref;
+  quoted_intfs: CU.Name.Set.t ref;
+  quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
@@ -168,7 +169,8 @@ let empty () = {
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
-  quoted_globals = ref CU.Name.Set.empty;
+  quoted_intfs = ref CU.Name.Set.empty;
+  quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
   can_load_cmis = ref Can_load_cmis;
@@ -183,7 +185,8 @@ let clear penv =
     locals_bound_to_runtime_parameters;
     imported_units;
     imported_opaque_units;
-    quoted_globals;
+    quoted_intfs;
+    quoted_impls;
     param_imports;
     crc_units;
     can_load_cmis;
@@ -195,7 +198,8 @@ let clear penv =
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
   imported_opaque_units := CU.Name.Set.empty;
-  quoted_globals := CU.Name.Set.empty;
+  quoted_intfs := CU.Name.Set.empty;
+  quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
   can_load_cmis := Can_load_cmis;
@@ -785,7 +789,7 @@ type address =
   | Adot of address * Types.module_representation * int
 
 type 'a sig_reader =
-  Subst.Lazy.signature
+  Subst.Lazy.persistent_signature
   -> Global_module.Name.t
   -> Shape.Uid.t
   -> shape:Shape.t
@@ -955,13 +959,41 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
+let read_cmi_file penv filename =
+  let cmi = read_cmi_lazy filename in
+  let unit_name = cmi.cmi_name in
+  let modname = CU.Name.to_global_name unit_name in
+  add_import penv unit_name;
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
+  let pers_sig =
+    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+  in
+  let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  let pers_name =
+    acknowledge_pers_name penv true modname import ~allow_excess_args:false
+  in
+  modname, pers_name.pn_sign
+
 let find ~allow_hidden penv f name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
      name).ps_val
 
 let check ~allow_hidden penv f ~loc name =
   let {persistent_structures; _} = penv in
-  if not (Hashtbl.mem persistent_structures name) then begin
+  let persistent_structure_visible =
+    match Hashtbl.find persistent_structures name with
+    | ps ->
+        begin
+          match
+            check_visibility ~allow_hidden ps.ps_name_info.pn_import
+          with
+        | () -> true
+        | exception Not_found -> false
+        end
+    | exception Not_found -> false
+  in
+  if not persistent_structure_visible then begin
     (* PR#6843: record the weak dependency ([add_import]) regardless of
        whether the check succeeds, to help make builds more
        deterministic. *)
@@ -997,10 +1029,31 @@ let imports {imported_units; crc_units; _} =
   List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
     imports
 
-let require_global_for_quote {quoted_globals; _} name =
-  quoted_globals := CU.Name.Set.add name !quoted_globals
+let require_intf_for_quote {quoted_intfs; _} name =
+  quoted_intfs := CU.Name.Set.add name !quoted_intfs
 
-let quoted_globals {quoted_globals; _} = CU.Name.Set.elements !quoted_globals
+let quoted_intfs { quoted_intfs; _ } = !quoted_intfs
+
+let loaded_transitive_dependencies penv intfs =
+  let names = ref Compilation_unit.Name.Set.empty in
+  let rec add_loaded_deps name =
+    match find_import_info_in_cache penv name with
+    | None -> ()
+    | Some { imp_crcs; _ } ->
+      if not (CU.Name.Set.mem name !names)
+      then (
+        names := CU.Name.Set.add name !names;
+        Array.iter
+          (fun import_info -> add_loaded_deps (Import_info.name import_info))
+          imp_crcs)
+  in
+  Compilation_unit.Name.Set.iter add_loaded_deps intfs;
+  !names
+
+let require_impl_for_quote {quoted_impls; _} name =
+  quoted_impls := CU.Set.add name !quoted_impls
+
+let quoted_impls {quoted_impls; _} = !quoted_impls
 
 let is_imported_parameter penv modname =
   match find_info_in_cache penv modname with

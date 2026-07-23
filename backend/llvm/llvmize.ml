@@ -35,7 +35,7 @@ module List = struct
 end
 
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module LL = Llvm_ir
 module V = LL.Value
 module T = LL.Type
@@ -64,9 +64,9 @@ let not_implemented_aux pp_instr ?msg i =
        (fun ppf msg -> Format.fprintf ppf "(%s)" msg))
     msg
 
-let not_implemented_basic = not_implemented_aux Cfg.print_basic
+let not_implemented_basic = not_implemented_aux Printcfg.basic
 
-let not_implemented_terminator = not_implemented_aux Cfg.print_terminator
+let not_implemented_terminator = not_implemented_aux Printcfg.terminator
 
 type c_call_wrapper =
   { args : LL.Type.t list;
@@ -629,7 +629,10 @@ let extcall t (i : Cfg.terminator Cfg.instruction) ~func_symbol ~alloc
             in
             emit_ins_no_res t (I.store ~ptr:slot ~to_store:temp)
           | Stack (Local _ | Incoming _ | Domainstate _) | Unknown | Reg _ ->
-            assert false)
+            Misc.fatal_errorf
+              "Llvmize.extcall: unexpected non-Outgoing stack-argument \
+               location %a for call to %s"
+              Printreg.reg reg func_symbol)
         stack_arg_regs;
       (* Prepare direct args + special values for [caml_c_call_stack_args] *)
       let stack_args_begin =
@@ -886,8 +889,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       else do_binary Sub
     | Imul -> do_binary Mul
     | Imulh { signed } -> do_imulh ~signed
-    | Idiv -> do_binary Sdiv
-    | Imod -> do_binary Srem
+    | Idiv { signed = true } -> do_binary Sdiv
+    | Idiv { signed = false } -> do_binary Udiv
+    | Imod { signed = true } -> do_binary Srem
+    | Imod { signed = false } -> do_binary Urem
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
@@ -1644,7 +1649,8 @@ let make_temp_data_symbol =
   let idx = ref 0 in
   fun () ->
     let module_name =
-      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
     in
     let res = Format.asprintf "temp.%s.%d" module_name !idx in
     incr idx;
@@ -1886,7 +1892,6 @@ let define_auxiliary_functions t =
 
 let init ~output_prefix ~ppf_dump =
   fail_if_not ~msg:"stack checks not supported" "init" Config.no_stack_checks;
-  fail_if_not ~msg:"runtime5 required" "init" Config.runtime5;
   let llvmir_filename = output_prefix ^ ".ll" in
   current_compilation_unit := Some (create ~llvmir_filename ~ppf_dump)
 
@@ -1979,7 +1984,9 @@ let write_module_metadata t =
   let module_name =
     if t.is_startup
     then "_startup" (* LLVM will put the "caml" in front *)
-    else Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    else
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;

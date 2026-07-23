@@ -23,10 +23,6 @@ open Misc
 open Reg
 open Arch
 
-(* Instruction selection *)
-
-let word_addressed = false
-
 (* Registers available for register allocation *)
 
 (* Integer register map:
@@ -236,9 +232,9 @@ let domainstate_ptr_dwarf_register_number = 28
 (* Registers destroyed by operations *)
 
 let destroyed_at_c_noalloc_call =
-  (* x19-x28, d8-d15 preserved *)
+  (* x20-x28, d8-d15 preserved *)
   let int_regs_destroyed_at_c_noalloc_call =
-    Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15 |]
+    Regs.[| X0;X1;X2;X3;X4;X5;X6;X7;X8;X9;X10;X11;X12;X13;X14;X15;X19 |]
   in
   let float_regs_destroyed_at_c_noalloc_call =
     Regs.[|D0;D1;D2;D3;D4;D5;D6;D7;
@@ -318,7 +314,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         [||]
       else
         destroy_neon_reg7
-  | Op (Intop (Iadd  | Isub | Imul | Idiv|Imod|Iand|Ior|Ixor|Ilsl
+  | Op (Intop (Iadd  | Isub | Imul | Idiv _ | Imod _ |Iand|Ior|Ixor|Ilsl
               |Ilsr|Iasr|Imulh _|Iclz|Ictz|Icomp _))
   | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
@@ -358,7 +354,9 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.destroyed_at_terminator: unexpected Never terminator"
   | Call {op = Indirect _ | Direct _; _} ->
     all_phys_regs
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
@@ -378,7 +376,9 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
 (* note: keep this function in sync with `destroyed_at_terminator` above. *)
 let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.is_destruction_point: unexpected Never terminator"
   | Call {op = Indirect _ | Direct _; _} ->
     true
   | Always _ | Parity_test _ | Truth_test _ | Float_test _
@@ -508,7 +508,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Cpackf32
   | Cclz | Cctz | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccmpi _ | Caddv | Cadda
   | Cnegf Float64 | Cabsf Float64 | Caddf Float64

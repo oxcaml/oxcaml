@@ -54,6 +54,18 @@ let typ_vec512 = [| Vec512 |]
 
 let typ_int128 = [| Int; Int |]
 
+let string_of_machtype_component (comp : machtype_component) =
+  match comp with
+  | Val -> "Val"
+  | Addr -> "Addr"
+  | Int -> "Int"
+  | Float -> "Float"
+  | Vec128 -> "Vec128"
+  | Vec256 -> "Vec256"
+  | Vec512 -> "Vec512"
+  | Float32 -> "Float32"
+  | Valx2 -> "Valx2"
+
 (** [machtype_component]s are partially ordered as follows:
 
     {v
@@ -95,9 +107,11 @@ let lub_component comp1 comp2 =
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
   | Float, Float32 ->
-    Printf.eprintf "%d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
     (* Float unboxing code must be sure to avoid this case. *)
-    assert false
+    Misc.fatal_errorf
+      "Cmm.lub_component: unexpected machtype_component combination (%s, %s)"
+      (string_of_machtype_component comp1)
+      (string_of_machtype_component comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
@@ -123,8 +137,10 @@ let ge_component comp1 comp2 =
   | (Vec128 | Vec256 | Vec512), (Float | Float32 | Vec256 | Vec512)
   | Float32, Float
   | Float, Float32 ->
-    Printf.eprintf "GE: %d %d\n%!" (Obj.magic comp1) (Obj.magic comp2);
-    assert false
+    Misc.fatal_errorf
+      "Cmm.ge_component: unexpected machtype_component combination (%s, %s)"
+      (string_of_machtype_component comp1)
+      (string_of_machtype_component comp2)
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_error "Unexpected machtype_component Valx2"
 
@@ -275,9 +291,28 @@ type coeffects =
   | No_coeffects
   | Has_coeffects
 
+type is_global =
+  | Global
+  | Local
+
+let equal_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> true
+  | Local, Global | Global, Local -> false
+
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
+let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  String.equal left_sym_name right_sym_name
+  && equal_is_global left_sym_global right_sym_global
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
-  | Cphantom_const_symbol of string
+  | Cphantom_const_symbol of symbol
   | Cphantom_var of Backend_var.t
   | Cphantom_offset_var of
       { var : Backend_var.t;
@@ -288,7 +323,7 @@ type phantom_defining_expr =
         field : int
       }
   | Cphantom_read_symbol_field of
-      { sym : string;
+      { sym : symbol;
         field : int
       }
   | Cphantom_block of
@@ -499,25 +534,6 @@ type alloc_dbginfo = alloc_dbginfo_item list
 let equal_alloc_dbginfo left right =
   List.equal equal_alloc_dbginfo_item left right
 
-type is_global =
-  | Global
-  | Local
-
-let equal_is_global g g' =
-  match g, g' with
-  | Local, Local | Global, Global -> true
-  | Local, Global | Global, Local -> false
-
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
-
-let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
-    { sym_name = right_sym_name; sym_global = right_sym_global } =
-  String.equal left_sym_name right_sym_name
-  && equal_is_global left_sym_global right_sym_global
-
 type operation =
   | Capply of
       { result_type : machtype;
@@ -545,8 +561,8 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
@@ -761,11 +777,11 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
-        | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
-        | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
-        | Ctls_get | Cdomain_index | Cpoll | Cpause | Capply _ | Cextcall _
-        | Cload _
+      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
+        | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
         | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -795,7 +811,7 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
+        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause

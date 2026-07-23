@@ -20,6 +20,8 @@
 module Expanded_type : sig
   type t
 
+  val of_non_alias_type : ?coercion:Coercion.t -> Type_grammar.t -> t
+
   val create_const : Reg_width_const.t -> t
 
   val create_value : Type_grammar.head_of_kind_value -> t
@@ -65,6 +67,8 @@ module Expanded_type : sig
   val is_unknown_maybe_null : t -> bool
 
   val to_type : t -> Type_grammar.t
+
+  val kind : t -> Flambda_kind.t
 
   type descr = private
     | Value of Type_grammar.head_of_kind_value

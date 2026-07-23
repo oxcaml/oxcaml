@@ -48,17 +48,17 @@ type env =
   { parent_env : TE.t;
     left_env : TE.t;
     right_env : TE.t;
-    meet_type : ME.meet_type;
+    meet_expanded_head : ME.meet_expanded_head;
     config : config;
     renaming : renaming
   }
 
-let create_env ?(config = create_config ()) ~meet_type parent_env left_env
-    right_env =
+let create_env ?(config = create_config ()) ~meet_expanded_head parent_env
+    left_env right_env =
   { parent_env;
     left_env;
     right_env;
-    meet_type;
+    meet_expanded_head;
     config;
     renaming = create_renaming ()
   }
@@ -68,15 +68,19 @@ let extension_env env left_env right_env = { env with left_env; right_env }
 let add_env_extension env ext1 ext2 =
   extension_env env
     (ME.use_meet_env env.left_env ~f:(fun left_env ->
-         ME.add_env_extension ~meet_type:env.meet_type left_env ext1))
+         ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
+           left_env ext1))
     (ME.use_meet_env env.right_env ~f:(fun right_env ->
-         ME.add_env_extension ~meet_type:env.meet_type right_env ext2))
+         ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
+           right_env ext2))
 
 let add_env_extension_strict env ext1 ext2 =
   ( ME.use_meet_env_strict env.left_env ~f:(fun left_env ->
-        ME.add_env_extension ~meet_type:env.meet_type left_env ext1),
+        ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head left_env
+          ext1),
     ME.use_meet_env_strict env.right_env ~f:(fun right_env ->
-        ME.add_env_extension ~meet_type:env.meet_type right_env ext2) )
+        ME.add_env_extension ~meet_expanded_head:env.meet_expanded_head
+          right_env ext2) )
 
 let exists_in_parent_env env name =
   TE.mem ~min_name_mode:Name_mode.in_types env.parent_env name
@@ -309,16 +313,18 @@ let equal_head_of_kind_value ~equal_type env (t1 : TG.head_of_kind_value)
       (equal_head_of_kind_value_non_null ~equal_type env)
       t1.non_null t2.non_null
 
-let equal_head_of_kind_naked_immediate ~equal_type env
+let equal_head_of_kind_naked_immediate ~equal_type:_ _env
     (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) =
-  match t1, t2 with
-  | Naked_immediates is1, Naked_immediates is2 ->
-    Target_ocaml_int.Set.equal is1 is2
-  | Is_int t1, Is_int t2 -> equal_type env t1 t2
-  | Get_tag t1, Get_tag t2 -> equal_type env t1 t2
-  | Is_null t1, Is_null t2 -> equal_type env t1 t2
-  | (Naked_immediates _ | Is_int _ | Get_tag _ | Is_null _), _ -> false
+  match
+    ( TG.Head_of_kind_naked_immediate.descr t1,
+      TG.Head_of_kind_naked_immediate.descr t2 )
+  with
+  | ( { naked_immediates = is1; inverse_relations = rs1 },
+      { naked_immediates = is2; inverse_relations = rs2 } ) ->
+    (* CR bclement: reduce names to their canonicals *)
+    Or_unknown.equal Target_ocaml_int.Set.equal is1 is2
+    && TG.Relation.Map.equal Name.Set.equal rs1 rs2
 
 let equal_head_of_kind_naked_float32 (t1 : TG.head_of_kind_naked_float32)
     (t2 : TG.head_of_kind_naked_float32) =
@@ -506,8 +512,8 @@ let rec equal_type env t1 t2 =
       (Expand_head.expand_head env.left_env t1)
       (Expand_head.expand_head env.right_env t2)
 
-let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
-    level1 level2 =
+let names_with_non_equal_types_level_ignoring_name_mode ?config
+    ~meet_expanded_head env level1 level2 =
   let left_env =
     Typing_env_level.fold_on_defined_vars
       (fun var kind left_env ->
@@ -535,23 +541,26 @@ let names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
       level2 env
   in
   names_with_non_equal_types_env_extension ~equal_type
-    (create_env ?config ~meet_type env left_env right_env)
+    (create_env ?config ~meet_expanded_head env left_env right_env)
     (TEE.from_map (Typing_env_level.equations level1))
     (TEE.from_map (Typing_env_level.equations level2))
 
-let equal_level_ignoring_name_mode ?config ~meet_type env level1 level2 =
+let equal_level_ignoring_name_mode ?config ~meet_expanded_head env level1 level2
+    =
   Name.Set.is_empty
-    (names_with_non_equal_types_level_ignoring_name_mode ?config ~meet_type env
-       level1 level2)
+    (names_with_non_equal_types_level_ignoring_name_mode ?config
+       ~meet_expanded_head env level1 level2)
 
-let names_with_non_equal_types_env_extension ?config ~meet_type env ext1 ext2 =
+let names_with_non_equal_types_env_extension ?config ~meet_expanded_head env
+    ext1 ext2 =
   names_with_non_equal_types_env_extension ~equal_type
-    (create_env ?config ~meet_type env env env)
+    (create_env ?config ~meet_expanded_head env env env)
     ext1 ext2
 
-let equal_env_extension ?config ~meet_type env ext1 ext2 =
+let equal_env_extension ?config ~meet_expanded_head env ext1 ext2 =
   Name.Set.is_empty
-    (names_with_non_equal_types_env_extension ?config ~meet_type env ext1 ext2)
+    (names_with_non_equal_types_env_extension ?config ~meet_expanded_head env
+       ext1 ext2)
 
-let equal_type ?config ~meet_type env t1 t2 =
-  equal_type (create_env ?config ~meet_type env env env) t1 t2
+let equal_type ?config ~meet_expanded_head env t1 t2 =
+  equal_type (create_env ?config ~meet_expanded_head env env env) t1 t2

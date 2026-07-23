@@ -1,17 +1,14 @@
 (* TEST
-   modules = "preemption_util.ml";
    include systhreads;
    hassysthreads;
-   runtime5;
    poll_insertion;
-   multidomain;
-   flags += "-alert -unsafe_multidomain -alert -do_not_spawn_domains -w -21";
+   multicore;
+   flags += "-w -21";
    { native; }
 *)
 
 open Effect
 open Effect.Shallow
-open Preemption_util
 
 module Work_queue = struct
   type t =
@@ -58,9 +55,10 @@ module Scheduler = struct
         Atomic.incr completed)
       in
       let rec run k =
-        continue_with k ()
+        Preemptible.continue_with k ()
           { retc = (fun _result -> ());
             exnc = raise;
+            tickc = (fun () -> Preempt);
             effc = fun (type a) (e : a t) ->
               match e with
               | Preemption -> Some (fun (k : (a, _) continuation) ->
@@ -85,12 +83,16 @@ let twiddle_refs () =
   done;
   !r
 
+let with_tick f = Domain.Tick.with_ ~interval_usec:1_000 (fun _ -> f ())
+
 let multidomain () =
   let stop = Atomic.make false in
   let work_queue = Work_queue.create () in
   let domains =
     Array.init 8 (fun _ ->
-      Domain.spawn (fun () -> Scheduler.worker ~work_queue ~stop))
+      Domain.spawn (fun () ->
+        with_tick (fun () ->
+          Scheduler.worker ~work_queue ~stop)))
   in
   let result = Atomic.make 0 in
   let completed = Atomic.make 0 in
@@ -125,11 +127,12 @@ let multidomain_multithread () =
   let domains =
     Array.init 2 (fun _ ->
       Domain.spawn (fun () ->
-        let threads = Array.init 4 (fun _ ->
-          Thread.create (fun () -> Scheduler.worker ~work_queue ~stop) ())
-        in
-        Scheduler.worker ~work_queue ~stop;
-        Array.iter Thread.join threads))
+        with_tick (fun () ->
+          let threads = Array.init 4 (fun _ ->
+            Thread.create (fun () -> Scheduler.worker ~work_queue ~stop) ())
+          in
+          Scheduler.worker ~work_queue ~stop;
+          Array.iter Thread.join threads)))
   in
   let result = Atomic.make 0 in
   let completed = Atomic.make 0 in
@@ -160,7 +163,7 @@ let sequential () =
   Printf.printf "  Sequential result: %d\n" !result
 
 let () =
-  with_preemption_setup ~interval:0.001 ~repeating:true (fun () ->
+  with_tick (fun () ->
     multidomain ();
     multithread ();
     multidomain_multithread ();

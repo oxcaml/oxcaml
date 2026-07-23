@@ -12,13 +12,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-external register_named_value : string -> 'a -> unit
-  = "caml_register_named_value"
+type 'a t = 'a eff = ..
 
-type 'a t = ..
 external perform : 'a t -> 'a = "%perform"
+
+module Handler = struct
+  type t : void mod external_ many stateless immutable
+  external unsafe_make : unit -> t @ yielding = "%unbox_unit"
+end
+
+module Safe = struct
+  let[@inline never] perform (_ : Handler.t @ yielding) eff = perform eff
+end
+
 exception Out_of_fibers = Out_of_fibers
+
 type exn += Unhandled: 'a t -> exn
+
 exception Continuation_already_resumed
 
 let () =
@@ -41,9 +51,6 @@ let _ = Callback.Safe.register_exception "Effect.Unhandled"
 let _ = Callback.Safe.register_exception "Effect.Continuation_already_resumed"
           Continuation_already_resumed
 
-type _ t += Preemption : unit t
-let () = register_named_value "Effect.Preemption" Preemption
-
 (* A paused fiber, awaiting an 'a, which terminates with an 'x,
    equipped with a handler that produces a 'b *)
 type (-'a, 'x, +'b) cont : value mod non_float
@@ -53,67 +60,134 @@ type (-'a, 'x, +'b) cont : value mod non_float
    the final fiber in the linked list formed by [cont.fiber->parent]. *)
 type last_fiber [@@immediate]
 
-external cont_set_last_fiber :
-  _ cont -> last_fiber -> unit = "%setfield1"
-
-external resume : ('a, _, 'b) cont -> ('c -> 'a) -> 'c -> 'b = "%resume"
-
 type ('a,'x,'b) effc = 'a t -> ('a, 'x, 'b) cont -> last_fiber -> 'b
 
-external with_stack :
-  ('x -> 'b) ->
-  (exn -> 'b) ->
-  ('a . ('a,'x,'b) effc) ->
-  ('d -> 'x) ->
-  'd ->
-  'b = "%with_stack"
+type tick_outcome =
+  | Preempt
+  | Continue
 
-external update_cont_handler_noexc :
-  ('a, 'x, _) cont ->
-  ('x -> 'b) ->
-  (exn -> 'b) ->
-  ('a2 . ('a2, 'x, 'b) effc) ->
-  ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
+module Prim = struct
+  external register_named_value : string -> 'a -> unit
+    = "caml_register_named_value"
 
-(* Retrieve the stack from a [cont]inuation, update its handlers, and run
-   [f x] using it. *)
-let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) f x =
-  resume
-    (* FIXME: There's a race condition here - if multiple threads call
-       [with_handler] on the same continuation at once, they could be
-       interleaved, causing a segfault rather
-       than an exception. *)
-    (update_cont_handler_noexc cont valuec exnc effc) f x
+  external cont_set_last_fiber :
+    _ cont -> last_fiber -> unit = "%setfield1"
+
+  external continue : ('a, _, 'b) cont -> 'a -> 'b = "%continue"
+  external discontinue : ('a, _, 'b) cont -> exn -> 'b = "%discontinue"
+  external discontinue_with_backtrace :
+    ('a, _, 'b) cont -> exn -> Printexc.raw_backtrace -> 'b
+    = "%discontinue_with_backtrace"
+
+  external reperform :
+    'a t -> ('a, 'x, 'b) cont -> last_fiber -> 'c = "%reperform"
+
+  external with_stack :
+    ('x -> 'b) ->
+    (exn -> 'b) ->
+    ('a . ('a,'x,'b) effc) ->
+    ('d -> 'x) ->
+    'd ->
+    'b = "%with_stack"
+
+  external with_stack_preemptible :
+    ('x -> 'b) ->
+    (exn -> 'b) ->
+    ('a . ('a,'x,'b) effc) ->
+    (unit -> tick_outcome) ->
+    ('d -> 'x) ->
+    'd ->
+    'b = "%with_stack_preemptible"
+
+  external update_cont_handler_noexc :
+    ('a, 'x, _) cont ->
+    ('x -> 'b) ->
+    (exn -> 'b) ->
+    ('a2 . ('a2, 'x, 'b) effc) ->
+    (unit -> tick_outcome) or_null ->
+    ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
+end
+
+type _ t += Preemption : unit t
+let () = Prim.register_named_value "Effect.Preemption" Preemption
+
+(* We need [continue] (and the other resumption functions below) to take a
+   [Handler.t @ yielding] so that it (and things that call it, such as
+   Shallow.continue_with) is always inferred to be a yielding function
+   application, since resuming a continuation might perform effects (since the
+   computation in the continuation itself might perform effects). This is
+   depended on by the JSOO compiler to ensure that this doesn't direct-call as
+   opposed to being CPSed *)
+let[@inline] continue (_h : Handler.t @ yielding) cont v = Prim.continue cont v
+
+let[@inline] discontinue (_h : Handler.t @ yielding) cont e =
+  Prim.discontinue cont e
+
+let[@inline] discontinue_with_backtrace (_h : Handler.t @ yielding) cont e bt =
+  Prim.discontinue_with_backtrace cont e bt
+
+(* Retrieve the stack from a [cont]inuation, update its handlers, and resume it.
+
+   FIXME: There's a race condition here - if multiple threads call one of these
+   on the same continuation at once with handlers that return different types,
+   they could be interleaved, causing a segfault rather than an exception. *)
+
+let continue_with_handler (h : Handler.t @ yielding) cont valuec exnc
+    (effc : 'a. ('a, _, _) effc) tickc v =
+  continue h (Prim.update_cont_handler_noexc cont valuec exnc effc tickc) v
+
+let discontinue_with_handler (h : Handler.t @ yielding) cont valuec exnc
+    (effc : 'a. ('a, _, _) effc) tickc e =
+  discontinue h
+    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
+    e
+
+let discontinue_with_handler_with_backtrace (h : Handler.t @ yielding) cont
+    valuec exnc (effc : 'a. ('a, _, _) effc) tickc e bt =
+  discontinue_with_backtrace h
+    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
+    e bt
 
 module Deep = struct
 
-  type ('a,'b) continuation =
-    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
 
-  let continue (Cont k) v = resume k (fun x-> x) v
+  type ('a,'b) continuation_ =
+    | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation_ [@@unboxed]
 
-  let discontinue (Cont k) e = resume k (fun e -> raise e) e
+  let[@inline] continue (Cont k) v = continue (Handler.unsafe_make ()) k v
 
-  let discontinue_with_backtrace (Cont k) e bt =
-    resume k (fun e -> Printexc.raise_with_backtrace e bt) e
+  let[@inline] discontinue (Cont k) e =
+    discontinue (Handler.unsafe_make ()) k e
+
+  let[@inline] discontinue_with_backtrace (Cont k) e bt =
+    discontinue_with_backtrace (Handler.unsafe_make ()) k e bt
 
   type ('a,'b) handler =
     { retc: 'a -> 'b;
       exnc: exn -> 'b;
       effc: 'c.'c t -> (('c,'b) continuation -> 'b) option }
 
-  external reperform :
-    'a t -> ('a, _, 'b) cont -> last_fiber -> 'b = "%reperform"
+  (* FIXME Upstream the 3-parameter version of continuation and use it to
+           maintain type safety here. *)
+  let[@inline]
+    to_continuation
+      (f : (_ continuation -> 'a) @ local)
+      (k : _ continuation_)
+    =
+    f (Obj.magic k)
+
+  let[@inline] of_continuation (f : _ continuation_ -> 'a) (k : _ continuation)
+      =
+    f (Obj.magic k)
 
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
-      | None -> reperform eff k last_fiber
+      | Some f -> to_continuation f (Cont k) [@nontail]
+      | None -> Prim.reperform eff k last_fiber
     in
-    with_stack handler.retc handler.exnc effc comp arg
+    Prim.with_stack handler.retc handler.exnc effc comp arg
 
   type 'a effect_handler =
     { effc: 'b. 'b t -> (('b,'a) continuation -> 'a) option }
@@ -121,12 +195,136 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
-      | None -> reperform eff k last_fiber
+      | Some f -> to_continuation f (Cont k) [@nontail]
+      | None -> Prim.reperform eff k last_fiber
     in
-    with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
+    Prim.with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
+
+  let[@inline] continue k = of_continuation continue k
+  let[@inline] discontinue k = of_continuation discontinue k
+  let[@inline] discontinue_with_backtrace k =
+    of_continuation discontinue_with_backtrace k
+
+  module Safe = struct
+    let match_with comp arg handler =
+      match_with (fun arg -> comp (Handler.unsafe_make ()) arg) arg
+        handler
+
+    let try_with comp arg handler =
+      try_with (fun arg -> comp (Handler.unsafe_make ()) arg) arg
+        handler
+
+    module With_handler = struct
+      type ('a,'b) handler =
+        { retc: Handler.t @ local -> 'a -> 'b;
+          exnc: Handler.t @ local -> exn -> 'b;
+          effc: 'c. Handler.t @ local -> 'c t
+                -> (('c,'b) continuation -> 'b) option @ local }
+
+      type 'a effect_handler =
+        { effc: 'b. Handler.t @ local -> 'b t
+                -> (('b,'a) continuation -> 'a) option @ local }
+
+      let match_with (_h : Handler.t @ yielding) comp arg
+            (handler : (_, _) handler) =
+        let effc eff k last_fiber =
+          match handler.effc (Handler.unsafe_make ()) eff with
+          | Some f -> to_continuation f (Cont k) [@nontail]
+          | None -> Prim.reperform eff k last_fiber
+        in
+        Prim.with_stack
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+          effc
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
+          arg
+
+      let try_with (_h : Handler.t @ local) comp arg
+            (handler : _ effect_handler) =
+        let effc' eff k last_fiber =
+          match handler.effc (Handler.unsafe_make ()) eff with
+          | Some f -> to_continuation f (Cont k) [@nontail]
+          | None -> Prim.reperform eff k last_fiber
+        in
+        Prim.with_stack (fun x -> x) (fun e -> raise e) effc'
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
+          arg
+    end
+  end
+
+  module Preemptible = struct
+    type ('a,'b) handler =
+      { retc: 'a -> 'b;
+        exnc: exn -> 'b;
+        effc: 'c.'c t -> (('c,'b) continuation -> 'b) option;
+        tickc: unit -> tick_outcome }
+
+    let match_with comp arg handler =
+      let effc eff k last_fiber =
+        match handler.effc eff with
+        | Some f ->
+          Prim.cont_set_last_fiber k last_fiber;
+          to_continuation f (Cont k) [@nontail]
+        | None -> Prim.reperform eff k last_fiber
+      in
+      Prim.with_stack_preemptible
+        handler.retc handler.exnc effc handler.tickc
+        comp arg
+
+    let try_with ~on_tick comp arg (handler : _ effect_handler) =
+      match_with comp arg
+        { retc = Fun.id
+        ; exnc = raise
+        ; effc = handler.effc
+        ; tickc = on_tick
+        };
+    ;;
+
+    module Safe = struct
+      let match_with comp arg handler =
+        match_with (fun arg -> comp (Handler.unsafe_make ()) arg)
+          arg handler
+
+      let try_with ~on_tick comp arg handler =
+        try_with ~on_tick
+          (fun arg -> comp (Handler.unsafe_make ()) arg)
+          arg handler
+
+      module With_handler = struct
+        type ('a,'b) handler =
+          { retc: Handler.t @ local -> 'a -> 'b;
+            exnc: Handler.t @ local -> exn -> 'b;
+            effc: 'c. Handler.t @ local -> 'c t
+                  -> (('c,'b) continuation -> 'b) option @ local;
+            tickc: unit -> tick_outcome }
+
+        let match_with (_h : Handler.t @ local) comp arg
+            (handler : (_, _) handler) =
+          let effc eff k last_fiber =
+            match handler.effc (Handler.unsafe_make ()) eff with
+            | Some f ->
+              Prim.cont_set_last_fiber k last_fiber;
+              to_continuation f (Cont k) [@nontail]
+            | None -> Prim.reperform eff k last_fiber
+          in
+          Prim.with_stack_preemptible
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+            effc handler.tickc
+            (fun arg -> comp (Handler.unsafe_make ()) arg)
+            arg
+
+        let try_with (h @ local) ~on_tick comp arg
+              (handler : _ Safe.With_handler.effect_handler) =
+          match_with h comp arg
+            { retc = (fun _ x -> x);
+              exnc = (fun _ e -> raise e);
+              effc = (fun (type c) hh (eff : c t) ->
+                exclave_ handler.effc hh eff);
+              tickc = on_tick }
+      end
+    end
+  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =
@@ -143,19 +341,16 @@ module Shallow = struct
     let exception E of (a,b) continuation in
     let f' () = f (perform M.Initial_setup__) in
     let error _ = failwith "impossible" in
-    let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) last_fiber =
+    let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with
-      | M.Initial_setup__ ->
-          cont_set_last_fiber k last_fiber;
-          raise_notrace (E (Cont k))
+      | M.Initial_setup__ -> raise_notrace (E (Cont k))
       (* We need to handle [Preemption] here since it's triggered automatically
          on a timer, and might arrive while we're setting up the fiber *)
       | Preemption ->
-          cont_set_last_fiber k last_fiber;
-          resume k (fun x -> x) ()
+          continue (Handler.unsafe_make ()) k ()
       | _ -> error ()
     in
-    match with_stack error error effc f' () with
+    match Prim.with_stack error error effc f' () with
     | exception E k -> k
     | _ -> error ()
 
@@ -164,27 +359,175 @@ module Shallow = struct
       exnc: exn -> 'b;
       effc: 'c.'c t -> (('c,'a) continuation -> 'b) option }
 
-  external reperform :
-    'a t -> ('a, 'b, _) cont -> last_fiber -> 'c = "%reperform"
-
-  let continue_gen (Cont k) resume_fun v handler =
+  let continue_with (Cont k) v handler =
     let effc eff k last_fiber =
       match handler.effc eff with
-      | Some f ->
-          cont_set_last_fiber k last_fiber;
-          f (Cont k)
-      | None -> reperform eff k last_fiber
+      | Some f -> f (Cont k)
+      | None -> Prim.reperform eff k last_fiber
     in
-    with_handler k handler.retc handler.exnc effc resume_fun v
+    continue_with_handler (Handler.unsafe_make ())
+      k handler.retc handler.exnc effc Null v
 
-  let continue_with k v handler =
-    continue_gen k (fun x -> x) v handler
+  let discontinue_with (Cont k) e handler =
+    let effc eff k last_fiber =
+      match handler.effc eff with
+      | Some f -> f (Cont k)
+      | None -> Prim.reperform eff k last_fiber
+    in
+    discontinue_with_handler (Handler.unsafe_make ())
+      k handler.retc handler.exnc effc Null e
 
-  let discontinue_with k v handler =
-    continue_gen k (fun e -> raise e) v handler
+  let discontinue_with_backtrace (Cont k) e bt handler =
+    let effc eff k last_fiber =
+      match handler.effc eff with
+      | Some f -> f (Cont k)
+      | None -> Prim.reperform eff k last_fiber
+    in
+    discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
+      k handler.retc handler.exnc effc Null e bt
 
-  let discontinue_with_backtrace k v bt handler =
-    continue_gen k (fun e -> Printexc.raise_with_backtrace e bt) v handler
+  module Safe = struct
+    let fiber f =
+      fiber (fun arg -> f (Handler.unsafe_make ()) arg)
+
+    module With_handler = struct
+      type ('a,'b) handler =
+        { retc: Handler.t @ local -> 'a -> 'b;
+          exnc: Handler.t @ local -> exn -> 'b;
+          effc: 'c. Handler.t @ local -> 'c t
+                -> (('c,'a) continuation -> 'b) option @ local }
+
+      let continue_with (h : Handler.t @ yielding) (Cont k) v
+            (handler : (_, _) handler) =
+        let effc eff k last_fiber =
+          match handler.effc (Handler.unsafe_make ()) eff with
+          | Some f -> f (Cont k) [@nontail]
+          | None -> Prim.reperform eff k last_fiber
+        in
+        continue_with_handler h k
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+          effc Null v
+
+      let discontinue_with (h : Handler.t @ yielding) (Cont k) e
+            (handler : (_, _) handler) =
+        let effc eff k last_fiber =
+          match handler.effc (Handler.unsafe_make ()) eff with
+          | Some f -> f (Cont k) [@nontail]
+          | None -> Prim.reperform eff k last_fiber
+        in
+        discontinue_with_handler h k
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+          effc Null e
+
+      let discontinue_with_backtrace (h : Handler.t @ yielding) (Cont k) e bt
+            (handler : (_, _) handler) =
+        let effc eff k last_fiber =
+          match handler.effc (Handler.unsafe_make ()) eff with
+          | Some f -> f (Cont k) [@nontail]
+          | None -> Prim.reperform eff k last_fiber
+        in
+        discontinue_with_handler_with_backtrace h k
+          (fun x -> handler.retc (Handler.unsafe_make ()) x)
+          (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+          effc Null e bt
+    end
+  end
+
+  module Preemptible = struct
+    type ('a,'b) handler =
+        { retc: 'a -> 'b;
+          exnc: exn -> 'b;
+          effc: 'c.'c t -> (('c,'a) continuation -> 'b) option;
+          tickc: unit -> tick_outcome }
+
+    let continue_with (Cont k) v handler =
+      let effc eff k last_fiber =
+        match handler.effc eff with
+        | Some f ->
+          Prim.cont_set_last_fiber k last_fiber;
+          f (Cont k)
+        | None -> Prim.reperform eff k last_fiber
+      in
+      continue_with_handler (Handler.unsafe_make ())
+        k handler.retc handler.exnc effc (This handler.tickc) v
+
+    let discontinue_with (Cont k) e handler =
+      let effc eff k last_fiber =
+        match handler.effc eff with
+        | Some f ->
+          Prim.cont_set_last_fiber k last_fiber;
+          f (Cont k)
+        | None -> Prim.reperform eff k last_fiber
+      in
+      discontinue_with_handler (Handler.unsafe_make ())
+        k handler.retc handler.exnc effc (This handler.tickc) e
+
+    let discontinue_with_backtrace (Cont k) e bt handler =
+      let effc eff k last_fiber =
+        match handler.effc eff with
+        | Some f ->
+          Prim.cont_set_last_fiber k last_fiber;
+          f (Cont k)
+        | None -> Prim.reperform eff k last_fiber
+      in
+      discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
+        k handler.retc handler.exnc effc (This handler.tickc) e bt
+
+    module Safe = struct
+      module With_handler = struct
+        type ('a,'b) handler =
+            { retc: Handler.t @ local -> 'a -> 'b;
+              exnc: Handler.t @ local -> exn -> 'b;
+              effc: 'c. Handler.t @ local -> 'c t
+                    -> (('c,'a) continuation -> 'b) option @ local;
+              tickc: unit -> tick_outcome }
+
+        let continue_with (h : Handler.t @ yielding) (Cont k) v
+              (handler : (_, _) handler) =
+          let effc eff k last_fiber =
+            match handler.effc (Handler.unsafe_make ()) eff with
+            | Some f ->
+              Prim.cont_set_last_fiber k last_fiber;
+              f (Cont k) [@nontail]
+            | None -> Prim.reperform eff k last_fiber
+          in
+          continue_with_handler h k
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+            effc (This handler.tickc) v
+
+        let discontinue_with (h : Handler.t @ yielding) (Cont k) e
+              (handler : (_, _) handler) =
+          let effc eff k last_fiber =
+            match handler.effc (Handler.unsafe_make ()) eff with
+            | Some f ->
+              Prim.cont_set_last_fiber k last_fiber;
+              f (Cont k) [@nontail]
+            | None -> Prim.reperform eff k last_fiber
+          in
+          discontinue_with_handler h k
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+            effc (This handler.tickc) e
+
+        let discontinue_with_backtrace (h : Handler.t @ yielding) (Cont k) e bt
+              (handler : (_, _) handler) =
+          let effc eff k last_fiber =
+            match handler.effc (Handler.unsafe_make ()) eff with
+            | Some f ->
+              Prim.cont_set_last_fiber k last_fiber;
+              f (Cont k) [@nontail]
+            | None -> Prim.reperform eff k last_fiber
+          in
+          discontinue_with_handler_with_backtrace h k
+            (fun x -> handler.retc (Handler.unsafe_make ()) x)
+            (fun e -> handler.exnc (Handler.unsafe_make ()) e)
+            effc (This handler.tickc) e bt
+      end
+    end
+  end
 
   external get_callstack :
     ('a,'b) continuation -> int -> Printexc.raw_backtrace =

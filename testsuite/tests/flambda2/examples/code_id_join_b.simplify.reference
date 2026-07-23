@@ -1,12 +1,12 @@
-let $camlCode_id_join_b__const_block334 = Block 0 (2, 0) in
-let $camlCode_id_join_b__const_block336 =
-  Block 0 (1, $camlCode_id_join_b__const_block334)
+let $camlCode_id_join_b__const_block388 = Block 0 (2, 0) in
+let $camlCode_id_join_b__const_block390 =
+  Block 0 (1, $camlCode_id_join_b__const_block388)
 in
-let $camlCode_id_join_b__const_block338 =
-  Block 0 (0, $camlCode_id_join_b__const_block336)
+let $camlCode_id_join_b__const_block392 =
+  Block 0 (0, $camlCode_id_join_b__const_block390)
 in
-cont self ($camlCode_id_join_b__const_block338)
-  where rec self (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+cont `self` ($camlCode_id_join_b__const_block392)
+  where rec `self` (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
     let prim = %is_int (param) in
     (switch prim
        | 0 -> k1
@@ -29,12 +29,13 @@ cont self ($camlCode_id_join_b__const_block338)
                    k1
                      ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_13`))
             where k1 (full_apply) =
-              (apply inlining_state(depth(20)) full_apply (42) -> k2 * error
+              (apply &toplevel.alloc_region inlining_state(depth(20))
+                 full_apply (42) -> k2 * error
                  where k2 (param_1 : imm tagged) =
                    cont k1
                  where k1 =
                    let Pfield_1 = %block_load.[`1`] (param) in
-                   cont self (Pfield_1))))
+                   cont `self` (Pfield_1))))
   where k =
     let $camlCode_id_join_b = Block 0 () in
     cont done ($camlCode_id_join_b)

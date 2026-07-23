@@ -66,14 +66,16 @@ let union t1 t2 =
   | (Leaf _ | Leaf_array _ | Union _), Empty -> t1
   | (Leaf _ | Leaf_array _ | Union _), t2 -> Union { t2 = t1; t1 = t2 }
 
-let rec fold t ~init ~f =
-  match t with
-  | Empty -> init
-  | Leaf const -> f init const
-  | Leaf_array { ts } -> ArrayLabels.fold_left ts ~init ~f
-  | Union { t2; t1 } ->
-    let init = fold t2 ~init ~f in
-    fold t1 ~init ~f
+let[@inline] fold t ~init ~f =
+  let rec loop init = function
+    | Empty -> init
+    | Leaf const -> f init const
+    | Leaf_array { ts } -> ArrayLabels.fold_left ts ~init ~f
+    | Union { t2; t1 } ->
+      let init = loop init t2 in
+      loop init t1
+  in
+  loop init t
 
 let all_defined_symbols t =
   fold t ~init:Symbol.Set.empty ~f:(fun symbols const ->

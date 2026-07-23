@@ -19,17 +19,34 @@ module TE = Flambda2_types.Typing_env
 module TI = Target_ocaml_int
 module Alias_set = TE.Alias_set
 
+type alias_set =
+  | Aliases of Alias_set.t
+  | Poison of Flambda_kind.t
+
 type mergeable_arms =
   | No_arms
   | Mergeable of
       { cont : Continuation.t;
-        args : Alias_set.t list
+        args : alias_set list
       }
   | Not_mergeable
 
+let inter_alias_set alias1 alias2 =
+  match alias1, alias2 with
+  | Aliases alias1, Aliases alias2 -> Aliases (Alias_set.inter alias1 alias2)
+  | Aliases alias, Poison _ | Poison _, Aliases alias -> Aliases alias
+  | Poison kind1, Poison kind2 ->
+    if Flambda_kind.equal kind1 kind2
+    then Poison kind1
+    else
+      Misc.fatal_errorf
+        "[inter_alias_set]: intersection of poison with different kinds %a and \
+         %a"
+        Flambda_kind.print kind1 Flambda_kind.print kind2
+
 let find_all_aliases env arg =
   let find_all_aliases () =
-    TE.aliases_of_simple env ~min_name_mode:NM.normal arg
+    Aliases (TE.aliases_of_simple env ~min_name_mode:NM.normal arg)
   in
   Simple.pattern_match'
     ~var:(fun _var ~coercion:_ ->
@@ -53,9 +70,12 @@ let find_all_aliases env arg =
          of continuations to variables that where not in scope during the
          downward traversal. In particular for the alias rewriting provided by
          data_flow *)
-      TE.Alias_set.singleton arg)
+      Aliases (TE.Alias_set.singleton arg))
     ~symbol:(fun _sym ~coercion:_ -> find_all_aliases ())
-    ~const:(fun _cst -> find_all_aliases ())
+    ~const:(fun cst ->
+      match Reg_width_const.is_poison cst with
+      | Some (kind, _name) -> Poison kind
+      | None -> find_all_aliases ())
     arg
 
 let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
@@ -151,7 +171,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               let args =
                 List.map2
                   (fun arg_set arg ->
-                    Alias_set.inter (find_all_aliases env_at_use arg) arg_set)
+                    inter_alias_set (find_all_aliases env_at_use arg) arg_set)
                   args (Apply_cont.args action)
               in
               ( new_let_conts,
@@ -183,9 +203,16 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
                 let not_arms = TI.Map.add arm action not_arms in
                 maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
               else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
+          | Poison (Value, _) ->
+            (* Poison can both be considered as an identity and as a not arm,
+               depending on what's best for us. *)
+            let identity_arms = TI.Map.add arm action identity_arms in
+            let not_arms = TI.Map.add arm action not_arms in
+            maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
           | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
           | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null ->
+          | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ | Null
+          | Poison ((Naked_number _ | Region | Rec_info), _) ->
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
         in
         Simple.pattern_match arg ~const ~name:(fun _ ~coercion:_ ->
@@ -197,13 +224,17 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
     new_let_conts, arms, Not_mergeable, identity_arms, not_arms
 
 let filter_and_choose_alias required_names alias_set =
-  let available_alias_set =
-    Alias_set.filter alias_set ~f:(fun alias ->
-        Simple.pattern_match alias
-          ~name:(fun name ~coercion:_ -> Name.Set.mem name required_names)
-          ~const:(fun _ -> true))
-  in
-  Alias_set.find_best available_alias_set
+  match alias_set with
+  | Poison kind ->
+    Some (Simple.const (Reg_width_const.const_poison kind "rebuild_switch"))
+  | Aliases alias_set ->
+    let available_alias_set =
+      Alias_set.filter alias_set ~f:(fun alias ->
+          Simple.pattern_match alias
+            ~name:(fun name ~coercion:_ -> Name.Set.mem name required_names)
+            ~const:(fun _ -> true))
+    in
+    Alias_set.find_best available_alias_set
 
 let find_cse_simple ?(required = true) dacc required_names prim =
   match P.Eligible_for_cse.create prim with
@@ -467,7 +498,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
   let block_sym =
     let var = Variable.create "switch_block" K.value in
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
@@ -802,7 +833,7 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
       Simplify_common.apply_cont_use_kind ~context:Switch_branch action
     in
     let { S.simples = args; simple_tys = arg_types } =
-      S.simplify_simples dacc args
+      S.simplify_simples (DA.with_denv dacc denv_at_use) args
     in
     let dacc, rewrite_id =
       DA.record_continuation_use dacc (AC.continuation action) use_kind
@@ -827,6 +858,157 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
     let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
     arms, dacc
 
+let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
+  match DA.are_lifting_conts dacc with
+  | Lifting_out_of _ ->
+    Misc.fatal_errorf
+      "[Are_lifting_cont] values in the dacc cannot be [Lifting_out_of _] when \
+       going downwards through a [Switch] expression. See the explanation in \
+       [are_lifting_conts.mli]."
+  | Not_lifting _ -> `Not_lifting
+  | Analyzing { continuation; uses; is_exn_handler } -> (
+    (* Some preliminary requirements. We do **not** specialize continuations if
+       one of the following conditions are true:
+
+       - they have only one (or less) use
+
+       - they are an exception handler. To handle this case, the existing
+       mechanism used to rewrite specialized calls on the way up should be
+       extended to also rewrite pop_traps and other uses of exn handlers (which
+       is not currently the case).
+
+       - we are at toplevel, in which case there can be symbols which we might
+       duplicate by specializing (which would be an error). More generally, the
+       benefits of specialization at unit toplevel do not seem that great,
+       because partial evaluation would be better. *)
+    let n_uses = Continuation_uses.number_of_uses uses in
+    if n_uses <= 1
+    then `Single_use
+    else if is_exn_handler
+    then `Exn_handler
+    else if DE.at_unit_toplevel (DA.denv dacc)
+    then `Toplevel
+    else
+      let denv = DA.denv dacc in
+      match DE.specialization_cost denv with
+      | Cannot_specialize { reason } ->
+        (* CR gbury: we could try and emit something analog to the inlining
+           report, but for other optimizations at one point ? *)
+        begin match reason with
+        | Specialization_disabled -> `Disabled
+        | At_toplevel -> `Toplevel
+        | Contains_static_consts | Contains_set_of_closures ->
+          `Cannot_specialize
+        end
+      | Can_specialize spec_cost -> (
+        (* We should never reach here if specialization is disabled, since we
+           should never have created a `Can_specialize` value for the
+           specialization_cost *)
+        if not (Flambda_features.match_in_match ())
+        then
+          Misc.fatal_errorf
+            "Cannot specialize continuations (due to command line arguments), \
+             this code path should not have been reached.";
+        (* Estimate the cost of lifting: this mainly comes from adding new
+           parameters, which increase the work done by the typing env, as well
+           as the flow analysis. We then only do the lifting if the cost is
+           within the budget for the current function. *)
+        let lifting_budget = DA.get_continuation_lifting_budget dacc in
+        let lifting_cost =
+          DE.cost_of_lifting_continuations_out_of_current_one denv
+        in
+        (* is_lifting_allowed_by_budget ? *)
+        if not (lifting_budget > 0 && lifting_cost <= lifting_budget)
+        then `Insufficient_lifting_budget
+        else
+          (* Main Criterion: whether all callsites (but one) of the continuation
+             determine the value of the scrutinee (and therefore the specialized
+             versions will eliminate the switch in favor of an apply_cont
+             directly). *)
+          let join_analysis_result =
+            match DE.join_analysis denv with
+            | None -> `Not_enough_join_info
+            | Some join_analysis -> (
+              match
+                Join_analysis.simple_refined_at_join join_analysis
+                  (DE.typing_env denv) scrutinee
+              with
+              | Not_refined_at_join -> `Not_enough_join_info
+              | Invariant_in_all_uses _ ->
+                (* in this case, we don't need to specialize to know the
+                   scrutinee, or to simplify the switch, it will happen without
+                   specialization. *)
+                `No_reason_to_spec
+              | Variable_refined_at_these_uses var_analysis -> (
+                let specialized, generic =
+                  Join_analysis.Variable_refined_at_join.fold_values_at_uses
+                    (fun id value (specialized, generic) ->
+                      match value with
+                      | Known _ ->
+                        Apply_cont_rewrite_id.Set.add id specialized, generic
+                      | Unknown ->
+                        specialized, Apply_cont_rewrite_id.Set.add id generic)
+                    var_analysis
+                    ( Apply_cont_rewrite_id.Set.empty,
+                      Apply_cont_rewrite_id.Set.empty )
+                in
+                match Apply_cont_rewrite_id.Set.cardinal generic with
+                | 0 | 1 -> `Spec (join_analysis, specialized, generic)
+                | _ ->
+                  if Apply_cont_rewrite_id.Set.is_empty specialized
+                  then `All_unknown
+                  else `Too_many_unknown_uses))
+          in
+          match join_analysis_result with
+          | ( `No_reason_to_spec | `Too_many_unknown_uses | `All_unknown
+            | `Not_enough_join_info ) as res ->
+            res
+          | `Spec (join_analysis, specialized, generic) ->
+            (* Specialization benefit estimation: we use heuristics similar to
+               that of inlining to estimate the benefit based on code size and
+               removed operations (note that we use the join info in the typing
+               env to estimate which operations will be removed during
+               specialization, rather that computing it speculatively like is
+               done for inlining). *)
+            let cost_metrics =
+              Specialization_cost.cost_metrics (DE.typing_env denv) spec_cost
+                ~switch ~join_analysis ~specialized ~generic
+            in
+            let final_cost =
+              Cost_metrics.evaluate
+                ~args:(DE.inlining_arguments denv)
+                cost_metrics
+            in
+            let threshold = Flambda_features.Expert.cont_spec_threshold () in
+            if
+              Float.compare threshold 0. < 0
+              || Float.compare final_cost threshold > 0
+            then `Too_costly
+            else `Specialized (continuation, lifting_cost)))
+
+let decide_continuation_specialization ~dacc ~switch ~scrutinee =
+  Profile.record_with_counters ~accumulate:true "continuation_specialization"
+    (fun () -> decide_continuation_specialization0 ~dacc ~switch ~scrutinee)
+    ()
+    ~counter_f:(fun result ->
+      let counters = Profile.Counters.create () in
+      match result with
+      | `Disabled -> counters
+      | `Single_use -> counters
+      | `Exn_handler -> counters
+      | `Toplevel -> counters
+      | `All_unknown -> Profile.Counters.incr "all_unknown" counters
+      | `No_reason_to_spec -> Profile.Counters.incr "no_reason" counters
+      | `Not_lifting -> Profile.Counters.incr "not_lifting" counters
+      | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters
+      | `Insufficient_lifting_budget ->
+        Profile.Counters.incr "no_lifting_budget" counters
+      | `Not_enough_join_info -> Profile.Counters.incr "no_join_info" counters
+      | `Too_many_unknown_uses ->
+        Profile.Counters.incr "too_much_unknown" counters
+      | `Too_costly -> Profile.Counters.incr "not_beneficial" counters
+      | `Specialized _ -> Profile.Counters.incr "specialized" counters)
+
 let simplify_switch dacc switch ~down_to_up =
   let scrutinee = Switch.scrutinee switch in
   let scrutinee_ty, scrutinee =
@@ -850,86 +1032,16 @@ let simplify_switch dacc switch ~down_to_up =
     DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
   in
   let dacc =
-    match DA.are_lifting_conts dacc with
-    | Lifting_out_of _ ->
-      Misc.fatal_errorf
-        "[Are_lifting_cont] values in the dacc cannot be [Lifting_out_of _] \
-         when going downwards through a [Switch] expression. See the \
-         explanation in [are_lifting_conts.mli]."
-    | Not_lifting -> dacc
-    | Analyzing { continuation; uses; is_exn_handler } -> (
-      (* Some preliminary requirements. We do **not** specialize continuations
-         if one of the following conditions are true:
-
-         - they have only one (or less) use
-
-         - they are an exception handler. To handle this case, the existing
-         mechanism used to rewrite specialized calls on the way up should be
-         extended to also rewrite pop_traps and other uses of exn handlers
-         (which is not currently the case).
-
-         - we are at toplevel, in which case there can be symbols which we might
-         duplicate by specializing (which would be an error). More generally,
-         the benefits of specialization at unit toplevel do not seem that great,
-         because partial evaluation would be better. *)
-      let n_uses = Continuation_uses.number_of_uses uses in
-      if is_exn_handler || n_uses <= 1 || DE.at_unit_toplevel (DA.denv dacc)
-      then dacc
-      else
-        let denv = DA.denv dacc in
-        match DE.specialization_cost denv with
-        | Cannot_specialize { reason = _ } ->
-          (* CR gbury: we could try and emit something analog to the inlining
-             report, but for other optimizations at one point ? *)
-          dacc
-        | Can_specialize { size_of_primitives = _ } ->
-          (* Estimate the cost of lifting: this mainly comes from adding new
-             parameters, which increase the work done by the typing env, as well
-             as the flow analysis. We then only do the lifting if the cost is
-             within the budget for the current function. *)
-          let lifting_budget = DA.get_continuation_lifting_budget dacc in
-          let lifting_cost =
-            DE.cost_of_lifting_continuations_out_of_current_one denv
-          in
-          let is_lifting_allowed_by_budget =
-            lifting_budget > 0 && lifting_cost <= lifting_budget
-          in
-          (* very basic specialization budget *)
-          let specialization_budget =
-            DA.get_continuation_specialization_budget dacc
-          in
-          let specialization_cost =
-            n_uses + 1
-            (* specializing requires 'n_uses + 1' traversals of the continuation
-               handler *)
-          in
-          let is_specialization_allowed_by_budget =
-            specialization_budget > 0
-            && specialization_cost <= specialization_budget
-          in
-          if
-            (not is_lifting_allowed_by_budget)
-            || not is_specialization_allowed_by_budget
-          then dacc
-          else
-            (* TODO/FIXME: implement an actual criterion for when to lift
-               continuations and specialize them. Currently for testing, we lift
-               any continuation that occurs in a handler that ends with a switch
-               (if the bduget for lifting and specialization allows it), and we
-               specialize the continuation that ends with the switch. *)
-            let dacc =
-              DA.decrease_continuation_lifting_budget dacc lifting_cost
-            in
-            let dacc =
-              DA.decrease_continuation_specialization_budget dacc
-                specialization_cost
-            in
-            let dacc =
-              DA.with_are_lifting_conts dacc
-                (Are_lifting_conts.lift_continuations_out_of continuation)
-            in
-            let dacc = DA.add_continuation_to_specialize dacc continuation in
-            dacc)
+    match decide_continuation_specialization ~dacc ~switch ~scrutinee with
+    | `Specialized (continuation, lifting_cost) ->
+      let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
+      let dacc =
+        DA.with_are_lifting_conts dacc
+          (Are_lifting_conts.lift_continuations_out_of continuation)
+      in
+      let dacc = DA.add_continuation_to_specialize dacc continuation in
+      dacc
+    | _ -> dacc
   in
   down_to_up dacc
     ~rebuild:

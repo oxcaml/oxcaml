@@ -16,6 +16,7 @@
 (* Environment handling *)
 
 open Types
+open Data_types
 open Misc
 module Jkind = Btype.Jkind0
 
@@ -176,6 +177,18 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
+val add_required_global_for_quote: Path.t -> t -> unit
+
+(* Return the set of interfaces referenced by quotes *)
+val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+
+(* Compute the transitive closure of the dependencies of these interfaces that
+   have been loaded by typing. Always includes the input interfaces. *)
+val loaded_transitive_dependencies:
+  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+
+(* Return the set of implementations referenced by quotes *)
+val quoted_impls: unit -> Compilation_unit.Set.t
 
 val reset_probes: unit -> unit
 val add_probe: string -> unit
@@ -220,7 +233,9 @@ val locks_empty : locks
 
 val locks_is_empty : locks -> bool
 
-val mode_unit : Mode.Value.lr
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+val mode_unit : staticity:Mode.Staticity.Const.t -> Mode.Value.lr
 
 type structure_components_reason =
   | Project
@@ -271,7 +286,8 @@ type lookup_error =
         container_class_type : string
       }
   | Cannot_scrape_alias of Longident.t * Path.t
-  | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
+    (* CR modes: merge into mode error hints. *)
+  | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
@@ -302,6 +318,13 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
 val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
   type_expr option -> mode_with_locks -> Mode.Value.l
+
+(** Registers a use of a construct that is at legacy comonadic modes,
+    constraining every enclosing closure lock as if a legacy value defined at
+    toplevel were used at the pinpoint's location. Used for constructs (e.g.
+    effect handlers) that force enclosing functions to be nonportable and
+    stateful. *)
+val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
@@ -334,7 +357,7 @@ val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
   ?use:bool -> loc:Location.t -> load:bool -> Global_module.Name.t -> t ->
-    Path.t * locks
+    Path.t * mode_with_locks
 
 val lookup_constructor:
   ?use:bool -> loc:Location.t -> constructor_usage -> Longident.t -> t ->
@@ -432,7 +455,7 @@ val add_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> Types.value_description -> t -> t
 val add_type:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
+  check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
@@ -488,7 +511,13 @@ val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,
-   not a structure. *)
+   not a structure.
+
+   Soundness of type checking does not depend on the returned
+   [mode_with_locks]: the locks crossed to reach the opened module have
+   already been threaded into the resulting environment so that later
+   lookups of items brought into scope walk them. The value is returned
+   only so callers can record it on the typedtree's [mod_mode]. *)
 val open_signature:
     used_slot:bool ref ->
     loc:Location.t -> toplevel:bool ->
@@ -497,7 +526,12 @@ val open_signature:
 
 val open_signature_by_path: Path.t -> t -> t
 
-val open_pers_signature: string -> t -> Path.t * mode_with_locks * t
+val open_pers_signature: string -> t -> Path.t * t
+
+(* Like [open_pers_signature], but takes a [.cmi] file path and loads it
+   directly (bypassing the include path) and ignores any in-scope module of
+   the same name. Used to implement [-open-cmi]. *)
+val open_pers_signature_cmi: string -> t -> Path.t * t
 
 val remove_last_open: Path.t -> t -> t option
 
@@ -576,23 +610,26 @@ val reset_cache: preserve_persistent_env:bool -> unit
 (* To be called before each toplevel phrase. *)
 val reset_cache_toplevel: unit -> unit
 
-(* Remember the name of the current compilation unit. *)
-val set_unit_name: Unit_info.t option -> unit
-val get_unit_name: unit -> Unit_info.t option
+(* Remember the current compilation unit. *)
+val set_current_unit: Unit_info.t -> unit
+val get_current_unit : unit -> Unit_info.t option
+val get_current_unit_name: unit -> string
 
 (* Read, save a signature to/from a file. *)
 val read_signature:
   Global_module.Name.t -> Unit_info.Artifact.t
-  -> signature
+  -> persistent_signature
         (* Arguments: module name, file name, [add_binding] flag.
            Results: signature. If [add_binding] is true, creates an entry for
            the module in the environment. *)
 val save_signature:
-  alerts:alerts -> Types.signature -> Compilation_unit.Name.t -> Cmi_format.kind
+  alerts:alerts -> persistent_signature
+  -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind, file name. *)
 val save_signature_with_imports:
-  alerts:alerts -> signature -> Compilation_unit.Name.t -> Cmi_format.kind
+  alerts:alerts -> persistent_signature
+  -> Compilation_unit.Name.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
@@ -608,13 +645,6 @@ val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
 val import_crcs: source:string -> Import_info.t array -> unit
-
-(* Require that the provided compilation unit will be available at quotation
-   compile time. *)
-val require_global_for_quote: Compilation_unit.Name.t -> unit
-
-(* Return the set of compilation units referenced by quotes *)
-val quoted_globals: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
@@ -663,11 +693,6 @@ val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
 type error =
   | Missing_module of Location.t * Path.t * Path.t
   | Illegal_value_name of Location.t * string
-  | Implicit_jkind_already_defined of {
-      loc : Location.t;
-      name : string;
-      defined_at : Location.t;
-    }
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Toplevel_splice of Location.t
@@ -675,14 +700,6 @@ type error =
 
 exception Error of error
 
-
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
-
-val report_lookup_error:
-    Location.t -> t -> lookup_error Format_doc.format_printer
-val report_lookup_error_doc:
-    Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -715,8 +732,6 @@ val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val constrain_type_jkind:
   (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
-(* Forward declaration to break mutual recursion with Printtyp. *)
-val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_path: Path.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)

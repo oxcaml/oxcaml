@@ -42,9 +42,6 @@ void caml_stop_here (void)
 {
 }
 
-char * caml_instr_string (code_t pc);
-
-
 void
 caml_event_trace(code_t pc)
 {
@@ -81,7 +78,8 @@ void caml_disasm_instr(code_t pc)
   case BRANCH: case BRANCHIF: case BRANCHIFNOT: case PUSHTRAP:
   case CONSTINT: case PUSHCONSTINT: case OFFSETINT: case OFFSETREF:
   case OFFSETCLOSURE: case PUSHOFFSETCLOSURE:
-  case RESUMETERM: case REPERFORMTERM:
+  case CONTINUETERM: case DISCONTINUETERM:
+  case DISCONTINUE_WITH_BACKTRACETERM: case REPERFORMTERM:
     snprintf(buf, sizeof(buf), "%s %d\n", opbuf, pc[0]); break;
     /* Instructions with two operands */
   case APPTERM: case CLOSURE: case CLOSUREREC: case PUSHGETGLOBALFIELD:
@@ -91,8 +89,13 @@ void caml_disasm_instr(code_t pc)
     snprintf(buf, sizeof(buf), "%s %d, %d\n", opbuf, pc[0], pc[1]); break;
     /* Instructions with a C primitive as operand */
   case C_CALLN:
-    snprintf(buf, sizeof(buf), "%s %d,", opbuf, pc[0]); pc++;
-    /* fallthrough */
+    if (pc[1] < 0 || pc[1] >= caml_prim_name_table.size)
+      snprintf(buf, sizeof(buf), "%s %d, unknown primitive %d\n", opbuf, pc[0],
+               pc[1]);
+    else
+      snprintf(buf, sizeof(buf), "%s %d, %s\n", opbuf, pc[0],
+               (char *) caml_prim_name_table.contents[pc[1]]);
+    break;
   case C_CALL1: case C_CALL2: case C_CALL3: case C_CALL4: case C_CALL5:
     if (pc[0] < 0 || pc[0] >= caml_prim_name_table.size)
       snprintf(buf, sizeof(buf), "%s unknown primitive %d\n", opbuf, pc[0]);
@@ -116,7 +119,6 @@ void caml_disasm_instr(code_t pc)
 void
 caml_trace_value_file (value v, code_t prog, asize_t proglen, FILE * f)
 {
-  int i;
   fprintf (f, "%#" ARCH_INTNAT_PRINTF_FORMAT "x", v);
   if (!v)
     return;
@@ -144,7 +146,7 @@ caml_trace_value_file (value v, code_t prog, asize_t proglen, FILE * f)
     case String_tag:
       l = caml_string_length (v);
       fprintf (f, "=string[s%dL%d]'", s, l);
-      for (i = 0; i < ((l>0x1f)?0x1f:l) ; i++) {
+      for (int i = 0; i < ((l>0x1f)?0x1f:l) ; i++) {
         if (isprint ((int) Byte (v, i)))
           putc (Byte (v, i), f);
         else
@@ -157,7 +159,7 @@ caml_trace_value_file (value v, code_t prog, asize_t proglen, FILE * f)
       goto displayfields;
     case Double_array_tag:
       fprintf (f, "=floatarray[s%d]", s);
-      for (i = 0; i < ((s>0xf)?0xf:s); i++)
+      for (int i = 0; i < ((s>0xf)?0xf:s); i++)
         fprintf (f, " %g", Double_flat_field (v, i));
       goto displayfields;
     case Abstract_tag:
@@ -171,7 +173,7 @@ caml_trace_value_file (value v, code_t prog, asize_t proglen, FILE * f)
     displayfields:
       if (s > 0)
         fputs ("=(", f);
-      for (i = 0; i < s; i++) {
+      for (int i = 0; i < s; i++) {
         if (i > 20) {
           fputs ("....", f);
           break;

@@ -73,7 +73,7 @@ let _ = k ~a:Lexing.dummy_pos ~a:0 ();;
 Line 1, characters 13-29:
 1 | let _ = k ~a:Lexing.dummy_pos ~a:0 ();;
                  ^^^^^^^^^^^^^^^^
-Error: This expression has type "Lexing.position" = "lexing_position"
+Error: The value "Lexing.dummy_pos" has type "Lexing.position" = "lexing_position"
        but an expression was expected of type "int"
 |}]
 

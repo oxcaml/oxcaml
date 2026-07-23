@@ -18,7 +18,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module List = ListLabels
 module Array = ArrayLabels
 
@@ -302,21 +302,34 @@ let insert_move :
 
 module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let class_of_operation0 : Operation.t -> op_class = function
-    | Move | Spill | Reload -> assert false (* treated specially *)
+    | (Move | Spill | Reload) as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       Op_pure
-    | Opaque | Pause -> assert false (* treated specially *)
+    | Opaque as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
+    | Pause ->
+      (* Pause is used to spin on memory locations, so equations over mutable
+         loads must not survive it. *)
+      Op_store true
     | Stackoffset _ -> Op_other
     | Load { mutability; is_atomic; memory_chunk = _; addressing_mode = _ } ->
-      (* #12173: disable CSE for atomic loads. *)
+      (* #12173: disable CSE for atomic loads. Moreover, an atomic load is an
+         acquire: a load that follows it must not be satisfied by an equation
+         over a load that precedes it, so atomic loads are also load
+         barriers. *)
       if is_atomic
-      then Op_other
+      then Op_store true
       else
         Op_load
           (match mutability with Mutable -> Mutable | Immutable -> Immutable)
     | Store (_, _, asg) -> Op_store asg
-    | Alloc _ | Poll -> assert false (* treated specially *)
+    | (Alloc _ | Poll) as op ->
+      Misc.fatal_errorf "Cfg_cse.class_of_operation0: %a is handled specially"
+        Operation.dump op
     | Intop _ -> Op_pure
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
@@ -362,10 +375,6 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Op Opaque ->
       (* Assume arbitrary side effects from Opaque *)
       empty_numbering
-    | Op Pause ->
-      (* We don't want to reorder loads across Pause, since it's used to spin on
-         memory locations. *)
-      kill_loads n
     | Op (Alloc _) | Op Poll ->
       (* For allocations, we must avoid extending the live range of a
          pseudoregister across the allocation if this pseudoreg is a derived
@@ -390,7 +399,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Intop_atomic _
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-         | Specific _ | Name_for_debugger _ ) as op) -> (
+         | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
@@ -446,7 +455,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       =
    fun numbering terminator ->
     match terminator.desc with
-    | Never -> assert false
+    | Never ->
+      Misc.fatal_error "Cfg_cse.cse_terminator: unexpected Never terminator"
     | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
     | Switch _ ->
       set_unknown_regs numbering (Proc.destroyed_at_terminator terminator.desc)

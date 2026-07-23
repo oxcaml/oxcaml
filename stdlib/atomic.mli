@@ -40,9 +40,7 @@ external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
     modifying these disjoint memory regions simultaneously becomes impossible,
     which can create a bottleneck. Hence, as a general guideline, if an atomic
     reference is experiencing contention, assigning it its own cache line may
-    enhance performance.
-
-    CR ocaml 5 all-runtime5: does not support runtime4 *)
+    enhance performance. *)
 external make_contended
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
@@ -119,6 +117,12 @@ module Loc : sig
       The API below mirrors the API to access {{!t}atomic references},
       see the documentation above for more information. *)
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
+
+  (* exposing 'external' primitives directly helps reasoning about
+     performance: it guarantees that all versions of the compiler
+     (including bytecode) remove the pair construction on direct
+     calls:
+       Atomic.Loc.foo [%atomic.loc r.x] ...  *)
 
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 

@@ -24,7 +24,7 @@ let rec flatten_arrow ret_ty =
           | Tconstr (path, [ ty ], _) when Path.same path Predef.path_option ->
             ty
           | Tpoly (ty, vars) ->
-            Types.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
+            Btype.newty3 ~level:(Types.get_level ty) ~scope:(Types.get_scope ty)
               (Tpoly (strip_option ty, vars))
           | _ -> ty
         in
@@ -91,6 +91,14 @@ let rec create_type_tree ty : Type_tree.t =
     (* CR-someday liam923: Wrap this in something to indicate that it's inside a
        Tquote. *)
     create_type_tree ty
+  | Tbox ty ->
+    let ty_without_args =
+      Btype.newgenty (Tconstr (Predef.path_box, [], ref Types.Mnil))
+    in
+    let children = [ create_type_tree ty ] in
+    { data = Type_ref { path = Predef.path_box; ty = ty_without_args };
+      children
+    }
   | Tnil
   | Tvar _
   | Tsubst _

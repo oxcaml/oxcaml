@@ -42,9 +42,7 @@ type unit_link_info = Linkenv.unit_link_info =
 
 let runtime_lib () =
   let variant =
-    if Config.runtime5 && !Clflags.runtime_variant = "nnp"
-    then ""
-    else !Clflags.runtime_variant
+    if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
   let libname = "libasmrun" ^ variant ^ ext_lib in
   try
@@ -113,15 +111,10 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     (Cmm_helpers.data_segment_table (startup_comp_unit :: name_list));
   (* CR mshinwell: We should have a separate notion of "backend compilation
      unit" really, since the units here don't correspond to .ml source files. *)
-  let hot_comp_unit = CU.create CU.Prefix.empty (CU.Name.of_string "_hot") in
   let system_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_system")
   in
-  let code_comp_units =
-    if !Clflags.function_sections
-    then hot_comp_unit :: startup_comp_unit :: name_list
-    else startup_comp_unit :: name_list
-  in
+  let code_comp_units = startup_comp_unit :: name_list in
   let code_comp_units =
     if !Oxcaml_flags.use_cached_generic_functions
     then Generic_fns.imported_units cached_gen @ code_comp_units
@@ -405,7 +398,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
 (* Main entry point *)
 
 let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
-    ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
+    ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
   then Emitaux.binary_backend_available := true;
   let named_startup_file = named_startup_file () in
@@ -416,16 +409,21 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
   let startup_obj = Filename.temp_file "camlstartup" ext_obj in
-  let ml_objfiles =
+  let bundled_cm_obj =
     if not uses_eval
-    then ml_objfiles
+    then None
     else
       match
-        Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_globals
+        Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx
           ~named_startup_file ~output_name
       with
       | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
-      | bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
+      | bundled_cm_obj -> Some bundled_cm_obj
+  in
+  let ml_objfiles =
+    match bundled_cm_obj with
+    | None -> ml_objfiles
+    | Some bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
   in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
@@ -481,13 +479,14 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
     ~always:(fun () ->
       remove_file startup_obj;
+      Option.iter remove_file bundled_cm_obj;
       cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
-    ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
+    ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump : unit =
   Profile.record_call "link" (fun () ->
       link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
-        ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
+        ~genfns ~units_tolink ~uses_eval ~quoted_cmi ~quoted_cmx ~ppf_dump)
 
 (* Error report *)
 
@@ -511,7 +510,7 @@ let report_error_doc ppf = function
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
-      CU.Name.print_as_inline_code impl
+      CU.print_as_inline_code impl
 
 let report_error = Format_doc.compat report_error_doc
 
