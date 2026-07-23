@@ -677,9 +677,9 @@ and Exp_desc : sig
 
   val quote : Exp.t -> t
 
-  val antiquote : Exp.t -> t
+  val splice : Exp.t -> t
 
-  val splice : Code.t -> t
+  val unquote : Code.t -> t
 
 end
 

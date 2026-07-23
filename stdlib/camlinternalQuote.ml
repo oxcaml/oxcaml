@@ -1365,7 +1365,7 @@ module Ast = struct
     | Array_comprehension of comprehension
     | Immutable_array_comprehension of comprehension
     | Quote of expression
-    | Antiquote of expression
+    | Splice of expression
 
   and case =
     { lhs : pattern;
@@ -2087,7 +2087,7 @@ module Ast = struct
       pp fmt "%a.#%a" (print_exp_with_parens env) exp (print_field env)
         rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
-    | Antiquote exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
+    | Splice exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension compr ->
       pp fmt "@[<2>[@ %a@ ]@]" (print_comprehension env) compr
     | Array_comprehension compr ->
@@ -3096,11 +3096,11 @@ module Exp_desc = struct
     let+ exp = exp in
     Ast.Quote exp
 
-  let antiquote exp =
+  let splice exp =
     let+ exp = exp in
-    Ast.Antiquote exp
+    Ast.Splice exp
 
-  let splice code =
+  let unquote code =
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
 

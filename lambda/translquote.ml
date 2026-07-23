@@ -2063,9 +2063,9 @@ and Exp_desc : sig
 
   val quote : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val antiquote : Debuginfo.Scoped_location.t -> Exp.t -> t'
+  val splice : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val splice : Debuginfo.Scoped_location.t -> Code.t -> t'
+  val unquote : Debuginfo.Scoped_location.t -> Code.t -> t'
 end = struct
   type s = lambda
 
@@ -2231,9 +2231,9 @@ end = struct
 
   let quote loc a1 = apply1 "Exp_desc" "quote" loc (extract a1)
 
-  let antiquote loc a1 = apply1 "Exp_desc" "antiquote" loc (extract a1)
-
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
+
+  let unquote loc a1 = apply1 "Exp_desc" "unquote" loc (extract a1)
 end
 
 and Exp : sig
@@ -3942,7 +3942,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       if stage > 0
       then
         let exp = quote_expression ~scopes ~transl (stage - 1) exp in
-        Exp_desc.antiquote loc exp
+        Exp_desc.splice loc exp
       else
         let exp =
           (* Local allocations are not expected to escape from this expression.
@@ -3950,7 +3950,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
              need to indicate local mode. *)
           Lregion (transl exp, layout_any_value)
         in
-        Exp_desc.splice loc (Code.inject exp)
+        Exp_desc.unquote loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path)
     | Texp_pack m ->
