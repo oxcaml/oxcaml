@@ -1446,25 +1446,12 @@ let rec lam ppf = function
       fprintf ppf "$%a" slam slambda
   | Lkindtemplate {ktmpl_params; ktmpl_return; ktmpl_body; ktmpl_mode;
                    ktmpl_env; ktmpl_loc = _} ->
-      let pr_env ppf env =
-        fprintf ppf "{@[";
-        Ident.Map.iter
-          (fun id (l, layout) ->
-            match l with
-            | Lvar id2 when Ident.same id id2 ->
-              fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
-            | _ ->
-              fprintf ppf "@,%a=%a%a;"
-                Ident.print id layout_annotation layout lam l)
-          env;
-        fprintf ppf "@]}"
-      in
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
       fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a%a)@]"
         (locality_kind ktmpl_mode)
-        pr_env ktmpl_env
+        template_env ktmpl_env
         pr_params ktmpl_params
         return_kind (ktmpl_mode, ktmpl_return)
         lam ktmpl_body
@@ -1474,6 +1461,21 @@ let rec lam ppf = function
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
       fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
         lam kinst_func lams kinst_args
+  | Ltemplate ({kind; params; return; body; attr; ret_mode; mode}, env) ->
+      fprintf ppf "@[<2>(template%s@ %a%a@ %a%a%a)@]"
+        (locality_kind mode) template_env env
+        (function_params kind) params
+        function_attribute attr return_kind (ret_mode, return) lam body
+  | Linstantiate ap ->
+      let lams ppf largs =
+        List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
+      let form = apply_kind "instantiate" ap.ap_region_close ap.ap_mode in
+      fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
+        lam ap.ap_func lams ap.ap_args
+        apply_tailcall_attribute ap.ap_tailcall
+        apply_inlined_attribute ap.ap_inlined
+        apply_specialised_attribute ap.ap_specialised
+        apply_probe ap.ap_probe
 
 and slam ppf = function
   | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
@@ -1527,36 +1529,50 @@ and sequence ppf = function
   | l ->
       lam ppf l
 
+and function_params kind ppf params =
+  match kind with
+  | Curried {nlocal} ->
+      fprintf ppf "@ {nlocal = %d}" nlocal;
+      List.iter (fun (p : Lambda.lparam) ->
+          let { unbox_param } = p.attributes in
+          fprintf ppf "@ %a%a%s%a%s"
+            Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode)
+            layout_annotation p.layout
+            (if unbox_param then "[@unboxable]" else "")
+        ) params
+  | Tupled ->
+      fprintf ppf " (";
+      let first = ref true in
+      List.iter
+        (fun (p : Lambda.lparam) ->
+           let { unbox_param } = p.attributes in
+           if !first then first := false else fprintf ppf ",@ ";
+           Ident.print ppf p.name;
+           debug_uid ppf p.debug_uid;
+           Format.fprintf ppf "%s" (locality_kind p.mode);
+           layout_annotation ppf p.layout;
+           if unbox_param then Format.fprintf ppf "[@unboxable]"
+        )
+        params;
+      fprintf ppf ")"
+
 and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
-  let pr_params ppf params =
-    match kind with
-    | Curried {nlocal} ->
-        fprintf ppf "@ {nlocal = %d}" nlocal;
-        List.iter (fun (p : Lambda.lparam) ->
-            let { unbox_param } = p.attributes in
-            fprintf ppf "@ %a%a%s%a%s"
-              Ident.print p.name debug_uid p.debug_uid (locality_kind p.mode)
-              layout_annotation p.layout
-              (if unbox_param then "[@unboxable]" else "")
-          ) params
-    | Tupled ->
-        fprintf ppf " (";
-        let first = ref true in
-        List.iter
-          (fun (p : Lambda.lparam) ->
-             let { unbox_param } = p.attributes in
-             if !first then first := false else fprintf ppf ",@ ";
-             Ident.print ppf p.name;
-             debug_uid ppf p.debug_uid;
-             Format.fprintf ppf "%s" (locality_kind p.mode);
-             layout_annotation ppf p.layout;
-             if unbox_param then Format.fprintf ppf "[@unboxable]"
-          )
-          params;
-        fprintf ppf ")" in
   fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
-    (locality_kind mode) pr_params params
+    (locality_kind mode) (function_params kind) params
     function_attribute attr return_kind (ret_mode, return) lam body
+
+and template_env ppf env =
+  fprintf ppf "{@[";
+  Ident.Map.iter
+    (fun id (l, layout) ->
+      match l with
+      | Lvar id2 when Ident.same id id2 ->
+        fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
+      | _ ->
+        fprintf ppf "@,%a=%a%a;"
+          Ident.print id layout_annotation layout lam l)
+    env;
+  fprintf ppf "@]}"
 
 let structured_constant = struct_const
 

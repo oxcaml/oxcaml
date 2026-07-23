@@ -955,6 +955,10 @@ type lambda =
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of lfunction * (lambda * layout) Ident.Map.t
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout

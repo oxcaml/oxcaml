@@ -356,7 +356,7 @@ let rec fracture_lam lambda : slambda =
           let closure_param =
             { name = closure_id;
               debug_uid = debug_uid_none;
-              layout = layout_block;
+              layout = layout_template_env;
               attributes = default_param_attribute;
               mode = ktmpl_mode
             }
@@ -378,9 +378,6 @@ let rec fracture_lam lambda : slambda =
                       lam ) ))
               (0, body_r) env
           in
-          (* This relies on all templates currently being generated from
-             [let poly_] which means all arguments are erased, this will need to
-             be improved for functors where the arguments aren't erased. *)
           SLhalves
             { sval_comptime = body_c;
               sval_runtime =
@@ -453,6 +450,110 @@ let rec fracture_lam lambda : slambda =
                       }
                 }
           })
+  | Ltemplate ({ kind; params; return; body; attr; loc; mode; ret_mode }, env)
+    ->
+    let env = Ident.Map.to_list env in
+    let free_vars_shape_locality_mode =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let free_vars_shape_unit =
+      Misc.Stdlib.Array.of_list_map
+        (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
+        env
+    in
+    let templated_function_body =
+      slet_local "body" body (fun body_c body_r ->
+          let closure_id = Ident.create_local "closure" in
+          let closure_param =
+            { name = closure_id;
+              debug_uid = debug_uid_none;
+              layout = layout_template_env;
+              attributes = default_param_attribute;
+              mode
+            }
+          in
+          let _, body =
+            List.fold_left
+              (fun (i, lam) (ident, (_, layout)) ->
+                ( i + 1,
+                  Llet
+                    ( Alias,
+                      layout,
+                      ident,
+                      debug_uid_none,
+                      Lprim
+                        ( Pmixedfield
+                            ([i], free_vars_shape_locality_mode, Reads_agree),
+                          [Lvar closure_id],
+                          loc ),
+                      lam ) ))
+              (0, body_r) env
+          in
+          let kind =
+            match kind, mode with
+            | Curried { nlocal }, Alloc_local -> Curried { nlocal = nlocal + 1 }
+            | _ -> kind
+          in
+          SLhalves
+            { sval_comptime = body_c;
+              sval_runtime =
+                lfunction ~kind ~params:(closure_param :: params) ~return ~body
+                  ~attr ~loc ~mode ~ret_mode
+            })
+    in
+    let free_var_capture =
+      List.map
+        (fun (id, _) -> Lsplice (loc, SLvar (Slambdaident.of_ident id)))
+        env
+    in
+    let kind_function =
+      SLhalves
+        { sval_comptime =
+            SLtemplate
+              { sfun_params =
+                  Misc.Stdlib.Array.of_list_map
+                    (fun { name; _ } -> Slambdaident.of_ident name)
+                    params;
+                sfun_body = templated_function_body
+              };
+          sval_runtime =
+            Lprim
+              ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, mode),
+                free_var_capture,
+                loc )
+        }
+    in
+    List.fold_left
+      (fun slam (id, (lam, _)) ->
+        SLlet
+          { slet_name = Slambdaident.of_ident id;
+            slet_value = fracture_lam lam;
+            slet_body = slam
+          })
+      kind_function env
+  | Linstantiate ({ ap_func; ap_args; ap_loc; _ } as ap) ->
+    slet_local "fun" ap_func (fun fun_c fun_r ->
+        slet_local_list "arg" ap_args (fun args_c args_r ->
+            let app_id = Slambdaident.create_local "app" in
+            let app_var = SLvar app_id in
+            SLlet
+              { slet_name = app_id;
+                slet_value =
+                  SLinstantiate
+                    { sapp_func = fun_c; sapp_args = Array.of_list args_c };
+                slet_body =
+                  SLhalves
+                    { sval_comptime = SLproj_comptime app_var;
+                      sval_runtime =
+                        Lapply
+                          { ap with
+                            ap_func = Lsplice (ap_loc, app_var);
+                            ap_args = fun_r :: args_r
+                          }
+                    }
+              }))
 
 (** Fracture an [lfun]. Currently, functions only have a dynamic part so this
     can always return an [lfun]. *)
@@ -603,6 +704,32 @@ and slet_local_slam name value value_lam body =
         slet_body =
           body (SLproj_comptime (SLvar name)) (Lsplice (loc, SLvar name))
       }
+
+(** [slet_local_list name values body] binds each item of [values] to [name0],
+    [name1], etc in [body] in slambda.
+
+    Note this will omit all the [SLlet]s that it can, however if the elements of
+    [values] have compile-time effects they are guaranteed to be run in reverse
+    order before (the slambda produced by) [body] is evaluated.
+
+    [body] is a function, called as [body values_c values_r], where the elements
+    of [values_c] and [values_r] evaluate to the compile-time and run-time
+    halves of each element of [values] respectively. The elements of [values_c]
+    are guaranteed to not contain any effects and [values_r] is physically equal
+    to [values] where possible. *)
+and slet_local_list name values body =
+  let rec slet_local_list_loop unchanged i values_c values_r = function
+    | [] -> body values_c (if unchanged then values else values_r)
+    | value :: values ->
+      slet_local
+        (name ^ string_of_int i)
+        value
+        (fun value_c value_r ->
+          let unchanged = unchanged && value_r == value in
+          slet_local_list_loop unchanged (i - 1) (value_c :: values_c)
+            (value_r :: values_r) values)
+  in
+  slet_local_list_loop true (List.length values - 1) [] [] (List.rev values)
 
 (** Helper function fracture [lambda] where we only need the dynamic part of the
     result. *)

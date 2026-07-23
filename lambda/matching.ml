@@ -4726,7 +4726,7 @@ let rec map_return f = function
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
     | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
-    | Lkindinstantiate _ )
+    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ )
     as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)

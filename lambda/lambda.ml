@@ -1087,6 +1087,8 @@ type lambda =
   | Lsplice of scoped_location * slambda
   | Lkindtemplate of lkindtemplate
   | Lkindinstantiate of lkindinstantiate
+  | Ltemplate of lfunction * (lambda * layout) Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1210,9 +1212,11 @@ let rec try_to_find_location lam =
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
   | Lkindtemplate { ktmpl_loc = loc; _ }
+  | Ltemplate ({ loc; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
   | Lkindinstantiate { kinst_loc = loc; _ }
+  | Linstantiate { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1271,6 +1275,8 @@ let fatal_error_invalid_constructor lambda =
     | Lsplice _ -> "Lsplice"
     | Lkindtemplate _ -> "Lkindtemplate"
     | Lkindinstantiate _ -> "Lkindinstantiate"
+    | Ltemplate _ -> "Ltemplate"
+    | Linstantiate _ -> "Linstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1631,6 +1637,10 @@ let make_key e =
     | Lkindinstantiate inst ->
         Lkindinstantiate { inst with kinst_func = tr_rec env inst.kinst_func;
                                      kinst_loc = Loc_unknown}
+    | Linstantiate inst ->
+        Linstantiate { inst with ap_func = tr_rec env inst.ap_func;
+                                 ap_args = tr_recs env inst.ap_args;
+                                 ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1672,7 +1682,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _ | Lkindtemplate _
+    | Lletrec _|Lfunction _ | Lkindtemplate _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1785,6 +1795,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f ktmpl_body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
+  | Ltemplate ({body}, _) ->
+      f body
+  | Linstantiate {ap_func = fn; ap_args = args} ->
+      f fn; List.iter f args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1884,6 +1898,12 @@ let rec free_variables = function
         ktmpl_env Ident.Set.empty
   | Lkindinstantiate {kinst_func = fn} ->
       free_variables fn
+  | Ltemplate (_, env) ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        env Ident.Set.empty
+  | Linstantiate {ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2135,6 +2155,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                       ap_args = subst_list s l ap.ap_args}
     | Lkindinstantiate inst ->
         Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
+    | Linstantiate inst ->
+        Linstantiate { inst with ap_func = subst s l inst.ap_func;
+                                ap_args = subst_list s l inst.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
     | Lkindtemplate ({ktmpl_env} as ktmpl) ->
@@ -2145,6 +2168,10 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                 (fun (lam, layout) -> (subst s l lam, layout))
                 ktmpl_env;
           }
+    | Ltemplate (lf, env) ->
+        Ltemplate
+          (subst_lfun s l lf,
+            Ident.Map.map (fun (lam, layout) -> (subst s l lam, layout)) env)
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2277,6 +2304,18 @@ let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
   then lfunction
   else { kind; params; return; body = new_body; attr; loc; mode; ret_mode }
 
+let map_env f old_env =
+  let env_changed = ref false in
+  let new_env =
+    Ident.Map.map
+      (fun (old_lam, layout) ->
+        let new_lam = f old_lam in
+        env_changed := !env_changed || old_lam != new_lam;
+        (new_lam, layout))
+      old_env
+  in
+  if not !env_changed then old_env else new_env
+
 let shallow_map ~tail ~non_tail:f lam =
   match lam with
   | Lvar _
@@ -2316,22 +2355,34 @@ let shallow_map ~tail ~non_tail:f lam =
           kinst_mode;
           kinst_loc;
         }
+  | Linstantiate { ap_func = old_func; ap_args = old_args; ap_result_layout;
+                   ap_region_close; ap_mode; ap_loc; ap_tailcall;
+                   ap_inlined; ap_specialised; ap_probe } ->
+      let new_func = f old_func in
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_func == new_func && old_args == new_args
+      then lam
+      else
+        Linstantiate {
+          ap_func = new_func;
+          ap_args = new_args;
+          ap_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
   | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
                     ktmpl_mode; ktmpl_env = old_env; ktmpl_loc } ->
       let new_body = f old_body in
-      let env_changed = ref false in
-      let new_env =
-        Ident.Map.map
-          (fun (old_lam, layout) ->
-            let new_lam = f old_lam in
-            env_changed := !env_changed || old_lam != new_lam;
-            (new_lam, layout))
-          old_env
-      in
-      if old_body == new_body && not !env_changed
+      let new_env = map_env f old_env in
+      if old_body == new_body && old_env == new_env
       then lam
       else
         Lkindtemplate {
@@ -2342,6 +2393,12 @@ let shallow_map ~tail ~non_tail:f lam =
           ktmpl_env = new_env;
           ktmpl_loc;
         }
+  | Ltemplate (old_lfun, old_env) ->
+      let new_lfun = map_lfunction f old_lfun in
+      let new_env = map_env f old_env in
+      if old_lfun == new_lfun && old_env == new_env
+      then lam
+      else Ltemplate (new_lfun, new_env)
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -3504,12 +3561,14 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_mode=Alloc_local} ->
-      raise Exit
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_mode=Alloc_heap}
+    | Ltemplate ({mode=Alloc_heap}, _) -> ()
+    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_mode=Alloc_local}
+    | Ltemplate ({mode=Alloc_local}, _) -> raise Exit
 
     | Lapply {ap_mode=Alloc_local}
     | Lkindinstantiate {kinst_mode=Alloc_local}
+    | Linstantiate {ap_mode=Alloc_local}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3529,10 +3588,10 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _  | Lkindinstantiate _ | Llet _ | Lmutlet _ | Lletrec _
-      | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
-      | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
-      | Levent _ | Lifused _) as lam ->
+    | ( Lapply _  | Lkindinstantiate _ | Linstantiate _ | Llet _ | Lmutlet _
+      | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
+      | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _
+      | Lsend _ | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false

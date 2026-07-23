@@ -1094,7 +1094,7 @@ let free_methods l =
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
     | Levent _ | Lifused _ | Lregion _ | Lexclave _
-    | Lkindtemplate _ | Lkindinstantiate _ -> ()
+    | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ -> ()
     | Lsplice _ ->
       fatal_error_invalid_constructor l
   in free l; !fv
