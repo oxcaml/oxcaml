@@ -158,6 +158,18 @@ let print_always_static_allocation ppf = function
   | Unboxed_unit -> Format_doc.fprintf ppf "unboxed unit literals"
   | Unboxed_bool -> Format_doc.fprintf ppf "unboxed boolean literals"
 
+type match_result_context =
+  | Try
+  | Match_with_exception
+  | Match_with_effects
+
+let print_match_result_context ppf = function
+  | Try -> Format_doc.fprintf ppf "a try expression"
+  | Match_with_exception ->
+      Format_doc.fprintf ppf "a match with exception patterns"
+  | Match_with_effects ->
+      Format_doc.fprintf ppf "a match with effect handlers"
+
 type mutable_restriction =
   | In_group
   | In_rec
@@ -321,6 +333,9 @@ type error =
         kind : [`Argument | `Result];
         why : [`Partial_match | `Optional_argument];
       }
+  | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
+  | Match_result_not_rep of
+      match_result_context * type_expr * Jkind.Violation.t
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
@@ -5175,6 +5190,12 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
   in
   ty_ret, mode_ret, args
 
+let contains_exception_pat pat =
+  exists_general_pattern { f = fun (type k) (p : k general_pattern) ->
+    match p.pat_desc with
+    | Tpat_exception _ -> true
+    | _ -> false } pat
+
 (* Generalization criterion for expressions *)
 
 let rec is_nonexpansive exp =
@@ -5201,12 +5222,6 @@ let rec is_nonexpansive exp =
      (* Not sure this is necessary, if [e] is nonexpansive then we shouldn't
          care if there are exception patterns. But the previous version enforced
          that there be none, so... *)
-      let contains_exception_pat pat =
-        exists_general_pattern { f = fun (type k) (p : k general_pattern) ->
-          match p.pat_desc with
-          | Tpat_exception _ -> true
-          | _ -> false } pat
-      in
       is_nonexpansive e &&
       List.for_all
         (fun {c_lhs; c_guard; c_rhs} ->
@@ -6083,6 +6098,14 @@ let check_absent_variant env =
       unify_pat env {pat with pat_type = newty (Tvariant row')}
                      (duplicate_type pat.pat_type)
     | _ -> () }
+
+let check_effect_handler_result_value env loc ty_expected =
+  let value = Jkind.Builtin.value_or_null ~why:Effect_handler_result in
+  match Ctype.constrain_type_jkind env ty_expected value with
+  | Ok () -> ()
+  | Error err ->
+      raise
+        (Error (loc, env, Effect_handler_result_not_value (ty_expected, err)))
 
 (* To find reasonable names for let-bound and lambda-bound idents *)
 
@@ -7428,6 +7451,8 @@ and type_expect_
       in
       if val_caselist = [] && eff_caselist <> [] then
         raise (Error (loc, env, No_value_clauses));
+      if eff_caselist <> [] then
+        check_effect_handler_result_value env loc ty_expected;
       let env, arg_pat_mode, arg_expected_mode, expected_mode =
         match eff_caselist with
         | [] ->
@@ -7472,6 +7497,23 @@ and type_expect_
         List.for_all (fun c -> pattern_needs_partial_application_check c.c_lhs)
           val_cases
       then check_partial_application ~statement:false arg;
+      if eff_cases <> []
+         || List.exists (fun c -> contains_exception_pat c.c_lhs) val_cases
+      then begin
+        match
+          Ctype.type_sort ~why:Match_or_try_result ~fixed:false env
+            ty_expected
+        with
+        | Ok _ -> ()
+        | Error err ->
+          let context =
+            match eff_cases with
+            | [] -> Match_with_exception
+            | _ :: _ -> Match_with_effects
+          in
+          raise (Error (loc, env,
+                        Match_result_not_rep (context, ty_expected, err)))
+      end;
       re {
         exp_desc = Texp_match(arg, sort, val_cases, eff_cases, partial);
         exp_loc = loc; exp_extra;
@@ -7491,6 +7533,8 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
+      if eff_caselist <> [] then
+        check_effect_handler_result_value env loc ty_expected;
       let env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
         | [] ->
@@ -7518,6 +7562,15 @@ and type_expect_
             type_effect_cases Value env expected_mode ty_expected_explained loc
               eff_caselist eff_conts
       in
+      begin
+        match
+          Ctype.type_sort ~why:Match_or_try_result ~fixed:false env ty_expected
+        with
+        | Ok _ -> ()
+        | Error err ->
+            raise (Error (loc, env,
+                          Match_result_not_rep (Try, ty_expected, err)))
+      end;
       re {
         exp_desc = Texp_try(body, exn_cases, eff_cases);
         exp_loc = loc; exp_extra = [];
@@ -13574,6 +13627,20 @@ let report_error ~loc env =
         Printtyp.type_expr ty
         (Location.Doc.loc ~capitalize_first:false) match_loc
         how what requirement
+  | Effect_handler_result_not_value (ty,violation) ->
+      Location.errorf ~loc
+        "@[The result of a match or try expression with effect handlers@ \
+          must have a value layout.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
+  | Match_result_not_rep (context,ty,violation) ->
+      Location.errorf ~loc
+        "@[The result of %a must have a representable layout.@]@ %a"
+        print_match_result_context context
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
