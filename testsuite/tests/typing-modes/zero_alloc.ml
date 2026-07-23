@@ -2191,7 +2191,7 @@ Error: The allocation is "alloc"
 (* The keyword binds loosely: the whole sequence to its right is inside
    the region. *)
 let (za_seq @ noalloc_strict) (r : int ref) =
-  zero_alloc_ (incr r; { x = 1.; y = 2. })
+  zero_alloc_ incr r; { x = 1.; y = 2. }
 [%%expect{|
 val za_seq : int ref -> record_t = <fun>
 |}]
@@ -2209,6 +2209,25 @@ let (za_nested @ noalloc_strict) () =
 val za_nested : unit -> record_t = <fun>
 |}]
 
+(* Nested regions with an intervening noalloc closure: the inner region
+   escapes the inner closure's allocation checks. *)
+let (za_nested_deep @ noalloc_strict) () =
+  zero_alloc_
+    (let (g @ noalloc_strict) () = zero_alloc_ { x = 1.; y = 2. } in
+     g ())
+[%%expect{|
+val za_nested_deep : unit -> record_t = <fun>
+|}]
+
+(* A captured [alloc] function may be called inside the region, even
+   though the capture would otherwise force the closure to be [alloc]. *)
+let za_exempt (h : (unit -> record_t) @ alloc) =
+  let (f @ noalloc_strict) () = zero_alloc_ (h ()) in
+  f
+[%%expect{|
+val za_exempt : (unit -> record_t) -> unit -> record_t = <fun>
+|}]
+
 (* [zero_alloc_] is transparent for type inference. *)
 let za_infer = zero_alloc_ (ref [])
 let () = za_infer := [1]
@@ -2224,7 +2243,9 @@ val za_contents : 'a list = [<poly>]
 
 let za_quoted = <[ fun () -> zero_alloc_ (1, 2) ]>
 [%%expect{|
->> Fatal error: Translquote [at Line 1, characters 29-47]: Texp_zero_alloc
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 29-47:
+1 | let za_quoted = <[ fun () -> zero_alloc_ (1, 2) ]>
+                                 ^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc_" construct is not supported inside quoted expressions,
+       as seen at line 1, characters 29-47.
 |}]

@@ -843,6 +843,7 @@ type no_open_quotations_context =
   | Layout_polymorphism_qt
   | Tconst_pat_qt of Longident.t
   | Class_type_qt
+  | Zero_alloc_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -3805,12 +3806,13 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
    [inner] is the locks pushed inside the innermost [zero_alloc_] region. *)
 let split_at_last_zero_alloc_lock locks =
   (* Printf.eprintf "ZA locks: %d\n" (List.length locks); *)
-  let rec go acc = function
-    | [] -> None
-    | (Zero_alloc_lock as l) :: rest -> Some (List.rev (l :: acc), rest)
-    | l :: rest -> go (l :: acc) rest
+  let rec go acc found = function
+    | [] -> found
+    | (Zero_alloc_lock as l) :: rest ->
+        go (l :: acc) (Some (List.rev (l :: acc), rest)) rest
+    | l :: rest -> go (l :: acc) found rest
   in
-  go [] locks
+  go [] None locks
 
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   let walk_one vmode lock =
@@ -3840,6 +3842,11 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           Mode.Allocation.Const.Noalloc_strict mode
       in
       let vmode = List.fold_left walk_one masked outer in
+      (* CR dkalinichenko: restoring the allocation axis here also
+         discards the [closure_noalloc_mode] marking that forces
+         allocations in enclosing noalloc closures to be local. Revisit
+         once the [Closure_noalloc_lock] detection (currently too
+         conservative) is fixed. *)
       let vmode =
         Mode.Value.join
           [ vmode;
@@ -5222,6 +5229,8 @@ let print_unsupported_quotation ppf =
         (Format.asprintf "%a" Pprintast.longident tconst)
   | Class_type_qt ->
       fprintf ppf "Using class type annotations"
+  | Zero_alloc_qt ->
+      fprintf ppf "The %a construct" (Style.inline_code) "zero_alloc_"
 
 let print_unbound_in_quotation ppf =
   function

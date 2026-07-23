@@ -669,7 +669,7 @@ let mode_zero_alloc expected_mode =
   let crossing =
     Crossing.create ~linearity:false ~portability:false
       ~regionality:false ~uniqueness:false ~contention:false
-      ~statefulness:true ~visibility:false ~forkable:false ~yielding:false
+      ~statefulness:false ~visibility:false ~forkable:false ~yielding:false
       ~staticity:false ~allocation:true
   in
   mode_morph (Crossing.apply_right crossing) expected_mode
@@ -8580,6 +8580,7 @@ and type_expect_
            exp_env = env }
   | Pexp_zero_alloc sbody ->
       Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+      Env.check_no_open_quotations loc env Zero_alloc_qt;
       (* [zero_alloc_ e] must be in the tail position of its region; the
          allocation axis of [e] is unconstrained and its zero_alloc property
          is verified by the backend checker instead. *)
