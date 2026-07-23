@@ -49,7 +49,7 @@ let get_global glob =
     raise(Error(Unbound_global glob))
 
 let rec address path event = function
-  | Env.Aunit cu -> get_global (Glob_compunit cu)
+  | Env.Aunit (cu, _) -> get_global (Glob_compunit cu)
   | Env.Alocal id ->
     begin
       match Symtable.Global.of_ident id with

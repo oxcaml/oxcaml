@@ -2019,7 +2019,14 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
+  | Env.Aunit (cu, mode) ->
+    let staticity = Mode.Value.proj_monadic Staticity mode in
+    let staticity =
+      match Mode.Staticity.zap_to_floor staticity with
+      | Static -> Static
+      | Dynamic -> Dynamic
+    in
+    Lprim(Pgetglobal (cu, staticity), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)

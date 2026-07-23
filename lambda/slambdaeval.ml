@@ -345,10 +345,29 @@ module CU_data = struct
       templates
 end
 
-type ctx =
-  { cu_static_data : Compilation_unit.t -> CU_data.t option;
-    store : Template_store.t
-  }
+module Ctx = struct
+  type t =
+    { cu_static_data_getter : Compilation_unit.t -> CU_data.t option;
+      cu_static_data : value Or_missing.t Compilation_unit.Tbl.t;
+      store : Template_store.t
+    }
+
+  let create ~cu_static_data =
+    { cu_static_data_getter = cu_static_data;
+      cu_static_data = Compilation_unit.Tbl.create 0;
+      store = Template_store.empty ()
+    }
+
+  let cu_static_data t cu =
+    Compilation_unit.Tbl.memoize t.cu_static_data
+      (fun cu ->
+        match t.cu_static_data_getter cu with
+        | Some { CU_data.templates; cu } ->
+          Template_store.add_foreign_templates t.store templates;
+          cu
+        | None -> Or_missing.Missing)
+      cu
+end
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -396,25 +415,19 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam ?name ctx env slam : value Or_missing.t =
+let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam ctx env sval_comptime in
+    let slv_comptime = eval_slam ?name ctx env sval_comptime in
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
-  | SLglobal cu ->
-    begin match ctx.cu_static_data cu with
-    | Some { CU_data.templates; cu } ->
-      Template_store.add_foreign_templates ctx.store templates;
-      cu
-    | None -> Missing
-    end
+  | SLglobal cu -> Ctx.cu_static_data ctx cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam ~name:slet_name ctx env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam ctx env_body slet_body
+    eval_slam ?name ctx env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
@@ -423,7 +436,7 @@ let rec eval_slam ?name ctx env slam : value Or_missing.t =
     let* fields = eval_slam ctx env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam ctx env slam |>> expect Thalves in
+    let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
     let closure =
@@ -859,7 +872,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
-let do_eval ctx slam =
+let do_eval (ctx : Ctx.t) slam =
   let { slv_comptime; slv_runtime } =
     eval_slam ctx Env.empty slam
     |> expect_not_missing
@@ -876,13 +889,13 @@ let do_eval ctx slam =
 
 let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
-      let store = Template_store.empty () in
-      let { slv_comptime; slv_runtime } =
-        do_eval { cu_static_data; store } slam
-      in
+      let ctx = Ctx.create ~cu_static_data in
+      let { slv_comptime; slv_runtime } = do_eval ctx slam in
       (try assert_no_splices slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      ( { CU_data.templates = Template_store.templates store; cu = slv_comptime },
+      ( { CU_data.templates = Template_store.templates ctx.store;
+          cu = slv_comptime
+        },
         slv_runtime ))

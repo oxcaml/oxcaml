@@ -161,7 +161,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
         else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
       global_symbol cu
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
