@@ -56,28 +56,12 @@ let $camlUnboxable_local_returning__ret_heap_6 =
 and $camlUnboxable_local_returning__ret_heap_unboxed_7 =
   closure ret_heap_3_2 @ret_heap_unboxed &toplevel.alloc_region
 in
-(let stdout =
-   %project_value_slot.[print_endline].[stdout]
-     ($Stdlib.camlStdlib__print_endline_138)
- in
- apply ccall inlining_state(depth(20))
-   ($`*extern*`.caml_ml_output : val * val * val * val -> val)
-     (stdout, $camlUnboxable_local_returning__immstring81, 0, 2)
-     -> k2 * error
-   where k2 (param) =
-     cont k1
-   where k1 =
-     (apply ccall inlining_state(depth(10))
-        ($`*extern*`.caml_ml_output_char : val * val -> val)
-          (stdout, 10)
-          -> k2 * error
-        where k2 (param) =
-          cont k1
-        where k1 =
-          (apply ccall inlining_state(depth(10))
-             ($`*extern*`.caml_ml_flush : val -> val) (stdout) -> k1 * error
-             where k1 (param) =
-               cont k)))
+apply direct(print_endline_47 &toplevel.alloc_region) inlined(never)
+  ($Stdlib.camlStdlib__print_endline_138 : _ -> imm tagged)
+    ($camlUnboxable_local_returning__immstring81)
+    -> k1 * error
+  where k1 (param : imm tagged) =
+    cont k
   where k =
     let $camlUnboxable_local_returning =
       Block 0 ($camlUnboxable_local_returning__ret_local_4,
