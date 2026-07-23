@@ -1021,20 +1021,14 @@ let (alloc_int_ref @ noalloc_strict) () = ( + )
 Line 1, characters 42-47:
 1 | let (alloc_int_ref @ noalloc_strict) () = ( + )
                                               ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 37-47
-         which is expected to be "noalloc_strict".
+Error: This value is "local" but is expected to be "global".
 |}]
 let (alloc_int_ref @ noalloc) () = ( + )
 [%%expect{|
 Line 1, characters 35-40:
 1 | let (alloc_int_ref @ noalloc) () = ( + )
                                        ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 30-40
-         which is expected to be "noalloc".
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* A partial application of [(+)] also allocates a closure. *)
@@ -1043,22 +1037,20 @@ let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
 Line 1, characters 53-58:
 1 | let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
                                                          ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 41-60
-         which is expected to be "noalloc_strict".
+Error: This value is "local" but is expected to be "global".
 |}]
 let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
 [%%expect{|
 Line 1, characters 46-51:
 1 | let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
                                                   ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 34-53
-         which is expected to be "noalloc".
+Error: This value is "local" but is expected to be "global".
 |}]
 
+(* CR shsong: [( + )] is Prim_global, we do not have the corresponding
+    mode variable in [type_ident], so we just register allocation with
+    legacy mode [alloc], and cannot make its partial application result
+    to local. *)
 (* [(( + ) a) a] forces [( + ) a] to be materialised as its own partial
    application (a closure), unlike the fully-applied [a + a]. *)
 let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
@@ -1066,20 +1058,39 @@ let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
 Line 1, characters 52-57:
 1 | let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
                                                         ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 39-62
-         which is expected to be "noalloc_strict".
+Error: This value is "local" but is expected to be "global".
 |}]
 let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
 [%%expect{|
 Line 1, characters 45-50:
 1 | let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
                                                  ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 32-55
-         which is expected to be "noalloc".
+Error: This value is "local" but is expected to be "global".
+|}]
+
+let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
+[%%expect{|
+Line 1, characters 61-66:
+1 | let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
+                                                                 ^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
+[%%expect{|
+Line 1, characters 54-59:
+1 | let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
+                                                          ^^^^^
+Error: This value is "local" but is expected to be "global".
+|}]
+
+(* Primitive's mode is kept on aliasing, not modified by its fully-applied
+   exemption. *)
+let (f_alias @ noalloc_strict) = ( + )
+[%%expect{|
+Line 1, characters 33-38:
+1 | let (f_alias @ noalloc_strict) = ( + )
+                                     ^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
 (* The fully-applied relaxation also reaches primitives applied through [|>]
@@ -1120,10 +1131,7 @@ let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
 Line 1, characters 67-72:
 1 | let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
                                                                        ^^^^^
-Error: The value "(+)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 50-72
-         which is expected to be "noalloc_strict".
+Error: This value is "local" but is expected to be "global".
 |}]
 
 (* CR-soon shsong: revisit exception handling after implementing the

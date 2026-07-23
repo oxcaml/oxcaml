@@ -6517,16 +6517,17 @@ let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
   | "%boolnot" | "%sequand" | "%sequor" -> true
   | _ -> false
 
-let prim_fully_applied_noalloc (prim : Primitive.description) ~applied_arity =
-  prim.prim_arity > 0
-  && applied_arity >= prim.prim_arity
-  && prim_is_noalloc_when_fully_applied prim
-
-let relax_alloc_for_fully_applied_prim ~applied_arity val_kind mode =
-  match val_kind with
-  | Val_prim prim when prim_fully_applied_noalloc prim ~applied_arity ->
+let relax_alloc desc mode =
+  match desc.val_kind with
+  | Val_prim prim when prim_is_noalloc_when_fully_applied prim ->
     Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
   | _ -> mode
+
+let unrelax_alloc orig_mode actual_mode =
+  Value.join
+    [ actual_mode;
+      Value.min_with_comonadic Allocation
+        (Value.proj_comonadic Allocation orig_mode) ]
 
 let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(applied_arity=0)
       env expected_mode sexp =
@@ -9108,13 +9109,18 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  let mode =
-    relax_alloc_for_fully_applied_prim ~applied_arity desc.val_kind mode
-  in
+  (* Relax mode for primtives that do not allocate when fully applied.
+    They may still trigger closure allocation when they are
+    (1) referenced with no arguments or (2) partially applied, which
+    will be handled by register_allocation_mode below. *)
+  let relax_mode = relax_alloc desc mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
-      (mode, locks)
+      (relax_mode, locks)
   in
+  (* We need to restore Allocation mode axis for primitives: they cannot be noalloc
+     since they allocates when partially applied. *)
+  let actual_mode = unrelax_alloc mode actual_mode in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
   and the second only deals with monadic. *)
@@ -9137,27 +9143,23 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
   end;
   let layout_args, val_type, kind =
     match desc.val_kind with
-    (* Allocation axis: only [Val_prim] can allocate merely by being referenced
-       (the primitive's result).
-
-       CR shsong: Double check this: We skip registering that allocation exactly
-       when the reference is fully applied to a non-allocating primitive -- the
-       case relaxed by [relax_alloc_for_fully_applied_prim] above, where there
-       is no allocation to account for. Every other case still registers: bare
-       and partial references (eta-expanded into a closure), and fully-applied
-       *allocating* primitives (e.g. [ref], [Int64.add]), whose boxed result is
-       a real allocation that stack-allocation / regionality inference relies
-       on.
-
-       Why non-primitives do not need to register allocation here? *)
+    (* register_allocation_mode is used for two things:
+        1. if the locality of returned value of the primitive is poly
+          we then register allocation for further optimization
+        2. if the primitive is noalloc when fully applied, we prevent
+          it from forcing the closure to be noalloc, but need to register
+          closure allocation when it is (1) referenced with no arguments
+          or (2) partially applied *)
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
-       if not (prim_fully_applied_noalloc prim ~applied_arity) then begin
+       if not (prim_is_noalloc_when_fully_applied prim) ||
+          prim.prim_arity = 0 || applied_arity < prim.prim_arity then begin
          match prim.prim_native_repr_res, mode with
-         (* Poly result: register an allocation at the result's locality. *)
+         (* Poly result: register an allocation at the result's locality
+            for further optimization. *)
          | (Prim_poly, _), Some mode ->
              register_allocation_mode ~env ~loc:lid.loc
                (Alloc.max_with_comonadic Areality mode)
