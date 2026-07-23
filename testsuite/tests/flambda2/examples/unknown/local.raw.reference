@@ -37,7 +37,7 @@
               apply &my_alloc_region f (Pfield) -> k3 * k2)
                where k3 (apply_result_1 : val) =
                  let Pmakeblock =
-                   %block.[`0`].my_alloc_region.`local`[my_region]
+                   %block.[`0`].my_alloc_region.local[my_region]
                      (apply_result_1, apply_result)
                  in
                  cont k1 (Pmakeblock)))
@@ -94,7 +94,7 @@
      where k3 =
        let Pfield = %block_load.[`0`] (l1) in
        let Pmakeblock =
-         %block.[`0`].my_alloc_region.`local`[my_region] (Pfield, l2)
+         %block.[`0`].my_alloc_region.local[my_region] (Pfield, l2)
        in
        let Pfield_1 = %block_load.[`1`] (l1) in
        apply direct(rev_app_4 &my_alloc_region &my_region &my_ghost_region)
@@ -127,8 +127,7 @@
      where k4 =
        let l_1 = %block_load.[`1`] (l) in
        let a = %block_load.[`0`] (l) in
-       let acc_1 = %block.[`0`].my_alloc_region.`local`[my_region] (a, acc)
-       in
+       let acc_1 = %block.[`0`].my_alloc_region.local[my_region] (a, acc) in
        (apply &my_alloc_region break_here (a) -> k6 * k2
           where k6 (apply_result : [ 0 |1 ]) =
             ((let untagged = %untag_imm (apply_result) in
@@ -151,12 +150,12 @@
                 -> k1 * k2
           where k4 =
             let Pmakeblock =
-              %block.[`0`].my_alloc_region.`local`[my_region] (acc_1, l_1)
+              %block.[`0`].my_alloc_region.local[my_region] (acc_1, l_1)
             in
             cont k1 (Pmakeblock))
      where k3 =
        let Pmakeblock =
-         %block.[`0`].my_alloc_region.`local`[my_region] (acc, 0)
+         %block.[`0`].my_alloc_region.local[my_region] (acc, 0)
        in
        cont k1 (Pmakeblock)
  in
@@ -211,7 +210,7 @@
                             (apply_result_1 :
                                [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                       let Pmakeblock =
-                        %block.[`0`].my_alloc_region.`local`[my_region]
+                        %block.[`0`].my_alloc_region.local[my_region]
                           (apply_result_1, apply_result)
                       in
                       cont k1 (Pmakeblock))))

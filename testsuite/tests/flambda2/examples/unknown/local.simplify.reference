@@ -67,7 +67,7 @@ and code rec loopify(never) size(31) newer_version_of(map_local_1)
              apply &my_alloc_region f (Pfield) -> k2 * k1)
               where k2 (apply_result_1 : val) =
                 let Pmakeblock =
-                  %block.[`0`].my_alloc_region.`local`[my_region]
+                  %block.[`0`].my_alloc_region.local[my_region]
                     (apply_result_1, apply_result)
                 in
                 cont k (Pmakeblock)))
@@ -174,7 +174,7 @@ apply direct(length_2_1 &toplevel.alloc_region)
                        where k2 =
                          let Pfield = %block_load.[`0`] (l1_1) in
                          let Pmakeblock =
-                           %block.[`0`].my_alloc_region.`local`[my_region]
+                           %block.[`0`].my_alloc_region.local[my_region]
                              (Pfield, l2_1)
                          in
                          let Pfield_1 = %block_load.[`1`] (l1_1) in
@@ -203,16 +203,14 @@ apply direct(length_2_1 &toplevel.alloc_region)
                   | 1 -> k3
                   where k3 =
                     let Pmakeblock =
-                      %block.[`0`].my_alloc_region.`local`[my_region]
-                        (acc, 0)
+                      %block.[`0`].my_alloc_region.local[my_region] (acc, 0)
                     in
                     cont k (Pmakeblock)
                   where k2 =
                     let l_1 = %block_load.[`1`] (l) in
                     let a = %block_load.[`0`] (l) in
                     let acc_1 =
-                      %block.[`0`].my_alloc_region.`local`[my_region]
-                        (a, acc)
+                      %block.[`0`].my_alloc_region.local[my_region] (a, acc)
                     in
                     (apply &my_alloc_region break_here (a) -> k3 * k1
                        where k3 (param : [ 0 |1 ]) =
@@ -225,7 +223,7 @@ apply direct(length_2_1 &toplevel.alloc_region)
                             | 1 -> k3
                             where k3 =
                               let Pmakeblock =
-                                %block.[`0`].my_alloc_region.`local`[my_region]
+                                %block.[`0`].my_alloc_region.local[my_region]
                                   (acc_1, l_1)
                               in
                               cont k (Pmakeblock)
@@ -298,7 +296,7 @@ apply direct(length_2_1 &toplevel.alloc_region)
                                             | 0 of val *
                                                 [ 0 | 0 of val * val ] ]) =
                                    let Pmakeblock =
-                                     %block.[`0`].my_alloc_region.`local`[my_region]
+                                     %block.[`0`].my_alloc_region.local[my_region]
                                        (apply_result_1, apply_result)
                                    in
                                    cont k (Pmakeblock))))
