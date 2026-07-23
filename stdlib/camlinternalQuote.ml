@@ -31,8 +31,8 @@
 type 'a lam = 'a
 
 module Stamp : sig
-  (** [t] is the type of stamps. Stamps have no structure, only a notion
-      of identity. *)
+  (** [t] is the type of stamps. Stamps have no structure, only a notion of
+      identity. *)
   type t
 
   (** [fresh ()] creates a fresh stamp, unequal to any other. *)
@@ -78,14 +78,14 @@ end
 
 module Level : sig
   (** [t] is the type of binding levels. All variable bindings have an
-      associated level and all bindings of the same level have the same
-      scope. Each level is associated with a point on the call
-      stack. Each level has a location attached for error messages. *)
+      associated level and all bindings of the same level have the same scope.
+      Each level is associated with a point on the call stack. Each level has a
+      location attached for error messages. *)
   type t
 
   (** [with_fresh loc f] creates a fresh level not equal to any others,
-      associated with the current point in the call stack, with [loc] as
-      the attached location. *)
+      associated with the current point in the call stack, with [loc] as the
+      attached location. *)
   val with_fresh : Loc.t -> (t -> 'a) -> 'a
 
   (** [compare] is a total order on levels. *)
@@ -129,23 +129,25 @@ module Name = struct
 
   let base_name s =
     let whole_possibly_parens s =
-      if List.for_all
-           (fun p -> not (String.starts_with ~prefix:p s))
-           let_prefixes
+      if
+        List.for_all
+          (fun p -> not (String.starts_with ~prefix:p s))
+          let_prefixes
       then s
       else "(" ^ s ^ ")"
     in
     match String.rindex_opt s '_' with
     | None -> whole_possibly_parens s
-    | Some i -> begin
-        if i = 0 then whole_possibly_parens s
-        else if s.[i - 1] = '_'
-        then
-          let n = String.length s in
-          match Int32.of_string_opt (String.sub s (i + 1) (n - i - 1)) with
-          | None -> s
-          | Some _ -> String.sub s 0 (i - 1)
-        else s
+    | Some i ->
+      begin if i = 0
+      then whole_possibly_parens s
+      else if s.[i - 1] = '_'
+      then
+        let n = String.length s in
+        match Int32.of_string_opt (String.sub s (i + 1) (n - i - 1)) with
+        | None -> s
+        | Some _ -> String.sub s 0 (i - 1)
+      else s
       end
 
   let print fmt s = Format.fprintf fmt "%s" s
@@ -192,8 +194,8 @@ module Var : sig
     (** [t] is the type of module variables *)
     type t
 
-    (** [generate lv n] creates a fresh module variable bound at [lv]
-        whose name is [n]. *)
+    (** [generate lv n] creates a fresh module variable bound at [lv] whose name
+        is [n]. *)
     val generate : Level.t -> Name.t -> t
 
     (** [generic t] is [t] as a generic variable *)
@@ -214,8 +216,8 @@ module Var : sig
     (** [t] is the type of ordinary variables *)
     type t
 
-    (** [generate lv n] creates a fresh variable bound at [lv] whose
-        name is [n]. *)
+    (** [generate lv n] creates a fresh variable bound at [lv] whose name is
+        [n]. *)
     val generate : Level.t -> Name.t -> t
 
     (** [generic t] is [t] as a generic variable *)
@@ -236,8 +238,8 @@ module Var : sig
     (** [t] is the type of type variables *)
     type t
 
-    (** [generate lv n] creates a fresh type constructor variable
-        bound at [lv] whose name is [n]. *)
+    (** [generate lv n] creates a fresh type constructor variable bound at [lv]
+        whose name is [n]. *)
     val generate : Level.t -> Name.t -> t
 
     (** [name t] is the name of [t]. *)
@@ -252,8 +254,8 @@ module Var : sig
     (** [t] is the type of type constructor variables *)
     type t
 
-    (** [generate lv n] creates a fresh type constructor variable
-        bound at [lv] whose name is [n]. *)
+    (** [generate lv n] creates a fresh type constructor variable bound at [lv]
+        whose name is [n]. *)
     val generate : Level.t -> Name.t -> t
 
     (** [generic t] is [t] as a generic variable *)
@@ -290,10 +292,10 @@ module Var : sig
         all the variables that are in both [t1] and [t2]. *)
     val union : shared:(var -> unit) -> t -> t -> t
 
-    (** [inter ~left_only ~right_only t1 t2] is the intersection of [t1]
-        and [t2]. [left_only] is run on all the variables that are in
-        [t1] and not in [t2]. [right_only] is run on all the variables
-        that are in [t2] and not in [t1]. *)
+    (** [inter ~left_only ~right_only t1 t2] is the intersection of [t1] and
+        [t2]. [left_only] is run on all the variables that are in [t1] and not
+        in [t2]. [right_only] is run on all the variables that are in [t2] and
+        not in [t1]. *)
     val inter :
       left_only:(var -> unit) -> right_only:(var -> unit) -> t -> t -> t
 
@@ -510,8 +512,8 @@ end = struct
 end
 
 module With_bound_vars : sig
-  (** ['a t] is the type of ['a]s paired with a set of variables that
-      are bound by the ['a]. *)
+  (** ['a t] is the type of ['a]s paired with a set of variables that are bound
+      by the ['a]. *)
   type 'a t
 
   (** [return x] is [mk Var.Set.empty x]. *)
@@ -523,24 +525,22 @@ module With_bound_vars : sig
   (** [module_var v] is [mk (Var.Set.singleton (Var.Module.generic v)) v]. *)
   val module_var : Var.Module.t -> Var.Module.t t
 
-  (** [map f t] is [f v], where [v] is the value of [t], paired with the
-      same variables as [t]. *)
+  (** [map f t] is [f v], where [v] is the value of [t], paired with the same
+      variables as [t]. *)
   val map : ('a -> 'b) -> 'a t -> 'b t
 
-  (** [meet t1 t2] is [(v1, v2)], where [v1] and [v2] are the values of
-      [t1] and [t2] respectively, paired with the union of the variables
-      from [t1] and [t2] which are expected to be disjoint. If [t1] and
-      [t2] share any variables then [duplicated] will be run on the
-      shared variables.*)
+  (** [meet t1 t2] is [(v1, v2)], where [v1] and [v2] are the values of [t1] and
+      [t2] respectively, paired with the union of the variables from [t1] and
+      [t2] which are expected to be disjoint. If [t1] and [t2] share any
+      variables then [duplicated] will be run on the shared variables.*)
   val meet : duplicated:(Var.t -> unit) -> 'a t -> 'b t -> ('a * 'b) t
 
-  (** [join ~left_only ~right_only t1 t2] is [(v1, v2)], where [v1] and
-      [v2] are the values of [t1] and [t2] respectively, paired with the
-      intersection of the variables from [t1] and [t2] which are
-      expected to be equal. If any variables in [t1] are missing from
-      [t2] then [left_only] with be run on them. If any variables in
-      [t2] are missing from [t1] then [right_only] will be run on
-      them. *)
+  (** [join ~left_only ~right_only t1 t2] is [(v1, v2)], where [v1] and [v2] are
+      the values of [t1] and [t2] respectively, paired with the intersection of
+      the variables from [t1] and [t2] which are expected to be equal. If any
+      variables in [t1] are missing from [t2] then [left_only] with be run on
+      them. If any variables in [t2] are missing from [t1] then [right_only]
+      will be run on them. *)
   val join :
     left_only:(Var.t -> unit) ->
     right_only:(Var.t -> unit) ->
@@ -548,28 +548,25 @@ module With_bound_vars : sig
     'b t ->
     ('a * 'b) t
 
-  (** [meet_all ~duplicated [t1; t2; ...]] is [[v1; v2; ...]], where
-      each [vn] is the value of [tn], paired with the union of the
-      variables from all the [ts] which are expected to be disjoint. If
-      the [ts] share any variables then [duplicated] will be run on the
-      shared variables. *)
+  (** [meet_all ~duplicated [t1; t2; ...]] is [[v1; v2; ...]], where each [vn]
+      is the value of [tn], paired with the union of the variables from all the
+      [ts] which are expected to be disjoint. If the [ts] share any variables
+      then [duplicated] will be run on the shared variables. *)
   val meet_all : duplicated:(Var.t -> unit) -> 'a t list -> 'a list t
 
-  (** [optional tm] is [Some v], where [v] is the value of [t], paired
-      with the variables from [t] if [tm] is [Some t]. It is [return
-      None] if [tm] is [None]. *)
+  (** [optional tm] is [Some v], where [v] is the value of [t], paired with the
+      variables from [t] if [tm] is [Some t]. It is [return None] if [tm] is
+      [None]. *)
   val optional : 'a t option -> 'a option t
 
-  (** [value ~extra ~missing t vs] is [t]'s value. [t] is expected to
-      bind exactly the variables [vs]. [extra] is run on any additional
-      variables that are bound. [missing] is run on any variables that
-      are missing. *)
+  (** [value ~extra ~missing t vs] is [t]'s value. [t] is expected to bind
+      exactly the variables [vs]. [extra] is run on any additional variables
+      that are bound. [missing] is run on any variables that are missing. *)
   val value :
     extra:(Var.t -> unit) -> missing:(Var.t -> unit) -> 'a t -> Var.t list -> 'a
 
-  (** [value_nonbinding ~extra t] is [t]'s value. [t] is expected to
-      bind no variables. [extra] is run on any additional variables that
-      are bound. *)
+  (** [value_nonbinding ~extra t] is [t]'s value. [t] is expected to bind no
+      variables. [extra] is run on any additional variables that are bound. *)
   val value_nonbinding : extra:(Var.t -> unit) -> 'a t -> 'a
 end = struct
   type 'a t =
@@ -625,8 +622,8 @@ end = struct
 end
 
 module With_free_vars : sig
-  (** ['a t] is the type of ['a]s paired with a set of variables that
-      are free in the ['a] along with their associated locations. *)
+  (** ['a t] is the type of ['a]s paired with a set of variables that are free
+      in the ['a] along with their associated locations. *)
   type 'a t
 
   (** [mk vars x] is [x] paired with [vars]. *)
@@ -635,32 +632,31 @@ module With_free_vars : sig
   (** [return x] is [mk Var.Map.empty x]. *)
   val return : 'a -> 'a t
 
-  (** [map f t] is [f v], where [v] is the value of [t], paired with the
-      same variables as [t]. *)
+  (** [map f t] is [f v], where [v] is the value of [t], paired with the same
+      variables as [t]. *)
   val map : ('a -> 'b) -> 'a t -> 'b t
 
-  (** [both t1 t2] is [(v1, v2)], where [v1] and [v2] are the values of
-      [t1] and [t2] respectively, paired with the union of the variables
-      from [t1] and [t2]. *)
+  (** [both t1 t2] is [(v1, v2)], where [v1] and [v2] are the values of [t1] and
+      [t2] respectively, paired with the union of the variables from [t1] and
+      [t2]. *)
   val both : 'a t -> 'b t -> ('a * 'b) t
 
-  (** [all [t1; t2; ...]] is [[v1; v2; ...]], where each [vn] is the
-      value of [tn], paired with the union of the variables from all the
-      [ts]. *)
+  (** [all [t1; t2; ...]] is [[v1; v2; ...]], where each [vn] is the value of
+      [tn], paired with the union of the variables from all the [ts]. *)
   val all : 'a t list -> 'a list t
 
-  (** [optional tm] is [Some t], where [v] is the value of [t], paired
-      with the variables from [t] if [tm] is [Some t]. It is [return
-      None] if [tm] is [None]. *)
+  (** [optional tm] is [Some t], where [v] is the value of [t], paired with the
+      variables from [t] if [tm] is [Some t]. It is [return None] if [tm] is
+      [None]. *)
   val optional : 'a t option -> 'a option t
 
-  (** [value ~free t] is the value of [t]. [t] is expected to have no
-      free variables. [free] is run on any variables paired with [t]. *)
+  (** [value ~free t] is the value of [t]. [t] is expected to have no free
+      variables. [free] is run on any variables paired with [t]. *)
   val value : free:(Var.t -> Loc.t -> unit) -> 'a t -> 'a
 
-  (** [value_binding loc name t] is the value of [t]. [t] is expected to have
-      a single free variable named [name]. [t] is represented as a function
-      from this variable to the term itself. *)
+  (** [value_binding loc name t] is the value of [t]. [t] is expected to have a
+      single free variable named [name]. [t] is represented as a function from
+      this variable to the term itself. *)
   val value_binding : Loc.t -> Name.t -> (Var.Value.t -> 'a t) -> 'a t
 
   (** [value_bindings loc names t] is the value of [t]. [t] is expected to have
@@ -681,23 +677,22 @@ module With_free_vars : sig
   val type_var_bindings :
     Loc.t -> Name.t list -> (Var.Type_var.t list -> 'a t) -> 'a t
 
-  (** [type_bindings loc name t] is the value of [t]. [t] is expected to have
-      a single free type constructor variable named [name]. [t] is represented
-      as a function from these type constructor variables to the term itself. *)
-  val type_binding :
-    Loc.t -> Name.t -> (Var.Type_constr.t -> 'a t) -> 'a t
+  (** [type_bindings loc name t] is the value of [t]. [t] is expected to have a
+      single free type constructor variable named [name]. [t] is represented as
+      a function from these type constructor variables to the term itself. *)
+  val type_binding : Loc.t -> Name.t -> (Var.Type_constr.t -> 'a t) -> 'a t
 
-  (** [module_binding loc name t] is the value of [t]. [t] is expected to have
-      a single free module variable named [name]. [t] is represented as a
-      function from this module variable to the term itself. *)
+  (** [module_binding loc name t] is the value of [t]. [t] is expected to have a
+      single free module variable named [name]. [t] is represented as a function
+      from this module variable to the term itself. *)
   val module_binding : Loc.t -> Name.t -> (Var.Module.t -> 'a t) -> 'a t
 
   (** [complex_bindings ~extra ~missing ~bound_values ~bound_modules t] is the
       value of [t]. [t] is expected to have free value-kinded variables (named
-      [bound_values]) and free module variables (named [bound_modules]).
-      [t] is expected to bind exactly these variables. [extra] is run on any
-      additional variables that are bound. [missing] is run on any variables
-      that are missing. *)
+      [bound_values]) and free module variables (named [bound_modules]). [t] is
+      expected to bind exactly these variables. [extra] is run on any additional
+      variables that are bound. [missing] is run on any variables that are
+      missing. *)
   val complex_bindings :
     Loc.t ->
     extra:(Var.t -> unit) ->
@@ -914,8 +909,8 @@ let print_op fmt s =
 let needs_value_parens s =
   s <> ""
   && (List.mem s special_infix_strings
-      || List.mem s.[0] special_symbols
-      || s.[0] = '.')
+     || List.mem s.[0] special_symbols
+     || s.[0] = '.')
 
 let print_value_var env fmt v =
   if needs_value_parens (Var.Value.name v)
@@ -1187,7 +1182,8 @@ module Ast = struct
     | Nonrecursive
     | Recursive
 
-  type mode = | Mode of string [@@unboxed]
+  type mode = Mode of string [@@unboxed]
+
   type modes = mode list
 
   type direction_flag =
@@ -1440,13 +1436,13 @@ module Ast = struct
     | { desc = Ident (VVar _ as l); attributes = [] }
     (* Stdlib is available inside quotations; if the operator is unambiguous
        and from Stdlib, it can be written in an infix position *)
-    | { desc = Ident (VDot (Global_module "Stdlib", _) as l);
-        attributes = [] } ->
+    | { desc = Ident (VDot (Global_module "Stdlib", _) as l); attributes = [] }
+      ->
       fixity_of_string (suffix_string_of_ident_value l)
     | _ -> `Normal
 
-  let print_tuple_like
-        ?(with_space=true) delim open_sym close_sym printer fmt entries =
+  let print_tuple_like ?(with_space = true) delim open_sym close_sym printer fmt
+      entries =
     pp fmt "%s@[" open_sym;
     (match entries with
     | [] -> ()
@@ -1454,9 +1450,9 @@ module Ast = struct
       printer fmt e;
       List.iter
         (fun e ->
-           if with_space
-           then pp fmt "%a@ %a" pp delim printer e
-           else pp fmt "%a@,%a" pp delim printer e)
+          if with_space
+          then pp fmt "%a@ %a" pp delim printer e
+          else pp fmt "%a@,%a" pp delim printer e)
         es);
     pp fmt "@]%s" close_sym
 
@@ -1474,22 +1470,21 @@ module Ast = struct
   let print_obj_closed fmt closed_flag =
     pp fmt "%s" (match closed_flag with OOpen -> "; .." | OClosed -> "")
 
-
-  let print_dir fmt = function
-    | Upto -> pp fmt "to"
-    | Downto -> pp fmt "downto"
+  let print_dir fmt = function Upto -> pp fmt "to" | Downto -> pp fmt "downto"
 
   let print_vb_attribute fmt { vb_attr_name; vb_attr_payload } =
     match vb_attr_payload with
     | None -> pp fmt "[@%s]@ " vb_attr_name
     | Some s -> pp fmt "[@%s %s]@ " vb_attr_name s
 
-  let print_vb_attributes fmt attrs =
-    List.iter (print_vb_attribute fmt) attrs
+  let print_vb_attributes fmt attrs = List.iter (print_vb_attribute fmt) attrs
 
   let rec print_vb env fmt ({ pat; expr; _ } : value_binding) =
     pp fmt "%a@ =@ @[<2>%a@]"
-      (print_pat ~with_parens:false env) pat (print_exp_with_parens env) expr
+      (print_pat ~with_parens:false env)
+      pat
+      (print_exp_with_parens env)
+      expr
 
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
@@ -1546,9 +1541,10 @@ module Ast = struct
     | PatConstant c when is_negative_const c ->
       pp fmt "(@[%a@])" (print_pat env) pat
     | PatAny | PatVar _ | PatConstant _ | PatTuple _ | PatUnboxedUnit
-    | PatUnboxedBool _ | PatUnboxedTuple _ | PatVariant (_, None)
-    | PatConstruct (_, None) | PatRecord _ | PatUnboxedRecord _ | PatArray _
-    | PatConstraint _ ->
+    | PatUnboxedBool _ | PatUnboxedTuple _
+    | PatVariant (_, None)
+    | PatConstruct (_, None)
+    | PatRecord _ | PatUnboxedRecord _ | PatArray _ | PatConstraint _ ->
       print_pat env fmt pat
     | _ -> pp fmt "(@[%a@])" (print_pat env) pat
 
@@ -1564,15 +1560,14 @@ module Ast = struct
     | PatTuple ts -> print_tuple (print_pat env) fmt ts
     | PatUnboxedTuple ts -> pp fmt "#%a" (print_tuple (print_pat env)) ts
     | PatConstruct (ident, pat_opt) -> (
-        match pat_opt with
-        | None -> print_constr env fmt ident
-        | Some p ->
-          match ident with
-          | CIdent (CBuiltin "::") -> print_list_pat env fmt pat
-          | _ ->
-            pp fmt "%a@ %a"
-              (print_constr env) ident (print_pat_with_parens env) p
-      )
+      match pat_opt with
+      | None -> print_constr env fmt ident
+      | Some p -> (
+        match ident with
+        | CIdent (CBuiltin "::") -> print_list_pat env fmt pat
+        | _ ->
+          pp fmt "%a@ %a" (print_constr env) ident (print_pat_with_parens env) p
+        ))
     | PatVariant (variant, pat_opt) -> (
       match pat_opt with
       | None -> Variant.print fmt variant
@@ -1599,9 +1594,8 @@ module Ast = struct
       pp fmt "%a@ |@ %a" (print_pat env) pat1 (print_pat env) pat2
     | PatConstraint (pat, ty, modes) ->
       maybe_parens with_parens fmt (fun fmt () ->
-        pp fmt "%a@ :@ %a%a"
-          (print_pat env) pat (print_core_type env) ty
-          print_mode_constraint modes)
+          pp fmt "%a@ :@ %a%a" (print_pat env) pat (print_core_type env) ty
+            print_mode_constraint modes)
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "(module@ %a)" (Var.Module.print env) v
@@ -1609,23 +1603,18 @@ module Ast = struct
 
   and print_mode_constraint fmt = function
     | [] -> ()
-    | _::_ as modes ->
+    | _ :: _ as modes ->
       pp fmt " %@ @[%a@]"
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
-          Format.pp_print_string)
+           Format.pp_print_string)
         (List.map (fun (Mode m) -> m) modes)
 
   and print_type_constraint env fmt = function
     | Constraint (ty, modes) ->
-      pp fmt "@ : @[%a@]%a"
-        (print_core_type env) ty
-        print_mode_constraint modes
-    | Coerce (None, ty) ->
-      pp fmt "@ :> @[%a@]"
-        (print_core_type env) ty
+      pp fmt "@ : @[%a@]%a" (print_core_type env) ty print_mode_constraint modes
+    | Coerce (None, ty) -> pp fmt "@ :> @[%a@]" (print_core_type env) ty
     | Coerce (Some ty_constr, ty) ->
-      pp fmt "@ : @[%a@]@ :> @[%a@]"
-        (print_core_type env) ty_constr
+      pp fmt "@ : @[%a@]@ :> @[%a@]" (print_core_type env) ty_constr
         (print_core_type env) ty
 
   and print_exp_with_parens env fmt exp =
@@ -1637,10 +1626,10 @@ module Ast = struct
     | Variant (_, None)
     | Record (_, None)
     | Field _ | Array _ | Send _ | Unreachable | Src_pos | Unboxed_unit
-    | Unboxed_bool _ | Unboxed_tuple _ | Unboxed_record_product (_, None)
-    | ConstraintExp _ | CoerceExp _
-    | List_comprehension _ | Array_comprehension _
-    | Immutable_array_comprehension _ | Quote _ ->
+    | Unboxed_bool _ | Unboxed_tuple _
+    | Unboxed_record_product (_, None)
+    | ConstraintExp _ | CoerceExp _ | List_comprehension _
+    | Array_comprehension _ | Immutable_array_comprehension _ | Quote _ ->
       (print_exp env) fmt exp
     | _ -> pp fmt "(@[%a@])" (print_exp env) exp
 
@@ -1648,8 +1637,7 @@ module Ast = struct
     match exp.desc with
     | Match _ | Try _
     | Fun { body = Pfunction_cases _; params = []; _ }
-    | Let _ | Let_op _ | Letmodule _ | Let_exception _
-    | Sequence _ ->
+    | Let _ | Let_op _ | Letmodule _ | Let_exception _ | Sequence _ ->
       pp fmt "(@[%a@])" (print_exp env) exp
     | _ -> print_exp env fmt exp
 
@@ -1687,7 +1675,7 @@ module Ast = struct
 
   and print_core_type_with_arrow env fmt ty =
     match ty with
-    | TypeArrow _ | TypePoly (_::_, _) ->
+    | TypeArrow _ | TypePoly (_ :: _, _) ->
       pp fmt "(@[%a@])" (print_core_type env) ty
     | _ -> print_core_type env fmt ty
 
@@ -1711,11 +1699,9 @@ module Ast = struct
 
   and print_package_type env fmt (ident, wcs) =
     match wcs with
-    | [] ->
-      pp fmt "%a" (print_module_type env) ident
+    | [] -> pp fmt "%a" (print_module_type env) ident
     | (modtype_path, core_type) :: wcs ->
-      pp fmt "@[%a@ with@ type@ %a@ =@ %a"
-        (print_module_type env) ident
+      pp fmt "@[%a@ with@ type@ %a@ =@ %a" (print_module_type env) ident
         print_modtype_path modtype_path (print_core_type env) core_type;
       List.iter
         (fun (modtype_path, core_type) ->
@@ -1729,9 +1715,8 @@ module Ast = struct
     | TypeVar v -> Var.Type_var.print env fmt v
     | TypeArrow (arg_label, ty1, ms1, ty2, ms2) ->
       pp fmt "%a%a%a@ ->@ %a%a" print_arrow_arg_lab arg_label
-        (print_core_type_with_arrow env) ty1
-        print_mode_constraint ms1
-        (print_core_type env) ty2
+        (print_core_type_with_arrow env)
+        ty1 print_mode_constraint ms1 (print_core_type env) ty2
         print_mode_constraint ms2
     | TypeTuple ts ->
       pp fmt "%a"
@@ -1774,15 +1759,16 @@ module Ast = struct
       List.iter (print_row_field env true fmt) row_fields;
       (match variant_form with
       | VClosed (_ :: _ as tags) ->
-        pp fmt " > %a" (print_tuple_like "" "" "" (fun fmt s ->
-          pp fmt "`%s" s)) tags
+        pp fmt " > %a"
+          (print_tuple_like "" "" "" (fun fmt s -> pp fmt "`%s" s))
+          tags
       | _ -> ());
       pp fmt " ]"
     | TypePoly ([], ty) -> print_core_type env fmt ty
-    | TypePoly ((_ :: _) as tvs, ty) ->
+    | TypePoly ((_ :: _ as tvs), ty) ->
       pp fmt "%a@ %a"
-        (print_tuple_like "" "" "." (Var.Type_var.print env)) tvs
-        (print_core_type env) ty
+        (print_tuple_like "" "" "." (Var.Type_var.print env))
+        tvs (print_core_type env) ty
     | TypePackage (ident, wcs) ->
       pp fmt "(module@ %a)" (print_package_type env) (ident, wcs)
     | TypeQuote core_type ->
@@ -1801,12 +1787,11 @@ module Ast = struct
 
   and print_param env fmt = function
     | Pparam_val (arg_lab, None, pat) ->
-      pp fmt "@ %a%a" print_arg_lab arg_lab
-        (print_pat_with_parens env) pat
+      pp fmt "@ %a%a" print_arg_lab arg_lab (print_pat_with_parens env) pat
     | Pparam_val (arg_lab, Some exp, pat) ->
       pp fmt "@ %a(%a=@[%a@])" print_arg_lab arg_lab
-        (print_pat_with_parens env) pat
-        (print_exp env) exp
+        (print_pat_with_parens env)
+        pat (print_exp env) exp
     | Pparam_newtype ty -> pp fmt "@ (type@ %a)" (Var.Type_constr.print env) ty
 
   and print_record env fmt (fields, exp_opt) =
@@ -1836,45 +1821,46 @@ module Ast = struct
     let rec list_items_and_cons pat =
       match pat with
       | PatConstruct (CIdent (CBuiltin "::"), Some p) -> (
-          match p with
-          | PatTuple [(NolabelTup, p); (NolabelTup, tl)] ->
-            let remainder, has_cons = list_items_and_cons tl in
-            p::remainder, has_cons
-          | _ -> failwith "Unexpected list contents encountered."
-        )
+        match p with
+        | PatTuple [(NolabelTup, p); (NolabelTup, tl)] ->
+          let remainder, has_cons = list_items_and_cons tl in
+          p :: remainder, has_cons
+        | _ -> failwith "Unexpected list contents encountered.")
       | PatConstruct (CIdent (CBuiltin "[]"), None) -> [], false
       | _ -> [pat], true
     in
     let items, has_cons = list_items_and_cons pat in
     if has_cons
-    then print_tuple_like ~with_space:false "::" "" ""
-           (print_pat_with_parens env) fmt items
+    then
+      print_tuple_like ~with_space:false "::" "" ""
+        (print_pat_with_parens env)
+        fmt items
     else print_tuple_like ";" "[" "]" (print_pat env) fmt items
 
   and print_list_exp env fmt exp =
     let rec list_items_and_cons exp =
       match exp.desc with
       | Construct (CIdent (CBuiltin "::"), Some e) -> (
-          match e.desc with
-          | Tuple [(NolabelTup, e); (NolabelTup, tl)] ->
-            let remainder, has_cons = list_items_and_cons tl in
-            e::remainder, has_cons
-          | _ -> failwith "Unexpected list contents encountered."
-        )
+        match e.desc with
+        | Tuple [(NolabelTup, e); (NolabelTup, tl)] ->
+          let remainder, has_cons = list_items_and_cons tl in
+          e :: remainder, has_cons
+        | _ -> failwith "Unexpected list contents encountered.")
       | Construct (CIdent (CBuiltin "[]"), None) -> [], false
       | _ -> [exp], true
     in
     let items, has_cons = list_items_and_cons exp in
     if has_cons
-    then print_tuple_like ~with_space:false "::" "" ""
-           (print_exp_with_parens env) fmt items
+    then
+      print_tuple_like ~with_space:false "::" "" ""
+        (print_exp_with_parens env)
+        fmt items
     else print_tuple_like ";" "[" "]" (print_exp env) fmt items
 
   and print_for_iterator env fmt = function
     | Range (var, exp_start, exp_stop, dir) ->
-      pp fmt "@[%a = %a@]@ %a@ %a"
-        (print_value_var env) var (print_exp env) exp_start
-        (print_dir) dir (print_exp env) exp_stop
+      pp fmt "@[%a = %a@]@ %a@ %a" (print_value_var env) var (print_exp env)
+        exp_start print_dir dir (print_exp env) exp_stop
     | In (pat, exp) ->
       pp fmt "%a@ in@ %a" (print_pat env) pat (print_exp env) exp
 
@@ -1888,10 +1874,8 @@ module Ast = struct
            (print_for_iterator env))
         its
 
-  and print_comprehension env fmt {comp_body; clauses} =
-    pp fmt "%a@ %a"
-      (print_exp env)
-      comp_body
+  and print_comprehension env fmt { comp_body; clauses } =
+    pp fmt "%a@ %a" (print_exp env) comp_body
       (print_tuple_like ~with_space:true "" "" ""
          (print_comprehension_clause env))
       clauses
@@ -1919,23 +1903,23 @@ module Ast = struct
       | _ -> print_apply env fmt exp args)
     | Fun { params; constraint_; body } -> (
       (match params with
-      | _::_ ->
+      | _ :: _ ->
         pp fmt "@[<2>fun";
         List.iter (print_param env fmt) params
       | [] -> ());
       match body with
-      | Pfunction_body exp ->
+      | Pfunction_body exp -> (
         Option.iter (print_type_constraint env fmt) constraint_;
-        (match params with
-        | _::_ -> pp fmt "@ ->@ %a@]" (print_exp env) exp
+        match params with
+        | _ :: _ -> pp fmt "@ ->@ %a@]" (print_exp env) exp
         | [] -> pp fmt "%a" (print_exp env) exp)
-      | Pfunction_cases cases ->
+      | Pfunction_cases cases -> (
         Option.iter (print_type_constraint env fmt) constraint_;
-        (match params with _::_ -> pp fmt "@ ->@ " | [] -> ());
+        (match params with _ :: _ -> pp fmt "@ ->@ " | [] -> ());
         pp fmt "@[<2>function";
         List.iter (print_case env fmt) cases;
         pp fmt "@]";
-        (match params with _::_ -> pp fmt "@]" | [] -> ()))
+        match params with _ :: _ -> pp fmt "@]" | [] -> ()))
     | Let (_, [], _) ->
       failwith "Cannot create empty let-expressions. This should not happen."
     | Let (rec_flag, vb :: vbs, body) ->
@@ -1943,13 +1927,12 @@ module Ast = struct
         | Nonrecursive -> ()
         | Recursive -> pp fmt "rec@ "
       in
-      pp fmt "@[@[let@ %a%a%a@]@ "
-        print_vb_attributes vb.attrs
-        print_rec_suffix rec_flag (print_vb env) vb;
+      pp fmt "@[@[let@ %a%a%a@]@ " print_vb_attributes vb.attrs print_rec_suffix
+        rec_flag (print_vb env) vb;
       List.iter
         (fun (vb : value_binding) ->
-          pp fmt "@[and@ %a%a@]@ "
-            print_vb_attributes vb.attrs (print_vb env) vb)
+          pp fmt "@[and@ %a%a@]@ " print_vb_attributes vb.attrs (print_vb env)
+            vb)
         vbs;
       pp fmt "in@;@[<2>%a@]@]" (print_exp env) body
     | Let_op ([], _, _) ->
@@ -1980,13 +1963,13 @@ module Ast = struct
     | Construct (ident, exp_opt) -> (
       match exp_opt with
       | None -> print_constr env fmt ident
-      | Some e ->
+      | Some e -> (
         match ident with
         | CIdent (CBuiltin "::") -> print_list_exp env fmt exp
         | _ ->
-          pp fmt "@[<2>%a@ %a@]"
-            (print_constr env) ident (print_exp_with_parens env) e
-      )
+          pp fmt "@[<2>%a@ %a@]" (print_constr env) ident
+            (print_exp_with_parens env)
+            e))
     | Variant (s, exp_opt) -> (
       match exp_opt with
       | None -> pp fmt "`%s" s
@@ -1999,14 +1982,16 @@ module Ast = struct
     | Ifthenelse (cond, then_, else_) -> (
       pp fmt "@[if@ %a@ @[<2>then@ %a@]"
         (print_exp_with_parens env)
-        cond (print_exp_with_parens env) then_;
+        cond
+        (print_exp_with_parens env)
+        then_;
       match else_ with
       | Some else_ ->
         pp fmt "@ @[<2>else@ %a@]@]" (print_exp_pipe_semi env) else_
       | None -> pp fmt "@]")
     | Sequence (exp1, exp2) ->
-      pp fmt "%a;@ @,%a"
-        (print_exp_pipe_semi env) exp1 (print_exp_pipe_semi env) exp2
+      pp fmt "%a;@ @,%a" (print_exp_pipe_semi env) exp1
+        (print_exp_pipe_semi env) exp2
     | While (cond, body) ->
       pp fmt "@[<2>while@ %a@ do@; @[%a@]@]@;done" (print_exp env) cond
         (print_exp_with_parens env)
@@ -2018,24 +2003,17 @@ module Ast = struct
         body
     | Send (exp, meth) ->
       pp fmt "%a#@[%a@]" (print_exp_with_parens env) exp Method.print meth
-    | ConstraintExp (exp, TypeAny, []) ->
-      print_exp_desc env fmt exp
+    | ConstraintExp (exp, TypeAny, []) -> print_exp_desc env fmt exp
     | ConstraintExp (exp, ty, modes) ->
-      pp fmt "(%a@ :@ %a%a)"
-        (print_exp env) exp
-        (print_core_type env) ty
+      pp fmt "(%a@ :@ %a%a)" (print_exp env) exp (print_core_type env) ty
         print_mode_constraint modes
-    | CoerceExp (exp, opt_ty, ty) -> begin
-      match opt_ty with
+    | CoerceExp (exp, opt_ty, ty) ->
+      begin match opt_ty with
       | None ->
-        pp fmt "(%a@ :>@ %a)"
-          (print_exp env) exp
-          (print_core_type env) ty
+        pp fmt "(%a@ :>@ %a)" (print_exp env) exp (print_core_type env) ty
       | Some ty_constr ->
-        pp fmt "(%a@ :@ %a@ :>@ %a)"
-          (print_exp env) exp
-          (print_core_type env) ty_constr
-          (print_core_type env) ty
+        pp fmt "(%a@ :@ %a@ :>@ %a)" (print_exp env) exp (print_core_type env)
+          ty_constr (print_core_type env) ty
       end
     | Match (exp, cases) ->
       pp fmt "@[<2>match@ @[%a@]@ with" (print_exp env) exp;
@@ -2060,10 +2038,8 @@ module Ast = struct
     | Letmodule (Some modvar, module_exp, exp) ->
       pp fmt "@[<2>let@ module@ %a@ =@ @[%a@]@ in@ %a@]" (Var.Module.print env)
         modvar (print_module_exp env) module_exp (print_exp env) exp
-    | Assert exp ->
-      pp fmt "@[<2>assert@ %a@]" (print_exp_with_parens env) exp
-    | Lazy exp ->
-      pp fmt "@[<2>lazy@ %a@]" (print_exp_with_parens env) exp
+    | Assert exp -> pp fmt "@[<2>assert@ %a@]" (print_exp_with_parens env) exp
+    | Lazy exp -> pp fmt "@[<2>lazy@ %a@]" (print_exp_with_parens env) exp
     | Pack module_exp ->
       pp fmt "(@[<2>module@ %a@])" (print_module_exp env) module_exp
     | New ident -> pp fmt "@[<2>new@ %a@]" (print_raw_ident_value env) ident
@@ -2073,7 +2049,8 @@ module Ast = struct
       pp fmt "@[<2>let@ exception@ %s@ in@ %a@]" name (print_exp env) exp
     | Let_open (id, exp) ->
       pp fmt "@[<2>let@ open!@ %a@ in@ %a@]"
-        (print_raw_ident_module env) id (print_exp env) exp
+        (print_raw_ident_module env)
+        id (print_exp env) exp
     | Extension_constructor name ->
       pp fmt "@[[%%extension_constructor@ %a]@]" Name.print name
     | Unboxed_unit -> pp fmt "#()"
@@ -2084,8 +2061,9 @@ module Ast = struct
     | Unboxed_record_product (ts, exp_opt) ->
       pp fmt "#%a" (print_record env) (ts, exp_opt)
     | Unboxed_field (exp, rec_field) ->
-      pp fmt "%a.#%a" (print_exp_with_parens env) exp (print_field env)
-        rec_field
+      pp fmt "%a.#%a"
+        (print_exp_with_parens env)
+        exp (print_field env) rec_field
     | Quote exp -> pp fmt "@[<2><[@,%a@,@]]>" (print_exp env) exp
     | Splice exp -> pp fmt "@[<2>$@,%a@]" (print_exp_with_parens env) exp
     | List_comprehension compr ->
@@ -2099,9 +2077,8 @@ module Ast = struct
 
   and print_exp env fmt exp =
     match exp.attributes with
-    | [] ->
-      print_exp_desc env fmt exp
-    | (_ :: _) as attr ->
+    | [] -> print_exp_desc env fmt exp
+    | _ :: _ as attr ->
       pp fmt "(@[(@[";
       print_exp_desc env fmt exp;
       pp fmt "@])";
@@ -2397,10 +2374,8 @@ end
 module Vb_attribute = struct
   type t = Ast.vb_attribute
 
-  let mk name payload : t =
-    { vb_attr_name = name; vb_attr_payload = payload }
+  let mk name payload : t = { vb_attr_name = name; vb_attr_payload = payload }
 end
-
 
 module Object_type = struct
   module Object_closed_flag = struct
@@ -2434,10 +2409,9 @@ module Object_type = struct
   type t = Ast.object_field list With_free_vars.t * Ast.object_closed_flag
 
   let of_object_fields_list object_fields object_closed_flag =
-    With_free_vars.all object_fields,
-    Object_closed_flag.to_ast_object_closed_flag object_closed_flag
+    ( With_free_vars.all object_fields,
+      Object_closed_flag.to_ast_object_closed_flag object_closed_flag )
 end
-
 
 module Variant_type = struct
   module Variant_form = struct
@@ -2555,7 +2529,8 @@ module Type = struct
     Ast.TypePackage (m, specs)
 
   let quote t =
-    let+ t = t in Ast.TypeQuote t
+    let+ t = t in
+    Ast.TypeQuote t
 
   let call_pos = With_free_vars.return Ast.TypeCallPos
 end
@@ -2711,7 +2686,9 @@ end
 module Comprehension = struct
   module Iterator = struct
     type t = Ast.for_comprehension_iterator With_free_vars.t
+
     let ( let+ ) m f = With_free_vars.map f m
+
     let ( and+ ) = With_free_vars.both
 
     let range var start stop direction =
@@ -2733,28 +2710,28 @@ module Comprehension = struct
   type t = Ast.comprehension With_free_vars.t
 
   let ( let+ ) m f = With_free_vars.map f m
+
   let ( and+ ) = With_free_vars.both
 
-  let mk clauses comp_body = Ast.{clauses; comp_body}
+  let mk clauses comp_body = Ast.{ clauses; comp_body }
 
   let body exp =
     let+ exp = exp in
     mk [] exp
 
   let when_ exp comprehension =
-    let+ Ast.{clauses; comp_body} = comprehension
-    and+ exp = exp
-    in
-    mk ((Ast.WhenComp exp) :: clauses) comp_body
+    let+ Ast.{ clauses; comp_body } = comprehension and+ exp = exp in
+    mk (Ast.WhenComp exp :: clauses) comp_body
 
   let for_ loc names frest =
-    let+ its, Ast.{clauses; comp_body} =
+    let+ its, Ast.{ clauses; comp_body } =
       With_free_vars.value_bindings loc names (fun vars ->
-        let its, comprehension = frest vars in
-        let+ its = With_free_vars.all its and+ comprehension = comprehension
-        in (its, comprehension))
+          let its, comprehension = frest vars in
+          let+ its = With_free_vars.all its
+          and+ comprehension = comprehension in
+          its, comprehension)
     in
-    mk ((Ast.ForComp its) :: clauses) comp_body
+    mk (Ast.ForComp its :: clauses) comp_body
 end
 
 module Code = struct
@@ -2792,9 +2769,7 @@ module Code = struct
     let to_exp code = code |> open_ |> to_exp
 
     let print fmt c =
-      Format.fprintf fmt "@[<2><[@,%a@]@,]>"
-        (Ast.print_exp (new_env ()))
-        c.exp
+      Format.fprintf fmt "@[<2><[@,%a@]@,]>" (Ast.print_exp (new_env ())) c.exp
   end
 
   let print fmt c =
@@ -2825,23 +2800,19 @@ module Exp_desc = struct
 
   let let_rec_simple loc names_with_cstrs_attrs f =
     let names_with_cstrs =
-      List.map (fun (name, cstr, _attrs) -> (name, cstr))
-        names_with_cstrs_attrs
+      List.map (fun (name, cstr, _attrs) -> name, cstr) names_with_cstrs_attrs
     in
     let attrs_per_vb =
-      List.map (fun (_name, _cstr, attrs) -> attrs)
-        names_with_cstrs_attrs
+      List.map (fun (_name, _cstr, attrs) -> attrs) names_with_cstrs_attrs
     in
-    With_free_vars.value_bindings_with_constraints
-      loc names_with_cstrs
+    With_free_vars.value_bindings_with_constraints loc names_with_cstrs
       (fun (vars_with_cstrs : (Var.Value.t * Type.t option) list) ->
         let vars, _ = List.split vars_with_cstrs in
         let defs, body = f vars in
         let rec map3 f l1 l2 l3 =
           match l1, l2, l3 with
           | [], [], [] -> []
-          | a :: l1, b :: l2, c :: l3 ->
-            f a b c :: map3 f l1 l2 l3
+          | a :: l1, b :: l2, c :: l3 -> f a b c :: map3 f l1 l2 l3
           | _ -> failwith "map3: lists of different lengths"
         in
         let+ vbs =
@@ -2871,8 +2842,7 @@ module Exp_desc = struct
       let rec map3 f l1 l2 l3 =
         match l1, l2, l3 with
         | [], [], [] -> []
-        | a :: l1, b :: l2, c :: l3 ->
-          f a b c :: map3 f l1 l2 l3
+        | a :: l1, b :: l2, c :: l3 -> f a b c :: map3 f l1 l2 l3
         | _ -> failwith "map3: lists of different lengths"
       in
       let vbs =
@@ -3080,8 +3050,7 @@ module Exp_desc = struct
     Ast.Let_op (idents, defs, case)
 
   let let_open id exp =
-    let+ id = id
-    and+ exp = exp in
+    let+ id = id and+ exp = exp in
     Ast.Let_open (id, exp)
 
   let stack exp =
@@ -3103,7 +3072,6 @@ module Exp_desc = struct
   let unquote code =
     let+ exp = Code.to_exp code in
     Ast.(exp.desc)
-
 end
 
 module Exp = struct

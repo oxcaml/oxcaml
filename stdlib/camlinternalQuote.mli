@@ -680,7 +680,6 @@ and Exp_desc : sig
   val splice : Exp.t -> t
 
   val unquote : Code.t -> t
-
 end
 
 and Exp : sig
