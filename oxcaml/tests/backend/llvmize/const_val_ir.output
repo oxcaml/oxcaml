@@ -47,4 +47,5 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Const_val" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }

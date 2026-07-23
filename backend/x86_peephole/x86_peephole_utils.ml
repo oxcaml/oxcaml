@@ -29,7 +29,7 @@ let is_hard_barrier = function
     | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
     | Indirect_symbol _ | Loc _ | New_line | Private_extern _ | Size _
     | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _ | Weak _
-    | External _ | Reloc _ ->
+    | External _ | Reloc _ | Delta_uleb128 _ ->
       false)
   | Ins instr -> is_control_flow instr
 

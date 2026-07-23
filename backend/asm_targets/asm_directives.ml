@@ -283,8 +283,19 @@ module Directive = struct
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Delta_uleb128 of { delta : Constant.t }
+  (* A constant (typically a label difference) emitted as ULEB128 *)
 
   let bprintf = Printf.bprintf
+
+  (* Fresh names for Mach-O [Delta_uleb128] .set temporaries. Never reset:
+     uniqueness within each emitted file is all that is required. *)
+  let delta_temp_var_counter = ref 0
+
+  let new_delta_temp_var () =
+    let id = !delta_temp_var_counter in
+    incr delta_temp_var_counter;
+    Printf.sprintf "Ldelta%d" id
 
   let string_of_substring_literal ~start:k ~length:n s =
     let between x low high =
@@ -411,6 +422,19 @@ module Directive = struct
       | _, _ -> print_ascii_string_gas ~chunk_size:80 buf str);
       bprintf buf "%s" (gas_comment_opt comment)
     | Comment s -> if emit_comments () then bprintf buf "\t\t\t\t/* %s */" s
+    | Delta_uleb128 { delta } -> (
+      (* Typically a difference of two same-section labels, which the assembler
+         computes; the value must be non-negative. *)
+      match TS.assembler () with
+      | MacOS ->
+        (* Mach-O assemblers refuse a cross-atom label difference emitted
+           inline, but accept one bound with .set, which forces assembly-time
+           evaluation (compare [Direct_assignment]). The L prefix keeps the
+           temporary assembler-local. *)
+        let temp = new_delta_temp_var () in
+        bprintf buf "\t.set %s, (%a)\n\t.uleb128 %s" temp Constant.print delta
+          temp
+      | _ -> bprintf buf "\t.uleb128 (%a)" Constant.print delta)
     | Global sym -> bprintf buf "\t.globl\t%s" (Asm_symbol.encode sym)
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)
     | New_label (Symbol sym, _typ) -> bprintf buf "%s:" (Asm_symbol.encode sym)
@@ -573,6 +597,7 @@ module Directive = struct
     | External sym -> bprintf buf "\tEXTRN\t%s: NEAR" (Asm_symbol.encode sym)
     (* The only supported "type" on EXTRN declarations is NEAR. *)
     | Reloc _ -> unsupported "Reloc"
+    | Delta_uleb128 _ -> unsupported "Delta_uleb128"
 
   let print b t =
     match TS.assembler () with
@@ -663,6 +688,13 @@ module Directive = struct
       | This | Label _ | Symbol _ | Variable _ | Add _ | Sub _ ->
         Misc.fatal_error
           "increment_offset_in_bytes: uleb128 with non-integer constant")
+    | Delta_uleb128 _ ->
+      (* Variable-width, and the delta's value is not available here:
+         offset-accounting callers must special-case this directive by
+         evaluating the label difference themselves (see
+         [Arm64_binary_emitter.Binary_emitter.iter]). *)
+      Misc.fatal_error
+        "increment_offset_in_bytes: Delta_uleb128 is not supported"
     (* Directives that don't contribute to section size *)
     | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc
     | Cfi_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
@@ -1125,6 +1157,13 @@ let between_labels_32_bit ?comment:_comment ~upper ~lower () =
 let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
   (* CR poechsel: use the arguments *)
   Misc.fatal_error "between_labels_64_bit not implemented yet"
+
+let delta_uleb128 ~upper ~lower =
+  let delta =
+    Directive.Constant.Sub
+      (Directive.Constant.Label upper, Directive.Constant.Label lower)
+  in
+  emit (Delta_uleb128 { delta })
 
 let between_labels_64_bit_with_offsets ?comment:_comment ~upper ~upper_offset
     ~lower ~lower_offset () =

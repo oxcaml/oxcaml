@@ -2132,4 +2132,5 @@ module asm "  movq camlSwitch__entry.recover_rbp_var.L367(%rip), %rbx"
 module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Switch" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }
