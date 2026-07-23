@@ -126,5 +126,14 @@ val use_wm : t_cm -> t_wm = <fun>
 let use_cm (x : t_cm) : t_cm = gm x
 
 [%%expect{|
-val use_cm : t_cm -> t_cm = <fun>
+Line 1, characters 31-35:
+1 | let use_cm (x : t_cm) : t_cm = gm x
+                                   ^^^^
+Error: This expression has type "('a : (bits8 & bits16) addressable)"
+       but an expression was expected of type "t_cm"
+       The layout of t_cm is bits8 addressable & bits16 addressable
+         because of the definition of t_cm at line 1, characters 0-50.
+       But the layout of t_cm must be a sublayout of
+           (bits8 & bits16) addressable
+         because of the definition of gm at lines 4-6, characters 7-30.
 |}]
