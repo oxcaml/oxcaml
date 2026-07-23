@@ -277,7 +277,9 @@
 (rule
  (alias runtest)
  (enabled_if
-  (= %{context_name} "main"))
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
  (deps avx512imm.expected avx512imm.corrected avx512rnd.expected avx512rnd.corrected)
  (action
   (progn
@@ -286,7 +288,9 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
  (targets avx512imm.corrected)
  (deps avx512imm.ml)
  (action
@@ -307,7 +311,9 @@
 
 (rule
  (enabled_if
-  (= %{context_name} "main"))
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
  (targets avx512rnd.corrected)
  (deps avx512rnd.ml)
  (action

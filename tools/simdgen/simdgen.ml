@@ -566,6 +566,20 @@ let print_one bind instr =
       args
     |> Array.to_list |> String.concat ";"
   in
+  let print_register_args args =
+    Array.map
+      (fun ({ loc; _ } as arg : arg) ->
+        match loc with
+        | Pin _ -> arg
+        | Temp temps ->
+          let temps =
+            Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+          in
+          if Array.length temps = 0 then failwith instr.mnemonic;
+          { arg with loc = Temp temps })
+      args
+    |> print_args
+  in
   let print_idxs idxs =
     Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
   in
@@ -655,12 +669,15 @@ let print_one bind instr =
     match instr.res with
     | Res rr when instr.flags.z ->
       (* Without zeroing, masked-off lanes of the destination are preserved, so
-         the destination must also be an input operand. *)
+         the destination must also be an input operand. With zeroing, the
+         destination must be a register because EVEX.z is invalid with a memory
+         destination. *)
       let args = print_args instr.args in
       let res_args = print_args rr in
+      let zeroing_res_args = print_register_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
       ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
-        sprintf "(if z then Res [|%s|] else Arg [|%s|])" res_args idxs )
+        sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
     | (Res_none | Arg _ | Res _) as res ->
       sprintf "[|%s|]" (print_args instr.args), print_res res
   in
