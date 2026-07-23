@@ -40,9 +40,13 @@ let decode_entities s =
   let n = String.length s in
   let i = ref 0 in
   while !i < n do
-    if s.[!i] = '&'
-    then (
-      let semi = try String.index_from s !i ';' with Not_found -> !i in
+    match if s.[!i] = '&' then String.index_from_opt s !i ';' else None with
+    | None ->
+      (* Either not an entity, or a lone '&' with no terminating ';' (not valid
+         XML): copy the character verbatim. *)
+      Buffer.add_char buf s.[!i];
+      incr i
+    | Some semi ->
       let name = String.sub s (!i + 1) (semi - !i - 1) in
       (match name with
       | "lt" -> Buffer.add_char buf '<'
@@ -63,10 +67,7 @@ let decode_entities s =
         Buffer.add_char buf '&';
         Buffer.add_string buf other;
         Buffer.add_char buf ';');
-      i := semi + 1)
-    else (
-      Buffer.add_char buf s.[!i];
-      incr i)
+      i := semi + 1
   done;
   Buffer.contents buf
 

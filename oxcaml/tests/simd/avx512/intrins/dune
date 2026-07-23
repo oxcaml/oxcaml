@@ -2,10 +2,12 @@
 ; the real C intrinsic (the C compiler is the oracle). Enabled on amd64 non-macos
 ; in the main context, like the other AVX512 tests.
 
-; The generated test sources are build-time rule targets (not checked in),
-; regenerated from the same data that produces the selection code.
+; The generated test sources are checked in (via promotion) so that diffs to
+; the generator are visible in review; they are regenerated from the same data
+; that produces the selection code.
 (rule
  (targets gen512.ml)
+ (mode promote)
  (deps
   (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
   (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
@@ -22,6 +24,7 @@
 
 (rule
  (targets gen512_stubs.c)
+ (mode promote)
  (deps
   (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
   (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
@@ -35,6 +38,20 @@
   (with-stdout-to
    gen512_stubs.c
    (run %{gen} intrins tests-c %{csv} %{xml}))))
+
+; The tests run through a wrapper that execs them only if the host CPU
+; supports AVX512 (and exits 0 silently otherwise), so the runtest rules skip
+; cleanly on hosts without it.
+(rule
+ (targets run_if_avx512.exe)
+ (deps run_if_avx512.c)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (action
+  (run clang -O2 -o run_if_avx512.exe run_if_avx512.c)))
 
 ; The C oracle for the generated tests must be compiled by clang: the host gcc
 ; (8.5) lacks many of the newer AVX512 intrinsic names.
@@ -75,7 +92,7 @@
  (action
   (with-outputs-to
    gen512.out
-   (run ./gen512.exe))))
+   (run ./run_if_avx512.exe %{dep:gen512.exe}))))
 
 (rule
  (alias runtest)
@@ -124,7 +141,7 @@
  (action
   (with-outputs-to
    mem.out
-   (run ./mem.exe))))
+   (run ./run_if_avx512.exe %{dep:mem.exe}))))
 
 (rule
  (alias runtest)
@@ -172,7 +189,7 @@
  (action
   (with-outputs-to
    mem_ia.out
-   (run ./mem_ia.exe))))
+   (run ./run_if_avx512.exe %{dep:mem_ia.exe}))))
 
 (rule
  (alias runtest)
@@ -217,7 +234,7 @@
  (action
   (with-outputs-to
    gen512_ia.out
-   (run ./gen512_ia.exe))))
+   (run ./run_if_avx512.exe %{dep:gen512_ia.exe}))))
 
 (rule
  (alias runtest)

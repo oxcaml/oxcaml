@@ -831,7 +831,10 @@ let expand_modifiers instr =
           match masked.res with
           | Arg rr -> Arg (Array.append rr [| k_index |])
           | Res_none -> Arg [| k_index |]
-          | Res _ -> assert false
+          | Res _ ->
+            failwith
+              (instr.mnemonic
+             ^ ": gather/scatter with a non-argument result operand")
         in
         [{ masked with res }]
       else [masked; { instr with flags = { instr.flags with z = false } }]

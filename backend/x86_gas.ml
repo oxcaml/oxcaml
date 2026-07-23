@@ -184,13 +184,19 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
   in
   (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
   if not rounding_after_gpr then Buffer.add_string b rounding;
+  let rounding_no_sep =
+    (* [rounding] is either empty or "{..}, "; drop the trailing ", ". *)
+    if String.length rounding = 0
+    then rounding
+    else String.sub rounding 0 (String.length rounding - 2)
+  in
   let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
       if i > 0 then Buffer.add_string b ", ";
       arg b a;
-      if i = 0 && rounding_after_gpr && String.length rounding > 0
-      then bprintf b ", %s" (String.sub rounding 0 (String.length rounding - 2));
+      if i = 0 && rounding_after_gpr && String.length rounding_no_sep > 0
+      then bprintf b ", %s" rounding_no_sep;
       if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
       if i = last then bprintf b "%a%s" mask writemask zeroing)
     args

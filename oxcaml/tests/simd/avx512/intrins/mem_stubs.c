@@ -46,12 +46,25 @@ void ctest_storeu_epi32(void *p, __m512i a) { _mm512_storeu_epi32(p, a); }
 void ctest_mask_storeu_epi32(void *p, __mmask16 k, __m512i a) { _mm512_mask_storeu_epi32(p, k, a); }
 void ctest_compressstoreu_epi32(void *p, __mmask16 k, __m512i a) { _mm512_mask_compressstoreu_epi32(p, k, a); }
 __m512i ctest_expandloadu_epi32(__m512i s, __mmask16 k, void *p) { return _mm512_mask_expandloadu_epi32(s, k, p); }
-__m512i ctest_i32gather_epi32(int scale, __m512i vindex, void *base)
-{ return _mm512_i32gather_epi32(vindex, base, 4); }
+/* The C gather/scatter intrinsics require a literal scale, so each tested
+   scale gets its own oracle; the scale parameter mirrors the OCaml external
+   and must agree with the baked-in literal. */
+#define GATHER_ORACLE(S) \
+  __m512i ctest_i32gather_epi32_s##S(int scale, __m512i vindex, void *base) \
+  { assert(scale == S); return _mm512_i32gather_epi32(vindex, base, S); }
+GATHER_ORACLE(1)
+GATHER_ORACLE(2)
+GATHER_ORACLE(4)
+GATHER_ORACLE(8)
+#define SCATTER_ORACLE(S) \
+  void ctest_i32scatter_epi32_s##S(int scale, void *base, __m512i vindex, __m512i a) \
+  { assert(scale == S); _mm512_i32scatter_epi32(base, vindex, a, S); }
+SCATTER_ORACLE(1)
+SCATTER_ORACLE(2)
+SCATTER_ORACLE(4)
+SCATTER_ORACLE(8)
 __m512i ctest_mask_i32gather_epi32(int scale, __m512i src, __mmask16 k, __m512i vindex, void *base)
-{ return _mm512_mask_i32gather_epi32(src, k, vindex, base, 4); }
-void ctest_i32scatter_epi32(int scale, void *base, __m512i vindex, __m512i a)
-{ _mm512_i32scatter_epi32(base, vindex, a, 4); }
+{ assert(scale == 4); return _mm512_mask_i32gather_epi32(src, k, vindex, base, 4); }
 void ctest_mask_i32scatter_epi32(int scale, void *base, __mmask16 k, __m512i vindex, __m512i a)
-{ _mm512_mask_i32scatter_epi32(base, k, vindex, a, 4); }
+{ assert(scale == 4); _mm512_mask_i32scatter_epi32(base, k, vindex, a, 4); }
 #endif

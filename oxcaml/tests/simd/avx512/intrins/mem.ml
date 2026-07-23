@@ -179,9 +179,18 @@ external c_expandloadu_epi32
 external caml_mm512_i32gather_epi32 :
   (int[@untagged]) -> (int32x16[@unboxed]) -> addr -> (int32x16[@unboxed])
   = "caml_vec512_unreachable" "caml_mm512_i32gather_epi32" [@@noalloc] [@@builtin]
-external c_i32gather_epi32 :
+external c_i32gather_epi32_s1 :
   (int[@untagged]) -> (int32x16[@unboxed]) -> addr -> (int32x16[@unboxed])
-  = "" "ctest_i32gather_epi32" [@@noalloc]
+  = "" "ctest_i32gather_epi32_s1" [@@noalloc]
+external c_i32gather_epi32_s2 :
+  (int[@untagged]) -> (int32x16[@unboxed]) -> addr -> (int32x16[@unboxed])
+  = "" "ctest_i32gather_epi32_s2" [@@noalloc]
+external c_i32gather_epi32_s4 :
+  (int[@untagged]) -> (int32x16[@unboxed]) -> addr -> (int32x16[@unboxed])
+  = "" "ctest_i32gather_epi32_s4" [@@noalloc]
+external c_i32gather_epi32_s8 :
+  (int[@untagged]) -> (int32x16[@unboxed]) -> addr -> (int32x16[@unboxed])
+  = "" "ctest_i32gather_epi32_s8" [@@noalloc]
 
 external caml_mm512_mask_i32gather_epi32 :
   (int[@untagged]) -> (int32x16[@unboxed]) -> (mask[@unboxed]) ->
@@ -197,10 +206,22 @@ external caml_mm512_i32scatter_epi32 :
   (int[@untagged]) -> addr -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) ->
   void
   = "caml_vec512_unreachable" "caml_mm512_i32scatter_epi32" [@@noalloc] [@@builtin]
-external c_i32scatter_epi32 :
+external c_i32scatter_epi32_s1 :
   (int[@untagged]) -> addr -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) ->
   void
-  = "" "ctest_i32scatter_epi32" [@@noalloc]
+  = "" "ctest_i32scatter_epi32_s1" [@@noalloc]
+external c_i32scatter_epi32_s2 :
+  (int[@untagged]) -> addr -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) ->
+  void
+  = "" "ctest_i32scatter_epi32_s2" [@@noalloc]
+external c_i32scatter_epi32_s4 :
+  (int[@untagged]) -> addr -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) ->
+  void
+  = "" "ctest_i32scatter_epi32_s4" [@@noalloc]
+external c_i32scatter_epi32_s8 :
+  (int[@untagged]) -> addr -> (int32x16[@unboxed]) -> (int32x16[@unboxed]) ->
+  void
+  = "" "ctest_i32scatter_epi32_s8" [@@noalloc]
 
 external caml_mm512_mask_i32scatter_epi32 :
   (int[@untagged]) -> addr -> (mask[@unboxed]) -> (int32x16[@unboxed]) ->
@@ -246,28 +267,65 @@ let () =
     "mask_expandloadu_epi32"
     (caml_mm512_mask_expandloadu_epi32 va mk src)
     (c_expandloadu_epi32 va mk src);
-  (* gathers/scatters: indices 0..15 reversed over a 16-int table *)
+  (* gathers/scatters over a 16-int table; each scale is checked against its
+     own C oracle (the C intrinsic requires a literal scale). Indices keep
+     every access within the 64-byte table; the scale-8 indices repeat, which
+     scatter resolves in lane order on both sides. *)
+  let idx_vec f =
+    let pack i =
+      Int64.logor
+        (Int64.of_int (f (2 * i)))
+        (Int64.shift_left (Int64.of_int (f ((2 * i) + 1))) 32)
+    in
+    of_w (pack 0) (pack 1) (pack 2) (pack 3) (pack 4) (pack 5) (pack 6)
+      (pack 7)
+  in
+  let idx1 = idx_vec (fun i -> (15 - i) * 4) in
+  let idx2 = idx_vec (fun i -> (15 - i) * 2) in
+  let idx4 = idx_vec (fun i -> 15 - i) in
+  let idx8 = idx_vec (fun i -> 7 - (i mod 8)) in
   let table = aligned_alloc ~align:#64n ~size:#64n in
   let _ = caml_mm512_storeu_epi32 table va in
-  let idxv = of_w 0x0000000e0000000fL 0x0000000c0000000dL 0x0000000a0000000bL
-      0x0000000800000009L 0x0000000600000007L 0x0000000400000005L
-      0x0000000200000003L 0x0000000000000001L in
-  checkv "i32gather_epi32" (caml_mm512_i32gather_epi32 4 idxv table)
-    (c_i32gather_epi32 4 idxv table);
+  checkv "i32gather_epi32_s1" (caml_mm512_i32gather_epi32 1 idx1 table)
+    (c_i32gather_epi32_s1 1 idx1 table);
+  checkv "i32gather_epi32_s2" (caml_mm512_i32gather_epi32 2 idx2 table)
+    (c_i32gather_epi32_s2 2 idx2 table);
+  checkv "i32gather_epi32_s4" (caml_mm512_i32gather_epi32 4 idx4 table)
+    (c_i32gather_epi32_s4 4 idx4 table);
+  checkv "i32gather_epi32_s8" (caml_mm512_i32gather_epi32 8 idx8 table)
+    (c_i32gather_epi32_s8 8 idx8 table);
   checkv "mask_i32gather_epi32"
-    (caml_mm512_mask_i32gather_epi32 4 va mk idxv table)
-    (c_mask_i32gather_epi32 4 va mk idxv table);
+    (caml_mm512_mask_i32gather_epi32 4 va mk idx4 table)
+    (c_mask_i32gather_epi32 4 va mk idx4 table);
   let s1 = aligned_alloc ~align:#64n ~size:#64n in
   let s2 = aligned_alloc ~align:#64n ~size:#64n in
+  (* The builtins must stay fully applied (an indirect call would hit the C
+     assert stub), so the scatter cases are written out. *)
+  let reset () =
+    let _ = caml_mm512_storeu_epi32 s1 vb in
+    let _ = caml_mm512_storeu_epi32 s2 vb in
+    ()
+  in
+  reset ();
+  let _ = caml_mm512_i32scatter_epi32 1 s1 idx1 va in
+  let _ = c_i32scatter_epi32_s1 1 s2 idx1 va in
+  checkbuf "i32scatter_epi32_s1" s1 s2;
+  reset ();
+  let _ = caml_mm512_i32scatter_epi32 2 s1 idx2 va in
+  let _ = c_i32scatter_epi32_s2 2 s2 idx2 va in
+  checkbuf "i32scatter_epi32_s2" s1 s2;
+  reset ();
+  let _ = caml_mm512_i32scatter_epi32 4 s1 idx4 va in
+  let _ = c_i32scatter_epi32_s4 4 s2 idx4 va in
+  checkbuf "i32scatter_epi32_s4" s1 s2;
+  reset ();
+  let _ = caml_mm512_i32scatter_epi32 8 s1 idx8 va in
+  let _ = c_i32scatter_epi32_s8 8 s2 idx8 va in
+  checkbuf "i32scatter_epi32_s8" s1 s2;
   let _ = caml_mm512_storeu_epi32 s1 vb in
   let _ = caml_mm512_storeu_epi32 s2 vb in
-  let _ = caml_mm512_i32scatter_epi32 4 s1 idxv va in
-  let _ = c_i32scatter_epi32 4 s2 idxv va in
-  checkbuf "i32scatter_epi32" s1 s2;
-  let _ = caml_mm512_storeu_epi32 s1 vb in
-  let _ = caml_mm512_storeu_epi32 s2 vb in
-  let _ = caml_mm512_mask_i32scatter_epi32 4 s1 mk idxv va in
-  let _ = c_mask_i32scatter_epi32 4 s2 mk idxv va in
+  let _ = caml_mm512_mask_i32scatter_epi32 4 s1 mk idx4 va in
+  let _ = c_mask_i32scatter_epi32 4 s2 mk idx4 va in
   checkbuf "mask_i32scatter_epi32" s1 s2;
   if !failures <> 0 then exit 1
 ;;

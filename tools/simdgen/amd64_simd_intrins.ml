@@ -33,7 +33,8 @@ module type Sel = sig
 
   val extract_scale : expr list -> string -> int * expr list
 
-  val simd_load_scaled : Amd64_simd_instrs.instr -> scale:int -> expr list -> result
+  val simd_load_scaled :
+    Amd64_simd_instrs.instr -> scale:int -> expr list -> result
 
   val simd_store_scaled :
     Amd64_simd_instrs.instr -> scale:int -> expr list -> result
@@ -78,14 +79,14 @@ module Make (Sel : Sel) = struct
     | "caml_kor_mask32" -> (match args with [x0; x1] -> Sel.instr kord [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kor_mask64" -> (match args with [x0; x1] -> Sel.instr korq [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kor_mask8" -> (match args with [x0; x1] -> Sel.instr korb [x0; x1] | _ -> Sel.bad_arity op)
-    | "caml_kortestc_mask16_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestw [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestc_mask32_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestd [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestc_mask64_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestq [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestc_mask8_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestb [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestz_mask16_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestw [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestz_mask32_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestd [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestz_mask64_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestq [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_kortestz_mask8_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestb [x0; x1] | _ -> Sel.bad_arity             op)
+    | "caml_kortestc_mask16_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestw [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestc_mask32_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestd [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestc_mask64_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestq [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestc_mask8_u8" -> (match args with [x0; x1] -> Sel.kortestc kortestb [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestz_mask16_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestw [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestz_mask32_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestd [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestz_mask64_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestq [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_kortestz_mask8_u8" -> (match args with [x0; x1] -> Sel.kortestz kortestb [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kshiftli_mask16" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftlw ~i [x0] | _ -> Sel.bad_arity op)
     | "caml_kshiftli_mask32" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftld ~i [x0] | _ -> Sel.bad_arity op)
     | "caml_kshiftli_mask64" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftlq ~i [x0] | _ -> Sel.bad_arity op)
@@ -94,14 +95,14 @@ module Make (Sel : Sel) = struct
     | "caml_kshiftri_mask32" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftrd ~i [x0] | _ -> Sel.bad_arity op)
     | "caml_kshiftri_mask64" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftrq ~i [x0] | _ -> Sel.bad_arity op)
     | "caml_kshiftri_mask8" -> (let i, args = Sel.extract_constant args ~max:255 op in match args with [x0] -> Sel.instr kshiftrb ~i [x0] | _ -> Sel.bad_arity op)
-    | "caml_ktestc_mask16_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestw [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestc_mask32_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestd [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestc_mask64_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestq [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestc_mask8_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestb [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestz_mask16_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestw [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestz_mask32_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestd [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestz_mask64_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestq [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_ktestz_mask8_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestb [x0; x1] | _ -> Sel.bad_arity             op)
+    | "caml_ktestc_mask16_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestw [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestc_mask32_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestd [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestc_mask64_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestq [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestc_mask8_u8" -> (match args with [x0; x1] -> Sel.ktestc ktestb [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestz_mask16_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestw [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestz_mask32_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestd [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestz_mask64_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestq [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_ktestz_mask8_u8" -> (match args with [x0; x1] -> Sel.ktestz ktestb [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kxnor_mask16" -> (match args with [x0; x1] -> Sel.instr kxnorw [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kxnor_mask32" -> (match args with [x0; x1] -> Sel.instr kxnord [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_kxnor_mask64" -> (match args with [x0; x1] -> Sel.instr kxnorq [x0; x1] | _ -> Sel.bad_arity op)
@@ -1350,8 +1351,8 @@ module Make (Sel : Sel) = struct
     | "caml_mm512_kmov" -> (match args with [x0] -> Sel.instr kmovw_K_Km16 [x0] | _ -> Sel.bad_arity op)
     | "caml_mm512_knot" -> (match args with [x0] -> Sel.instr knotw [x0] | _ -> Sel.bad_arity op)
     | "caml_mm512_kor" -> (match args with [x0; x1] -> Sel.instr korw [x0; x1] | _ -> Sel.bad_arity op)
-    | "caml_mm512_kortestc" -> (match args with [x0; x1] -> Sel.kortestc kortestw [x0; x1] | _ -> Sel.bad_arity             op)
-    | "caml_mm512_kortestz" -> (match args with [x0; x1] -> Sel.kortestz kortestw [x0; x1] | _ -> Sel.bad_arity             op)
+    | "caml_mm512_kortestc" -> (match args with [x0; x1] -> Sel.kortestc kortestw [x0; x1] | _ -> Sel.bad_arity op)
+    | "caml_mm512_kortestz" -> (match args with [x0; x1] -> Sel.kortestz kortestw [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_mm512_kunpackb" -> (match args with [x0; x1] -> Sel.instr kunpckbw [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_mm512_kunpackd" -> (match args with [x0; x1] -> Sel.instr kunpckdq [x0; x1] | _ -> Sel.bad_arity op)
     | "caml_mm512_kunpackw" -> (match args with [x0; x1] -> Sel.instr kunpckwd [x0; x1] | _ -> Sel.bad_arity op)

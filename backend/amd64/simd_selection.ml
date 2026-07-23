@@ -27,7 +27,9 @@ open! Int_replace_polymorphic_compare
 open Arch
 open Amd64_simd_instrs
 
-type error = Bad_immediate of string
+type error =
+  | Bad_immediate of string
+  | Bad_arity of string
 
 exception Error of error
 
@@ -1138,7 +1140,11 @@ module Intrins = Amd64_simd_intrins.Make (struct
   let none = None
 
   let bad_arity op =
-    Misc.fatal_errorf "simd intrinsic %s: unexpected argument count" op
+    (* A user-declared external with the wrong number of parameters. *)
+    raise
+      (Error
+         (Bad_arity
+            (Printf.sprintf "Wrong number of arguments for SIMD intrinsic %s" op)))
 
   let bad_immediate op = bad_immediate "Invalid immediate for %s" op
 
@@ -1308,7 +1314,7 @@ let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
 (* Error report *)
 
 let report_error ppf = function
-  | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
+  | Bad_immediate msg | Bad_arity msg -> Format_doc.pp_print_string ppf msg
 
 let () =
   Location.register_error_of_exn (function
