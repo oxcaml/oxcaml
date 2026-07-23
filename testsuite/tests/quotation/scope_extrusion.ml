@@ -67,3 +67,23 @@ gensym_exn ()
 val gensym_exn : unit -> <[int]> expr @ once = <fun>
 - : <[int]> expr = <[x]>
 |}];;
+
+(* No scope extrusion in effect handler *)
+
+type _ Effect.t += Extrude : <[int]> expr -> <[int]> expr Effect.t
+[%%expect {|
+type _ Stdlib.Effect.t += Extrude : <[int]> expr -> <[int]> expr Effect.t
+|}];;
+
+(* Even though [$x] is syntactically outside its binder,
+   it appears in a handler that continues back under the binder. *)
+let safe_eff () =
+  match <[ fun () -> let x = 42 in $(Effect.perform (Extrude <[x]>)) ]> with
+  | x -> x
+  | effect Extrude x, k -> Effect.Deep.continue k (Obj.magic_many <[ $x ]>)
+;;
+safe_eff ()
+[%%expect {|
+val safe_eff : unit -> <[unit -> int]> expr = <fun>
+- : <[unit -> int]> expr = <[fun () -> let x = 42 in x]>
+|}];;
