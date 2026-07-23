@@ -1,13 +1,11 @@
-type p_plain : bits8 & bits16
-type p_whole : (bits8 & bits16) addressable
-type p_components : bits8 addressable & bits16 addressable
-module Use :
-  functor
-    (M : sig
-           val f : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b -> unit
-         end)
-    ->
-    sig
-      val ok : p_plain -> p_whole -> unit
-      val questionable : p_plain -> p_components -> unit
-    end
+File "instantiate.ml", line 31, characters 10-11:
+31 |     M.f a b
+               ^
+Error: The value b has type p_components
+       but an expression was expected of type
+         ('a : (bits8 & bits16) addressable)
+       The layout of p_components is bits8 addressable & bits16 addressable
+         because of the definition of p_components at file "instantiate.ml", line 21, characters 0-58.
+       But the layout of p_components must be a sublayout of 
+           (bits8 & bits16) addressable
+         because of the definition of f at file "instantiate.ml", lines 24-26, characters 2-51.

@@ -98,13 +98,12 @@ type ok' = ok reqa
 |}]
 
 (**********************************************************************)
-(* A sort variable constrained [addressable] (here via [any addressable])
-   and resolved to a product sort accepts every addressable kind at that
-   sort: the constraint is an upper bound, not a whole-product mark, so
-   both the whole-marked kind and a component-marked kind satisfy it. (An
-   explicit [(bits8 & bits16) addressable] annotation is by contrast the
-   exact whole-marked kind, which the component-marked kind does not
-   match.) *)
+(* Constraining a kind-undetermined variable with [any addressable] COMMITS
+   it to exactly the marked kind of whatever sort it resolves to (like sort
+   defaulting; every question the checker asks is about an exact kind). At a
+   product sort that means only the whole-marked kind satisfies it: the
+   component-marked kind is a different, incomparable addressable kind and
+   is (deliberately, incompletely) rejected. *)
 
 type t_cm : bits8 addressable & bits16 addressable
 type t_wm : (bits8 & bits16) addressable
@@ -128,13 +127,25 @@ val use_wm : t_cm -> t_wm = <fun>
 let use_cm (x : t_cm) : t_cm = gm x
 
 [%%expect{|
-val use_cm : t_cm -> t_cm = <fun>
+Line 1, characters 31-35:
+1 | let use_cm (x : t_cm) : t_cm = gm x
+                                   ^^^^
+Error: This expression has type "('a : (bits8 & bits16) addressable)"
+       but an expression was expected of type "t_cm"
+       The layout of t_cm is bits8 addressable & bits16 addressable
+         because of the definition of t_cm at line 1, characters 0-50.
+       But the layout of t_cm must be a sublayout of
+           (bits8 & bits16) addressable
+         because of the definition of gm at lines 4-6, characters 7-30.
 |}]
 
 (**********************************************************************)
-(* A layout-poly external bounded by [any addressable] must accept every
-   addressable kind, including a product that is addressable via its
-   components: the bound is a constraint, not a whole-product mark. *)
+(* The same commitment applies to a layout-poly external bounded by
+   [any addressable]: instantiating it at a product sort demands the
+   whole-marked kind, so a component-marked product is (deliberately,
+   incompletely) rejected even though it is addressable. Recovering this
+   would take a fourth addressability slot value distinguishing the
+   constraint from the mark; see [Jkind_types.Layout]. *)
 
 external[@layout_poly] id_addressable :
   ('a : any addressable). 'a -> 'a = "%identity"
@@ -144,7 +155,18 @@ let poly_component_marked (x : t_cm) = id_addressable x
 [%%expect{|
 external id_addressable : ('a : any addressable). 'a -> 'a = "%identity"
   [@@layout_poly]
-val poly_component_marked : t_cm -> t_cm = <fun>
+Line 4, characters 54-55:
+4 | let poly_component_marked (x : t_cm) = id_addressable x
+                                                          ^
+Error: The value "x" has type "t_cm" but an expression was expected of type
+         "('a : (bits8 & bits16) addressable)"
+       The layout of t_cm is bits8 addressable & bits16 addressable
+         because of the definition of t_cm at line 1, characters 0-50.
+       But the layout of t_cm must be a sublayout of
+           (bits8 & bits16) addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
 (**********************************************************************)

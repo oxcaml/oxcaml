@@ -1,6 +1,7 @@
 (* TEST
  flags = "-extension layout_poly_alpha -extension layouts_beta -i -stop-after typing";
  setup-ocamlc.byte-build-env;
+ ocamlc_byte_exit_status = "2";
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)
@@ -10,14 +11,10 @@
    (translation of the instantiation is not, hence [-stop-after typing]).
 
    At [x := bits8 & bits16], the [('b : x addressable)] bound is exactly
-   the whole-marked product, so [ok] must be accepted. [questionable]
-   passes a component-marked product - a different, incomparable kind -
-   and OUGHT to be rejected; it is currently accepted because the instance
-   copy of the exact [x addressable] bound is indistinguishable from a
-   flexible [any addressable]-style constraint, which legitimately admits
-   every addressable kind at the sort. Separating the two readings needs a
-   fourth addressability slot value (exact vs upper bound); see the CR in
-   [Jkind_types.Layout]. *)
+   the whole-marked product: [ok] is accepted, and [rejected] passes a
+   component-marked product - a different, incomparable kind - and fails.
+   The instance copies preserve the bound's exact meaning; see the
+   invariants on [Jkind_types.Layout]. *)
 
 type p_plain : bits8 & bits16
 type p_whole : (bits8 & bits16) addressable
@@ -30,6 +27,6 @@ module Use (M : sig
 end @ static) = struct
   let ok (a : p_plain) (b : p_whole) = M.f a b
 
-  let questionable (a : p_plain) (b : p_components) =
+  let rejected (a : p_plain) (b : p_components) =
     M.f a b
 end
