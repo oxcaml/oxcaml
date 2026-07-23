@@ -16,13 +16,6 @@
 open Misc
 open Asttypes
 
-type error =
-  | Slambda_unsupported of string
-
-exception Error of Location.t option * error
-
-let error ?loc err = raise (Error (loc, err))
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -456,7 +449,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Ident.t
+  | Psplicevar of Slambdaident.t
 
 and block_shape =
   | All_value
@@ -477,7 +470,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
+  | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -610,6 +603,11 @@ let equal_raise_kind left right =
   | Raise_notrace, Raise_notrace -> true
   | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
 
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf
+    "Splice variable %a should have been evaluated"
+    Slambdaident.print ident
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -677,7 +675,7 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
+  | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
      | Vec256 | Vec512 | Word | Untagged_immediate | Product _
@@ -749,7 +747,7 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Vec512, Vec512
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> Some m1
-  | Splice_variable id1, Splice_variable id2 when Ident.equal id1 id2 ->
+  | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
       Some m1
   | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
       | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
@@ -790,7 +788,7 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
 let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
-  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
     false
@@ -832,7 +830,7 @@ let rec join_layout x y =
   | Punboxed_vector v1, Punboxed_vector v2
     when Primitive.equal_unboxed_vector v1 v2 ->
       x
-  | Psplicevar id1, Psplicevar id2 when Ident.equal id1 id2 -> x
+  | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
   | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
       | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
@@ -1087,6 +1085,8 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Lkindtemplate of lkindtemplate
+  | Lkindinstantiate of lkindinstantiate
 
 and slambda =
   | SLlayout of layout
@@ -1113,7 +1113,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1137,6 +1137,23 @@ and lfunction =
     loc: scoped_location;
     mode: locality_mode;
     ret_mode: locality_mode;
+  }
+
+and lkindtemplate =
+  { ktmpl_params: Slambdaident.t list;
+    ktmpl_return: layout;
+    ktmpl_body: lambda;
+    ktmpl_mode: locality_mode;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_loc: scoped_location;
+  }
+
+and lkindinstantiate =
+  { kinst_func: lambda;
+    kinst_args: layout list;
+    kinst_result_layout: layout;
+    kinst_mode: locality_mode;
+    kinst_loc: scoped_location;
   }
 
 and lambda_while =
@@ -1192,8 +1209,10 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
+  | Lkindtemplate { ktmpl_loc = loc; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
+  | Lkindinstantiate { kinst_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1219,11 +1238,6 @@ let rec try_to_find_location lam =
 
 let try_to_find_debuginfo lam =
   Debuginfo.from_location (try_to_find_location lam)
-
-let fatal_error_unevaluated_splice_var ident =
-  Misc.fatal_errorf_doc
-    "Splice variable %a should have been evaluated"
-    Ident.doc_print ident
 
 let fatal_error_invalid_constructor lambda =
   let loc =
@@ -1255,6 +1269,8 @@ let fatal_error_invalid_constructor lambda =
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
+    | Lkindtemplate _ -> "Lkindtemplate"
+    | Lkindinstantiate _ -> "Lkindinstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1470,6 +1486,7 @@ let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
+let layout_template_env = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
 let layout_unboxed_nativeint = Punboxed_or_untagged_integer Unboxed_nativeint
@@ -1611,6 +1628,9 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = tr_rec env inst.kinst_func;
+                                     kinst_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1652,7 +1672,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Lkindtemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1761,6 +1781,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Lkindtemplate {ktmpl_body} ->
+      f ktmpl_body
+  | Lkindinstantiate {kinst_func} ->
+      f kinst_func
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1854,6 +1878,12 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Lkindtemplate {ktmpl_env} ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        ktmpl_env Ident.Set.empty
+  | Lkindinstantiate {kinst_func = fn} ->
+      free_variables fn
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2103,8 +2133,18 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Lkindtemplate ({ktmpl_env} as ktmpl) ->
+        Lkindtemplate
+          { ktmpl with
+            ktmpl_env =
+              Ident.Map.map
+                (fun (lam, layout) -> (subst s l lam, layout))
+                ktmpl_env;
+          }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2263,9 +2303,45 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_specialised;
           ap_probe;
         }
+  | Lkindinstantiate { kinst_func = old_func; kinst_args; kinst_result_layout;
+                       kinst_mode; kinst_loc } ->
+      let new_func = f old_func in
+      if old_func == new_func
+      then lam
+      else
+        Lkindinstantiate {
+          kinst_func = new_func;
+          kinst_args;
+          kinst_result_layout;
+          kinst_mode;
+          kinst_loc;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
+  | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
+                    ktmpl_mode; ktmpl_env = old_env; ktmpl_loc } ->
+      let new_body = f old_body in
+      let env_changed = ref false in
+      let new_env =
+        Ident.Map.map
+          (fun (old_lam, layout) ->
+            let new_lam = f old_lam in
+            env_changed := !env_changed || old_lam != new_lam;
+            (new_lam, layout))
+          old_env
+      in
+      if old_body == new_body && not !env_changed
+      then lam
+      else
+        Lkindtemplate {
+          ktmpl_params;
+          ktmpl_return;
+          ktmpl_body = new_body;
+          ktmpl_mode;
+          ktmpl_env = new_env;
+          ktmpl_loc;
+        }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -3428,10 +3504,12 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_mode=Alloc_heap} -> ()
+    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_mode=Alloc_local} ->
+      raise Exit
 
     | Lapply {ap_mode=Alloc_local}
+    | Lkindinstantiate {kinst_mode=Alloc_local}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3451,9 +3529,9 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
-      | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
+    | ( Lapply _  | Lkindinstantiate _ | Llet _ | Lmutlet _ | Lletrec _
+      | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
+      | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
@@ -3589,16 +3667,3 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
-
-let report_error ppf = function
-  | Slambda_unsupported where ->
-    Format_doc.fprintf ppf
-      "Static computation and layout polymorphism are not yet supported in %s."
-      where
-
-let () =
-  Location.register_error_of_exn (function
-    | Error (Some loc, err) ->
-      Some (Location.error_of_printer ~loc report_error err)
-    | Error (None, err) -> Some (Location.error_of_printer report_error err)
-    | _ -> None)

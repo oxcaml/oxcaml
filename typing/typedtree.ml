@@ -1259,7 +1259,10 @@ let rec iter_bound_idents
   match pat.pat_desc with
   | Tpat_var { id; name = s; uid; sort; _ } ->
       f (id, s, pat.pat_type, sort, uid)
-  | Tpat_fun_layout { id; name = s; uid; sort; _ } ->
+  | Tpat_fun_layout { id; name = s; uid; sort; lpoly; _ } ->
+      let sort =
+        if Lpoly.is_empty_exn lpoly then sort else Jkind.Sort.scannable
+      in
       f (id, s, pat.pat_type, sort, uid)
   | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
       iter_bound_idents f p;

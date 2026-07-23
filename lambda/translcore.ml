@@ -416,20 +416,23 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
-and transl_exp0 ~in_new_scope ~scopes layout e =
+and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
-  | Texp_apply_layout (_, args) ->
-      let sorts = List.map Jkind.Sort.var_default_to_scannable_and_get args in
-      Misc.fatal_errorf
-        "Translcore: translation of layout-polymorphic instantiation is not \
-         yet supported@ (layout args: [%a])"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           (Format_doc.compat Jkind.Sort.Const.format))
-        sorts
+  | Texp_apply_layout (func, args) ->
+      Lkindinstantiate {
+        kinst_func = (transl_exp ~scopes Lambda.layout_template_env func);
+        kinst_args = List.map
+          (fun var ->
+            let layout = Jkind.Sort.var_default_to_scannable_and_get var in
+            Typeopt.layout_of_sort e.exp_loc layout)
+          args;
+        kinst_result_layout = layout;
+        kinst_mode = alloc_local;
+        kinst_loc = (of_location ~scopes e.exp_loc);
+      }
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       transl_let ~scopes ~return_layout:layout rec_flag pat_expr_list
@@ -2200,7 +2203,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_fun_layout { id; uid; lpoly }
+                when List.is_empty (Lpoly.get_exn lpoly) ->
+              id, uid
             | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
