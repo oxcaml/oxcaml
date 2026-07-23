@@ -3871,6 +3871,24 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
 let walk_locks_for_legacy_construct ~env pp =
   ignore (walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy)
 
+(* The allocation ceiling demanded of values entering the current context
+   from a [zero_alloc_] region: leaving the region is a capture by the
+   enclosing function, so the region result must satisfy the innermost
+   enclosing noalloc obligation. Locks are scanned from the use site
+   outwards; a [Zero_alloc_lock] means the current context is itself inside
+   a [zero_alloc_] region (whose own exit performs this check), so there is
+   no obligation here. *)
+let enclosing_noalloc_ceiling env =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  let rec go = function
+    | [] -> Mode.Allocation.alloc
+    | Zero_alloc_lock :: _ -> Mode.Allocation.alloc
+    | Closure_noalloc_lock :: _ -> Mode.Allocation.noalloc_strict
+    | _ :: rest -> go rest
+  in
+  Mode.Allocation.disallow_left (go (List.rev locks))
+
 (** Registers a use of an allocation, constraining every enclosing closure lock.
     Used for constructs with allocations that force enclosing functions to be
     alloc (rather than noalloc_strict) *)

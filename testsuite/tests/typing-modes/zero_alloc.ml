@@ -2146,14 +2146,24 @@ Error: The allocation is "alloc"
 |}]
 
 
-(** Test 8: the [zero_alloc_] escape hatch. The allocation axis is not
-    checked inside [zero_alloc_ e]; the zero_alloc property of [e] is
-    instead verified by the backend checker. *)
+(** Test 8: the [zero_alloc_] escape hatch. [zero_alloc_ e] rolls the
+    enclosing noalloc obligations back for the extent of [e]: uses of values
+    and allocations inside neither constrain nor are constrained by
+    enclosing functions on the allocation axis; the zero_alloc property of
+    [e] is instead verified by the backend checker. Leaving the region is a
+    capture by the enclosing function, so the value [e] produces must
+    satisfy the enclosing noalloc obligation: function-free data crosses
+    the allocation axis and flows out freely, while functions and other
+    allocation carriers must be provably noalloc to re-enter. *)
 
-(* An [alloc] value can be returned where [noalloc_strict] is expected. *)
+(* The result value cannot launder its allocation mode: an [alloc] value
+   does not satisfy a [noalloc_strict] expectation through the wrapper. *)
 let za_direct (x : t @ alloc) : _ @ noalloc_strict = zero_alloc_ x
 [%%expect{|
-val za_direct : t -> t @ noalloc_strict = <fun>
+Line 13, characters 65-66:
+13 | let za_direct (x : t @ alloc) : _ @ noalloc_strict = zero_alloc_ x
+                                                                      ^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
 (* Allocations inside a [noalloc_strict] / [noalloc] closure are allowed. *)
@@ -2167,12 +2177,53 @@ let (za_alloc_n @ noalloc) () = zero_alloc_ { x = 1.; y = 2. }
 val za_alloc_n : unit -> record_t = <fun>
 |}]
 
-(* An [alloc] function can be called inside the region. *)
+(* An [alloc] function can be called inside the region; its result flows
+   out normally. *)
 let alloc_fun () = { x = 1.; y = 2. }
 let (za_call @ noalloc_strict) () = zero_alloc_ (alloc_fun ())
 [%%expect{|
 val alloc_fun : unit -> record_t = <fun>
 val za_call : unit -> record_t = <fun>
+|}]
+
+(* ... but the [alloc] function itself cannot leave the region. *)
+let (za_smuggle_result @ noalloc_strict) () = zero_alloc_ alloc_fun
+[%%expect{|
+Line 1, characters 58-67:
+1 | let (za_smuggle_result @ noalloc_strict) () = zero_alloc_ alloc_fun
+                                                              ^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+(* Nor can it leave through mutable storage. *)
+let (za_smuggle_ref @ noalloc_strict) () =
+  let mutable (r @ alloc) = None in
+  zero_alloc_ (r <- Some alloc_fun);
+  (match r with
+  | None -> assert false
+  | Some f -> f ());
+  ()
+[%%expect{|
+Lines 4-6, characters 2-19:
+4 | ..(match r with
+5 |   | None -> assert false
+6 |   | Some f -> f ()).
+Warning 10 [non-unit-statement]: this expression should have type unit.
+
+val za_smuggle_ref : unit -> unit = <fun>
+|}]
+
+(* Nor wrapped in a closure built inside the region. *)
+let (za_smuggle_closure @ noalloc_strict) () =
+  zero_alloc_ (fun () -> alloc_fun ())
+[%%expect{|
+Line 2, characters 25-34:
+2 |   zero_alloc_ (fun () -> alloc_fun ())
+                             ^^^^^^^^^
+Error: The value "alloc_fun" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 14-38
+         which is expected to be "noalloc_strict".
 |}]
 
 (* A closure defined inside the region is still checked. *)
@@ -2226,6 +2277,40 @@ let za_exempt (h : (unit -> record_t) @ alloc) =
   f
 [%%expect{|
 val za_exempt : (unit -> record_t) -> unit -> record_t = <fun>
+|}]
+
+(* An inner region's exit is checked against the closure it re-enters:
+   [int ref] is function-free data, crosses the allocation axis, and so
+   flows out of the inner region into the [noalloc_strict] closure [g]
+   (exactly as g could capture an [alloc] int ref). *)
+let za_nested_intervening () =
+  zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ (ref 0) in g ())
+[%%expect{|
+Line 2, characters 57-64:
+2 |   zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ (ref 0) in g ())
+                                                             ^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+(* ... but an allocation carrier may not re-enter [g], even though the
+   lookup of [alloc_fun] itself is exempted by the regions. *)
+let za_nested_smuggle () =
+  zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ alloc_fun in g ())
+[%%expect{|
+Line 2, characters 57-66:
+2 |   zero_alloc_ (let (g @ noalloc_strict) () = zero_alloc_ alloc_fun in g ())
+                                                             ^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+(* [zero_alloc_] does not relax other axes. *)
+let za_other_axis (g : (unit -> unit) @ stateful portable) : _ @ stateless =
+  zero_alloc_ g
+[%%expect{|
+Line 2, characters 14-15:
+2 |   zero_alloc_ g
+                  ^
+Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
 (* [zero_alloc_] is transparent for type inference. *)

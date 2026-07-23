@@ -602,6 +602,12 @@ val add_exclave_lock : t -> t
 (** Add a lock recording entry into a [zero_alloc_] expression: the allocation
     axis is unconstrained across this lock in both directions. *)
 val add_zero_alloc_lock : loc:Location.t -> t -> t
+
+(** The allocation ceiling demanded by the innermost enclosing noalloc
+    function, up to the nearest enclosing [zero_alloc_] region. Values
+    produced by a [zero_alloc_] region must satisfy it to re-enter the
+    enclosing context. [alloc] if there is no such obligation. *)
+val enclosing_noalloc_ceiling : t -> Mode.Allocation.r
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t

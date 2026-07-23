@@ -662,18 +662,6 @@ let mode_strictly_stack expected_mode =
     with strictly_stack = true
   }
 
-(** Take the expected mode of [zero_alloc_ exp], return the expected mode of
-    [exp]. The allocation axis is relaxed, since the zero_alloc property is
-    verified by the backend instead. *)
-let mode_zero_alloc expected_mode =
-  let crossing =
-    Crossing.create ~linearity:false ~portability:false
-      ~regionality:false ~uniqueness:false ~contention:false
-      ~statefulness:false ~visibility:false ~forkable:false ~yielding:false
-      ~staticity:false ~allocation:true
-  in
-  mode_morph (Crossing.apply_right crossing) expected_mode
-
 let is_not_alloc_mode expected_mode =
   let ceil =
     Allocation.Guts.get_loose_ceil
@@ -8581,10 +8569,13 @@ and type_expect_
   | Pexp_zero_alloc sbody ->
       Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
       Env.check_no_open_quotations loc env Zero_alloc_qt;
-      (* [zero_alloc_ e] must be in the tail position of its region; the
-         allocation axis of [e] is unconstrained and its zero_alloc property
-         is verified by the backend checker instead. *)
-      let body_mode = mode_zero_alloc expected_mode in
+      (* CR dkalinichenko: explain *)
+      let body_mode =
+        mode_coerce
+          (Value.max_with_comonadic Allocation
+             (Env.enclosing_noalloc_ceiling env))
+          expected_mode
+      in
       let new_env = Env.add_zero_alloc_lock ~loc env in
       let body =
         type_expect ~recarg new_env body_mode sbody ty_expected_explained
