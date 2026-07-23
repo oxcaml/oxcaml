@@ -240,6 +240,11 @@ type always_static_allocation =
   | Unboxed_unit
   | Unboxed_bool
 
+type match_result_context =
+  | Try
+  | Match_with_exception
+  | Match_with_effects
+
 type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
@@ -394,6 +399,9 @@ type error =
         kind : [`Argument | `Result];
         why : [`Partial_match | `Optional_argument];
       }
+  | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
+  | Match_result_not_rep of
+      match_result_context * type_expr * Jkind.Violation.t
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
