@@ -44,14 +44,47 @@ module Make (S : Ssa.Finished_graph) : sig
       [Block_param] value, which a finished graph does not let us construct. *)
   val is_header_param : S.Block.t -> int -> S.Instruction.t -> bool
 
-  (** Map each [Op]'s id to the block in which it is defined. *)
-  val build_op_def_block : unit -> S.Block.t S.Instruction.Id.Tbl.t
+  (** Map each [Op]'s id to the block in which it is defined. Computed once per
+      graph and memoized. *)
+  val op_def : unit -> S.Block.t S.Instruction.Id.Tbl.t
+
+  (** Whether [v] is a compile-time constant operation. *)
+  val is_const : S.Instruction.t -> bool
+
+  (** The value of a [Const_int] that fits in an OCaml [int]. *)
+  val const_int : S.Instruction.t -> int option
+
+  (** [available_at preheader v] is [true] iff [v] can be referenced by a value
+      built in [preheader]: it is a constant (rematerialisable anywhere), or its
+      defining block dominates [preheader] (which also makes it invariant in any
+      loop [preheader] is the preheader of). *)
+  val available_at : S.Block.t -> S.Instruction.t -> bool
+
+  (** The signed per-iteration step of a constant-step BIV ([+c] steps give [c],
+      [-c] steps give [-c]); [None] for variable steps. *)
+  val signed_step : biv -> int option
+
+  (** [loop.back_edges] as a set. *)
+  val back_edge_set : loop -> S.Block.Set.t
+
+  (** The predecessors of [loop]'s header that are not back edges, i.e. the
+      edges by which the loop is entered. *)
+  val entry_predecessors : loop -> S.Block.t list
+
+  (** The single entry predecessor of [loop]'s header, when there is exactly one
+      (the loop's preheader). *)
+  val preheader_of : loop -> S.Block.t option
+
+  (** See {!Natural_loop.Make.edge_dominates}: a sufficient condition for the
+      CFG edge [src -> succ] to dominate [target]. *)
+  val edge_dominates :
+    src:S.Block.t -> succ:S.Block.t -> target:S.Block.t -> bool
 
   (** [is_loop_invariant op_def loop_body v] is [true] iff [v] cannot change
       across iterations of a loop whose body is [loop_body]: it is a
       compile-time constant, or its defining block (for [op_def]) / owning block
       (for a [Block_param]) lies outside [loop_body]. [op_def] should come from
-      [build_op_def_block]. *)
+      {!op_def}. *)
   val is_loop_invariant :
     S.Block.t S.Instruction.Id.Tbl.t -> S.Block.Set.t -> S.Instruction.t -> bool
 end

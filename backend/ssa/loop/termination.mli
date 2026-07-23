@@ -21,7 +21,8 @@ module Make (S : Ssa.Finished_graph) : sig
 
   type exit_branch =
     { condition : S.Instruction.t;
-      continue_when_true : bool
+      continue_when_true : bool;
+      exit_target : S.Block.t  (** the out-of-loop target of the branch *)
     }
 
   (** Identify the loop's exit branch when it has the simple shape the

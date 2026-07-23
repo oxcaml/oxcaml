@@ -78,15 +78,11 @@ module Make (S : Ssa.Finished_graph) = struct
   let is_dead (biv : IV.biv) : bool =
     match Term.find_exit_branch biv.loop with
     | None -> false
-    | Some { condition = cond; continue_when_true = _ } ->
+    | Some { condition = cond; continue_when_true = _; exit_target = _ } ->
       let header = biv.loop.header in
       let k = biv.param_index in
       let is_self = IV.is_header_param header k in
-      let back_preds =
-        List.fold_left
-          (fun s b -> S.Block.Set.add b s)
-          S.Block.Set.empty biv.loop.back_edges
-      in
+      let back_preds = IV.back_edge_set biv.loop in
       (* Uses of [self]: approved only when the consumer is the exit comparison
          or one of the update expressions. [self] must not appear as a direct
          argument of any terminator. *)

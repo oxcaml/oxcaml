@@ -32,6 +32,25 @@ module Make (S : Ssa.Finished_graph) : sig
       among its facts. Anything not decomposed becomes an atom. *)
   val linearize : ctx -> Affine.t list ref -> S.Instruction.t -> Affine.t
 
+  (** How {!coeff_of_target} should treat an SSA value it encounters, before any
+      decomposition through the value's operation is attempted (constant
+      integers are always decomposed as constants). *)
+  type leaf_class =
+    | Target  (** the value whose coefficient is being computed *)
+    | Invariant  (** an opaque leaf the caller knows is invariant *)
+    | Reject  (** reject the whole expression *)
+    | Decompose  (** not a leaf: decompose through the operation *)
+
+  (** [coeff_of_target ~classify v] is the coefficient of the (unique)
+      [Target]-classified value in [v], seen as an affine function of it —
+      [None] if [v] does not decompose into such a function (an unrecognised
+      operation, a [Reject]-classified leaf, or [Target] occurring
+      non-affinely). Recognises the same shapes as {!linearize}, plus constant
+      multiplies; used by {!Strength_reduction} to compute derived induction
+      variables' scale. *)
+  val coeff_of_target :
+    classify:(S.Instruction.t -> leaf_class) -> S.Instruction.t -> int option
+
   (** [guards_at ctx side target] collects the affine facts that hold on entry
       to [target], from the signed comparisons on its immediate-dominator chain
       whose taken edge dominates [target]. Side conditions from [linearize] are

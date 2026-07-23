@@ -7,13 +7,10 @@ module Make (S : Ssa.Finished_graph) = struct
     | Terminates
     | Unknown
 
-  type direction =
-    | Up
-    | Down
-
   type exit_branch =
     { condition : S.Instruction.t;
-      continue_when_true : bool
+      continue_when_true : bool;
+      exit_target : S.Block.t
     }
 
   (* The exit branch must be the loop header's [Branch] terminator, with exactly
@@ -25,34 +22,19 @@ module Make (S : Ssa.Finished_graph) = struct
       let true_in = S.Block.Set.mem ifso loop.body in
       let false_in = S.Block.Set.mem ifnot loop.body in
       match true_in, false_in with
-      | true, false -> Some { condition = cond; continue_when_true = true }
-      | false, true -> Some { condition = cond; continue_when_true = false }
+      | true, false ->
+        Some
+          { condition = cond; continue_when_true = true; exit_target = ifnot }
+      | false, true ->
+        Some
+          { condition = cond; continue_when_true = false; exit_target = ifso }
       | true, true | false, false -> None)
     | Goto _ | Switch _ | Return _ | Raise _ | Tailcall_self _ | Tailcall_func _
     | Call _ | Invalid _ ->
       None
 
-  let direction_of_biv (biv : IV.biv) : direction option =
-    match biv.step, biv.sign with
-    | Step_const c, `Add ->
-      if c > 0 then Some Up else if c < 0 then Some Down else None
-    | Step_const c, `Sub ->
-      if c > 0 then Some Down else if c < 0 then Some Up else None
-    | Step_var _, _ -> None
-
-  (* Continue-condition (oriented with the IV operand on the left): the loop
-     continues iff this comparison holds. Decides whether monotonic progression
-     in [dir] must eventually break the comparison. We only handle signed
-     comparisons; unsigned wrap-around invalidates monotonicity, so those are
-     reported as Unknown. *)
-  let continue_terminates dir (cmp : Cmm.integer_comparison) =
-    match dir, cmp with
-    | Up, (Clt | Cle) -> true
-    | Down, (Cgt | Cge) -> true
-    | (Up | Down), Ceq -> true
-    | Up, (Cgt | Cge | Cne | Cult | Cugt | Cule | Cuge)
-    | Down, (Clt | Cle | Cne | Cult | Cugt | Cule | Cuge) ->
-      false
+  let direction_of_biv (biv : IV.biv) : Loop_comparisons.direction option =
+    Option.bind (IV.signed_step biv) Loop_comparisons.direction_of_step
 
   let biv_implies_termination ~op_def (biv : IV.biv) : bool =
     match find_exit_branch biv.loop, direction_of_biv biv with
@@ -84,20 +66,17 @@ module Make (S : Ssa.Finished_graph) = struct
       match extract with
       | None -> false
       | Some (cmp, side) ->
-        let cmp_iv_left =
-          match side with
-          | `Iv_left -> cmp
-          | `Iv_right -> Cmm.swap_integer_comparison cmp
+        let iv_is_left =
+          match side with `Iv_left -> true | `Iv_right -> false
         in
         let continue_cmp =
-          if exit_info.continue_when_true
-          then cmp_iv_left
-          else Cmm.negate_integer_comparison cmp_iv_left
+          Loop_comparisons.oriented_continue_comparison ~iv_is_left
+            ~continue_when_true:exit_info.continue_when_true cmp
         in
-        continue_terminates dir continue_cmp)
+        Loop_comparisons.continue_terminates dir continue_cmp)
 
   let analyze (_loop : IV.loop) (bivs : IV.biv list) : t =
-    let op_def = IV.build_op_def_block () in
+    let op_def = IV.op_def () in
     if List.exists (biv_implies_termination ~op_def) bivs
     then Terminates
     else Unknown

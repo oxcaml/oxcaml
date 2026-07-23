@@ -25,32 +25,16 @@ module Make (S : Ssa.Finished_graph) = struct
 
   let guards_at = A.guards_at
 
-  (* === Loop-invariance of atoms === *)
+  (* === Loop-invariance of atoms ===
 
-  let build_op_def_block () : S.Block.t S.Instruction.Id.Tbl.t =
-    let tbl = S.Instruction.Id.Tbl.create 64 in
-    List.iter
-      (fun (bl : S.Block.t) ->
-        Array.iter
-          (fun (i : S.Instruction.t) ->
-            match i with
-            | Op { id; _ } -> S.Instruction.Id.Tbl.replace tbl id bl
-            | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-            | Stack_check _ | Name_for_debugger _ ->
-              ())
-          bl.body)
-      S.blocks;
-    tbl
+     Deliberately more conservative than [IV.is_loop_invariant]: values other
+     than [Op]s and [Block_param]s (projections, trap markers, ...) are rejected
+     rather than approved, since a spurious invariance fact here could license
+     an unsound elimination. *)
 
   let atom_invariant ctx ~op_def_block ~(body : S.Block.Set.t) id =
     match atom_instr ctx id with
-    | Op
-        { op =
-            ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ );
-          _
-        } ->
-      true
+    | v when IV.is_const v -> true
     | Op { id = oid; _ } -> (
       match S.Instruction.Id.Tbl.find_opt op_def_block oid with
       | Some bl -> not (S.Block.Set.mem bl body)
@@ -134,11 +118,7 @@ module Make (S : Ssa.Finished_graph) = struct
                   else None)
                 (guards_at ctx side pe)
             in
-            let init_preds =
-              List.filter
-                (fun p -> not (List.exists (S.Block.equal p) loop.back_edges))
-                (S.Block.predecessors header)
-            in
+            let init_preds = IV.entry_predecessors loop in
             let verify u =
               (not (List.is_empty init_preds))
               && List.for_all
@@ -227,7 +207,7 @@ module Make (S : Ssa.Finished_graph) = struct
     | [] -> 0
     | loops ->
       let ctx = new_ctx () in
-      let op_def_block = build_op_def_block () in
+      let op_def_block = IV.op_def () in
       let count = ref 0 in
       List.iter
         (fun ((loop : IV.loop), bivs) ->

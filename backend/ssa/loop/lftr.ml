@@ -8,60 +8,13 @@ module Make (S : Ssa.Finished_graph) = struct
   module Term = Termination.Make (S)
   module AS = Affine_ssa.Make (S)
 
-  let op_def_block : S.Block.t S.Instruction.Id.Tbl.t =
-    let tbl = S.Instruction.Id.Tbl.create 64 in
-    List.iter
-      (fun (bl : S.Block.t) ->
-        Array.iter
-          (fun (i : S.Instruction.t) ->
-            match i with
-            | Op { id; _ } -> S.Instruction.Id.Tbl.replace tbl id bl
-            | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-            | Stack_check _ | Name_for_debugger _ ->
-              ())
-          bl.body)
-      S.blocks;
-    tbl
+  (* Shared loop utilities: constants, availability at the preheader (via the
+     memoized op-definition table) and BIV steps live in {!Induction_var}. *)
+  let is_const = IV.is_const
 
-  let is_const (v : S.Instruction.t) =
-    match v with
-    | Op
-        { op =
-            ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ );
-          _
-        } ->
-      true
-    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-    | Stack_check _ | Name_for_debugger _ ->
-      false
+  let available_at = IV.available_at
 
-  (* Is [v] available (and loop-invariant) on entry to [preheader]? Its defining
-     block must dominate [preheader], so the limit we build there can refer to
-     it. *)
-  let rec available_at (preheader : S.Block.t) (v : S.Instruction.t) : bool =
-    is_const v
-    ||
-    match v with
-    | Op { id; _ } -> (
-      match S.Instruction.Id.Tbl.find_opt op_def_block id with
-      | Some bl -> S.Block.dominates bl preheader
-      | None -> false)
-    | Block_param { block; _ } -> S.Block.dominates block preheader
-    | Proj { src; _ } -> available_at preheader src
-    | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
-      ->
-      false
-
-  let signed_step (biv : IV.biv) : int option =
-    match biv.step with
-    | IV.Step_const c -> Some (match biv.sign with `Add -> c | `Sub -> -c)
-    | IV.Step_var _ -> None
-
-  let is_signed_order (cmp : Cmm.integer_comparison) =
-    match cmp with
-    | Clt | Cle | Cgt | Cge -> true
-    | Ceq | Cne | Cult | Cugt | Cule | Cuge -> false
+  let signed_step = IV.signed_step
 
   (* An opportunity to retire the dead counter [i_param_index] by re-expressing
      the loop's exit test on the live induction variable [sr_param_index], which
@@ -118,25 +71,15 @@ module Make (S : Ssa.Finished_graph) = struct
   let opportunity_of_loop ((loop, bivs) : IV.loop * IV.biv list) :
       opportunity option =
     let header = loop.header in
-    let back_set =
-      List.fold_left
-        (fun s b -> S.Block.Set.add b s)
-        S.Block.Set.empty loop.back_edges
-    in
-    let preheaders =
-      List.filter
-        (fun p -> not (S.Block.Set.mem p back_set))
-        (S.Block.predecessors header)
-    in
-    match preheaders with
-    | [] | _ :: _ :: _ -> None
-    | [preheader] -> (
+    match IV.preheader_of loop with
+    | None -> None
+    | Some preheader -> (
       match Term.find_exit_branch loop with
       | None -> None
-      | Some { condition; continue_when_true } -> (
+      | Some { condition; continue_when_true; exit_target = _ } -> (
         match condition with
         | Op { op = Intop (Icomp cmp); args = [| x; y |]; typ; dbg; _ }
-          when is_signed_order cmp -> (
+          when Loop_comparisons.is_signed_order cmp -> (
           (* The IV side must be a dead basic IV (so it disappears once the test
              stops mentioning it); the other side must be loop-invariant. *)
           let dead_biv_at v =
@@ -163,19 +106,10 @@ module Make (S : Ssa.Finished_graph) = struct
                bound] / [i <= bound]. Other shapes (down-counters, [i > bound]
                continue) are left alone. *)
             let up_and_upper_bounded step_i =
-              let cmp_iv_left =
-                if i_is_left then cmp else Cmm.swap_integer_comparison cmp
-              in
-              let continue_cmp =
-                if continue_when_true
-                then cmp_iv_left
-                else Cmm.negate_integer_comparison cmp_iv_left
-              in
               step_i > 0
-              &&
-              match continue_cmp with
-              | Clt | Cle -> true
-              | Ceq | Cne | Cgt | Cge | Cult | Cugt | Cule | Cuge -> false
+              && Loop_comparisons.continues_while_upper_bounded
+                   (Loop_comparisons.oriented_continue_comparison
+                      ~iv_is_left:i_is_left ~continue_when_true cmp)
             in
             match i_biv.init with
             | [] | _ :: _ :: _ -> None

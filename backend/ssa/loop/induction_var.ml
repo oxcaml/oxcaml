@@ -3,69 +3,36 @@
 module Make (S : Ssa.Finished_graph) = struct
   module Dom = Ssa_dominators.Make (S)
 
-  (* === Natural loop detection ===
+  (* Natural-loop detection is pure graph theory and lives in {!Natural_loop};
+     instantiate it with the SSA block graph. *)
+  module Block_graph = struct
+    type node = S.Block.t
 
-     An edge u -> v is a back edge iff v dominates u. The natural loop of such
-     an edge consists of the header v plus every node that can reach u in the
-     CFG without passing through v. *)
+    module Set = S.Block.Set
+    module Tbl = S.Block.Tbl
 
-  type loop =
+    let equal = S.Block.equal
+
+    let nodes = S.blocks
+
+    let successors = Dom.successors
+
+    let predecessors = Dom.predecessors
+
+    let dominates = Dom.dominates
+  end
+
+  module NL = Natural_loop.Make (Block_graph)
+
+  type loop = NL.loop =
     { header : S.Block.t;
       body : S.Block.Set.t;
       back_edges : S.Block.t list
     }
 
-  let natural_loop_body ~header ~back_preds =
-    let body = ref (S.Block.Set.singleton header) in
-    let rec walk worklist =
-      match worklist with
-      | [] -> ()
-      | bl :: rest ->
-        let ps = Dom.predecessors bl in
-        let added = ref rest in
-        List.iter
-          (fun p ->
-            if not (S.Block.Set.mem p !body)
-            then (
-              body := S.Block.Set.add p !body;
-              added := p :: !added))
-          ps;
-        walk !added
-    in
-    let seeds =
-      List.filter
-        (fun bp ->
-          if S.Block.Set.mem bp !body
-          then false
-          else (
-            body := S.Block.Set.add bp !body;
-            true))
-        back_preds
-    in
-    walk seeds;
-    !body
+  let find_loops = NL.find_loops
 
-  let find_loops () : loop list =
-    let header_tbl : S.Block.t list S.Block.Tbl.t = S.Block.Tbl.create 8 in
-    List.iter
-      (fun bl ->
-        List.iter
-          (fun succ ->
-            if Dom.dominates succ bl
-            then
-              let existing =
-                match S.Block.Tbl.find_opt header_tbl succ with
-                | Some l -> l
-                | None -> []
-              in
-              S.Block.Tbl.replace header_tbl succ (bl :: existing))
-          (Dom.successors bl))
-      S.blocks;
-    S.Block.Tbl.fold
-      (fun header back_preds acc ->
-        let body = natural_loop_body ~header ~back_preds in
-        { header; body; back_edges = back_preds } :: acc)
-      header_tbl []
+  let edge_dominates = NL.edge_dominates
 
   (* === Induction-variable classification === *)
 
@@ -91,21 +58,81 @@ module Make (S : Ssa.Finished_graph) = struct
     | Name_for_debugger _ ->
       false
 
-  (* Map each Op's id to the block in which it is defined. *)
-  let build_op_def_block () : S.Block.t S.Instruction.Id.Tbl.t =
-    let tbl = S.Instruction.Id.Tbl.create 64 in
-    List.iter
-      (fun (bl : S.Block.t) ->
-        Array.iter
-          (fun (i : S.Instruction.t) ->
-            match i with
-            | Op { id; _ } -> S.Instruction.Id.Tbl.replace tbl id bl
-            | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-            | Stack_check _ | Name_for_debugger _ ->
-              ())
-          bl.body)
-      S.blocks;
-    tbl
+  (* Map each Op's id to the block in which it is defined. Memoized: the graph's
+     blocks and their bodies do not change under a fixed [S] (the in-place
+     rewrites the passes perform only replace terminators). *)
+  let op_def_lazy : S.Block.t S.Instruction.Id.Tbl.t Lazy.t =
+    lazy
+      (let tbl = S.Instruction.Id.Tbl.create 64 in
+       List.iter
+         (fun (bl : S.Block.t) ->
+           Array.iter
+             (fun (i : S.Instruction.t) ->
+               match i with
+               | Op { id; _ } -> S.Instruction.Id.Tbl.replace tbl id bl
+               | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+               | Stack_check _ | Name_for_debugger _ ->
+                 ())
+             bl.body)
+         S.blocks;
+       tbl)
+
+  let op_def () = Lazy.force op_def_lazy
+
+  let is_const (v : S.Instruction.t) =
+    match v with
+    | Op
+        { op =
+            ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
+            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ );
+          _
+        } ->
+      true
+    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+    | Stack_check _ | Name_for_debugger _ ->
+      false
+
+  let const_int (v : S.Instruction.t) : int option =
+    match v with
+    | Op { op = Const_int n; _ }
+      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+      Some (Nativeint.to_int n)
+    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+    | Stack_check _ | Name_for_debugger _ ->
+      None
+
+  (* Is [v] available (and loop-invariant) on entry to [preheader]? Its defining
+     block must dominate [preheader], so a value built there can refer to it.
+     Constants are rematerialised by the callers, so they qualify regardless of
+     where they were defined. *)
+  let rec available_at (preheader : S.Block.t) (v : S.Instruction.t) : bool =
+    is_const v
+    ||
+    match v with
+    | Op { id; _ } -> (
+      match S.Instruction.Id.Tbl.find_opt (op_def ()) id with
+      | Some bl -> S.Block.dominates bl preheader
+      | None -> false)
+    | Block_param { block; _ } -> S.Block.dominates block preheader
+    | Proj { src; _ } -> available_at preheader src
+    | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
+      ->
+      false
+
+  let back_edge_set (loop : loop) : S.Block.Set.t =
+    List.fold_left
+      (fun s b -> S.Block.Set.add b s)
+      S.Block.Set.empty loop.back_edges
+
+  let entry_predecessors (loop : loop) : S.Block.t list =
+    List.filter
+      (fun p -> not (List.exists (S.Block.equal p) loop.back_edges))
+      (S.Block.predecessors loop.header)
+
+  let preheader_of (loop : loop) : S.Block.t option =
+    match entry_predecessors loop with
+    | [preheader] -> Some preheader
+    | [] | _ :: _ :: _ -> None
 
   (* A value is loop-invariant wrt [loop_body] if its defining block lies
      outside the body, or it is a compile-time constant. We do not try to hoist
@@ -148,6 +175,12 @@ module Make (S : Ssa.Finished_graph) = struct
     | Step_const x, Step_const y -> Int.equal x y
     | Step_var x, Step_var y -> instr_same x y
     | Step_const _, Step_var _ | Step_var _, Step_const _ -> false
+
+  (* The signed per-iteration step of a constant-step BIV. *)
+  let signed_step (biv : biv) : int option =
+    match biv.step with
+    | Step_const c -> Some (match biv.sign with `Add -> c | `Sub -> -c)
+    | Step_var _ -> None
 
   (* Given [is_self] = "is the header block_param", decide whether [v] is of the
      form [self + c], [c + self] or [self - c] for loop-invariant [c]. *)
@@ -248,7 +281,7 @@ module Make (S : Ssa.Finished_graph) = struct
 
   let analyze () : (loop * biv list) list =
     let loops = find_loops () in
-    let op_def = build_op_def_block () in
+    let op_def = op_def () in
     List.map (fun loop -> loop, analyze_loop ~op_def loop) loops
 
   (* === Printing === *)

@@ -33,93 +33,179 @@ module Make (S : Ssa.Finished_graph) = struct
         if IV.is_header_param block index i then Some id else None)
       ctx.atoms
 
-  (* === Linearization === *)
+  (* === Recognition into {!Affine_expr} === *)
 
   let fits_int (n : nativeint) =
     Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n
 
-  (* Affine form of [instr]'s machine-integer value. Right shifts are atomized,
-     pushing the sound bounds [2^k*t <= a] and [a <= 2^k*t + 2^k-1] onto [side].
-     Target-specific scaled-add index ops are decoded via the [Arch] hook.
-     Anything else becomes an atom. *)
-  let rec linearize ctx side (instr : S.Instruction.t) : Affine.t =
-    let lin = linearize ctx side in
-    match instr with
+  type leaf_class =
+    | Target
+    | Invariant
+    | Reject
+    | Decompose
+
+  (* Per-caller recognition policy; see the two instantiations below. Each hook
+     returning an atom id may reject by returning [None]. *)
+  type mode =
+    { classify : S.Instruction.t -> leaf_class;
+      target_atom : int;
+      invariant_atom : unit -> int option;
+      fallback_atom : S.Instruction.t -> int option;
+      shr_atom : S.Instruction.t -> int option;
+      max_shift_bits : int;
+      decompose_mul : bool
+    }
+
+  (* The affine expression of [v]'s machine-integer value, per [mode]:
+     decomposition through add/sub/shift (and constant-multiply when
+     [decompose_mul]) shapes, target-specific scaled-add index ops and fused
+     multiply-adds via the [Arch] hooks, with leaves and unrecognised values
+     classified by the [mode]'s hooks. [None] when the policy rejects. *)
+  let rec expr_of_value ~mode (v : S.Instruction.t) : Affine_expr.t option =
+    let module E = Affine_expr in
+    let ( let* ) = Option.bind in
+    let recur = expr_of_value ~mode in
+    let fallback v = Option.map (fun id -> E.Atom id) (mode.fallback_atom v) in
+    match v with
     | Op { op = Const_int n; _ } when fits_int n ->
-      Affine.const (Nativeint.to_int n)
-    | Op { op = Intop Iadd; args = [| a; b |]; _ } -> Affine.add (lin a) (lin b)
-    | Op { op = Intop Isub; args = [| a; b |]; _ } -> Affine.sub (lin a) (lin b)
-    | Op { op = Intop_imm (Iadd, k); args = [| a |]; _ } ->
-      Affine.add_const (lin a) k
-    | Op { op = Intop_imm (Isub, k); args = [| a |]; _ } ->
-      Affine.add_const (lin a) (-k)
-    | Op { op = Intop_imm (Ilsl, k); args = [| a |]; _ } when k >= 0 && k < 16
-      ->
-      Affine.scale (1 lsl k) (lin a)
-    | Op { op = Intop_imm (Iasr, k); args = [| a |]; _ } when k >= 0 && k < 16
-      ->
-      let t = Affine.var (intern ctx instr) in
-      let av = lin a in
-      let pow = 1 lsl k in
-      side
-        := Affine.sub av (Affine.scale pow t)
-           :: Affine.sub (Affine.add_const (Affine.scale pow t) (pow - 1)) av
-           :: !side;
-      t
-    | Op { op = Specific spec; args; _ } -> (
-      match Arch.specific_operation_as_affine spec with
-      | Some (coeff, disp) when Array.length coeff = Array.length args ->
-        let acc = ref (Affine.const disp) in
-        Array.iteri
-          (fun i c -> acc := Affine.add !acc (Affine.scale c (lin args.(i))))
-          coeff;
-        !acc
-      | Some _ | None -> (
-        (* Fused multiply-add/sub: affine when one multiplicand linearizes to a
-           constant [k], giving [±k * other + addend]. Otherwise atomize. *)
-        match Arch.specific_operation_as_muladd spec with
-        | Some (m0, m1, a, negate)
-          when m0 < Array.length args
-               && m1 < Array.length args
-               && a < Array.length args -> (
-          let a0 = lin args.(m0) and a1 = lin args.(m1) in
-          let prod =
-            if Affine.is_const a0
-            then Some (Affine.scale a0.Affine.const a1)
-            else if Affine.is_const a1
-            then Some (Affine.scale a1.Affine.const a0)
-            else None
-          in
-          match prod with
-          | Some p ->
-            Affine.add (if negate then Affine.neg p else p) (lin args.(a))
-          | None -> Affine.var (intern ctx instr))
-        | Some _ | None -> Affine.var (intern ctx instr)))
-    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-    | Stack_check _ | Name_for_debugger _ ->
+      Some (E.Const (Nativeint.to_int n))
+    | _ -> (
+      match mode.classify v with
+      | Target -> Some (E.Atom mode.target_atom)
+      | Invariant -> Option.map (fun id -> E.Atom id) (mode.invariant_atom ())
+      | Reject -> None
+      | Decompose -> (
+        match v with
+        | Op { op = Intop Iadd; args = [| a; b |]; _ } ->
+          let* ea = recur a in
+          let* eb = recur b in
+          Some (E.Add (ea, eb))
+        | Op { op = Intop Isub; args = [| a; b |]; _ } ->
+          let* ea = recur a in
+          let* eb = recur b in
+          Some (E.Sub (ea, eb))
+        | Op { op = Intop_imm (Iadd, k); args = [| a |]; _ } ->
+          let* ea = recur a in
+          Some (E.Add (ea, E.Const k))
+        | Op { op = Intop_imm (Isub, k); args = [| a |]; _ } ->
+          let* ea = recur a in
+          Some (E.Sub (ea, E.Const k))
+        | Op { op = Intop_imm (Ilsl, k); args = [| a |]; _ }
+          when k >= 0 && k < mode.max_shift_bits ->
+          let* ea = recur a in
+          Some (E.Scale (1 lsl k, ea))
+        | Op { op = Intop_imm (Iasr, k); args = [| a |]; _ }
+          when k >= 0 && k < mode.max_shift_bits -> (
+          (* Atomized right shift: the atom's relation to the shifted value is
+             expressed by the side bounds {!Affine_expr.to_affine} emits. *)
+          match mode.shr_atom v with
+          | Some atom ->
+            let* ea = recur a in
+            Some (E.Shr_atom { atom; arg = ea; bits = k })
+          | None -> fallback v)
+        | Op { op = Intop_imm (Imul, k); args = [| a |]; _ }
+          when mode.decompose_mul ->
+          let* ea = recur a in
+          Some (E.Scale (k, ea))
+        | Op { op = Intop Imul; args = [| a; b |]; _ } when mode.decompose_mul
+          -> (
+          let* ea = recur a in
+          let* eb = recur b in
+          match E.as_const ea, E.as_const eb with
+          | Some k, _ -> Some (E.Scale (k, eb))
+          | None, Some k -> Some (E.Scale (k, ea))
+          | None, None -> fallback v)
+        | Op { op = Specific spec; args; _ } -> (
+          match Arch.specific_operation_as_affine spec with
+          | Some (coeff, disp) when Array.length coeff = Array.length args ->
+            let rec build i acc =
+              if i >= Array.length args
+              then Some acc
+              else
+                let* ei = recur args.(i) in
+                build (i + 1) (E.Add (acc, E.Scale (coeff.(i), ei)))
+            in
+            build 0 (E.Const disp)
+          | Some _ | None -> (
+            (* Fused multiply-add/sub: affine when one multiplicand's affine
+               form is a constant [k], giving [±k * other + addend]. *)
+            match Arch.specific_operation_as_muladd spec with
+            | Some (m0, m1, a, negate)
+              when m0 < Array.length args
+                   && m1 < Array.length args
+                   && a < Array.length args -> (
+              let* e0 = recur args.(m0) in
+              let* e1 = recur args.(m1) in
+              let prod =
+                match E.as_const e0, E.as_const e1 with
+                | Some k, _ -> Some (E.Scale (k, e1))
+                | None, Some k -> Some (E.Scale (k, e0))
+                | None, None -> None
+              in
+              match prod with
+              | Some p ->
+                let* ea = recur args.(a) in
+                Some (E.Add ((if negate then E.Scale (-1, p) else p), ea))
+              | None -> fallback v)
+            | Some _ | None -> fallback v))
+        | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+        | Stack_check _ | Name_for_debugger _ ->
+          fallback v))
+
+  (* === Linearization === *)
+
+  (* Affine form of [instr]'s machine-integer value. Right shifts are atomized,
+     with the sound bounds [2^k*t <= a] and [a <= 2^k*t + 2^k-1] pushed onto
+     [side]. Anything not decomposed becomes an atom, so this never rejects. *)
+  let linearize ctx side (instr : S.Instruction.t) : Affine.t =
+    let mode =
+      { classify = (fun _ -> Decompose);
+        target_atom = 0;
+        invariant_atom = (fun () -> None);
+        fallback_atom = (fun v -> Some (intern ctx v));
+        shr_atom = (fun v -> Some (intern ctx v));
+        max_shift_bits = 16;
+        decompose_mul = false
+      }
+    in
+    match expr_of_value ~mode instr with
+    | Some e ->
+      let form, sides = Affine_expr.to_affine e in
+      side := sides @ !side;
+      form
+    | None ->
+      (* Unreachable in this mode (no hook rejects); atomize for totality. *)
       Affine.var (intern ctx instr)
 
-  (* === Guard facts from dominating branches === *)
+  (* === Coefficient extraction === *)
 
-  (* Facts implied by the (possibly negated) signed comparison [la cmp lb].
-     Unsigned comparisons and [Cne] cannot be expressed as a single affine
-     inequality, so they contribute nothing. *)
-  let cmp_facts ~negate (cmp : Cmm.integer_comparison) la lb : Affine.t list =
-    let cmp = if negate then Cmm.negate_integer_comparison cmp else cmp in
-    match cmp with
-    | Cge -> [Affine.sub la lb]
-    | Cgt -> [Affine.add_const (Affine.sub la lb) (-1)]
-    | Cle -> [Affine.sub lb la]
-    | Clt -> [Affine.add_const (Affine.sub lb la) (-1)]
-    | Ceq -> [Affine.sub la lb; Affine.sub lb la]
-    | Cne | Cult | Cugt | Cule | Cuge -> []
+  let coeff_of_target ~(classify : S.Instruction.t -> leaf_class)
+      (v : S.Instruction.t) : int option =
+    let next = ref 0 in
+    let mode =
+      { classify;
+        target_atom = 0;
+        invariant_atom =
+          (fun () ->
+            incr next;
+            Some !next);
+        fallback_atom = (fun _ -> None);
+        shr_atom = (fun _ -> None);
+        max_shift_bits = 62;
+        decompose_mul = true
+      }
+    in
+    Option.bind (expr_of_value ~mode v) (Affine_expr.coeff_of_atom 0)
+
+  (* === Guard facts from dominating branches === *)
 
   let cond_facts ctx side ~negate (cond : S.Instruction.t) : Affine.t list =
     match cond with
     | Op { op = Intop (Icomp cmp); args = [| a; b |]; _ } ->
-      cmp_facts ~negate cmp (linearize ctx side a) (linearize ctx side b)
+      Loop_comparisons.facts ~negate cmp (linearize ctx side a)
+        (linearize ctx side b)
     | Op { op = Intop_imm (Icomp cmp, k); args = [| a |]; _ } ->
-      cmp_facts ~negate cmp (linearize ctx side a) (Affine.const k)
+      Loop_comparisons.facts ~negate cmp (linearize ctx side a) (Affine.const k)
     | _ -> []
 
   (* Facts that hold at entry to [target], gathered from the branches on its
@@ -135,18 +221,9 @@ module Make (S : Ssa.Finished_graph) = struct
           (* [cond] (or its negation) is a fact at [target] only if the taken
              edge [idom -> ifso] (resp. [idom -> ifnot]) *dominates* [target] --
              i.e. every path from entry to [target] traverses that specific
-             edge. Block-dominance of [ifso] is not enough: control can reach
-             [ifso] via the other edge when it reconverges, so the guard need
-             not have held. We use the standard sufficient condition: the
-             successor is dominated (so all paths to [target] pass through it)
-             *and* its only predecessor is [idom] (so the only way into it is
-             the taken edge). *)
+             edge; see {!Natural_loop.Make.edge_dominates}. *)
           let edge_dominates (succ : S.Block.t) =
-            S.Block.dominates succ target
-            &&
-            match S.Block.predecessors succ with
-            | [p] -> S.Block.equal p idom
-            | [] | _ :: _ :: _ -> false
+            IV.edge_dominates ~src:idom ~succ ~target
           in
           if edge_dominates ifso
           then acc := cond_facts ctx side ~negate:false cond @ !acc

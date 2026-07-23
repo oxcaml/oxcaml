@@ -722,6 +722,10 @@
   cfg_of_ssa
   ;; backend/ssa/loop/
   fourier_motzkin
+  affine_expr
+  loop_comparisons
+  loop_chains
+  natural_loop
   induction_var
   affine_ssa
   termination

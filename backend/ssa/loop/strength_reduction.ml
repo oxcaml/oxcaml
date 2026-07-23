@@ -4,63 +4,13 @@
 
 module Make (S : Ssa.Finished_graph) = struct
   module IV = Induction_var.Make (S)
+  module AS = Affine_ssa.Make (S)
 
-  (* Map each Op's id to the block in which it is defined. *)
-  let op_def_block : S.Block.t S.Instruction.Id.Tbl.t =
-    let tbl = S.Instruction.Id.Tbl.create 64 in
-    List.iter
-      (fun (bl : S.Block.t) ->
-        Array.iter
-          (fun (i : S.Instruction.t) ->
-            match i with
-            | Op { id; _ } -> S.Instruction.Id.Tbl.replace tbl id bl
-            | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-            | Stack_check _ | Name_for_debugger _ ->
-              ())
-          bl.body)
-      S.blocks;
-    tbl
+  (* Shared loop utilities: constants and availability at the preheader (via the
+     memoized op-definition table) live in {!Induction_var}. *)
+  let is_const = IV.is_const
 
-  let is_const (v : S.Instruction.t) =
-    match v with
-    | Op
-        { op =
-            ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ );
-          _
-        } ->
-      true
-    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-    | Stack_check _ | Name_for_debugger _ ->
-      false
-
-  let const_int (v : S.Instruction.t) : int option =
-    match v with
-    | Op { op = Const_int n; _ }
-      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
-      Some (Nativeint.to_int n)
-    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-    | Stack_check _ | Name_for_debugger _ ->
-      None
-
-  (* Is [v] computed (and loop-invariant) on entry to [preheader]? We require
-     its defining block to dominate [preheader], so the value can be referenced
-     from [preheader] when we materialise the new IV's initial value there.
-     Constants are rematerialised, so they qualify regardless of where they were
-     defined. *)
-  let rec available_at (preheader : S.Block.t) (v : S.Instruction.t) : bool =
-    is_const v
-    ||
-    match v with
-    | Op { id; _ } -> (
-      match S.Instruction.Id.Tbl.find_opt op_def_block id with
-      | Some bl -> S.Block.dominates bl preheader
-      | None -> false)
-    | Block_param { block; _ } -> S.Block.dominates block preheader
-    | Proj { src; _ } -> available_at preheader src
-    | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
-      ->
-      false
+  let available_at = IV.available_at
 
   let is_int_value (v : S.Instruction.t) =
     match S.Instruction.arg_type v with Cmm.Int -> true | _ -> false
@@ -72,76 +22,17 @@ module Make (S : Ssa.Finished_graph) = struct
      expression, so we never fold a pointer into the carried IV — only its
      integer offset. [None] if [v] is not an affine function [coeff * iv +
      invariant] of that shape. The constant term does not affect the
-     coefficient, so displacements are ignored. *)
-  let rec biv_coeff ~is_biv ~preheader (v : S.Instruction.t) : int option =
-    let recur = biv_coeff ~is_biv ~preheader in
-    let ( let* ) = Option.bind in
-    if is_biv v
-    then Some 1
-    else if available_at preheader v
-    then if is_int_value v then Some 0 else None
-    else
-      match v with
-      | Op { op = Intop Iadd; args = [| a; b |]; _ } ->
-        let* ca = recur a in
-        let* cb = recur b in
-        Some (ca + cb)
-      | Op { op = Intop Isub; args = [| a; b |]; _ } ->
-        let* ca = recur a in
-        let* cb = recur b in
-        Some (ca - cb)
-      | Op { op = Intop_imm ((Iadd | Isub), _); args = [| a |]; _ } -> recur a
-      | Op { op = Intop_imm (Ilsl, k); args = [| a |]; _ } when k >= 0 && k < 62
-        ->
-        let* ca = recur a in
-        Some (ca lsl k)
-      | Op { op = Intop_imm (Imul, k); args = [| a |]; _ } ->
-        let* ca = recur a in
-        Some (ca * k)
-      | Op { op = Intop Imul; args = [| a; b |]; _ } -> (
-        match const_int a with
-        | Some k ->
-          let* cb = recur b in
-          Some (k * cb)
-        | None -> (
-          match const_int b with
-          | Some k ->
-            let* ca = recur a in
-            Some (ca * k)
-          | None -> None))
-      | Op { op = Specific spec; args; _ } -> (
-        match Arch.specific_operation_as_affine spec with
-        | Some (coeffs, _disp) when Array.length coeffs = Array.length args ->
-          let acc = ref (Some 0) in
-          Array.iteri
-            (fun i c ->
-              match !acc, recur args.(i) with
-              | Some s, Some ci -> acc := Some (s + (c * ci))
-              | _ -> acc := None)
-            coeffs;
-          !acc
-        | Some _ | None -> (
-          (* Fused multiply-add/sub (e.g. arm64 [madd]/[msub]): affine only when
-             one multiplicand is a compile-time constant [k], in which case the
-             IV coefficient is [±k * coeff(other) + coeff(addend)]. *)
-          match Arch.specific_operation_as_muladd spec with
-          | Some (m0, m1, a, negate)
-            when m0 < Array.length args
-                 && m1 < Array.length args
-                 && a < Array.length args ->
-            let prod =
-              match const_int args.(m0), const_int args.(m1) with
-              | Some k, _ -> Option.map (fun c -> k * c) (recur args.(m1))
-              | None, Some k -> Option.map (fun c -> k * c) (recur args.(m0))
-              | None, None -> None
-            in
-            let* pc = prod in
-            let* ac = recur args.(a) in
-            Some ((if negate then -pc else pc) + ac)
-          | Some _ | None -> None))
-      | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-      | Stack_check _ | Name_for_debugger _ ->
-        None
+     coefficient, so displacements are ignored. Shape recognition is shared with
+     the range analyses via {!Affine_ssa.coeff_of_target}. *)
+  let biv_coeff ~is_biv ~preheader (v : S.Instruction.t) : int option =
+    AS.coeff_of_target
+      ~classify:(fun v ->
+        if is_biv v
+        then AS.Target
+        else if available_at preheader v
+        then if is_int_value v then AS.Invariant else AS.Reject
+        else AS.Decompose)
+      v
 
   (* A strength-reduction opportunity: replace the integer derived IV [derived]
      (which equals [coeff * iv + invariant]) with a fresh header parameter
@@ -206,18 +97,8 @@ module Make (S : Ssa.Finished_graph) = struct
   let reductions_in_loop ((loop : IV.loop), (bivs : IV.biv list)) :
       reduction list =
     let header = loop.header in
-    let back_set =
-      List.fold_left
-        (fun s b -> S.Block.Set.add b s)
-        S.Block.Set.empty loop.back_edges
-    in
-    let preheaders =
-      List.filter
-        (fun p -> not (S.Block.Set.mem p back_set))
-        (S.Block.predecessors header)
-    in
-    match preheaders with
-    | [preheader] ->
+    match IV.preheader_of loop with
+    | Some preheader ->
       List.concat_map
         (fun (biv : IV.biv) ->
           match biv.step with
@@ -273,7 +154,7 @@ module Make (S : Ssa.Finished_graph) = struct
                     })
               cand_list)
         bivs
-    | [] | _ :: _ :: _ -> []
+    | None -> []
 
   let find_reductions () : reduction list =
     IV.analyze ()

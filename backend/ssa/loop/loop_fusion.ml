@@ -48,18 +48,7 @@ module Analysis (S : Ssa.Finished_graph) = struct
       cursor_input : S.Instruction.t (* value fed as the cursor at loop entry *)
     }
 
-  let is_const (v : S.Instruction.t) : bool =
-    match v with
-    | Op
-        { op =
-            ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ );
-          _
-        } ->
-      true
-    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
-    | Stack_check _ | Name_for_debugger _ ->
-      false
+  let is_const = IV.is_const
 
   (* Only allocation-style generative effects are tolerated in a fusable body:
      pure operations, and the initialising stores/allocs that build the fresh
@@ -192,13 +181,8 @@ module Analysis (S : Ssa.Finished_graph) = struct
             (* Preheader (the sole non-back-edge predecessor) supplies the
                initial cursor. *)
             let* cursor_input =
-              let preheaders =
-                List.filter
-                  (fun p -> not (List.exists (S.Block.equal p) loop.back_edges))
-                  header.predecessors
-              in
-              match preheaders with
-              | [ph] -> (
+              match IV.preheader_of loop with
+              | Some ph -> (
                 match ph.terminator with
                 | Goto { goto; args }
                   when S.Block.equal goto header
@@ -206,7 +190,7 @@ module Analysis (S : Ssa.Finished_graph) = struct
                        && Option.is_some args.(cursor_index) ->
                   Some (Option.get args.(cursor_index))
                 | _ -> None)
-              | [] | _ :: _ :: _ -> None
+              | None -> None
             in
             Some
               { header;
@@ -253,16 +237,9 @@ module Analysis (S : Ssa.Finished_graph) = struct
     go b.cursor_input
 
   (* Group the recognised loops into maximal producer/consumer chains, each in
-     producer-first order. *)
-  let chains (loops : t list) : t list list =
-    let is_consumer l = List.exists (fun other -> consumes other l) loops in
-    let heads = List.filter (fun l -> not (is_consumer l)) loops in
-    let rec extend acc l =
-      match List.find_opt (fun n -> consumes l n) loops with
-      | Some n -> extend (n :: acc) n
-      | None -> List.rev acc
-    in
-    List.map (fun h -> extend [h] h) heads
+     producer-first order. The chain logic itself is pure and lives in
+     {!Loop_chains}. *)
+  let chains (loops : t list) : t list list = Loop_chains.chains ~consumes loops
 
   (* The element computation [car] can be recomputed elsewhere: it is a pure
      expression over [head] and constants (no allocation, store, call, ...). *)
@@ -297,22 +274,9 @@ module Analysis (S : Ssa.Finished_graph) = struct
      (producer-first). *)
   let fusable_chains () : t list list =
     IV.analyze () |> List.filter_map classify |> chains
-    |> List.filter_map (fun chain ->
-        let k = List.length chain in
-        let rec pick m =
-          if m < 3
-          then None
-          else
-            let prefix = List.filteri (fun i _ -> i < m) chain in
-            if
-              exit_ok (List.nth prefix (m - 1))
-              && List.for_all
-                   (fun (l : t) -> clonable ~head:l.head l.car)
-                   (List.tl prefix)
-            then Some prefix
-            else pick (m - 2)
-        in
-        pick (if k mod 2 = 1 then k else k - 1))
+    |> List.filter_map
+         (Loop_chains.largest_odd_prefix ~last_ok:exit_ok
+            ~later_ok:(fun (l : t) -> clonable ~head:l.head l.car))
 end
 
 let run (input : (module Ssa.Finished_graph)) :

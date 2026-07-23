@@ -43,17 +43,9 @@ module Make (S : Ssa.Finished_graph) = struct
      analysis also requires (exactly one in-loop target), return the out-of-loop
      target. *)
   let exit_target_of_loop (loop : IV.loop) : S.Block.t option =
-    match loop.header.terminator with
-    | Branch { cond = _; ifso; ifnot } -> (
-      let true_in = S.Block.Set.mem ifso loop.body in
-      let false_in = S.Block.Set.mem ifnot loop.body in
-      match true_in, false_in with
-      | true, false -> Some ifnot
-      | false, true -> Some ifso
-      | true, true | false, false -> None)
-    | Goto _ | Switch _ | Return _ | Raise _ | Tailcall_self _ | Tailcall_func _
-    | Call _ | Invalid _ ->
-      None
+    Option.map
+      (fun (eb : Term.exit_branch) -> eb.exit_target)
+      (Term.find_exit_branch loop)
 
   let run () : deletion list =
     let loops = IV.analyze () in
