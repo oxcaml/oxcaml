@@ -10,7 +10,7 @@ module M = struct
   let id x = x
 end
 [%%expect{|
-module M : sig val id : 'a -> 'a end
+module M : sig val id : 'a @ [< 'm] -> 'a @ [> 'm] end
 |}]
 
 let need_portable (x @ portable) = x
@@ -23,15 +23,11 @@ val need_nonportable : 'a @ [< 'm > nonportable] -> 'a @ [> 'm | nonportable] =
 
 let a (x @ portable) = need_portable (M.id x)
 [%%expect{|
-Line 1, characters 37-45:
-1 | let a (x @ portable) = need_portable (M.id x)
-                                         ^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val a : 'a @ [< 'm & global portable] -> 'a @ [> 'm] = <fun>
 |}]
 
 let b (x @ nonportable) = need_nonportable (M.id x)
 [%%expect{|
-val b :
-  'a @ [< global many uncontended > nonportable] ->
-  'a @ [> aliased nonportable] = <fun>
+val b : 'a @ [< 'm & global > nonportable] -> 'a @ [> 'm | nonportable] =
+  <fun>
 |}]
