@@ -113,7 +113,12 @@ module Addressability = struct
     else
       match actual with
       | Addressable -> Some [to_string actual]
-      | Id | Id_or_addressable -> None
+      | Id_or_addressable ->
+        (* Display defaulting: an undetermined join prints like the plain
+           base, with no suffix word. (Semantic operations must NOT collapse
+           the join like this; see [Layout.Const.addressability].) *)
+        Some []
+      | Id -> None
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -148,8 +153,8 @@ module Layout = struct
               (fun s -> of_sort_const s sa Addressability.Id_or_addressable)
               consts,
             Addressability.forget_join a )
-      | Univar uv -> Univar uv
-      | Genvar v -> Genvar v
+      | Univar uv -> Univar (uv, sa, a)
+      | Genvar v -> Genvar (v, sa, a)
 
     (* Ignores the scannable axes and the addressability slots, both of which
        are printed as suffix words on the base abbreviation. *)
@@ -159,12 +164,12 @@ module Layout = struct
       | Any _, Any _ -> true
       | Product (cs1, _), Product (cs2, _) ->
         List.equal equal_up_to_scannable_axes cs1 cs2
-      | Univar uv1, Univar uv2 ->
+      | Univar (uv1, _, _), Univar (uv2, _, _) ->
         (* [equal_up_to_scannable_axes] is only used to choose which
            abbreviation to use for printing, so physical equality suffices here.
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar (v1, _, _), Genvar (v2, _, _) -> v1 == v2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     (* Compute how to print the layout [scannable sa] *)
@@ -255,9 +260,16 @@ module Layout = struct
               [ (if nested then "(" else "");
                 components;
                 (if nested then ")" else "") ])
-        | Univar { name = Some n } -> n
-        | Univar { name = None } -> "_"
-        | Genvar v -> Sort.to_string_genvar v
+        | Univar ({ name }, _, a) -> (
+          let base = match name with Some n -> n | None -> "_" in
+          match a with
+          | Addressable -> base ^ " " ^ Addressability.to_string a
+          | Id | Id_or_addressable -> base)
+        | Genvar (v, _, a) -> (
+          let base = Sort.to_string_genvar v in
+          match a with
+          | Addressable -> base ^ " " ^ Addressability.to_string a
+          | Id | Id_or_addressable -> base)
       in
       to_string false t
 

@@ -216,13 +216,15 @@ module Layout : sig
       | Any of Scannable_axes.t * Addressability.Action.t
       | Base of Sort.base * Scannable_axes.t * Addressability.t
       | Product of t list * Addressability.Action.t
-      | Univar of Sort.univar
-      | Genvar of Sort.var
+      | Univar of Sort.univar * Scannable_axes.t * Addressability.t
+      | Genvar of Sort.var * Scannable_axes.t * Addressability.t
           (** A layout variable bound by a surrounding [val_lpoly]. It's a
               "fake" constant that will be instantiated to real layout constant
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
+              [Ident.highest_scope]. [Univar] and [Genvar] carry their scannable
+              axes and addressability so a variable's bound survives a cmi round
+              trip losslessly. *)
 
     module Static : sig
       (** Normalizes the addressability slot to [Addressable] on intrinsically

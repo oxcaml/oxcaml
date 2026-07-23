@@ -1089,27 +1089,43 @@ module Layout = struct
       | Any of Scannable_axes.t * Addressability.Action.t
       | Base of Sort.base * Scannable_axes.t * Addressability.t
       | Product of t list * Addressability.Action.t
-      | Univar of Sort.univar
-      | Genvar of Sort.var
+      (* [Univar] and [Genvar] carry their scannable axes and addressability
+         so that a layout variable's bound survives a cmi round trip
+         losslessly ([Subst.Prepare_for_saving] rebuilds every saved jkind
+         through this type): in particular, for a rigid [x], the exact
+         distinction between [x] and [x addressable] must be preserved. The
+         slots are carried passively (root scannable-axis operations still
+         skip these constructors, as before). *)
+      | Univar of Sort.univar * Scannable_axes.t * Addressability.t
+      | Genvar of Sort.var * Scannable_axes.t * Addressability.t
 
     let max = Any (Scannable_axes.max, Addressability.Action.Id)
 
     (* The addressability reading of a constant layout. A join slot on a base
-       is collapsed to the base's intrinsic addressability (a snapshot-level
-       convention: an undetermined bound prints and compares like the plain
-       base), and an unmarked product derives its reading from its
-       components. *)
+       collapses only when the base is intrinsically addressable, where its
+       branches coincide; it is otherwise PRESERVED - the join is
+       information (e.g. a flexible [bits8] bound still admits
+       [bits8 addressable]), and must survive [equal] (in particular through
+       the builtin memoization used when saving cmis). Only printing elides
+       the join ([Jkind.Addressability.to_string_list_diff]). An unmarked
+       product derives its reading from its components. *)
     let rec addressability : t -> Addressability.t = function
       | Base (b, _, a) -> (
         match a with
-        | Id_or_addressable -> Addressability.of_base b
+        | Id_or_addressable -> (
+          match Addressability.of_base b with
+          | Addressable -> Addressable
+          | Id | Id_or_addressable -> Id_or_addressable)
         | Addressable | Id -> a)
       | Any (_, a) -> Addressability.of_action_on_undetermined a
       | Product (ts, a) -> (
         match (a : Addressability.Action.t) with
         | Addressable -> Addressability.Addressable
         | Id -> Addressability.combine_product (List.map addressability ts))
-      | Univar _ | Genvar _ -> Addressability.Id_or_addressable
+      | Univar (_, _, a) | Genvar (_, _, a) ->
+        (* The carrier is never resolved, so the slot is the reading:
+           [Id] on a rigid variable means exactly the plain kind. *)
+        a
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -1128,8 +1144,14 @@ module Layout = struct
            unaddressable kinds from the unmarked product; marking a product
            of addressable kinds does nothing. *)
         && Addressability.equal (addressability c1) (addressability c2)
-      | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | Genvar v1, Genvar v2 -> v1.id = v2.id
+      | Univar (uv1, sa1, a1), Univar (uv2, sa2, a2) ->
+        Sort.equal_univar_univar uv1 uv2
+        && Scannable_axes.equal sa1 sa2
+        && Addressability.equal a1 a2
+      | Genvar (v1, sa1, a1), Genvar (v2, sa2, a2) ->
+        v1.id = v2.id
+        && Scannable_axes.equal sa1 sa2
+        && Addressability.equal a1 a2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
@@ -1139,8 +1161,8 @@ module Layout = struct
         Option.map
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
-      | Univar uv -> Some (Sort.Const.Univar uv)
-      | Genvar v -> Some (Sort.Const.Genvar v)
+      | Univar (uv, _, _) -> Some (Sort.Const.Univar uv)
+      | Genvar (v, _, _) -> Some (Sort.Const.Genvar v)
 
     let is_scannable_or_any = function
       | Any _ | Base (Scannable, _, _) -> true
@@ -1177,14 +1199,14 @@ module Layout = struct
 
     (* Apply the [addressable] kind operator: an override of the root slot to
        [Addressable], not a meet. This does nothing to an already-addressable
-       kind. Like the scannable axes, applications to [Univar]/[Genvar]
-       layouts are dropped (these are alpha-gated). *)
+       kind. *)
     let set_root_addressable t =
       match t with
       | Any (sa, _) -> Any (sa, Addressability.Action.Addressable)
       | Base (b, sa, _) -> Base (b, sa, Addressability.Addressable)
       | Product (ts, _) -> Product (ts, Addressability.Action.Addressable)
-      | Univar _ | Genvar _ -> t
+      | Univar (uv, sa, _) -> Univar (uv, sa, Addressability.Addressable)
+      | Genvar (v, sa, _) -> Genvar (v, sa, Addressability.Addressable)
 
     module Static = struct
       let scannable_non_null_non_pointer =
@@ -1348,7 +1370,7 @@ module Layout = struct
     let of_sort s sa a =
       let rec of_sort (s : Sort.t) sa a =
         match s with
-        | Var v when Sort.is_genvar v -> Some (Genvar v)
+        | Var v when Sort.is_genvar v -> Some (Genvar (v, sa, a))
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa a)
         | Product sorts ->
@@ -1368,17 +1390,17 @@ module Layout = struct
                (fun s ->
                  of_sort s Scannable_axes.max Addressability.Id_or_addressable)
                sorts)
-        | Univar uv -> Some (Univar uv)
+        | Univar uv -> Some (Univar (uv, sa, a))
       in
       of_sort (Sort.get s) sa a
 
-    let of_univar uv = Univar uv
+    let of_univar uv sa a = Univar (uv, sa, a)
 
     let of_flat_sort (s : Sort.Flat.t) sa a =
       match s with
       | Var _ -> None
-      | Genvar v -> Some (Genvar v)
-      | Univar uv -> Some (of_univar uv)
+      | Genvar v -> Some (Genvar (v, sa, a))
+      | Univar uv -> Some (of_univar uv sa a)
       | Base b -> Some (Static.of_base b sa a)
   end
 
@@ -1387,10 +1409,8 @@ module Layout = struct
     | Any (sa, a) -> Any (sa, a)
     | Base (b, sa, a) -> Sort (Sort.of_base b, sa, a)
     | Product (cs, a) -> Product (List.map of_const cs, a)
-    | Univar uv ->
-      Sort (Sort.Univar uv, Scannable_axes.max, Addressability.Id_or_addressable)
-    | Genvar v ->
-      Sort (Sort.Var v, Scannable_axes.max, Addressability.Id_or_addressable)
+    | Univar (uv, sa, a) -> Sort (Sort.Univar uv, sa, a)
+    | Genvar (v, sa, a) -> Sort (Sort.Var v, sa, a)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
