@@ -52,6 +52,14 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
+type atomicity = Asttypes.atomic_flag
+
+type access_mutability = Immutable | Mutable | Atomic
+
+let access_atomicity : access_mutability -> atomicity = function
+  | Immutable | Mutable -> Nonatomic
+  | Atomic -> Atomic
+
 include (struct
 
   type locality_mode =
@@ -419,12 +427,12 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
-  | Pget_ptr of layout * Asttypes.mutable_flag
-  | Pset_ptr of layout * modify_mode
-  | Pget_ext_ptr of layout * Asttypes.mutable_flag
-  | Pset_ext_ptr of layout * modify_mode
+  | Pget_idx of layout * access_mutability
+  | Pset_idx of layout * modify_mode * atomicity
+  | Pget_ptr of layout * access_mutability
+  | Pset_ptr of layout * modify_mode * atomicity
+  | Pget_ext_ptr of layout * access_mutability
+  | Pset_ext_ptr of layout * modify_mode * atomicity
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t

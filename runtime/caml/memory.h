@@ -46,6 +46,8 @@ CAMLextern void caml_free_dependent_memory (value v, mlsize_t bsz);
 CAMLextern void caml_modify (volatile value *, value);
 CAMLextern void caml_modify_local (value obj, intnat i, value val);
 CAMLextern void caml_initialize (volatile value *, value);
+CAMLextern value caml_atomic_load_field (value, value);
+CAMLprim value caml_atomic_exchange_field (value, value, value);
 CAMLextern value caml_atomic_cas_field (value, value, value, value);
 CAMLextern value caml_check_urgent_gc (value);
 

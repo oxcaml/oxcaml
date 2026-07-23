@@ -2384,7 +2384,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       else Immutable in
     let lam =
       try
-        if mut = Mutable then raise Not_constant;
+        if mut = (Mutable : mutable_flag) then raise Not_constant;
         let cl = List.map extract_constant ll in
         match repres with
         | Record_boxed -> Lconst(Const_block(0, cl))

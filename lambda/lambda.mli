@@ -51,6 +51,17 @@ type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
+type atomicity = Asttypes.atomic_flag
+
+type access_mutability =
+  | Immutable
+  | Mutable
+  (** Nonatomic access of mutable data. *)
+  | Atomic
+  (** Atomic access of mutable data. *)
+
+val access_atomicity : access_mutability -> atomicity
+
 val alloc_heap : locality_mode
 
 (* Actually [Alloc_heap] if [Config.stack_allocation] is [false] *)
@@ -433,14 +444,14 @@ type primitive =
   | Ppoll
   (* Arch-specific pause. Without poll insertion, also acts as a [Ppoll]. *)
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
-  | Pget_ptr of layout * Asttypes.mutable_flag
-  | Pset_ptr of layout * modify_mode
+  | Pget_idx of layout * access_mutability
+  | Pset_idx of layout * modify_mode * atomicity
+  | Pget_ptr of layout * access_mutability
+  | Pset_ptr of layout * modify_mode * atomicity
   (* External pointer primitives: like [Pget_ptr]/[Pset_ptr] but take only the
      offset and behave as if the base were null. *)
-  | Pget_ext_ptr of layout * Asttypes.mutable_flag
-  | Pset_ext_ptr of layout * modify_mode
+  | Pget_ext_ptr of layout * access_mutability
+  | Pset_ext_ptr of layout * modify_mode * atomicity
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)

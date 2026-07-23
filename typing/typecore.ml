@@ -7724,14 +7724,14 @@ and type_expect_
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ }, _)
       | Baccess_block (Immutable, _) ->
-        false
+        Immutable
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
       | Baccess_block (Mutable, _) ->
-        true
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic }
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic }
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -7750,18 +7750,24 @@ and type_expect_
         (el_ty, modality)
         uas
     in
-    let expected_modality = Typemode.idx_expected_modalities ~mut in
+    let expected_modality =
+      Typemode.idx_expected_modalities ~mut:(Types.is_mutable mut)
+    in
     begin
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-        raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
+        raise (Error(
+          loc, env,
+          Block_index_modality_mismatch { mut = Types.is_mutable mut; err }
+        ))
     end;
-    let ty =
-      if mut then
+    let ty = match mut with
+      | Immutable -> Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Nonatomic; mode = _ } ->
         Predef.type_idx_mut base_ty el_ty
-      else
-        Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Atomic; mode = _ } ->
+        Predef.type_idx_atomic base_ty el_ty
     in
     with_explanation (fun () ->
       unify_exp_types loc env ty (generic_instance ty_expected));

@@ -431,7 +431,7 @@ let array_type_kind ~elt_ty env loc ty =
         }))
     end
 
-let array_type_mut env ty =
+let array_type_mut env ty : Lambda.mutable_flag =
   match scrape_poly env ty with
   | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable

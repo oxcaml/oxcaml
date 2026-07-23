@@ -1182,9 +1182,14 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          (just above), it's also safe to use this one. Marking the primitive as
          [Mutable] just restricts the optimizations that can be performed. *)
       Primitive(Pget_idx (layout, Mutable), 2)
+    | "%get_idx_atomic" ->
+      Primitive(Pget_idx (layout, Atomic), 2)
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
-      Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Nonatomic), 3)
+    | "%set_idx_atomic" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Atomic), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -1225,14 +1230,14 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       Primitive(Pget_ptr (layout, Mutable), 1)
     | "%unsafe_set_ptr" ->
       let layout = List.nth (get_arg_layouts ()) 1 in
-      Primitive(Pset_ptr (layout, get_first_arg_mode ()), 2)
+      Primitive(Pset_ptr (layout, get_first_arg_mode (), Nonatomic), 2)
     | "%unsafe_get_ext_ptr_imm" ->
       Primitive(Pget_ext_ptr (layout, Immutable), 1)
     | "%unsafe_get_ext_ptr" ->
       Primitive(Pget_ext_ptr (layout, Mutable), 1)
     | "%unsafe_set_ext_ptr" ->
       let layout = List.nth (get_arg_layouts ()) 1 in
-      Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
+      Primitive(Pset_ext_ptr (layout, get_first_arg_mode (), Nonatomic), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
     | s when String.length s > 0 && s.[0] = '%' ->
@@ -1893,15 +1898,15 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     (match fst (maybe_pointer_type env v) with
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
-  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+  | Primitive (Pset_idx (_, m, a), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
-    Some (Primitive (Pset_idx (l, m), arity))
-  | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
+    Some (Primitive (Pset_idx (l, m, a), arity))
+  | Primitive (Pset_ptr (_, m, a), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
-    Some (Primitive (Pset_ptr (l, m), arity))
-  | Primitive (Pset_ext_ptr (_, m), arity), (_ :: p2 :: _) ->
+    Some (Primitive (Pset_ptr (l, m, a), arity))
+  | Primitive (Pset_ext_ptr (_, m, a), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
-    Some (Primitive (Pset_ext_ptr (l, m), arity))
+    Some (Primitive (Pset_ext_ptr (l, m, a), arity))
   | Primitive (Pmake_idx_array (_, ik, _mbe, path), arity), _ ->
     let loc = to_location loc in
     let err () =

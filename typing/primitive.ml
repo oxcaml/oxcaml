@@ -945,7 +945,20 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.bits64);
         any
       ]
+    | "%get_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
     | "%set_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%set_idx_atomic" ->
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
