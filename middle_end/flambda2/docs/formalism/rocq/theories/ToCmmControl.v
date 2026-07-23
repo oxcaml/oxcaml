@@ -387,7 +387,7 @@ Inductive tc_trap (th : tcenv)
       tc_phi th k_h = Some (R_exn lbl_h) ->
       tc_trap th (Some (Trap_pop k_h rk)) [Pop lbl_h].
 
-(** RULE TC.LetCont.Classify (STATUS normative) -- 16-to-cmm-control.md
+(** RULE TC.LetCont.Classify (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont
     CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler
 
@@ -431,7 +431,7 @@ Inductive tc_bind_args
       tc_bind_args th1 ps ss th' ->
       tc_bind_args th ((x, kw) :: ps) (s :: ss) th'.
 
-(** RULE TC.Apply.Call (STATUS normative) -- 16-to-cmm-control.md
+(** RULE TC.Apply.Call (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0
 
     Call-kind dispatch.  The direct form is concrete: a Capply to the
@@ -488,7 +488,7 @@ Inductive tc_apply_call (th : tcenv) (ap : apply_expr)
       extcall_image th ap vs e_call ->
       tc_apply_call th ap e_call.
 
-(** RULE TC.Apply.ExnWrapper (STATUS normative) -- 16-to-cmm-control.md
+(** RULE TC.Apply.ExnWrapper (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply
     CODE backend/cmm_helpers.ml#trywith
     CODE backend/cmm_helpers.ml#raise_prim
@@ -558,7 +558,7 @@ Inductive tc_exn_wrapper (th : tcenv) (ap : apply_expr)
                     (Cexit (Lbl lbl_pop) [call] [Pop lbl_w]) false]
                  (Cexit (Lbl lbl_push) [] [Push lbl_w])))).
 
-(** RULE TC.Expr.Dispatch (STATUS normative) -- 16-to-cmm-control.md
+(** RULE TC.Expr.Dispatch (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 
     The translation is structural on the expression grammar: Let ->
@@ -577,7 +577,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_expr th' body body_c ->
       tc_expr th (E_let p dfn body) (ctx body_c)
 
-  (** RULE TC.LetCont.Inline (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.LetCont.Inline (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_inlined
       CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_inline_cont
 
@@ -593,7 +593,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
         e_body e_c ->
       tc_expr th (E_let_cont_nonrec k h e_body) e_c
 
-  (** RULE TC.LetCont.Jump (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.LetCont.Jump (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined
       CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_jump_cont
 
@@ -619,7 +619,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
         (Ccatch Normal [SHandler lbl xs_c e_h_c (ch_is_cold h)]
            e_body_c)
 
-  (** RULE TC.LetCont.Exn (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.LetCont.Exn (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler
       CODE backend/cmm_helpers.ml#trywith
 
@@ -648,7 +648,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
         (Ccatch Exn_handler [SHandler lbl xs_c e_h_c (ch_is_cold h)]
            e_body_c)
 
-  (** RULE TC.LetCont.Rec (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.LetCont.Rec (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec
 
       A recursive continuation group is a recursive Ccatch
@@ -674,7 +674,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_expr th (E_let_cont_rec zs handlers e_body)
         (Ccatch Recursive shs e_body_c)
 
-  (** RULE TC.ApplyCont.Jump (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.ApplyCont.Jump (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 
       A jump becomes Cexit carrying the translated trap actions
@@ -690,7 +690,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_expr th (E_apply_cont (Mk_apply_cont k ss ta))
         (Cexit (Lbl lbl) vs tas)
 
-  (** RULE TC.ApplyCont.Return (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.ApplyCont.Return (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_return_continuation
       CODE backend/cmm_helpers.ml#trap_return
 
@@ -711,7 +711,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
            e_c = Cexit Return_lbl [tc_make_tuple vs] [Pop lbl_h])) ->
       tc_expr th (E_apply_cont (Mk_apply_cont k ss ta)) e_c
 
-  (** RULE TC.ApplyCont.Inline (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.ApplyCont.Inline (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_cont
 
       Calling an inlined continuation splices its handler in, binding
@@ -727,7 +727,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_expr th' e_h e_h_c ->
       tc_expr th (E_apply_cont (Mk_apply_cont k ss None)) e_h_c
 
-  (** RULE TC.ApplyCont.Raise (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.ApplyCont.Raise (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
       CODE backend/cmm_helpers.ml#raise_prim
 
@@ -778,7 +778,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_apply_return th (ap_result_continuation ap) call' e_c ->
       tc_expr th (E_apply ap) e_c
 
-  (** RULE TC.Switch (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.Switch (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
       CODE backend/cmm_helpers.ml#transl_switch_clambda
       CODE backend/cmm_helpers.ml#ite
@@ -796,7 +796,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_switch_form sc arms_c e_c ->
       tc_expr th (E_switch (Mk_switch s arms)) e_c
 
-  (** RULE TC.Invalid (STATUS normative) -- 16-to-cmm-control.md
+  (** RULE TC.Invalid (CLAIM normative) -- 16-to-cmm-control.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
       CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid
 
@@ -809,7 +809,7 @@ Inductive tc_expr : tcenv -> expr -> cmm_expr -> Prop :=
       tc_flush FM_flush_everything th ->
       tc_expr th (E_invalid msg) (Cinvalid msg)
 
-(** RULE TC.Apply.Return (STATUS normative) -- 16-to-cmm-control.md
+(** RULE TC.Apply.Return (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_expr
 
     Placement of the call result by return continuation (apply_expr's
@@ -951,7 +951,7 @@ Definition control_shape (e : expr) : Prop :=
   | _ => True
   end.
 
-(** RULE INV.ToCmm.Control (STATUS conjectured) -- 16-to-cmm-control.md
+(** RULE INV.ToCmm.Control (CLAIM normative) -- 16-to-cmm-control.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
     CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler
 

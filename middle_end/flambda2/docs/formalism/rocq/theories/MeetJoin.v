@@ -34,7 +34,7 @@ Inductive mres (A : Type) : Type :=
 Arguments Mres_bottom {A}.
 Arguments Mres_ok {A}.
 
-(** RULE T.Meet.Dispatch (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Meet.Dispatch (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet.ml#meet
     CODE middle_end/flambda2/ui/flambda_features.ml#use_n_way_join
     CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
@@ -272,7 +272,7 @@ Definition rlfb_empty (r : row_like_for_blocks) : Prop :=
 (* Block shapes and row-like indices                                      *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Meet.BlockShape (STATUS normative) -- 08-meet-join.md
+(** RULE T.Meet.BlockShape (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks
     CODE middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks
     CODE middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape
@@ -348,7 +348,7 @@ Inductive meet_index
 (* Naked-number set meet / join                                           *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Meet.NakedNumber (STATUS normative) -- 08-meet-join.md
+(** RULE T.Meet.NakedNumber (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_expanded_head0
     CODE middle_end/flambda2/types/meet_and_join.ml#set_meet
     Premise: T1, T2 are heads of the same naked-number kind, denoting
@@ -613,7 +613,7 @@ Inductive meet (E : tenv) : ftype -> ftype -> meet_res -> Prop :=
   | M_bottom_r : forall T1 T2,
       ftype_is_bottom T2 = true ->
       meet E T1 T2 Meet_bottom
-  (** RULE T.Meet.AliasAlias (STATUS normative) -- 08-meet-join.md
+  (** RULE T.Meet.AliasAlias (CLAIM normative) -- 08-meet-join.md
       CODE middle_end/flambda2/types/env/meet_env.ml#meet
       CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
       Premises in doc order: can_E(T1) = s1; can_E(T2) = s2; the
@@ -638,7 +638,7 @@ Inductive meet (E : tenv) : ftype -> ftype -> meet_res -> Prop :=
       (binding_time_of_simple E s1 <= binding_time_of_simple E s2)%nat ->
       meet E (stored_type E k s1) (stored_type E k s2) r ->
       meet E T1 T2 (alias_alias_res k s1 s2 r)
-  (** RULE T.Meet.AliasConcrete (STATUS normative) -- 08-meet-join.md
+  (** RULE T.Meet.AliasConcrete (CLAIM normative) -- 08-meet-join.md
       CODE middle_end/flambda2/types/env/meet_env.ml#meet
       CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
       Premises in doc order: can_E(T1) = s1; T2 is a non-alias
@@ -691,7 +691,7 @@ with meet_hv (E : tenv)
 with meet_hvnn (E : tenv)
   : head_value_non_null -> head_value_non_null
   -> mres head_value_non_null -> Prop :=
-  (** RULE T.Meet.ValueHeadIncompatible (STATUS normative)
+  (** RULE T.Meet.ValueHeadIncompatible (CLAIM normative)
       -- 08-meet-join.md
       CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
       Premises in doc order: T1, T2 are non-null value heads with
@@ -707,7 +707,7 @@ with meet_hvnn (E : tenv)
       ~ (hvnn_code h1 = 0%nat /\ hvnn_code h2 = 1%nat) ->
       ~ (hvnn_code h1 = 1%nat /\ hvnn_code h2 = 0%nat) ->
       meet_hvnn E h1 h2 Mres_bottom
-  (** RULE T.Meet.Variant (STATUS normative) -- 08-meet-join.md
+  (** RULE T.Meet.Variant (CLAIM normative) -- 08-meet-join.md
       CODE middle_end/flambda2/types/meet_and_join.ml#meet_variant
       CODE middle_end/flambda2/types/meet_and_join.ml#meet_relation
       Premise: meeting Variant{is_int1, get_tag1, blocks1, imms1,
@@ -886,7 +886,7 @@ with meet_fields (E : tenv)
 (* Meet: properties                                                       *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Meet.Sound (STATUS normative) -- 08-meet-join.md
+(** RULE T.Meet.Sound (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet.ml#meet
     CODE middle_end/flambda2/types/env/meet_env.ml#meet
     Premise: E |- T1 /\ T2 = T |> eps.  Conclusion: gamma_{E;eps}(T)
@@ -902,7 +902,7 @@ Theorem T_Meet_Sound :
     gamma E rho H T v /\ sat_ext E rho H eps.
 Admitted.
 
-(** RULE T.Meet.Bottom (STATUS normative) -- 08-meet-join.md
+(** RULE T.Meet.Bottom (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet.ml#meet
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
     Premise: E |- T1 /\ T2 = Bottom.  Conclusion: gamma_E(T1)
@@ -917,7 +917,7 @@ Theorem T_Meet_Bottom :
     False.
 Admitted.
 
-(** RULE T.Meet.GreatestLowerBound (STATUS conjectured)
+(** RULE T.Meet.GreatestLowerBound (CLAIM normative)
     -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.mli#meet
     Premise: E |- T1 /\ T2 = T |> eps.  Conclusion: gamma_{E;eps}(T)
@@ -941,7 +941,7 @@ Definition T_Meet_GreatestLowerBound_claim : Prop :=
     sat_ext E rho H eps ->
     gamma E rho H T1 v /\ gamma E rho H T2 v.
 
-(** RULE T.Meet.Store.CoercionErasure (STATUS conjectured)
+(** RULE T.Meet.Store.CoercionErasure (CLAIM descriptive)
     -- 08-meet-join.md
     CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
     CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
@@ -962,7 +962,7 @@ Definition T_Meet_GreatestLowerBound_claim : Prop :=
     that transcription; the inliner-visible skew is out of scope with
     rec_info opacity (ch. 07 sec. 6).
     Reflexivity-class Qed (catalog entry 34 as AMENDED, second
-    instance class; STATUS conjectured preserved above): the proof
+    instance class; CLAIM descriptive preserved above): the proof
     is free because the erasure is baked into record_on, which
     stores on the canonical simple's underlying name looking through
     any coercion -- the pinned statement discharges definitionally
@@ -980,7 +980,7 @@ Proof.
   reflexivity.
 Qed.
 
-(** RULE T.Meet.MutableBlockMissedBottom (STATUS conjectured)
+(** RULE T.Meet.MutableBlockMissedBottom (CLAIM descriptive)
     -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
     Premise: meeting T1 = Variant{immediates = S not Bottom, blocks =
@@ -1007,7 +1007,7 @@ Proof.
   - discriminate.
 Qed.
 
-(** RULE T.Meet.Terminates (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Meet.Terminates (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/env/meet_env.ml#adding_equation_for_name
     CODE middle_end/flambda2/types/meet_and_join.ml#meet
     The meet/reduction fixpoint terminates: no infinite descending
@@ -1200,7 +1200,7 @@ Definition get_tag_for_block (b : simple) : ftype :=
   | None => FT_naked_immediate Oub_unknown
   end.
 
-(** RULE T.Meet.Relational (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Meet.Relational (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_naked_immediate
     Premise: meeting a naked-immediate type carrying inverse relations
@@ -1231,7 +1231,7 @@ Definition T_Meet_Relational_documented : Prop := True.
    permits any over-approximation), so the envelope's partiality never
    understates the spec. *)
 Inductive join2 (E : tenv) : ftype -> ftype -> ftype -> Prop :=
-  (** RULE T.Join.SharedAlias (STATUS normative) -- 08-meet-join.md
+  (** RULE T.Join.SharedAlias (CLAIM normative) -- 08-meet-join.md
       CODE middle_end/flambda2/types/meet_and_join.ml#join
       Premises in doc order: the alias sets of s1 (in the left env)
       and s2 (in the right) intersect in the target env at s; and, if
@@ -1277,7 +1277,7 @@ Inductive nway_join (E : tenv) : list ftype -> ftype -> Prop :=
       join2 E T1 T2 T ->
       nway_join E (T1 :: Ts) T.
 
-(** RULE T.Join.Sound (STATUS normative) -- 08-meet-join.md
+(** RULE T.Join.Sound (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#join
     CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
     VERIFIED 14-validation/n_way_join_null.md
@@ -1295,7 +1295,7 @@ Theorem T_Join_Sound :
     gamma E rho H T v.
 Admitted.
 
-(** RULE T.Join.ConstAgreement (STATUS conjectured) -- 08-meet-join.md
+(** RULE T.Join.ConstAgreement (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#join
     CODE middle_end/flambda2/types/env/aliases.mli#find_best
     CODE middle_end/flambda2/types/env/typing_env.ml#alias_is_bound_strictly_earlier
@@ -1325,7 +1325,7 @@ Theorem T_Join_ConstAgreement :
     ftype_alias_simple T = Some c.
 Admitted.
 
-(** RULE T.Join.Head (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Join.Head (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#join_expanded_head
     CODE middle_end/flambda2/types/meet_and_join.ml#join_head_of_kind_value_non_null
     Premise: no shared alias.  Conclusion: the join is the join of the
@@ -1340,7 +1340,7 @@ Admitted.
     anchor for the rest. *)
 Definition T_Join_Head_documented : Prop := True.
 
-(** RULE T.Join.Cutoff (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Join.Cutoff (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/meet_and_join.ml#join
     CODE middle_end/flambda2/ui/flambda_features.ml#join_depth
     Premise: join is already recursively joining the pair (s1, s2), or
@@ -1352,7 +1352,7 @@ Definition T_Join_Head_documented : Prop := True.
     T.Join.Sound; recorded as a documented anchor. *)
 Definition T_Join_Cutoff_documented : Prop := True.
 
-(** RULE T.Join.Levels (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Join.Levels (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
     CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
     Premise: fork env E0; branches E0 extended by eps_i, each cut
@@ -1366,7 +1366,7 @@ Definition T_Join_Cutoff_documented : Prop := True.
     documented anchor. *)
 Definition T_Join_Levels_documented : Prop := True.
 
-(** RULE T.Join.Existentials (STATUS descriptive) -- 08-meet-join.md
+(** RULE T.Join.Existentials (CLAIM descriptive) -- 08-meet-join.md
     CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
     CODE middle_end/flambda2/types/join_levels_old.ml#cut_and_n_way_join
     Premise: a name x defined after the fork survives the join.
@@ -1380,7 +1380,7 @@ Definition T_Join_Levels_documented : Prop := True.
     below); recorded as a documented anchor. *)
 Definition T_Join_Existentials_documented : Prop := True.
 
-(** RULE T.Join.RecursiveParamsUnknown (STATUS descriptive)
+(** RULE T.Join.RecursiveParamsUnknown (CLAIM descriptive)
     -- 08-meet-join.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types
@@ -1537,7 +1537,7 @@ Inductive prove_single_closures_entry (E : tenv)
       kc fs = Some (Mk_row_like_closures_case ce idx eps) ->
       prove_single_closures_entry E s fs ce.
 
-(** RULE T.Prove.Sound (STATUS normative) -- 08-meet-join.md
+(** RULE T.Prove.Sound (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/provers.mli#proof_of_property
     CODE middle_end/flambda2/types/provers.ml#prove_is_int
     Premise: E |- prove_X(T) gives Proved(r).  Conclusion: every v in
@@ -1551,7 +1551,7 @@ Theorem T_Prove_Sound :
     is_int_flag v = (if b then 1 else 0).
 Admitted.
 
-(** RULE T.Prove.MeetShortcut (STATUS normative) -- 08-meet-join.md
+(** RULE T.Prove.MeetShortcut (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/provers.mli#meet_shortcut
     CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
     Premise: E |- meet_X(T) gives r'.  Conclusions in doc order:
@@ -1572,7 +1572,7 @@ Theorem T_Prove_MeetShortcut :
     (r = Invalid -> forall i, v <> V_tagged_imm i).
 Admitted.
 
-(** RULE T.Prove.MeetShortcut.NullPremise (STATUS conjectured)
+(** RULE T.Prove.MeetShortcut.NullPremise (CLAIM descriptive)
     -- 08-meet-join.md
     CODE middle_end/flambda2/types/provers.ml#gen_value_to_meet
     CODE middle_end/flambda2/types/provers.ml#gen_value_to_proof
@@ -1605,7 +1605,7 @@ Proof.
   - eapply METI_imm. reflexivity.
 Qed.
 
-(** RULE T.Prove.SimpleModeBoundary (STATUS conjectured)
+(** RULE T.Prove.SimpleModeBoundary (CLAIM normative)
     -- 08-meet-join.md
     CODE middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind
     CODE middle_end/flambda2/types/provers.ml#meet_block_field_simple
@@ -1637,7 +1637,7 @@ Proof.
     unfold scoped_name_mode. rewrite Hbt. reflexivity.
 Qed.
 
-(** RULE T.Prove.GetTag (STATUS normative) -- 08-meet-join.md
+(** RULE T.Prove.GetTag (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/provers.ml#prove_get_tag
     Premise: E |- prove_get_tag(T) gives Proved(tags).  Conclusion:
     every block v in gamma_E(T) has its tag in tags. *)
@@ -1670,7 +1670,7 @@ Inductive expand_head (E : tenv) : ftype -> ftype -> Prop :=
       simple_is_const (canonical E s) = false ->
       expand_head E T (stored_type E k (canonical E s)).
 
-(** RULE T.Expand.Head (STATUS normative) -- 08-meet-join.md
+(** RULE T.Expand.Head (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/expand_head.ml#expand_head
     CODE middle_end/flambda2/types/expand_head.ml#expand_head0
     Premise: E |- T expands to H.  Conclusion: gamma_E(T) = gamma_E(H)
@@ -1762,7 +1762,7 @@ Inductive reify (E : tenv) : ftype -> reification_result -> Prop :=
       ftype_is_bottom T = true ->
       reify E T R_invalid.
 
-(** RULE T.Reify.Sound (STATUS normative) -- 08-meet-join.md
+(** RULE T.Reify.Sound (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/reify.ml#reify
     Premise: E |- reify(T) gives r.  Conclusions in doc order:
     r = Simple s implies every v in gamma_E(T) equals the value of s;
@@ -1779,7 +1779,7 @@ Theorem T_Reify_Sound :
     (r = R_invalid -> False).
 Admitted.
 
-(** RULE T.Reify.LiftLocalGuard (STATUS normative) -- 08-meet-join.md
+(** RULE T.Reify.LiftLocalGuard (CLAIM normative) -- 08-meet-join.md
     CODE middle_end/flambda2/types/reify.ml#reify
     CODE middle_end/flambda2/types/provers.ml#never_holds_locally_allocated_values
     Premise: reify considers lifting a block/array with fields that

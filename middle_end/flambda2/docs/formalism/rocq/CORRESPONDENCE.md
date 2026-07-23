@@ -7,25 +7,34 @@ and the Markdown chapters say the same thing.
 ## Traceability
 
 - One Rocq artifact per rule. Every artifact is immediately preceded by a
-  comment `(** RULE <id> (STATUS <status>) — <chapter file> ... *)` quoting the
-  rule's id, status, and chapter. Premises appear in the same order as in the
-  Markdown rule block.
+  comment `(** RULE <id> (CLAIM <kind>) — <chapter file> ... *)` quoting the
+  rule's id, claim kind, and chapter. Premises appear in the same order as in
+  the Markdown rule block. (MIGRATION IN PROGRESS, record 76: fences and
+  comments not yet swept carry the retired keyword `STATUS`; the census
+  invariant during the migration is byte-identity of id|keyword|value TRIPLES
+  doc↔.v, so each rule's keyword flips on both sides in one flagged delta.)
 - Rule id → Rocq identifier: replace each `.` with `_`
   (`OS.Let.Prim.Pure` → `OS_Let_Prim_Pure`).
-- Status → artifact kind:
-  - normative defining clause → constructor of an `Inductive` judgment (or a
-    `Definition`/`Fixpoint` equation);
-  - normative property → `Theorem ... Admitted.` (proof out of scope);
+- Claim kind → artifact kind:
+  - defining clause (normative or interpretive) → constructor of an
+    `Inductive` judgment (or a `Definition`/`Fixpoint` equation) — the γ
+    family stays an Inductive;
+  - property (normative or interpretive) → `Theorem ...` — `Admitted.` until
+    proved; a `Qed` never changes the claim kind (it is a formal-axis badge,
+    record 76);
   - descriptive → comment block + `Definition <id>_documented : Prop := True.`
-    anchor (heuristics/architecture are documented, not modeled);
-  - conjectured property → `Theorem ... Admitted.`
-  - EXCEPTION (sanctioned; catalog 37's decision rule): a property — even
-    normative/conjectured — whose quantification is irreducibly over
+    anchor (heuristics/architecture/imprecision witnesses are documented, not
+    modeled);
+  - EXCEPTION (sanctioned; catalog 37's decision rule): a property of any
+    claim kind whose quantification is irreducibly over
     unmodeled pass internals (dacc/flow_acc/required_names/slot_offsets/
-    cmx) becomes a documented anchor: full rule-text citation,
-    `_documented := True`, true STATUS preserved in the comment. Current
+    cmx) OR over out-of-scope or absent components (the entry-40
+    sharpened boundary) becomes a documented anchor: full rule-text citation,
+    `_documented := True`, true CLAIM preserved in the comment. Current
     instances: seven ch. 13 `INV.*` conjectures (`Soundness.v`); the ch. 09
-    anchor set (`SimplifyStructure.v`); and six ch. 10 conjectures in
+    anchor set (`SimplifyStructure.v`; 16 anchors — count pinned for the
+    classifier's set-equality, per the semantics-bundle ruling); and six
+    ch. 10 conjectures in
     `RewritesControl.v` (`S.Rewrite.LetCont.InlineForcesElimination`,
     `S.Rewrite.LetCont.ShortcutFlat`,
     `S.Rewrite.Loopify.TailrecEmitsNonRecursive`,
@@ -38,7 +47,17 @@ and the Markdown chapters say the same thing.
     `.CallConvCoherent`, `.StaticUpdateBarrier`, `.LoweringTotal`,
     `.SymbolInitPlacement`, `.SymbolLocality` — each quantifies over to_cmm
     pass internals: slot offsets, the delayed-effect accumulator,
-    calling-convention and linkage metadata; entry 70).
+    calling-convention and linkage metadata; entry 70); and four
+    out-of-scope/absent-component anchors sanctioned at their sites and
+    list-registered at the migration's day-one mutual check (batch C):
+    `P.Unchecked.FrontendInsertsChecks` (`PrimMemoryB.v` — the
+    from_lambda frontend, entry 40's boundary), `T.Role.SinglePass`
+    (`TypeGrammar.v` — architectural absence claim, entry 14),
+    `WF.Syntax.NonRecOccursPositive` (`Syntax.v` — caller-maintained
+    metadata invariant, entry 27's whitelist family), and
+    `OS.Apply.Effect` (`Opsem.v` — unformalized apply kind; listing
+    retires after its adjudicated descriptive flip, when the default
+    anchor mapping covers it).
   - HYBRID variant of the exception (sanctioned; strictly stronger than a
     whole-rule anchor): when only SOME clauses of a property quantify over
     unmodeled internals, the modelable clauses are stated as a real
@@ -56,19 +75,30 @@ and the Markdown chapters say the same thing.
     (`ToCmmSoundness.v` inc 4 — hybrid WITH envelope-Qed: the
     flush-quantified clauses documented, clause (i) stated on its
     code-witnessed envelope and proved outright via
-    `machtype_of_kind_data_no_addr`; entry 70).
+    `machtype_of_kind_data_no_addr`; entry 70). Instances survive claim
+    reclassification (record 76's blanket ruling — `AccumBoxElim` keeps
+    this shape under CLAIM descriptive).
   - DESCRIPTIVE-AS-DEFINING-CLAUSE variant (sanctioned): a descriptive
     rule whose documented term shape is load-bearing for the development
     (an inhabited union arm, or exact fold content) may be encoded as a
-    defining constructor with STATUS descriptive preserved in the comment
+    defining constructor with CLAIM descriptive preserved in the comment
     and a fidelity caveat (algorithm-dependent shape). Instances:
     `S.Unbox.ContParam.Rewrite` (`Unboxing.v`),
     `S.Rewrite.Prim.ConstFold.Float` and `S.Rewrite.Prim.ObjDupElide`
-    (`RewritesPrim.v`).
+    (`RewritesPrim.v`); `CM.Context` and `CM.Syntax.Fragment` (`Cmm.v` —
+    the machine cannot run without them, catalog 29; list-registered at
+    the migration's day-one mutual check, batch C).
+  - PROVIDED-PROP variant (sanctioned; entry 37's decision rule, KF-046's
+    rewording): a rule's documented anchor may be ACCOMPANIED by a named
+    `Prop` `Definition` stated for other chapters' consumption WITHOUT
+    assertion — no axiom footprint, id greppable on the RULE comment,
+    the anchor carrying the rule and the Prop adjacent. Instance:
+    `S.Struct.JoinParams.AnalysisExtraParams` (`SimplifyStructure.v`;
+    provided for chs. 10/12 entry-type reasoning, currently unconsumed).
   - ENVELOPE-QED variant (sanctioned; strictly stronger than the mapping):
-    a conjectured rule whose code-witnessed ENVELOPE is derivable in the
+    a not-yet-proved property (any claim kind) whose code-witnessed ENVELOPE is derivable in the
     encoding may be stated on that envelope under its RULE header (true
-    STATUS preserved) and proved outright (`Qed`), with the comment saying
+    CLAIM preserved) and proved outright (`Qed`), with the comment saying
     "stated on the envelope, proved outright". Cousin of the
     by-construction True-Qed (entry 27) and reflexivity-Qed (entry 34)
     precedents. Current instances: `T.Meet.MutableBlockMissedBottom`,
@@ -77,12 +107,19 @@ and the Markdown chapters say the same thing.
     clauses (`RewritesPrim.v`, within its hybrid);
     `INV.ToCmm.AddrConfined`'s clause (i) (`machtype_of_kind_data_no_addr`,
     `ToCmmSoundness.v`, within its hybrid; entry 70).
+  - REFLEXIVITY-QED variant (sanctioned; entry 34's precedent, list-
+    registered at the batch-4 residual): a rule of any claim kind whose
+    pinned transcription is definitionally true in the encoding may carry
+    a reflexivity-class `Qed` under its RULE header (true CLAIM preserved;
+    the comment says why the proof is free). Instance:
+    `T.Meet.Store.CoercionErasure` (`MeetJoin.v`, CLAIM descriptive —
+    survives reclassification per record 76's never-drop-a-Qed ruling).
   - REFUTED-CONJECTURE variant (sanctioned; KF-053, entry 73): a
-    conjectured rule whose refutation is disclosed by the development's own
+    rule whose asserted property is refuted by the development's own
     record — a `Qed`'d counterexample witness in the same file — is stated
     as a named `Definition <id>_claim : Prop`, NOT asserted (zero axiom
     footprint; the rule id stays greppable on the RULE comment and the
-    `_claim` name), with the comment carrying the true STATUS, the
+    `_claim` name), with the comment carrying the true CLAIM, the
     demotion rationale, and the witness's name. The plain
     conjectured → `Theorem ... Admitted.` mapping deliberately does NOT
     apply: an `Admitted` universal with a `Qed`'d refutation in scope is a
@@ -91,11 +128,17 @@ and the Markdown chapters say the same thing.
     negation as a `Qed` theorem. Instance: `T.Meet.GreatestLowerBound`
     (`MeetJoin.v`; witness `T.Meet.MutableBlockMissedBottom`).
 - Coverage check: `grep -roh 'RULE [A-Za-z0-9.]*' theories/ | sort -u` must
-  set-equal the ids in the chapters.
-- Prose convention: never write the uppercase word `RULE` followed by another
-  word in a prose comment — it greps as a phantom rule id. Use lowercase
-  "rule" in prose; the uppercase token is reserved for the traceability
-  headers.
+  set-equal the ids in the chapters. The regen tooling additionally parses the
+  evidence lines (`VERIFIED … @ commit`, `CHECKED @ commit`, `CAVEAT …`) and
+  DERIVES per-rule evidence and grades per record 76 — evidence is always
+  recomputed, never trusted from disk, and a hand-written evidence summary
+  anywhere is an error.
+- Prose convention: never write the uppercase words `RULE`, `CLAIM`, `STATUS`,
+  `CAVEAT`, `CHECKED`, or `VERIFIED` followed by an ID-SHAPED payload (a
+  dotted or capitalized-token form) in prose — such text greps as a phantom
+  header line. Terms of art like "the RULE comment" are fine (and are what
+  the implemented scan tolerates); when in doubt, use lowercase forms — the
+  uppercase tokens are reserved for the traceability headers.
 
 ## Encoding conventions (doc notation → Rocq)
 
@@ -1413,6 +1456,142 @@ here (writers: append as you add them):
     entry 44). Finding records: KF-055/056 closed on the doc letter;
     KF-057 codified at entry 20; KF-030's disclosure rewritten at
     entry 55 (partial re-entry).
+
+76. **The solidity schema** (migration spec; user-directed 2026-07-22;
+    Knuth's DESIGN RULING row and the auditor's invariant blessing,
+    codified — this record gates the migration sweep; the Traceability
+    and README rewrites are the sweep's batch 0).
+    CLAIM replaces STATUS as the claim-kind: {normative, descriptive,
+    interpretive}, classified by the rule's CONSTRAINED SUBJECT —
+    normative when the subject is something the code computes or the
+    runtime does, regardless of checkability or vocabulary; interpretive
+    when the subject is formalism-only apparatus (the γ clauses and
+    γ-properties, R.Heap, environment-extension semantics), where
+    falsity is remediable only by a doc/model edit; descriptive for
+    current-behavior documentation INCLUDING imprecision witnesses that
+    legitimately retire when the code improves. Classifier tiebreak:
+    "if this were false and that were unacceptable, what would you
+    change?" The old `conjectured` DISSOLVES as an evidence level
+    masquerading as a kind: each of the frozen 84 conjectured ids maps
+    to exactly one of the three, with an id-keyed rationale row; the
+    classification output is the migration's audit artifact, audited
+    set-equal in both directions.
+    EVIDENCE is DERIVED, never declared, on TWO INCOMPARABLE AXES:
+    empirical (stated < code-read < validated) and formal
+    (unmechanized < mechanized; proved-in-model is a badge atop
+    mechanized, never more). "Mechanized" REQUIRES the fidelity-review
+    stamp (unreviewed Admitted certifies falsities — the Admitted-false
+    campaign is the existence proof) and EXCLUDES documented anchors
+    (else the rung is uniformly true and stops discriminating). Fence
+    event lines feeding derivation: `CHECKED @ <commit>` (code-reading
+    verification), `VERIFIED <study> @ <commit>`, and
+    `CAVEAT <kind>: <text>` with kinds {known-false, compiler-bug,
+    pending-upstream, watch(W-nn), disclosure} — compiler-bug is the
+    KF-040 polarity (rule TRUE of the code, code diverges from intent;
+    the inverse sign of known-false). KIND PRINCIPLE (ruled at the
+    kind's first live instance, the float32 double-round family): a
+    caveat's kind is judged against the claim of the RULE IT SITS ON,
+    not the story it participates in — the true-of-mainline ch. 05
+    denotation carries an informational compiler-bug family caveat
+    (fix branch named in text only), while the divergent ch. 10 fold
+    rule carries the compiler-bug + pending-upstream pair with the
+    machine-watched key. MULTI-SITE LIFT (for whoever fires it): the
+    `fix-float32-double-rounding` key is lift-watched at the ch. 10
+    fold rule ONLY; its landing retires FOUR sites in one change —
+    the ch. 10 pair, ch. 05's NumConv family caveat, 13 §4.7's OPEN
+    marker, and ch. 18's TC.Prim.NumConv disclosures. A pending-upstream
+    caveat REQUIRES its branch/commit key — keyless is a syntax error;
+    the kind means depends-on-an-unlanded-KEYED-branch, and a keyless
+    instance is invisible to the reverse-proviso checker. The key must
+    name an EXISTING branch or commit: aspirational deferrals (planned
+    or hoped-for upstream work with no watchable key and no falsifiable
+    lift condition) are not provisos — they belong to the 01 scope
+    ledger.
+    GRADE (derived by checked-in tooling only; hand-computed grades are
+    forbidden): A = validated × mechanized, not false-as-stated and not
+    pending-upstream (those two flags demote — they undermine current
+    truth; compiler-bug DISPLAYS WITHOUT DEMOTING: the rule is true of
+    the code, the flag marks the code's divergence from intent);
+    B = validated
+    alone, OR code-read × mechanized; C = exactly one axis inhabited;
+    D = neither. DISPUTED — derived as "an open FIDELITY finding whose
+    RULES: header names this id" — SUSPENDS the letter entirely.
+    Display flags: false-as-stated, compiler-bug, pending-upstream;
+    HYBRID rules carry clause-granular evidence and grade at the
+    weakest clause with an explicit (hybrid) flag; the tooling refuses
+    rule-level VERIFIED on HYBRID-listed ids. A Qed is never a grade
+    input; an envelope-Qed's code evidence is the CHECKED event that
+    verified the envelope. Staleness: evidence is marked stale when any
+    CODE-anchored file changed since the evidence commit — and STALE
+    EVIDENCE DEMOTES: it does not count toward the grade (display
+    persists, stale-marked). Commit keys are 7-40 lowercase hex.
+    "Mechanized"'s fidelity-stamp provenance is FIDELITY.md's
+    machine-readable '## Stamps' table (file-granular STAMP: rows,
+    author-maintained, each backed by a review-log row; a rule's stamp
+    resolves through the classifier's artifact-location join).
+    END-STATE STRICTNESS: when the migration's STATUS count reaches
+    zero, STATUS rows become hard phantom-class errors in the join
+    (keyed to the completion event). LEGACY FLAG-DAY:
+    legacy_verified_ok flips to False within the VERIFIED-backfill
+    batch itself, whose own green run passes strict.
+    CENSUS INVARIANT (the auditor's, binding): end-state = fence-aware
+    byte-identity of id|CLAIM pairs doc↔.v, 453 conserved, stated as
+    SET LAWS (AMENDED to the three-target ruling): normative =
+    old-normative ⊎ A, descriptive = old-descriptive ⊎ C, interpretive
+    = B, with A ⊎ B ⊎ C = the frozen conjectured 84 — end split
+    (303+a)/(66+c)/b, a+b+c = 84. Every conjectured→descriptive id (the
+    C set) is tagged in the classification output with its
+    artifact-conversion consequence (Theorem+Admitted → documented
+    anchor is a statement-level .v delta with its own compile round),
+    and batches carrying C-set ids call them out for the
+    untouched-subset checks. Mid-migration the extraction emits TRIPLES
+    id|keyword|value with keyword ∈ {STATUS, CLAIM}; byte-identity of
+    triples doc↔.v holds at EVERY step (forcing each rule's flip to
+    land doc-side and .v-side in one flagged delta); STATUS ⊎ CLAIM =
+    453 always, disjoint, STATUS strictly shrinking; per-batch: mapping
+    legality (normative→normative, descriptive→descriptive,
+    conjectured→{normative, interpretive, descriptive} + rationale
+    row), conservation and duplicate checks PRE-uniquing, untouched-id
+    byte-invariance, and phantom scans for ALL keywords — the prose
+    convention extends to CLAIM/CAVEAT/CHECKED/VERIFIED. Batch flags
+    ENUMERATE their files (W-36).
+    ARTIFACT-MAPPING RE-KEY: defining clause (normative OR
+    interpretive) → constructor/equation; property (normative or
+    interpretive) → Theorem, Admitted or Qed; descriptive → documented
+    anchor; the five sanctioned variants unchanged in substance, the
+    REFUTED-CONJECTURE variant's text re-keyed to the new vocabulary.
+    STRAND INVENTORY the sweep must cover: nine doc-side prose
+    "STATUS …" mentions (13:80, 13:607, 16:426, 17:456, 18:143 — the
+    counting-trap line, RETIRED by rewording, not inherited — 19:155,
+    20:75, 20:122, 20:160); the theories-side prose trio ("STATUS
+    preserved" ×2, "STATUS marks" ×1); this catalog's own variant
+    texts.
+    REGEN TOOL obligations: exactly one keyword line per fence;
+    duplicate ids pre-dedup; CODE/CAVEAT/CHECKED/VERIFIED syntax with
+    commit-key well-formedness AND repo reachability (a proviso whose
+    keyed branch has landed but whose text has not lifted is flagged —
+    the reverse-proviso check, first test rows: the string-load
+    provisos); EVIDENCE always recomputed, never trusted from disk; the
+    artifact-kind classifier CONSUMES this catalog's Traceability
+    instance lists as ground truth and errors on mismatch (parser and
+    catalog mutually checking); the derived index join FAILS on any
+    doc/.v disagreement, never picks a side; double-run determinism;
+    every regeneration diff row traces to a stamped source delta.
+    PHANTOM-SCAN SCOPE (ruled): the scan protects MACHINE-CONSUMED
+    surfaces — chapter fences, theories/ comments, FIDELITY RULES:
+    headers, and this catalog's Traceability section (parser ground
+    truth); the catalog's numbered records carry an ERA CUTOFF —
+    records ≤ 76 are historical documents in their era's vocabulary
+    and are exempt (rewriting them falsifies the record), records
+    > 76 are post-migration prose and are scanned. If the parser ever
+    consumes record text beyond the Traceability section, the
+    exemption is revisited in the same change.
+    FIDELITY.md gains structured `RULES: <id>, …` headers on all 54
+    finding entries (`RULES: none` for findings targeting no rule —
+    doc-preamble and process-level findings), catalog-cross-derived
+    plus machine-drafted, author-verified in full before feeding the
+    index; DISPUTED derivation makes these headers load-bearing for
+    grading, accepted knowingly.
 
 ## Build
 

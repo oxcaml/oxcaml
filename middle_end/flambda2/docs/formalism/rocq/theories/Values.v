@@ -572,7 +572,7 @@ Definition const_value (c : const) : option value :=
   | Const_poison _ _ => None
   end.
 
-(** RULE OS.Simple.Eval (STATUS normative) — 04-opsem.md
+(** RULE OS.Simple.Eval (CLAIM normative) — 04-opsem.md
     CODE middle_end/flambda2/term_basics/simple.mli#t
     CODE middle_end/flambda2/term_basics/coercion.mli#t
 

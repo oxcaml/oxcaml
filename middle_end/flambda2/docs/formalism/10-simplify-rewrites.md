@@ -74,7 +74,7 @@ constructors (`T.this_*`, `T.these_*`, `T.box_*`, `T.tag_immediate`, …) owned 
 
 ```rule
 RULE S.Rewrite.Prim.Transfer
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
 ---
@@ -94,7 +94,7 @@ NOTES: The base case: arguments are canonicalized and the primitive is kept, but
 
 ```rule
 RULE S.Rewrite.Prim.ArgKindMismatch
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#arg_kind_mismatch
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 ---
@@ -117,7 +117,7 @@ recover the scrutinee's shape from a test on the result (e.g. learning inside a
 
 ```rule
 RULE S.Rewrite.Prim.Relational
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_relational_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_get_tag
@@ -145,7 +145,7 @@ carrying coercions correctly.
 
 ```rule
 RULE S.Rewrite.Alias.Canonicalize
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_simple.ml#simplify_simple0
 CODE middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn
 ---
@@ -172,11 +172,13 @@ and that constant equals the runtime result.
 
 ```rule
 RULE S.Rewrite.Prim.ConstFold
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unary_primitive
-VERIFIED 14-validation/new-01-constfold.md
-VERIFIED 14-validation/new-05-inline-fold.md
+VERIFIED 14-validation/new-01-constfold.md @ c59c5780b0
+VERIFIED 14-validation/new-05-inline-fold.md @ c59c5780b0
+CAVEAT compiler-bug: the integer→float32 fold arms double-round for |x| ≥ 2^53 (number_adjuncts.ml :251/:342/:460/:846-class, via a 53-bit double) where the backend single-rounds (cvtsi2ss; emission chain at ch. 05's family caveat) — the confirmed 13 §4.7 finding, committed by this rule's fold; witness 14-validation/float32_double_round.md.
+CAVEAT pending-upstream: the double-rounding fix lives on branch `fix-float32-double-rounding` (commit 26daff7cee), covering all four folder arms; on landing, retire this rule's compiler-bug caveat, ch. 05's NumConv family caveats, 13 §4.7's OPEN marker, 13 §2's Rewrite.Local family pointer, the ch. 18 TC.Prim.NumConv disclosures, and ch. 20's EndToEnd known-false caveat — one lift, all sites.
 ---
 p = p₀(s₁ … sₙ)
 for each i the prover proves sᵢ equals a constant cᵢ (Known_result)
@@ -197,7 +199,7 @@ NOTES: The folded constant is exactly ⟦p₀⟧ applied to the argument constan
 
 ```rule
 RULE S.Rewrite.Prim.ConstFold.Float
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen
 ---
@@ -213,7 +215,7 @@ NOTES: Float folding is gated on the `propagating_float_consts` flag (the
 
 ```rule
 RULE S.Rewrite.Prim.ConstFold.PartialUndef
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like
 ---
@@ -234,7 +236,7 @@ Simplify may replace the binding by a reference to a lifted constant.
 
 ```rule
 RULE S.Rewrite.Prim.Reify
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
 CODE middle_end/flambda2/simplify/lifting/reification.ml#try_to_reify
 ---
@@ -260,7 +262,7 @@ rewrite (integer multiply folds only for the constants 0, 1 and −1), and **no*
 
 ```rule
 RULE S.Rewrite.Prim.IntIdentity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift
 ---
@@ -285,7 +287,7 @@ NOTES: Realized by the one-side-known outcomes `The_other_side`, `Exactly v`,
 
 ```rule
 RULE S.Rewrite.Prim.FloatIdentity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen
 ---
 p is a float binary arithmetic primitive; DE.propagating_float_consts = true
@@ -303,10 +305,10 @@ NOTES: Only multiply/divide by ±1.0 are simplified — these preserve every bit
 
 ```rule
 RULE S.Rewrite.Prim.UntagTag
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number
-VERIFIED 14-validation/code_size_of_boolean_not_switch.md
+VERIFIED 14-validation/code_size_of_boolean_not_switch.md @ 1c1940b7ea
 ---
 p = untag_imm(x)   [resp. unbox_number(x)]
 E proves x's type carries an alias to a naked immediate s [resp. naked number s]
@@ -324,13 +326,14 @@ NOTES: `Untag(Tag s) → s` and `Unbox(Box s) → s`, realized structurally: the
 
 ```rule
 RULE S.Rewrite.Prim.Projection
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_function_slot
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_array_length
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_string_length
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
+CAVEAT disclosure: conclusion `let r = s` holds only for fast-path group (a); array_load, array_length, string_length keep the primitive and fold only via S.Rewrite.Prim.Reify.
 ---
 p reads a field of an immutable aggregate at a known position:
   Block_load(imm, x, i)  |  Project_value_slot(w, x)  |  Project_function_slot(f, x)
@@ -366,7 +369,7 @@ NOTES: Reading a component of a *provably immutable* aggregate at compile time.
 
 ```rule
 RULE S.Rewrite.Prim.PhysEqual
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal
 CODE middle_end/flambda2/types/provers.ml#prove_physical_equality
 ---
@@ -384,7 +387,7 @@ NOTES: The prover only concludes when the addresses provably coincide (same
 
 ```rule
 RULE S.Rewrite.Prim.CompareRecovery
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#recover_comparison_primitive
 CODE middle_end/flambda2/simplify/comparison_result.ml#convert_result_compared_to_tagged_zero
 ---
@@ -400,7 +403,7 @@ NOTES: `(compare x y) <op> 0` collapses to the direct relation between x and y,
 
 ```rule
 RULE S.Rewrite.Prim.ObjDupElide
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_obj_dup
 ---
 p = obj_dup(x)   and x's type proves it is an immutable boxed/tagged number or a string
@@ -425,12 +428,12 @@ types cannot track, say, a load at a variable index, while CSE can.
 
 ```rule
 RULE S.Rewrite.CSE.Eligible
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#Eligible_for_cse.create
 CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse
 CODE middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse
-VERIFIED 14-validation/cse_immutable_array_load_var_index.md
-VERIFIED 14-validation/cse_immutable_array_load.md
+VERIFIED 14-validation/cse_immutable_array_load_var_index.md @ 1c1940b7ea
+VERIFIED 14-validation/cse_immutable_array_load.md @ 1c1940b7ea
 ---
 p is eligible for CSE iff:
   its per-primitive eligibility predicate holds (see NOTES for the shape), and
@@ -447,7 +450,7 @@ NOTES: The per-primitive predicate excludes primitives whose results are already
   and Bigarray_load). It *includes* immutable and
   immutable_unique Array_load — a genuine load that CSE, not type-based
   projection, deduplicates (decisive when the index is a variable; see the
-  VERIFIED case study) — as well as the header-read family Is_int, Is_null,
+  validating case study) — as well as the header-read family Is_int, Is_null,
   Get_tag, Get_header, Array_length, String_length, Bigarray_get_alignment,
   arithmetic/comparison primitives, and construction of immutable blocks (so
   identical immutable allocations may be shared). Anything with coeffects (a
@@ -458,13 +461,14 @@ NOTES: The per-primitive predicate excludes primitives whose results are already
 
 ```rule
 RULE S.Rewrite.CSE.Replace
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#try_cse
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#apply_cse
-VERIFIED 14-validation/cse_immutable_array_load.md
-VERIFIED 14-validation/cse_immutable_array_load_var_index.md
-VERIFIED 14-validation/issue5721.md
-VERIFIED 14-validation/new-04-cse.md
+VERIFIED 14-validation/cse_immutable_array_load.md @ 1c1940b7ea
+VERIFIED 14-validation/cse_immutable_array_load_var_index.md @ 1c1940b7ea
+VERIFIED 14-validation/issue5721.md @ 1c1940b7ea
+VERIFIED 14-validation/new-04-cse.md @ c59c5780b0
+CAVEAT disclosure: CSE of immutable allocations can change phys_equal results; sound only under P.Binary.PhysEqual (06) plus INV.Simplify.Preserves' refinement reading (13 §1, §4 item 8), not strict observational equality.
 ---
 p eligible (S.Rewrite.CSE.Eligible), min name mode = normal
 denv's CSE table maps p (with canonicalized arguments) to a simple s in scope
@@ -483,10 +487,10 @@ NOTES: The prior equal application already computed the value bound to s; reusin
 
 ```rule
 RULE S.Rewrite.CSE.Extend
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#try_cse
 CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#T0.add
-VERIFIED 14-validation/new-04-cse.md
+VERIFIED 14-validation/new-04-cse.md @ c59c5780b0
 ---
 p eligible, no prior equal application in scope
 --------------------------------------------------
@@ -503,12 +507,14 @@ dynamic (a Simple operand).
 
 ```rule
 RULE S.Rewrite.Share.StaticDynamicSplit
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse
 CODE middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load
+CAVEAT pending-upstream: string-load constant fold lives on branch `flambda2-string-load-fold`, commit 9712d270eb, not mainline; the NOT-CSE-eligible fact already holds in mainline; proviso lifts when the branch lands.
+CAVEAT watch(W-40): discriminators (Is_int, Get_tag, Is_null) ride BOTH forward CSE and the relational types domain — a redundancy the code plans to retire; clause (3) goes stale when it does.
 ---
 p is a pure ((No_effects, No_coeffects)) projection primitive
 --------------------------------------------------
@@ -560,11 +566,11 @@ emits `Invalid` when nothing survives.
 
 ```rule
 RULE S.Rewrite.Switch.ArmPrune
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
-VERIFIED 14-validation/array_element_kind_meet.md
-VERIFIED 14-validation/new-02-known-switch.md
-VERIFIED 14-validation/new-08-nested-switch.md
+VERIFIED 14-validation/array_element_kind_meet.md @ 1c1940b7ea
+VERIFIED 14-validation/new-02-known-switch.md @ c59c5780b0
+VERIFIED 14-validation/new-08-nested-switch.md @ c59c5780b0
 ---
 switch on scrutinee x with arms { dᵢ → kᵢ āᵢ }
 E ⊢ (type of x) ⊓ {dᵢ} = ⊥   for some arm dᵢ
@@ -579,10 +585,10 @@ NOTES: An arm whose discriminant is incompatible with the scrutinee's type is
 
 ```rule
 RULE S.Rewrite.Switch.Merge
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_arm
-VERIFIED 14-validation/new-02-known-switch.md
+VERIFIED 14-validation/new-02-known-switch.md @ c59c5780b0
 ---
 after pruning, every surviving arm targets the same continuation k with args that
   intersect (over alias sets) to a common list ā, and no arm has a trap action
@@ -597,9 +603,9 @@ NOTES: Covers both the single-surviving-arm case and the all-arms-identical case
 
 ```rule
 RULE S.Rewrite.Switch.Identity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch
-VERIFIED 14-validation/n_way_join_null.md
+VERIFIED 14-validation/n_way_join_null.md @ 1c1940b7ea
 ---
 switch on x, every arm d → k [d]  (arm passes its own discriminant, tagged, to one k)
 --------------------------------------------------
@@ -611,10 +617,10 @@ NOTES: The switch is an identity map through tagging, replaced by a single
 
 ```rule
 RULE S.Rewrite.Switch.BooleanNot
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch
-VERIFIED 14-validation/code_size_of_boolean_not_switch.md
-VERIFIED 14-validation/new-08-nested-switch.md
+VERIFIED 14-validation/code_size_of_boolean_not_switch.md @ 1c1940b7ea
+VERIFIED 14-validation/new-08-nested-switch.md @ c59c5780b0
 ---
 switch on x with discriminants exactly {0, 1}, arm 0 → k [1] and arm 1 → k [0]
 --------------------------------------------------
@@ -629,7 +635,7 @@ NOTES: Recognizes a two-arm boolean switch that negates its scrutinee and
 
 ```rule
 RULE S.Rewrite.Switch.Invalid
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch
 ---
 after pruning, zero arms survive
@@ -656,10 +662,10 @@ if unused.
 
 ```rule
 RULE S.Rewrite.Let.DeadBinding
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/terms/flambda_primitive.ml#at_most_generative_effects
-VERIFIED 14-validation/array_element_kind_meet.md
+VERIFIED 14-validation/array_element_kind_meet.md @ 1c1940b7ea
 ---
 let x = n in e
 n has at most generative effects (Named.at_most_generative_effects n)
@@ -677,7 +683,7 @@ NOTES: "At most generative effects" allows allocations (pure or immutable
 
 ```rule
 RULE S.Rewrite.Let.DeadRegion
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_end_region
 ---
@@ -701,7 +707,7 @@ NOTES: An `End_region` for a region whose corresponding `Begin_region` was itsel
 
 ```rule
 RULE S.Rewrite.Let.Phantom
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 ---
 let x = n in e   n at most generative effects, x unused in terms
@@ -715,7 +721,7 @@ NOTES: Instead of deleting, the binding is kept at phantom mode so debuggers can
 
 ```rule
 RULE S.Rewrite.Let.Invalid
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#simplify_let0
 CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
 ---
@@ -742,11 +748,11 @@ substitution of the handler for the call happens at the call site in
 
 ```rule
 RULE S.Rewrite.LetCont.Inline
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation
-VERIFIED 14-validation/new-03-letcont-inline.md
+VERIFIED 14-validation/new-03-letcont-inline.md @ c59c5780b0
 ---
 let_cont k p̄ = h in e   (k non-recursive)
 k has exactly one use in e, and that use has use-kind Inlinable
@@ -765,7 +771,7 @@ NOTES: The single call is replaced by the handler with parameters bound to the
 
 ```rule
 RULE S.Rewrite.LetCont.InlineForcesElimination
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind
 CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation
@@ -795,7 +801,7 @@ S.Struct.SingleInlinableUse.
 
 ```rule
 RULE S.Rewrite.LetCont.DeadHandler
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont
 ---
@@ -811,7 +817,7 @@ NOTES: An unused continuation is dropped, handler and all. Downwards, an unused
 
 ```rule
 RULE S.Rewrite.LetCont.Shortcut
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/continuation_shortcut.ml#apply
 CODE middle_end/flambda2/simplify/continuation_shortcut.ml#to_alias
@@ -837,11 +843,12 @@ NOTES: A continuation whose body is just a jump to another continuation becomes 
 
 ```rule
 RULE S.Rewrite.LetCont.ShortcutFlat
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/continuation_shortcut.ml#apply
 CODE middle_end/flambda2/simplify/env/upwards_env.ml#add_continuation_shortcut
+CAVEAT disclosure: known precision (not soundness) leak (CR gbury): shortcut retargeting can lose kind/subkind info carried by the intermediate continuation's params.
 ---
 the upwards environment's continuation-shortcut map, at any point of the upwards
 rebuild
@@ -873,7 +880,7 @@ S.Rewrite.LetCont.InlineForcesElimination.
 
 ```rule
 RULE S.Rewrite.LetCont.UnusedParam
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
 CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
@@ -895,7 +902,7 @@ NOTES: Unused parameters are removed from the handler and from every call site.
 
 ```rule
 RULE S.Rewrite.LetCont.AliasedParam
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler
 ---
@@ -913,7 +920,7 @@ NOTES: The invariant/constant-parameter optimization. A parameter pinned to one
 
 ```rule
 RULE S.Rewrite.LetCont.InvalidHandler
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont
 ---
@@ -927,7 +934,7 @@ NOTES: If a handler is unreachable, every jump to it is unreachable too. Sound b
 
 ```rule
 RULE S.Rewrite.LetCont.Specialize
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#specialize_continuation_if_needed
 CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont
 ---
@@ -951,7 +958,7 @@ bucket-pinning fact.
 
 ```rule
 RULE S.Rewrite.LetCont.DemoteExn
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#demote_exn_handler
 CODE middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind
@@ -1010,11 +1017,11 @@ remaining application rewrites are here.
 
 ```rule
 RULE S.Rewrite.Apply.IndirectToDirect
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_function_call
 CODE middle_end/flambda2/types/provers.ml#meet_single_closures_entry
-VERIFIED 14-validation/naked_immediates_many_relations.md
+VERIFIED 14-validation/naked_immediates_many_relations.md @ 1c1940b7ea
 ---
 apply f (indirect call) with args ā
 meet_single_closures_entry proves f's type is a single closure with function slot,
@@ -1032,7 +1039,7 @@ NOTES: An indirect call whose callee type pins down one code id becomes a direct
 
 ```rule
 RULE S.Rewrite.Apply.OverApplication
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_over_application
 CODE middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application
 ---
@@ -1050,7 +1057,7 @@ NOTES: An over-application is split into a full application producing an
 
 ```rule
 RULE S.Rewrite.Apply.PartialApplication
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application
 ---
 apply_direct[cid] f (a₁ … aₘ) → k   where cid takes n params and 0 < m < n
@@ -1072,7 +1079,7 @@ NOTES: A partial application builds a wrapper closure that captures the supplied
 
 ```rule
 RULE S.Rewrite.Apply.Invalid
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#replace_apply_by_invalid
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call
 ---
@@ -1116,10 +1123,10 @@ boundaries.
 
 ```rule
 RULE S.Rewrite.Loopify.Attribute
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function
 CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Acc.add_name_to_free_names
-VERIFIED 14-validation/loopify-03-not-purely-tailrec.md
+VERIFIED 14-validation/loopify-03-not-purely-tailrec.md @ 358b5366cb
 ---
 Closure conversion emits Code c for a source function f
 --------------------------------------------------
@@ -1147,7 +1154,7 @@ NOTES: The "purely tail-recursive" test (is_purely_tailrec) starts true only for
 
 ```rule
 RULE S.Rewrite.Loopify.Attribute.ValueSlotExempt
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Let_with_acc.create
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function
 ---
@@ -1177,11 +1184,11 @@ Composes: S.Rewrite.Loopify.Attribute, S.Rewrite.Loopify.TailrecEmitsNonRecursiv
 
 ```rule
 RULE S.Rewrite.Loopify.Body
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
 CODE middle_end/flambda2/simplify/loopify_state.mli
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
-VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md @ 358b5366cb
 ---
 should_loopify(metadata(c).loopify)      (⇔ Always_loopify | Default_loopify_and_tailrec)
 k fresh (named "self")
@@ -1203,10 +1210,10 @@ NOTES: Unconditional given the attribute — there is no cost model or oracle
 
 ```rule
 RULE S.Rewrite.Loopify.SelfTailCall
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call
-VERIFIED 14-validation/loopify-06-mutual-and-mixed.md
+VERIFIED 14-validation/loopify-06-mutual-and-mixed.md @ 358b5366cb
 ---
 loopify_state(denv) = Loopify k      (we are inside a body wrapped by S.Rewrite.Loopify.Body)
 canon(callee) = canon(my_closure)    (canonical simples, coercions stripped)
@@ -1229,9 +1236,9 @@ NOTES: The self-call test is semantic, not syntactic: the callee is compared to
 
 ```rule
 RULE S.Rewrite.Loopify.AttributeUpdate
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
-VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md @ 358b5366cb
 ---
 Simplify rebuilds Code c (input attribute a = metadata(c).loopify)
 --------------------------------------------------
@@ -1247,9 +1254,9 @@ NOTES: The Default_* values exist only between closure conversion and the first
 
 ```rule
 RULE S.Rewrite.Code.RecursiveRecompute
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
-VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md @ 358b5366cb
 ---
 Simplify rebuilds Code c with simplified body e′
 --------------------------------------------------
@@ -1268,9 +1275,9 @@ NOTES: Not loopify-specific — this recompute applies to every code binding —
 
 ```rule
 RULE S.Rewrite.LetCont.Demote
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers
-VERIFIED 14-validation/loopify-04-loop-attr-no-tailcall.md
+VERIFIED 14-validation/loopify-04-loop-attr-no-tailcall.md @ 358b5366cb
 ---
 let_cont rec k̄ = h̄ in e   (a declared-recursive group)
 after the downwards traversal, handler k's recorded uses place it in no SCC
@@ -1289,7 +1296,7 @@ NOTES: A general continuation rule, stated here because loopification is its
 
 ```rule
 RULE S.Rewrite.Loopify.TailrecEmitsNonRecursive
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#create_apply
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
@@ -1324,7 +1331,7 @@ S.Rewrite.Code.RecursiveRecompute.
 
 ```rule
 RULE S.Rewrite.Loopify.InvariantArgElim
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#dominator_analysis
 CODE middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler
@@ -1353,7 +1360,7 @@ S.Struct.Flow.Aliases, S.Rewrite.LetCont.AliasedParam.
 
 ```rule
 RULE S.Rewrite.Loopify.SimplifyExposed
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
@@ -1388,11 +1395,12 @@ local non-escaping mutual recursion into staticcatch — arriving as recursive
 continuation groups with no loopify attribute; this rule is about recursion
 reaching Simplify as Code. Composes: S.Rewrite.Loopify.Body,
 S.Rewrite.Loopify.SelfTailCall, S.Rewrite.Loopify.AttributeUpdate.
+Ownership pointer: the during-Simplify tail-recursion path this rule exposes is owned by S.Rewrite.Loopify.SelfTailCall.
 ```
 
 ```rule
 RULE S.Rewrite.Loopify.ResimplifyIdempotent
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers
@@ -1437,7 +1445,7 @@ expression by `Invalid`.
 
 ```rule
 RULE S.Rewrite.Invalid.Propagate
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/expr_builder.ml#rebuild_invalid
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr
 ---

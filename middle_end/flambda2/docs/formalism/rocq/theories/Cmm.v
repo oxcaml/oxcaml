@@ -219,7 +219,7 @@ Definition cm_bundle (vs : list cmm_value) : cmm_value :=
   | _ => CV_tuple vs
   end.
 
-(** RULE CM.Syntax.Fragment (STATUS descriptive) -- 15-cmm.md
+(** RULE CM.Syntax.Fragment (CLAIM descriptive) -- 15-cmm.md
     CODE backend/cmm.mli#expression
     CODE backend/cmm.mli#operation
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
@@ -478,7 +478,7 @@ Record cmm_mem : Type := MkMem {
   mem_local : fmap Z region_handle
 }.
 
-(** RULE CM.Mem.LoadStore (STATUS normative) -- 15-cmm.md
+(** RULE CM.Mem.LoadStore (CLAIM normative) -- 15-cmm.md
     CODE backend/cmm.mli#memory_chunk
     CODE backend/cmm.mli#size_of_memory_chunk
     CODE backend/cmm_helpers.ml#mk_load_immut
@@ -966,7 +966,7 @@ Definition cm_op_pure (op : cmm_op) (vs : list cmm_value)
 (* 15 s7 (stated early; used by cm_returns below): reaching the
    enclosing function's return. *)
 
-(** RULE CM.Exit.Return (STATUS normative) -- 15-cmm.md
+(** RULE CM.Exit.Return (CLAIM normative) -- 15-cmm.md
     CODE backend/cmm.mli#exit_label
     CODE backend/cmm_helpers.ml#trap_return
 
@@ -1091,7 +1091,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
       cm_head (CmCfg (Ctuple (map Cval vs)) ce chi M TT RR) []
               (CmCfg (Cval (CV_tuple vs)) ce chi M TT RR)
 
-  (** RULE CM.Op.Pure (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Op.Pure (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#operation
       CODE backend/cmm_helpers.ml#add_int
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
@@ -1107,7 +1107,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
       cm_head (CmCfg (Cop op (map Cval vs)) ce chi M TT RR) []
               (CmCfg (Cval v) ce chi M TT RR)
 
-  (** RULE CM.Op.TupleField (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Op.TupleField (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Ctuple_field
       CODE backend/cmm_helpers.ml#tuple_field
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call
@@ -1121,7 +1121,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                           [Cval (CV_tuple vs)]) ce chi M TT RR) []
               (CmCfg (Cval v) ce chi M TT RR)
 
-  (** RULE CM.Load (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Load (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cload
       CODE backend/cmm_helpers.ml#mk_load_immut
 
@@ -1134,7 +1134,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                      ce chi M TT RR) []
               (CmCfg (Cval v) ce chi M TT RR)
 
-  (** RULE CM.Store (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Store (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cstore
       CODE backend/cmm_helpers.ml#setfield_computed
 
@@ -1150,7 +1150,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                           [Cval (CV_word a); Cval v]) ce chi M TT RR) []
               (CmCfg (Cval (CV_word 1)) ce chi M' TT RR)
 
-  (** RULE CM.If (STATUS normative) -- 15-cmm.md
+  (** RULE CM.If (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cifthenelse
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
 
@@ -1162,7 +1162,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
               (CmCfg (if to_unsigned64 n =? 0 then e_f else e_t)
                      ce chi M TT RR)
 
-  (** RULE CM.Switch (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Switch (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cswitch
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
       CODE backend/cmm_helpers.ml#transl_switch_clambda
@@ -1177,7 +1177,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                      ce chi M TT RR) []
               (CmCfg ce_i ce chi M TT RR)
 
-  (** RULE CM.Catch.NonRec (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Catch.NonRec (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Ccatch
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined
       CODE backend/cmm_helpers.ml#create_ccatch
@@ -1193,7 +1193,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                         (CHandler xs e_h ce chi (length TT) Normal))
                      M TT RR)
 
-  (** RULE CM.Catch.Rec (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Catch.Rec (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Ccatch
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec
 
@@ -1207,7 +1207,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
               (CmCfg e_body ce
                      (chi_bind_rec group ce chi (length TT)) M TT RR)
 
-  (** RULE CM.Catch.Exn (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Catch.Exn (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Exn_handler
       CODE backend/cmm_helpers.ml#trywith
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler
@@ -1228,7 +1228,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
                            (length TT) Exn_handler))
                      M TT RR)
 
-  (** RULE CM.Apply (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Apply (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Capply
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0
 
@@ -1262,7 +1262,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
               tr
               (CmCfg (Cval (cm_bundle rvals)) ce chi M' TT RR)
 
-  (** RULE CM.Apply.Raise (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Apply.Raise (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Capply
       CODE backend/cmm.mli#Craise
 
@@ -1294,7 +1294,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
               (CmCfg (Cop (Craise Raise_reraise) [Cval v_exn])
                      ce chi M' TT RR')
 
-  (** RULE CM.Extcall (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Extcall (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cextcall
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call
 
@@ -1318,7 +1318,7 @@ Inductive cm_head : cm_config -> list cm_event -> cm_config -> Prop :=
 
 with cm_step : cm_config -> list cm_event -> cm_config -> Prop :=
 
-  (** RULE CM.Context (STATUS descriptive) -- 15-cmm.md
+  (** RULE CM.Context (CLAIM descriptive) -- 15-cmm.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
       CODE backend/cmm.mli#expression
 
@@ -1341,7 +1341,7 @@ with cm_step : cm_config -> list cm_event -> cm_config -> Prop :=
       cm_step (CmCfg (cm_plug E r) ce chi M TT RR) tr
               (CmCfg (cm_plug E r') ce' chi' M' TT' RR')
 
-  (** RULE CM.Exit (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Exit (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Cexit
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 
@@ -1359,7 +1359,7 @@ with cm_step : cm_config -> list cm_event -> cm_config -> Prop :=
                      (venv_bind (chv_ce hv) (chv_params hv) vs)
                      (chv_chi hv) M TT RR)
 
-  (** RULE CM.Exit.Trap (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Exit.Trap (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#trap_action
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
@@ -1378,7 +1378,7 @@ with cm_step : cm_config -> list cm_event -> cm_config -> Prop :=
                      (venv_bind (chv_ce hv) (chv_params hv) vs)
                      (chv_chi hv) M TT' RR)
 
-  (** RULE CM.Raise (STATUS normative) -- 15-cmm.md
+  (** RULE CM.Raise (CLAIM normative) -- 15-cmm.md
       CODE backend/cmm.mli#Craise
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
       CODE backend/cmm_helpers.ml#raise_prim
@@ -1540,7 +1540,7 @@ Inductive cm_outcome : Type :=
   | CMO_undef
   | CMO_resource_exhaustion.
 
-(** RULE CM.Unit.Final (STATUS normative) -- 15-cmm.md
+(** RULE CM.Unit.Final (CLAIM normative) -- 15-cmm.md
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
     CODE backend/cmm.mli#Cdata
 
@@ -1600,7 +1600,7 @@ End CmmMachine.
 (* ------------------------------------------------------------------ *)
 (* 15 s9: Invalid. *)
 
-(** RULE CM.Invalid (STATUS normative) -- 15-cmm.md
+(** RULE CM.Invalid (CLAIM normative) -- 15-cmm.md
     CODE backend/cmm.mli#Cinvalid
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid

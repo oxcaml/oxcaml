@@ -122,7 +122,7 @@ Definition cmm_const_image (c : const) : option cmm_expr :=
   | Const_poison _ _ => None
   end.
 
-(** RULE TC.Simple (STATUS normative) -- 18-to-cmm-data.md
+(** RULE TC.Simple (CLAIM normative) -- 18-to-cmm-data.md
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#simple
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple
 
@@ -701,7 +701,7 @@ Definition bigarray_data_image (ba : cmm_expr) : cmm_expr :=
    get_tag, ...). *)
 Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
 
-  (** RULE TC.Prim.TagUntag (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.TagUntag (CLAIM normative) -- 18-to-cmm-data.md
       CODE backend/cmm_helpers.ml#tag_int
       CODE backend/cmm_helpers.ml#untag_int
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion
@@ -717,7 +717,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       tc_simple th s e ->
       tc_prim th (P_unary UP_untag_immediate s) (untag_int_image e)
 
-  (** RULE TC.Prim.BoxUnbox (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.BoxUnbox (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
       CODE backend/cmm_helpers.ml#box_int_gen
       CODE backend/cmm_helpers.ml#unbox_int
@@ -739,7 +739,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       tc_prim th (P_unary (UP_unbox_number bn) s)
         (unbox_number_image bn a)
 
-  (** RULE TC.Prim.ReinterpretBoxedVector (STATUS normative)
+  (** RULE TC.Prim.ReinterpretBoxedVector (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 
@@ -750,7 +750,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       tc_simple th s e ->
       tc_prim th (P_unary UP_reinterpret_boxed_vector s) e
 
-  (** RULE TC.Prim.MakeBlock (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.MakeBlock (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
       CODE backend/cmm_helpers.ml#make_alloc_generic
 
@@ -778,7 +778,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
                    (alloc_col am))
               :: es))
 
-  (** RULE TC.Prim.BlockLoad (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.BlockLoad (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load
       CODE backend/cmm_helpers.ml#get_field_computed
       CODE backend/cmm_helpers.ml#field_address
@@ -793,7 +793,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
         (Cop (Cload (bak_field_chunk bak) (cmm_mut mu) false)
              [field_address_image a (bak_field_offset bak i)])
 
-  (** RULE TC.Prim.BlockSet (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.BlockSet (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_set
       CODE backend/cmm_helpers.ml#setfield_computed
 
@@ -806,7 +806,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       tc_prim th (P_binary (BP_block_set bak ia i) s1 s2)
         (return_unit_image (block_set_image bak ia i a v))
 
-  (** RULE TC.Prim.ProjectFunctionSlot (STATUS normative)
+  (** RULE TC.Prim.ProjectFunctionSlot (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
       CODE backend/cmm_helpers.ml#infix_field_address
@@ -820,7 +820,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
         (infix_field_address_image a
            (fun_slot_offset f2 - fun_slot_offset f1))
 
-  (** RULE TC.Prim.ProjectValueSlot (STATUS normative)
+  (** RULE TC.Prim.ProjectValueSlot (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
       CODE backend/cmm_helpers.ml#get_field_computed
@@ -838,7 +838,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
              [field_address_image a
                 (val_slot_offset w - fun_slot_offset f)])
 
-  (** RULE TC.Prim.NumConv (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.NumConv (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion
       CODE backend/cmm_helpers.ml#float32_of_int
       CODE backend/cmm.mli#static_cast
@@ -853,7 +853,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       num_conv_image src dst e = Some e' ->
       tc_prim th (P_unary (UP_num_conv src dst) s) e'
 
-  (** RULE TC.Prim.StringLoad (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.StringLoad (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#string_like_load
       CODE backend/cmm_helpers.ml#unaligned_load_16
 
@@ -886,7 +886,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
            (Cop (Cstore (saw_chunk w) Assignment)
                 [Cop Cadda [bytes_like_base blv str; j]; v]))
 
-  (** RULE TC.Prim.ArrayAccess (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Prim.ArrayAccess (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
       CODE backend/cmm_helpers.ml#array_indexing
@@ -928,7 +928,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
       tc_prim th (P_ternary (TP_array_set ak ask) s1 s2 s3)
         (return_unit_image st)
 
-  (** RULE TC.Prim.ArrayAccess.Vector (STATUS normative)
+  (** RULE TC.Prim.ArrayAccess.Vector (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load_vector
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set_vector
@@ -982,7 +982,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
                                    Cconst_int (Z.log2 w)]];
                  v]))
 
-  (** RULE TC.Prim.BigarrayAccess (STATUS normative)
+  (** RULE TC.Prim.BigarrayAccess (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#bigarray_load_or_store
       CODE backend/cmm_helpers.ml#bigarray_load
@@ -1032,7 +1032,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
              [Cconst_int (n - 1);
               Cop Caddi [bigarray_data_image ba; j]])
 
-  (** RULE TC.Prim.BigarrayLength (STATUS normative)
+  (** RULE TC.Prim.BigarrayLength (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
       CODE backend/cmm_helpers.ml#field_address
@@ -1063,7 +1063,7 @@ Inductive tc_prim (th : tcenv) : prim -> cmm_expr -> Prop :=
      caml_modify are runtime services, not observable C calls);
    - "L' extending L" is stated pointwise on the address map. *)
 
-(** RULE TC.Prim.Sound (STATUS conjectured) -- 18-to-cmm-data.md
+(** RULE TC.Prim.Sound (CLAIM normative) -- 18-to-cmm-data.md
     CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
     CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_complex
     CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
@@ -1203,7 +1203,7 @@ Inductive let_prim_ext (th : tcenv) (x : variable) (e_p : cmm_expr)
    emits an event unconditionally, so silence excludes it).  Every
    LPE defining expression discharges the guard vacuously. *)
 
-(** RULE TC.Let.Subst (STATUS conjectured) -- 18-to-cmm-data.md
+(** RULE TC.Let.Subst (CLAIM normative) -- 18-to-cmm-data.md
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_binding_to_env
@@ -1556,7 +1556,7 @@ Inductive tc_let_binding
   : tcenv -> bound_pattern -> named -> tcenv
     -> (cmm_expr -> cmm_expr) -> Prop :=
 
-  (** RULE TC.Let.Simple (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Let.Simple (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple
 
@@ -1568,7 +1568,7 @@ Inductive tc_let_binding
       tc_let_binding th (BPat_singleton bv) (N_simple s)
         (upd_V th (bv_var bv) e) (fun body => body)
 
-  (** RULE TC.Let.Prim (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Let.Prim (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_prim
       CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
 
@@ -1586,7 +1586,7 @@ Inductive tc_let_binding
       let_prim_ext th (bv_var bv) e_p cls th' ctx ->
       tc_let_binding th (BPat_singleton bv) (N_prim p) th' ctx
 
-  (** RULE TC.Let.SetOfClosures (STATUS normative)
+  (** RULE TC.Let.SetOfClosures (CLAIM normative)
       -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#let_dynamic_set_of_closures
 
@@ -1661,7 +1661,7 @@ Inductive tc_let_binding
                  :: ws))
              body)
 
-  (** RULE TC.Let.Static (STATUS normative) -- 18-to-cmm-data.md
+  (** RULE TC.Let.Static (CLAIM normative) -- 18-to-cmm-data.md
       CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#static_consts
       CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0
 

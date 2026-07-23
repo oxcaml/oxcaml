@@ -290,7 +290,7 @@ Inductive static_const_object (rho : env)
     static_const_object rho (SC_block t mut Value_only fields)
       (HO_Block t mut vs)
 
-(** RULE P.Static.MixedBlock (STATUS normative)
+(** RULE P.Static.MixedBlock (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/static_const.ml#t
     CODE middle_end/flambda2/terms/static_const.ml#block_field_kind
@@ -522,7 +522,7 @@ Inductive install_boundaries (rho : env) (K : kenv) (T : trap_stack)
             (CE_return xs_r (RC_return k_c) rho K T R))
          k_exn (CE_exn x_b k_x vs_extra K T R))
 
-(** RULE OS.Apply.NeverReturns (STATUS normative) -- 04-opsem.md
+(** RULE OS.Apply.NeverReturns (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
     CODE middle_end/flambda2/terms/apply_expr.mli#returns
     "No Return boundary is installed: K_body carries only
@@ -607,7 +607,7 @@ Inductive denot_R
 
 Inductive step : config -> label -> config -> Prop :=
 
-(** RULE OS.Let.Simple (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.Simple (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Let_expr
     CODE middle_end/flambda2/terms/flambda.mli#Named *)
 | OS_Let_Simple : forall x nm s e rho K H T R v,
@@ -618,7 +618,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) (env_upd_var rho x v) K H T R)
 
-(** RULE OS.Let.Prim.Pure (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.Prim.Pure (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Named
     CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
     CODE middle_end/flambda2/terms/effects.mli#t
@@ -635,7 +635,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) (env_upd_var rho x v) K H' T R')
 
-(** RULE OS.Let.Prim.Effect (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.Prim.Effect (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Named
     CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
     Same transition as OS.Let.Prim.Pure (the doc separates them for
@@ -652,7 +652,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) (env_upd_var rho x v) K H' T R')
 
-(** RULE OS.Let.SetOfClosures (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.SetOfClosures (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Named
     CODE middle_end/flambda2/terms/set_of_closures.mli#create
     CODE middle_end/flambda2/bound_identifiers/alloc_mode.mli#For_allocations
@@ -674,7 +674,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) rho' K H' T R)
 
-(** RULE OS.Let.Static (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.Static (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Named
     CODE middle_end/flambda2/terms/static_const.mli#t
     CODE middle_end/flambda2/terms/flambda.mli#Static_const_or_code
@@ -697,7 +697,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) rho' K H' T R)
 
-(** RULE OS.Let.RecInfo (STATUS normative) -- 04-opsem.md
+(** RULE OS.Let.RecInfo (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Named
     CODE middle_end/flambda2/term_basics/rec_info_expr.mli#t *)
 | OS_Let_RecInfo : forall x nm ri e rho K H T R,
@@ -707,7 +707,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e) (env_upd_var rho x V_rec_info) K H T R)
 
-(** RULE OS.LetCont.NonRec (STATUS normative) -- 04-opsem.md
+(** RULE OS.LetCont.NonRec (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
     CODE middle_end/flambda2/terms/flambda.mli#Non_recursive_let_cont_handler
     CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
@@ -721,7 +721,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_expr e_body) rho
          (fupd continuation_eqb K k entry) H T R)
 
-(** RULE OS.LetCont.Rec (STATUS normative) -- 04-opsem.md
+(** RULE OS.LetCont.Rec (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
     CODE middle_end/flambda2/terms/flambda.mli#Recursive_let_cont_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#make_rewrite_for_recursive_continuation
@@ -740,7 +740,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr e_body) rho K' H T R)
 
-(** RULE OS.ApplyCont (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/apply_cont_expr.mli#create
     CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
     The handler runs in its definition-time environments extended by
@@ -753,7 +753,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_expr e_h) (env_upd_vars rho_def xs vs)
          K_def H T R)
 
-(** RULE OS.ApplyCont.Return (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont.Return (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
     CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
     Function return: control transfers to the caller's destination
@@ -771,7 +771,7 @@ Inductive step : config -> label -> config -> Prop :=
     step (mk_config ctl rho K H T R) L_tau
       (mk_config (Ctl_jump k_c vs) rho_c K_c H T_c R_c)
 
-(** RULE OS.ApplyCont.ExnBoundary (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont.ExnBoundary (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/exn_continuation.mli#t
     CODE middle_end/flambda2/terms/exn_continuation.mli#extra_args
     An exception escaping the callee: forward the bucket to the
@@ -794,7 +794,7 @@ Inductive step : config -> label -> config -> Prop :=
     step (mk_config ctl rho K H T R) L_tau
       (mk_config (Ctl_jump k_x (v_b :: v_extra)) fempty K_c H T' R_c)
 
-(** RULE OS.ApplyCont.TrapPush (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont.TrapPush (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/trap_action.mli#t
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps
     Entering a try body: push the handler k_h, then jump to k. *)
@@ -806,7 +806,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_expr e_h) (env_upd_vars rho_def xs vs)
          K_def H (k_h :: T) R)
 
-(** RULE OS.ApplyCont.TrapPop (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont.TrapPop (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/trap_action.mli#t
     CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
     Non-exceptional exit of a try: pop k_h, continue to the join
@@ -821,7 +821,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_expr e_h) (env_upd_vars rho_def xs vs)
          K_def H T' R)
 
-(** RULE OS.ApplyCont.Raise (STATUS normative) -- 04-opsem.md
+(** RULE OS.ApplyCont.Raise (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
     CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_raise0
     CODE middle_end/flambda2/terms/trap_action.mli#Raise_kind
@@ -840,7 +840,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_expr e_h) (env_upd_vars rho_def xs vs)
          K_def H T' R)
 
-(** RULE OS.Switch (STATUS normative) -- 04-opsem.md
+(** RULE OS.Switch (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/switch_expr.mli#create
     CODE middle_end/flambda2/terms/switch_expr.mli#arms
     The selected arm is itself an Apply_cont (possibly with a trap
@@ -854,7 +854,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_expr (E_apply_cont ac)) rho K H T R)
 
-(** RULE OS.Apply.Direct (STATUS normative) -- 04-opsem.md
+(** RULE OS.Apply.Direct (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/apply_expr.mli#create
     CODE middle_end/flambda2/terms/call_kind.mli#Function_call
     CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
@@ -878,7 +878,7 @@ Inductive step : config -> label -> config -> Prop :=
                                   am))) rho K H T R)
       L_tau c'
 
-(** RULE OS.Apply.IndirectUnknownArity.Full (STATUS normative)
+(** RULE OS.Apply.IndirectUnknownArity.Full (CLAIM normative)
     -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Function_call
     CODE middle_end/flambda2/terms/code_metadata.mli#params_arity
@@ -904,7 +904,7 @@ Inductive step : config -> label -> config -> Prop :=
                                   am))) rho K H T R)
       L_tau c'
 
-(** RULE OS.Apply.IndirectUnknownArity.Partial (STATUS conjectured)
+(** RULE OS.Apply.IndirectUnknownArity.Partial (CLAIM normative)
     -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Function_call
     CODE middle_end/flambda2/terms/code_metadata.mli#first_complex_local_param
@@ -941,7 +941,7 @@ Inductive step : config -> label -> config -> Prop :=
       L_tau
       (mk_config (Ctl_jump k_c [V_clos l_pa f_pa]) rho K H' T R)
 
-(** RULE OS.Apply.IndirectUnknownArity.Over (STATUS conjectured)
+(** RULE OS.Apply.IndirectUnknownArity.Over (CLAIM normative)
     -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Function_call
     CODE middle_end/flambda2/terms/apply_expr.mli#return_arity
@@ -985,7 +985,7 @@ Inductive step : config -> label -> config -> Prop :=
                                   FC_indirect_unknown_arity) am)))
          rho K' H T R)
 
-(** RULE OS.Apply.IndirectKnownArity (STATUS normative)
+(** RULE OS.Apply.IndirectKnownArity (CLAIM normative)
     -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Function_call
     "The argument arity is statically known to match the callee's
@@ -1012,7 +1012,7 @@ Inductive step : config -> label -> config -> Prop :=
                                   am))) rho K H T R)
       L_tau c'
 
-(** RULE OS.Apply.CCall (STATUS normative) -- 04-opsem.md
+(** RULE OS.Apply.CCall (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#t
     CODE middle_end/flambda2/terms/apply_expr.mli#create
     Normal return of the external: (rbar, H') in
@@ -1055,7 +1055,7 @@ Inductive step : config -> label -> config -> Prop :=
       (mk_config (Ctl_jump (ec_exn_handler exnc)
                     (v_exn :: vs_extra)) rho K H' T R)
 
-(** RULE OS.Apply.Method (STATUS conjectured) -- 04-opsem.md
+(** RULE OS.Apply.Method (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Method_kind
     Method dispatch resolves to a closure, applied like an indirect
     call.
@@ -1081,7 +1081,7 @@ Inductive step : config -> label -> config -> Prop :=
                                   am))) rho K H T R)
       L_tau c'.
 
-(** RULE OS.Apply.Effect (STATUS conjectured) -- 04-opsem.md
+(** RULE OS.Apply.Effect (CLAIM descriptive) -- 04-opsem.md
     CODE middle_end/flambda2/terms/call_kind.mli#Effect
     Out of scope: the doc gives NO transition ("modelling them
     requires a fibre component absent from <e, rho, K, H, T, R>";
@@ -1109,7 +1109,7 @@ Definition OS_Apply_Effect_documented : Prop := True.
 
 Inductive undef_next : config -> Prop :=
 
-(** RULE OS.Invalid (STATUS normative) -- 04-opsem.md
+(** RULE OS.Invalid (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda.mli#expr_descr
     CODE middle_end/flambda2/terms/flambda.mli#Invalid
     "has no transition (undefined behaviour)": no step constructor
@@ -1119,7 +1119,7 @@ Inductive undef_next : config -> Prop :=
 | UN_invalid : forall msg rho K H T R,
     undef_next (mk_config (Ctl_expr (E_invalid msg)) rho K H T R)
 
-(** RULE OS.Switch.Undef (STATUS normative) -- 04-opsem.md
+(** RULE OS.Switch.Undef (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/switch_expr.mli#create
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
     "There is no default case": a discriminant outside the arms is
@@ -1167,7 +1167,7 @@ Inductive final_config : config -> Prop :=
 Definition stuck (c : config) : Prop :=
   ~ final_config c /\ (forall lbl c', ~ step c lbl c').
 
-(** RULE OS.Unit.Final (STATUS normative) -- 04-opsem.md
+(** RULE OS.Unit.Final (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda_unit.mli#return_continuation
     CODE middle_end/flambda2/terms/flambda_unit.mli#module_symbol
     "A run of u is one of: normal termination (observing H(sym_mod)
@@ -1205,7 +1205,7 @@ Inductive has_behavior (c0 : config) : behavior -> Prop :=
 
 End STEP.
 
-(** RULE OS.Unit.Init (STATUS normative) -- 04-opsem.md
+(** RULE OS.Unit.Init (CLAIM normative) -- 04-opsem.md
     CODE middle_end/flambda2/terms/flambda_unit.mli#create
     ENCODING NOTE: the doc's ambient "predefined symbols |-> their
     pointers" / "predefined symbols and external code ids |-> their

@@ -40,7 +40,7 @@ Local Open Scope Z_scope.
 (* 1. Where continuation-parameter unboxing hooks in                  *)
 (* ================================================================== *)
 
-(** RULE S.Unbox.ContParam.Hook (STATUS descriptive)
+(** RULE S.Unbox.ContParam.Hook (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
@@ -139,7 +139,7 @@ Parameter unbox_dec :
 (* 3. The oracle's stages (anchors) and the loopify conjecture        *)
 (* ================================================================== *)
 
-(** RULE S.Unbox.Optimistic.Number (STATUS descriptive)
+(** RULE S.Unbox.Optimistic.Number (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision
     CODE middle_end/flambda2/simplify/unboxing/unboxers.ml
@@ -153,7 +153,7 @@ Parameter unbox_dec :
     "boxed number" whose unboxing is untagging. *)
 Definition S_Unbox_Optimistic_Number_documented : Prop := True.
 
-(** RULE S.Unbox.Optimistic.Block (STATUS descriptive)
+(** RULE S.Unbox.Optimistic.Block (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_fields
@@ -167,7 +167,7 @@ Definition S_Unbox_Optimistic_Number_documented : Prop := True.
     Meet bottom for all fields => Do_not_unbox All_fields_invalid. *)
 Definition S_Unbox_Optimistic_Block_documented : Prop := True.
 
-(** RULE S.Unbox.Optimistic.Closure (STATUS descriptive)
+(** RULE S.Unbox.Optimistic.Closure (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_vars_within_closure
 
@@ -177,7 +177,7 @@ Definition S_Unbox_Optimistic_Block_documented : Prop := True.
     epa component of Closure_single_entry. *)
 Definition S_Unbox_Optimistic_Closure_documented : Prop := True.
 
-(** RULE S.Unbox.Depth (STATUS descriptive) -- 12-unboxing.md
+(** RULE S.Unbox.Depth (CLAIM descriptive) -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
     CODE driver/oxcaml_flags.ml#Flambda2.Expert
 
@@ -188,7 +188,7 @@ Definition S_Unbox_Optimistic_Closure_documented : Prop := True.
     the bound only limits nesting of blocks/variants/closures. *)
 Definition S_Unbox_Depth_documented : Prop := True.
 
-(** RULE S.Unbox.ExtraArg.Available (STATUS descriptive)
+(** RULE S.Unbox.ExtraArg.Available (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
     CODE middle_end/flambda2/simplify/unboxing/unboxers.ml
@@ -201,7 +201,7 @@ Definition S_Unbox_Depth_documented : Prop := True.
     (section 3.3). *)
 Definition S_Unbox_ExtraArg_Available_documented : Prop := True.
 
-(** RULE S.Unbox.ExtraArg.Project (STATUS descriptive)
+(** RULE S.Unbox.ExtraArg.Project (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
 
@@ -212,7 +212,7 @@ Definition S_Unbox_ExtraArg_Available_documented : Prop := True.
     benefit filter. *)
 Definition S_Unbox_ExtraArg_Project_documented : Prop := True.
 
-(** RULE S.Unbox.ExtraArg.Invalid (STATUS descriptive)
+(** RULE S.Unbox.ExtraArg.Invalid (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
 
@@ -223,7 +223,7 @@ Definition S_Unbox_ExtraArg_Project_documented : Prop := True.
     blocking the unboxing. *)
 Definition S_Unbox_ExtraArg_Invalid_documented : Prop := True.
 
-(** RULE S.Unbox.Refine.Pass (STATUS descriptive) -- 12-unboxing.md
+(** RULE S.Unbox.Refine.Pass (CLAIM descriptive) -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#refine_decision_based_on_arg_types_at_uses
     CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#compute_extra_params_and_args
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_one_decision_and_use
@@ -237,7 +237,7 @@ Definition S_Unbox_ExtraArg_Invalid_documented : Prop := True.
     one Extra_arg per use site, or the use is marked invalid. *)
 Definition S_Unbox_Refine_Pass_documented : Prop := True.
 
-(** RULE S.Unbox.Beneficial (STATUS descriptive) -- 12-unboxing.md
+(** RULE S.Unbox.Beneficial (CLAIM descriptive) -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/is_unboxing_beneficial.ml#is_unboxing_beneficial_for_epa
     CODE middle_end/flambda2/simplify/unboxing/is_unboxing_beneficial.ml#filter_non_beneficial_decisions
 
@@ -285,7 +285,7 @@ Definition accum_unknown_head (nnk : naked_number_kind)
   | NN_naked_immediate | NN_naked_int8 | NN_naked_int16 => None
   end.
 
-(** RULE S.Unbox.Loopify.AccumBoxElim (STATUS conjectured)
+(** RULE S.Unbox.Loopify.AccumBoxElim (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#make_decisions
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision
@@ -344,7 +344,7 @@ Admitted.
 (* 4. Variants (anchors)                                              *)
 (* ================================================================== *)
 
-(** RULE S.Unbox.Optimistic.Variant (STATUS descriptive)
+(** RULE S.Unbox.Optimistic.Variant (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant
@@ -356,7 +356,7 @@ Admitted.
     when const_ctors = Zero and fields_by_tag is a singleton. *)
 Definition S_Unbox_Optimistic_Variant_documented : Prop := True.
 
-(** RULE S.Unbox.Variant.Discriminator (STATUS descriptive)
+(** RULE S.Unbox.Variant.Discriminator (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#extra_args_for_const_ctor_of_variant
@@ -374,7 +374,7 @@ Definition S_Unbox_Variant_Discriminator_documented : Prop := True.
 (* 5. Function parameter/result unboxing (wrappers; anchor)           *)
 (* ================================================================== *)
 
-(** RULE S.Unbox.FunParam.Wrapper (STATUS descriptive)
+(** RULE S.Unbox.FunParam.Wrapper (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps_function
     CODE middle_end/flambda2/from_lambda/closure_conversion.ml#compute_body_of_unboxed_function
@@ -568,7 +568,7 @@ Inductive decision_shape : unboxing_decision -> ftype -> Prop :=
 (* 6.3 The handler-side typing-environment equation                   *)
 (* ------------------------------------------------------------------ *)
 
-(** RULE S.Unbox.Denv.Equation (STATUS normative) -- 12-unboxing.md
+(** RULE S.Unbox.Denv.Equation (CLAIM normative) -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#denv_of_decision
     CODE middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#add_equation_on_var
 
@@ -611,7 +611,7 @@ Definition S_Unbox_Denv_Equation
 (* 6.4 The term rewrite                                               *)
 (* ------------------------------------------------------------------ *)
 
-(** RULE S.Unbox.ContParam.Rewrite (STATUS descriptive)
+(** RULE S.Unbox.ContParam.Rewrite (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args
     CODE middle_end/flambda2/simplify/apply_cont_rewrite.ml#create
@@ -706,7 +706,7 @@ Inductive rw_unbox (flags : eff_flags) (C : code_env) (E : tenv)
 (* 7. Mutable unboxing (ref-to-var; anchors)                          *)
 (* ================================================================== *)
 
-(** RULE S.Unbox.Mutable.Candidate (STATUS descriptive)
+(** RULE S.Unbox.Mutable.Candidate (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#blocks_to_unbox
     CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#escaping
@@ -720,7 +720,7 @@ Inductive rw_unbox (flags : eff_flags) (C : code_env) (E : tenv)
     non-required block does not mark its fields as escaping. *)
 Definition S_Unbox_Mutable_Candidate_documented : Prop := True.
 
-(** RULE S.Unbox.Mutable.Rewrite (STATUS descriptive)
+(** RULE S.Unbox.Mutable.Rewrite (CLAIM descriptive)
     -- 12-unboxing.md
     CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim
     CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites

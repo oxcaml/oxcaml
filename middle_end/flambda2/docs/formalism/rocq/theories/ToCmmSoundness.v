@@ -2,7 +2,9 @@
    preserves observable behaviour through the representation
    relation -- a forward simulation between the Flambda machine
    (Opsem.v/Machine.v) and the Cmm machine (Cmm.v/CmmMemory.v).
-   All 12 rules of the chapter are STATUS conjectured.
+   All 12 rules of the chapter are CLAIM normative (eight as
+   documented anchors under their EXCEPTION sanctions, one hybrid,
+   three theorems).
 
    HEADER OBLIGATIONS, binding on this file's simulation statement
    (coordinator ruling at ToCmmData.v's let_prim_ext, and reviewer
@@ -485,7 +487,7 @@ Definition custom_boxed_var_payload (sc : static_const) : Prop :=
   | _ => False
   end.
 
-(** RULE INV.ToCmm.Simulates (STATUS conjectured) -- 20-to-cmm-soundness.md
+(** RULE INV.ToCmm.Simulates (CLAIM normative) -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 
@@ -626,7 +628,7 @@ Admitted.
 (* 5. End-to-end composition and Invalid (ch. 20 s3)                  *)
 (* ================================================================== *)
 
-(** RULE INV.ToCmm.EndToEnd (STATUS conjectured)
+(** RULE INV.ToCmm.EndToEnd (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
@@ -721,7 +723,7 @@ Theorem INV_ToCmm_EndToEnd :
         L0 b' o.
 Admitted.
 
-(** RULE INV.ToCmm.InvalidUnreached (STATUS conjectured)
+(** RULE INV.ToCmm.InvalidUnreached (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
     CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#nullary_primitive
@@ -800,7 +802,7 @@ Admitted.
 (* Catalog 37's decision rule (CORRESPONDENCE.md): a conjectured
    property whose quantification is irreducibly over unmodeled pass
    internals becomes a documented anchor -- full rule-text citation,
-   _documented := True, true STATUS preserved in the comment.  Eight
+   _documented := True, true CLAIM preserved in the comment.  Eight
    of the nine discharging invariants quantify over exactly such
    internals (slot_offsets / dacc / cmx accumulators, to_cmm_env
    bookkeeping, the fatal-site inventory, linker state, and the
@@ -808,7 +810,7 @@ Admitted.
    hybrid exception, with one clause proved outright on its
    mechanized envelope. *)
 
-(** RULE INV.ToCmm.SlotLiveness (STATUS conjectured)
+(** RULE INV.ToCmm.SlotLiveness (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/flambda2.ml#build_run_result
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#finalize
@@ -851,7 +853,7 @@ Admitted.
     Dead offset entry, i.e. Cinvalid EXECUTED at runtime. *)
 Definition INV_ToCmm_SlotLiveness_documented : Prop := True.
 
-(** RULE INV.ToCmm.ClosureScanBoundary (STATUS conjectured)
+(** RULE INV.ToCmm.ClosureScanBoundary (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#update_set_for_slot
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#layout_aux
@@ -886,7 +888,7 @@ Definition INV_ToCmm_SlotLiveness_documented : Prop := True.
     below). *)
 Definition INV_ToCmm_ClosureScanBoundary_documented : Prop := True.
 
-(** RULE INV.ToCmm.AddrConfined (STATUS conjectured)
+(** RULE INV.ToCmm.AddrConfined (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#machtype_of_kind
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
@@ -937,7 +939,7 @@ Proof.
     simpl in Hin; intuition discriminate.
 Qed.
 
-(** RULE INV.ToCmm.EffectLinear (STATUS conjectured)
+(** RULE INV.ToCmm.EffectLinear (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
@@ -980,7 +982,7 @@ Qed.
     INV_ToCmm_Simulates). *)
 Definition INV_ToCmm_EffectLinear_documented : Prop := True.
 
-(** RULE INV.ToCmm.CallConvCoherent (STATUS conjectured)
+(** RULE INV.ToCmm.CallConvCoherent (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/terms/code_metadata.ml#function_slot_size
     CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
@@ -1014,7 +1016,7 @@ Definition INV_ToCmm_EffectLinear_documented : Prop := True.
     preserves that flag verbatim for the final report. *)
 Definition INV_ToCmm_CallConvCoherent_documented : Prop := True.
 
-(** RULE INV.ToCmm.StaticUpdateBarrier (STATUS conjectured)
+(** RULE INV.ToCmm.StaticUpdateBarrier (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#make_update
     CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#update_field
@@ -1050,7 +1052,7 @@ Definition INV_ToCmm_CallConvCoherent_documented : Prop := True.
     validation all tocmm-* case studies perform. *)
 Definition INV_ToCmm_StaticUpdateBarrier_documented : Prop := True.
 
-(** RULE INV.ToCmm.LoweringTotal (STATUS conjectured)
+(** RULE INV.ToCmm.LoweringTotal (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#inline_variable
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#get_continuation
@@ -1085,7 +1087,7 @@ Definition INV_ToCmm_StaticUpdateBarrier_documented : Prop := True.
     INV.NameMode.Coherent is stated in Soundness.v. *)
 Definition INV_ToCmm_LoweringTotal_documented : Prop := True.
 
-(** RULE INV.ToCmm.SymbolInitPlacement (STATUS conjectured)
+(** RULE INV.ToCmm.SymbolInitPlacement (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#place_symbol_inits
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_bindings
@@ -1120,7 +1122,7 @@ Definition INV_ToCmm_LoweringTotal_documented : Prop := True.
     at top level -- a latent hazard if lifting ever changes. *)
 Definition INV_ToCmm_SymbolInitPlacement_documented : Prop := True.
 
-(** RULE INV.ToCmm.SymbolLocality (STATUS conjectured)
+(** RULE INV.ToCmm.SymbolLocality (CLAIM normative)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol
     CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol_of_code_id

@@ -863,7 +863,7 @@ Definition is_purely_tailrec (kret kexn : continuation)
     (x : variable) (e : expr) : Prop :=
   ~ free_vars (erase_exempt x kret kexn e) x.
 
-(** RULE S.Rewrite.Loopify.Attribute (STATUS normative)
+(** RULE S.Rewrite.Loopify.Attribute (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function
     CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Acc.add_name_to_free_names *)
@@ -897,7 +897,7 @@ Definition S_Rewrite_Loopify_Attribute (la : loop_attribute)
        /\ result = Default_loopify_and_not_tailrec)
   end.
 
-(** RULE S.Rewrite.Loopify.Attribute.ValueSlotExempt (STATUS conjectured)
+(** RULE S.Rewrite.Loopify.Attribute.ValueSlotExempt (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#Let_with_acc.create
     CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_one_function *)
@@ -918,7 +918,7 @@ Theorem S_Rewrite_Loopify_Attribute_ValueSlotExempt :
     <-> is_purely_tailrec kret kexn x body).
 Admitted.
 
-(** RULE S.Rewrite.Loopify.AttributeUpdate (STATUS normative)
+(** RULE S.Rewrite.Loopify.AttributeUpdate (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0 *)
 Definition S_Rewrite_Loopify_AttributeUpdate
@@ -929,7 +929,7 @@ Definition S_Rewrite_Loopify_AttributeUpdate
   | Default_loopify_and_not_tailrec => Never_loopify
   end.
 
-(** RULE S.Rewrite.Code.RecursiveRecompute (STATUS normative)
+(** RULE S.Rewrite.Code.RecursiveRecompute (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body *)
 (* Not loopify-specific: every rebuilt code's recursive flag is
@@ -970,7 +970,7 @@ Inductive rw_code_loopify (C : code_env) (E : tenv)
     : loopify_attribute -> code0
       -> loopify_attribute -> recursiveness -> code0 -> Prop :=
 
-(** RULE S.Rewrite.Loopify.Body (STATUS normative)
+(** RULE S.Rewrite.Loopify.Body (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
     CODE middle_end/flambda2/simplify/loopify_state.mli
@@ -1014,7 +1014,7 @@ Inductive rw_self_tail_call (C : code_env) (E : tenv)
     (my_closure : variable) (kret kexn : continuation)
     : expr -> expr -> Prop :=
 
-(** RULE S.Rewrite.Loopify.SelfTailCall (STATUS normative)
+(** RULE S.Rewrite.Loopify.SelfTailCall (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call *)
@@ -1068,7 +1068,7 @@ Variable flags : eff_flags.
 Inductive rw_control (C : code_env) (E : tenv)
     : expr -> expr -> Prop :=
 
-(** RULE S.Rewrite.Switch.ArmPrune (STATUS normative)
+(** RULE S.Rewrite.Switch.ArmPrune (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm *)
 (* The meet against `this_naked_immediate d` is Bottom, so the arm is
@@ -1083,7 +1083,7 @@ Inductive rw_control (C : code_env) (E : tenv)
         (E_switch (Mk_switch x (arms1 ++ (d, ac) :: arms2)))
         (E_switch (Mk_switch x (arms1 ++ arms2)))
 
-(** RULE S.Rewrite.Switch.Merge (STATUS normative)
+(** RULE S.Rewrite.Switch.Merge (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_arm *)
@@ -1106,7 +1106,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       rw_control C E (E_switch sw)
         (E_apply_cont (Mk_apply_cont k abar None))
 
-(** RULE S.Rewrite.Switch.Identity (STATUS normative)
+(** RULE S.Rewrite.Switch.Identity (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch *)
 (* Every arm passes its own discriminant, tagged, to one k; the
@@ -1128,7 +1128,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            (E_apply_cont
               (Mk_apply_cont k [simple_of_name (Name_var t)] None)))
 
-(** RULE S.Rewrite.Switch.BooleanNot (STATUS normative)
+(** RULE S.Rewrite.Switch.BooleanNot (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch *)
 (* Discriminants exactly {0, 1}, arm 0 -> k [1] and arm 1 -> k [0]
@@ -1160,7 +1160,7 @@ Inductive rw_control (C : code_env) (E : tenv)
                  (Mk_apply_cont k [simple_of_name (Name_var n)]
                     None))))
 
-(** RULE S.Rewrite.Switch.Invalid (STATUS normative)
+(** RULE S.Rewrite.Switch.Invalid (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#rebuild_switch *)
 (* "After pruning, zero arms survive": composition with ArmPrune
@@ -1170,7 +1170,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       rw_control C E (E_switch (Mk_switch x []))
         (E_invalid "Zero_switch_arms"%string)
 
-(** RULE S.Rewrite.Let.DeadBinding (STATUS normative)
+(** RULE S.Rewrite.Let.DeadBinding (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
     CODE middle_end/flambda2/terms/flambda_primitive.ml#at_most_generative_effects *)
@@ -1183,7 +1183,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       (forall x, In x (bound_pattern_vars p) -> ~ free_vars e x) ->
       rw_control C E (E_let p n e) e
 
-(** RULE S.Rewrite.Let.DeadRegion (STATUS normative)
+(** RULE S.Rewrite.Let.DeadRegion (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_end_region *)
@@ -1206,7 +1206,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            e)
         e
 
-(** RULE S.Rewrite.Let.Invalid (STATUS normative)
+(** RULE S.Rewrite.Let.Invalid (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#simplify_let0
     CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0 *)
@@ -1221,7 +1221,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       rw_control C E (E_let p (N_prim pr) e)
         (E_invalid "Defining_expr_of_let"%string)
 
-(** RULE S.Rewrite.LetCont.Inline (STATUS normative)
+(** RULE S.Rewrite.LetCont.Inline (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
@@ -1243,7 +1243,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            (fun args => bind_params (ch_params h) args (ch_handler h))
            e)
 
-(** RULE S.Rewrite.LetCont.DeadHandler (STATUS normative)
+(** RULE S.Rewrite.LetCont.DeadHandler (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont *)
@@ -1254,7 +1254,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       count_cont_uses k e = 0 ->
       rw_control C E (E_let_cont_nonrec k h e) e
 
-(** RULE S.Rewrite.LetCont.Shortcut (STATUS normative)
+(** RULE S.Rewrite.LetCont.Shortcut (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
     CODE middle_end/flambda2/simplify/continuation_shortcut.ml#apply
@@ -1316,7 +1316,7 @@ Inductive rw_control (C : code_env) (E : tenv)
               (shortcut_apply_cont k ps k' (params_as_args ps)
                  e)))
 
-(** RULE S.Rewrite.LetCont.UnusedParam (STATUS normative)
+(** RULE S.Rewrite.LetCont.UnusedParam (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
@@ -1346,7 +1346,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            (Mk_cont_handler (remove_nth j ps) body exn cold)
            (drop_arg_at k j e))
 
-(** RULE S.Rewrite.LetCont.AliasedParam (STATUS normative)
+(** RULE S.Rewrite.LetCont.AliasedParam (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler *)
@@ -1389,7 +1389,7 @@ Inductive rw_control (C : code_env) (E : tenv)
               exn cold)
            (drop_arg_at k j e))
 
-(** RULE S.Rewrite.LetCont.InvalidHandler (STATUS normative)
+(** RULE S.Rewrite.LetCont.InvalidHandler (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
     CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont *)
@@ -1406,7 +1406,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            (Mk_cont_handler ps (E_invalid msg) exn cold)
            (invalidate_jumps_to k e))
 
-(** RULE S.Rewrite.LetCont.DemoteExn (STATUS conjectured)
+(** RULE S.Rewrite.LetCont.DemoteExn (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#demote_exn_handler
@@ -1443,7 +1443,7 @@ Inductive rw_control (C : code_env) (E : tenv)
         (E_let_cont_nonrec k (Mk_cont_handler ps body false cold)
            (clear_demoted_traps k e))
 
-(** RULE S.Rewrite.Apply.IndirectToDirect (STATUS normative)
+(** RULE S.Rewrite.Apply.IndirectToDirect (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_function_call
@@ -1471,7 +1471,7 @@ Inductive rw_control (C : code_env) (E : tenv)
            (ap_args_arity ap) (ap_return_arity ap)
            (CK_function (FC_direct cid)) (ap_alloc_mode ap)))
 
-(** RULE S.Rewrite.Apply.OverApplication (STATUS normative)
+(** RULE S.Rewrite.Apply.OverApplication (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_over_application
     CODE middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application *)
@@ -1516,7 +1516,7 @@ Inductive rw_control (C : code_env) (E : tenv)
               ar1 rar1
               (CK_function (FC_direct cid)) (ap_alloc_mode ap))))
 
-(** RULE S.Rewrite.Apply.PartialApplication (STATUS normative)
+(** RULE S.Rewrite.Apply.PartialApplication (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application *)
 (* A wrapper stub is built: fresh code cid' whose parameters ps_rem
@@ -1596,7 +1596,7 @@ Inductive rw_control (C : code_env) (E : tenv)
                  (Mk_apply_cont kk [simple_of_name (Name_var g)]
                     None))))
 
-(** RULE S.Rewrite.Apply.Invalid (STATUS normative)
+(** RULE S.Rewrite.Apply.Invalid (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#replace_apply_by_invalid
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_function_call *)
@@ -1638,7 +1638,7 @@ Inductive rw_control (C : code_env) (E : tenv)
       rw_control C E (E_apply ap)
         (E_invalid "Closure_type_was_invalid"%string)
 
-(** RULE S.Rewrite.LetCont.Demote (STATUS normative)
+(** RULE S.Rewrite.LetCont.Demote (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#sort_handlers *)
 (* ENCODING NOTE: sort_handlers' full No_loop classification (a
@@ -1668,7 +1668,7 @@ Inductive rw_control (C : code_env) (E : tenv)
                  handlers)
               e))
 
-(** RULE S.Rewrite.Invalid.Propagate (STATUS normative)
+(** RULE S.Rewrite.Invalid.Propagate (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/expr_builder.ml#rebuild_invalid
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr *)
@@ -1701,7 +1701,7 @@ End RwControlRelation.
    rules become Admitted theorems -- see ValueSlotExempt above --
    pass-machinery ones become anchors with their true STATUS). *)
 
-(** RULE S.Rewrite.Let.Phantom (STATUS descriptive)
+(** RULE S.Rewrite.Let.Phantom (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let *)
 (* With generate_phantom_lets on, a dead user-visible binding is kept
@@ -1710,7 +1710,7 @@ End RwControlRelation.
    have no runtime meaning (ch. 04). *)
 Definition S_Rewrite_Let_Phantom_documented : Prop := True.
 
-(** RULE S.Rewrite.LetCont.InlineForcesElimination (STATUS conjectured)
+(** RULE S.Rewrite.LetCont.InlineForcesElimination (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
     CODE middle_end/flambda2/simplify/simplify_common.ml#apply_cont_use_kind
@@ -1730,7 +1730,7 @@ Definition S_Rewrite_Let_Phantom_documented : Prop := True.
 Definition S_Rewrite_LetCont_InlineForcesElimination_documented
   : Prop := True.
 
-(** RULE S.Rewrite.LetCont.ShortcutFlat (STATUS conjectured)
+(** RULE S.Rewrite.LetCont.ShortcutFlat (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
@@ -1749,7 +1749,7 @@ Definition S_Rewrite_LetCont_InlineForcesElimination_documented
    S.Rewrite.LetCont.InlineForcesElimination. *)
 Definition S_Rewrite_LetCont_ShortcutFlat_documented : Prop := True.
 
-(** RULE S.Rewrite.LetCont.Specialize (STATUS descriptive)
+(** RULE S.Rewrite.LetCont.Specialize (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#specialize_continuation_if_needed
     CODE middle_end/flambda2/simplify/simplify_apply_cont_expr.ml#rebuild_apply_cont *)
@@ -1759,7 +1759,7 @@ Definition S_Rewrite_LetCont_ShortcutFlat_documented : Prop := True.
    recursive continuations are never specialized. *)
 Definition S_Rewrite_LetCont_Specialize_documented : Prop := True.
 
-(** RULE S.Rewrite.Loopify.TailrecEmitsNonRecursive (STATUS conjectured)
+(** RULE S.Rewrite.Loopify.TailrecEmitsNonRecursive (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/from_lambda/closure_conversion_aux.ml#create_apply
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
@@ -1779,7 +1779,7 @@ Definition S_Rewrite_LetCont_Specialize_documented : Prop := True.
 Definition S_Rewrite_Loopify_TailrecEmitsNonRecursive_documented
   : Prop := True.
 
-(** RULE S.Rewrite.Loopify.InvariantArgElim (STATUS conjectured)
+(** RULE S.Rewrite.Loopify.InvariantArgElim (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#dominator_analysis
     CODE middle_end/flambda2/simplify/flow/flow_types.mli#Continuation_param_aliases
@@ -1797,7 +1797,7 @@ Definition S_Rewrite_Loopify_TailrecEmitsNonRecursive_documented
 Definition S_Rewrite_Loopify_InvariantArgElim_documented
   : Prop := True.
 
-(** RULE S.Rewrite.Loopify.SimplifyExposed (STATUS conjectured)
+(** RULE S.Rewrite.Loopify.SimplifyExposed (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
@@ -1816,7 +1816,7 @@ Definition S_Rewrite_Loopify_InvariantArgElim_documented
 Definition S_Rewrite_Loopify_SimplifyExposed_documented
   : Prop := True.
 
-(** RULE S.Rewrite.Loopify.ResimplifyIdempotent (STATUS conjectured)
+(** RULE S.Rewrite.Loopify.ResimplifyIdempotent (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function
     CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function0

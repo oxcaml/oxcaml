@@ -108,18 +108,18 @@ Inductive mutable_flag :=
    ch. 06 effects-axes file) because call_kind's C_call carries them;
    PrimMemoryA.v reuses these very definitions for the effects axes. *)
 Inductive effects :=
-(** RULE P.Effects.NoEffects (STATUS normative) -- 06-primitives-memory.md
+(** RULE P.Effects.NoEffects (CLAIM normative) -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/effects.ml#t *)
   No_effects
-(** RULE P.Effects.OnlyGenerative (STATUS normative)
+(** RULE P.Effects.OnlyGenerative (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/effects.ml#t *)
 | Only_generative_effects (mut : mutability)
-(** RULE P.Effects.Arbitrary (STATUS normative) -- 06-primitives-memory.md
+(** RULE P.Effects.Arbitrary (CLAIM normative) -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/effects.ml#t *)
 | Arbitrary_effects.
 
-(** RULE P.Effects.Coeffects (STATUS normative) -- 06-primitives-memory.md
+(** RULE P.Effects.Coeffects (CLAIM normative) -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/coeffects.ml#t *)
 Inductive coeffects :=
   No_coeffects
@@ -934,7 +934,7 @@ End ReplaceApplyCont.
 (* 13. Structural well-formedness (02-syntax.md, WF.Syntax rules)     *)
 (* ================================================================== *)
 
-(** RULE WF.Syntax.Anf (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.Anf (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/terms/flambda.mli#expr_descr *)
 (* ENCODING NOTE: the ANF invariant ("the defining expression of a Let
    never affects control flow") is enforced BY CONSTRUCTION: [named]
@@ -947,7 +947,7 @@ End ReplaceApplyCont.
 Theorem WF_Syntax_Anf : True.
 Proof. exact I. Qed.
 
-(** RULE WF.Syntax.LetKindUniform (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.LetKindUniform (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/bound_identifiers/bound_pattern.mli#t *)
 (* Premise: Let (P = n) e binds x1 ... xn (n > 1 only for
    Set_of_closures).  Conclusion: all xi have the same kind, relative
@@ -960,7 +960,7 @@ Definition WF_Syntax_LetKindUniform (kind_of : variable -> kind)
     In y (bound_pattern_vars p) ->
     kind_of x = kind_of y.
 
-(** RULE WF.Syntax.SingletonNotSetOfClosures (STATUS normative)
+(** RULE WF.Syntax.SingletonNotSetOfClosures (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/bound_identifiers/bound_pattern.mli#t *)
 Definition WF_Syntax_SingletonNotSetOfClosures
@@ -974,7 +974,7 @@ Definition WF_Syntax_SingletonNotSetOfClosures
 Definition in_target_ocaml_int_range (i : Z) : Prop :=
   wrap (machine_width - 1)%Z i = i.
 
-(** RULE WF.Syntax.SwitchScrutinee (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.SwitchScrutinee (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/terms/switch_expr.mli#t
     CODE middle_end/flambda2/terms/switch_expr.mli#create *)
 (* The structural residue: each discriminant is a Target_ocaml_int,
@@ -985,7 +985,7 @@ Definition in_target_ocaml_int_range (i : Z) : Prop :=
 Definition WF_Syntax_SwitchScrutinee (sw : switch_expr) : Prop :=
   Forall (fun arm => in_target_ocaml_int_range (fst arm)) (sw_arms sw).
 
-(** RULE WF.Syntax.SwitchMinArms (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.SwitchMinArms (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/terms/switch_expr.mli#t
     CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_switch
     CODE middle_end/flambda2/simplify/expr_builder.ml#create_switch
@@ -993,7 +993,7 @@ Definition WF_Syntax_SwitchScrutinee (sw : switch_expr) : Prop :=
 Definition WF_Syntax_SwitchMinArms (sw : switch_expr) : Prop :=
   (2 <= length (sw_arms sw))%nat.
 
-(** RULE WF.Syntax.ExnHandlerNonRecursive (STATUS normative)
+(** RULE WF.Syntax.ExnHandlerNonRecursive (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
     CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr *)
@@ -1005,7 +1005,7 @@ Definition WF_Syntax_ExnHandlerNonRecursive
     (handlers : list (continuation * cont_handler)) : Prop :=
   Forall (fun kh => ch_is_exn_handler (snd kh) = false) handlers.
 
-(** RULE WF.Syntax.ExnHandlerFirstParamBucket (STATUS conjectured)
+(** RULE WF.Syntax.ExnHandlerFirstParamBucket (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/terms/exn_continuation.mli#arity
     CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler *)
@@ -1020,7 +1020,7 @@ Definition WF_Syntax_ExnHandlerFirstParamBucket
   length (ch_params h) = S (length (ec_extra_args ec)) /\
   map snd (tl (ch_params h)) = map snd (ec_extra_args ec).
 
-(** RULE WF.Syntax.EffectCalleeNone (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.EffectCalleeNone (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/terms/call_kind.mli#Effect
     CODE middle_end/flambda2/terms/apply_expr.mli#create *)
 Definition WF_Syntax_EffectCalleeNone (ap : apply_expr) : Prop :=
@@ -1029,7 +1029,7 @@ Definition WF_Syntax_EffectCalleeNone (ap : apply_expr) : Prop :=
   | _ => True
   end.
 
-(** RULE WF.Syntax.ContSecondClass (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.ContSecondClass (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr *)
 (* ENCODING NOTE: by construction.  The type [continuation] occurs in
    the grammar only as: Apply_cont targets and trap-action handlers,
@@ -1042,7 +1042,7 @@ Definition WF_Syntax_EffectCalleeNone (ap : apply_expr) : Prop :=
 Theorem WF_Syntax_ContSecondClass : True.
 Proof. exact I. Qed.
 
-(** RULE WF.Syntax.NonRecOccursPositive (STATUS conjectured)
+(** RULE WF.Syntax.NonRecOccursPositive (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/terms/flambda.mli#let_cont_expr
     CODE middle_end/flambda2/terms/flambda.ml#Let_cont_expr.create_non_recursive0 *)
@@ -1100,7 +1100,7 @@ Definition static_sym_edge
     bsp_binds_sym bsp s1 /\
     static_const_mentions_sym sc s2.
 
-(** RULE WF.Syntax.StaticRecThroughCode (STATUS normative)
+(** RULE WF.Syntax.StaticRecThroughCode (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/bound_identifiers/bound_static.mli#create *)
 (* ENCODING NOTE: "every recursive cycle among the bound names passes
@@ -1113,7 +1113,7 @@ Definition WF_Syntax_StaticRecThroughCode
     : Prop :=
   forall s, ~ clos_trans _ (static_sym_edge defs) s s.
 
-(** RULE WF.Syntax.ImmutableArrayNonEmpty (STATUS normative)
+(** RULE WF.Syntax.ImmutableArrayNonEmpty (CLAIM normative)
     -- 02-syntax.md
     CODE middle_end/flambda2/terms/static_const.mli#t *)
 Definition WF_Syntax_ImmutableArrayNonEmpty (sc : static_const)
@@ -1134,7 +1134,7 @@ Definition WF_Syntax_ImmutableArrayNonEmpty (sc : static_const)
   | _ => True
   end.
 
-(** RULE WF.Syntax.NameModeInTerms (STATUS normative) -- 02-syntax.md
+(** RULE WF.Syntax.NameModeInTerms (CLAIM normative) -- 02-syntax.md
     CODE middle_end/flambda2/nominal/name_mode.ml#can_be_in_terms *)
 Definition WF_Syntax_NameModeInTerms (bv : bound_var) : Prop :=
   match bv_name_mode bv with

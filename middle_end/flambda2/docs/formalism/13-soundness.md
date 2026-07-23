@@ -64,7 +64,7 @@ coercions (`Coercion.t`) are *not* observable: coercions are erased before
 
 ```rule
 RULE INV.Simplify.Preserves
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify.ml#run
 CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
 ---
@@ -77,8 +77,7 @@ U′ observationally refines U (§1): from every starting heap, every C-call
 effect trace and termination outcome of U′ — compared up to physical identity
 of immutable heap objects, including the final module block value at sym_mod —
 is an observation of U.
-NOTES: Claimed and empirically validated (§5), not proved; hence STATUS
-conjectured. This is the single property the whole formalism exists to make
+NOTES: Claimed and empirically validated (§5), not proved. This is the single property the whole formalism exists to make
 precise. The "modulo undefined behaviour" hypothesis is essential and is
 discussed below; it is not a weakness peculiar to Flambda 2 but the standard
 shape of an optimizing-compiler correctness statement for a language with
@@ -143,10 +142,11 @@ context is exactly what composes up to the whole-unit statement `INV.Simplify.Pr
 
 ```rule
 RULE INV.Rewrite.Local
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
+CAVEAT disclosure: the composed fold obligations inherit the §4 item 7 double-round violation (family caveats: ch. 05 P.Unary.NumConv, ch. 10 S.Rewrite.Prim.ConstFold).
 ---
 For every rewrite E ⊢ e ⇝ e′ (a rule in S.Rewrite.*, S.Inline.*, S.Unbox.*):
 whenever E is a sound abstraction of the runtime state at e (every equation in E
@@ -208,7 +208,7 @@ Two invariants are stated here because they have no dedicated chapter-09 rule.
 
 ```rule
 RULE INV.NameMode.Coherent
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/nominal/name_mode.ml#can_be_in_terms
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 ---
@@ -227,7 +227,7 @@ Phantom based on whether the bound var is still required in terms.
 
 ```rule
 RULE INV.KindChecks.Gated
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/ui/flambda_features.ml#kind_checks
 CODE driver/oxcaml_args.ml
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_apply_shared
@@ -253,7 +253,7 @@ underwrite the dead-code discipline `to_cmm` and the Reaper rely on.
 
 ```rule
 RULE INV.Simplify.EffectfulDeletionInventory
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/terms/flambda_primitive.ml#is_end_region
 CODE middle_end/flambda2/simplify/named_rewrite.mli#Prim_rewrite
@@ -285,7 +285,7 @@ INV.Simplify.RegionPairAtomic, S.Unbox.Mutable.Rewrite.
 
 ```rule
 RULE INV.Simplify.RegionPairAtomic
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/flow_acc.ml#record_let_binding
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/terms/flambda_primitive.ml#is_end_region
@@ -320,13 +320,14 @@ INV.Simplify.EffectfulDeletionInventory.
 
 ```rule
 RULE INV.Simplify.RequiredNamesSound
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
 CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#create
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_non_recursive
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#filter_and_choose_alias
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#find_cse_simple
+CAVEAT disclosure: the occurrence-introducer inventory is an UNCHECKED precondition per the decide_param_usage_non_recursive code comment; new upwards rewrites must be audited against it manually.
 ---
 R = required_names as returned by Flow.Analysis.analyze (after the union of mutable
   unboxing's additional_epa params); e′ = the rebuilt term for the analyzed body
@@ -361,7 +362,7 @@ S.Struct.Flow.RequiredNames, S.Struct.ApplyContRewrite, S.Struct.Flow.DeadLoopPa
 
 ```rule
 RULE INV.Simplify.DeadCodeBodyLocal
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#record_free_names_of_apply_as_used
 CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
@@ -395,7 +396,7 @@ Composes: INV.Simplify.DeadValueSlotCoherence, S.Struct.SetOfClosuresEager.
 
 ```rule
 RULE INV.Simplify.LiftedConstGranularity
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/flow_acc.ml#normalize_lifted_constant_aux
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#keep_lifted_constant_only_if_used
 CODE middle_end/flambda2/simplify/expr_builder.ml#create_let_symbol0
@@ -431,12 +432,13 @@ everything). Composes: S.Struct.Lift.PlaceAtToplevel, S.Struct.Flow.RequiredName
 
 ```rule
 RULE INV.Simplify.DeadValueSlotCoherence
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#add_use_of_value_slot
 CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
 CODE middle_end/flambda2/simplify/expr_builder.ml#remove_unused_value_slots
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#value_slot_is_used
 CODE middle_end/flambda2/cmx/exported_code.ml#prepare_for_export
+CAVEAT watch(W-41): SURVIVAL⇒RECORDED (premise P1 of INV.ToCmm.SlotLiveness) holds ACCIDENTALLY via the unboxing alignment; if it breaks, a reachable projection gets a Dead offset ⇒ Cinvalid at runtime.
 ---
 U = dacc.used_value_slots: the value slots projected anywhere in the WHOLE unit
   (accumulated across every function body and the toplevel; never save/restored).
@@ -486,11 +488,12 @@ INV.ToCmm.SlotLiveness, S.Rewrite.Prim.Projection, S.Struct.Flow.DeadLoopParam
 
 ```rule
 RULE INV.Simplify.AliasesMonotoneDown
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/types/env/aliases.mli#add
 CODE middle_end/flambda2/types/env/aliases.ml#add
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#with_typing_env
 CODE middle_end/flambda2/types/env/binding_time.ml#consts
+CAVEAT disclosure: only the alias half is genuinely γ-monotone; the concrete-type half's γ can grow at the documented non-GLB corners (S.Struct.EnvRefineOnly (b); T.Meet.MutableBlockMissedBottom).
 ---
 E₀ → E₁ → ⋯ → Eₙ is a straight-line descent lineage: each step is one of the
 S.Struct.EnvRefineOnly operations (definitions, add_equation / add_env_extension,
@@ -522,13 +525,14 @@ T.Env.ConstCanonicalPersists, T.Prove.SimpleModeBoundary, T.Join.ConstAgreement.
 
 ```rule
 RULE INV.Loopify.TrapNeutral
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_env.ml#add_continuation
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#compile_staticfail
 CODE middle_end/flambda2/simplify/expr_builder.ml#apply_continuation_shortcuts
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
+CAVEAT watch(W-42): falsifiers — a Push-carrying Cexit to a loopify loop label, any jump to k with post-trap-action depth ≠ entry depth, or a trap-bearing SelfTailCall redirect.
 ---
 Code c is loopified (S.Rewrite.Loopify.Body), self continuation k
 --------------------------------------------------
@@ -604,8 +608,8 @@ claim elsewhere seems too clean.
    *greatest* one, so two immutable loads that would be shared through a
    `Variant` type are not shared through the more-precise `Mutable_block` type.
    Soundness is unaffected — a smaller (less precise) type is still a valid
-   over-approximation. See `T.Meet.GreatestLowerBound` (STATUS conjectured; its
-   NOTES record this counterexample).
+   over-approximation. See `T.Meet.GreatestLowerBound` (whose known-false
+   caveat and NOTES record this counterexample).
 
 4. **CSE folklore "projections/loads are never CSE'd" is wrong for immutable
    array loads.** Earlier prose claimed the per-primitive CSE-eligibility
@@ -642,7 +646,7 @@ claim elsewhere seems too clean.
      re-verified against `Flambda2_reaper.Reaper.run` in this campaign; treat it
      as unverified context.
    - The **`to_cmm` "inlines non-recursive continuations used exactly once"**
-     claim is now **VERIFIED against source**:
+     claim is now **verified against source**:
      `to_cmm/to_cmm_effects.ml#classify_continuation_handler` returns `May_inline`
      exactly when `cont_is_known_to_have_exactly_one_occurrence` holds and the
      handler is not an exn handler, not cold, and not applied with traps;

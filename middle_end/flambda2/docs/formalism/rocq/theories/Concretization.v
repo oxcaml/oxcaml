@@ -7,7 +7,7 @@
     values of other names); the doc's set form gamma_E(T) is the
     derived [gamma_set] below (exists rho H consistent with E).
 
-    All T.Gamma.* rules are STATUS conjectured: the code does not
+    All T.Gamma.* rules are CLAIM interpretive: the code does not
     compute gamma, and this reading is the doc's intended denotation.
     Per the status mapping, the per-former clauses are constructors
     (conjectured defining clauses) and the two property rules
@@ -282,7 +282,7 @@ Definition string_contents_ok (sc : string_contents) (bytes : list Z)
 
 Inductive gamma (E : tenv) (rho : env) (H : heap)
   : ftype -> value -> Prop :=
-  (** RULE T.Gamma.TopBottom (STATUS conjectured) -- 07-types-domain.md
+  (** RULE T.Gamma.TopBottom (CLAIM interpretive) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_descr.mli#unknown
       CODE middle_end/flambda2/types/grammar/type_descr.mli#bottom
       gamma_E(Unknown_kappa) = all values of kind kappa (constructor
@@ -293,7 +293,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       ftype_is_unknown T = true ->
       value_has_kind v (kind_of_ftype T) ->
       gamma E rho H T v
-  (** RULE T.Gamma.Alias (STATUS conjectured) -- 07-types-domain.md
+  (** RULE T.Gamma.Alias (CLAIM interpretive) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#alias_type_of
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#get_alias_exn
       gamma_E(Equals s) under rho is the singleton { rho(s) }.
@@ -309,7 +309,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       simple_eval rho s = Some v ->
       value_has_kind v (kind_of_ftype T) ->
       gamma E rho H T v
-  (** RULE T.Gamma.Value.Nullability (STATUS conjectured)
+  (** RULE T.Gamma.Value.Nullability (CLAIM interpretive)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value
       VERIFIED 14-validation/n_way_join_preserves_null.md
@@ -328,7 +328,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       gamma E rho H
         (FT_value (Oub_ok (No_alias (Mk_head_value nn (Maybe_null yo)))))
         V_null
-  (** RULE T.Gamma.Naked.Relational (STATUS conjectured)
+  (** RULE T.Gamma.Naked.Relational (CLAIM interpretive)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate
       gamma of a Naked_immediate head with set S and relations M,
@@ -346,7 +346,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
           exists w, rho x = Some w /\ relation_denotes H R w n) ->
       gamma E rho H (FT_naked_immediate (Oub_ok (No_alias h)))
         (V_naked_imm n)
-  (** RULE T.Gamma.Naked.Set (STATUS conjectured) -- 07-types-domain.md
+  (** RULE T.Gamma.Naked.Set (CLAIM interpretive) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float
       For each remaining naked-number kind, gamma of a head is the
       finite set of constants it names (one constructor per kind;
@@ -415,7 +415,7 @@ with gamma_vnn (E : tenv) (rho : env) (H : heap)
 
 with gamma_hvnn (E : tenv) (rho : env) (H : heap)
   : head_value_non_null -> value -> Prop :=
-  (** RULE T.Gamma.Value.Variant (STATUS conjectured)
+  (** RULE T.Gamma.Value.Variant (CLAIM interpretive)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
       gamma(Variant) = gamma(immediates) u gamma(blocks): tagged
@@ -438,7 +438,7 @@ with gamma_hvnn (E : tenv) (rho : env) (H : heap)
       get_tag_witness rho H gt a ->
       sat_ext E rho H (ext_when_block ex) ->
       gamma_hvnn E rho H (HV_variant ii imms gt bl ex u) (V_ptr a)
-  (** RULE T.Gamma.Value.Boxed (STATUS conjectured)
+  (** RULE T.Gamma.Value.Boxed (CLAIM interpretive)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
       Boxed_kappa T am: pointers to a boxed number of naked kind kappa
@@ -495,7 +495,7 @@ with gamma_blocks_arm (E : tenv) (rho : env) (H : heap)
       gamma_blocks E rho H rl a ->
       gamma_blocks_arm E rho H (Ou_known rl) a
 
-(** RULE T.Gamma.Value.RowLikeBlocks (STATUS conjectured)
+(** RULE T.Gamma.Value.RowLikeBlocks (CLAIM interpretive)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_blocks
     gamma(row_like_for_blocks) = block pointers p such that for some
@@ -564,7 +564,7 @@ with gamma_array_contents (E : tenv) (rho : env) (H : heap)
       Forall2 (gamma E rho H) Ts elems ->
       gamma_array_contents E rho H (Ou_known (AC_immutable Ts)) elems
 
-(** RULE T.Gamma.Value.Closures (STATUS conjectured)
+(** RULE T.Gamma.Value.Closures (CLAIM interpretive)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_closures
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#closures_entry
@@ -610,7 +610,7 @@ with gamma_closures (E : tenv) (rho : env) (H : heap)
       sat_ext E rho H eps ->
       gamma_closures E rho H (Mk_row_like_for_closures kc oc) l f
 
-(** RULE T.Gamma.EnvExtension (STATUS conjectured)
+(** RULE T.Gamma.EnvExtension (CLAIM interpretive)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#env_extension
     CODE middle_end/flambda2/types/env/typing_env_extension.mli#t
@@ -679,7 +679,7 @@ Definition consistent (E : tenv) (rho : env) (H : heap) : Prop :=
 Definition gamma_set (E : tenv) (T : ftype) (v : value) : Prop :=
   exists rho H, consistent E rho H /\ gamma E rho H T v.
 
-(** RULE T.Gamma.Kind (STATUS conjectured) -- 07-types-domain.md
+(** RULE T.Gamma.Kind (CLAIM interpretive) -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#kind
     gamma_E(T) contains only values of kind kappa(T): concretization
     never crosses kinds.  Stated under consistency, the doc's ambient
@@ -704,7 +704,7 @@ Proof.
   end.
 Qed.
 
-(** RULE T.Gamma.Closures.CodeAgeLoose (STATUS conjectured)
+(** RULE T.Gamma.Closures.CodeAgeLoose (CLAIM interpretive)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_code_id
     CODE middle_end/flambda2/types/env/code_age_relation.ml#meet

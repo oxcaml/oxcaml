@@ -280,7 +280,7 @@ Inductive float_pm_one : float_bitwidth -> const -> bool -> Prop :=
 (* 4. Alias canonicalization                                          *)
 (* ================================================================== *)
 
-(** RULE S.Rewrite.Alias.Canonicalize (STATUS normative)
+(** RULE S.Rewrite.Alias.Canonicalize (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_simple.ml#simplify_simple0
     CODE middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn *)
@@ -348,7 +348,7 @@ Inductive cse_prim_pred : prim_op -> Prop :=
   | CPP_make_block_immutable : forall bk am,
       cse_prim_pred (Op_variadic (VP_make_block bk Immutable am)).
 
-(** RULE S.Rewrite.CSE.Eligible (STATUS normative)
+(** RULE S.Rewrite.CSE.Eligible (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#Eligible_for_cse.create
     CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse
@@ -394,7 +394,7 @@ Definition cse_eligible (fl : eff_flags) (p : prim) : Prop :=
    threads the table down from fempty). *)
 Definition cse_table : Type := fmap prim simple.
 
-(** RULE S.Rewrite.CSE.Replace (STATUS normative)
+(** RULE S.Rewrite.CSE.Replace (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#try_cse
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#apply_cse
@@ -427,7 +427,7 @@ Inductive rw_cse (fl : eff_flags) (C : code_env) (tbl : cse_table)
         (E_let (BPat_singleton (Mk_bound_var x NM_normal))
            (N_simple s) body).
 
-(** RULE S.Rewrite.CSE.Extend (STATUS normative)
+(** RULE S.Rewrite.CSE.Extend (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#try_cse
     CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#T0.add
@@ -466,7 +466,7 @@ Inductive cse_extend (fl : eff_flags) (E : tenv)
 Inductive rw_prim (flags : eff_flags) (C : code_env)
     : tenv -> expr -> expr -> Prop :=
 
-(** RULE S.Rewrite.Prim.Transfer (STATUS normative)
+(** RULE S.Rewrite.Prim.Transfer (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
     CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0 *)
@@ -493,7 +493,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim p) body)
       (E_let bp (N_prim (canonicalize_prim E p)) body)
 
-(** RULE S.Rewrite.Prim.ArgKindMismatch (STATUS normative)
+(** RULE S.Rewrite.Prim.ArgKindMismatch (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#arg_kind_mismatch
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive *)
@@ -514,7 +514,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim p) body)
       (E_invalid "Prim_arg_kind_mismatch"%string)
 
-(** RULE S.Rewrite.Prim.Relational (STATUS normative)
+(** RULE S.Rewrite.Prim.Relational (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_relational_primitive
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int
@@ -566,7 +566,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_simple (Simple_const
          (Const_naked_immediate (if b then 1 else 0)))) body)
 
-(** RULE S.Rewrite.Prim.ConstFold (STATUS normative)
+(** RULE S.Rewrite.Prim.ConstFold (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unary_primitive
@@ -597,7 +597,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim p) body)
       (E_let bp (N_simple (Simple_const c)) body)
 
-(** RULE S.Rewrite.Prim.ConstFold.Float (STATUS descriptive)
+(** RULE S.Rewrite.Prim.ConstFold.Float (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen *)
@@ -622,7 +622,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim p) body)
       (E_let bp (N_simple (Simple_const c)) body)
 
-(** RULE S.Rewrite.Prim.ConstFold.PartialUndef (STATUS normative)
+(** RULE S.Rewrite.Prim.ConstFold.PartialUndef (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Binary_arith_like *)
@@ -639,7 +639,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim (P_binary (BP_int_arith k op) s1 s2)) body)
       (E_invalid "Division_by_zero"%string)
 
-(** RULE S.Rewrite.Prim.Reify (STATUS normative)
+(** RULE S.Rewrite.Prim.Reify (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
     CODE middle_end/flambda2/simplify/lifting/reification.ml#try_to_reify *)
@@ -664,7 +664,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim p) body)
       (E_let bp (N_simple s) body)
 
-(** RULE S.Rewrite.Prim.IntIdentity (STATUS normative)
+(** RULE S.Rewrite.Prim.IntIdentity (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift *)
@@ -700,7 +700,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim (P_binary (BP_int_shift k op) s1 s2)) body)
       (E_let bp (int_id_named k s1 res) body)
 
-(** RULE S.Rewrite.Prim.FloatIdentity (STATUS normative)
+(** RULE S.Rewrite.Prim.FloatIdentity (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen *)
 (* Premises in doc order: a float binary arithmetic primitive under
@@ -727,7 +727,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
           else N_simple s_other)
          body)
 
-(** RULE S.Rewrite.Prim.UntagTag (STATUS normative)
+(** RULE S.Rewrite.Prim.UntagTag (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number
@@ -765,7 +765,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim (P_unary (UP_unbox_number bn) x)) body)
       (E_let bp (N_simple s) body)
 
-(** RULE S.Rewrite.Prim.Projection (STATUS normative)
+(** RULE S.Rewrite.Prim.Projection (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load0
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
@@ -830,7 +830,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
          (N_prim (P_unary (UP_project_function_slot f f') x)) body)
       (E_let bp (N_simple s) body)
 
-(** RULE S.Rewrite.Prim.PhysEqual (STATUS normative)
+(** RULE S.Rewrite.Prim.PhysEqual (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal
     CODE middle_end/flambda2/types/provers.ml#prove_physical_equality *)
@@ -861,7 +861,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_simple (Simple_const (Const_naked_immediate i)))
          body)
 
-(** RULE S.Rewrite.Prim.ObjDupElide (STATUS descriptive)
+(** RULE S.Rewrite.Prim.ObjDupElide (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_obj_dup *)
 (* Premise: obj_dup(x) where x's type proves it an immutable
@@ -902,7 +902,7 @@ Inductive rw_prim (flags : eff_flags) (C : code_env)
       (E_let bp (N_prim (P_unary UP_obj_dup x)) body)
       (E_let bp (N_simple x) body).
 
-(** RULE S.Rewrite.Prim.CompareRecovery (STATUS descriptive)
+(** RULE S.Rewrite.Prim.CompareRecovery (CLAIM descriptive)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#recover_comparison_primitive
     CODE middle_end/flambda2/simplify/comparison_result.ml#convert_result_compared_to_tagged_zero
@@ -923,7 +923,7 @@ Definition S_Rewrite_Prim_CompareRecovery_documented : Prop := True.
 (* 7. The static/dynamic sharing split                                *)
 (* ================================================================== *)
 
-(** RULE S.Rewrite.Share.StaticDynamicSplit (STATUS conjectured)
+(** RULE S.Rewrite.Share.StaticDynamicSplit (CLAIM normative)
     -- 10-simplify-rewrites.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#unary_primitive_eligible_for_cse
     CODE middle_end/flambda2/terms/flambda_primitive.ml#binary_primitive_eligible_for_cse

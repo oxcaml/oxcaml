@@ -436,7 +436,7 @@ Fixpoint ctx_plug (C : expr_ctx) (e : expr) : expr :=
 (* and the name-mode invariant (increment 2b)                         *)
 (* ================================================================== *)
 
-(** RULE INV.Simplify.Preserves (STATUS conjectured)
+(** RULE INV.Simplify.Preserves (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/simplify.ml#run
     CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
@@ -513,7 +513,7 @@ Theorem INV_Simplify_Preserves :
         (fl_unit_behavior fl U' rho_pre H0).
 Admitted.
 
-(** RULE INV.Rewrite.Local (STATUS conjectured)
+(** RULE INV.Rewrite.Local (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
@@ -612,7 +612,7 @@ Definition bp_bound_vars (p : bound_pattern) : list bound_var :=
   | BPat_static _ => []
   end.
 
-(** RULE INV.NameMode.Coherent (STATUS conjectured)
+(** RULE INV.NameMode.Coherent (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/nominal/name_mode.ml#can_be_in_terms
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
@@ -656,11 +656,11 @@ Admitted.
 (* quantifies irreducibly over unmodeled pass internals (dacc,        *)
 (* flow_acc, required_names, slot_offsets, cmx) whose honest          *)
 (* paraphrase would have to invent the flow analyses wholesale.       *)
-(* True STATUS preserved in each header; full text in                 *)
+(* True CLAIM preserved in each header; full text in                  *)
 (* 13-soundness.md.                                                   *)
 (* ================================================================== *)
 
-(** RULE INV.KindChecks.Gated (STATUS descriptive) -- 13-soundness.md
+(** RULE INV.KindChecks.Gated (CLAIM descriptive) -- 13-soundness.md
     CODE middle_end/flambda2/ui/flambda_features.ml#kind_checks
     CODE driver/oxcaml_args.ml
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_apply_shared
@@ -673,7 +673,7 @@ Admitted.
     driver: documented, not modeled. *)
 Definition INV_KindChecks_Gated_documented : Prop := True.
 
-(** RULE INV.Simplify.EffectfulDeletionInventory (STATUS conjectured)
+(** RULE INV.Simplify.EffectfulDeletionInventory (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
     CODE middle_end/flambda2/terms/flambda_primitive.ml#is_end_region
@@ -693,7 +693,7 @@ Definition INV_KindChecks_Gated_documented : Prop := True.
 Definition INV_Simplify_EffectfulDeletionInventory_documented
   : Prop := True.
 
-(** RULE INV.Simplify.RegionPairAtomic (STATUS conjectured)
+(** RULE INV.Simplify.RegionPairAtomic (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/flow/flow_acc.ml#record_let_binding
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
@@ -711,7 +711,7 @@ Definition INV_Simplify_EffectfulDeletionInventory_documented
     flow_acc use-skip (unmodeled). *)
 Definition INV_Simplify_RegionPairAtomic_documented : Prop := True.
 
-(** RULE INV.Simplify.RequiredNamesSound (STATUS conjectured)
+(** RULE INV.Simplify.RequiredNamesSound (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
     CODE middle_end/flambda2/simplify/flow/dominator_graph.ml#create
@@ -731,7 +731,7 @@ Definition INV_Simplify_RegionPairAtomic_documented : Prop := True.
     the dominator graph, and the introducer inventory (unmodeled). *)
 Definition INV_Simplify_RequiredNamesSound_documented : Prop := True.
 
-(** RULE INV.Simplify.DeadCodeBodyLocal (STATUS conjectured)
+(** RULE INV.Simplify.DeadCodeBodyLocal (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_function_body
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#record_free_names_of_apply_as_used
@@ -750,7 +750,7 @@ Definition INV_Simplify_RequiredNamesSound_documented : Prop := True.
     expressly distinguished and unaffected. *)
 Definition INV_Simplify_DeadCodeBodyLocal_documented : Prop := True.
 
-(** RULE INV.Simplify.LiftedConstGranularity (STATUS conjectured)
+(** RULE INV.Simplify.LiftedConstGranularity (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/flow/flow_acc.ml#normalize_lifted_constant_aux
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#keep_lifted_constant_only_if_used
@@ -769,7 +769,7 @@ Definition INV_Simplify_DeadCodeBodyLocal_documented : Prop := True.
 Definition INV_Simplify_LiftedConstGranularity_documented
   : Prop := True.
 
-(** RULE INV.Simplify.DeadValueSlotCoherence (STATUS conjectured)
+(** RULE INV.Simplify.DeadValueSlotCoherence (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#add_use_of_value_slot
     CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
@@ -799,7 +799,7 @@ Definition INV_Simplify_DeadValueSlotCoherence_documented
 Definition same_class (E : tenv) (s1 s2 : simple) : Prop :=
   canonical E s1 = canonical E s2.
 
-(** RULE INV.Simplify.AliasesMonotoneDown (STATUS conjectured)
+(** RULE INV.Simplify.AliasesMonotoneDown (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/types/env/aliases.mli#add
     CODE middle_end/flambda2/types/env/aliases.ml#add
@@ -854,7 +854,7 @@ Theorem INV_Simplify_AliasesMonotoneDown :
     same_class E' s1 s2.
 Admitted.
 
-(** RULE INV.Loopify.TrapNeutral (STATUS conjectured)
+(** RULE INV.Loopify.TrapNeutral (CLAIM normative)
     -- 13-soundness.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#loopify_decision_for_call
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_self_tail_call

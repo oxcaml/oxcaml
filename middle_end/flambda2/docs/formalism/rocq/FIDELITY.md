@@ -72,12 +72,15 @@ green, since compile-fix churn may moot or introduce drift.
 | All.v (task #26) + finale Print Assumptions | GATE REVIEW (2026-07-22; definition-of-done items 1-4) | All.v (on disk, 26 imports); Hopper's verbatim Print Assumptions log (~/.claude/plans/flambda2-rocq-print-assumptions.log, both closures read in full); theories/ grep sweeps run independently (naked-Axiom grep, RULE-token grep on All.v, unique id count, unique id-status pair split, chapter-side id extraction, comm set-difference); CORRESPONDENCE.md sanctioned-Parameter cites (:263 cextern_c, :288 cextern_rel entry 20, :391 f16_round, :429/:836 prim_arg_kinds + prim_transfer, :657-664 the layout oracles); Representation.v Parameter inventory | PASS ON ALL GATES. (1) INV_Simplify_Preserves closure: static_consts_in and cmm_unique_binders both ABSENT as required; members are exactly the sanctioned flambda-side set — Unbox?/Inline?/abstract-transfer oracles (unbox_dec, inline_dec, prim_transfer, prim_arg_kinds), alpha predicates (free_vars/free_conts/bound_vars), the Base.v float32/float64 type+op family, f16_round, data_ptr, Machine.cextern (catalog entry 20), as_pointer; nothing else, no foreign Admitted (closures are statement-type-driven; both invariants are themselves Admitted, correctly the only theorem-constants present). (2) INV_ToCmm_Simulates closure: static_consts_in and cmm_unique_binders both PRESENT as required; plus the EIGHT layout oracles (all eight individually sanctioned at catalog :657-664 — the final report's "7 layout oracles" is a miscount to fix), header_is_local, gc_reloc (still an unconstrained Parameter — W-32 intact), cextern_c, Machine.cextern, floats/f16_round/data_ptr/as_pointer, free_vars; nothing unsanctioned. Statement shapes spot-verified against the catalog: Preserves = the entry-70-quoted premise set; Simulates carries tc_expr_data_sunk, the cmm_unique_binders premise (W-28), the KF-040 custom_boxed_var_payload carve-out, symaddr_agree/rep_heap/loc_map_inj, no-undef premise, exists-outcome + tocmm_beh_rel conclusion. (3) NO NAKED AXIOMS: grep over theories/ finds zero Axiom declarations. (4) All.v: imports all 26 content files, contains zero RULE tokens (no phantom ids; prose uses lowercase "rule"). (5) Coverage independently re-verified: 453 unique ids in theories/; unique id-status pairs exactly 303 normative / 66 descriptive / 84 conjectured; chapter-side extraction 453; symmetric set difference EMPTY (exact set equality). Counting caveat recorded: raw STATUS-occurrence grep reads 88 conjectured + noise ("STATUS preserved"/"STATUS marks" prose fragments, duplicate quotings) — unique-pair extraction is the correct method. FINAL FIDELITY STATEMENT (definition-of-done item 4): NO OPEN DISCREPANCY REPORTS. KF-001..KF-054 all resolved, accepted-as-cataloged, or closed by doc ruling; the Admitted-false family (KF-037/038/041/043/044/049/050/051/052/053) fully resolved on disk; KF-040's compiler-bug half and Finding #16's design conflict remain open UPSTREAM/USER-side only (final-report decision items, not mechanization discrepancies). |
 | Final report Part 1 (findings narrative) + last two comment residues | REPORT PASS + LANDING VERIFICATION (2026-07-22, at main's request — the project's last unverified deltas) | ~/.claude/plans/flambda2-rocq-final-report.md (whole file); 04-opsem.md §1.4 diff; Opsem.v:677-697 + .vo mtime; per-file `^Admitted.` counts across all 13 Admitted-bearing files; TypeGrammar.v:916 (cut_as_extension); non-anchored RULE-token grep over all 20 chapters; ToCmmControl.v:209/:259-283 (TestByValue) | Residues BOTH VERIFIED: ch. 04 §1.4 parenthetical ("unless rebound by OS.Let.Static — see that rule's NOTES") is exactly the recommended resync, prose-only; Opsem.v:687-690 header comment now quotes the corrected conclusion (v_j with the per-match NOTES gloss), .vo rebuilt. Report Part 1: per-file Admitted distribution EXACT (sums to 32; MeetJoin 10, Opsem/Pilot 0 among the 14 Admitted-free); Parameter inventory real (cut_as_extension confirmed a Parameter); Print Assumptions bullet matches my certification; falsity/USER-DECISION items match my entries; Part 3 errata corrected to five with my classification. TWO FACTUAL ERRORS FILED (report-side, not mechanization): (1) the Qed-under-conjectured sentence lists TC_Switch_TestByValue among "six doc conjectures now machine-checked theorems" — ON DISK it is an ADMITTED kernel with NO rule id (ToCmmControl.v:259, Admitted :283; catalog-62 family; one of that file's two Admitted, already correctly counted in the report's own 32) — an inherited ledger slip (Dijkstra's 07-18 class listing predates the report's "machine-checked" rendering); true inventory is five members, and the doc-conjecture-theorems count is 4 rule upgrades + 3 envelope-Qeds. (2) The coverage bullet's "naive counting reads 454 on the doc side: a prose line in ch. 18's NOTES" does not reproduce: non-anchored unique-id grep over the twenty chapters reads 453, and no chapter contains a non-line-initial `RULE ` token — the phantom either predates a doc edit or used a different pattern; the sentence needs its method stated or removal. Plus one wording nit: Simulates' closure additions are not "exactly" the listed apparatus + two conditions — f32_of_Z is a 14th addition (float-family, reachable only Cmm-side). CLOSURE (2026-07-22, same session): all three fixes applied by main and RE-VERIFIED against disk — (1) the Qed sentence now headlines SEVEN doc conjectures discharged (4 rule upgrades + 3 envelope-Qeds), states the support inventory as five, and carries an explicit reconciliation note that TC_Switch_TestByValue is an Admitted kernel with no rule id; (2) the 454 parenthetical now states the reproducible method — and it REPRODUCES: 18-to-cmm-data.md:143 is a line-initial "STATUS conjectured —" prose line inside TC.Let.Subst's NOTES (the rule's real field is :111), so line-anchored STATUS extraction reads 454 while RULE-token greps read 453; (3) f32_of_Z listed as the 14th addition. Dijkstra's reconciliation (same session) confirms both filings: the class-membership slip was his pre-coma conflation of the support-theorem inventory with the Qed class (census figures unaffected — his own per-file counts had TestByValue right all along), and the 454 reproduces under his actual method (line-anchored RULE/STATUS pairing: ch. 18 has 22 ^STATUS lines against 21 rule fences, :143 pairing a second time with :110's RULE line). FINAL VERDICT: report read CLEAN; delivery unblocked. |
 | Item-8 resolution package (revised P.Binary.PhysEqual; 13 §1 folding + refinement; Preserves/Rewrite.Local restated; CSE.Replace NOTES; 20 §2/§5.6/EffectLinear; classic_physequal_box addendum) | RULING REVIEW (2026-07-22, pre-mechanization gate at main's request; full diffs, not summaries: 06/10/13 vs the rescue snapshot, 20 + 14-validation vs HEAD) | 06-primitives-memory.md:1191-1234 diff; 13-soundness.md §1 + §2 + §4-item-8 diff (incl. the :745-754 qualification tail); 10-simplify-rewrites.md:475-479 diff + CSE.Eligible :427-457; 20-to-cmm-soundness.md diff + EndToEnd :89-115 + InvalidUnreached; 14-validation/classic_physequal_box.md diff; 17-representation.md R.Observe :462-479; 04-opsem.md OS.Let.Prim premises; 06:62 mutability grammar; equivalence-phrase sweep over all chapters; ∋-notation grep | DESIGN PASSES — the refinement architecture is the right shape and coheres: pruning direction correct ({true} ⊆ {true,false} witness reclassification verified); the each-half-insufficient argument verified in both directions; CSE.Replace correction is item 8's mandated sentence verbatim; the symbol-disequality qualification (:745-751) is sound (licensed by always-derivable-0, not 1-underivability); repeated-comparison consistency handled ("consistent resolution is itself a resolution"); the NaN caveat is inherited, not worsened (==⇒= already fails at NaN in real OCaml; the float warning survives); R.Observe needs NO change — folding is correctly localized to the flambda-side §1 relation, the bridge's literal-equality reading survives because the backward-direction abstract behavior is the one matching Cmm's identity choices; closures-in-ι DEFENSIBLE (pipeline shares/duplicates/lifts closures; (=) raises on functionals so the manual's ==⇒= is vacuous there); EffectLinear Drop-arm answer ACCEPTED on its two grounds, completed by KF-057's oracle-input rider; no RULE id or STATUS moved in any of the five diffs (baseline 303/66/84 safe, Dijkstra re-certifies). THREE FINDINGS: KF-055 (high — the ι/Immutable_unique exclusion is DECIDED at 13 §4:751-754 but absent from the normative definition sites, and its letter leaves same-pointer unique comparisons (exception dispatch) with NO derivation; plus the ∋ notation is undefined and ch. 04's =-premises don't accept relational results — three one-line fixes + one sentence); KF-056 (high — Simulates' current ∀b∃o direction is refutable under relational PhysEqual; the re-posing must flip to ∀o∃b "Cmm refines Flambda", which EndToEnd's own :101-102 gloss already names; EndToEnd's "equivalence" parenthetical stale; decomposition needs a determinacy caveat); KF-057 (medium — cextern answer-monotonicity under folding is a new implicit premise; discipline sentence + watch). LOW rider: 11-inlining.md:170 still cites "observationally equivalent … stated in chapter 13" for what is now a refinement obligation — the only stale cross-reference the sweep found. |
-| Item-8 mechanization wave (fold core + re-shaped statements + event apparatus) | WAVE VERIFICATION (2026-07-22, at Hopper's green; against entries 44/75 and rulings (a)-(f)) | Values.v:185-416 (iota_object/iota_struct/iota_addr/is_iota, fold_vsim/fold_osim/fold_heap_sim, fold_eq diagonal, reflexivity family incl. fold_osim_refl's non-code premise, W-35 tripwire comment); Soundness.v:128-237 (ITEM-8 AMENDMENT header, fold_bij record, pins, event_sim), :334-364 (obs_equiv/obs_refines/no_ub), :497-514 (Preserves), :555-600 (Local + the rewritten KF-030 disclosure); ToCmmSoundness.v:578-623 (re-posed Simulates); Pilot.v:879/:908 sighted; counts by my own greps (Admitted terminators 32; unique id-status pairs 453; pre/post Print Assumptions name-set diff EMPTY) | ALL PASS. (1) iota_object implements the ruled table exactly (constructor-matched Immutable for the five μ-bearing forms; Closures/Boxed wholly ι; bigstring/bigarray/lazy/code excluded) with the doc rationale in the comment; iota_struct = ι minus closures with ruling (c)'s rationale verbatim. (2) fold_vsim/fold_osim: FV_clos = b + literal slot; FV_ptr_iota descent gated on BOTH sides iota_struct; FO_closures unconditional = catalog-44 leaf opacity (consistent with ruling (c) and the pre-item-8 certified treatment); no HO_Code clause with the reachability argument stated. (3) fold_bij: functionality waived on ι SOURCES, injectivity on ι TARGETS, fb_sym_l statics-fixed, fb_sym_r's lifting disjunct correctly ι-restricted; classification-stability note (class permanent once allocated) sound. (4) DESIGN POINT BLESSED: fold_osim_refl's explicit non-code premise is the honest shape — fold_osim is only consulted on HK_addr fetches, where HO_Code never lives (well-formed heaps install code at HK_code), so the premise discharges at every use site; the unconditional diagonal being unprovable is disclosed at the site as required. (5) obs_refines textually = obs_equiv's second conjunct, direction correct (transformed ⊆ source); Preserves/Local premise sides untouched, conclusions obs_refines. (6) Simulates re-posed exactly per KF-056 + ruling (e): certified premise set unchanged, set-level no_ub, ∀ Cmm outcome ∃ b_f b_q with fl_has_behavior + beh_sim quotient + tocmm_beh_rel UNTOUCHED. (7) Event apparatus: per-event fold_bij at call-time heaps (behavior-wide record correctly gone for the heap-less behaviors), results under full b with the fresh-ι anchoring disclosed; probed the diverging-last-event corner — fresh results from the final event before divergence are never re-read in the trace semantics, the same boundary as the certified KF-015 design, sound. (8) The KF-030 wave rider LANDED (Soundness.v:559-584 mirrors entry 55's rewrite exactly — structural ground alone, second ground dissolved, rw_cse obligation booked). (9) Counts independently confirmed: Admitted 32, census pairs 453, Print Assumptions name-sets IDENTICAL pre/post wave (empty diff of the two logs). No findings. |
+| Item-8 mechanization wave (fold core + re-shaped statements + event apparatus) | WAVE VERIFICATION (2026-07-22, at Hopper's green; against entries 44/75 and rulings (a)-(f)) | Values.v:185-416 (iota_object/iota_struct/iota_addr/is_iota, fold_vsim/fold_osim/fold_heap_sim, fold_eq diagonal, reflexivity family incl. fold_osim_refl's non-code premise, W-35 tripwire comment); Soundness.v:128-237 (ITEM-8 AMENDMENT header, fold_bij record, pins, event_sim), :334-364 (obs_equiv/obs_refines/no_ub), :497-514 (Preserves), :555-600 (Local + the rewritten KF-030 disclosure); ToCmmSoundness.v:578-623 (re-posed Simulates); Pilot.v:879/:908 sighted; counts by my own greps (Admitted terminators 32; unique id-status pairs 453; pre/post Print Assumptions name-set diff EMPTY) | ALL PASS. (1) iota_object implements the ruled table exactly (constructor-matched Immutable for the five μ-bearing forms; Closures/Boxed wholly ι; bigstring/bigarray/lazy/code excluded) with the doc rationale in the comment; iota_struct = ι minus closures with ruling (c)'s rationale verbatim. (2) fold_vsim/fold_osim: FV_clos = b + literal slot; FV_ptr_iota descent gated on BOTH sides iota_struct; FO_closures unconditional = catalog-44 leaf opacity (consistent with ruling (c) and the pre-item-8 certified treatment); no HO_Code clause with the reachability argument stated. (3) fold_bij: functionality waived on ι SOURCES, injectivity on ι TARGETS, fb_sym_l statics-fixed, fb_sym_r's lifting disjunct correctly ι-restricted; classification-stability note (class permanent once allocated) sound. (4) DESIGN POINT BLESSED: fold_osim_refl's explicit non-code premise is the honest shape — fold_osim is only consulted on HK_addr fetches, where HO_Code never lives (well-formed heaps install code at HK_code), so the premise discharges at every use site; the unconditional diagonal being unprovable is disclosed at the site as required. (5) obs_refines textually = obs_equiv's second conjunct, direction correct (transformed ⊆ source); Preserves/Local premise sides untouched, conclusions obs_refines. (6) Simulates re-posed exactly per KF-056 + ruling (e): certified premise set unchanged, set-level no_ub, ∀ Cmm outcome ∃ b_f b_q with fl_has_behavior + beh_sim quotient + tocmm_beh_rel UNTOUCHED. (7) Event apparatus: per-event fold_bij at call-time heaps (behavior-wide record correctly gone for the heap-less behaviors), results under full b with the fresh-ι anchoring disclosed; probed the diverging-last-event corner — fresh results from the final event before divergence are never re-read in the trace semantics, the same boundary as the certified KF-015 design, sound. (8) The KF-030 wave rider LANDED (Soundness.v:559-584 mirrors entry 55's rewrite exactly — structural ground alone, second ground dissolved, rw_cse obligation booked). (9) Counts independently confirmed: Admitted 32, census pairs 453, Print Assumptions name-sets IDENTICAL pre/post wave (empty diff of the two logs). No findings. DELTA (2026-07-22, stamps-table honesty pass): the wave verification had NOT read PrimMemoryB.v's 4→8 PhysEqual constructors — the new STAMP table's own staleness semantics exposed the gap (stamp 07-18 < wave edit). NOW READ AND VERIFIED (:819-884): deterministic non-ι Eq/Diff on phys_same_word; ι-clauses ∋0 unconditional and ∋1 under fold_eq (the diagonal instance; deliberate overlap on equal pointers per record 75); the Neq quadruple is the correct boolean mirror (IotaOne unconditional 1, IotaZero 0 under fold_eq); kind-Value guards on all eight clauses with the KF-039 rationale in the site comment (out-of-kind pairs stuck rather than phys_same_word's catch-all giving defined wrong answers). PrimMemoryB.v re-stamped GREEN @ 2026-07-22. |
 | PENDING-UPSTREAM provisos (string-load fold split to its own feature branch) | LANDING VERIFICATION + RULING (2026-07-22) | 06-primitives-memory.md:1191-1195 (StringOrBigstringLoad NOTES proviso); 10-simplify-rewrites.md:533-537 (StaticDynamicSplit clause-4 proviso); git: commit 9712d270eb ("flambda2: fold constant-index string loads from known contents", parent 5b3304cf54 = the formalism series' base, branch flambda2-string-load-fold exists); worktree simplify_binary_primitive.ml:1069-1075 (fix-files reverted, git status clean); flambda_primitive.ml:1839 at worktree vs 9712d270eb; RewritesPrim.v:943-953 (clause-4 comment); chapter-side id count | ALL CLAIMS VERIFIED: (a) mainline simplify_string_or_bigstring_load IS the stub (CR comment + create_unknown; the pre-existing worktree fix modifications are cleanly reverted, so the worktree = mainline for these files); the branch commit exists with the claimed parent and contains the fold; CSE-eligibility is FALSE on BOTH sides — identical value, the branch merely upgrades mainline's "(* CR mshinwell: review *)" to the substantive bytes-storage rationale (consistent with my string-load memory record and Church's drift check). (b) No RULE/STATUS movement — both provisos are NOTES/clause-internal prose; chapter-side unique id count still 453. (c) RULING on RewritesPrim.v:947's "only contents-known folds": ADD a one-phrase rider ("(PENDING UPSTREAM: the fold lives on flambda2-string-load-fold, 9712d270eb — see the rule's proviso)") — the comment quotes a rule clause that now carries the proviso, and the traceability discipline is that comments track the quoted text; but strictly batch-priority, ride the next compile round, never its own respin. NIT: ch. 10's proviso says "the NOT-CSE-eligible fact already holds there" — "there" is disambiguated only by the contrast structure; "holds in mainline" (as ch. 06 has it) would be exact. |
+| Solidity schema (CLAIM/EVIDENCE/GRADE replacing STATUS) — design ruling | DESIGN RULING (2026-07-22; gates the migration; delivered to main in full) | The draft spec (main's message); the 84 conjectured ids enumerated from theories/ RULE headers; the prose-STATUS strand inventory (grep over chapters: 9 sites — 13:80, 13:607, 16:426, 17:456, 18:143 the counting-trap line itself, 19:155, 20:75, 20:122, 20:160 — plus the theories-side prose trio and the Traceability REFUTED-CONJECTURE variant text); corpus test-cases for the criterion (γ family, T.Meet.Sound, T.Env pair, OS.Apply.Method, R.Heap, MutableBlockMissedBottom, GLB, KF-040) | ARCHITECTURE SOUND; ruling delivered with amendments: (1) CLAIM criterion replaced — classify by CONSTRAINED SUBJECT (code-computed subject → normative even when stated through formalism-only vocabulary, e.g. T.Meet.Sound; formalism-only subject → interpretive, e.g. the γ clauses AND γ-properties like T.Gamma.Kind; remedy tiebreak: what would an unacceptable violation force you to change) — the draft's "checkable" test re-smuggled evidence into kind and misclassified model-of-runtime rules; fan-out must allow DESCRIPTIVE as a third target (MutableBlockMissedBottom is an imprecision witness that legitimately retires if meet improves); estimated split ≈ 68-70 normative / ~14 interpretive / 1-2 descriptive. (2) EVIDENCE is TWO AXES, not a linear ladder — empirical (stated < code-read < validated) × formal (unmechanized < mechanized, Qed a badge): the draft's own grade formula already quantifies over the axes separately, and the corpus proves incomparability in both directions (KF-040: mechanization caught what validation missed; oracles: validation grounds what mechanization cannot); "mechanized" REQUIRES the fidelity-review stamp (the Admitted-false family is the proof that unreviewed Admitted certifies falsities) and EXCLUDES documented anchors (else the rung is uniformly true across all 453 and stops discriminating). (3) GRADE formula GAP fixed: draft's C ("exactly one evidence source") sends validated+code-read+unmechanized to D — absurd; restated monotone on the two axes (A = validated×mechanized; B = validated alone or code-read×mechanized; C = one axis; D = neither); DISPUTED is an off-ramp suspending the letter (derived from open FIDELITY findings via the new RULES: headers — which makes my #5 verification grade-load-bearing); Qed-never-a-grade-input AGREED (envelope-Qed's code evidence is the CHECKED event that verified the envelope, already counted); NEW CAVEAT KIND compiler-bug (KF-040 polarity: rule TRUE of code, code diverges from intent — false-as-stated has the wrong sign); staleness derivation from @commit recommended (evidence marked stale when a CODE-line file changed since; the suffix's real payoff). (4) Census invariant ACCEPTED with the migration stated as a pair-diff invariant (id set unchanged; kind image of the 84 in {normative, interpretive, descriptive}; 303/66 untouched) + the strand inventory above must be rewritten in the same sweep (the counting-trap prose line 18:143 becomes a phantom of a retired keyword otherwise) + interpretive DEFINING clauses map to constructors (γ stays an Inductive) + derivation must be checked-in tooling, never hand-computed. (5) FIDELITY RULES: headers ACCEPTED (my file, my verification of all 54) with a none-marker for doc-lane findings that target no rule (KF-054). DELTA (2026-07-22, record-76 codification spot-check): the ruling is codified with NO drift on amendments 1, 2, 4, 5 — criterion verbatim-in-substance with the γ-properties inclusion and the third target; both evidence-axis sub-rulings; the strand inventory with 18:143 "RETIRED by rewording, not inherited"; Dijkstra's invariant STRONGER than my statement (mid-migration id|keyword|value TRIPLES byte-identical at every step, forcing atomic per-rule flips; STATUS ⊎ CLAIM = 453 disjoint, STATUS strictly shrinking; set laws on the 84's image). Two good additions beyond the ruling, no objection: the tooling REFUSES rule-level VERIFIED on HYBRID ids, and the REVERSE-PROVISO check (a keyed branch that landed with unlifted proviso text is flagged; first test rows = the string-load provisos). Staleness promoted from recommended to adopted. ONE DRIFT CAUGHT AND FILED: the grade formula's "A = validated × mechanized, NO FLAGS" contradicts this ruling's compiler-bug amendment — KF-040's rule is TRUE of the code and deserves its A WITH the bug flag (the flag marks the code's divergence from intent, not the rule's unsoundness); precise fix: "not false-as-stated and not pending-upstream" (those two genuinely undermine current-truth; compiler-bug displays without demoting). DRIFT CLOSED same session: the patch verifies on disk (record 76 :1450-1453, my fix verbatim with the rationale inline); it also resolved Dijkstra's F2 (same under-specification from the flag/grade angle). RESIDUAL RISK logged by main, not yet closed: WF#2's joiner-and-grader parser agent may have read the pre-patch "no flags" text — main checks its returned formula encoding at consolidation and re-runs that one agent if stale. My consolidation spot-check therefore has TWO standing watch items: (i) the grader's formula encoding matches the patched A-clause; (ii) C-verdicts (descriptive third target) whose artifact conversion looks wrong — the descriptive→anchor conversion is the mechanization consequence of my third-target amendment (Dijkstra's F3 tagging). |
+| WF#2 consolidated classification (84/84) + ten questions + one dispute + parser open-questions | CLASSIFICATION ADJUDICATION (2026-07-22 evening; the spot-check + adjudication duty; artifact ~/.claude/plans/solidity-fanout-2-results.json read via jq — split counts, all 84 verdict rows' schema, the descriptive-8 rationales in full, the ten questions verbatim, the IntAsPointer verdict + skeptic review, the parser modules' open_questions and the joiner-grader's code) | ADJUDICATED. Both watch items closed: (i) the joiner-grader's code encodes the PATCHED A-clause (module comment :904-905, compiler-bug displays without demoting) — verified independently in the module source, not from main's assertion; (ii) C-set artifact traces complete — ZERO conversions needed (see blanket ruling). GOVERNING PRINCIPLE issued for the mixed-bundle questions (answers six of ten uniformly): OWNERSHIP-FIRST, THEN STRONGEST-LEG — a bundle classifies by its distinctive content iff every normative-grade leg is OWNED by a separately-stated normative rule (NOTES pointer mandatory); an unowned normative leg forces the whole rule normative; CLAIM stays per-rule (grade owns clause granularity). FLIPS (3): OS.Apply.Effect interpretive→descriptive (scope-entries document the formalism's own current state — override its classifier requested); INV.Simplify.DeadCodeBodyLocal descriptive→normative (clause (1)'s ABI-stability guarantee is UNOWNED — and this makes it consistent with its sibling LiftedConstGranularity, whose classifier correctly found the three-file coherence invariant); S.Struct.LetCont.UnreachableClosure normative→descriptive CONDITIONAL on a batch-0 consumer grep confirming its classifier's no-downstream-reliance claim (optimization-strength guarantees do not become normative merely by underwriting architecture). CONFIRMED: the 12 γ + R.Heap interpretive core; ReadOffset/WriteOffset normative (frozen-descriptive neighbor parity does NOT override the criterion — the frozen set predates and does not bind); CodeAgeLoose interpretive (model-side movability); CoercionErasure/LiftCont.Gate/SimplifyExposed descriptive via verified ownership (owners: coercion contract + γ's Rec_info-inertness; SpeculativeSandbox; SelfTailCall); StaticDynamicSplit normative by its unowned soundness core, no split; AccumBoxElim descriptive (performance-iff retire signature; hybrid artifact survives). Post-adjudication split: 62 normative / 13 interpretive / 9 descriptive (one conditional). DISPUTE: IntAsPointer label normative CONFIRMED (the skeptic's interpretive flip failed by its own account); the skeptic's RATIONALE CORRECTION is MANDATORY for the audit artifact — "identity-on-bits" is code-false (cmm_helpers.ml:4061 emits Caddi −1, untagging; skeptic's cite, routed to Church for the code-claim check) and a wrong rationale row would manufacture a future spurious finding. BLANKET ARTIFACT RULING: the migration NEVER drops a Qed — descriptive→anchor is the default for NEW rules only; sanctioned-variant artifacts (envelope-Qed, reflexivity-Qed/entry-34, True-Qed/entry-27, HYBRID) survive reclassification with variant texts re-keyed claim-neutral; consequence: the entire C-set needs zero artifact conversions (three already anchors incl. OS.Apply.Effect at Opsem.v:1097; two envelope-Qeds, one reflexivity-Qed, one hybrid all stay). PARSER TRIAGE (mine): the artifact_classifier's SIX day-one catalog-list mismatches = batch-0 catalog edits first, hard_fail armed after (the mutual check working as designed); True-Qed/reflexivity-Qed classes GET instance lists + reverse check; HYBRID instance list gains per-instance shape tags (AddrConfined's anchor+kernel shape stays — sanctioned at entry 70); the two VERIFIED prose sites (10:450, 13:645) join the strand inventory (the prose convention extends to event keywords per record 76 itself); census/phantom scope = the 19 chapters, README:221's template updated in batch 0; events live in fence headers, multiplicity = history, legacy commit-less VERIFIED gets a flag-day backfill; ancestry: CHECKED/VERIFIED must be base-ancestors, CAVEAT keys reachability-only (pending-upstream keys are non-ancestors by nature — the string-load key is the type specimen). |
 
 ## Findings
 
 ### KF-001 — arity_info dispatch arity ignores is_tupled (medium)
+RULES: OS.Apply.IndirectUnknownArity.Full
 - Chapter: 04-opsem.md:689-693 (OS.Apply.IndirectUnknownArity.Full NOTES);
   grounded by 20-to-cmm-soundness.md:350-353 (closinfo arity = param count
   *negated for Tupled*) and 17-representation.md:395-396.
@@ -101,6 +104,7 @@ green, since compile-fix churn may moot or introduce drift.
   verified 2026-07-18); catalog entry 9 amended.
 
 ### KF-002 — cextern callee is a value; doc's Cextern takes the simple (low)
+RULES: OS.Apply.CCall
 - Chapter: 04-opsem.md:796 (OS.Apply.CCall premise
   `(r̄, H′) ∈ Cextern(s_f, v̄, H)` — s_f syntactic).
 - Rocq: theories/Opsem.v:51-52 (`cextern_rel : value -> ...`).
@@ -117,6 +121,7 @@ green, since compile-fix churn may moot or introduce drift.
   deviation) is thereby discharged.
 
 ### KF-003 — P_Binary_BlockSet: unconstrained access kind accepts representation mismatches (medium)
+RULES: P.Binary.BlockSet
 - Chapter: 06-primitives-memory.md:670-692 (P.Binary.BlockSet; NOTES: "undef
   if not a block pointer, i out of range, or representation mismatch").
 - Rocq: theories/PrimMemoryA.v:473-479 (`P_Binary_BlockSet`, `forall bak`).
@@ -138,6 +143,7 @@ green, since compile-fix churn may moot or introduce drift.
   `BAK_naked_floats` with its own undef companion.
 
 ### KF-004 — doc gap: no Block_set rule for FloatBlock (escalated to main)
+RULES: P.Binary.BlockSet, P.Binary.BlockSet.Mixed, P.Binary.BlockSet.NakedFloats
 - Chapter: 06-primitives-memory.md §Block_set (only P.Binary.BlockSet on
   values Blocks, 670, and P.Binary.BlockSet.Mixed, 695). Compare Block_load,
   which has a .NakedFloats variant (632).
@@ -161,6 +167,7 @@ green, since compile-fix churn may moot or introduce drift.
   green.
 
 ### KF-005 — P.Variadic.MakeArray: element-conformance premise dropped (low)
+RULES: P.Variadic.MakeArray
 - Chapter: 06-primitives-memory.md:523 (premise `v̄ = v₁ … vₙ (unarized
   elements conforming to ak)`).
 - Rocq: theories/PrimMemoryA.v:420-424 (no conformance premise; comment
@@ -184,6 +191,7 @@ green, since compile-fix churn may moot or introduce drift.
   load-bearing. Site comment records the split.
 
 ### KF-006 — P.MixedShape.FieldKinds: normative defining clause as Admitted theorem (low)
+RULES: P.MixedShape.FieldKinds
 - Chapter: 06-primitives-memory.md:179-197 (STATUS normative; the defining
   equation of field_kinds).
 - Rocq: theories/PrimMemoryA.v:95-100 (`Theorem P_MixedShape_FieldKinds …
@@ -206,6 +214,7 @@ green, since compile-fix churn may moot or introduce drift.
   equation.)
 
 ### KF-007 — CM.Apply's nested-run encoding loses callee-escaping exceptions and callee divergence (high; doc-rooted, escalated)
+RULES: CM.Apply, CM.Apply.Raise, CM.Unit.Final
 - Chapter: 15-cmm.md:519-537 (CM.Apply: callee "yields result r̄ and memory
   M′ (running that function's own Cmm body to a Return_lbl exit)");
   15-cmm.md:584-604 (CM.Unit.Final: outcomes include "termination by
@@ -274,6 +283,7 @@ green, since compile-fix churn may moot or introduce drift.
   same stroke. Residual (b) was already closed by the KF-008 mirror.
 
 ### KF-008 — CMO_diverges carries no trace; asymmetric with the Flambda behavior split (low)
+RULES: CM.Unit.Final
 - Chapter: 15-cmm.md:594-598 (divergence listed as an outcome; the doc
   attaches the Cextern-event trace only to normal termination).
 - Rocq: theories/Cmm.v:1251-1263 (`cm_diverges`, `CMO_diverges` — no
@@ -295,6 +305,7 @@ green, since compile-fix churn may moot or introduce drift.
   section). Verify the mirrored encoding when that increment lands.
 
 ### KF-009 — CM.Alloc.Local: "hdr carries caml_local" premise dropped (low)
+RULES: CM.Alloc.Local, R.Header
 - Chapter: 19-cmm-memory-gc.md:82-84 (premise line "hdr carries caml_local
   (R.Header)"). Rocq: theories/CmmMemory.v:164-192 (`CM_Alloc_Local`; the
   site comment defers the premise to ch. 17). Owner: Milner.
@@ -329,6 +340,7 @@ green, since compile-fix churn may moot or introduce drift.
   Milner) — check at the Representation.v review.
 
 ### KF-010 — CM.Alloc.GC pins the expression, so pending Val words are never relocated (medium; doc-rooted, escalated)
+RULES: CM.Alloc.GC
 - Chapter: 19-cmm-memory-gc.md:130-153 (CM.Alloc.GC: conclusion keeps e_c
   unchanged; condition (ii) covers only ce and M′). Rocq:
   theories/CmmMemory.v:236-258 (`gc_reloc` note + `CM_Alloc_GC`: both
@@ -367,6 +379,7 @@ green, since compile-fix churn may moot or introduce drift.
   Milner's; re-verify at his next CmmMemory.v increment.
 
 ### KF-011 — gc_write_barriers lists a non-existent extern (low)
+RULES: CM.Alloc.GC
 - Chapter: 19-cmm-memory-gc.md:175-177, 188-190 (premise names
   caml_modify / caml_initialize; NOTES adds "addr_array_initialize on the
   large-block fill path" — a HELPER name). Rocq:
@@ -386,8 +399,10 @@ green, since compile-fix churn may moot or introduce drift.
   `gc_write_barriers = [caml_modify; caml_initialize]`
   (CmmMemory.v:304-305) with the helper-not-extern comment for
   addr_array_initialize (:294-297).
+- Status: resolved — whitelist fix verified on disk 2026-07-18 (see delta above).
 
 ### KF-012 — expr_addr_ok rejects the nested-Cadda addresses array_indexing emits (medium)
+RULES: CM.Alloc.GC
 - Chapter: 19-cmm-memory-gc.md:173-177 ("Each field_address (Cadda) …
   recomputed inline from a Val base … and consumed at once — as the
   address operand of the enclosing Cload/Cstore (… ArrayAccess) …").
@@ -427,8 +442,10 @@ green, since compile-fix churn may moot or introduce drift.
   scaled-index/const shapes, none allocating; would only matter if a
   ch. 16/18 emitted shape had an allocating innermost offset, which
   none does.
+- Status: resolved — expr_addr_ok fix verified on disk 2026-07-18 (see delta above).
 
 ### KF-013 — CM.Alloc.GC admits infinite silent self-stuttering, polluting the divergence outcome (medium; doc-rooted, escalated)
+RULES: CM.Alloc.GC, CM.Unit.Final
 - Chapter: 19-cmm-memory-gc.md:130-153 (CM.Alloc.GC — "the machine MAY take
   a collection step" at an allocation point; conditions (i)-(v) place no
   lower bound on progress); 15-cmm.md CM.Unit.Final (divergence = an
@@ -482,8 +499,10 @@ green, since compile-fix churn may moot or introduce drift.
   identity-phi self-loop is dead by construction (every cmem_gc step
   replaces the redex with the allocation's result); closure check for
   main PASSES.
+- Status: resolved — GC-stutter resolution verified in the KF-007/008 rework re-check (hereditary-divergence device).
 
 ### KF-014 — nested runs start with RR = [], stranding callee allocations into the caller's region (medium/high; escalated as doc-clarification)
+RULES: CM.Apply, CM.Apply.Raise, CM.Alloc.Local, CM.Region.Begin, CM.Region.End
 - Chapter: 15-cmm.md:527-573 (amended CM.Apply/CM.Apply.Raise: "fresh
   variable and catch environments, trap stack at its own base" — SILENT on
   the nested run's region stack; conclusions keep the caller's RR);
@@ -550,8 +569,10 @@ green, since compile-fix churn may moot or introduce drift.
   threading — its soundness argument (return configs stepless) is
   RR-independent and carries over. The ch. 16 exclave-form caveat
   stays booked at the ToCmmControl.v review (W-22).
+- Status: resolved — nested-run region amendment landed and verified (CM.Apply rework row).
 
 ### KF-015 — event_sim under-observes cross-event retention (medium; draft-stage)
+RULES: INV.Simplify.Preserves
 - Chapter: 04-opsem.md §8.2 / 13-soundness.md §1 (observables include
   C-call effects, glossed "(I/O and externally-visible mutation)").
   Rocq: theories/Soundness.v:224-247 (`event_sim`: per-event `b_ev`
@@ -594,8 +615,10 @@ green, since compile-fix churn may moot or introduce drift.
   lengths; mismatch fallback [] unreachable under event_sim). Site
   comments carry the KF-015 tag. Joint catalog-44 wording co-signed
   with the cumulative sentence included.
+- Status: resolved — event_sim seen-accumulator fix landed; KF-015 discipline codified (catalog + Soundness.v header).
 
 ### KF-016 — inlining lets can capture caller-side names in the argument simples (medium; draft-stage)
+RULES: S.Inline.Substitute, S.Inline.Substitute.ExnExtraArgs
 - Chapter: 11-inlining.md S.Inline.Substitute (:79-104, NOTES :99-103)
   and S.Inline.Substitute.ExnExtraArgs (:144-159). Rocq:
   theories/Inlining.v `inlined_body` (:569-584), `bind_params`
@@ -644,8 +667,10 @@ green, since compile-fix churn may moot or introduce drift.
   (:697-699); the d0-needs-nothing observation and the
   uniform-over-triangular over-approximation are both site-documented
   (:675-677, :687-690). Compile pending (draft file).
+- Status: resolved — premise-only fix verified at draft stage (capture-channel checklist item 1).
 
 ### KF-017 — sequential continuation renames diverge from the doc's simultaneous θ under target/source aliasing (medium; draft-stage)
+RULES: S.Inline.Substitute
 - Chapter: 11-inlining.md S.Inline.Substitute (:90-92: θ is one
   substitution built from the kret/kexn/region components). Rocq:
   theories/Inlining.v `inlined_body` (:573-581) applies them
@@ -678,8 +703,10 @@ green, since compile-fix churn may moot or introduce drift.
   disequalities applied verbatim (Inlining.v:789-790, :836), with the
   sequential-vs-simultaneous rationale added to the Substitute RULE
   comment (:764-768). Compile pending.
+- Status: resolved — premise-only fix verified at draft stage (capture-channel checklist item 2).
 
 ### KF-018 — ExnExtraArgs: k1 unconstrained against the caller's return continuation (medium; draft-stage)
+RULES: S.Inline.Substitute.ExnExtraArgs
 - Chapter: 11-inlining.md S.Inline.Substitute.ExnExtraArgs
   (:148-157: "k1 fresh"). Rocq: theories/Inlining.v
   RW_Inline_Substitute_ExnExtraArgs (:752-756: k1's freshness =
@@ -697,8 +724,10 @@ green, since compile-fix churn may moot or introduce drift.
   `forall k, ap_result_continuation ap = RC_return k -> k1 <> k`.
 - Status: RESOLVED-VERIFIED (2026-07-18, same day) — applied verbatim
   (Inlining.v:837-838). Compile pending.
+- Status: resolved — premise-only fix verified at draft stage (capture-channel checklist item 4).
 
 ### KF-019 — OS.Unit.Final's halting shapes exclude trap-carrying jumps, misclassifying toplevel uncaught exceptions as UB (medium-high)
+RULES: OS.Unit.Final, OS.ApplyCont.Raise
 - Chapter: 04-opsem.md:911-930 (OS.Unit.Final: halting shapes
   "⟨Apply_cont k_ret⁰ (v̄), …⟩" / "⟨Apply_cont k_exn⁰ (v_exn :: …), …⟩"
   — SILENT about trap actions) and :550-571 (OS.ApplyCont.Raise +
@@ -753,6 +782,7 @@ green, since compile-fix churn may moot or introduce drift.
   tracked as W-25.
 
 ### KF-020 — AccumBoxElim's clause (1) quantifies beyond the doc and is code-falsified at Maybe_null (medium; draft-stage)
+RULES: S.Unbox.Loopify.AccumBoxElim
 - Chapter: 12-unboxing.md:358-399 (S.Unbox.Loopify.AccumBoxElim, clause (1):
   the recursive path gives the param **unknown_with_subkind**, "on which
   prove_is_a_boxed_<nnk> is Proved"). Rocq: theories/Unboxing.v:314-323
@@ -791,6 +821,7 @@ green, since compile-fix churn may moot or introduce drift.
   it), unlike DeadBinding's rejected premise-side forall-fl. 2026-07-18.
 
 ### KF-021 — S_Unbox_Denv_Equation performs the meet in an env where the component parameters need not exist (medium; draft-stage)
+RULES: S.Unbox.Denv.Equation
 - Chapter: 12-unboxing.md:504-523 (S.Unbox.Denv.Equation: premise "component
   parameters epa̅ (**defined as extra variables of their kinds in the
   denv**)", conclusion added by meeting param's type with T; cf. the same
@@ -825,6 +856,7 @@ green, since compile-fix churn may moot or introduce drift.
   define-first order. 2026-07-18.
 
 ### KF-022 — decision_shape pins the closure/variant maps in one direction only; slack undisclosed (medium-low; draft-stage)
+RULES: S.Unbox.Denv.Equation
 - Chapter: 12-unboxing.md:512-515 (shape table: "Closure_single_entry →
   closure_with_at_least_these_value_slots; Variant → variant with
   const_ctors / non_const_ctors **from the field epas**"). Rocq:
@@ -865,6 +897,7 @@ green, since compile-fix churn may moot or introduce drift.
   extensions/uniqueness, fts/cts) disclosed. 2026-07-18.
 
 ### KF-023 — code0_wf drops the region-distinctness conjunct on a false unstatability claim (medium)
+RULES: none
 - Chapter: the W-23 family — the doc's alpha-fiat binder discipline
   (11-inlining.md:99-103); main's W-23 ruling spec'd FOUR conjuncts
   including my_region ≠ my_ghost_region. Rocq: theories/WellFormed.v:580-602
@@ -903,6 +936,7 @@ green, since compile-fix churn may moot or introduce drift.
   the ch. 13 conjunction check at Soundness.v increment 2b. 2026-07-18.
 
 ### KF-024 — S.Rewrite.LetCont.Shortcut drops the binder while Apply-position uses of k dangle (medium; draft-stage)
+RULES: S.Rewrite.LetCont.Shortcut
 - Chapter: 10-simplify-rewrites.md:806-821 (conclusion at :814 drops the
   binder; NOTES distinguish general shortcuts from pure aliases /
   `to_alias`). Rocq: theories/RewritesControl.v:1139-1159
@@ -972,8 +1006,10 @@ green, since compile-fix churn may moot or introduce drift.
   apply_continuation_aliases / apply_exn_continuation_aliases; fourth
   CODE anchor continuation_shortcut.ml#to_alias at :810, mirrored in
   the .v header (RewritesControl.v:1257-1262). Both halves closed.
+- Status: resolved — fix verified on disk (RewritesControl.v; see RESOLVED delta above).
 
 ### KF-025 — S.Rewrite.Apply.Invalid's arity disjunct licenses Invalid on every valid over/partial application (medium-high; draft-stage)
+RULES: S.Rewrite.Apply.Invalid
 - Chapter: 10-simplify-rewrites.md:1059-1074 (third premise: "an
   argument's or result's kind/arity provably mismatches the callee").
   Rocq: theories/RewritesControl.v:1447-1469 (third disjunct:
@@ -1026,6 +1062,7 @@ green, since compile-fix churn may moot or introduce drift.
   2026-07-18. Draft-stage verification; re-check at green with the file.
 
 ### KF-026 — PartialApplication's stub-internal binder distinctness is unstated but model-instantiable (low-medium; draft-stage)
+RULES: S.Rewrite.Apply.PartialApplication
 - Chapter: 10-simplify-rewrites.md:1037-1056 (stub takes the remaining
   params, captures the supplied args, body is the full application).
   Rocq: theories/RewritesControl.v:1386-1433
@@ -1057,6 +1094,7 @@ green, since compile-fix churn may moot or introduce drift.
   (:1541-1545). 2026-07-18. Draft-stage; re-check at green.
 
 ### KF-027 — ValueSlotExempt's iff is refutable when the pattern binds my_closure (low; draft-stage)
+RULES: S.Rewrite.Loopify.Attribute.ValueSlotExempt
 - Chapter: 10-simplify-rewrites.md:1134-1161 (premise: the converted
   body binds each CAPTURED variable v — necessarily distinct from
   my_closure). Rocq: theories/RewritesControl.v:799-805
@@ -1077,6 +1115,7 @@ green, since compile-fix churn may moot or introduce drift.
   failure mode. 2026-07-18. Draft-stage; re-check at green.
 
 ### KF-028 — rel_of_const answers is_int = 1 for Const_null, inverting the reducer the doc pins (medium)
+RULES: T.Grammar.NakedImmediate.Relational, T.Meet.Relational
 - Chapter: 07-types-domain.md:287-318 (T.Grammar.NakedImmediate.Relational,
   NORMATIVE — pins the meet-time reducer's resolution "via Relation.of_const
   (Is_int ↦ not is_null, Is_null ↦ is_null, Get_tag ↦ Bottom)" at :305-307,
@@ -1134,6 +1173,7 @@ green, since compile-fix churn may moot or introduce drift.
   pre-fix; increment 2 was never actually blocked.
 
 ### KF-029 — RF_alias omits the mode floor reify applies to its Simple result (low-medium)
+RULES: T.Reify.Sound, T.Prove.SimpleModeBoundary
 - Chapter: 08-meet-join.md:802-825 (reify "attempts to turn a type back
   into a term"; T.Reify.Sound) with the boundary discipline stated at
   :694-724 (T.Prove.SimpleModeBoundary: every Simple-returning channel
@@ -1180,6 +1220,7 @@ green, since compile-fix churn may moot or introduce drift.
   at :1711); Dijkstra ch. 08 re-stamp done. Fully stamped.
 
 ### Finding #16 verification — CSE of immutable Make_block vs deterministic Phys_equal (doc-level design conflict; CONFIRMED refutable)
+RULES: P.Binary.PhysEqual, S.Rewrite.CSE.Eligible, S.Rewrite.CSE.Replace
 - Provenance: surfaced by Curry's RewritesPrim.v transcription (FINDING #16
   comment at theories/RewritesPrim.v:363-373, the S.Rewrite.CSE.Eligible
   site); verification assigned to me by main (2026-07-18). Not a KF entry:
@@ -1246,8 +1287,10 @@ green, since compile-fix churn may moot or introduce drift.
   the resolution should be chosen jointly (20-to-cmm-soundness.md's
   INV.ToCmm.EffectLinear NOTES at :325-334 already states the shared
   license and points at §5.6). Resolution options stay with the humans.
+- Status: resolved — the item-8 resolution (13 §4 item 8, adopted 2026-07-22) dissolves the design conflict; the witness now exhibits refinement.
 
 ### KF-030 — INV_Rewrite_Local's union claim silently narrows the doc's rule quantification; the omission is load-bearing (medium)
+RULES: INV.Rewrite.Local, S.Rewrite.CSE.Replace, S.Rewrite.Loopify.SelfTailCall
 - Chapter: 13-soundness.md:106-124 — §2 and INV.Rewrite.Local quantify the
   local obligation over "Each rule of the E ⊢ e ⇝ e′ judgment (all of
   S.Rewrite.*, S.Inline.*, S.Unbox.*)". Rocq: theories/Soundness.v
@@ -1322,6 +1365,7 @@ green, since compile-fix churn may moot or introduce drift.
   and the FINDING-16 pointer but not this one).
 
 ### KF-031 — tc_raise_kind_opt defaults an absent raise kind to Raise_regular; the code defaults to Raise_notrace (low)
+RULES: TC.ApplyCont.Raise
 - Chapter: 16-to-cmm-control.md:235-254 (TC.ApplyCont.Raise; the doc
   conclusion writes `raise_kind` without stating the None default).
   Rocq: theories/ToCmmControl.v:136-141 (`tc_raise_kind_opt`, None =>
@@ -1344,6 +1388,7 @@ green, since compile-fix churn may moot or introduce drift.
   TC_ApplyCont_Raise (:673-674) untouched, as predicted.
 
 ### KF-032 — tc_switch_form freezes concrete two-arm shapes the code (and the doc's own example) escape; the coverage claim in the ENCODING NOTE is wrong (medium)
+RULES: TC.Switch
 - Chapter: 16-to-cmm-control.md:311-342 (TC.Switch: two-arm form given
   via SMART CONSTRUCTORS — "C.ite (C.eq (C.int d) sc)" — with the doc
   explicitly naming `(if (!= x 1) …)` as an emitted form, and the
@@ -1404,8 +1449,10 @@ green, since compile-fix churn may moot or introduce drift.
   discharged — KF-037's fix landed, compile-confirmed, and its delta
   explicitly records that KF-032(b)'s stated obligation is now
   sound-shaped. Nothing of this finding remains open; KF-032 CLOSED.
+- Status: resolved — closed at the revival re-orientation: the pending-KF-037 residual was discharged by KF-037's landed fix.
 
 ### KF-033 — the extras-reraise call wrapper is owned by no rule anywhere; the composed model classifies defined cross-call exception propagation as UB (medium-high; doc-rooted, escalated)
+RULES: TC.Apply.ExnWrapper, TC.Apply.Return, TC.ApplyCont.Raise
 - Chapter: 16-to-cmm-control.md:299-306 — TC.Apply.Return NOTES
   mention it in one sentence ("translate_apply additionally wraps the
   call in a Ctrywith that reraises with the extras") but no rule
@@ -1527,8 +1574,10 @@ green, since compile-fix churn may moot or introduce drift.
   full -k chain green on the KF-044+CF-6 batch builds ToCmmControl.v
   with the constructor in; pending-compile qualifier cleared
   2026-07-18.
+- Status: resolved — doc corrections + ExnWrapper constructor verified, compile confirmed (see DELTA 4 above).
 
 ### KF-034 — INV_ToCmm_Control's matching Cmm run has an unconstrained existential trace (low-medium)
+RULES: INV.ToCmm.Control, INV.ToCmm.Simulates
 - Chapter: 16-to-cmm-control.md:370-397 (INV.ToCmm.Control: a SILENT
   control step — the rule's own H ~ M unchanged reading, and the .v's
   L_tau restriction — matched by "a matching Cmm run"; as the doc's
@@ -1553,6 +1602,7 @@ green, since compile-fix churn may moot or introduce drift.
   list (:904).
 
 ### KF-035 — TC_Let_Static's update list is unconstrained beyond per-store shape; the slack contains behavior-changing "translations", so the disclosed under-determination is OVER-approximation, not narrowing (medium-high)
+RULES: TC.Let.Static
 - Chapter: 18-to-cmm-data.md:169-185 (TC.Let.Static — the NOTES pin the
   correspondence: "Or_variable 'holes' filled from ρ become deferred
   stores"; the update list is exactly the filled holes). Rocq:
@@ -1623,8 +1673,10 @@ green, since compile-fix churn may moot or introduce drift.
   where the payload is at word 1; spun off as KF-040 (the model is
   code-faithful there, doc/R.Obj disagree with both). KF-035 itself
   closed.
+- Status: resolved — resolved at grade (i), verified on disk (see DELTA 2 above).
 
 ### KF-036 — static_update's store shape misses the pointer path: real pointer-hole updates are caml_initialize extcalls, not Cstore (medium)
+RULES: TC.Let.Static
 - Chapter: 18-to-cmm-data.md:182-183 ("deferred stores (update_opt,
   sequenced before the body)"). Rocq: theories/ToCmmData.v:1246-1250
   (static_update = `Cop (Cstore ch Initialization) [field_address; e]`,
@@ -1665,8 +1717,10 @@ green, since compile-fix churn may moot or introduce drift.
   (ProjectValueSlot precedent), acceptable: R.Obj.* fixes each
   constant's layout, so the slack admits no behavior-changing image
   on in-layout programs. Closed.
+- Status: resolved — pointer-path fix verified on disk (see delta above).
 
 ### KF-037 — TC_Switch_TestByValue is refutable as stated: the machine's flat environments leak the test's binder extensions into the branches (high)
+RULES: none
 - Chapter: none directly (kernel statement; catalog-62 family; the
   stated obligation for KF-032(b)). Rocq:
   theories/ToCmmControl.v:252-269 (Theorem TC_Switch_TestByValue,
@@ -1729,8 +1783,10 @@ green, since compile-fix churn may moot or introduce drift.
   -k chain green on the KF-044+CF-6 batch (zero warnings) builds
   ToCmmControl.v with this fix in; pending-compile qualifier
   cleared 2026-07-18.
+- Status: resolved — kernel premises landed, compile confirmed; KF-032(b)'s obligation sound-shaped.
 
 ### KF-038 — TC_Let_Subst is refutable via the free chi': a defining expression can read the handler environment through a bare Cexit (high; retroactive on my inc-3c verification)
+RULES: TC.Let.Subst
 - Chapter: 18-to-cmm-data.md (TC.Let.Subst). Rocq:
   theories/ToCmmData.v:1131-1141 (Theorem TC_Let_Subst, Admitted; the
   conclusion re-runs e_dfn under ARBITRARY chi', TT', RR'). Machine
@@ -1784,8 +1840,10 @@ green, since compile-fix churn may moot or introduce drift.
   with the premise in); the kernel's Admitted-false status
   transferred to KF-043 and is now cleared through the KF-044
   resolution.
+- Status: resolved — chi channel resolved; TT'/RR' successors closed via the KF-043/044 family, fully resolved on disk.
 
 ### KF-039 — PhysEqual's clauses drop the kind-Value restriction; the catch-all `false` arm gives defined WRONG answers on out-of-kind pairs (low-medium)
+RULES: P.Binary.PhysEqual
 - Chapter: 06-primitives-memory.md:1185-1204 (P.Binary.PhysEqual —
   NOTES: "Only for values of kind Value (stated in the mli)"). Rocq:
   theories/PrimMemoryB.v:42-50 (phys_same_word, final arm
@@ -1828,6 +1886,7 @@ green, since compile-fix churn may moot or introduce drift.
   left as-is per my cosmetic call, N3 citation restored verbatim.
 
 ### KF-040 — boxed custom-block payload updates target word 0, where R.Obj puts the ops pointer; the model faithfully transcribes a latent COMPILER bug (medium-high for the mechanization; escalated as a compiler-bug FINDING)
+RULES: TC.Let.Static
 - Chapter: 17-representation.md:354-360 (R.Obj boxed numbers:
   Naked_float32/int32/int64/nativeint are CUSTOM blocks — M[a] = the
   &caml_*_ops pointer, payload at M[a+8]); 18-to-cmm-data.md:177-183
@@ -1905,8 +1964,10 @@ green, since compile-fix churn may moot or introduce drift.
   review checklist (already listed under the TC.Let.Static layout
   handoff item). COMPILER-BUG finding remains open upstream
   (unchanged by the model ruling).
+- Status: resolved — model side resolved 2026-07-18 (carve-out consumed); the compiler-bug half is caveated (compiler-bug kind, chs. 05/18) and tracked as a user-decision item, not an open mechanization discrepancy.
 
 ### KF-041 — sink_step's guards do not survive the binder-extension leak: licensed definitions with internal binders (or internal Ccatch labels) commute past prefixes that read them, so `sunk` relates behavior-distinct expressions (high)
+RULES: TC.Let.Subst, INV.ToCmm.Simulates
 - Chapter: 18-to-cmm-data.md:126-142 (the validity side conditions
   the closure exists to carry); catalog items 64-65 (which REJECT
   unguarded sinks precisely because "that closure contains
@@ -2055,6 +2116,7 @@ green, since compile-fix churn may moot or introduce drift.
   one of the four premises. W-26 CLOSED.
 
 ### KF-042 — the skip row reaches the raise-operand sites: TC_ApplyCont_Raise and TCWrap_Extras translate their extras via simples_translate, where nothing re-fixes the arity (medium)
+RULES: TC.Apply.ExnWrapper, TC.ApplyCont.Raise
 - Chapter: 16-to-cmm-control.md (TC.ApplyCont.Raise,
   TC.Apply.ExnWrapper — both write the extras as the full translated
   list). Rocq: theories/ToCmmControl.v:741-755 (TC_ApplyCont_Raise,
@@ -2105,6 +2167,7 @@ green, since compile-fix churn may moot or introduce drift.
   surfaced it).
 
 ### KF-043 — TC_Let_Subst is still refutable through TT'/RR': Pop trap actions and Cendregion are conditional READS of the control stacks, and hypothesis-satisfying expressions can touch context frames (high; my erratum — I certified these channels safe)
+RULES: TC.Let.Subst
 - Chapter: 18-to-cmm-data.md (TC.Let.Subst — "whatever the control
   state there"). Rocq: theories/ToCmmData.v:1140-1152 (the
   conclusion re-runs e_dfn under arbitrary TT', RR'). Machine ground
@@ -2183,8 +2246,10 @@ green, since compile-fix churn may moot or introduce drift.
   residue discharged, nothing of this finding remains open. The
   whole KF-037/038/041/043/044 flat-environment / Admitted-false
   family is now resolved on disk with compiles confirmed.
+- Status: resolved — guard landed and verified; residue discharged (see DELTA 2 above).
 
 ### KF-044 — cmm_touches_stacks is under-inclusive: raises and calls read the ambient stacks without a Pop trap action or Cendregion token, so TC_Let_Subst stays refutable (high; Admitted-false family; MY SECOND ERRATUM on this rule — the raise-exemption justification was mine)
+RULES: TC.Let.Subst
 - Chapter: 18-to-cmm-data.md (TC.Let.Subst). Rocq:
   theories/Cmm.v:400-429 (the guard — flags only Pop trap actions
   and Cendregion), theories/ToCmmData.v:1156-1169 (the kernel).
@@ -2275,8 +2340,10 @@ green, since compile-fix churn may moot or introduce drift.
   better argument than the writer's sweep gave — CM_Alloc_Local DOES
   read RR; it is excluded by M-pinning + allocation monotonicity,
   not by "allocs touch only M").
+- Status: resolved — guard completion verified, Hopper-greened; Admitted-false status cleared (see RESOLVED block above).
 
 ### KF-045 — TC.Prim.ArrayAccess's normative image claims the primitive's mutability is propagated into the Cmm load hint; the code drops it (array_load emits Mutable unconditionally) — DOC finding, escalated (low-medium)
+RULES: TC.Prim.ArrayAccess, TC.Prim.ArrayAccess.Vector
 - Chapter: 18-to-cmm-data.md:415 (`Array_load (ak, index i tagged):
   ... Cop(Cload{chunk(ak); mut}, ...)`, STATUS normative) and the
   :422 NOTES sentence about CSE eligibility. Code ground truth:
@@ -2366,6 +2433,483 @@ green, since compile-fix churn may moot or introduce drift.
   (same-minute mtime) — compiled. W-30 can close (Dijkstra's call).
   Entry CLOSED; the emission-line story is now consistent across
   doc, .v, and catalog entry 61.
+- Status: resolved — doc half and .v follow-up both verified; entry CLOSED (see DELTA 2 above).
+
+## Flip-batch verifications (solidity migration)
+
+- CH. 02 (2026-07-22): VERIFIED. 13 CLAIM-normative lines, zero STATUS
+  left in-chapter; the two adjudicated rows (ExnHandlerFirstParamBucket,
+  NonRecOccursPositive, both conjectured→normative) among them; Syntax.v
+  carries exactly 13 "(CLAIM normative)" comments — atomic with the doc —
+  while its guest ch. 06 P.Effects.* rules correctly remain STATUS until
+  their own batch (per-rule triples ✓). Caveat transcription: all three
+  disclosure lines landed (:621 SwitchMinArms, :643 ExnHandlerNonRecursive,
+  :704 NonRecOccursPositive) — pleasingly uniform, all three are
+  "no enforcement point" code facts; VERIFIED @ 1c1940b7ea suffix legal
+  (ancestor of HEAD, checked). JUDGMENT FLAGS RULED: (a) prose:Apply →
+  ordinary prose at ch. 02 (no local governing fence), BUT the check
+  surfaced a small DOC FINDING: ch. 02's parenthetical "Method and Effect
+  … not given operational rules" is WRONG for Method — OS.Apply.Method
+  (04:822-834) HAS a coarse dispatch transition; correct the prose in the
+  same rider ("Effect … no operational rules; Method only a coarse
+  dispatch rule, 04"), which also validates WF#2's Method-normative vs
+  Effect-descriptive split. The Effect scope-disclosure content lands as
+  a CAVEAT on ch. 04's OS.Apply.Effect fence at that chapter's flip.
+  RIDER: OS.Apply.Method's NOTES :834 says "Marked `conjectured`:" —
+  retired-vocabulary prose the ch. 04 batch must reword (and the sweep
+  should grep NOTES for the bare word "conjectured" chapter-wide; no
+  keyword collision, but stale post-migration). (b) prose:Simples-and-
+  constants → ordinary prose (fexpr printer/parser asymmetry is tooling
+  fact, not rule metadata; no fence governs). (c) kind 'other' hard-fail
+  CORRECT; Hopper's proposed transcription ACCEPTED WITH AMENDMENT —
+  strike the "verification missing / unverified" framing (that is
+  EVIDENCE-axis content, which the empty evidence record already
+  expresses; re-smuggling it into a caveat repeats the exact conflation
+  the schema dissolves) and keep the code fact, matching the other three:
+  "CAVEAT disclosure: no compiler check enforces the parameter/extra_args
+  alignment against Exn_continuation.t — the invariant is maintained by
+  construction at producing sites only."
+
+- CHS. 03+04 (2026-07-23): VERIFIED. 56 flips atomic (03: 27 CLAIM, 04:
+  29 CLAIM, zero STATUS in either); Effect→descriptive landed with the
+  composed scope caveat EXACTLY per my inheritance spec (04:843, with
+  the apt closing clause "this scope boundary is the rule's whole
+  descriptive content"); Method NOTES rewording verified — "Marked
+  `conjectured`:" gone, the not-modelled-in-detail disclosure kept
+  (optional polish, non-blocking: its "not grounded against the code"
+  tail is evidence-flavored prose the derived record now duplicates);
+  VERIFIED @ c59c5780b0 ancestry checked. JUDGMENT BUNDLE RULED (9):
+  (1-2) Erasable dedup to ONE disclosure caveat, text accepted —
+  and it agrees with both prose sites (03:137, 03:782), which is fine
+  triplication (prose explains, caveat is metadata). (3) WF.Let.Static:
+  disclosure kind YES, but "stated loosely" is NOT evidence-axis — it
+  is statement-PRECISION disclosure, and reading 03:780 (the item's
+  actual source, ch. 03's open-questions list) shows the precise
+  contract is UNPINNED ANYWHERE, not deferred to an existing rule;
+  ruled text: "CAVEAT disclosure: the shape-matching contract against
+  bound_static is asserted only coarsely here; pinning the precise
+  per-piece contract is an open question deferred to 06." (4-6)
+  Partial/Over/Method-unverified: DROP CONFIRMED — pure evidence-axis
+  per the ch. 02 (c) precedent; Method's NOTES verified to retain the
+  disclosure half. (7) prose→prose confirmed. (8-9) BOTH KEPT — the
+  marking-system test now codified for the sweep: reword prose that
+  references the MARKING ("marked conjectured", "STATUS conjectured",
+  "stands conjectured"); keep epistemic English ("only conjectured
+  globally — §13"). 03:137 and 03:782 are the epistemic kind; ch. 04's
+  Method NOTES was the marking kind and is gone.
+
+- CHS. 05+06 (2026-07-23): VERIFIED with ONE UNACCOUNTED ITEM and ONE
+  ESCALATION. 100 flips atomic (05: 31, 06: 69, zero STATUS); all 8
+  caveats landed and read verbatim-sane — the string-load pair
+  (06:1164 known-false on the OLD Immutable-implies-CSE-able claim
+  with the witness, :1165 pending-upstream keyed to 9712d270eb) is
+  exactly the reverse-proviso test-row shape; the PhysEqual pair
+  (:1209 REVISED marker, :1210 ι-wider-than-current-code-for-locals,
+  sound direction) coheres with the item-8 record. JUDGMENT BUNDLE
+  RULED (11): (1) dedup — keep the landed 05:629 code-fact form,
+  drop the open-question-1-resolved framing, with a RIDER: when a
+  caveat resolves a chapter open-question, the open-questions list
+  entry must be marked resolved in the same batch. (2) disclosure
+  as proposed. (3) strike the unverified clause ✓. (4-5) merge to
+  one ✓. (7) prose stays ✓. (8) ADD the disclosure caveat
+  (rule-statement provisionality on another chapter's unfinished
+  structure is solidity-relevant meta-content — Erasable-triplication
+  precedent). (9) NO caveat — the Get_tag immediate corner (06:866,
+  "conjectured undef", correctly kept as epistemic) is object-level
+  STATED content; caveats disclose what the statement does not carry.
+  (10) drop ✓ evidence-axis. (11) confirmed nothing owed — the
+  archaeology backfills commits on EXISTING VERIFIED lines; it never
+  mints evidence. (6) UPGRADED: the int64/nativeint→float32 item is
+  not a mere disclosure — the fold goes through a 53-bit double, so
+  for |x| ≥ 2^53 it double-rounds by exactly the confirmed 13 §4.7
+  argument; if the backend emits a direct single-rounding conversion
+  for boxed int64/nativeint (as it does for int — cvtsi2ss takes
+  64-bit operands), this is a SECOND INSTANCE of the confirmed bug
+  family, not an open modeling question. Ruled text keeps the open
+  question AS claim-side ("whether the backend single-rounds — which
+  would make this a second instance of the 13 §4.7 family — is open
+  question 3") and the emission check is routed to Church, escalation
+  to main as compiler-bug-candidate #4-in-lineage pending that check.
+  UNACCOUNTED: the WF#1 inventory carries a FOURTH NumConv item,
+  kind known-false ("OPEN code bug — int→float32 constant fold
+  double-rounds … witness float32_double_round.md"), keyed to
+  P.Unary.NumConv (ch. 05) — it is in neither the landed eight nor
+  the held bundle. Two fixes owed: ACCOUNTING (it must land
+  somewhere — the denotation rule here or the ch. 10 fold rule) and
+  KIND — by my own record-76 ruling it is CAVEAT compiler-bug, not
+  known-false: the denotation states the intended (single-rounding)
+  semantics and is TRUE; the CODE's fold diverges — its own text
+  says "OPEN code bug". known-false would wrongly demote the rule;
+  compiler-bug displays without demoting, which is the KF-040-class
+  treatment this exact bug family motivated.
+  DELTA (2026-07-23, accounting closed): the drop was SYSTEMIC —
+  cross-filed inventory items (recorded under one chapter, keyed to
+  another's rule id) were invisible to record-keyed extraction;
+  Hopper's id-keyed re-sweep found ELEVEN corpus-wide, eight mapped
+  to future batches with guaranteed pickup (extraction id-keyed from
+  now on — a stronger repair than my count-reconciliation
+  suggestion). The rider landed my rulings (census 284/169,
+  disjoint ✓) including the corpus's FIRST compiler-bug caveat
+  (05:267, kind fix applied, text verified). The two remaining
+  batch-3 cross-files RULED: (i) the "known-false(RESOLVED)"
+  PhysEqual history item — DO NOT LAND, confirmed: caveats are
+  CURRENT-STATE metadata; a resolved refutation is history, owned by
+  13 §4 item 8's entry and the catalog, and the landed REVISED
+  disclosure (06:1209) already points there; the parenthetical kind
+  syntax is illegal besides. (ii) the "deferred validation witness"
+  item — DROP, confirmed evidence-axis, WITH the loss-check done:
+  the witness proposal survives at 13:726-727 ("would be a
+  worthwhile follow-up"), so nothing is lost. Open-question-1
+  resolution marking was already in place — the stale-list
+  convention held without an edit.
+  DELTA (2026-07-23, candidate-#4 COLLAPSE + caveat-shape ruling):
+  Church's emission check (independently disk-verified by main)
+  confirms the four double-rounding folder sites live on this
+  branch and the fix on the user's pushed fix-float32-double-
+  rounding branch — and the ORIGINAL 2026-07-13/14 finding already
+  covered all four sites including the int64/nativeint arm (my
+  memory record concurs: "Same for tagged/int32/nativeint
+  variants"; the fix routed all four). CREDIT: candidate #4
+  COLLAPSES into the confirmed 13 §4.7 finding; the lineage stays
+  three; my batch-3 escalation was a sound re-derivation of an
+  in-scope arm — the chapter's open question 3 was stale against
+  the original finding, which the landed 05:268 correctly marks
+  resolved. WORDING FIX owed on 05:268: "second instance of the
+  13 §4.7 double-round family" → membership in the ORIGINAL
+  finding's scope (no second instance exists). CAVEAT-SHAPE
+  RULING, (b)-REFINED — split across RULES, not just caveats:
+  ch. 05's denotation keeps ONE merged compiler-bug caveat
+  (:267/:268 fold into a single family caveat, four folder sites,
+  fix branch named in TEXT only) — a pending-upstream HERE would
+  wrongly demote a rule whose claim is TRUE of mainline (the
+  backend single-rounds; the FOLDER is the divergent part), the
+  precise wrongful-demotion the compiler-bug kind exists to
+  prevent; the machine-watched pending-upstream keyed
+  fix-float32-double-rounding lands at CH. 10's fold rule (already
+  a guaranteed cross-file pickup), where the pair compiler-bug +
+  pending-upstream is exactly right: the fold rule's compliance IS
+  what the branch landing changes, so its A-demotion is correct
+  and the reverse-proviso checker lift-watches the key there. The
+  ch. 10 caveat text should note the lift retires the ch. 05
+  family caveat, 13 §4.7's OPEN marker, and the ch. 18 disclosures
+  in the same change. The string-load precedent is honored where
+  it actually applies: pending-upstream sits on the rule whose
+  claim depends on the branch.
+  DELTA 2 (2026-07-23, crossing resolved with Hopper): the ch. 05
+  landing kept TWO harmonized compiler-bug lines rather than my
+  merged one — ACCEPTED within tolerance (the arms carry genuinely
+  different scoping detail; both wording fixes verified on disk,
+  :267/:268). Placement ruling REFINED to land immediately: ch. 10's
+  ConstFold fence is still pre-flip, and caveat lines are fence
+  events independent of the STATUS/CLAIM flip, so the single
+  pending-upstream line (key `fix-float32-double-rounding`, one
+  lift retiring all sites) lands there NOW as a one-hunk rider —
+  the checker watches the key from today, and no demotion question
+  arises on ungraded pre-flip rows. Kinds stay atomic; dual-kind
+  syntax rejected.
+
+- CHS. 07+08 (2026-07-23): VERIFIED with TWO CATCHES on the "clean"
+  set. 60 flips atomic (30+30, matching Dijkstra's authoritative
+  ch. 08 header census; my old row-48 prose said "39 ch. 08 rules" —
+  my own ledger figure was imprecise, the census governs); ch. 07
+  carries exactly the 12 adjudicated interpretive rows; the GLB
+  five-way dedup landed as ONE known-false (08:130 — mechanism,
+  witness, sound-but-not-greatest; the kind is CORRECT there: the
+  demoted claim IS false). CATCH 1 (batch-4 marking escape): 07:659
+  still reads "They are marked `conjectured` because the code does
+  not compute γ…" — a marking-system reference sitting directly
+  above twelve CLAIM-interpretive rows; reword to the new
+  vocabulary ("Their claim is interpretive: …"), and re-run the
+  marking grep over 07/08 for siblings. This also conditions
+  bundle item (4): DROP-as-subsumed is right ONCE the prose speaks
+  the kind's language. CATCH 2 (kind error in a landed "clean"
+  caveat): 08:673's known-false sits on
+  T.Prove.MeetShortcut.NullPremise — the WITNESS rule, whose claim
+  is TRUE and Qed'd; what is false is the naïve reading, a
+  proposition that is not this rule's claim. known-false would flag
+  a machine-checked theorem false-as-stated and demote it. FLIP to
+  disclosure. The batch now exhibits the full kind-triangle of the
+  sits-on principle: GLB known-false (claim false), both witness
+  rules disclosure (claims true, content IS the refutation of
+  something else). BUNDLE RULED (12): (1)+(2) disclosure with the
+  no-single-anchor clause KEPT — structural-checkability is
+  claim-shape meta-content (it says why no CHECKED event CAN exist),
+  the batch-3 (8) family; (3) drop ✓; (4) drop-as-subsumed ✓
+  conditional on Catch 1's reword; (5) disclosure, text kept ✓;
+  (6) disclosure ✓ (consistent with Catch 2's flip); (7-8) both
+  watches CONFIRMED REAL — request Dijkstra mints (his sequence:
+  W-37 CoercionErasure coercion-contract/γ-inertness coupling,
+  W-38 NullPremise future-Null-consumer hazard); endorse the dual
+  use of W-37's text as strand (d)'s NOTES pointer; (9) ATTACH to
+  NakedImmediate.Relational as disclosure — a real code-vs-types.md
+  divergence is claim-relevant context on the rule owning §2.4's
+  subject (types.md staleness noted as an upstream-doc candidate,
+  record only); (10-11) prose ✓; (12) reword accepted, and
+  flagged-not-silent is the right protocol for marking tails inside
+  transcribed text. Also acknowledged: the C-set mutual-check guard
+  fix (my blanket-Qed ruling's mechanization consequence) and
+  CoercionErasure's machine-readable sanction with main.
+
+- CHS. 09-12 (2026-07-23): VERIFIED, no catches on the cleans this
+  time. 119 flips (37/54/10/18); TypesMonotoneDown's known-false
+  (09:224) is a CORRECT triangle application — the rule states the
+  universal γ-reading, refuted at MutableBlockMissedBottom, with the
+  true halves owned elsewhere (AliasesMonotoneDown, EnvRefineOnly):
+  the GLB shape exactly. BUNDLE RULED (20): W-39/W-40 mints
+  CONFIRMED (ArmIsolation coupling; StaticDynamicSplit
+  discriminator-redundancy staleness — its fence's keyed proviso is
+  the third watched row); FIVE resolved-history do-not-lands with
+  all current-state markers VERIFIED on disk (DemoteExn's conclusion
+  states the corrected demotion form; Loopify.Attribute's correction
+  IS the adjudicated ValueSlotExempt rule; ResimplifyIdempotent leg
+  (3) at 10:1419 states the exactly-one-wrap bound; the CSE pair's
+  item-8 successors landed and previously verified; PartialUndef's
+  domain-gated statement stands) — plus item (8) RESOLVED: the
+  Loopification intro (10:1106-1110) does NOT over-claim ("can
+  have"; attribute-computed-once, obeys-unconditionally), so
+  resolved-history, no prose correction needed. Marking tails (9-10):
+  flagged rewords accepted, with the sharpening that AccumBoxElim's
+  tail ("conjectured rule verified only empirically") is DOUBLY
+  stale (claim now descriptive; evidence lives in the record) —
+  drop the tail rather than reword. Illegal-'other' items:
+  S.Struct.Run disclosure (ownership pointer); LiftCont.Gate
+  disclosure with the structural-trust clause; DeadLoopParam
+  disclosure with the STRUCTURAL clause KEPT (fexpr-path-
+  unimplemented explains why no VERIFIED event CAN exist — the
+  structural-checkability family) and the evidence tail dropped;
+  ExnFirstParam defensive-branch disclosure; Inline.Substitute
+  DROP (evidence-axis); Mutable.Candidate SPLIT (keep the
+  escape-analysis completeness BOUNDARY as disclosure, drop the
+  unverified tail); the five prose:Summary and the (20) quartet
+  stay prose.
+
+- CH. 13 (2026-07-23): VERIFIED — 12 flips, headline pair
+  (Preserves, Rewrite.Local) CLAIM normative on disk. BUNDLE RULED
+  (17): W-41/W-42 mints CONFIRMED (DeadValueSlotCoherence's
+  holds-ACCIDENTALLY coupling — the fragile-invariant class watches
+  exist for; TrapNeutral's falsifier inventory — KF-037-family
+  counterexample recipes preserved as a watch). Resolved-history
+  trio (3-5) do-not-land with markers confirmed: Preserves' REVISED
+  note verified at the resolution round; TrapNeutral's corrected
+  legs-form on disk (:535); CSE.Eligible's corrected String text
+  read earlier this session. (6-7) AliasesMonotoneDown pair:
+  Hopper's triangle rec ACCEPTED VERBATIM — dedup to ONE, flip to
+  DISCLOSURE ("only the alias half is genuinely γ-monotone; the
+  concrete-type half's γ can grow — EnvRefineOnly (b)"): the rule's
+  STATED clause (alias coarsening, the hybrid's Theorem) is TRUE,
+  and the refuted universal already wears its known-false at ch. 09
+  — she ran the sits-on triangle unprompted and correctly. (8) DROP
+  ✓ doubly stale (marking + evidence; 13:80 was one of my nine
+  strand sites, already rewritten). (9) DROP ✓ the modulo-UB
+  premise is STATED content (GetTag precedent). (10) DISCLOSURE
+  pointer accepted with the evidence clause dropped, PLUS one flag:
+  the pointer enumerates the double-round family caveats, so it
+  must JOIN the ch. 10 lift enumeration — when fix-float32-double-
+  rounding lands, this pointer goes stale with the rest;
+  one-lift-all-sites. (11-17): intro-unproved DROP (duplicates
+  rule + evidence record); modulo-UB empirical note PROSE;
+  per-rewrite refuted-concern resolved-history (marker = the
+  rewritten §2 refinement conclusion, verified at the resolution
+  round); types.md staleness DEDUP-TO-EXISTING (same item as
+  batch 4's NakedImmediate.Relational attachment — cross-filed,
+  nothing new lands); Reaper and once-used-provenance PROSE;
+  validation-summary OPEN marker PROSE (it IS §4.7's marker,
+  already in the lift enumeration).
+
+- CHS. 15-17 (2026-07-23): VERIFIED — 53 flips (21/16/16), R.Heap
+  CLAIM interpretive on disk (the B set complete at 13), ch. 17's
+  target-seam family and the Closures naive-reading disclosure
+  landed per the triangle. BUNDLE RULED (10), one NEW CLASS RULE
+  CODIFIED: (1-2) prose-stays ACCEPTED and the class rule adopted
+  verbatim — "pending-upstream requires an unlanded-but-EXISTING
+  keyed branch; aspirations aren't provisos" (an aspiration has no
+  watchable key, no lift condition, no falsifiable retirement —
+  scope-ledger material; routed to main for record 76's kind
+  vocabulary). (3) DROP ✓ 16:426 strand retired this batch — one of
+  my nine. (4) DROP-AS-SUBSUMED ✓ the γ precedent. (5) DROP as
+  caveat WITH the boundary stated: positive-verification provenance
+  is not lost — it lives in FIDELITY's review rows; making it a
+  CHECKED event would be a FRESH verification act at today's
+  commit, never a retroactive transcription (the no-minting rule).
+  (6) DISCLOSURE ✓. (7) ATTACH to CM.Syntax.Fragment as disclosure
+  — "inherited from to_cmm, not re-checked here" is the
+  enforcement-point family (ch. 02 trio's sibling); violations
+  manifest as stuck configurations. (8) DROP ✓ with the boundary
+  correctly applied by Hopper: contingent absence of a case study
+  is evidence-axis; structural impossibility (DeadLoopParam's
+  unimplemented path) is claim-shape. (9) PROSE ✓. (10) DISCRIMINATOR
+  RULING for territory markers: text-staleness-at-lift decides —
+  keep the prose but phrase it LIFT-PROOF (historical-pointer form,
+  "the double-round family's home seam; see 13 §4.7 for current
+  status" — freshness delegated to a site the lift visits), and
+  then it needn't join the enumeration; present-tense open-bug
+  phrasing would have to join. Lift-proof phrasing recommended:
+  fewer lift sites, cheaper lift.
+
+- CHS. 18-20 (2026-07-23, FINAL FLIP BATCH): VERIFIED — end-state
+  independently re-extracted: 453 all-CLAIM, split EXACTLY
+  365 normative / 75 descriptive / 13 interpretive (= 303+62 /
+  66+9 / 13, my adjudication arithmetic to the digit), ZERO STATUS
+  lines corpus-wide; per my semantics-bundle ruling (8) the join
+  runs STRICT from here. EndToEnd's LIVE known-false (20:115)
+  verified — the triangle's genuine article (claim false-as-stated,
+  doc-acknowledged, family-citing text in the lift enumeration).
+  BUNDLE RULED (12): W-43/W-44 mints CONFIRMED (W-43 is the KF-045
+  flip-back condition as a staleness watch — my first doc ruling of
+  the revival, now a numbered watch; W-44 preserves Milner's
+  recursive-handler soft spot). (3) THE W-32 QUESTION — BOTH, not
+  either: the landed 19:137 caveat stays DISCLOSURE (its content is
+  the Addr-bug TRUST BOUNDARY — a consequence, not the tripwire);
+  ADD a separate watch(W-32) caveat on CM.Alloc.GC carrying the
+  tripwire's ACTUAL condition ("gc_reloc is deliberately an
+  unconstrained Parameter; any axiom cashing its conditions or any
+  concrete GC instantiation must revisit the TC.Let.Subst stack
+  guard in the same change — catalog entry 62, CmmMemory.v:249").
+  Flipping :137's kind would have mislabeled a true disclosure;
+  leaving the registry unlinked would have orphaned the oldest live
+  watch from the fence layer. Unification done right = the registry
+  key rides a caveat whose text IS the watch condition (the W-37
+  pattern, applied precisely). (4) drop-as-recorded ✓. (5)
+  disclosure-with-structural-clause ✓ (GC-scheduling-dependent
+  corruption invisible to byte-layout validation = no case study
+  CAN check it — Milner's blind-spot flag correctly becoming
+  structural disclosure). (6) SPLIT ✓ (109-sites sampling =
+  evidence, drop; fuzz-matrix-as-standing-validation = claim scope,
+  keep). (7-9) do-not-land ✓ — all three markers verified by me at
+  the item-8 wave. (10) disclosure ✓ (tables-by-convention =
+  claim-trust boundary). (11-12) prose ✓. Rider extras (batch-5's
+  two strand-(d) ownership pointers) acknowledged.
+
+- GRADE-COLUMN WIRING + STATUS HYGIENE (2026-07-23): the 26 entries
+  whose resolutions lived as prose inside OPEN status bullets now
+  carry terminal "- Status: resolved — <reason>" lines (scripted,
+  reasons summarizing the in-entry deltas; DISPUTED collapses to
+  zero — all were resolved-in-fact per the duty-6 inventory).
+  Template comment defanged (its "Status: open |" line would have
+  won last-wins for KF-057 if the parser reads comments) and given
+  a RULES: line; one script EOF-edge self-caught (terminal dropped
+  inside the comment, relocated). Hopper's mechanical rewrap in this
+  file verified content-preserving. WIRING RATIFICATIONS: (a) doc
+  fences are the event system of record, union mode — bundle ruling
+  (5) verbatim; the 29 pre-migration .v VERIFIED transcriptions to
+  be RETIRED eventually (comment-only), never key-backfilled (no
+  second event system). (b) Artifact-kind map ratified;
+  demoted-claim→claim-definition per the REFUTED-CONJECTURE
+  rationale. (c) No automated stamp-date demotion FOR NOW — the
+  principle stands as the formal-axis twin of evidence staleness,
+  enforced manually (PrimMemoryB precedent); automation deferred
+  until rocq/ is committed (stamps then become @-commit like
+  evidence). HYBRID clause inventories = future work; the
+  evidence-free-clause warning is correct behavior.
+  DELTA (2026-07-23, collapse confirmed): DISPUTED 0 on Hopper's
+  re-run, all 33 rules released to exactly their suspended letters;
+  final board A 38 / B 8 / C 310 / D 97 (= 453, arithmetic exact —
+  the CSE pair + Inline.Substitute to A, GLB to D wearing its
+  false-as-stated flag, 29 to C). Parser comment-blindness answered:
+  the template was inert only via the boundary-entry mechanism, so
+  my KF-057 relocation was the load-bearing fix and the defanging
+  belt-and-braces. HARDENING ACCEPTED: malformed finding headings
+  (finding-ish but failing the id regex) become a parser WARNING
+  rather than a silent drop from the DISPUTED derivation — the
+  silent-failure class this project kills on sight; my side of the
+  bargain done in the same pass (the template's heading is no
+  longer ###-prefixed, so the warning stays clean). Dijkstra
+  independently converged on retire-not-backfill for the 29 legacy
+  .v VERIFIED lines (".v headers are citations, not mirrors" — the
+  right slogan for it).
+  DELTA 2 (2026-07-23, MY MISS, owned): the template defang
+  REGRESSED regen to exit-1 — Hopper's boundary explanation had
+  SAID the ### heading was what kept the template inert, and my
+  edit removed exactly that boundary, attaching the template's body
+  to KF-057 (duplicate RULES: hard error; the "one of open…" line
+  winning last-wins). Caught by her self-tests, zero net trace in
+  the stamped artifact. Her STRUCTURAL fix is the right repair and
+  answers the original question properly: the parser now blanks
+  <!-- --> blocks before parsing — comments are not data — plus the
+  finding-ish heading warning landed per my GO (self-test 54
+  checks). Template's ### restored (copy-paste ergonomics, now safe
+  in any form). KF-057's two Status lines left as-is: the
+  original-bullet-plus-terminal shape matches the other 25 entries;
+  collapsing one would break consistency, and last-wins makes it
+  correct. Lesson for the ledger: I reasoned about a parser from a
+  described behavior instead of the mechanism — the same class of
+  error my fidelity lane exists to catch in others.
+  DELTA 3 (2026-07-23, final parser increment): Dijkstra
+  independently root-caused the same race and raised the right
+  objection to pure comment-blanking — a commented-out REAL entry
+  would vanish silently. Reconciled: strict finding headings inside
+  comments now WARN ("commented-out finding heading is ignored by
+  the scan"), while the template never trips it because KF-NNN
+  deliberately fails the strict regex — the placeholder-id choice
+  load-bearing a second time. Self-test 55, regen exit-0, index
+  byte-identical to the stamped board (A 38 / B 8 / C 310 / D 97).
+  Final contract for this file: comments can never corrupt an
+  entry, commented-out real entries surface loudly, both template
+  forms are safe.
+  DELTA 4 (2026-07-23, README front-door wording pass): known-false
+  = 4 RATIFIED faithful-to-corpus over the brief's 3 (derived
+  surfaces never bend to briefs; the brief predated
+  TypesMonotoneDown's batch-5 landing; all four personally verified
+  across batches 3-8). Block amendments ruled: full caveat census
+  (add watch + disclosure counts — the explicit-zero honesty
+  aesthetic argues for completeness, not a curated-alarming subset),
+  known-false first in urgency order, DISPUTED 0 keeps a compact
+  gloss ("no open finding suspends a grade" — teaches the slot at
+  the moment it is most confusing), "commit-keyed validation events"
+  → "validation events, each pinned to a commit" (Hopper's
+  alternative), "(lift-watched)" → "(watched)" (the one jargon that
+  earned its place, in plainer clothes). DECLINED: A-rate-among-
+  normative and other ratios — derived ratios editorialize; the
+  front door shows facts, the full scoreboard can compute rates.
+  DELTA (2026-07-23, landed): all five amendments verbatim, census
+  filled (9 watch, 104 disclosure — dominating as ruled), urgency
+  order carried into the index's Trust-signals line. Hopper's
+  disclosed spirit-deviation RATIFIED: the DISPUTED gloss is
+  CONDITIONAL — my seven-word gloss was stated for the zero case
+  only and would have printed FALSE exactly when the slot matters
+  most (DISPUTED>0); the generator now derives "(N grade(s)
+  suspended by open findings)" there instead. A correct
+  generalization of the ruling, disclosed not silent — the
+  flagged-not-silent protocol applied to my own words, which is how
+  it should work.
+
+## Stamps (machine-readable; the "mechanized" axis's fidelity-stamp provenance)
+
+Solidity-schema provenance (record 76; semantics-bundle ruling (3)): the
+"mechanized" evidence rung requires the fidelity-review stamp, and THIS
+table is where the tooling reads it — file-granular, because reviews are
+per-file (a rule's stamp = its artifact file's row, via the classifier's
+artifact-location join). Rows change only by my hand; each is backed by a
+review-log row above. Historical rule-level hold-outs (e.g. the KF-045-era
+ArrayAccess row) were released before this table existed; none are open.
+
+STAMP: Base.v GREEN @ 2026-07-18
+STAMP: Syntax.v GREEN @ 2026-07-18
+STAMP: Values.v GREEN @ 2026-07-22
+STAMP: WellFormed.v GREEN @ 2026-07-18
+STAMP: TypeGrammar.v GREEN @ 2026-07-18
+STAMP: CmmMemory.v GREEN @ 2026-07-18
+STAMP: Cmm.v GREEN @ 2026-07-18
+STAMP: Opsem.v GREEN @ 2026-07-22
+STAMP: PrimScalar.v GREEN @ 2026-07-18
+STAMP: PrimMemoryA.v GREEN @ 2026-07-18
+STAMP: PrimMemoryB.v GREEN @ 2026-07-22
+STAMP: Concretization.v GREEN @ 2026-07-18
+STAMP: Machine.v GREEN @ 2026-07-18
+STAMP: Representation.v GREEN @ 2026-07-18
+STAMP: MeetJoin.v GREEN @ 2026-07-22
+STAMP: SimplifyStructure.v GREEN @ 2026-07-18
+STAMP: Inlining.v GREEN @ 2026-07-18
+STAMP: RewritesControl.v GREEN @ 2026-07-18
+STAMP: RewritesPrim.v GREEN @ 2026-07-18
+STAMP: Unboxing.v GREEN @ 2026-07-18
+STAMP: ToCmmControl.v GREEN @ 2026-07-18
+STAMP: ToCmmData.v GREEN @ 2026-07-22
+STAMP: ToCmmSoundness.v GREEN @ 2026-07-22
+STAMP: Simplify.v GREEN @ 2026-07-18
+STAMP: Soundness.v GREEN @ 2026-07-22
+STAMP: Pilot.v GREEN @ 2026-07-22
+STAMP: All.v GREEN @ 2026-07-22
 
 ## Substitution-audit checklist (capture channels)
 
@@ -3052,6 +3596,7 @@ For each rule that splices a stored term into a use site, check:
   concrete GC instantiation.
 
 ### KF-046 — SimplifyStructure.v green review: three disclosure-level drifts (low; one part needs a writer answer)
+RULES: S.Struct.JoinParams, S.Struct.Rec.NoFixpoint, S.Struct.Run.ClosedResult, S.Struct.Lift.EmptyAtEnd
 - Chapter: 09-simplify-structure.md (whole chapter); Rocq:
   theories/SimplifyStructure.v; Owner: Girard
 - What differs (three parts, all low, all in one file's comments/
@@ -3128,8 +3673,10 @@ For each rule that splices a stored term into a use site, check:
   static binding under a lambda" with the handler caveat (:813), and
   Rec_NoFixpoint gained the invariant-columns-only scope sentence
   including why variant columns would be wrong.
+- Status: resolved — all three comment fixes verified on disk (see RESOLVED block above).
 
 ### KF-047 — ToCmmSoundness.v s3 anchors: two doc sharp edges dropped from anchor comments (low; comment-only)
+RULES: INV.ToCmm.SlotLiveness, INV.ToCmm.EffectLinear
 - Chapter: 20-to-cmm-soundness.md:156-215 (SlotLiveness), :293-335
   (EffectLinear); Rocq: theories/ToCmmSoundness.v:785-822 (SlotLiveness
   anchor), :910-947 (EffectLinear anchor); Owner: Milner
@@ -3178,6 +3725,7 @@ For each rule that splices a stored term into a use site, check:
   task completed.
 
 ### KF-048 — the stack-guard exemption inventory omits Calloc-local, which READS RR; currently safe only via M-pinning + allocation monotonicity, and gc_reloc's "constrainable later" invitation is a tripwire on exactly that argument (low; comment-level today, future-soundness guard)
+RULES: CM.Alloc.GC, CM.Alloc.Local, TC.Let.Subst
 - Chapter: 18-to-cmm-data.md (TC.Let.Subst); Rocq:
   theories/Cmm.v:388-405 (guard comment's exemption inventory),
   theories/CmmMemory.v:186-202 (CM_Alloc_Local), :226-250 (the
@@ -3255,6 +3803,7 @@ For each rule that splices a stored term into a use site, check:
   CmmMemory.v's rule inventory.
 
 ### KF-049 — T.Env.ConstCanonicalPersists / T.Env.AliasesAuthoritative: both Admitted theorems are REFUTABLE under tenv_wf as defined — te_canonical is unconstrained data and the wf predicate omits the two invariants the theorems need (high; Admitted-false family)
+RULES: T.Env.AliasesAuthoritative, T.Env.ConstCanonicalPersists
 - Chapter: 07-types-domain.md:466-527 (both conjectured rules); Rocq:
   theories/TypeGrammar.v:834-841 (T_Env_ConstCanonicalPersists),
   :858-861 (T_Env_AliasesAuthoritative), :812-817 (tenv_wf),
@@ -3341,6 +3890,7 @@ For each rule that splices a stored term into a use site, check:
   added; the combined-round suggestion became two rounds, fine.
 
 ### KF-050 — T.Gamma.Kind: the Admitted theorem is REFUTABLE — G_equals has no kind-agreement constraint, so an alias type concretizes across kinds; and unlike KF-049 this file is NOT a leaf (MeetJoin.v's meet/join/prover soundness rules all quantify over gamma) (high; Admitted-false family)
+RULES: T.Gamma.Kind, T.Gamma.Alias
 - Chapter: 07-types-domain.md:660-689 (T.Gamma.Kind, T.Gamma.Alias);
   Rocq: theories/Concretization.v:663-668 (Theorem T_Gamma_Kind,
   Admitted), :303-306 (G_equals), :644-650 (consistent);
@@ -3438,6 +3988,7 @@ For each rule that splices a stored term into a use site, check:
   fix): results in the re-sweep ledger row and KF-051/052/053 below.
 
 ### KF-051 — T.Meet.Sound: the Admitted theorem is REFUTABLE — simple_eval's symbol fallback lets gamma admit alias values with no rho binding, while sat_ext demands one for every recorded equation, so any meet that records an equation on an rho-unbound symbol breaks the sat_ext conjunct (high; Admitted-false family)
+RULES: T.Meet.Sound, T.Meet.AliasAlias
 - Chapter: 08-meet-join.md (T.Meet.Sound, normative; T.Meet.AliasAlias);
   Rocq: theories/MeetJoin.v:893-900 (T_Meet_Sound, Admitted),
   :631-637 (M_alias_alias), :170-177 (alias_alias_res), :100-105
@@ -3538,6 +4089,7 @@ For each rule that splices a stored term into a use site, check:
   disclosed in place.
 
 ### KF-052 — T.Expand.Head: the Admitted theorem is REFUTABLE — it states the doc's SET-form concretization equality at a FIXED rho, where the backward inclusion is simply false (expansion discards the alias's singleton constraint) (high; Admitted-false family; MY ERRATUM #4)
+RULES: T.Expand.Head
 - Chapter: 08-meet-join.md (T.Expand.Head, normative); Rocq:
   theories/MeetJoin.v:1641-1649 (expand_head), :1660-1665
   (T_Expand_Head, Admitted); Concretization.v gamma_set :660-661
@@ -3657,6 +4209,7 @@ For each rule that splices a stored term into a use site, check:
   and never asked "at WHICH kind". Logged for the retrospective.
 
 ### KF-053 — T.Meet.GreatestLowerBound: a KNOWINGLY-refutable universal is kept as an Admitted axiom — its own comment discloses the refutation (T.Meet.MutableBlockMissedBottom, proved Qed twenty lines below) (high; Admitted-false family, disclosed-in-place variant)
+RULES: T.Meet.GreatestLowerBound
 - Chapter: 08-meet-join.md (T.Meet.GreatestLowerBound, conjectured
   design-intent with a doc-witnessed failure); Rocq:
   theories/MeetJoin.v:917-933 (comment + T_Meet_GreatestLowerBound,
@@ -3745,8 +4298,10 @@ For each rule that splices a stored term into a use site, check:
   (KF-037/038/041/043/044/049/050/051/052/053) is fully resolved on
   disk, and the open-discrepancy inventory is EMPTY pending the
   All.v gate review.
+- Status: resolved — demotion landed and verified (REFUTED-CONJECTURE variant instance; see DELTA 2 above).
 
 ### KF-054 — consolidated doc-clarification candidate: the formalism never states where symbol bindings are guaranteed to live, and three independent findings in three files each patched a symptom of that silence (low-medium; doc lane, escalated to main; does NOT supersede KF-051's .v fix)
+RULES: OS.Simple.Eval, OS.Let.Static
 - Chapter: ch. 07 section 4 preamble (valuation rho and consistency;
   07-types-domain.md:646-658 territory) is the natural home; the
   seam also touches ch. 04's OS.Simple.Eval (symbol evaluation) and
@@ -3879,8 +4434,10 @@ For each rule that splices a stored term into a use site, check:
   no longer quoting the doc's line; comment-only resync, polish-wave
   candidate. The KF-054 seam is now closed at the root in all three
   places: foundational chapter, types chapter, mechanization.
+- Status: resolved — closed at the root in all three places: ch. 04, ch. 07, mechanization (see RIDER RESOLVED above).
 
 ### KF-055 — the revised P.Binary.PhysEqual's letter leaves defined comparisons without derivations: identity-pinned immutables fall through every clause, and ch. 04's `=`-premises don't accept relational results (high; on the item-8 resolution package, ruling-review finding; the DESIGN is right — the letter lags it in three places)
+RULES: P.Binary.PhysEqual, OS.Let.Prim.Pure, OS.Let.Prim.Effect
 - Chapter: 06-primitives-memory.md:1191-1234 (revised PhysEqual),
   04-opsem.md (OS.Let.Prim.Pure/Effect premises `⟦p⟧(v̄;H) = (v,H′)`),
   13-soundness.md:33-46 (§1 folding enumeration), :751-754 (the §4
@@ -3974,8 +4531,10 @@ For each rule that splices a stored term into a use site, check:
   (direction CORRECT — right-hand = the rewritten side, matching
   §2's C[e′] refines C[e]). The letter now matches the design
   everywhere this entry touched.
+- Status: resolved — all three legs and both cosmetic residues on disk; entry CLOSED (see DELTA 2 above).
 
 ### KF-056 — INV.ToCmm.Simulates' current direction (∀ Flambda behavior ∃ Cmm outcome) is refutable under the revised relational PhysEqual; the re-posing must flip to the "Cmm refines Flambda" direction EndToEnd's own gloss already names (high; design-direction ruling on the item-8 package; disclosed-in-place by the "to be re-posed" marker — this entry pins WHAT the re-posing must say)
+RULES: INV.ToCmm.Simulates, INV.ToCmm.EndToEnd
 - Chapter: 20-to-cmm-soundness.md §2 (Simulates, "to be re-posed"
   per the :74-78 FORMER-VIOLATION header), §3 EndToEnd :95-115.
   Owner: main (doc) / Milner-lane .v when re-posed.
@@ -4054,8 +4613,10 @@ For each rule that splices a stored term into a use site, check:
   distinction drawn exactly as this entry required. NOTHING remains
   open on KF-056; the item-8 letter items are all closed except
   KF-057's catalog sentence, which rides main's batch.
+- Status: resolved — re-pose landed and verified clause-for-clause; both riders fixed (see DELTA 2 above).
 
 ### KF-057 — the refinement reading carries a new implicit premise: cextern's licensed answers must be monotone under immutable-identity folding of its heap argument (medium; discipline note + watch, not poison)
+RULES: none
 - Chapter: 13-soundness.md §1 (refinement definition); catalog
   entry 20 territory (cextern_rel) + the :580 KF-015 discipline
   note. Owner: main (catalog/doc sentence), Dijkstra (watch).
@@ -4078,11 +4639,20 @@ For each rule that splices a stored term into a use site, check:
   keyed to any future cextern constraint or instantiation (the
   gc_reloc/W-32 pattern).
 - Status: OPEN (filed 2026-07-22, item-8 ruling review).
+  RESOLVED (2026-07-22, later same session — housekeeping during
+  the RULES: backfill): both asks landed and were verified in the item-8
+  catalog spot-check — the discipline sentence at entry 20
+  (:291-299, my wording near-verbatim with the determinacy-bridge
+  coupling) and the watch, assigned W-34 in record 75's inventory.
+  Nothing remains open on this entry.
+- Status: resolved — both asks landed and verified (entry 20 discipline sentence + W-34); nothing remains open.
 
-<!-- Finding template:
+<!-- Finding template (safe in any form: the parser blanks comment
+     blocks before parsing — comments are not data):
 ### KF-NNN — <RULE id> (<severity: high/med/low>)
+RULES: <ids or none>
 - Chapter: <file>:<line>; Rocq: theories/<X>.v:<line>; Owner: <writer>
 - What differs:
 - Why it matters:
-- Status: open | resolved | rebutted | escalated — <one-line disposition>
+- Status: one of open / resolved / rebutted / escalated — <one-line disposition>
 -->

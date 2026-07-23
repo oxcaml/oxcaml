@@ -18,7 +18,7 @@ From Flambda2 Require Import Base Syntax.
    are stated explicitly where the docs require them
    (T.Grammar.NakedNumber.NonEmptySet). *)
 
-(** RULE T.Role.SinglePass (STATUS normative) -- 07-types-domain.md
+(** RULE T.Role.SinglePass (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#t
     Simplify performs one pass over each function body; the types domain
     provides no widening operator, and meet/join (ch. 08) are the only
@@ -96,7 +96,7 @@ Inductive is_null_ty : Type :=
 (* Type_descr: the three-way split                                        *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Grammar.TypeDescr (STATUS normative) -- 07-types-domain.md
+(** RULE T.Grammar.TypeDescr (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_descr.mli#Descr.t
     CODE middle_end/flambda2/types/grammar/type_descr.mli#descr
     For each kind kappa, a type is Unknown, Bottom, a head (No_alias), or
@@ -116,7 +116,7 @@ Definition type_descr (H : Type) : Type :=
 (* Row_like indices                                                       *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Grammar.RowLike.Index (STATUS normative) -- 07-types-domain.md
+(** RULE T.Grammar.RowLike.Index (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_index_domain
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#row_like_index_domain
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#check_field_tys
@@ -147,7 +147,7 @@ Arguments rli_shape {Lat Shape}.
 (* Naked-number heads (non-recursive)                                     *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Grammar.NakedImmediate.Relational (STATUS normative)
+(** RULE T.Grammar.NakedImmediate.Relational (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#is_int_for_scrutinee
@@ -173,7 +173,7 @@ Inductive head_naked_immediate : Type :=
   | Naked_immediates_and_inverse_relations
       (s : list Z) (m : inverse_relations).
 
-(** RULE T.Grammar.NakedNumber.NonEmptySet (STATUS normative)
+(** RULE T.Grammar.NakedNumber.NonEmptySet (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_float
@@ -195,7 +195,7 @@ Definition head_naked_vec512 := list vec512.
 
 Definition head_nonempty {A : Type} (h : list A) : Prop := h <> nil.
 
-(** RULE T.Grammar.RecInfoRegion.Trivial (STATUS normative)
+(** RULE T.Grammar.RecInfoRegion.Trivial (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_region
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_rec_info
@@ -238,7 +238,7 @@ with head_value : Type :=
       (is_null : is_null_ty)
 
 with head_value_non_null : Type :=
-  (** RULE T.Grammar.Variant (STATUS normative) -- 07-types-domain.md
+  (** RULE T.Grammar.Variant (CLAIM normative) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#create_variant
       A Variant head is the disjoint union of an immediates arm (a
@@ -278,7 +278,7 @@ with array_contents : Type :=
   | AC_immutable (fields : list ftype)
   | AC_mutable
 
-(** RULE T.Grammar.Disjunction.Extensions (STATUS normative)
+(** RULE T.Grammar.Disjunction.Extensions (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#variant_extensions
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#row_like_case
@@ -707,7 +707,7 @@ Definition name_bound_in (E : tenv) (n : name) : Prop :=
   (exists ne, te_types E n = Some ne) \/
   (exists s, n = Name_sym s /\ In s (te_defined_symbols E)).
 
-(** RULE T.Env.Equation.Closed (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Equation.Closed (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_new_equation
     A new equation `name = T` may only mention (in T's free names) names
     already bound in E; a locally-unbound free name is a fatal error.
@@ -716,7 +716,7 @@ Definition T_Env_Equation_Closed (E : tenv) (n : name) (T : ftype)
   : Prop :=
   forall n', tmentions T n' -> name_bound_in E n'.
 
-(** RULE T.Env.Find.SymbolDefault (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Find.SymbolDefault (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'
     CODE middle_end/flambda2/types/env/typing_env.ml#initial_symbol_type
     A defined symbol with no equation has type any_value = Value
@@ -731,7 +731,7 @@ Definition tenv_find_default (n : name) (k : kind) : ftype :=
   | Name_var _ => unknown_of_kind k
   end.
 
-(** RULE T.Env.Find.Bottom (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Find.Bottom (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'
     CODE middle_end/flambda2/types/env/typing_env.ml#make_bottom
     If is_bottom E, then find E x kappa = Bottom (bottom_like of kappa)
@@ -744,7 +744,7 @@ Definition tenv_find (E : tenv) (n : name) (k : kind) : ftype :=
     | None => tenv_find_default n k
     end.
 
-(** RULE T.Env.Find.Canonical (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Find.Canonical (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn
     CODE middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn
     type_simple_in_term_exn(E, s) returns (alias_type_of kappa canonical,
@@ -762,7 +762,7 @@ Definition type_simple_in_term (E : tenv) (k : kind) (s : simple)
   let c := canonical E s in
   (alias_type_of k c, c).
 
-(** RULE T.Env.Canonical.Least (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Canonical.Least (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/aliases.mli#get_canonical_element_exn
     CODE middle_end/flambda2/types/env/binding_time.ml#consts
     CODE middle_end/flambda2/types/env/aliases.mli#Alias_set.find_best
@@ -783,7 +783,7 @@ Definition T_Env_Canonical_Least (E : tenv) : Prop :=
     (binding_time_of_simple E (canonical E s)
        <= binding_time_of_simple E s')%nat.
 
-(** RULE T.Env.Canonical.NoEqualsOnCanonical (STATUS normative)
+(** RULE T.Env.Canonical.NoEqualsOnCanonical (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias
     No canonical name may be given an Equals (alias) type; dually,
@@ -800,7 +800,7 @@ Definition T_Env_Canonical_NoEqualsOnCanonical (E : tenv) : Prop :=
     canonical E (simple_of_name n) = simple_of_name n ->
     ftype_alias_simple (ne_type ne) = None.
 
-(** RULE T.Env.Canonical.ConcreteOnCanonical (STATUS descriptive)
+(** RULE T.Env.Canonical.ConcreteOnCanonical (CLAIM descriptive)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/typing_env.ml#replace_equation
     Concrete (non-alias) types are stored only on canonical names.  When
@@ -831,7 +831,7 @@ Definition tenv_wf (E : tenv) : Prop :=
   (forall s, canonical E (canonical E s) = canonical E s) /\
   (forall c, simple_is_const c = true -> canonical E c = c).
 
-(** RULE T.Env.ConstCanonicalPersists (STATUS conjectured)
+(** RULE T.Env.ConstCanonicalPersists (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
     CODE middle_end/flambda2/types/env/aliases.mli#find_best
@@ -863,7 +863,7 @@ Proof.
   exact (Hconst c Hc).
 Qed.
 
-(** RULE T.Env.AliasesAuthoritative (STATUS conjectured)
+(** RULE T.Env.AliasesAuthoritative (CLAIM normative)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/aliases.ml#add
     CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
@@ -893,7 +893,7 @@ Qed.
 (* Scopes, levels, existentials (ch. 07 sec. 3.3)                         *)
 (* --------------------------------------------------------------------- *)
 
-(** RULE T.Env.Scope.Existential (STATUS normative) -- 07-types-domain.md
+(** RULE T.Env.Scope.Existential (CLAIM normative) -- 07-types-domain.md
     CODE middle_end/flambda2/types/env/binding_time.ml#With_name_mode.scoped_name_mode
     CODE middle_end/flambda2/types/env/typing_env.mli#cut
     A variable with binding time strictly earlier than E's

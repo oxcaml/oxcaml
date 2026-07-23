@@ -124,7 +124,7 @@ Fixpoint column {A : Type} (j : nat) (rows : list (list A))
 (* 2. Top-level contract (doc section 1)                              *)
 (* ================================================================== *)
 
-(** RULE S.Struct.Run (STATUS normative) -- 09-simplify-structure.md
+(** RULE S.Struct.Run (CLAIM normative) -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify.ml#run
     CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
 
@@ -141,7 +141,7 @@ Fixpoint column {A : Type} (j : nat) (rows : list (list A))
     meaning-preservation claim is ch. 13's. *)
 Definition S_Struct_Run_documented : Prop := True.
 
-(** RULE S.Struct.Run.ClosedResult (STATUS normative)
+(** RULE S.Struct.Run.ClosedResult (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify.ml#run
 
@@ -172,7 +172,7 @@ Definition S_Struct_Run_ClosedResult (u : flambda_unit) : Prop :=
      k = fu_return_continuation u \/
      k = fu_exn_continuation u).
 
-(** RULE S.Struct.Run.NoPendingConstants (STATUS normative)
+(** RULE S.Struct.Run.NoPendingConstants (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify.ml#run
     CODE middle_end/flambda2/simplify/lifting/lifted_constant_state.mli
@@ -192,7 +192,7 @@ Definition S_Struct_Run_NoPendingConstants (u : flambda_unit)
   : Prop :=
   all_statics_placed u.
 
-(** RULE S.Struct.SingleRound (STATUS normative)
+(** RULE S.Struct.SingleRound (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
     CODE middle_end/flambda2/simplify/simplify.ml#run
@@ -210,7 +210,7 @@ Definition S_Struct_SingleRound_documented : Prop := True.
 (* 3. Two-phase structure (doc section 2)                             *)
 (* ================================================================== *)
 
-(** RULE S.Struct.TwoPhase (STATUS descriptive)
+(** RULE S.Struct.TwoPhase (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr
     CODE middle_end/flambda2/simplify/simplify_common.mli
@@ -226,7 +226,7 @@ Definition S_Struct_SingleRound_documented : Prop := True.
     whole traversal. *)
 Definition S_Struct_TwoPhase_documented : Prop := True.
 
-(** RULE S.Struct.Dacc (STATUS descriptive)
+(** RULE S.Struct.Dacc (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#t
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#t
@@ -247,7 +247,7 @@ Definition S_Struct_TwoPhase_documented : Prop := True.
     fields persist. *)
 Definition S_Struct_Dacc_documented : Prop := True.
 
-(** RULE S.Struct.Uacc (STATUS descriptive)
+(** RULE S.Struct.Uacc (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/env/upwards_acc.ml#t
     CODE middle_end/flambda2/simplify/env/upwards_acc.ml#create
@@ -262,7 +262,7 @@ Definition S_Struct_Dacc_documented : Prop := True.
     is accumulated and never save/restored. *)
 Definition S_Struct_Uacc_documented : Prop := True.
 
-(** RULE S.Struct.TypesMonotoneDown (STATUS conjectured)
+(** RULE S.Struct.TypesMonotoneDown (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_variable
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_equation_on_name
@@ -281,7 +281,7 @@ Definition S_Struct_Uacc_documented : Prop := True.
     discipline (see file-wide ENCODING NOTE). *)
 Definition S_Struct_TypesMonotoneDown_documented : Prop := True.
 
-(** RULE S.Struct.EnvRefineOnly (STATUS conjectured)
+(** RULE S.Struct.EnvRefineOnly (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#with_typing_env
     CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
@@ -304,7 +304,7 @@ Definition S_Struct_TypesMonotoneDown_documented : Prop := True.
     installation sites (see file-wide ENCODING NOTE). *)
 Definition S_Struct_EnvRefineOnly_documented : Prop := True.
 
-(** RULE S.Struct.SetOfClosuresEager (STATUS normative)
+(** RULE S.Struct.SetOfClosuresEager (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_expr.mli
     CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
@@ -328,7 +328,7 @@ Definition S_Struct_SetOfClosuresEager_documented : Prop := True.
 (* 4. Continuation handling (doc section 3)                           *)
 (* ================================================================== *)
 
-(** RULE S.Struct.LetCont.BodyFirst (STATUS descriptive)
+(** RULE S.Struct.LetCont.BodyFirst (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_let_cont0
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#after_downwards_traversal_of_body
@@ -348,7 +348,7 @@ Definition S_Struct_SetOfClosuresEager_documented : Prop := True.
     traversal staging, algorithm-only (file-wide ENCODING NOTE). *)
 Definition S_Struct_LetCont_BodyFirst_documented : Prop := True.
 
-(** RULE S.Struct.ContUse (STATUS descriptive)
+(** RULE S.Struct.ContUse (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#record_continuation_use
     CODE middle_end/flambda2/simplify/env/continuation_uses_env.mli
@@ -365,7 +365,7 @@ Definition S_Struct_LetCont_BodyFirst_documented : Prop := True.
     uses. *)
 Definition S_Struct_ContUse_documented : Prop := True.
 
-(** RULE S.Struct.Switch.ArmIsolation (STATUS conjectured)
+(** RULE S.Struct.Switch.ArmIsolation (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#record_continuation_use
@@ -387,7 +387,7 @@ Definition S_Struct_ContUse_documented : Prop := True.
     T.Join.Levels, S.Struct.EnvRefineOnly. *)
 Definition S_Struct_Switch_ArmIsolation_documented : Prop := True.
 
-(** RULE S.Struct.JoinParams (STATUS normative)
+(** RULE S.Struct.JoinParams (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
     CODE middle_end/flambda2/simplify/join_points.ml#join
@@ -420,7 +420,7 @@ Definition S_Struct_JoinParams
    chapters quantify entry types directly). *)
 Abbreviation join_params := S_Struct_JoinParams.
 
-(** RULE S.Struct.JoinParams.AnalysisExtraParams (STATUS conjectured)
+(** RULE S.Struct.JoinParams.AnalysisExtraParams (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
     CODE middle_end/flambda2/simplify/join_points.ml#add_extra_params_from_join_analysis
@@ -440,7 +440,7 @@ Abbreviation join_params := S_Struct_JoinParams.
 Definition S_Struct_JoinParams_AnalysisExtraParams_documented
   : Prop := True.
 
-(** RULE S.Struct.NoJoinUnknown (STATUS descriptive)
+(** RULE S.Struct.NoJoinUnknown (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
     CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types
@@ -455,7 +455,7 @@ Definition S_Struct_JoinParams_AnalysisExtraParams_documented
     type licenses strictly fewer rewrites). *)
 Definition S_Struct_NoJoinUnknown_documented : Prop := True.
 
-(** RULE S.Struct.SingleInlinableUse (STATUS descriptive)
+(** RULE S.Struct.SingleInlinableUse (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 
@@ -469,7 +469,7 @@ Definition S_Struct_NoJoinUnknown_documented : Prop := True.
     Anchor: environment-management detail of the algorithm. *)
 Definition S_Struct_SingleInlinableUse_documented : Prop := True.
 
-(** RULE S.Struct.CSE.JoinPhi (STATUS conjectured)
+(** RULE S.Struct.CSE.JoinPhi (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#join_one_cse_equation
     CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#cse_with_eligible_lhs
@@ -493,7 +493,7 @@ Definition S_Struct_SingleInlinableUse_documented : Prop := True.
     S.Rewrite.LetCont.UnusedParam. *)
 Definition S_Struct_CSE_JoinPhi_documented : Prop := True.
 
-(** RULE S.Struct.Rec.NoFixpoint (STATUS normative)
+(** RULE S.Struct.Rec.NoFixpoint (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
@@ -523,7 +523,7 @@ Definition S_Struct_Rec_NoFixpoint
    unconsumed. *)
 Abbreviation rec_invariant_entry := S_Struct_Rec_NoFixpoint.
 
-(** RULE S.Struct.Rec.InvariantVsVariant (STATUS descriptive)
+(** RULE S.Struct.Rec.InvariantVsVariant (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
@@ -544,7 +544,7 @@ Abbreviation rec_invariant_entry := S_Struct_Rec_NoFixpoint.
     above. *)
 Definition S_Struct_Rec_InvariantVsVariant_documented : Prop := True.
 
-(** RULE S.Struct.ApplyContRewrite (STATUS descriptive)
+(** RULE S.Struct.ApplyContRewrite (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/apply_cont_rewrite.mli
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
@@ -565,7 +565,7 @@ Definition S_Struct_Rec_InvariantVsVariant_documented : Prop := True.
     on the term. *)
 Definition S_Struct_ApplyContRewrite_documented : Prop := True.
 
-(** RULE S.Struct.LetCont.UnreachableClosure (STATUS conjectured)
+(** RULE S.Struct.LetCont.UnreachableClosure (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_recursive_handlers
@@ -592,7 +592,7 @@ Definition S_Struct_ApplyContRewrite_documented : Prop := True.
 Definition S_Struct_LetCont_UnreachableClosure_documented
   : Prop := True.
 
-(** RULE S.Struct.LiftCont.Gate (STATUS conjectured)
+(** RULE S.Struct.LiftCont.Gate (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/are_lifting_conts.mli#t
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#get_continuation_lifting_budget
@@ -619,7 +619,7 @@ Definition S_Struct_LiftCont_Gate_documented : Prop := True.
 (* 5. The turn: dataflow analysis (doc section 4)                     *)
 (* ================================================================== *)
 
-(** RULE S.Struct.Turn (STATUS descriptive)
+(** RULE S.Struct.Turn (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_toplevel_common
     CODE middle_end/flambda2/simplify/flow/flow_analysis.mli#analyze
@@ -636,7 +636,7 @@ Definition S_Struct_LiftCont_Gate_documented : Prop := True.
     the out-of-model traversal (file-wide ENCODING NOTE). *)
 Definition S_Struct_Turn_documented : Prop := True.
 
-(** RULE S.Struct.Flow.RequiredNames (STATUS descriptive)
+(** RULE S.Struct.Flow.RequiredNames (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/flow_types.ml#Data_flow_result
     CODE middle_end/flambda2/simplify/env/upwards_acc.ml#required_names
@@ -656,7 +656,7 @@ Definition S_Struct_Turn_documented : Prop := True.
     the term. *)
 Definition S_Struct_Flow_RequiredNames_documented : Prop := True.
 
-(** RULE S.Struct.Flow.UnusedParams (STATUS descriptive)
+(** RULE S.Struct.Flow.UnusedParams (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/flow_analysis.mli
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
@@ -670,7 +670,7 @@ Definition S_Struct_Flow_RequiredNames_documented : Prop := True.
     a consistency check.  Anchor. *)
 Definition S_Struct_Flow_UnusedParams_documented : Prop := True.
 
-(** RULE S.Struct.Flow.DeadLoopParam (STATUS conjectured)
+(** RULE S.Struct.Flow.DeadLoopParam (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#required_names
     CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
@@ -700,7 +700,7 @@ Definition S_Struct_Flow_UnusedParams_documented : Prop := True.
     simultaneously without a reachability oracle. *)
 Definition S_Struct_Flow_DeadLoopParam_documented : Prop := True.
 
-(** RULE S.Struct.Flow.Aliases (STATUS descriptive)
+(** RULE S.Struct.Flow.Aliases (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/flow_types.ml#Alias_result
     CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#extra_params_for_continuation_param_aliases
@@ -714,7 +714,7 @@ Definition S_Struct_Flow_DeadLoopParam_documented : Prop := True.
     trigger resimplification (S.Struct.Resimplify).  Anchor. *)
 Definition S_Struct_Flow_Aliases_documented : Prop := True.
 
-(** RULE S.Struct.Flow.ExnFirstParam (STATUS conjectured)
+(** RULE S.Struct.Flow.ExnFirstParam (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/control_flow_graph.ml#minimize_extra_args_for_one_continuation
     CODE middle_end/flambda2/terms/exn_continuation.mli#t
@@ -737,7 +737,7 @@ Definition S_Struct_Flow_Aliases_documented : Prop := True.
     removed from a kept exception handler). *)
 Definition S_Struct_Flow_ExnFirstParam_documented : Prop := True.
 
-(** RULE S.Struct.Flow.MutableUnboxing (STATUS descriptive)
+(** RULE S.Struct.Flow.MutableUnboxing (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/flow/mutable_unboxing.mli
     CODE middle_end/flambda2/simplify/flow/flow_types.ml#Mutable_unboxing_result
@@ -759,7 +759,7 @@ Definition S_Struct_Flow_MutableUnboxing_documented : Prop := True.
 (* 6. Lifting constants to symbols (doc section 5)                    *)
 (* ================================================================== *)
 
-(** RULE S.Struct.Lift.Accumulate (STATUS descriptive)
+(** RULE S.Struct.Lift.Accumulate (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/lifting/reification.ml#try_to_reify
     CODE middle_end/flambda2/simplify/lifting/lifted_constant_state.mli
@@ -777,7 +777,7 @@ Definition S_Struct_Flow_MutableUnboxing_documented : Prop := True.
     in a term, a constant exists only where it is placed). *)
 Definition S_Struct_Lift_Accumulate_documented : Prop := True.
 
-(** RULE S.Struct.Lift.PlaceAtToplevel (STATUS normative)
+(** RULE S.Struct.Lift.PlaceAtToplevel (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
     CODE middle_end/flambda2/simplify/expr_builder.mli#place_lifted_constants
@@ -800,7 +800,7 @@ Definition S_Struct_Lift_Accumulate_documented : Prop := True.
     S_Struct_Lift_EmptyAtEnd. *)
 Definition S_Struct_Lift_PlaceAtToplevel_documented : Prop := True.
 
-(** RULE S.Struct.Lift.EmptyAtEnd (STATUS normative)
+(** RULE S.Struct.Lift.EmptyAtEnd (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify.ml#run
 
@@ -822,7 +822,7 @@ Definition S_Struct_Lift_EmptyAtEnd (u : flambda_unit) : Prop :=
 (*    (doc section 6)                                                 *)
 (* ================================================================== *)
 
-(** RULE S.Struct.InlineResimplify (STATUS normative)
+(** RULE S.Struct.InlineResimplify (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
     CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml
@@ -840,7 +840,7 @@ Definition S_Struct_Lift_EmptyAtEnd (u : flambda_unit) : Prop :=
     needed. *)
 Definition S_Struct_InlineResimplify_documented : Prop := True.
 
-(** RULE S.Struct.SpeculativeSandbox (STATUS conjectured)
+(** RULE S.Struct.SpeculativeSandbox (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
     CODE middle_end/flambda2/simplify/env/downwards_acc.ml#prepare_for_speculative_inlining
@@ -863,7 +863,7 @@ Definition S_Struct_InlineResimplify_documented : Prop := True.
     construction. *)
 Definition S_Struct_SpeculativeSandbox_documented : Prop := True.
 
-(** RULE S.Struct.Resimplify (STATUS descriptive)
+(** RULE S.Struct.Resimplify (CLAIM descriptive)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_toplevel_common
     CODE middle_end/flambda2/simplify/env/upwards_acc.ml#set_resimplify
@@ -878,7 +878,7 @@ Definition S_Struct_SpeculativeSandbox_documented : Prop := True.
     (cf. S.Struct.SingleRound).  Anchor. *)
 Definition S_Struct_Resimplify_documented : Prop := True.
 
-(** RULE S.Struct.Loopify (STATUS normative)
+(** RULE S.Struct.Loopify (CLAIM normative)
     -- 09-simplify-structure.md
     CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
     CODE middle_end/flambda2/simplify/loopify_state.mli

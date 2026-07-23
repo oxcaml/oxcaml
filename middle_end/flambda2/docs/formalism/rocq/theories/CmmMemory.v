@@ -123,7 +123,7 @@ Parameter header_is_local : Z -> Prop.
 
 Inductive cmem_head : cm_config -> list cm_event -> cm_config -> Prop :=
 
-  (** RULE CM.Alloc.Heap (STATUS normative) -- 19-cmm-memory-gc.md
+  (** RULE CM.Alloc.Heap (CLAIM normative) -- 19-cmm-memory-gc.md
       CODE backend/cmm.mli#Calloc
       CODE backend/cmm_helpers.ml#make_alloc_generic
 
@@ -151,7 +151,7 @@ Inductive cmem_head : cm_config -> list cm_event -> cm_config -> Prop :=
                       (mem_local M))
                TT RR)
 
-  (** RULE CM.Region.Begin (STATUS normative) -- 19-cmm-memory-gc.md
+  (** RULE CM.Region.Begin (CLAIM normative) -- 19-cmm-memory-gc.md
       CODE backend/cmm.mli#Cbeginregion
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_region
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_try_region
@@ -170,7 +170,7 @@ Inductive cmem_head : cm_config -> list cm_event -> cm_config -> Prop :=
         (CmCfg (Cval (CV_word (region_word iota))) ce chi M TT
                (iota :: RR))
 
-  (** RULE CM.Alloc.Local (STATUS normative) -- 19-cmm-memory-gc.md
+  (** RULE CM.Alloc.Local (CLAIM normative) -- 19-cmm-memory-gc.md
       CODE backend/cmm.mli#Calloc
       CODE backend/cmm_helpers.ml#local_block_header
       CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#alloc_mode_for_allocations_to_cmm
@@ -201,7 +201,7 @@ Inductive cmem_head : cm_config -> list cm_event -> cm_config -> Prop :=
                          (8 + length bs) iota))
                TT (iota :: RR0))
 
-  (** RULE CM.Region.End (STATUS normative) -- 19-cmm-memory-gc.md
+  (** RULE CM.Region.End (CLAIM normative) -- 19-cmm-memory-gc.md
       CODE backend/cmm.mli#Cendregion
       CODE middle_end/flambda2/terms/flambda_primitive.mli#End_region
       CODE middle_end/flambda2/terms/flambda_primitive.mli#End_try_region
@@ -243,7 +243,7 @@ Inductive cmem_head : cm_config -> list cm_event -> cm_config -> Prop :=
    none of which is statable before the machtype discipline and the
    representation relation ~ of ch. 17 exist; Representation.v states
    the ~-preservation conclusion as the Admitted conjecture the rule's
-   STATUS marks it as.  Condition (v) -- local blocks are not moved --
+   CLAIM marks it as.  Condition (v) -- local blocks are not moved --
    IS statable against mem_local and is a premise of the constructor
    below rather than folded into the oracle.
    TRIPWIRE (KF-048, reviewer watch W-31): TC.Let.Subst's Calloc
@@ -260,7 +260,7 @@ Parameter gc_reloc :
 
 Inductive cmem_gc : cm_config -> list cm_event -> cm_config -> Prop :=
 
-  (** RULE CM.Alloc.GC (STATUS conjectured) -- 19-cmm-memory-gc.md
+  (** RULE CM.Alloc.GC (CLAIM normative) -- 19-cmm-memory-gc.md
       CODE backend/cmm_helpers.ml#make_alloc_generic
       CODE backend/cmm.mli#machtype_component
 
@@ -430,7 +430,7 @@ Fixpoint expr_addr_ok' (addr_pos : bool) (e : cmm_expr) : bool :=
 
 Definition expr_addr_ok : cmm_expr -> bool := expr_addr_ok' false.
 
-(** RULE CM.Addr.NoSurvive (STATUS normative) -- 19-cmm-memory-gc.md
+(** RULE CM.Addr.NoSurvive (CLAIM normative) -- 19-cmm-memory-gc.md
     CODE backend/cmm.mli#machtype_component
     CODE backend/cmm_helpers.ml#field_address
     CODE backend/cmm_helpers.ml#setfield_computed
@@ -460,7 +460,7 @@ Admitted.
 (* ------------------------------------------------------------------ *)
 (* 19 s5: resource exhaustion (Cmm.v's alloc_fails hook). *)
 
-(** RULE CM.Alloc.Exhaustion (STATUS normative) -- 19-cmm-memory-gc.md
+(** RULE CM.Alloc.Exhaustion (CLAIM normative) -- 19-cmm-memory-gc.md
     CODE backend/cmm_helpers.ml#make_alloc_generic
 
     An allocation that cannot be satisfied -- no free memory / stack

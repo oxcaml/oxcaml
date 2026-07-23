@@ -28,9 +28,10 @@ names).
 
 ```rule
 RULE S.Struct.Run
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify.ml#run
 CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
+CAVEAT disclosure: meaning-preservation of run is stated and discussed in 13-soundness.md; this rule fixes only the interface and orchestration.
 ---
 Simplify.run : cmx_loader:… -> machine_width:… -> round:int ->
                code_slot_offsets:… -> flambda_unit -> simplify_result
@@ -55,7 +56,7 @@ recording, because later chapters assume them.
 
 ```rule
 RULE S.Struct.Run.ClosedResult
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify.ml#run
 ---
 after simplification, the only variable permitted to occur free in the whole
@@ -69,7 +70,7 @@ allowed (they are the unit's imports and its own defined symbols).
 
 ```rule
 RULE S.Struct.Run.NoPendingConstants
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify.ml#run
 CODE middle_end/flambda2/simplify/lifting/lifted_constant_state.mli
 ---
@@ -87,7 +88,7 @@ passes `round = 0` and never iterates.
 
 ```rule
 RULE S.Struct.SingleRound
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
 CODE middle_end/flambda2/simplify/simplify.ml#run
 ---
@@ -119,7 +120,7 @@ continuation-passing (`simplify_common.mli`):
 
 ```rule
 RULE S.Struct.TwoPhase
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_expr
 CODE middle_end/flambda2/simplify/simplify_common.mli
 ---
@@ -149,7 +150,7 @@ whole traversal.
 
 ```rule
 RULE S.Struct.Dacc
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#t
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#t
 ---
@@ -190,7 +191,7 @@ fields load-bearing for this chapter are listed.
 
 ```rule
 RULE S.Struct.Uacc
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/env/upwards_acc.ml#t
 CODE middle_end/flambda2/simplify/env/upwards_acc.ml#create
 ---
@@ -218,9 +219,10 @@ contrast is accumulated in the dacc and never save/restored.
 
 ```rule
 RULE S.Struct.TypesMonotoneDown
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_variable
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_equation_on_name
+CAVEAT known-false: universal γ-reading REFUTED at T.Meet.MutableBlockMissedBottom; alias half holds (INV.Simplify.AliasesMonotoneDown), algorithmic half is S.Struct.EnvRefineOnly; soundness unthreatened.
 ---
 As the downwards traversal descends into a subexpression, the typing env E only
 gains equations; the type assigned to any given in-scope name only moves down
@@ -245,11 +247,12 @@ for constant/symbol (alias) witnesses but not for arbitrary concrete types.
 
 ```rule
 RULE S.Struct.EnvRefineOnly
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#with_typing_env
 CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+CAVEAT disclosure: the γ-shrink failure of part (b) (T.Meet.MutableBlockMissedBottom) has no reachable Simplify trigger found; the semantic invariant survives only as an empirical per-run observation, not by construction.
 ---
 E is the typing env at some downwards point; E' is the env installed by ANY
 DE.with_typing_env / DE.map_typing_env / DA.map_denv reachable in the downwards
@@ -285,7 +288,7 @@ T.Join.Levels.
 
 ```rule
 RULE S.Struct.SetOfClosuresEager
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_expr.mli
 CODE middle_end/flambda2/simplify/simplify_named.ml#simplify_named0
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml#simplify_non_lifted_set_of_closures
@@ -318,9 +321,10 @@ of `simplify_let_cont_expr.ml`; the load-bearing steps are below.
 
 ```rule
 RULE S.Struct.LetCont.BodyFirst
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_let_cont0
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#after_downwards_traversal_of_body
+CAVEAT disclosure: a stale code comment in simplify_let_cont0 claims the CUE is reset before the body; actual behaviour clears the CUE only per-handler at step 4.
 ---
 To simplify (let_cont k params = handler in body):
   1. save-and-clear the lifted constants;
@@ -352,7 +356,7 @@ of uses is performed at scope `n+1`, and the joined environment is bumped back t
 
 ```rule
 RULE S.Struct.ContUse
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#record_continuation_use
 CODE middle_end/flambda2/simplify/env/continuation_uses_env.mli
 CODE middle_end/flambda2/simplify/env/one_continuation_use.ml
@@ -374,10 +378,11 @@ escapes to the threaded dacc.
 
 ```rule
 RULE S.Struct.Switch.ArmIsolation
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#record_continuation_use
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
+CAVEAT watch(W-39): isolation rests on three facts in three files (record_continuation_use leaves denv untouched, fold keeps outer dacc, compute_handler_env sole consumer); a leak in any one is a soundness hazard.
 ---
 Switch on a scrutinee with arms {iᵢ ↦ actionᵢ}; simplify_arm folds over the arms
 with accumulator (arms, dacc)
@@ -405,7 +410,7 @@ Composes: T.Meet.Bottom, T.Join.Levels, S.Struct.EnvRefineOnly.
 
 ```rule
 RULE S.Struct.JoinParams
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 CODE middle_end/flambda2/simplify/join_points.ml#join
 CODE middle_end/flambda2/types/flambda2_types.mli#cut_and_n_way_join
@@ -427,7 +432,7 @@ join, introduces extra parameters for projections/aliases known in all uses
 
 ```rule
 RULE S.Struct.JoinParams.AnalysisExtraParams
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 CODE middle_end/flambda2/simplify/join_points.ml#add_extra_params_from_join_analysis
 CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
@@ -459,7 +464,7 @@ oxcaml_flags (profiles), join_levels (algorithm dispatch), join_points
 
 ```rule
 RULE S.Struct.NoJoinUnknown
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types
 ---
@@ -473,7 +478,7 @@ add_parameters_with_unknown_types for both the ordinary and the extra params.
 
 ```rule
 RULE S.Struct.SingleInlinableUse
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
 ---
 If k is non-recursive with exactly one use and that use is Inlinable, no join is
@@ -492,11 +497,12 @@ join synthesizes a phi node as a fresh continuation parameter.
 
 ```rule
 RULE S.Struct.CSE.JoinPhi
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#join_one_cse_equation
 CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#cse_with_eligible_lhs
 CODE middle_end/flambda2/simplify/common_subexpression_elimination.ml#cut_cse_environment
 CODE middle_end/flambda2/simplify/join_points.ml#join
+CAVEAT disclosure: known precision loss (CR-someday lmaurer): a bᵢ canonicalizing to a fork param with no unique non-param alias (Alias_set.get_singleton) defeats the phi introduction.
 ---
 continuation k, joining enabled (S.Struct.JoinParams gate), uses u₁ … uₘ;
 p a CSE-eligible primitive (S.Rewrite.CSE.Eligible) such that for EVERY use uᵢ the
@@ -535,7 +541,7 @@ shared by all handlers in the recursive group) and each handler's own
 
 ```rule
 RULE S.Struct.Rec.NoFixpoint
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
@@ -552,7 +558,7 @@ not the parameter types already fixed.
 
 ```rule
 RULE S.Struct.Rec.InvariantVsVariant
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
 CODE middle_end/flambda2/simplify/join_points.ml#compute_handler_env
@@ -593,7 +599,7 @@ the job of `Apply_cont_rewrite`.
 
 ```rule
 RULE S.Struct.ApplyContRewrite
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/apply_cont_rewrite.mli
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_single_non_recursive_handler
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#make_rewrite_for_recursive_continuation
@@ -623,11 +629,12 @@ subgraph of continuations and the bindings feeding it, transitively, in one pass
 
 ```rule
 RULE S.Struct.LetCont.UnreachableClosure
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_recursive_handlers
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_arm
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#rebuild_let_cont
+CAVEAT disclosure: same-pass transitive deadness is not exact — required_names-based decisions can lag one round via S.Rewrite.Switch.Merge (scrutinee occurrence evaporates upwards after required_names is fixed).
 ---
 Body B under downwards traversal. Define the residual jump graph J: nodes =
 {entry} ∪ continuations of B; an edge (site owner) → k′ for every apply_cont /
@@ -671,12 +678,13 @@ leaf.
 
 ```rule
 RULE S.Struct.LiftCont.Gate
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/are_lifting_conts.mli#t
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#get_continuation_lifting_budget
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#after_downwards_traversal_of_body_and_handlers
 CODE middle_end/flambda2/simplify/simplify_switch_expr.ml#simplify_switch
 CODE driver/oxcaml_flags.ml#o2
+CAVEAT disclosure: budget thresholds are heuristic and may drift; rely only on the five-reason gate and leaf-decision architecture as structural.
 ---
 let_cont k' is nested inside the handler of let_cont k
 --------------------------------------------------
@@ -700,6 +708,7 @@ handler is never lifted out of the loop (same for single-inlinable-use handlers 
 specialization replays). Descriptive-leaning: thresholds are heuristic, but the
 five-reason gate and leaf-decision architecture are structural. Composes:
 S.Struct.Dacc, S.Struct.SpeculativeSandbox.
+Ownership pointer: the speculative-simplification machinery this gate feeds is owned by S.Struct.SpeculativeSandbox.
 ```
 
 ## 4. The turn: dataflow analysis
@@ -712,7 +721,7 @@ upwards pass.
 
 ```rule
 RULE S.Struct.Turn
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_toplevel_common
 CODE middle_end/flambda2/simplify/flow/flow_analysis.mli#analyze
 CODE middle_end/flambda2/simplify/flow/flow_types.ml
@@ -733,7 +742,7 @@ The four facts the analysis computes:
 
 ```rule
 RULE S.Struct.Flow.RequiredNames
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/flow_types.ml#Data_flow_result
 CODE middle_end/flambda2/simplify/env/upwards_acc.ml#required_names
 CODE middle_end/flambda2/simplify/env/upwards_acc.ml#reachable_code_ids
@@ -753,7 +762,7 @@ and the code checks required_names ⊇ actual uses (S.Struct.ApplyContRewrite).
 
 ```rule
 RULE S.Struct.Flow.UnusedParams
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/flow_analysis.mli
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
 ---
@@ -773,11 +782,12 @@ binding).
 
 ```rule
 RULE S.Struct.Flow.DeadLoopParam
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#required_names
 CODE middle_end/flambda2/simplify/flow/data_flow_graph.ml#add_continuation_info
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
+CAVEAT disclosure: the multi-handler recursive-group case is untestable via fexpr today — fexpr_to_flambda's recursive multi-handler path is unimplemented, so no validation study can exist for it.
 ---
 a function body B analyzed at the turn; G = the flow dependency graph with edges
   x → FN(defn of x) for at-most-generative bindings and direct aliases, and
@@ -820,7 +830,7 @@ S.Struct.Flow.RequiredNames, S.Struct.Flow.UnusedParams, S.Rewrite.Let.DeadBindi
 
 ```rule
 RULE S.Struct.Flow.Aliases
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/flow_types.ml#Alias_result
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#extra_params_for_continuation_param_aliases
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler
@@ -840,9 +850,11 @@ removal, and alias equations are oriented around it rather than through it.
 
 ```rule
 RULE S.Struct.Flow.ExnFirstParam
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/flow/control_flow_graph.ml#minimize_extra_args_for_one_continuation
 CODE middle_end/flambda2/terms/exn_continuation.mli#t
+CAVEAT disclosure: do not read S.Rewrite.LetCont.AliasedParam locally for exception handlers — that reading is exactly wrong there; this rule records the inversion (alias recovered FROM the bucket).
+CAVEAT disclosure: no live trigger found for the Aliased{var} branch (such handlers get demoted first per S.Rewrite.LetCont.DemoteExn; Apply-exn edges self-dominate); the branch is defensive.
 ---
 k is an exception handler with first (bucket) parameter x_b that REMAINS an
   exception handler through Simplify (not demoted per S.Rewrite.LetCont.DemoteExn —
@@ -873,7 +885,7 @@ S.Rewrite.LetCont.DemoteExn.
 
 ```rule
 RULE S.Struct.Flow.MutableUnboxing
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/mutable_unboxing.mli
 CODE middle_end/flambda2/simplify/flow/flow_types.ml#Mutable_unboxing_result
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
@@ -899,7 +911,7 @@ constants*, to be emitted as "let symbol" bindings on the way up.
 
 ```rule
 RULE S.Struct.Lift.Accumulate
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/lifting/reification.ml#try_to_reify
 CODE middle_end/flambda2/simplify/lifting/lifted_constant_state.mli
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#add_to_lifted_constant_accumulator
@@ -923,7 +935,7 @@ binding is reached.
 
 ```rule
 RULE S.Struct.Lift.PlaceAtToplevel
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_let_expr.ml#rebuild_let
 CODE middle_end/flambda2/simplify/expr_builder.mli#place_lifted_constants
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#add_lets_around_handler
@@ -947,7 +959,7 @@ closure or a recursive continuation.
 
 ```rule
 RULE S.Struct.Lift.EmptyAtEnd
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify.ml#run
 ---
 When the upwards pass reaches the top of the unit, the lifted-constant
@@ -963,7 +975,7 @@ Guaranteed because the unit's top is at_unit_toplevel; run asserts it
 
 ```rule
 RULE S.Struct.InlineResimplify
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
 CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml
 ---
@@ -983,11 +995,13 @@ measure its cost. That speculative traversal is hermetic: only cost metrics esca
 
 ```rule
 RULE S.Struct.SpeculativeSandbox
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
 CODE middle_end/flambda2/simplify/env/downwards_acc.ml#prepare_for_speculative_inlining
 CODE middle_end/flambda2/simplify/flow/flow_analysis.ml#analyze
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
+CAVEAT disclosure: hermeticity is modulo benign leaks — fresh-name stamp counters, Profile counters, debug dumps — which touch no compilation state.
+CAVEAT disclosure: CR gbury at the Apply conversion admits speculation UNDERCOUNTS loopification benefit — a documented cost-model imprecision.
 ---
 an Apply reaches the inlining oracle and speculative_inlining runs the full
 Simplify machinery (down + up, including a private flow analysis) on the candidate
@@ -1020,7 +1034,7 @@ S.Struct.InlineResimplify, S.Struct.LiftCont.Gate, S.Struct.Turn.
 
 ```rule
 RULE S.Struct.Resimplify
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_toplevel_common
 CODE middle_end/flambda2/simplify/env/upwards_acc.ml#set_resimplify
 CODE middle_end/flambda2/simplify/simplify_set_of_closures.ml
@@ -1041,10 +1055,10 @@ re-run is driven from the set-of-closures / function-body machinery.
 
 ```rule
 RULE S.Struct.Loopify
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/simplify_expr.ml#simplify_function_body
 CODE middle_end/flambda2/simplify/loopify_state.mli
-VERIFIED 14-validation/loopify-01-escaping-tailrec.md
+VERIFIED 14-validation/loopify-01-escaping-tailrec.md @ 358b5366cb
 ---
 A function whose loopify attribute satisfies should_loopify — an attribute fixed
 deterministically at closure conversion (S.Rewrite.Loopify.Attribute,

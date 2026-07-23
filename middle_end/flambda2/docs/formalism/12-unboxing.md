@@ -77,7 +77,7 @@ use) are computed later, on the upwards pass, by
 
 ```rule
 RULE S.Unbox.ContParam.Hook
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#prepare_dacc_for_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
 CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#make_decisions
@@ -169,10 +169,10 @@ parameter whose kind is not `Value` is not of a shape we unbox
 
 ```rule
 RULE S.Unbox.Optimistic.Number
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision
 CODE middle_end/flambda2/simplify/unboxing/unboxers.ml
-VERIFIED 14-validation/new-07-float-unbox.md
+VERIFIED 14-validation/new-07-float-unbox.md @ c59c5780b0
 ---
 E ⊢ prove_is_a_boxed_<nnk>(param_type) ⇒ Proved ()   for some naked-number kind nnk
 --------------------------------------------------
@@ -183,7 +183,7 @@ NOTES: The deciders are tried in order: immediate (untagging), float, float32,
 
 ```rule
 RULE S.Unbox.Optimistic.Block
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_fields
 ---
@@ -202,7 +202,7 @@ NOTES: The meet against the reconstructed block both checks feasibility and
 
 ```rule
 RULE S.Unbox.Optimistic.Closure
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_vars_within_closure
 ---
 E ⊢ prove_single_closures_entry(param_type) ⇒ Proved (function_slot, _, entry, _)
@@ -215,7 +215,7 @@ Unbox?(param, uses) → Unbox (Closure_single_entry { function_slot;
 
 ```rule
 RULE S.Unbox.Depth
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
 CODE driver/oxcaml_flags.ml#Flambda2.Expert
 ---
@@ -254,7 +254,7 @@ this use, decides how the component is obtained:
 
 ```rule
 RULE S.Unbox.ExtraArg.Available
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
 CODE middle_end/flambda2/simplify/unboxing/unboxers.ml
 ---
@@ -269,7 +269,7 @@ NOTES: The component is already a Simple in scope (e.g. the box was itself built
 
 ```rule
 RULE S.Unbox.ExtraArg.Project
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
 ---
 the argument at this use is a Simple s available in E_use
@@ -283,7 +283,7 @@ NOTES: The component is not statically known; the use site gains a let-binding
 
 ```rule
 RULE S.Unbox.ExtraArg.Invalid
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#unbox_arg
 ---
 E_use ⊢ unboxer.prove_simple(alias_type_of s) ⇒ Invalid
@@ -311,7 +311,7 @@ encounter a `Prevent_current_unboxing` (that would be a compiler bug).
 
 ```rule
 RULE S.Unbox.Refine.Pass
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#refine_decision_based_on_arg_types_at_uses
 CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#compute_extra_params_and_args
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_one_decision_and_use
@@ -335,7 +335,7 @@ its (transitively reachable) components is; otherwise it is demoted to
 
 ```rule
 RULE S.Unbox.Beneficial
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/is_unboxing_beneficial.ml#is_unboxing_beneficial_for_epa
 CODE middle_end/flambda2/simplify/unboxing/is_unboxing_beneficial.ml#filter_non_beneficial_decisions
 ---
@@ -356,11 +356,12 @@ accumulator loses its per-iteration allocation.
 
 ```rule
 RULE S.Unbox.Loopify.AccumBoxElim
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#make_decisions
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_number_decision
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#decide_param_usage_recursive
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
+CAVEAT disclosure: both directions witnessed on float-accumulator variants (boxed exit keeps box, int_of_float exit removes it); no code-anchored proof.
 ---
 Code c is loopified (S.Rewrite.Loopify.Body), self continuation k;
 parameter pⱼ of k has a boxed-number declared subkind (boxed float / float32 /
@@ -428,7 +429,7 @@ carrying the redundant tag/`is_int` discriminators.
 
 ```rule
 RULE S.Unbox.Optimistic.Variant
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/optimistic_unboxing_decision.ml#make_optimistic_decision
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant
 ---
@@ -443,7 +444,7 @@ Unbox?(param, uses) → Unbox (Variant { tag; const_ctors; fields_by_tag })
 
 ```rule
 RULE S.Unbox.Variant.Discriminator
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#compute_extra_args_for_variant
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#extra_args_for_const_ctor_of_variant
 ---
@@ -477,7 +478,7 @@ constant constructors and exactly one block case with tag zero (records/pairs).
 
 ```rule
 RULE S.Unbox.FunParam.Wrapper
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps_function
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#compute_body_of_unboxed_function
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#make_unboxed_function_wrapper
@@ -503,7 +504,7 @@ parameters.
 
 ```rule
 RULE S.Unbox.Denv.Equation
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#denv_of_decision
 CODE middle_end/flambda2/simplify/unboxing/build_unboxing_denv.ml#add_equation_on_var
 ---
@@ -534,12 +535,13 @@ parameter being retained when needed.
 
 ```rule
 RULE S.Unbox.ContParam.Rewrite
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/unboxing/unboxing_epa.ml#add_extra_params_and_args
 CODE middle_end/flambda2/simplify/apply_cont_rewrite.ml#create
 CODE middle_end/flambda2/simplify/expr_builder.ml#rewrite_apply_cont
 CODE middle_end/flambda2/simplify/unboxing/unbox_continuation_params.ml#compute_extra_params_and_args
-VERIFIED 14-validation/new-07-float-unbox.md
+VERIFIED 14-validation/new-07-float-unbox.md @ c59c5780b0
+CAVEAT disclosure: exact term shape is algorithm-dependent (a descriptive claim); trust rests on separately anchored ingredient rules plus the §8 example vs a real .simplify.reference.
 ---
 Unbox?(x, uses) → Unbox U with component parameters x₁…xₙ (flattened from U)
 E_handler ⊢ x : box(x₁…xₙ)     (S.Unbox.Denv.Equation)
@@ -588,9 +590,10 @@ constructing primitive has been removed.
 
 ```rule
 RULE S.Unbox.Mutable.Candidate
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#blocks_to_unbox
 CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#escaping
+CAVEAT disclosure: the claim's boundary is the completeness of the three escape analyses (especially escaping_by_use via New_let_binding dependencies and value-slot capture).
 ---
 prim = Make_block { tag; mut; fields } binding var, reachable in the flow graph
 Simple.var var is required (live)
@@ -611,10 +614,10 @@ into a rewrite (`Named_rewrite`) over the local field bindings:
 
 ```rule
 RULE S.Unbox.Mutable.Rewrite
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#Fold_prims.apply_prim
 CODE middle_end/flambda2/simplify/flow/mutable_unboxing.ml#compute_rewrites
-VERIFIED 14-validation/new-07-float-unbox.md
+VERIFIED 14-validation/new-07-float-unbox.md @ c59c5780b0
 ---
 block b ∈ blocks_to_unbox with current field bindings fields
 --------------------------------------------------

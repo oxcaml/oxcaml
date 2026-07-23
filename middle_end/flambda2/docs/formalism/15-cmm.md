@@ -91,10 +91,11 @@ well-formedness precondition inherited from `to_cmm`, not re-checked here.
 
 ```rule
 RULE CM.Syntax.Fragment
-STATUS descriptive
+CLAIM descriptive
 CODE backend/cmm.mli#expression
 CODE backend/cmm.mli#operation
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
+CAVEAT disclosure: Cexit label-boundedness is a to_cmm-inherited precondition, re-checked nowhere in the machine — violations manifest as stuck configurations.
 ---
 The grammar above is the fragment of Cmm.expression / Cmm.operation that
 to_cmm_expr.ml#expr and to_cmm_primitive.ml emit for the in-scope Flambda
@@ -139,10 +140,11 @@ Memory is **byte-addressed** and little-endian. Multi-byte access is defined by
 
 ```rule
 RULE CM.Mem.LoadStore
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#memory_chunk
 CODE backend/cmm.mli#size_of_memory_chunk
 CODE backend/cmm_helpers.ml#mk_load_immut
+CAVEAT disclosure: Rule hardcodes the 64-bit little-endian target (byte order, b = 8 word chunks); not valid as stated for other word sizes or big-endian.
 ---
 For a chunk κ of width b = size_of_memory_chunk κ bytes (Byte=1, Sixteen=2,
 Thirtytwo/Single=4, Word_int/Word_val/Double=8,
@@ -215,9 +217,10 @@ argument positions are ordinary `Cop` positions.
 
 ```rule
 RULE CM.Context
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 CODE backend/cmm.mli#expression
+CAVEAT disclosure: Evaluation-order modeling choice — code leaves Cop-argument order unspecified (Selectgen, historically right-to-left); model fixes left-to-right for determinism.
 ---
 If ⟨r, ce, χ, M, TT, RR⟩ ⟶c ⟨r′, ce′, χ′, M′, TT′, RR′⟩ for a redex r, then
 ⟨E[r], ce, χ, M, TT, RR⟩ ⟶c ⟨E[r′], ce′, χ′, M′, TT′, RR′⟩,
@@ -250,10 +253,11 @@ no tagging; tagging is arithmetic introduced by `to_cmm`, ch. 18).
 
 ```rule
 RULE CM.Op.Pure
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#operation
 CODE backend/cmm_helpers.ml#add_int
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
+CAVEAT disclosure: Cstatic_cast (Float_of_int Float32) is a single rounding; the known int→float32 double-rounding defect (ch. 13 §4.7, ch. 18) is in Simplify's constant fold, not here.
 ---
 op ∈ {Caddi,Csubi,Cmuli,Cdivi,Cmodi,Cand,Cor,Cxor,Clsl,Clsr,Casr,Ccmpi _,
       Cnegf _,Caddf _,Csubf _,Cmulf _,Cdivf _,Ccmpf _,Cstatic_cast _,
@@ -280,7 +284,7 @@ multi-value returns) are carried by `Ctuple [v̄]`, a transient bundle projected
 
 ```rule
 RULE CM.Op.TupleField
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Ctuple_field
 CODE backend/cmm_helpers.ml#tuple_field
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call
@@ -306,7 +310,7 @@ shape is given here. What the resulting bytes *mean* as an OCaml value is `≈`
 
 ```rule
 RULE CM.Load
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cload
 CODE backend/cmm_helpers.ml#mk_load_immut
 ---
@@ -320,9 +324,10 @@ CSE-/reorder-eligible, ch. 06/18); it does not change the value read.
 
 ```rule
 RULE CM.Store
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cstore
 CODE backend/cmm_helpers.ml#setfield_computed
+CAVEAT disclosure: Model widening — backend bare Cstore is void (unit comes from the trailing Cconst_int 1); model totalizes it to word 1, observationally irrelevant since never consumed.
 ---
 ⟨Cop(Cstore(κ, ι), [word a; v], dbg), ce, χ, M, TT, RR⟩
   ⟶c ⟨word 1 (unit), ce, χ, write(M, a, κ, v), TT, RR⟩
@@ -347,7 +352,7 @@ pointer-store barrier discipline is why to_cmm emits caml_modify for value store
 
 ```rule
 RULE CM.If
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cifthenelse
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
 ---
@@ -362,7 +367,7 @@ scrutinee; arm 0 is the else branch.
 
 ```rule
 RULE CM.Switch
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cswitch
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
 CODE backend/cmm_helpers.ml#transl_switch_clambda
@@ -380,7 +385,7 @@ Cmm image of OS.Switch / OS.Switch.Undef (04-opsem.md §5).
 
 ```rule
 RULE CM.Catch.NonRec
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Ccatch
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined
 CODE backend/cmm_helpers.ml#create_ccatch
@@ -396,7 +401,7 @@ non-inlined, non-exn Flambda continuation.
 
 ```rule
 RULE CM.Catch.Rec
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Ccatch
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec
 ---
@@ -412,7 +417,7 @@ recursive Flambda continuation group (loop). to_cmm flushes before entering
 
 ```rule
 RULE CM.Exit
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cexit
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 ---
@@ -429,7 +434,7 @@ actions below.
 
 ```rule
 RULE CM.Exit.Trap
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#trap_action
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
@@ -449,7 +454,7 @@ INV.ToCmm.Control).
 
 ```rule
 RULE CM.Exit.Return
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#exit_label
 CODE backend/cmm_helpers.ml#trap_return
 ---
@@ -468,7 +473,7 @@ CM.Unit.Final is the special case tā = [] at the toplevel initialiser.
 
 ```rule
 RULE CM.Catch.Exn
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Exn_handler
 CODE backend/cmm_helpers.ml#trywith
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler
@@ -493,7 +498,7 @@ TC.LetCont.Exn).
 
 ```rule
 RULE CM.Raise
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Craise
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
 CODE backend/cmm_helpers.ml#raise_prim
@@ -528,9 +533,10 @@ events are part of the caller's trace.
 
 ```rule
 RULE CM.Apply
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Capply
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0
+CAVEAT disclosure: caml_apply/caml_curry arity-dispatch calling convention deliberately not expanded here; rule abstracts over it (arity behaviour described in 04-opsem.md §6.2).
 ---
 e_c = Cop(Capply{result_type; region; callees}, [w_code; v̄_args], dbg)
 w_code addresses a function whose code, applied to v̄_args, RETURNS: the
@@ -558,7 +564,7 @@ records possible direct targets (Indirect_known_arity).
 
 ```rule
 RULE CM.Apply.Raise
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Capply
 CODE backend/cmm.mli#Craise
 ---
@@ -586,7 +592,7 @@ catches the exception (CM.Region.End's pop-down-to-ι shape, [19](19-cmm-memory-
 
 ```rule
 RULE CM.Extcall
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cextcall
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_external_call
 ---
@@ -608,10 +614,11 @@ promise it. A raising external transfers to the current trap handler.
 
 ```rule
 RULE CM.Invalid
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cinvalid
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid
+CAVEAT disclosure: Model-vs-code choice — compiler lowers Cinvalid to an aborting caml_flambda2_invalid call; model deliberately treats it as stuck, following ch. 04.
 ---
 e_c = Cinvalid { message }
 --------------------------------------------------
@@ -633,9 +640,10 @@ ends by reaching `Return_lbl` (normal) or exhausting the trap stack with a raise
 
 ```rule
 RULE CM.Unit.Final
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 CODE backend/cmm.mli#Cdata
+CAVEAT disclosure: Correspondence holds modulo resource exhaustion (allocation failure/stack overflow) — an observable Cmm outcome absent from the Flambda machine; carved out in ch. 20.
 ---
 Normal termination:  a Cexit(Return_lbl, [v̄], []) with TT balanced to the base
     ⟶c halt; the observable module value is the bytes of the module block reachable

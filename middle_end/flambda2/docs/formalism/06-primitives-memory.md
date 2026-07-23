@@ -188,11 +188,11 @@ suffix holds only unboxed scalars; `flambda_kind.ml` comment on
 
 ```rule
 RULE P.MixedShape.FieldKinds
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.from_prefix_size_and_suffix_elements
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Scannable_block_shape.element_kind
 CODE middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape.field_kinds
-VERIFIED 14-validation/mixed-01-record.md
+VERIFIED 14-validation/mixed-01-record.md @ c59c5780b0
 ---
 field_kinds(σ) = [ Value, … (p copies) …, kind(e₁), …, kind(e_m) ]
 field_kinds(σ)(i) = Value                     if 0 ≤ i < p
@@ -209,7 +209,7 @@ P.MixedShape.Offset).
 
 ```rule
 RULE P.MixedShape.Offset
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Flat_suffix_element0.size_in_words
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.size_in_words
@@ -253,7 +253,7 @@ primitive. The four components are independent axes.
 
 ```rule
 RULE P.Effects.Classification
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/effects_and_coeffects.ml
 CODE middle_end/flambda2/terms/effects.ml
 CODE middle_end/flambda2/terms/coeffects.ml
@@ -276,7 +276,7 @@ change. Placement and Validity further restrict motion (below).
 
 ```rule
 RULE P.Effects.NoEffects
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/effects.ml#t
 ---
 --------------------------------------------------
@@ -287,7 +287,7 @@ constrain reordering.)
 
 ```rule
 RULE P.Effects.OnlyGenerative
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/effects.ml#t
 ---
 --------------------------------------------------
@@ -302,7 +302,7 @@ changes nothing in, the pre-existing heap.
 
 ```rule
 RULE P.Effects.Arbitrary
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/effects.ml#t
 ---
 --------------------------------------------------
@@ -315,7 +315,7 @@ duplicated.
 
 ```rule
 RULE P.Effects.Coeffects
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/coeffects.ml#t
 ---
 --------------------------------------------------
@@ -330,7 +330,7 @@ CSE-able across such operations.
 
 ```rule
 RULE P.Effects.Placement
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/placement.ml#t
 ---
 --------------------------------------------------
@@ -348,9 +348,11 @@ enforces but every producer respects.
 
 ```rule
 RULE P.Effects.DelayDuplicable
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects
 CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
+CAVEAT disclosure: Delay's duplicability side condition (TC.Let.Subst, §18, silently depends on it) is enforced by no assertion; every producer respects it by convention only.
+CAVEAT disclosure: enforced nowhere (no assertion); the classic-mode Box_number Delay arm pushes the boundary and enables the headline INV.ToCmm.Simulates PhysEqual discrepancy (§20).
 ---
 for every primitive p: placement(p) = Delay
 --------------------------------------------------
@@ -377,7 +379,7 @@ INV.ToCmm.EffectLinear.
 
 ```rule
 RULE P.Effects.Validity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/validity.ml#t
 ---
 --------------------------------------------------
@@ -403,7 +405,7 @@ from `Reading`/`Writing` helpers.
 
 ```rule
 RULE P.Effects.Pure
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/effects_and_coeffects.ml#pure
 CODE middle_end/flambda2/terms/effects_and_coeffects.ml#pure_can_be_duplicated
 ---
@@ -416,7 +418,7 @@ read                 = (No_effects, Has_coeffects, Strict, Can't_move_before_any
 
 ```rule
 RULE P.Effects.ReadingFromBlock
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#reading_from_a_block
 ---
 μ = Immutable ∨ μ = Immutable_unique  ⟹  Coeffects = No_coeffects
@@ -433,7 +435,7 @@ identically; a String load is always Immutable, a Bytes/Bigstring load Mutable.
 
 ```rule
 RULE P.Effects.Writing
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_block
 ---
 --------------------------------------------------
@@ -445,7 +447,7 @@ writing_to_bytes_or_bigstring.
 
 ```rule
 RULE P.Effects.Allocation
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_variadic_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#coeffects_of_mode
 ---
@@ -472,7 +474,7 @@ rounding-mode change in intervening C code cannot be reordered past them (see
 
 ```rule
 RULE P.Variadic.MakeBlock.Values
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
 CODE middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_block
 ---
@@ -487,7 +489,7 @@ frontend/kinding invariant, [§03](03-kinds.md)); a mismatch is ill-formed, not 
 
 ```rule
 RULE P.Variadic.MakeBlock.NakedFloats
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
 ---
 p = Make_block(Naked_floats, μ, mode)      v̄ = f₁ … fₙ  (naked floats)
@@ -499,12 +501,12 @@ NOTES: Runtime representation uses Double_array_tag.
 
 ```rule
 RULE P.Variadic.MakeBlock.Mixed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
 CODE middle_end/flambda2/terms/flambda_primitive.ml#args_kind_of_variadic_primitive
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 CODE middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape
-VERIFIED 14-validation/mixed-01-record.md
+VERIFIED 14-validation/mixed-01-record.md @ c59c5780b0
 ---
 prim = Make_block(Mixed(t, σ), μ, mode)      σ = ⟨p, ē⟩,  p + |ē| = n
 v̄ = v₁ … vₙ      kind(vᵢ) = field_kinds(σ)(i−1)  for each i  (P.MixedShape.FieldKinds)
@@ -527,7 +529,7 @@ A field whose kind disagrees with field_kinds(σ) is ill-formed by kinding
 
 ```rule
 RULE P.Variadic.MakeArray
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive
 CODE middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_array
 ---
@@ -551,11 +553,11 @@ field is a `Scannable_block_shape` (`Value_only` or `Mixed_record σ`).
 
 ```rule
 RULE P.Static.MixedBlock
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/static_const.ml#t
 CODE middle_end/flambda2/terms/static_const.ml#block_field_kind
 CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#static_const0
-VERIFIED 14-validation/mixed-02-static.md
+VERIFIED 14-validation/mixed-02-static.md @ c59c5780b0
 ---
 sc = Block(t, μ, Mixed_record σ, [s₀ … sₙ₋₁])      n = p + |ē|
 kind(sᵢ) = field_kinds(σ)(i)  for each i  (block_field_kind = Scannable_block_shape.element_kind)
@@ -576,13 +578,14 @@ the static case; the machine object is the same MixedBlock as for Make_block.
 `Begin_region`/`Begin_try_region` do not fit `⟦p⟧(v̄; H) = (v, H′)` because they
 push onto the region stack `R`. We use the augmented form `⟦p⟧(v̄; H, R) = (v,
 H′, R′)`; [§04](04-opsem.md)'s machine rules embed these. They are presented here for
-completeness and marked `conjectured` pending [§04](04-opsem.md)'s exact `R` structure.
+completeness; provisional pending [§04](04-opsem.md)'s exact `R` structure.
 
 ```rule
 RULE P.Variadic.BeginRegion
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_begin_region
+CAVEAT disclosure: the augmented R-threading judgment is provisional pending 04's exact region-stack structure.
 ---
 ι fresh      R′ = push(ι, R)
 --------------------------------------------------
@@ -597,8 +600,9 @@ true} and exist only to structure nesting without a runtime effect.
 
 ```rule
 RULE P.Variadic.BeginTryRegion
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive
+CAVEAT disclosure: the augmented R-threading judgment is provisional pending 04's exact region-stack structure.
 ---
 ι fresh      R′ = push(ι, R)
 --------------------------------------------------
@@ -616,7 +620,7 @@ allocations. Same classification as Begin_region.
 
 ```rule
 RULE P.Unary.BlockLoad
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_mutable_block_load
@@ -641,7 +645,7 @@ CSE) — see unary_primitive_eligible_for_cse.
 
 ```rule
 RULE P.Unary.BlockLoad.NakedFloats
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind
 ---
 p = Block_load { kind = Naked_floats _; mut; field = i }
@@ -652,11 +656,11 @@ H(ℓ) = FloatBlock(μ, [f₀ … fₙ₋₁])      0 ≤ i < n
 
 ```rule
 RULE P.Unary.BlockLoad.Mixed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
 CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.element_kind_for_load
 CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape
-VERIFIED 14-validation/mixed-01-record.md
+VERIFIED 14-validation/mixed-01-record.md @ c59c5780b0
 ---
 p = Block_load { kind = Mixed { shape = σ; field_kind = fk; … }; mut; field = i }
 H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|
@@ -679,7 +683,7 @@ if i is out of range, or if fk disagrees with from_block_shape(σ, i).
 
 ```rule
 RULE P.Binary.BlockSet
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
 ---
@@ -704,7 +708,7 @@ error, not modelled as undef here.
 
 ```rule
 RULE P.Binary.BlockSet.NakedFloats
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
 ---
@@ -726,11 +730,11 @@ Float_record classification).
 
 ```rule
 RULE P.Binary.BlockSet.Mixed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
 CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set
-VERIFIED 14-validation/mixed-03-mutable-set.md
+VERIFIED 14-validation/mixed-03-mutable-set.md @ c59c5780b0
 ---
 p = Block_set { kind = Mixed { shape = σ; field_kind = fk; … }; init; field = i }
 H(ℓ) = MixedBlock(t, μ, σ, [v₀ … vₙ₋₁])      0 ≤ i < n = p + |ē|
@@ -753,7 +757,7 @@ precondition; the store proceeds regardless of μ.
 
 ```rule
 RULE P.Unary.DuplicateBlock
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 p = Duplicate_block { kind }
@@ -770,7 +774,7 @@ moved past a write to the source.
 
 ```rule
 RULE P.Unary.DuplicateBlock.Mixed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Duplicate_block_kind
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -788,7 +792,7 @@ wholesale. Same classification as the general rule.
 
 ```rule
 RULE P.Unary.DuplicateArray
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -806,7 +810,7 @@ Mutable source copy has coeffects. Effects are Only_generative_effects(μ_d).
 
 ```rule
 RULE P.Unary.IsInt.Immediate
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int
 ---
@@ -818,7 +822,7 @@ NOTES: Is_int returns a naked immediate 1 (true) on a tagged immediate.
 
 ```rule
 RULE P.Unary.IsInt.Pointer
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int
 ---
@@ -836,7 +840,7 @@ is a pointer-shaped value; see Is_null for the null test.
 
 ```rule
 RULE P.Unary.IsNull
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 --------------------------------------------------
@@ -848,7 +852,7 @@ Is_int: a non-null pointer and a non-null immediate both give 0.
 
 ```rule
 RULE P.Unary.GetTag
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_get_tag
 ---
@@ -866,7 +870,7 @@ conjectured undef (Get_tag is a block operation).
 
 ```rule
 RULE P.Unary.GetHeader
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 H(ℓ) = o      o a block with tag ≤ No_scan_tag
@@ -875,7 +879,7 @@ H(ℓ) = o      o a block with tag ≤ No_scan_tag
 NOTES: Reads the raw block header (encoding tag, size and GC colour bits). undef
 on an immediate argument (stated in the mli) and must not be used to read tags
 above No_scan_tag. Only the colour bits' "is this locally allocated" information
-is reliable. No_effects, No_coeffects. Marked conjectured: the exact header
+is reliable. No_effects, No_coeffects. The exact header
 encoding is target-specific and not modelled precisely.
 ```
 
@@ -883,7 +887,7 @@ encoding is target-specific and not modelled precisely.
 
 ```rule
 RULE P.Unary.ArrayLength
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_array_length
 ---
@@ -899,7 +903,7 @@ against the array's type.
 
 ```rule
 RULE P.Unary.StringLength
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_string_length
 ---
@@ -913,10 +917,10 @@ NOTES: n is the byte length. No_effects, No_coeffects — even for Bytes, the
 
 ```rule
 RULE P.Unary.BigarrayLength
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
-VERIFIED 14-validation/bigarray_access.md
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 ---
 p = Bigarray_length { dimension = d }
 H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      1 ≤ d ≤ n
@@ -933,7 +937,7 @@ effectful code.
 
 ```rule
 RULE P.Unary.ProjectFunctionSlot
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_function_slot
 ---
@@ -951,7 +955,7 @@ a set of closures, or move_from/move_to are not slots of that set.
 
 ```rule
 RULE P.Unary.ProjectValueSlot
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
 ---
@@ -972,7 +976,7 @@ w is not one of its value slots.
 
 ```rule
 RULE P.Unary.IsBoxedFloat
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 H(ℓ) = Boxed(Naked_float, _)   ⟹  b = 1
@@ -982,14 +986,14 @@ H(ℓ) = o, o not a boxed float  ⟹  b = 0
 NOTES: Only valid when the float-array optimisation is enabled. Tests the
 runtime tag to distinguish a boxed float from other blocks. No_effects,
 No_coeffects (tags are immutable). Is_flat_float_array is analogous, testing for
-a Double_array_tag (FloatBlock) array. Marked conjectured pending validation.
+a Double_array_tag (FloatBlock) array. Pending validation against the code.
 ```
 
 ### Regions (unary side)
 
 ```rule
 RULE P.Unary.EndRegion
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -1009,7 +1013,7 @@ augmented judgment threads R; [§04](04-opsem.md) owns the precise region-stack 
 
 ```rule
 RULE P.Unary.EndTryRegion
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 R = push(ι, R′)
@@ -1023,7 +1027,7 @@ invariant as End_region.
 
 ```rule
 RULE P.Unary.ObjDup
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 H(ℓ) = o
@@ -1038,7 +1042,7 @@ them.
 
 ```rule
 RULE P.Unary.OpaqueIdentity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -1053,7 +1057,7 @@ delete it. `middle_end_only = true` means it is erased before code generation
 
 ```rule
 RULE P.Unary.MakeLazy
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 p = Make_lazy t      t ∈ {Lazy_tag, Forward_tag}
@@ -1071,7 +1075,7 @@ R.Obj.Lazy (17) for the representation.
 
 ```rule
 RULE P.Unary.IntAsPointer
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 --------------------------------------------------
@@ -1079,7 +1083,7 @@ CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 NOTES: Reinterprets an integer as a pointer value (unsafe, used for low-level
 interop). Effects No_effects; coeffects depend on `mode` (Local ⟹ Has_coeffects,
 Heap ⟹ No_coeffects) via coeffects_of_mode, and only the Heap case is CSE-eligible.
-Denotation marked conjectured — this is a raw address computation not otherwise
+Denotation ungrounded — this is a raw address computation not otherwise
 modelled.
 ```
 
@@ -1091,7 +1095,7 @@ modelled.
 
 ```rule
 RULE P.Binary.ArrayLoad
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load
 ---
@@ -1122,7 +1126,7 @@ and j+1, side by side little-endian.
 
 ```rule
 RULE P.Binary.ArrayLoad.Vector
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
@@ -1156,9 +1160,11 @@ never constant-folded even from known immutable arrays.
 
 ```rule
 RULE P.Binary.StringOrBigstringLoad
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load
+CAVEAT known-false: 'String load Immutable, CSE-able' fails — deprecated %caml_string_get* may read mutable bytes (witness tests/prim-bigstring/string_access.ml); only the Contents-known fold stays sound.
+CAVEAT pending-upstream: contents-known String-load fold lives only on branch `flambda2-string-load-fold` (commit 9712d270eb); mainline simplify_string_or_bigstring_load is a stub; proviso lifts when it lands.
 ---
 p = String_or_bigstring_load(slv, width)      byte width w = byte_width_of_string_accessor_width width
 H(ℓ) = Bytes(μ, b̄)  (slv ∈ {String, Bytes})  or  Bigstring(b̄) (slv = Bigstring)
@@ -1199,9 +1205,11 @@ mainline. This proviso lifts when that branch lands.
 
 ```rule
 RULE P.Binary.PhysEqual
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal
+CAVEAT disclosure: REVISED per 13 §4 item 8 (adopted 2026-07-22); the previous deterministic word-equality formulation was refuted by immutable-object sharing/duplication in the pipeline.
+CAVEAT disclosure: ι-class is deliberately wider than current code for LOCAL immutable objects (compiler shares/duplicates only heap allocations today); widening is in the sound direction.
 ---
 p = Phys_equal Eq
 Call vᵢ an ι-operand if it points to an *immutable heap object* — an immutable
@@ -1274,10 +1282,10 @@ multi-dimensional surface form is lowered during `from_lambda`:
 
 ```rule
 RULE P.Bigarray.Indexing
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigarray_indexing
 CODE middle_end/flambda2/from_lambda/lambda_to_lambda_transforms.ml#transform_primitive
-VERIFIED 14-validation/bigarray_access.md
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 ---
 Pbigarrayref/Pbigarrayset with known kind bk and layout, indices i₁ … iₙ
 --------------------------------------------------
@@ -1301,11 +1309,11 @@ not a Flambda term rewrite.
 
 ```rule
 RULE P.Binary.BigarrayLoad
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#reading_from_a_bigarray
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_bigarray_load
-VERIFIED 14-validation/bigarray_access.md
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 ---
 p = Bigarray_load(dims, bk, layout)
 H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      n = dims
@@ -1333,7 +1341,7 @@ mismatch. Simplify never const-folds these loads
 
 ```rule
 RULE P.Binary.BigarrayGetAlignment
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 CODE backend/cmm_helpers.ml#bigstring_get_alignment
 ---
@@ -1355,7 +1363,7 @@ a given bigstring never changes).
 
 ```rule
 RULE P.Binary.AtomicLoadField
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 ---
 p = Atomic_load_field fk      H(ℓ) = Block(t, μ, v̄)      i = tagged_imm j
@@ -1370,7 +1378,7 @@ model has no concurrency, so the "atomic"/ordering content is prose only.
 
 ```rule
 RULE P.Binary.Poke
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 ---
 p = Poke sif      addr a naked pointer      v a scalar of kind sif
@@ -1386,7 +1394,7 @@ alignment; this model does not track raw addresses, so treated descriptively.
 
 ```rule
 RULE P.Binary.ReadOffset
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 ---
 p = Read_offset(κ̂, mut)      base b      byte offset δ
@@ -1402,7 +1410,7 @@ The unary `Peek` is the read dual of `Poke`:
 
 ```rule
 RULE P.Unary.Peek
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 ---
 p = Peek sif      addr a naked pointer
@@ -1419,7 +1427,7 @@ treated descriptively as raw addressing is unmodelled.
 
 ```rule
 RULE P.Ternary.ArraySet
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_array_set
 ---
@@ -1439,7 +1447,7 @@ P.Ternary.ArraySet.Vector below.
 
 ```rule
 RULE P.Ternary.ArraySet.Vector
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
@@ -1462,7 +1470,7 @@ range or on an immutable array.
 
 ```rule
 RULE P.Ternary.BytesOrBigstringSet
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bytes_or_bigstring_set
 ---
@@ -1481,11 +1489,11 @@ aligned vector widths) misaligned is undef. writing_to_bytes_or_bigstring:
 
 ```rule
 RULE P.Ternary.BigarraySet
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_bigarray
 CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bigarray_set
-VERIFIED 14-validation/bigarray_access.md
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 ---
 p = Bigarray_set(dims, bk, layout)
 H(ℓ) = Bigarray(bk, layout, [d₁ … dₙ], ē)      n = dims
@@ -1508,7 +1516,7 @@ as opaque unit (simplify_bigarray_set).
 
 ```rule
 RULE P.Ternary.AtomicSetField
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 ---
 p = Atomic_set_field fk      H(ℓ) = Block(t, μ, v̄)      i = tagged_imm j
@@ -1525,7 +1533,7 @@ Descriptive: no concurrency in this model.
 
 ```rule
 RULE P.Ternary.WriteOffset
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 ---
 p = Write_offset(wk, κ̂, mode)      base b      byte offset δ      payload v
@@ -1545,7 +1553,7 @@ Conjectured/unsafe: raw addressing unmodelled.
 
 ```rule
 RULE P.Quaternary.AtomicCompareAndSetField
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#quaternary_primitive
 ---
 p = Atomic_compare_and_set_field fk
@@ -1568,7 +1576,7 @@ Descriptive: no concurrency in this model.
 
 ```rule
 RULE P.Nullary.StateAccessors
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive
 ---
@@ -1584,7 +1592,7 @@ change that context, but they do not themselves change the world. Descriptive
 
 ```rule
 RULE P.Nullary.ControlBarriers
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive
 ---
@@ -1613,7 +1621,7 @@ explicit test that raises before the primitive runs.
 
 ```rule
 RULE P.Unchecked.FrontendInsertsChecks
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_array_access
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_bound
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#checked_access
@@ -1642,7 +1650,7 @@ and the SIMD reinterpret array accesses — need a stronger bound than
 
 ```rule
 RULE P.Unchecked.WideAccess
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#actual_max_length_for_string_like_access_as_nativeint
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigstring_alignment_validity_condition

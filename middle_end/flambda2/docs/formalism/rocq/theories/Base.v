@@ -449,7 +449,7 @@ Definition ws_of_kind (k : kind) : kind_ws :=
   | _ => Mk_kind_ws k Non_nullable VS_anything
   end.
 
-(** RULE WF.Subkind.Erasable (STATUS normative) -- 03-kinds.md
+(** RULE WF.Subkind.Erasable (CLAIM normative) -- 03-kinds.md
     CODE kinds/flambda_kind.ml#With_subkind.erase_subkind
     CODE kinds/flambda_kind.ml#With_subkind.equal_ignoring_subkind
     CODE kinds/flambda_kind.ml#With_subkind.has_useful_subkind_info
@@ -487,7 +487,7 @@ Definition arity := list arity_component.
 (* A [`Unarized] arity: only singletons, i.e. a flat kind list. *)
 Definition unarized_arity := list kind_ws.
 
-(** RULE WF.Arity.Unarize (STATUS normative) -- 03-kinds.md
+(** RULE WF.Arity.Unarize (CLAIM normative) -- 03-kinds.md
     CODE kinds/flambda_arity.ml#unarize
     CODE kinds/flambda_arity.ml#Component.unarize
     Premises, in doc order:

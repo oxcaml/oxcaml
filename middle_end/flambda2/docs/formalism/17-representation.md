@@ -1,5 +1,8 @@
 # to_cmm, Stage 2: the representation relation `≈`
 
+This chapter is the double-round family's home seam; see [§13](13-soundness.md)
+§4.7 for current status.
+
 *Part of the Flambda 2 formalism; see [README.md](README.md).*
 
 This chapter defines the **representation relation** `≈` linking the *abstract*
@@ -50,10 +53,11 @@ H ≈_L M            -- whole-heap relation (every object of H laid out per L in
 
 ```rule
 RULE R.Val.Imm
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#tag_int
 CODE backend/cmm_helpers.ml#untag_int
 CODE middle_end/flambda2/kinds/flambda_kind.ml#t
+CAVEAT disclosure: 63-bit immediate range is a deliberate 64-bit-target narrowing; a target-parameterized model would open this seam (31-bit on 32-bit targets).
 ---
 tagged_imm n  ≈ᵥ  word (2·n + 1)         -- kind Value: OCaml int, tag bit set
 naked_imm  n  ≈ᵥ  word n                 -- kind Naked_immediate: untagged (switch scrutinee, tag)
@@ -68,10 +72,11 @@ The 63-vs-31-bit range is the seam a target-parameterized model would open.
 
 ```rule
 RULE R.Val.NakedNumber
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unbox_number
 CODE backend/cmm_helpers.ml#sign_extend
 CODE backend/cmm.mli#machtype_component
+CAVEAT disclosure: rule is TARGET-DEPENDENT, fixed to 64-bit; int64/nativeint coincide only here — the 32-bit split-int64 representation is deliberately deferred, not modelled.
 ---
 naked_int64 n     ≈ᵥ  word n
 naked_nativeint n ≈ᵥ  word n
@@ -98,7 +103,7 @@ like Float.
 
 ```rule
 RULE R.Val.Pointer
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load
 CODE backend/cmm_helpers.ml#field_address
 ---
@@ -115,7 +120,7 @@ are transient and must not survive allocation (ch. 19).
 
 ```rule
 RULE R.Val.Clos
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout
 CODE backend/cmm_helpers.ml#infix_field_address
@@ -141,10 +146,11 @@ Every heap block is preceded by a one-word header. `to_cmm` builds it with
 
 ```rule
 RULE R.Header
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#block_header
 CODE backend/cmm_helpers.ml#Mixed_block_support
 CODE backend/cmm_helpers.ml#caml_black
+CAVEAT disclosure: header encoding (shifts 10/8/56, reserved_header_bits = 8, addr_size_bits = 64) is 64-BIT-SPECIFIC, a deliberate narrowing from the Arch/Config-parameterized code.
 ---
 The header word for a block of tag t, size sz (in words, not counting the header),
 GC color col, and encoded prefix field pf is:
@@ -175,7 +181,7 @@ address `a` is `w`".
 
 ```rule
 RULE R.Obj.Block
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
 CODE backend/cmm_helpers.ml#make_alloc_generic
 ---
@@ -193,7 +199,7 @@ Word_val (GC-scanned); immediate fields Word_int. Cmm image of P.Variadic.MakeBl
 
 ```rule
 RULE R.Obj.Lazy
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#Lazy_block_tag
 ---
@@ -211,7 +217,7 @@ GC may still blacken, hence col unconstrained between white and black.
 
 ```rule
 RULE R.Obj.FloatBlock
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#float_header
 CODE backend/cmm_helpers.ml#make_float_alloc
 CODE backend/cmm_helpers.ml#floatarray_header
@@ -228,10 +234,11 @@ NOTES: make_float_alloc; floatarray_header uses len·size_float/size_addr = len 
 
 ```rule
 RULE R.Obj.MixedBlock
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
 CODE backend/cmm_helpers.ml#make_mixed_alloc
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
+CAVEAT disclosure: sub-word flat-field layout is LITTLE-ENDIAN-ONLY; get_field_unboxed fatal-errors on big-endian (ch. 18), so no big-endian model exists or is claimed.
 ---
 H ⊢ MixedBlock(t, μ, σ, [v₀ … v_{k−1}]) @ a ≈ₒ M    iff
   M[a−8] = hdr(t, size_in_words(σ), col(μ), value_prefix_size(σ) + 1)   -- mixed: pf = p+1
@@ -250,7 +257,7 @@ on big-endian; ch. 18). Cmm image of P.Variadic.MakeBlock.Mixed / P.Unary.BlockL
 
 ```rule
 RULE R.Obj.Array
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
 CODE backend/cmm_helpers.ml#array_indexing
 CODE backend/cmm_helpers.ml#Unboxed_or_untagged_array_tags
@@ -294,8 +301,9 @@ P.Binary.ArrayLoad / P.Ternary.ArraySet.
 
 ```rule
 RULE R.Obj.Bytes
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#string_header
+CAVEAT disclosure: string/bytes scalar-load decoding is LITTLE-ENDIAN baked in; big-endian layout not modelled.
 ---
 H ⊢ Bytes(μ, b̄) @ a ≈ₒ M    iff  |b̄| = len,
   M[a−8] = hdr(string_tag, (len + 8)/8, col(μ), 0)
@@ -313,10 +321,11 @@ P.Binary.StringOrBigstringLoad). LITTLE-ENDIAN baked in.
 
 ```rule
 RULE R.Obj.Bigarray
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#bigarray_load
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
-VERIFIED 14-validation/bigarray_access.md
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
+CAVEAT disclosure: bigarray element byte layout is LITTLE-ENDIAN baked in; big-endian layout not modelled.
 ---
 H ⊢ Bigarray(bk, layout, [d₁ … dₙ], ē) @ a ≈ₒ M    iff
   M[a−8] = hdr(custom_tag, size, col, 0)
@@ -343,11 +352,13 @@ in.
 
 ```rule
 RULE R.Obj.Boxed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
 CODE backend/cmm_helpers.ml#float_header
 CODE backend/cmm_helpers.ml#boxedint64_header
 CODE backend/cmm_helpers.ml#boxedvec128_header
+CAVEAT disclosure: int32 box payload placement is ENDIANNESS-DEPENDENT (box_int_gen); the model fixes little-endian, stating the big-endian variant without adopting it.
+CAVEAT disclosure: the big-endian int32-box variant is implemented in code but exercised by no shipped target; the model's little-endian fixing has no big-endian validation.
 ---
 H ⊢ Boxed(κ, c) @ a ≈ₒ M    iff, by κ:
   Naked_float:      M[a−8] = hdr(double_tag, 1, col, 0);  the 8 bytes at a decode to c
@@ -383,11 +394,12 @@ Cmm image of P.Unary.BoxNumber / UnboxNumber(06).
 
 ```rule
 RULE R.Obj.Closures
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
 CODE backend/cmm_helpers.ml#pack_closure_info
 CODE backend/cmm_helpers.ml#infix_header
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout
+CAVEAT disclosure: naive reading "all value slots ≥ startenv" is FALSE — unscanned captures sit below startenv; counterexample witnessed by tocmm-06-closure-unscanned.
 ---
 H ⊢ Closures(funs, env) @ a ≈ₒ M    iff
   M[a−8] = hdr(closure_tag, total_size, col, 0)
@@ -442,7 +454,7 @@ code pointer (R.Obj.Closures) is the address of that symbol.
 
 ```rule
 RULE R.Heap
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 ---
 H ≈_L M    iff there is a location map L : dom(H) ⇀ Addr, injective on distinct
@@ -453,7 +465,7 @@ resolve consistently (if a field of one object is ptr ℓ′, its stored word is
 --------------------------------------------------
 The whole-heap relation: every abstract object is laid out somewhere in M per its
 object rule, with pointers threaded through L.
-NOTES: STATUS conjectured — this is the invariant the translation and the GC must
+NOTES: This is the invariant the translation and the GC must
 maintain; validated by the tocmm-* case studies (14-validation) checking the -dcmm
 byte layout against §4. L is existential and mutable: the GC may relocate objects,
 changing L but preserving H ≈_L M (ch. 19, CM.Alloc.GC).
@@ -461,7 +473,7 @@ changing L but preserving H ≈_L M (ch. 19, CM.Alloc.GC).
 
 ```rule
 RULE R.Observe
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_unit.mli#module_symbol
 CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 ---

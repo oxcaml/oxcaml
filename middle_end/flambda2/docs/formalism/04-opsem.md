@@ -123,7 +123,7 @@ We write `⟦s⟧ρ` for the value of a `Simple` `s = x | sym | c` under `ρ`:
 
 ```rule
 RULE OS.Simple.Eval
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/term_basics/simple.mli#t
 CODE middle_end/flambda2/term_basics/coercion.mli#t
 ---
@@ -244,7 +244,7 @@ subexpressions to descend into — the language is in ANF, so every operand is a
 
 ```rule
 RULE OS.Let.Simple
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Let_expr
 CODE middle_end/flambda2/terms/flambda.mli#Named
 ---
@@ -258,7 +258,7 @@ v = ⟦s⟧ρ
 
 ```rule
 RULE OS.Let.Prim.Pure
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
 CODE middle_end/flambda2/terms/effects.mli#t
@@ -285,7 +285,7 @@ region) and so match OS.Let.Prim.Effect, not this rule.
 
 ```rule
 RULE OS.Let.Prim.Effect
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
 ---
@@ -312,7 +312,7 @@ not as a control transfer; genuine OCaml-level raising goes through
 
 ```rule
 RULE OS.Let.SetOfClosures
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/set_of_closures.mli#create
 CODE middle_end/flambda2/bound_identifiers/alloc_mode.mli#For_allocations
@@ -341,7 +341,7 @@ allocation time.
 
 ```rule
 RULE OS.Let.Static
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/static_const.mli#t
 CODE middle_end/flambda2/terms/flambda.mli#Static_const_or_code
@@ -375,7 +375,7 @@ one-shot installation is well-defined despite mutual reference.
 
 ```rule
 RULE OS.Let.RecInfo
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/term_basics/rec_info_expr.mli#t
 ---
@@ -394,7 +394,7 @@ to erasing the binding entirely (the backend does not emit anything for it).
 
 ```rule
 RULE OS.LetCont.NonRec
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
 CODE middle_end/flambda2/terms/flambda.mli#Non_recursive_let_cont_handler
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
@@ -413,7 +413,7 @@ when `k` is used.
 
 ```rule
 RULE OS.LetCont.Rec
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
 CODE middle_end/flambda2/terms/flambda.mli#Recursive_let_cont_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#make_rewrite_for_recursive_continuation
@@ -447,7 +447,7 @@ handler in the *definition* environment recorded for `k`.
 
 ```rule
 RULE OS.ApplyCont
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/apply_cont_expr.mli#create
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
 ---
@@ -468,7 +468,7 @@ Boundary continuations (installed by `Apply`, §4.3) are entered by the same
 
 ```rule
 RULE OS.ApplyCont.Return
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
 CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
 ---
@@ -489,7 +489,7 @@ undefined behaviour (OS.Invalid); see OS.Apply.NeverReturns.
 
 ```rule
 RULE OS.ApplyCont.ExnBoundary
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/exn_continuation.mli#t
 CODE middle_end/flambda2/terms/exn_continuation.mli#extra_args
 ---
@@ -521,10 +521,10 @@ non-exceptional path pops it; raising pops it and jumps to it.
 
 ```rule
 RULE OS.ApplyCont.TrapPush
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/trap_action.mli#t
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps
-VERIFIED 14-validation/new-06-trap.md
+VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 ---
 e = Apply_cont k (s̄),  trap_action(e) = Some (Push { exn_handler = k_h })
 K(k) = Handler ⟨x̄, e_h, ρ_def, K_def, d⟩
@@ -538,10 +538,10 @@ of the try). Generated as the entry edge of a `Ltrywith` body.
 
 ```rule
 RULE OS.ApplyCont.TrapPop
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/trap_action.mli#t
 CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
-VERIFIED 14-validation/new-06-trap.md
+VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 ---
 e = Apply_cont k (s̄),  trap_action(e) = Some (Pop { exn_handler = k_h; raise_kind })
 k ≠ k_h                                   -- not a raise (cf. is_raise)
@@ -557,7 +557,7 @@ on `trap_action.mli` `Pop`); it names *which* frame is popped.
 
 ```rule
 RULE OS.ApplyCont.Raise
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_raise0
 CODE middle_end/flambda2/terms/trap_action.mli#Raise_kind
@@ -583,7 +583,7 @@ OS.ApplyCont.ExnBoundary fires instead, forwarding to the caller's handler.
 
 ```rule
 RULE OS.Switch
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/switch_expr.mli#create
 CODE middle_end/flambda2/terms/switch_expr.mli#arms
 ---
@@ -600,9 +600,10 @@ no default case.
 
 ```rule
 RULE OS.Switch.Undef
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/switch_expr.mli#create
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
+CAVEAT disclosure: two-arm to_cmm lowering silently falls into an arm on out-of-range discriminants; the model's stuck/UB conclusion holds only because well-formedness makes that path unreachable.
 ---
 e = Switch { scrutinee = s; arms }
 ⟦s⟧ρ = naked_imm n
@@ -640,7 +641,7 @@ a `Result_continuation` (`Return k` or `Never_returns`), an `Exn_continuation`
 
 ```rule
 RULE OS.Apply.Direct
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/apply_expr.mli#create
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
@@ -684,7 +685,7 @@ callee's arity. The three cases — full, partial, and over-application — are 
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Full
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/code_metadata.mli#params_arity
 ---
@@ -704,7 +705,7 @@ after that adjustment.
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Partial
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/code_metadata.mli#first_complex_local_param
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application
@@ -727,19 +728,19 @@ prefix. Its allocation mode is the application's `alloc_mode`, checked against
 the callee's parameter modes (`first_complex_local_param`, `param_modes`): if
 the supplied args stop at or before the first complex local param the closure is
 forced onto the heap, and a genuine mode mismatch yields
-`Expr.create_invalid (Partial_application_mode_mismatch (apply, …))`. Still
-`conjectured` because the rule is stated for the *runtime* generic
-(`Indirect_unknown_arity`) path via `caml_curry`, whose precise wrapper shape
-and allocation region are not verified line-by-line against the direct-case
-model above.
+`Expr.create_invalid (Partial_application_mode_mismatch (apply, …))`. The rule
+is stated for the *runtime* generic (`Indirect_unknown_arity`) path via
+`caml_curry`, whose precise wrapper shape and allocation region are not
+verified line-by-line against the direct-case model above.
 ```
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Over
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/apply_expr.mli#return_arity
 CODE middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application
+CAVEAT disclosure: model narrowing — the fresh Begin_region/End_region pair wrapping both calls for a local-returning callee is deliberately elided from this rule.
 ---
 e = Apply { callee = Some s_f; args = s̄; call_kind = Function Indirect_unknown_arity;
             continuation = Return k_c; exn_continuation = ⟨k_x, ē_extra⟩; alloc_mode = am }
@@ -770,14 +771,14 @@ sharing `Apply.exn_continuation apply`. `Over_application_never_returns` is the
 `Invalid` used both when the first call's result arity is not a single value and
 when the whole over-application never returns. (A local-returning callee also
 gets a fresh `Begin_region`/`End_region` wrapping both calls — a detail the rule
-elides.) Still `conjectured`: the rule is stated for the runtime generic
+elides.) The rule is stated for the runtime generic
 (`caml_apply`) path, not verified line-by-line, and the region wrapping is not
 modelled.
 ```
 
 ```rule
 RULE OS.Apply.IndirectKnownArity
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 ---
 e = Apply { callee = Some s_f; call_kind = Function (Indirect_known_arity code_ids); … }
@@ -795,7 +796,7 @@ are otherwise identical to a full indirect call.
 
 ```rule
 RULE OS.Apply.CCall
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#t
 CODE middle_end/flambda2/terms/apply_expr.mli#create
 ---
@@ -820,7 +821,7 @@ semantics.
 
 ```rule
 RULE OS.Apply.Method
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Method_kind
 ---
 e = Apply { call_kind = Method { kind; obj = s_obj }; args = s̄; continuation = Return k_c; … }
@@ -831,14 +832,15 @@ resolves to a closure, which is then applied to s̄ (as an indirect call)
 NOTES: Method calls arise from OCaml's object system; the middle end treats them
 descriptively — the method `kind` selects a lookup strategy (self, public
 dispatch, or a cached slot) that produces a closure, applied like any indirect
-call. Marked `conjectured`: object-system lowering is not modelled in detail
+call. Object-system lowering is not modelled in detail
 here and the resolution is not grounded against the code.
 ```
 
 ```rule
 RULE OS.Apply.Effect
-STATUS conjectured
+CLAIM descriptive
 CODE middle_end/flambda2/terms/call_kind.mli#Effect
+CAVEAT disclosure: Effect applications are syntax-only in the model — documented in 02 but given no operational rules (per the 01 scope ledger); this scope boundary is the rule's whole descriptive content.
 ---
 call_kind = Effect (Perform | Reperform | Resume | With_stack | With_stack_preemptible)
 --------------------------------------------------
@@ -854,7 +856,7 @@ Listed for completeness only.
 
 ```rule
 RULE OS.Apply.NeverReturns
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
 CODE middle_end/flambda2/terms/apply_expr.mli#returns
 ---
@@ -874,7 +876,7 @@ ill-formed (undefined behaviour).
 
 ```rule
 RULE OS.Invalid
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#expr_descr
 CODE middle_end/flambda2/terms/flambda.mli#Invalid
 ---
@@ -896,7 +898,7 @@ ever reached, because a correct Simplify guarantees it never is. Soundness
 
 ```rule
 RULE OS.Unit.Init
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_unit.mli#create
 ---
 u : Flambda_unit.t
@@ -918,7 +920,7 @@ halting entries below. Compilation of the module body eventually defines
 
 ```rule
 RULE OS.Unit.Final
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda_unit.mli#return_continuation
 CODE middle_end/flambda2/terms/flambda_unit.mli#module_symbol
 ---

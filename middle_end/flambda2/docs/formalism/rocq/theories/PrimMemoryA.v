@@ -55,7 +55,7 @@ Open Scope Z_scope.
    Mixed-block shape arithmetic
    =================================================================== *)
 
-(** RULE P.MixedShape.FieldKinds (STATUS normative)
+(** RULE P.MixedShape.FieldKinds (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.from_prefix_size_and_suffix_elements
     CODE middle_end/flambda2/kinds/flambda_kind.mli#Mixed_block_shape.field_kinds *)
@@ -75,7 +75,7 @@ Proof. intros s. reflexivity. Qed.
 
 Definition zsum (xs : list Z) : Z := fold_right Z.add 0 xs.
 
-(** RULE P.MixedShape.Offset (STATUS normative)
+(** RULE P.MixedShape.Offset (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
     CODE middle_end/flambda2/kinds/flambda_kind.ml#Flat_suffix_element0.size_in_words
@@ -117,7 +117,7 @@ Definition size_in_words (s : mixed_block_shape) : Z :=
    and P.Effects.Coeffects there. The remaining two axes and the
    quadruple live here. *)
 
-(** RULE P.Effects.Placement (STATUS normative)
+(** RULE P.Effects.Placement (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/placement.ml#t *)
 Inductive placement : Type :=
@@ -131,7 +131,7 @@ Definition placement_join (p1 p2 : placement) : placement :=
   | _, _ => Strict
   end.
 
-(** RULE P.Effects.Validity (STATUS normative)
+(** RULE P.Effects.Validity (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/validity.ml#t *)
 (* The doc's Can't_move_before_any_branch is spelled without the
@@ -153,7 +153,7 @@ Definition validity_join (v1 v2 : validity) : validity :=
   | Can_move_anywhere, Can_move_anywhere => Can_move_anywhere
   end.
 
-(** RULE P.Effects.Classification (STATUS normative)
+(** RULE P.Effects.Classification (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/effects_and_coeffects.ml *)
 (* The quadruple (Effects, Coeffects, Placement, Validity). The
@@ -169,7 +169,7 @@ Record ece : Type := Mk_ece
    Named classifications
    =================================================================== *)
 
-(** RULE P.Effects.Pure (STATUS normative)
+(** RULE P.Effects.Pure (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/effects_and_coeffects.ml#pure
     CODE middle_end/flambda2/terms/effects_and_coeffects.ml#pure_can_be_duplicated *)
@@ -200,7 +200,7 @@ Definition EC_read : ece :=
      ece_placement := Strict;
      ece_validity := Cant_move_before_any_branch |}.
 
-(** RULE P.Effects.ReadingFromBlock (STATUS normative)
+(** RULE P.Effects.ReadingFromBlock (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#reading_from_a_block *)
 (* The premises (mu Immutable/Immutable_unique => No_coeffects,
@@ -220,7 +220,7 @@ Definition reading_from_a_block (mu : mutability) : ece :=
      ece_placement := Strict;
      ece_validity := Cant_move_before_any_branch |}.
 
-(** RULE P.Effects.Writing (STATUS normative)
+(** RULE P.Effects.Writing (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_block *)
 Definition writing_to_a_block : ece :=
@@ -229,7 +229,7 @@ Definition writing_to_a_block : ece :=
      ece_placement := Strict;
      ece_validity := Cant_move_before_any_branch |}.
 
-(** RULE P.Effects.Allocation (STATUS normative)
+(** RULE P.Effects.Allocation (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_variadic_primitive
     CODE middle_end/flambda2/terms/flambda_primitive.ml#coeffects_of_mode *)
@@ -486,7 +486,7 @@ Definition effects_of (fl : eff_flags) (op : prim_op) : ece :=
       end
   end.
 
-(** RULE P.Effects.DelayDuplicable (STATUS conjectured)
+(** RULE P.Effects.DelayDuplicable (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects
     CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding *)
@@ -642,7 +642,7 @@ Parameter as_pointer : value -> value.
 Inductive denot_mem_a
   : prim_op -> list value -> heap -> prim_result -> Prop :=
 
-  (** RULE P.Variadic.MakeBlock.Values (STATUS normative)
+  (** RULE P.Variadic.MakeBlock.Values (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
       CODE middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_block *)
@@ -655,7 +655,7 @@ Inductive denot_mem_a
           (Op_variadic (VP_make_block (BK_values t ks) mu mode))
           vs H (PR_ok (V_ptr (Addr_loc l)) H')
 
-  (** RULE P.Variadic.MakeBlock.NakedFloats (STATUS normative)
+  (** RULE P.Variadic.MakeBlock.NakedFloats (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind *)
   | P_Variadic_MakeBlock_NakedFloats :
@@ -666,7 +666,7 @@ Inductive denot_mem_a
           (map V_naked_float fs) H
           (PR_ok (V_ptr (Addr_loc l)) H')
 
-  (** RULE P.Variadic.MakeBlock.Mixed (STATUS normative)
+  (** RULE P.Variadic.MakeBlock.Mixed (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_kind
       CODE middle_end/flambda2/terms/flambda_primitive.ml#args_kind_of_variadic_primitive *)
@@ -681,7 +681,7 @@ Inductive denot_mem_a
           (Op_variadic (VP_make_block (BK_mixed t s) mu mode))
           vs H (PR_ok (V_ptr (Addr_loc l)) H')
 
-  (** RULE P.Variadic.MakeArray (STATUS normative)
+  (** RULE P.Variadic.MakeArray (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive
       CODE middle_end/flambda2/simplify/simplify_variadic_primitive.ml#simplify_make_array *)
@@ -700,7 +700,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_variadic (VP_make_array ak mu mode)) vs H
           (PR_ok (V_ptr (Addr_loc l)) H')
 
-  (** RULE P.Unary.BlockLoad (STATUS normative)
+  (** RULE P.Unary.BlockLoad (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_immutable_block_load *)
@@ -732,7 +732,7 @@ Inductive denot_mem_a
           (Op_unary (UP_block_load (BAK_values bt bsz bfk) mut i))
           [V_ptr a] H PR_undef
 
-  (** RULE P.Unary.BlockLoad.NakedFloats (STATUS normative)
+  (** RULE P.Unary.BlockLoad.NakedFloats (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind *)
   | P_Unary_BlockLoad_NakedFloats :
@@ -751,7 +751,7 @@ Inductive denot_mem_a
           (Op_unary (UP_block_load (BAK_naked_floats bsz) mut i))
           [V_ptr a] H PR_undef
 
-  (** RULE P.Unary.BlockLoad.Mixed (STATUS normative)
+  (** RULE P.Unary.BlockLoad.Mixed (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
       CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape *)
@@ -774,7 +774,7 @@ Inductive denot_mem_a
              (UP_block_load (BAK_mixed bt bsz fk s) mut i))
           [V_ptr a] H PR_undef
 
-  (** RULE P.Binary.BlockSet (STATUS normative)
+  (** RULE P.Binary.BlockSet (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set *)
@@ -798,7 +798,7 @@ Inductive denot_mem_a
           (Op_binary (BP_block_set (BAK_values bt bsz bfk) init i))
           [V_ptr a; v] H PR_undef
 
-  (** RULE P.Binary.BlockSet.NakedFloats (STATUS normative)
+  (** RULE P.Binary.BlockSet.NakedFloats (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Block_access_kind
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_block_set *)
@@ -825,7 +825,7 @@ Inductive denot_mem_a
           (Op_binary (BP_block_set (BAK_naked_floats bsz) init i))
           [V_ptr a; V_naked_float f] H PR_undef
 
-  (** RULE P.Binary.BlockSet.Mixed (STATUS normative)
+  (** RULE P.Binary.BlockSet.Mixed (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Mixed_block_access_field_kind
       CODE middle_end/flambda2/terms/flambda_primitive.ml#Block_access_kind.from_block_shape *)
@@ -852,7 +852,7 @@ Inductive denot_mem_a
              (BP_block_set (BAK_mixed bt bsz fk s) init i))
           [V_ptr a; v] H PR_undef
 
-  (** RULE P.Unary.DuplicateBlock (STATUS normative)
+  (** RULE P.Unary.DuplicateBlock (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   (* Shallow copy; may not change tag or mutability (mli). *)
@@ -864,7 +864,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary (UP_duplicate_block dbk)) [V_ptr a] H
           (PR_ok (V_ptr (Addr_loc l')) H')
 
-  (** RULE P.Unary.DuplicateBlock.Mixed (STATUS normative)
+  (** RULE P.Unary.DuplicateBlock.Mixed (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#Duplicate_block_kind
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -877,7 +877,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary (UP_duplicate_block DBK_mixed))
           [V_ptr a] H (PR_ok (V_ptr (Addr_loc l')) H')
 
-  (** RULE P.Unary.DuplicateArray (STATUS normative)
+  (** RULE P.Unary.DuplicateArray (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -891,7 +891,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary (UP_duplicate_array dak mu_s mu_d))
           [V_ptr a] H (PR_ok (V_ptr (Addr_loc l')) H')
 
-  (** RULE P.Unary.ObjDup (STATUS normative)
+  (** RULE P.Unary.ObjDup (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   | P_Unary_ObjDup :
@@ -901,7 +901,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary UP_obj_dup) [V_ptr a] H
           (PR_ok (V_ptr (Addr_loc l')) H')
 
-  (** RULE P.Unary.OpaqueIdentity (STATUS normative)
+  (** RULE P.Unary.OpaqueIdentity (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -913,7 +913,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary (UP_opaque_identity meo k)) [v] H
           (PR_ok v H)
 
-  (** RULE P.Unary.MakeLazy (STATUS normative)
+  (** RULE P.Unary.MakeLazy (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   | P_Unary_MakeLazy :
@@ -922,7 +922,7 @@ Inductive denot_mem_a
         denot_mem_a (Op_unary (UP_make_lazy t)) [v] H
           (PR_ok (V_ptr (Addr_loc l)) H')
 
-  (** RULE P.Unary.IntAsPointer (STATUS conjectured)
+  (** RULE P.Unary.IntAsPointer (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   (* Result via the sanctioned Parameter as_pointer above (see its
@@ -945,7 +945,7 @@ Inductive denot_region
   : prim_op -> list value -> heap -> region_stack
     -> prim_result_r -> Prop :=
 
-  (** RULE P.Variadic.BeginRegion (STATUS conjectured)
+  (** RULE P.Variadic.BeginRegion (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_begin_region *)
@@ -958,7 +958,7 @@ Inductive denot_region
         denot_region (Op_variadic (VP_begin_region ghost)) [] H R
           (PRr_ok (V_region iota) H (iota :: R))
 
-  (** RULE P.Variadic.BeginTryRegion (STATUS conjectured)
+  (** RULE P.Variadic.BeginTryRegion (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#variadic_primitive *)
   | P_Variadic_BeginTryRegion :
@@ -967,7 +967,7 @@ Inductive denot_region
         denot_region (Op_variadic (VP_begin_try_region ghost)) [] H R
           (PRr_ok (V_region iota) H (iota :: R))
 
-  (** RULE P.Unary.EndRegion (STATUS conjectured)
+  (** RULE P.Unary.EndRegion (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -980,7 +980,7 @@ Inductive denot_region
           [V_region iota] H (iota :: R')
           (PRr_ok (V_tagged_imm 0) H R')
 
-  (** RULE P.Unary.EndTryRegion (STATUS conjectured)
+  (** RULE P.Unary.EndTryRegion (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   | P_Unary_EndTryRegion :

@@ -43,8 +43,9 @@ declaration is recorded here; [`18`](18-to-cmm-data.md) owns `V` and `D`.
 
 ```rule
 RULE TC.Expr.Dispatch
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
+CAVEAT disclosure: model narrows code's quadruple return (Cmm expr, free vars, symbol inits, result) to the Cmm expr alone, treating the other components as semantically irrelevant.
 ---
 Θ ⊢ e ⤳ e_c dispatches on Expr.descr e:
   Let → §TC.Let* (data: [18]) ;  Let_cont → §3 ;  Apply → §5 ;
@@ -66,7 +67,7 @@ handler). Recursive groups are always `Jump` (a recursive `Ccatch`).
 
 ```rule
 RULE TC.LetCont.Classify
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont
 CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler
 ---
@@ -89,7 +90,7 @@ the source-verified claim of 13 §4.6). Everything else is a real Cmm catch.
 
 ```rule
 RULE TC.LetCont.Inline
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_inlined
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_inline_cont
 ---
@@ -107,7 +108,7 @@ makes to_cmm output sequential code instead of a Ccatch (to_cmm.md; 13 §4.6).
 
 ```rule
 RULE TC.LetCont.Jump
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_not_inlined
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_jump_cont
 ---
@@ -126,7 +127,7 @@ Steps to CM.Catch.NonRec / CM.Exit. `is_cold` carries the handler's coldness.
 
 ```rule
 RULE TC.LetCont.Exn
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_exn_handler
 CODE backend/cmm_helpers.ml#trywith
 ---
@@ -150,8 +151,9 @@ Flambda Push trap action; TC.ApplyCont.Jump), with a matching `Pop` on the norma
 
 ```rule
 RULE TC.LetCont.Rec
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_cont_rec
+CAVEAT disclosure: invariant_params branch is code-accurate but rarely exercised — Simplify/loopify carry loop invariants as free variables/aliases, so the invariant prefix is usually empty.
 ---
 e = Let_cont (Recursive handlers);  no handler is_exn_handler (checked)
 pattern_match handlers = (invariant_params z̄, body e_body, (kᵢ ↦ hᵢ)ᵢ)
@@ -178,7 +180,7 @@ Dispatch mirrors `to_cmm_expr.ml#apply_cont`: exn handler → raise; else on `Φ
 
 ```rule
 RULE TC.ApplyCont.Jump
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 ---
 e = Apply_cont k (s̄);  Φ(k) = Jump ⟨param_types, lbl⟩
@@ -197,7 +199,7 @@ unused (unarized-void / skipped params).
 
 ```rule
 RULE TC.ApplyCont.Return
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_return_continuation
 CODE backend/cmm_helpers.ml#trap_return
 ---
@@ -217,7 +219,7 @@ A `Push` on the return continuation is rejected.
 
 ```rule
 RULE TC.ApplyCont.Inline
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_cont
 ---
 e = Apply_cont k (s̄);  Φ(k) = Inline ⟨params x̄, e_h, occ⟩;  trap_action(e) = None
@@ -233,7 +235,7 @@ inlined continuation must not carry a trap action (checked; fatal otherwise).
 
 ```rule
 RULE TC.ApplyCont.Raise
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_raise
 CODE backend/cmm_helpers.ml#raise_prim
 ---
@@ -262,8 +264,9 @@ control aspect is here; the calling convention detail is in
 
 ```rule
 RULE TC.Apply.Call
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply0
+CAVEAT disclosure: Method and Effect call translations are noted only; their semantics are out of scope (ch. 01, OS.Apply.Method/Effect) and carry no ≈-correctness obligation.
 ---
 For Apply { callee; args = s̄; call_kind; alloc_mode; … }:
   Function (Direct cid)            ⤳ C.direct_call code_sym(cid) v̄   (my_closure appended
@@ -283,7 +286,7 @@ obligation.
 
 ```rule
 RULE TC.Apply.Return
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_expr
 ---
 Let `call` = TC.Apply.Call for the application, with return continuation dst:
@@ -307,10 +310,11 @@ the call in a Ctrywith that reraises with the extras (TC.Apply.ExnWrapper).
 
 ```rule
 RULE TC.Apply.ExnWrapper
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_apply
 CODE backend/cmm_helpers.ml#trywith
 CODE backend/cmm_helpers.ml#raise_prim
+CAVEAT disclosure: rule closes fidelity finding KF-033 (Cmm-side twin of KF-019); omitting the wrapper leaves the composed model stuck at a defined program point.
 ---
 Let `call` = TC.Apply.Call for the application, with exn continuation k_exn:
   extra_args(k_exn) = []  ⟹  call is used unchanged (the common case)
@@ -345,7 +349,7 @@ last, wrapping the pop/push scaffold. Steps to CM.Catch.Exn / CM.Raise.
 
 ```rule
 RULE TC.Switch
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
 CODE backend/cmm_helpers.ml#transl_switch_clambda
 CODE backend/cmm_helpers.ml#ite
@@ -381,7 +385,7 @@ being duplicated across arms.
 
 ```rule
 RULE TC.Invalid
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#invalid
 ---
@@ -404,7 +408,7 @@ labels, and the trap/region-stack correspondence), not the memory layout.
 
 ```rule
 RULE INV.ToCmm.Control
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_continuation_handler
 ---
@@ -423,7 +427,7 @@ Control transfers correspond step-for-step; trap Push/Pop and region push/pop
 stay in lockstep (TC.ApplyCont.Jump/Return/Raise, TC.LetCont.*, TC.Switch,
 TC.Apply.Return). Reaching OS.Invalid corresponds to reaching CM.Invalid, both
 excluded on reachable states by soundness (ch. 20).
-NOTES: STATUS conjectured — empirically validated by the control case studies
+NOTES: Empirically validated by the control case studies
 (tocmm-switch, tocmm-trywith, tocmm-inline-cont; 14-validation). Target-
 independent: no rule here mentions word size, endianness, or layout. It is a
 specialization of INV.ToCmm.Simulates (ch. 20) to the control fragment, proved

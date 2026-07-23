@@ -36,8 +36,9 @@ over-approximation, so it is always safe to discard a type and replace it with
 
 ```rule
 RULE T.Role.SinglePass
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#t
+CAVEAT disclosure: no single CODE anchor proves widening-absence; it is a structural property of the code; soundness precision owned by 13-soundness.md.
 ---
 Simplify performs one pass over each function body. The types domain provides
 no widening operator; meet and join ([§08](08-meet-join.md)) are the only combinators, and
@@ -89,7 +90,7 @@ is what `types.md` calls a "type-lifted abstract element or an equality".
 
 ```rule
 RULE T.Grammar.TypeDescr
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_descr.mli#Descr.t
 CODE middle_end/flambda2/types/grammar/type_descr.mli#descr
 ---
@@ -155,7 +156,7 @@ value came from a `[@unique]`/unboxable allocation. `extensions` is discussed in
 
 ```rule
 RULE T.Grammar.Variant
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#create_variant
 ---
@@ -224,7 +225,7 @@ documented in the code as always `Bottom` and slated for removal
 
 ```rule
 RULE T.Grammar.RowLike.Index
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_index_domain
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#row_like_index_domain
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#check_field_tys
@@ -286,12 +287,14 @@ variant head *and* the inverse map here — so a note is warranted.
 
 ```rule
 RULE T.Grammar.NakedImmediate.Relational
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#is_int_for_scrutinee
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#get_tag_for_block
-VERIFIED 14-validation/issue5721.md
-VERIFIED 14-validation/naked_immediates_many_relations.md
+VERIFIED 14-validation/issue5721.md @ 1c1940b7ea
+VERIFIED 14-validation/naked_immediates_many_relations.md @ 1c1940b7ea
+CAVEAT disclosure: is_int_for_scrutinee (construction, `= true`) disagrees with Relation.of_const (meet reduction, `= false`) for a null constant; only is_int is anomalous.
+CAVEAT disclosure: code diverges from types.md's 'one way only' design — the is_int/get_tag relation is stored at both ends (Variant forward fields plus inverse_relations map).
 ---
 A Naked_immediate type is a finite set of immediate values (or Unknown) together
 with a map from relations (Is_null, Is_int, Get_tag) to sets of Names. An entry
@@ -328,7 +331,7 @@ are not implemented.
 
 ```rule
 RULE T.Grammar.NakedNumber.NonEmptySet
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_float
 ---
@@ -361,7 +364,7 @@ one non-top/bottom inhabitant, so its type lattice is trivial
 
 ```rule
 RULE T.Grammar.RecInfoRegion.Trivial
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_region
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_rec_info
 ---
@@ -417,7 +420,7 @@ than variables (`aliases.mli#Alias_set.find_best`).
 
 ```rule
 RULE T.Env.Canonical.Least
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/aliases.mli#get_canonical_element_exn
 CODE middle_end/flambda2/types/env/binding_time.ml#consts
 CODE middle_end/flambda2/types/env/aliases.mli#Alias_set.find_best
@@ -437,7 +440,7 @@ canonical one. The code actively checks the first half.
 
 ```rule
 RULE T.Env.Canonical.NoEqualsOnCanonical
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias
 ---
 No canonical name may be given an Equals (alias) type: adding an `Equals s`
@@ -448,8 +451,9 @@ element.
 
 ```rule
 RULE T.Env.Canonical.ConcreteOnCanonical
-STATUS descriptive
+CLAIM descriptive
 CODE middle_end/flambda2/types/env/typing_env.ml#replace_equation
+CAVEAT disclosure: invariant checked only under debug flag concrete_types_only_on_canonicals; states intended representation, not an always-enforced property (hence its descriptive claim).
 ---
 Concrete (non-alias) types are stored only on canonical names. When the debug
 flag concrete_types_only_on_canonicals is set, adding a concrete type to a
@@ -465,11 +469,12 @@ expansion relies on.
 
 ```rule
 RULE T.Env.ConstCanonicalPersists
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
 CODE middle_end/flambda2/types/env/aliases.mli#find_best
 CODE middle_end/flambda2/types/env/binding_time.ml#consts
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
+CAVEAT disclosure: read alias-class-only — non-constant Proved answers may degrade Proved→Unknown via non-GLB meet corner (T.Meet.GreatestLowerBound); raise_on_bottom:false silently drops conflicting const equations.
 ---
 canonical_E(x) = c for a constant c (x's alias class contains c);
 E' is obtained from E by any finite sequence of downwards-descent operations
@@ -498,7 +503,7 @@ meet. Witnessed in `middle_end/flambda2/tests/meet_test.ml`: `x = 3` then `x = 4
 
 ```rule
 RULE T.Env.AliasesAuthoritative
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/types/env/aliases.ml#add
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
 CODE middle_end/flambda2/types/expand_head.ml#expand_head0
@@ -535,7 +540,7 @@ to their exact type (`type_for_const`).
 
 ```rule
 RULE T.Env.Find.Canonical
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn
 CODE middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn
 ---
@@ -566,7 +571,7 @@ three edge cases worth recording:
 
 ```rule
 RULE T.Env.Find.Bottom
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'
 CODE middle_end/flambda2/types/env/typing_env.ml#make_bottom
 ---
@@ -575,7 +580,7 @@ If is_bottom E, then find E x κ = Bottom (bottom_like of κ) for every name x.
 
 ```rule
 RULE T.Env.Find.SymbolDefault
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'
 CODE middle_end/flambda2/types/env/typing_env.ml#initial_symbol_type
 ---
@@ -592,7 +597,7 @@ names must already be bound, else the analysis has produced a dangling reference
 
 ```rule
 RULE T.Env.Equation.Closed
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_new_equation
 ---
 A new equation `name = T` may only mention (in T's free names) names already
@@ -629,7 +634,7 @@ pruned, keeping their number in check.
 
 ```rule
 RULE T.Env.Scope.Existential
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/env/binding_time.ml#With_name_mode.scoped_name_mode
 CODE middle_end/flambda2/types/env/typing_env.mli#cut
 ---
@@ -654,8 +659,9 @@ than defined pointwise. Write `γ_E(T) ⊆ Val` for the set of values `v` such t
 some `ρ` consistent with `E` maps the value in question to `v`; the per-former
 clauses below define the constraint that `v` (and `ρ`) must satisfy. These
 definitions are the intended denotation; [§13](13-soundness.md) owns the soundness theorem
-that ties them to Simplify. They are marked `conjectured` because the code does
-not compute `γ` and the reading is unverified.
+that ties them to Simplify. Their claim is interpretive: the code does not
+compute `γ`, so the definitions' correctness is testable only through
+consequences ([§13](13-soundness.md)).
 
 A note on symbols, inherited by every obligation in this section: symbols need
 no entry in `ρ`. A symbol is always evaluable — through `ρ` when `ρ` binds it
@@ -668,7 +674,7 @@ obligations read names the way evaluation does, through `⟦·⟧ρ`.
 
 ```rule
 RULE T.Gamma.Kind
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#kind
 ---
 γ_E(T) ⊆ { v ∈ Val | v has kind κ(T) }. Concretization never crosses kinds; the
@@ -677,7 +683,7 @@ kinds partition Val ([§03](03-kinds.md)).
 
 ```rule
 RULE T.Gamma.TopBottom
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_descr.mli#unknown
 CODE middle_end/flambda2/types/grammar/type_descr.mli#bottom
 ---
@@ -687,7 +693,7 @@ CODE middle_end/flambda2/types/grammar/type_descr.mli#bottom
 
 ```rule
 RULE T.Gamma.Alias
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#alias_type_of
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#get_alias_exn
 ---
@@ -703,9 +709,9 @@ For kind `Value`, `γ` splits along nullability and then along the non-null head
 
 ```rule
 RULE T.Gamma.Value.Nullability
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value
-VERIFIED 14-validation/n_way_join_preserves_null.md
+VERIFIED 14-validation/n_way_join_preserves_null.md @ 1c1940b7ea
 ---
 γ_E({ non_null; is_null }) = γ_E(non_null) ∪ N, where N = { Null } if is_null =
 Maybe_null and N = ∅ if is_null = Not_null; γ_E(non_null) is ∅ when non_null =
@@ -716,7 +722,7 @@ is_null = Maybe_null { is_null = Some y }, ρ additionally satisfies ρ(y) =
 
 ```rule
 RULE T.Gamma.Value.Variant
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
 ---
 γ_E(Variant { immediates; blocks; is_int; get_tag; extensions }) =
@@ -729,7 +735,7 @@ block, ρ(g) = that block's tag. Extensions constrain ρ per arm (§5).
 
 ```rule
 RULE T.Gamma.Value.RowLikeBlocks
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_blocks
 ---
 γ_E(row_like_for_blocks) = the set of block pointers p such that, for some case
@@ -741,7 +747,7 @@ field i, and ρ satisfies that case's env_extension.
 
 ```rule
 RULE T.Gamma.Value.Boxed
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
 ---
 γ_E(Boxed_κ T alloc_mode) = the set of pointers to a boxed number of naked kind κ
@@ -755,9 +761,10 @@ pointers of the given alloc mode (contents untracked).
 
 ```rule
 RULE T.Gamma.Value.Closures
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_closures
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#closures_entry
+CAVEAT disclosure: code-pointer clause reads code_id up to the newer_version_of version class per T.Gamma.Closures.CodeAgeLoose; exact-match γ would be unsound before any meet.
 ---
 γ_E(Closures { by_function_slot }) = the set of closure pointers p such that p
 selects some function slot f present in known_closures, the closure block
@@ -775,10 +782,12 @@ closure type to a value that will carry the newer specialized code, so exact-mat
 
 ```rule
 RULE T.Gamma.Closures.CodeAgeLoose
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_code_id
 CODE middle_end/flambda2/types/env/code_age_relation.ml#meet
 CODE middle_end/flambda2/types/env/typing_env.ml#add_to_code_age_relation
+CAVEAT disclosure: meet_code_id abuses Both_inputs on unequal cids ('We are kind of lying here' code comment); nondeterministically imprecise, sound only under version-class γ.
+CAVEAT disclosure: rule is a cross-chapter consistency constraint between ch-07 γ and ch-08 meet_code_id; no single file or CODE anchor exhibits it.
 ---
 the γ clause for Closures code pointers (T.Gamma.Value.Closures) must read the
 function_type's code_id up to the newer_version_of preorder, not exactly
@@ -809,7 +818,7 @@ T.Gamma.Value.Closures (corrected), [§08](08-meet-join.md) meet_code_id.
 
 ```rule
 RULE T.Gamma.Naked.Set
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float
 ---
 For a naked number kind, γ_E(head) = the finite set of constants named by the
@@ -819,7 +828,7 @@ The empty set never occurs as a head (it is Bottom).
 
 ```rule
 RULE T.Gamma.Naked.Relational
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate
 ---
 γ_E of a Naked_immediate head with set S and inverse_relations M, under ρ, is
@@ -847,7 +856,7 @@ satisfying every equation in `ε` as well.
 
 ```rule
 RULE T.Gamma.EnvExtension
-STATUS conjectured
+CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#env_extension
 CODE middle_end/flambda2/types/env/typing_env_extension.mli#t
 ---
@@ -871,7 +880,7 @@ imply `x = 0` via the case extension, which a plain product could not record.
 
 ```rule
 RULE T.Grammar.Disjunction.Extensions
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#variant_extensions
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#row_like_case
 ---

@@ -349,7 +349,7 @@ Definition vector_kind (k : kind) : Prop :=
   | _ => False
   end.
 
-(** RULE P.Contract.NoRaiseNoControl (STATUS normative)
+(** RULE P.Contract.NoRaiseNoControl (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#t
     ENCODING NOTE: the contract is that a primitive denotes either a
@@ -375,7 +375,7 @@ Qed.
 Inductive denot_scalar
     : prim_op -> list value -> heap -> prim_result -> Prop :=
 
-(** RULE P.Unary.IntArith.SwapByteEndianness (STATUS normative)
+(** RULE P.Unary.IntArith.SwapByteEndianness (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Unary_int_arith
     CODE middle_end/flambda2/numbers/target_ocaml_int.ml#get_least_significant_16_bits_then_byte_swap *)
@@ -385,7 +385,7 @@ Inductive denot_scalar
       [val_si k i] H
       (PR_ok (val_si k (swap_si k i)) H)
 
-(** RULE P.Unary.FloatArith (STATUS normative)
+(** RULE P.Unary.FloatArith (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op
     ENCODING NOTE: one constructor per bitwidth because float64 and
@@ -399,7 +399,7 @@ Inductive denot_scalar
       [V_naked_float32 b] H
       (PR_ok (V_naked_float32 (f32_unop op b)) H)
 
-(** RULE P.Unary.NumConv (STATUS normative)
+(** RULE P.Unary.NumConv (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_int_conv
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
@@ -411,7 +411,7 @@ Inductive denot_scalar
     num_conv_defined src dst v v' ->
     denot_scalar (Op_unary (UP_num_conv src dst)) [v] H (PR_ok v' H)
 
-(** RULE P.Unary.NumConv.FloatToInt.OutOfRange (STATUS normative)
+(** RULE P.Unary.NumConv.FloatToInt.OutOfRange (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/numbers/target_ocaml_int.ml#of_float
     CODE middle_end/flambda2/numbers/numeric_types.ml#Short_int
@@ -424,7 +424,7 @@ Inductive denot_scalar
       (Op_unary (UP_num_conv src (sif_of_standard_int dst)))
       [v] H PR_undef
 
-(** RULE P.Unary.NumConv.Int32ToInt64.SignExtend (STATUS normative)
+(** RULE P.Unary.NumConv.Int32ToInt64.SignExtend (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#For_int32s
     CODE middle_end/flambda2/z3/sign_extension.py
@@ -437,7 +437,7 @@ Inductive denot_scalar
       [V_naked_int32 a] H
       (PR_ok (V_naked_int64 a) H)
 
-(** RULE P.Unary.BooleanNot (STATUS normative)
+(** RULE P.Unary.BooleanNot (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_boolean_not *)
 | P_Unary_BooleanNot_def : forall i H,
@@ -449,7 +449,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary UP_boolean_not) [V_tagged_imm i] H
       PR_undef
 
-(** RULE P.Unary.TagImmediate (STATUS normative)
+(** RULE P.Unary.TagImmediate (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_tag_immediate *)
 | P_Unary_TagImmediate : forall i H,
@@ -457,7 +457,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary UP_tag_immediate) [V_naked_imm i] H
       (PR_ok (V_tagged_imm i) H)
 
-(** RULE P.Unary.UntagImmediate (STATUS normative)
+(** RULE P.Unary.UntagImmediate (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate *)
 | P_Unary_UntagImmediate : forall i H,
@@ -465,7 +465,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary UP_untag_immediate) [V_tagged_imm i] H
       (PR_ok (V_naked_imm i) H)
 
-(** RULE P.Unary.Reinterpret64.Int64AsFloat64 (STATUS normative)
+(** RULE P.Unary.Reinterpret64.Int64AsFloat64 (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_int64_as_unboxed_float64 *)
 | P_Unary_Reinterpret64_Int64AsFloat64 : forall b64 H,
@@ -476,7 +476,7 @@ Inductive denot_scalar
       [V_naked_int64 b64] H
       (PR_ok (V_naked_float (f64_of_bits b64)) H)
 
-(** RULE P.Unary.Reinterpret64.Float64AsInt64 (STATUS normative)
+(** RULE P.Unary.Reinterpret64.Float64AsInt64 (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_float64_as_unboxed_int64 *)
 | P_Unary_Reinterpret64_Float64AsInt64 : forall b H,
@@ -486,7 +486,7 @@ Inductive denot_scalar
       [V_naked_float b] H
       (PR_ok (V_naked_int64 (f64_to_bits b)) H)
 
-(** RULE P.Unary.Reinterpret64.Int64AsTaggedInt63 (STATUS normative)
+(** RULE P.Unary.Reinterpret64.Int64AsTaggedInt63 (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_int64_as_tagged_int63 *)
 | P_Unary_Reinterpret64_Int64AsTaggedInt63 : forall w0 H,
@@ -498,7 +498,7 @@ Inductive denot_scalar
       (PR_ok (V_tagged_imm
                 (wrap W (Z.shiftr (to_unsigned 64 w0) 1))) H)
 
-(** RULE P.Unary.Reinterpret64.TaggedInt63AsInt64 (STATUS normative)
+(** RULE P.Unary.Reinterpret64.TaggedInt63AsInt64 (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_tagged_int63_as_unboxed_int64 *)
 | P_Unary_Reinterpret64_TaggedInt63AsInt64 : forall i H,
@@ -509,7 +509,7 @@ Inductive denot_scalar
       [V_tagged_imm i] H
       (PR_ok (V_naked_int64 (2 * i + 1)) H)
 
-(** RULE P.Unary.ReinterpretBoxedVector (STATUS normative)
+(** RULE P.Unary.ReinterpretBoxedVector (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_reinterpret_boxed_vector
@@ -533,7 +533,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary UP_reinterpret_boxed_vector) [V_ptr a] H
       (PR_ok (V_ptr a) H)
 
-(** RULE P.Unary.BoxNumber (STATUS normative)
+(** RULE P.Unary.BoxNumber (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_box_number
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -543,7 +543,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary (UP_box_number bn am)) [nv] H
       (PR_ok (V_ptr (Addr_loc l)) H')
 
-(** RULE P.Unary.UnboxNumber (STATUS normative)
+(** RULE P.Unary.UnboxNumber (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number *)
 (* The wrong-kind undef sentence is left unrelated (stuck) per the
@@ -554,7 +554,7 @@ Inductive denot_scalar
     denot_scalar (Op_unary (UP_unbox_number bn)) [V_ptr a] H
       (PR_ok nv H)
 
-(** RULE P.Binary.IntArith.Total (STATUS normative)
+(** RULE P.Binary.IntArith.Total (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common *)
@@ -566,7 +566,7 @@ Inductive denot_scalar
       [val_si k a; val_si k b] H
       (PR_ok (val_si k (int_arith_op_sem (si_width k) op a b)) H)
 
-(** RULE P.Binary.IntArith.DivMod (STATUS normative)
+(** RULE P.Binary.IntArith.DivMod (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
     CODE middle_end/flambda2/numbers/target_ocaml_int.ml#div *)
@@ -585,7 +585,7 @@ Inductive denot_scalar
       [val_si k a; val_si k b] H
       (PR_ok (val_si k (a - Z.quot a b * b)) H)
 
-(** RULE P.Binary.IntArith.DivModByZero (STATUS normative)
+(** RULE P.Binary.IntArith.DivModByZero (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_zero_division *)
@@ -598,7 +598,7 @@ Inductive denot_scalar
     denot_scalar (Op_binary (BP_int_arith k BIA_mod))
       [val_si k a; val_si k 0] H PR_undef
 
-(** RULE P.Binary.IntArith.DivMinIntByMinusOne (STATUS normative)
+(** RULE P.Binary.IntArith.DivMinIntByMinusOne (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/numbers/target_ocaml_int.ml#div
     CODE backend/cmm_helpers.ml#div_int
@@ -615,7 +615,7 @@ Inductive denot_scalar
        val_si k (-1)] H
       (PR_ok (val_si k 0) H)
 
-(** RULE P.Binary.IntShift (STATUS normative)
+(** RULE P.Binary.IntShift (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#with_shift *)
@@ -636,7 +636,7 @@ Inductive denot_scalar
    refinement of the undef above; see the FolderPicksZero anchor after
    this Inductive. *)
 
-(** RULE P.Binary.IntShift.ByZero (STATUS normative)
+(** RULE P.Binary.IntShift.ByZero (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift
     (Derivable from P.Binary.IntShift since 0 in [0, w); stated
@@ -647,7 +647,7 @@ Inductive denot_scalar
       [val_si k a; V_naked_imm 0] H
       (PR_ok (val_si k a) H)
 
-(** RULE P.Binary.IntComp.Bool (STATUS normative)
+(** RULE P.Binary.IntComp.Bool (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_comp
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#compare_unsigned_generic *)
@@ -659,7 +659,7 @@ Inductive denot_scalar
       (PR_ok (V_naked_imm
                 (z_of_bool (int_comp_holds (si_width k) c a b))) H)
 
-(** RULE P.Binary.IntComp.CompareFunction (STATUS normative)
+(** RULE P.Binary.IntComp.CompareFunction (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_comp *)
 | P_Binary_IntComp_CompareFunction : forall k su a b H,
@@ -673,7 +673,7 @@ Inductive denot_scalar
                 (zcmp (su_view (si_width k) su a)
                       (su_view (si_width k) su b))) H)
 
-(** RULE P.Binary.FloatArith (STATUS normative)
+(** RULE P.Binary.FloatArith (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen
     CODE middle_end/flambda2/numbers/numeric_types.ml#IEEE_semantics
@@ -688,7 +688,7 @@ Inductive denot_scalar
       [V_naked_float32 b1; V_naked_float32 b2] H
       (PR_ok (V_naked_float32 (f32_binop op b1 b2)) H)
 
-(** RULE P.Binary.FloatComp.Bool (STATUS normative)
+(** RULE P.Binary.FloatComp.Bool (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_comp_gen
     CODE middle_end/flambda2/numbers/numeric_types.ml#IEEE_semantics *)
@@ -703,7 +703,7 @@ Inductive denot_scalar
       [V_naked_float32 b1; V_naked_float32 b2] H
       (PR_ok (V_naked_imm (z_of_bool (f32_comp_bool c b1 b2))) H)
 
-(** RULE P.Binary.FloatComp.CompareFunction (STATUS normative)
+(** RULE P.Binary.FloatComp.CompareFunction (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_comp_gen
     (Base's fXX_compare is the TOTAL order of Stdlib.compare on
@@ -724,7 +724,7 @@ Inductive denot_scalar
       (PR_ok (V_naked_imm (f32_compare b1 b2)) H)
 .
 
-(** RULE P.Binary.IntShift.OutOfRange.FolderPicksZero (STATUS descriptive)
+(** RULE P.Binary.IntShift.OutOfRange.FolderPicksZero (CLAIM descriptive)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/simplify/number_adjuncts.ml#with_shift
     Descriptive of the constant folder: on undef shift inputs the
@@ -767,7 +767,7 @@ Definition scalar_float_prim (op : prim_op) : Prop :=
   | _ => False
   end.
 
-(** RULE P.Effects.PureScalars (STATUS normative)
+(** RULE P.Effects.PureScalars (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive *)
@@ -777,7 +777,7 @@ Theorem P_Effects_PureScalars :
     effects_of fl op = EC_pure.
 Admitted.
 
-(** RULE P.Effects.FloatRoundingMode (STATUS normative)
+(** RULE P.Effects.FloatRoundingMode (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive
@@ -790,7 +790,7 @@ Theorem P_Effects_FloatRoundingMode :
       (if ef_float_const_prop fl then EC_pure else EC_read).
 Admitted.
 
-(** RULE P.Effects.BoxNumber (STATUS normative)
+(** RULE P.Effects.BoxNumber (CLAIM normative)
     -- 05-primitives-scalar.md
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
     ENCODING NOTE: the doc's conclusion fixes the effects and

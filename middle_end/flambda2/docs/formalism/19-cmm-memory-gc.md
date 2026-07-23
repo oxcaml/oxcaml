@@ -23,7 +23,7 @@ by contrast, *does* correspond to the Flambda region stack `R`
 
 ```rule
 RULE CM.Alloc.Heap
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Calloc
 CODE backend/cmm_helpers.ml#make_alloc_generic
 ---
@@ -51,7 +51,7 @@ handles correspond one-to-one.
 
 ```rule
 RULE CM.Region.Begin
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cbeginregion
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_region
 CODE middle_end/flambda2/terms/flambda_primitive.mli#Begin_try_region
@@ -74,7 +74,7 @@ variadic_primitive to `Cconst_int 0`, leaving RR unchanged. That ghost `Cconst_i
 
 ```rule
 RULE CM.Alloc.Local
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Calloc
 CODE backend/cmm_helpers.ml#local_block_header
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#alloc_mode_for_allocations_to_cmm
@@ -94,11 +94,12 @@ allocation is enabled.
 
 ```rule
 RULE CM.Region.End
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#Cendregion
 CODE middle_end/flambda2/terms/flambda_primitive.mli#End_region
 CODE middle_end/flambda2/terms/flambda_primitive.mli#End_try_region
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
+CAVEAT disclosure: soundness relies on the type system / Simplify's alloc-mode discipline (external to this rule) preventing region escapes; an escaped value would be a dangling pointer.
 ---
 e_c = Cop(Cendregion, [word ι], dbg);   RR = ι₀ :: … :: ι :: RR₀
 M′ = M with every block allocated in ι (or in a region above it in RR) reclaimed
@@ -129,9 +130,12 @@ stutter in the simulation ([`20`](20-to-cmm-soundness.md)).
 
 ```rule
 RULE CM.Alloc.GC
-STATUS conjectured
+CLAIM normative
 CODE backend/cmm_helpers.ml#make_alloc_generic
 CODE backend/cmm.mli#machtype_component
+CAVEAT disclosure: the moving collector is axiomatized as ≈-preserving, modelled not implemented; soundness rests on the Val-root machtype discipline and CM.Addr.NoSurvive.
+CAVEAT disclosure: a to_cmm Addr bug (Cadda held across allocation) would violate the ≈-preservation assumption undetected — an unmodelled trust boundary.
+CAVEAT watch(W-32): gc_reloc is deliberately an unconstrained Parameter; any axiom cashing its conditions or any concrete GC instantiation must revisit the TC.Let.Subst stack guard in the same change (catalog entry 62; CmmMemory.v:249).
 ---
 An allocation (CM.Alloc.Heap/Local) may be preceded by a collection, atomically:
 at an allocation point, instead of allocating in M directly, the machine may take
@@ -152,7 +156,7 @@ allocation by CM.Alloc.Heap/Local (with no further collection), reaching
 --------------------------------------------------
 The GC preserves the representation relation: H ≈_{ϕ∘L} M′ still holds, so no
 Flambda-observable changes. Modelled, not implemented, here.
-NOTES: STATUS conjectured — this axiomatizes the OCaml moving minor/major collector
+NOTES: This axiomatizes the OCaml moving minor/major collector
 as ≈-preserving, rather than modelling collection. This is the standard "GC is
 observational identity" assumption; its soundness rests on the machtype discipline
 (GC roots are exactly the Val-typed live variables; cmm.mli header comment) and on
@@ -181,10 +185,11 @@ guarantees this by construction, and it is what makes `CM.Alloc.GC` sound.
 
 ```rule
 RULE CM.Addr.NoSurvive
-STATUS normative
+CLAIM normative
 CODE backend/cmm.mli#machtype_component
 CODE backend/cmm_helpers.ml#field_address
 CODE backend/cmm_helpers.ml#setfield_computed
+CAVEAT disclosure: the no-live-Addr invariant is an unverified obligation on to_cmm codegen; any violation is a to_cmm bug that CM.Alloc.GC would expose as a dangling pointer.
 ---
 No Addr-typed value (a Cadda/field_address result) is let-bound or held live across
 any GC-permitting point: an allocating primitive (a CM.Alloc.Heap/Local, hence a
@@ -214,8 +219,9 @@ a to_cmm codegen bug that CM.Alloc.GC would expose as a dangling pointer.
 
 ```rule
 RULE CM.Alloc.Exhaustion
-STATUS normative
+CLAIM normative
 CODE backend/cmm_helpers.ml#make_alloc_generic
+CAVEAT disclosure: INV.ToCmm.Simulates (20) is stated modulo resource exhaustion: a Cmm run may exhaust resources where the Flambda run diverges or terminates normally.
 ---
 An allocation (CM.Alloc.Heap/Local, after a possible CM.Alloc.GC) that cannot be
 satisfied — no free memory / stack overflow — halts the run with an out-of-memory /

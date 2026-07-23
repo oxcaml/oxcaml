@@ -541,7 +541,7 @@ Definition let_depth (mydepth : variable) (d : rec_info_expr)
   E_let (BPat_singleton (Mk_bound_var mydepth NM_normal))
     (N_rec_info d) body.
 
-(** RULE S.Inline.Substitute.Region (STATUS normative)
+(** RULE S.Inline.Substitute.Region (CLAIM normative)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body
     rho_region, by cases on (alpha, alpha^c) in doc order: empty if
@@ -727,7 +727,7 @@ Definition callee_binders_fresh (code : code0)
 Inductive rw_inline (flags : eff_flags) (C : code_env) (E : tenv)
     : expr -> expr -> Prop :=
 
-(** RULE S.Inline.ModeMismatchInvalid (STATUS normative)
+(** RULE S.Inline.ModeMismatchInvalid (CLAIM normative)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline
     Premises in doc order: call kind Function, direct to cid;
@@ -745,7 +745,7 @@ Inductive rw_inline (flags : eff_flags) (C : code_env) (E : tenv)
       c0_result_mode code = LM_local ->
       rw_inline flags C E (E_apply ap) (E_invalid msg)
 
-(** RULE S.Inline.Substitute (STATUS normative)
+(** RULE S.Inline.Substitute (CLAIM normative)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline
     CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body
@@ -802,7 +802,7 @@ Inductive rw_inline (flags : eff_flags) (C : code_env) (E : tenv)
            (ap_alloc_mode ap) kret_t
            (ec_exn_handler (ap_exn_continuation ap)))
 
-(** RULE S.Inline.Substitute.ExnExtraArgs (STATUS normative)
+(** RULE S.Inline.Substitute.ExnExtraArgs (CLAIM normative)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify_shared/inlining_helpers.ml#wrap_inlined_body_for_exn_extra_args
     Premises in doc order: the oracle verdict inline;
@@ -878,7 +878,7 @@ Inductive rw_inline (flags : eff_flags) (C : code_env) (E : tenv)
 (* 3. Oracle internals and unrolling (doc sections 2-3)               *)
 (* ================================================================== *)
 
-(** RULE S.Inline.DeclDecision (STATUS descriptive)
+(** RULE S.Inline.DeclDecision (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify_shared/function_decl_inlining_decision.ml#make_decision0
     CODE middle_end/flambda2/terms/function_decl_inlining_decision_type.ml#behaviour
@@ -899,7 +899,7 @@ Inductive rw_inline (flags : eff_flags) (C : code_env) (E : tenv)
     inline_dec oracle. *)
 Definition S_Inline_DeclDecision_documented : Prop := True.
 
-(** RULE S.Inline.Decision (STATUS descriptive)
+(** RULE S.Inline.Decision (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision
@@ -921,7 +921,7 @@ Definition S_Inline_DeclDecision_documented : Prop := True.
     implementation; the model keeps only the verdict. *)
 Definition S_Inline_Decision_documented : Prop := True.
 
-(** RULE S.Inline.Speculative (STATUS descriptive)
+(** RULE S.Inline.Speculative (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#might_inline
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
@@ -942,7 +942,7 @@ Definition S_Inline_Decision_documented : Prop := True.
     retunable; all folded into inline_dec. *)
 Definition S_Inline_Speculative_documented : Prop := True.
 
-(** RULE S.Inline.DepthLimit (STATUS descriptive)
+(** RULE S.Inline.DepthLimit (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
     CODE middle_end/flambda2/terms/inlining_state.ml#is_depth_exceeded
@@ -959,7 +959,7 @@ Definition S_Inline_Speculative_documented : Prop := True.
     oracle. *)
 Definition S_Inline_DepthLimit_documented : Prop := True.
 
-(** RULE S.Inline.Unroll.Begin (STATUS descriptive)
+(** RULE S.Inline.Unroll.Begin (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
     CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body
@@ -978,7 +978,7 @@ Definition S_Inline_DepthLimit_documented : Prop := True.
     the rest of the unrolling machinery. *)
 Definition S_Inline_Unroll_Begin_documented : Prop := True.
 
-(** RULE S.Inline.Unroll.Continue (STATUS descriptive)
+(** RULE S.Inline.Unroll.Continue (CLAIM descriptive)
     -- 11-inlining.md
     CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
     CODE middle_end/flambda2/simplify/simplify_rec_info_expr.ml#known_remaining_unrolling_depth

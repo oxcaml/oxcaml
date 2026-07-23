@@ -175,8 +175,10 @@ the call needs `caml_c_call`, whether it is a C builtin, and its effects and
 coeffects. The `Effect` operations carry their operands as `Simple`s *inside*
 the call kind and correspondingly set `callee = None` with an empty argument
 list, to avoid confusing these `Simple`s with ordinary call arguments
-(WF.Syntax.EffectCalleeNone). (Per the scope ledger in 01, `Method` and `Effect`
-applications are documented here but not given operational rules.)
+(WF.Syntax.EffectCalleeNone). (Per the scope ledger in 01, `Effect`
+applications are documented here but given no operational rules; `Method`
+applications get only a coarse dispatch rule, OS.Apply.Method in
+[§04](04-opsem.md).)
 
 ### `Apply_cont`
 
@@ -556,7 +558,7 @@ construction site.
 
 ```rule
 RULE WF.Syntax.Anf
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#expr_descr
 ---
 n is the defining expression of a Let binding
@@ -570,7 +572,7 @@ may allocate or have side effects, but does not branch, jump, or return.
 
 ```rule
 RULE WF.Syntax.LetKindUniform
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/bound_identifiers/bound_pattern.mli#t
 ---
 Let (P = n) e   binds names x₁ … xₙ   (n > 1 only when P = Set_of_closures …)
@@ -583,7 +585,7 @@ the [Set_of_closures] pattern.
 
 ```rule
 RULE WF.Syntax.SingletonNotSetOfClosures
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/bound_identifiers/bound_pattern.mli#t
 ---
 P = Singleton bv
@@ -595,7 +597,7 @@ Dynamically-allocated sets of closures use the [Set_of_closures] pattern.
 
 ```rule
 RULE WF.Syntax.SwitchScrutinee
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/switch_expr.mli#t
 CODE middle_end/flambda2/terms/switch_expr.mli#create
 ---
@@ -612,12 +614,13 @@ judgment* counterpart is WF.Switch.Scrutinee in [§03](03-kinds.md).
 
 ```rule
 RULE WF.Syntax.SwitchMinArms
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/switch_expr.mli#t
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_switch
 CODE middle_end/flambda2/simplify/expr_builder.ml#create_switch
 CODE middle_end/flambda2/terms/flambda.mli#Invalid.t
-VERIFIED 14-validation/gadt_simplified_switch.md
+VERIFIED 14-validation/gadt_simplified_switch.md @ 1c1940b7ea
+CAVEAT disclosure: not enforced by Switch_expr.create; the fexpr parser can build a <2-arm Switch from hand-written input — invariant maintained by construction on producing paths, not by the constructor.
 ---
 Switch sw appears in a well-formed term
 --------------------------------------------------
@@ -636,9 +639,10 @@ has at least one arm.
 
 ```rule
 RULE WF.Syntax.ExnHandlerNonRecursive
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
+CAVEAT disclosure: holds only by Flambda_to_cmm — transient mutual recursion through stubs is permitted earlier, relying on Simplify to inline it out before to_cmm.
 ---
 continuation k is an exception handler (is_exn_handler = true)
 --------------------------------------------------
@@ -652,9 +656,10 @@ doc).
 
 ```rule
 RULE WF.Syntax.ExnHandlerFirstParamBucket
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/exn_continuation.mli#arity
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
+CAVEAT disclosure: no compiler check enforces the parameter/extra_args alignment against Exn_continuation.t — the invariant is maintained by construction at producing sites only.
 ---
 k is an exception handler with parameters p₁ … pₘ
 --------------------------------------------------
@@ -668,7 +673,7 @@ not checked here.
 
 ```rule
 RULE WF.Syntax.EffectCalleeNone
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/call_kind.mli#Effect
 CODE middle_end/flambda2/terms/apply_expr.mli#create
 ---
@@ -682,7 +687,7 @@ confusion between the different [Simple]s" (which are carried inside [eff]).
 
 ```rule
 RULE WF.Syntax.ContSecondClass
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
 ---
 k is a continuation
@@ -696,9 +701,10 @@ NOTES: "Continuations are second-class. Continuations do not capture variables."
 
 ```rule
 RULE WF.Syntax.NonRecOccursPositive
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#let_cont_expr
 CODE middle_end/flambda2/terms/flambda.ml#Let_cont_expr.create_non_recursive0
+CAVEAT disclosure: not enforced by construction — create_non_recursive0 passes a Known 0 count straight to create0, which builds the Let_cont unconditionally; invariant maintained by callers and Simplify dead-continuation removal.
 ---
 Let_cont (Non_recursive { num_free_occurrences = Known m; … })
 --------------------------------------------------
@@ -716,7 +722,7 @@ documented but maintained by callers, not by construction.
 
 ```rule
 RULE WF.Syntax.StaticRecThroughCode
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/bound_identifiers/bound_static.mli#create
 ---
 bst binds names N ; there is a recursive cycle among N
@@ -729,7 +735,7 @@ that points to itself is forbidden.)
 
 ```rule
 RULE WF.Syntax.ImmutableArrayNonEmpty
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/terms/static_const.mli#t
 ---
 sc = Immutable_*_array [fields]
@@ -742,7 +748,7 @@ constructors ([immutable_*_array]) route empty lists to [Empty_array].
 
 ```rule
 RULE WF.Syntax.NameModeInTerms
-STATUS normative
+CLAIM normative
 CODE middle_end/flambda2/nominal/name_mode.ml#can_be_in_terms
 ---
 bv is a Bound_var.t occurring in a term

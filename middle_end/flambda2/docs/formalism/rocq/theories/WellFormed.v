@@ -21,7 +21,7 @@ Import ListNotations.
 (* 1. GC-scannability (03-kinds.md section 2)                         *)
 (* ================================================================== *)
 
-(** RULE WF.Subkind.Scannable (STATUS descriptive) -- 03-kinds.md
+(** RULE WF.Subkind.Scannable (CLAIM descriptive) -- 03-kinds.md
     CODE kinds/flambda_kind.ml#With_subkind.must_be_gc_scannable
     must_be_gc_scannable(kw) = true iff kind(kw) = Value and
     non_null_value_subkind(kw) <> Tagged_immediate: only Value-kinded
@@ -43,7 +43,7 @@ Definition arity_is_unarized (a : arity) : Prop :=
               end)
     a.
 
-(** RULE WF.Arity.ApplyFlavours (STATUS normative) -- 03-kinds.md
+(** RULE WF.Arity.ApplyFlavours (CLAIM normative) -- 03-kinds.md
     CODE terms/apply_expr.mli#create
     CODE terms/apply_expr.mli#args_arity
     CODE terms/apply_expr.mli#return_arity
@@ -92,21 +92,21 @@ Definition const_kind (c : const) : kind :=
    name at any coercion. *)
 Inductive kinding (Gamma : kctx) : simple -> kind -> Prop :=
 
-(** RULE WF.Kind.Var (STATUS normative) -- 03-kinds.md
+(** RULE WF.Kind.Var (CLAIM normative) -- 03-kinds.md
     CODE term_basics/simple.ml#kind
     CODE identifiers/int_ids.ml#Variable.kind *)
 | WF_Kind_Var : forall x k,
     Gamma x = Some k ->
     kinding Gamma (Simple_name (Name_var x) Coercion_id) k
 
-(** RULE WF.Kind.Symbol (STATUS normative) -- 03-kinds.md
+(** RULE WF.Kind.Symbol (CLAIM normative) -- 03-kinds.md
     CODE term_basics/simple.ml#kind
     Symbols name statically-allocated data and are always of kind
     Value (Symbol.t carries no kind field). *)
 | WF_Kind_Symbol : forall s,
     kinding Gamma (Simple_name (Name_sym s) Coercion_id) K_value
 
-(** RULE WF.Kind.Const (STATUS normative) -- 03-kinds.md
+(** RULE WF.Kind.Const (CLAIM normative) -- 03-kinds.md
     CODE identifiers/reg_width_const.ml#kind
     CODE identifiers/int_ids.mli#Const.Descr
     Each Const case has a fixed kind (const_kind above, cases in the
@@ -115,7 +115,7 @@ Inductive kinding (Gamma : kctx) : simple -> kind -> Prop :=
 | WF_Kind_Const : forall c,
     kinding Gamma (Simple_const c) (const_kind c)
 
-(** RULE WF.Kind.Coerce (STATUS normative) -- 03-kinds.md
+(** RULE WF.Kind.Coerce (CLAIM normative) -- 03-kinds.md
     CODE identifiers/coercion0.mli#S
     CODE term_basics/simple.ml#kind
     A coercion does not alter the run-time value of its argument;
@@ -171,13 +171,13 @@ Definition result_kind' (op : prim_op) : kind :=
    WF.Let.Static below). *)
 Inductive named_kinding (Gamma : kctx) : named -> kind -> Prop :=
 
-(** RULE WF.Named.Simple (STATUS normative) -- 03-kinds.md
+(** RULE WF.Named.Simple (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.ml#Named.kind *)
 | WF_Named_Simple : forall s k,
     kinding Gamma s k ->
     named_kinding Gamma (N_simple s) k
 
-(** RULE WF.Named.Prim (STATUS normative) -- 03-kinds.md
+(** RULE WF.Named.Prim (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.ml#Named.kind
     CODE terms/flambda_primitive.mli#result_kind
     CODE terms/flambda_primitive.ml#result_kind'
@@ -186,7 +186,7 @@ Inductive named_kinding (Gamma : kctx) : named -> kind -> Prop :=
 | WF_Named_Prim : forall p,
     named_kinding Gamma (N_prim p) (result_kind' (prim_op_of p))
 
-(** RULE WF.Named.RecInfo (STATUS normative) -- 03-kinds.md
+(** RULE WF.Named.RecInfo (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.ml#Named.kind *)
 | WF_Named_RecInfo : forall ri,
     named_kinding Gamma (N_rec_info ri) K_rec_info.
@@ -195,7 +195,7 @@ Inductive named_kinding (Gamma : kctx) : named -> kind -> Prop :=
 (* 6. Primitive argument kinds (03-kinds.md section 5.2)              *)
 (* ================================================================== *)
 
-(** RULE WF.Prim.ArgKinds (STATUS normative) -- 03-kinds.md
+(** RULE WF.Prim.ArgKinds (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda_primitive.mli#arg_kind_of_unary_primitive
     CODE terms/flambda_primitive.mli#args_kind_of_binary_primitive
     CODE terms/flambda_primitive.mli#args_kind_of_variadic_primitive
@@ -207,7 +207,7 @@ Definition WF_Prim_ArgKinds (Gamma : kctx) (p : prim) : Prop :=
     prim_arg_kinds (prim_op_of p) ks
     /\ Forall2 (kinding Gamma) (prim_args p) ks.
 
-(** RULE WF.Prim.MakeBlockMixed (STATUS normative) -- 03-kinds.md
+(** RULE WF.Prim.MakeBlockMixed (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda_primitive.ml#args_kind_of_variadic_primitive
     CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
     CODE kinds/flambda_kind.mli#Mixed_block_shape.field_kinds
@@ -229,7 +229,7 @@ Definition WF_Prim_MakeBlockMixed (Gamma : kctx)
 (* 7. Switch non-emptiness (03-kinds.md section 5.3)                  *)
 (* ================================================================== *)
 
-(** RULE WF.Switch.NonEmpty (STATUS normative) -- 03-kinds.md
+(** RULE WF.Switch.NonEmpty (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_switch_expr.ml
     CODE simplify/expr_builder.ml
     CODE terms/flambda.mli#Invalid
@@ -252,7 +252,7 @@ Definition WF_Switch_NonEmpty (sw : switch_expr) : Prop :=
    kinds (Bound_parameter.kind of each parameter). *)
 Definition cctx := fmap continuation unarized_arity.
 
-(** RULE WF.ApplyCont.Arity (STATUS normative) -- 03-kinds.md
+(** RULE WF.ApplyCont.Arity (CLAIM normative) -- 03-kinds.md
     CODE terms/apply_cont_expr.mli#create
     CODE bound_identifiers/bound_parameters.mli#arity
     CODE bound_identifiers/bound_parameter.mli#kind
@@ -281,7 +281,7 @@ Definition apply_direct_code (ap : apply_expr) : option code_id :=
   | _ => None
   end.
 
-(** RULE WF.Apply.ArgKinds (STATUS normative) -- 03-kinds.md
+(** RULE WF.Apply.ArgKinds (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml#simplify_apply_shared
     CODE terms/apply_expr.mli#args_arity
     apply with args s1 ... sm and args_arity a;
@@ -312,7 +312,7 @@ Definition arity_agree_prefix (a b : arity) : Prop :=
   let n := Nat.min (length a) (length b) in
   map erase_component (firstn n a) = map erase_component (firstn n b).
 
-(** RULE WF.Apply.DirectArity (STATUS normative) -- 03-kinds.md
+(** RULE WF.Apply.DirectArity (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml#arity_mismatch
     CODE terms/flambda.mli#Invalid
     Direct call of code cid with params_arity from its code
@@ -326,7 +326,7 @@ Definition WF_Apply_DirectArity (ap : apply_expr) : Prop :=
       code_params_arity cid = Some pa
       /\ arity_agree_prefix (ap_args_arity ap) pa.
 
-(** RULE WF.Apply.DirectResultArity (STATUS normative) -- 03-kinds.md
+(** RULE WF.Apply.DirectResultArity (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml
     CODE terms/flambda.mli#Invalid
     Exact direct call (provided_num_args = num_params, i.e. equal
@@ -348,7 +348,7 @@ Definition WF_Apply_DirectResultArity (ap : apply_expr) : Prop :=
 Definition arity_is_one_value (a : arity) : Prop :=
   map ws_kind (unarize a) = [K_value].
 
-(** RULE WF.Apply.Over (STATUS normative) -- 03-kinds.md
+(** RULE WF.Apply.Over (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml
     CODE simplify/simplify_common.ml
     CODE terms/flambda.mli#Invalid
@@ -367,7 +367,7 @@ Definition WF_Apply_Over (ap : apply_expr) : Prop :=
     exists ra,
       code_result_arity cid = Some ra /\ arity_is_one_value ra.
 
-(** RULE WF.Apply.Partial (STATUS normative) -- 03-kinds.md
+(** RULE WF.Apply.Partial (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml
     CODE terms/flambda.mli#Invalid
     Direct call with 0 < provided_num_args < num_params: partial
@@ -387,7 +387,7 @@ Definition WF_Apply_Partial (ap : apply_expr) : Prop :=
 (* 10. Regions and recursion depths (03-kinds.md section 5.6)         *)
 (* ================================================================== *)
 
-(** RULE WF.Region.Var (STATUS normative) -- 03-kinds.md
+(** RULE WF.Region.Var (CLAIM normative) -- 03-kinds.md
     CODE from_lambda/closure_conversion.ml
     CODE terms/flambda_primitive.ml#result_kind_of_variadic_primitive
     Region tokens are of kind Region.  This predicate is the
@@ -399,7 +399,7 @@ Definition WF_Apply_Partial (ap : apply_expr) : Prop :=
 Definition WF_Region_Var (Gamma : kctx) (x : variable) : Prop :=
   Gamma x = Some K_region.
 
-(** RULE WF.RecInfo.MyDepth (STATUS normative) -- 03-kinds.md
+(** RULE WF.RecInfo.MyDepth (CLAIM normative) -- 03-kinds.md
     CODE simplify/simplify_apply_expr.ml
     CODE simplify/simplify_set_of_closures.ml
     CODE terms/flambda.mli#Function_params_and_body.create
@@ -441,7 +441,7 @@ Definition bsp_matches_scc (bsp : bound_static_pattern)
    predicates; Invalid is vacuously ok. *)
 Inductive expr_wf : kctx -> cctx -> expr -> Prop :=
 
-(** RULE WF.Let.Singleton (STATUS normative) -- 03-kinds.md
+(** RULE WF.Let.Singleton (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.ml#Named.kind
     CODE terms/flambda.mli#Named.kind
     CODE bound_identifiers/bound_pattern.mli#t
@@ -454,7 +454,7 @@ Inductive expr_wf : kctx -> cctx -> expr -> Prop :=
     expr_wf (fupd variable_eqb Gamma (bv_var bv) kn) Delta body ->
     expr_wf Gamma Delta (E_let (BPat_singleton bv) n body)
 
-(** RULE WF.Let.SetOfClosures (STATUS normative) -- 03-kinds.md
+(** RULE WF.Let.SetOfClosures (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.mli#Named
     CODE bound_identifiers/bound_pattern.mli#t
     CODE simplify/simplify_set_of_closures.ml
@@ -472,7 +472,7 @@ Inductive expr_wf : kctx -> cctx -> expr -> Prop :=
       (E_let (BPat_set_of_closures bvs) (N_set_of_closures soc am)
          body)
 
-(** RULE WF.Let.Static (STATUS normative) -- 03-kinds.md
+(** RULE WF.Let.Static (CLAIM normative) -- 03-kinds.md
     CODE terms/flambda.mli#Named
     CODE bound_identifiers/bound_pattern.mli#t
     n = Static_consts g; pattern = Static bound_static; matching
@@ -487,7 +487,7 @@ Inductive expr_wf : kctx -> cctx -> expr -> Prop :=
     expr_wf Gamma Delta
       (E_let (BPat_static bst) (N_static_consts scg) body)
 
-(** RULE WF.Switch.Scrutinee (STATUS normative) -- 03-kinds.md
+(** RULE WF.Switch.Scrutinee (CLAIM normative) -- 03-kinds.md
     CODE terms/switch_expr.ml#t
     CODE simplify/simplify_switch_expr.ml#simplify_arm
     Gamma |- scrutinee : Naked_immediate (a Switch scrutinee is a
@@ -557,7 +557,7 @@ End WithKindTables.
 (* 12. Where kinds are checked in practice (03-kinds.md section 6)    *)
 (* ================================================================== *)
 
-(** RULE WF.Check.Gated (STATUS descriptive) -- 03-kinds.md
+(** RULE WF.Check.Gated (CLAIM descriptive) -- 03-kinds.md
     CODE ui/flambda_features.ml#kind_checks
     CODE driver/oxcaml_flags.ml
     CODE driver/oxcaml_args.ml

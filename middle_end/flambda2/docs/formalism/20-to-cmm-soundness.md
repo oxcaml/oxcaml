@@ -43,9 +43,11 @@ component correspondences already established:
 
 ```rule
 RULE INV.ToCmm.Simulates
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
+CAVEAT disclosure: refinement holds only up to ≈ and 13 §1's immutable-identity folding, modulo undefined behaviour (inherited verbatim from 13) and resource exhaustion (the one outcome Cmm adds).
+CAVEAT disclosure: Cmm fixes no Cop operand order (Selectgen chooses); the model's left-to-right pick is a modelling choice; INV.ToCmm.Simulates is claimed independent of it.
 ---
 Let P = ⟦U⟧ and let the initial Cmm state of P's module initialiser be
 initc(P), with initial(U) ≈cfg initc(P) (OS.Unit.Init ≈ the entry of the module
@@ -72,7 +74,7 @@ normal termination.
 --------------------------------------------------
 to_cmm refines observable behaviour up to ≈ and 13 §1's folding, modulo
 undefined behaviour and resource exhaustion.
-NOTES: STATUS conjectured — claimed and empirically validated (§4), not proved.
+NOTES: Claimed and empirically validated (§4), not proved.
 REPOSED (KF-056, 2026-07-22): the top-level claim is the BACKWARD ("Cmm
 refines Flambda") direction — the former forward direction (∀ Flambda
 behaviour ∃ Cmm outcome) is refutable under the revised P.Binary.PhysEqual: an
@@ -107,9 +109,10 @@ Composing with Simplify's soundness gives the whole middle-end pipeline
 
 ```rule
 RULE INV.ToCmm.EndToEnd
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
 CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
+CAVEAT known-false: false for any U₀ with a compile-time int→float32 conversion (float32_double_round, 13 §4.7); the gap is entirely in Simplify's constant fold — read EndToEnd modulo that family until the fix lands.
 ---
 Let U₀ be a well-formed raw Flambda unit, U′ = Simplify(U₀) (13,
 INV.Simplify.Preserves), and P = ⟦U′⟧ (INV.ToCmm.Simulates). If U₀ has no
@@ -119,7 +122,7 @@ exhaustion AND the known int→float32 constant-fold unsoundness (§5.1, 13 §4.
 --------------------------------------------------
 By transitivity of INV.Simplify.Preserves (refinement on Flambda observations)
 and INV.ToCmm.Simulates (≈-refinement of Flambda by Cmm).
-NOTES: STATUS conjectured. This is the composed correctness of the two formalized
+NOTES: This is the composed correctness of the two formalized
 passes, and it INHERITS INV.Simplify.Preserves as a premise — a premise with a known
 counterexample. So EndToEnd as stated is FALSE for any U₀ containing a compile-time
 int→float32 conversion: Simplify's constant fold double-rounds (13 §4.7,
@@ -135,11 +138,12 @@ simulation itself holds for any well-formed optimized Flambda.
 
 ```rule
 RULE INV.ToCmm.InvalidUnreached
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#nullary_primitive
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 CODE backend/cmm.mli#Cinvalid
+CAVEAT disclosure: leans on the Slot_offsets slot-liveness premise, stated but not discharged in this rule — the dead-slot arms' discharge lives only in INV.ToCmm.SlotLiveness.
 ---
 If a Flambda configuration is unreachable-when-Invalid in U′ (13: a correct
 Simplify never steps a reachable config to OS.Invalid), and Simplify/Slot_offsets
@@ -157,7 +161,7 @@ argument as OS.Invalid (05 §60, cross-ref); and (d) the dead closure-slot
 projections (to_cmm_primitive#unary_primitive, the `Dead_function_slot` /
 `Dead_value_slot` arms), unreachable by slot-liveness: a live projection never
 targets a slot dropped from the layout, so those arms are never taken.
-NOTES: STATUS conjectured. The Cmm `Cinvalid` (which lowers to caml_flambda2_invalid,
+NOTES: The Cmm `Cinvalid` (which lowers to caml_flambda2_invalid,
 aborting) is reached only from states the Flambda machine already calls undefined,
 so it does not widen the set of undefined behaviours. Inherits the discharge of
 "reachable ⇏ Invalid" from 13, plus the Slot_offsets slot-liveness invariant: the
@@ -177,7 +181,7 @@ statement) that manifest only when another unit links.
 
 ```rule
 RULE INV.ToCmm.SlotLiveness
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/flambda2.ml#build_run_result
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#finalize
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#mark_slot_as_removed
@@ -186,6 +190,7 @@ CODE middle_end/flambda2/simplify/expr_builder.ml#remove_unused_value_slots
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 CODE middle_end/flambda2/cmx/exported_code.ml#prepare_for_export
 CODE middle_end/flambda2/types/env/cached_level.ml#remove_unused_value_slots_and_shortcut_aliases
+CAVEAT disclosure: holds only under undischarged premises — (P1) survival⇒recorded, an ACCIDENTAL, non-structural alignment whose breakage means reachable Cinvalid at runtime (watch W-41, 13).
 ---
 [MANDATORY MERGE with INV.Simplify.DeadValueSlotCoherence ([§13](13-soundness.md)):
 these are the to_cmm and Simplify faces of ONE pruning event. Three DISTINCT
@@ -239,11 +244,12 @@ INV.Simplify.DeadValueSlotCoherence, INV.ToCmm.InvalidUnreached, INV.NameMode.Co
 
 ```rule
 RULE INV.ToCmm.ClosureScanBoundary
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#update_set_for_slot
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#layout_aux
 CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
 CODE backend/cmm_helpers.ml#pack_closure_info
+CAVEAT disclosure: rests on the subkind-soundness premise (Tagged_immediate captures really immediate at runtime), a 07/13 typing fact outside the kind grammar; a wrong bit is silent heap corruption.
 ---
 For every closure block emitted by to_cmm (dynamic TC.Let.SetOfClosures or static
 TC.Let.Static), there is a SINGLE word boundary startenv such that:
@@ -279,11 +285,12 @@ R.Val.Clos, CM.Alloc.GC, TC.Let.SetOfClosures.
 
 ```rule
 RULE INV.ToCmm.AddrConfined
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#machtype_of_kind
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
 CODE middle_end/flambda2/kinds/flambda_kind.ml#t
 CODE backend/cmm.mli#machtype_component
+CAVEAT disclosure: deliberately narrowed to ⤳-translated phrases of Θ(U′); generic_fns send_function Clet-binds an Addr (cache_ptr) — safe, cited as a deliberate counterexample marking the boundary.
 ---
 [SCOPE: covers the ⤳-TRANSLATED phrases (images of Flambda expressions), NOT every
 phrase in the emitted unit — the generic-functions machinery emits a genuine Addr
@@ -315,10 +322,12 @@ CM.Addr.NoSurvive, CM.Alloc.GC.
 
 ```rule
 RULE INV.ToCmm.EffectLinear
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#apply_expr
+CAVEAT disclosure: occurrence counts from Simplify's upwards accumulation are consumed with no revalidation (Not_found ⇒ Regular is the conservative default).
+CAVEAT disclosure: the zero-occurrence Drop arm needs the same immutable-identity license as CSE sharing; the Gc.stat/minor-words counter concern is answered in the NOTES — counters are outside the observation.
 ---
 [RESTATED: the original "an unused effectful binding is never dropped" is FALSE —
 can_be_removed holds for ALL Only_generative_effects (Mutable / Immutable /
@@ -365,11 +374,12 @@ TC.Let.Subst, P.Effects.DelayDuplicable, R.Observe, INV.ToCmm.Simulates.
 
 ```rule
 RULE INV.ToCmm.CallConvCoherent
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/terms/code_metadata.ml#function_slot_size
 CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
 CODE backend/cmm_helpers.ml#curry_function_sym
 CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#create_function_slot
+CAVEAT disclosure: leg (2) (null-code slots never applied) is UNDISCHARGED in 15-20 — its discharge lives in Reaper's deletion criterion, currently excluded from the scope ledger.
 ---
 For every function slot f in every emitted closure block:
 (1) LIVE code cid: the slot's size = 2 iff (num_params ≤ 1 ∧ not tupled) and 3
@@ -405,10 +415,11 @@ INV.ToCmm.SlotLiveness.
 
 ```rule
 RULE INV.ToCmm.StaticUpdateBarrier
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#make_update
 CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#update_field
 CODE backend/cmm_helpers.ml#setfield
+CAVEAT disclosure: a header bug would surface as GC-scheduling-dependent corruption invisible to byte-layout validation — no case study CAN check caml_initialize placement, a structural gap in the validation method.
 ---
 Every deferred symbol-field update (the Or_variable "holes" of TC.Let.Static, filled
 at module-init time) is emitted as follows, and this classification is COMPLETE:
@@ -442,11 +453,12 @@ TC.Prim.BlockSet, INV.ToCmm.ClosureScanBoundary.
 
 ```rule
 RULE INV.ToCmm.LoweringTotal
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#inline_variable
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#get_continuation
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#translate_jump_to_continuation
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#param_machtype_of_kinded_parameter
+CAVEAT disclosure: the fexprc fuzz matrix is the standing validation for the 109 fatal sites; the fatal-localizes-upstream corollary is NARROWED to the sampled classes.
 ---
 On any unit U′ that is (a) well-formed (WF.*, [§03](03-kinds.md)), (b) name-mode
 coherent (INV.NameMode.Coherent, [§13](13-soundness.md)), (c) trap-disciplined
@@ -486,10 +498,11 @@ WF.*.
 
 ```rule
 RULE INV.ToCmm.SymbolInitPlacement
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#place_symbol_inits
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_bindings
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#make_update
+CAVEAT watch(W-44): SOFT SPOT — leftover inits at a recursive-handler boundary are eprintf'd and DROPPED (to_cmm_expr.ml:983-988), guarded only by the unchecked top-level-symbol convention.
 ---
 When a static constant's Or_variable hole is filled from a variable v whose
 translation is a bare Cvar (make_update's Cvar arm), the init store is REGISTERED
@@ -522,11 +535,12 @@ INV.ToCmm.StaticUpdateBarrier, R.Observe.
 
 ```rule
 RULE INV.ToCmm.SymbolLocality
-STATUS conjectured
+CLAIM normative
 CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol
 CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol_of_code_id
 CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#raw_symbol
 CODE middle_end/flambda2/flambda2.ml#build_run_result
+CAVEAT disclosure: link soundness (reachable_names over-approximation) is invisible to the single-unit statements INV.Simplify.Preserves/INV.ToCmm.Simulates and manifests only at link time.
 ---
 to_cmm emits a data/function symbol with Cmm.Local linkage iff it belongs to the
 current unit AND is absent from reachable_names (computed alongside the cmx by

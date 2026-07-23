@@ -520,7 +520,7 @@ Definition wok_base_ok (wk : write_offset_kind) (b : value) : Prop :=
 Inductive denot_mem_b
   : prim_op -> list value -> heap -> prim_result -> Prop :=
 
-  (** RULE P.Unary.IsInt.Immediate (STATUS normative)
+  (** RULE P.Unary.IsInt.Immediate (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int *)
@@ -531,7 +531,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_is_int vo)) [V_tagged_imm n] H
           (PR_ok (V_naked_imm 1) H)
 
-  (** RULE P.Unary.IsInt.Pointer (STATUS normative)
+  (** RULE P.Unary.IsInt.Pointer (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_is_int *)
@@ -545,7 +545,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_is_int vo)) [v] H
           (PR_ok (V_naked_imm 0) H)
 
-  (** RULE P.Unary.IsNull (STATUS normative)
+  (** RULE P.Unary.IsNull (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   | P_Unary_IsNull_Null :
@@ -558,7 +558,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary UP_is_null) [v] H
           (PR_ok (V_naked_imm 0) H)
 
-  (** RULE P.Unary.GetTag (STATUS normative)
+  (** RULE P.Unary.GetTag (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_get_tag *)
@@ -572,7 +572,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary UP_get_tag) [V_ptr a] H
           (PR_ok (V_naked_imm t) H)
 
-  (** RULE P.Unary.GetHeader (STATUS conjectured)
+  (** RULE P.Unary.GetHeader (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   (* hdr(o) is target-specific and "not modelled precisely" (NOTES):
@@ -589,7 +589,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary UP_get_header) [V_ptr a] H
           (PR_ok (V_naked_nativeint hdr) H)
 
-  (** RULE P.Unary.ArrayLength (STATUS normative)
+  (** RULE P.Unary.ArrayLength (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_array_length *)
@@ -602,7 +602,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_array_length akl)) [V_ptr a] H
           (PR_ok (V_tagged_imm (Z.of_nat (length vs))) H)
 
-  (** RULE P.Unary.StringLength (STATUS normative)
+  (** RULE P.Unary.StringLength (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_string_length *)
@@ -612,7 +612,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_string_length sb)) [V_ptr a] H
           (PR_ok (V_naked_imm (Z.of_nat (length bs))) H)
 
-  (** RULE P.Unary.BigarrayLength (STATUS normative)
+  (** RULE P.Unary.BigarrayLength (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive *)
@@ -628,7 +628,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_bigarray_length d)) [V_ptr a] H
           (PR_ok (V_naked_imm dd) H)
 
-  (** RULE P.Unary.ProjectFunctionSlot (STATUS normative)
+  (** RULE P.Unary.ProjectFunctionSlot (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_function_slot *)
@@ -647,7 +647,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_project_function_slot mf mt))
           [V_clos l mf] H (PR_ok (V_clos l mt) H)
 
-  (** RULE P.Unary.ProjectValueSlot (STATUS normative)
+  (** RULE P.Unary.ProjectValueSlot (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
       CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot *)
@@ -662,7 +662,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary (UP_project_value_slot pf w))
           [V_clos l pf] H (PR_ok v H)
 
-  (** RULE P.Unary.IsBoxedFloat (STATUS conjectured)
+  (** RULE P.Unary.IsBoxedFloat (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive *)
   (* Four clauses under one rule id: the NOTES define
@@ -692,7 +692,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_unary UP_is_flat_float_array) [V_ptr a] H
           (PR_ok (V_naked_imm 0) H)
 
-  (** RULE P.Binary.ArrayLoad (STATUS normative)
+  (** RULE P.Binary.ArrayLoad (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_array_load *)
@@ -717,7 +717,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_binary (BP_array_load ak lk mu))
           [V_ptr a; V_tagged_imm j] H PR_undef
 
-  (** RULE P.Binary.ArrayLoad.Vector (STATUS normative)
+  (** RULE P.Binary.ArrayLoad.Vector (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
@@ -753,7 +753,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_binary (BP_array_load ak lk mu))
           [V_ptr a; V_tagged_imm j] H PR_undef
 
-  (** RULE P.Binary.StringOrBigstringLoad (STATUS normative)
+  (** RULE P.Binary.StringOrBigstringLoad (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_string_or_bigstring_load *)
@@ -793,7 +793,7 @@ Inductive denot_mem_b
           (Op_binary (BP_string_or_bigstring_load slv width))
           [V_ptr a; V_naked_nativeint j] H PR_undef
 
-  (** RULE P.Binary.PhysEqual (STATUS normative)
+  (** RULE P.Binary.PhysEqual (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#simplify_phys_equal *)
@@ -883,7 +883,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_binary (BP_phys_equal EC_neq)) [v1; v2] H
           (PR_ok (V_naked_imm 0) H)
 
-  (** RULE P.Binary.BigarrayLoad (STATUS normative)
+  (** RULE P.Binary.BigarrayLoad (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#reading_from_a_bigarray
@@ -930,7 +930,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_binary (BP_bigarray_load ndims bk layout))
           [V_ptr a; V_tagged_imm j] H PR_undef
 
-  (** RULE P.Binary.BigarrayGetAlignment (STATUS normative)
+  (** RULE P.Binary.BigarrayGetAlignment (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
       CODE backend/cmm_helpers.ml#bigstring_get_alignment *)
@@ -944,7 +944,7 @@ Inductive denot_mem_b
           [V_ptr (Addr_loc l); V_naked_imm j] H
           (PR_ok (V_naked_imm (Z.land (data_ptr l + j) (n - 1))) H)
 
-  (** RULE P.Binary.ReadOffset (STATUS conjectured)
+  (** RULE P.Binary.ReadOffset (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive *)
   (* Kind-constrained nondeterministic result (coordinator ruling:
@@ -967,7 +967,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_binary (BP_read_offset kw mut)) [b; d] H
           PR_undef
 
-  (** RULE P.Ternary.ArraySet (STATUS normative)
+  (** RULE P.Ternary.ArraySet (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
       CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_array_set *)
@@ -1002,7 +1002,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_ternary (TP_array_set ak sk))
           [V_ptr a; V_tagged_imm j; v] H PR_undef
 
-  (** RULE P.Ternary.ArraySet.Vector (STATUS normative)
+  (** RULE P.Ternary.ArraySet.Vector (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
@@ -1044,7 +1044,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_ternary (TP_array_set ak sk))
           [V_ptr a; V_tagged_imm j; v] H PR_undef
 
-  (** RULE P.Ternary.BytesOrBigstringSet (STATUS normative)
+  (** RULE P.Ternary.BytesOrBigstringSet (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
       CODE middle_end/flambda2/simplify/simplify_ternary_primitive.ml#simplify_bytes_or_bigstring_set *)
@@ -1091,7 +1091,7 @@ Inductive denot_mem_b
           (Op_ternary (TP_bytes_or_bigstring_set blv width))
           [V_ptr a; V_naked_nativeint j; v] H PR_undef
 
-  (** RULE P.Ternary.BigarraySet (STATUS normative)
+  (** RULE P.Ternary.BigarraySet (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#writing_to_a_bigarray
@@ -1141,7 +1141,7 @@ Inductive denot_mem_b
         denot_mem_b (Op_ternary (TP_bigarray_set ndims bk layout))
           [V_ptr a; V_tagged_imm j; v] H PR_undef
 
-  (** RULE P.Ternary.WriteOffset (STATUS conjectured)
+  (** RULE P.Ternary.WriteOffset (CLAIM normative)
       -- 06-primitives-memory.md
       CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive *)
   (* ENCODING NOTE: raw addressing is unmodelled, so "H with the
@@ -1179,7 +1179,7 @@ Inductive denot_mem_b
       forall k H,
         denot_mem_b (Op_nullary (NP_invalid k)) [] H PR_undef.
 
-(** RULE P.Nullary.ControlBarriers (STATUS normative)
+(** RULE P.Nullary.ControlBarriers (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive *)
@@ -1216,7 +1216,7 @@ Proof. destruct np; reflexivity. Qed.
 (* 3. Documented anchors (descriptive rules; one ruled exception)     *)
 (* ================================================================== *)
 
-(** RULE P.Bigarray.Indexing (STATUS descriptive)
+(** RULE P.Bigarray.Indexing (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#bigarray_indexing
     CODE middle_end/flambda2/from_lambda/lambda_to_lambda_transforms.ml#transform_primitive
@@ -1241,7 +1241,7 @@ Proof. destruct np; reflexivity. Qed.
     lowering, not a Flambda term rewrite. *)
 Definition P_Bigarray_Indexing_documented : Prop := True.
 
-(** RULE P.Binary.AtomicLoadField (STATUS descriptive)
+(** RULE P.Binary.AtomicLoadField (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 
@@ -1253,7 +1253,7 @@ Definition P_Bigarray_Indexing_documented : Prop := True.
     concurrency, so the atomic/ordering content is prose only. *)
 Definition P_Binary_AtomicLoadField_documented : Prop := True.
 
-(** RULE P.Binary.Poke (STATUS descriptive)
+(** RULE P.Binary.Poke (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#binary_primitive
 
@@ -1266,7 +1266,7 @@ Definition P_Binary_AtomicLoadField_documented : Prop := True.
     not track raw addresses, so treated descriptively. *)
 Definition P_Binary_Poke_documented : Prop := True.
 
-(** RULE P.Unary.Peek (STATUS descriptive)
+(** RULE P.Unary.Peek (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 
@@ -1277,7 +1277,7 @@ Definition P_Binary_Poke_documented : Prop := True.
     address; descriptive as raw addressing is unmodelled. *)
 Definition P_Unary_Peek_documented : Prop := True.
 
-(** RULE P.Ternary.AtomicSetField (STATUS descriptive)
+(** RULE P.Ternary.AtomicSetField (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#ternary_primitive
 
@@ -1292,7 +1292,7 @@ Definition P_Unary_Peek_documented : Prop := True.
     this model. *)
 Definition P_Ternary_AtomicSetField_documented : Prop := True.
 
-(** RULE P.Quaternary.AtomicCompareAndSetField (STATUS descriptive)
+(** RULE P.Quaternary.AtomicCompareAndSetField (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#quaternary_primitive
 
@@ -1310,7 +1310,7 @@ Definition P_Ternary_AtomicSetField_documented : Prop := True.
 Definition P_Quaternary_AtomicCompareAndSetField_documented
   : Prop := True.
 
-(** RULE P.Nullary.StateAccessors (STATUS descriptive)
+(** RULE P.Nullary.StateAccessors (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/terms/flambda_primitive.mli#nullary_primitive
     CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_nullary_primitive
@@ -1325,7 +1325,7 @@ Definition P_Quaternary_AtomicCompareAndSetField_documented
     context is not part of this model's state. *)
 Definition P_Nullary_StateAccessors_documented : Prop := True.
 
-(** RULE P.Unchecked.FrontendInsertsChecks (STATUS normative)
+(** RULE P.Unchecked.FrontendInsertsChecks (CLAIM normative)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_array_access
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_bound
@@ -1361,7 +1361,7 @@ Definition P_Nullary_StateAccessors_documented : Prop := True.
     Division_by_zero). *)
 Definition P_Unchecked_FrontendInsertsChecks_documented : Prop := True.
 
-(** RULE P.Unchecked.WideAccess (STATUS descriptive)
+(** RULE P.Unchecked.WideAccess (CLAIM descriptive)
     -- 06-primitives-memory.md
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#actual_max_length_for_string_like_access_as_nativeint
     CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#array_vector_access_validity_condition

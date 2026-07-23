@@ -69,7 +69,7 @@ Parameter fun_slot_offset : function_slot -> Z.
 
 Inductive rep_val (L : loc_map) : value -> cmm_value -> Prop :=
 
-  (** RULE R.Val.Imm (STATUS normative) -- 17-representation.md
+  (** RULE R.Val.Imm (CLAIM normative) -- 17-representation.md
       CODE backend/cmm_helpers.ml#tag_int
       CODE backend/cmm_helpers.ml#untag_int
       CODE middle_end/flambda2/kinds/flambda_kind.ml#t
@@ -85,7 +85,7 @@ Inductive rep_val (L : loc_map) : value -> cmm_value -> Prop :=
   | R_Val_Imm_naked : forall n,
       rep_val L (V_naked_imm n) (CV_word n)
 
-  (** RULE R.Val.NakedNumber (STATUS normative) -- 17-representation.md
+  (** RULE R.Val.NakedNumber (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unbox_number
       CODE backend/cmm_helpers.ml#sign_extend
       CODE backend/cmm.mli#machtype_component
@@ -117,7 +117,7 @@ Inductive rep_val (L : loc_map) : value -> cmm_value -> Prop :=
   | R_Val_NakedNumber_vec512 : forall b,
       rep_val L (V_naked_vec512 b) (CV_vec512 b)
 
-  (** RULE R.Val.Pointer (STATUS normative) -- 17-representation.md
+  (** RULE R.Val.Pointer (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load
       CODE backend/cmm_helpers.ml#field_address
 
@@ -132,7 +132,7 @@ Inductive rep_val (L : loc_map) : value -> cmm_value -> Prop :=
   | R_Val_Pointer_null :
       rep_val L V_null (CV_word 0)
 
-  (** RULE R.Val.Clos (STATUS normative) -- 17-representation.md
+  (** RULE R.Val.Clos (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
       CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#Layout
       CODE backend/cmm_helpers.ml#infix_field_address
@@ -158,7 +158,7 @@ Definition col_white : Z := 0.
 Definition col_black : Z := 3.
 Definition col_local : Z := 3.
 
-(** RULE R.Header (STATUS normative) -- 17-representation.md
+(** RULE R.Header (CLAIM normative) -- 17-representation.md
     CODE backend/cmm_helpers.ml#block_header
     CODE backend/cmm_helpers.ml#Mixed_block_support
     CODE backend/cmm_helpers.ml#caml_black
@@ -475,7 +475,7 @@ Definition ba_entry_bytes (bk : bigarray_kind) (sv : value)
 Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
   : heap_object -> Z -> Prop :=
 
-  (** RULE R.Obj.Block (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Block (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
       CODE backend/cmm_helpers.ml#make_alloc_generic
 
@@ -491,7 +491,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
            rep_val L v cw) ->
       rep_obj SA L M (HO_Block t mu fields) a
 
-  (** RULE R.Obj.Lazy (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Lazy (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
       CODE middle_end/flambda2/terms/flambda_primitive.ml#Lazy_block_tag
 
@@ -506,7 +506,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
          cm_read M a Word_val = Some cw /\ rep_val L v cw) ->
       rep_obj SA L M (HO_Lazy t v) a
 
-  (** RULE R.Obj.FloatBlock (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.FloatBlock (CLAIM normative) -- 17-representation.md
       CODE backend/cmm_helpers.ml#float_header
       CODE backend/cmm_helpers.ml#make_float_alloc
       CODE backend/cmm_helpers.ml#floatarray_header
@@ -523,7 +523,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
          cm_read M (a + 8 * Z.of_nat i) Double = Some (CV_flt f)) ->
       rep_obj SA L M (HO_FloatBlock mu fields) a
 
-  (** RULE R.Obj.MixedBlock (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.MixedBlock (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
       CODE backend/cmm_helpers.ml#make_mixed_alloc
       CODE middle_end/flambda2/kinds/flambda_kind.ml#Mixed_block_shape.offset_in_words
@@ -546,7 +546,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
            rep_val L v cw) ->
       rep_obj SA L M (HO_MixedBlock t mu sigma fields) a
 
-  (** RULE R.Obj.Array (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Array (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
       CODE backend/cmm_helpers.ml#array_indexing
       CODE backend/cmm_helpers.ml#Unboxed_or_untagged_array_tags
@@ -582,7 +582,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
       word_at M (a - 8) (hdr_word t sz col 1) ->
       rep_obj SA L M (HO_Array (AK_unboxed_product kinds) mu elems) a
 
-  (** RULE R.Obj.Bytes (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Bytes (CLAIM normative) -- 17-representation.md
       CODE backend/cmm_helpers.ml#string_header
 
       hdr(string_tag, (len + 8)/8, col(mu), 0); the len bytes at
@@ -601,7 +601,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
         = Some [8 * words - len - 1] ->
       rep_obj SA L M (HO_Bytes mu bytes) a
 
-  (** RULE R.Obj.Bigarray (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Bigarray (CLAIM normative) -- 17-representation.md
       CODE backend/cmm_helpers.ml#bigarray_load
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
       VERIFIED 14-validation/bigarray_access.md
@@ -632,7 +632,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
            ba_entry_bytes bk sv bs) ->
       rep_obj SA L M (HO_Bigarray bk layout dims elems) a
 
-  (** RULE R.Obj.Boxed (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Boxed (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
       CODE backend/cmm_helpers.ml#float_header
       CODE backend/cmm_helpers.ml#boxedint64_header
@@ -703,7 +703,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
         (HO_Boxed (K_naked_number NN_naked_vec512)
            (V_naked_vec512 b)) a
 
-  (** RULE R.Obj.Closures (STATUS normative) -- 17-representation.md
+  (** RULE R.Obj.Closures (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
       CODE backend/cmm_helpers.ml#pack_closure_info
       CODE backend/cmm_helpers.ml#infix_header
@@ -766,7 +766,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
 (* 5. Whole heap and observation (17 s5)                              *)
 (* ================================================================== *)
 
-(** RULE R.Heap (STATUS conjectured) -- 17-representation.md
+(** RULE R.Heap (CLAIM interpretive) -- 17-representation.md
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 
     H ~_L M: L injective on distinct live objects; every heap object
@@ -774,7 +774,7 @@ Inductive rep_obj (SA : fmap cmm_symbol Z) (L : loc_map) (M : cmm_mem)
     link-time addresses (SA).  The pointer-consistency clause ("if a
     field of one object is ptr l', its stored word is L(l')") is
     built into the s4 rules, whose fields go through rep_val's
-    pointer clause -- the SAME L.  STATUS conjectured is about
+    pointer clause -- the SAME L.  Its interpretive claim is about
     maintenance (the translation and the GC must preserve this;
     the conjecture below, and ch. 20), not about this definition;
     L existential and mutable at every use site.  HK_code keys are
@@ -801,7 +801,7 @@ Definition rep_heap (SA : fmap cmm_symbol Z) (H : heap) (L : loc_map)
 Section Observation.
   Variable ev_rel : event -> cm_event -> Prop.
 
-  (** RULE R.Observe (STATUS normative) -- 17-representation.md
+  (** RULE R.Observe (CLAIM normative) -- 17-representation.md
       CODE middle_end/flambda2/terms/flambda_unit.mli#module_symbol
       CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
 
