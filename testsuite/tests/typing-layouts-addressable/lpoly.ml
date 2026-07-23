@@ -49,9 +49,23 @@ module G (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) : sig
   val f : layout_ x. ('a : x addressable). 'a -> 'a
 end = M
 [%%expect{|
-module G :
-  functor (M : sig val f : layout_ l. ('a : l). 'a -> 'a end) ->
-    sig val f : layout_ l. ('a : l). 'a -> 'a end
+Line 3, characters 6-7:
+3 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l. ('a : l). 'a -> 'a end
+       is not included in
+         sig val f : layout_ l. ('a : l). 'a -> 'a end
+       Values do not match:
+         val f : layout_ l. ('a : l). 'a -> 'a
+       is not included in
+         val f : layout_ l. ('a : l). 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is '_representable_layout_2 addressable
+         because of the definition of f at line 2, characters 2-51.
+       But the layout of 'a must be a sublayout of '_representable_layout_2
+         because of the definition of f at line 1, characters 18-55.
 |}]
 
 (* A GADT match on an equality between kinds [x] and [x addressable] must
