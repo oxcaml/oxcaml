@@ -35,6 +35,7 @@ type pinpoint_desc =
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
+  | Zero_alloc_func_appl (** Application of a zero_alloc function *)
   | Expression  (** An arbitrary expression *)
   | Effect_match  (** A pattern match with effect cases *)
   | Effect_try  (** A try-with expression with effect cases *)
