@@ -7695,15 +7695,6 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let update_level : int -> t -> unit =
-     fun n m ->
-      match m with
-      | Const _c -> ()
-      | Diff (mm, m) ->
-        Mode.update_level n mm;
-        Mode.update_level n m
-      | Undefined -> ()
-
     let apply_left : type r.
         ?is_contained_by:Hint.is_contained_by ->
         t ->
@@ -7882,15 +7873,6 @@ module Modality = struct
           "inferred modaltiy Exactly should not be on the RHS of sub."
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
-
-    let update_level : int -> t -> unit =
-     fun n m ->
-      match m with
-      | Const _c -> ()
-      | Undefined -> ()
-      | Exactly (mm, m) ->
-        Mode.update_level n mm;
-        Mode.update_level n m
 
     let apply_left : type r.
         ?is_contained_by:Hint.is_contained_by ->
@@ -8117,10 +8099,6 @@ module Modality = struct
       | Error (Error (ax, e)) -> Error (Error (Comonadic ax, e)))
 
   let sub l r = try_with_log (sub_log l r)
-
-  let update_level n ({ monadic; comonadic } : t) =
-    Monadic.update_level n monadic;
-    Comonadic.update_level n comonadic
 
   let equate m1 m2 = try_with_log (equate_from_submode sub_log m1 m2)
 
