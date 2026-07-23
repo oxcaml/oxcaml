@@ -144,6 +144,14 @@ end = struct
             (not (Label.Tbl.mem components label))
             && Label.Set.is_empty block.predecessors
           then raise (Found label));
+      (* CR-someday xclerc for xclerc: this fatals on an isolated unreachable
+         cycle (a dead strongly-connected component in which every block has a
+         predecessor inside the component), so no unvisited block then has an
+         empty predecessor set. Cfg_reducibility tolerates the analogous case;
+         consider a clearer diagnostic, or falling back to an arbitrary
+         unvisited block as the component root. Not known to occur today. Note
+         however, that if all dead block are deleted, this should not happen,
+         and we are guaranteed to have a tree rather than a forest. *)
       Misc.fatal_error "did not find a block with no predecessors"
     with Found label -> label
 
@@ -237,6 +245,14 @@ let compute_doms : Cfg.t -> doms =
   Cfg.iter_blocks cfg ~f:(fun label block ->
       if Label.Set.is_empty block.predecessors
       then Label.Tbl.replace doms label label);
+  (* CR-someday xclerc for xclerc: the entry is seeded as self-dominating only
+     via the no-predecessor rule above, so the assertion below also requires the
+     entry block to have no predecessors. Per the dominance definition the entry
+     is always its own immediate dominator; consider seeding it unconditionally
+     (Label.Tbl.replace doms cfg.entry_label cfg.entry_label) and dropping the
+     assertion, so this stays correct even if the entry ever gained a
+     predecessor (e.g. a Tailcall_self back-edge, which cfg_invariants permits
+     to target the entry block). *)
   (match Label.Tbl.find_opt doms cfg.entry_label with
   | None -> assert false
   | Some label -> assert (Label.equal label cfg.entry_label));
@@ -400,7 +416,7 @@ let invariant_dominator_forest : Cfg.t -> doms -> dominator_tree list -> unit =
   List.iter dominator_forest ~f:(fun dominator_tree ->
       check_parent ~parent:None dominator_tree)
 
-let compute_dominator_forest_naive : Cfg.t -> doms -> dominator_tree list =
+let compute_dominator_forest : Cfg.t -> doms -> dominator_tree list =
  fun cfg doms ->
   let roots = ref [] in
   let children = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
@@ -429,65 +445,48 @@ let compute_dominator_forest_naive : Cfg.t -> doms -> dominator_tree list =
   if debug then invariant_dominator_forest cfg doms res;
   res
 
-let compute_dominator_forest_opt : Cfg.t -> doms -> dominator_tree list =
- fun cfg doms ->
-  let roots = ref [] in
-  let children = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-  let rec build_tree (label : Label.t) : dominator_tree =
-    let children_labels =
-      match Label.Tbl.find_opt children label with
-      | None -> []
-      | Some labels -> labels
+module Validator : sig
+  val validate_idom : Cfg.t -> doms -> unit
+end = struct
+  let calculate_idom (cfg : Cfg.t) : doms =
+    let buffer = Buffer.create 4096 in
+    let fmt = Format.formatter_of_buffer buffer in
+    let id_gen = Cfg_z3.Id_gen.create cfg in
+    Cfg_z3.fmt_dom_code_begin fmt ~id_gen;
+    Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
+    Cfg_z3.fmt_dom_code_end fmt;
+    Format.pp_print_flush fmt ();
+    let z3_output = Buffer.contents buffer |> Cfg_z3.run_z3 in
+    Cfg_z3.parse_doms ~id_gen ~entry_label:cfg.entry_label z3_output
+
+  (* CR hwasilewski: add validators for the dominance frontier and forest. *)
+  let validate_idom (cfg : Cfg.t) (doms : doms) =
+    let z3_doms = calculate_idom cfg in
+    let doms_equal =
+      Label.Map.equal Label.equal (Label.Tbl.to_map doms)
+        (Label.Tbl.to_map z3_doms)
     in
-    { label; children = List.map children_labels ~f:build_tree }
-  in
-  Cfg.iter_blocks cfg ~f:(fun label _block ->
-      match Label.Tbl.find_opt doms label with
-      | None -> assert false
-      | Some immediate_dominator ->
-        if Label.equal label immediate_dominator
-        then roots := label :: !roots
-        else
-          let current =
-            match Label.Tbl.find_opt children immediate_dominator with
-            | None -> []
-            | Some children -> children
-          in
-          Label.Tbl.replace children immediate_dominator (label :: current));
-  let res = List.map !roots ~f:build_tree in
-  if debug then invariant_dominator_forest cfg doms res;
-  res
-
-let sort_forest : dominator_tree list -> dominator_tree list =
- fun trees ->
-  let compare_label left right = Label.compare left.label right.label in
-  List.sort ~cmp:compare_label trees
-
-let rec equal_tree : dominator_tree -> dominator_tree -> bool =
- fun left right ->
-  Label.equal left.label right.label
-  && equal_forest left.children right.children
-
-and equal_forest : dominator_tree list -> dominator_tree list -> bool =
- fun left right ->
-  match sort_forest left, sort_forest right with
-  | [], [] -> true
-  | hd_left :: tl_left, hd_right :: tl_right ->
-    equal_tree hd_left hd_right && equal_forest tl_left tl_right
-  | [], _ :: _ | _ :: _, [] -> false
+    if not doms_equal
+    then
+      (* CR hwasilewski for xclerc: cannot import Printcfg here, it causes a
+         cyclic dependency. *)
+      Misc.fatal_errorf
+        "validate_idoms: Dominator validation failed: dominator calculated by \
+         Datalog does not agree with the Cfg_dominators, cfg '%s'"
+        cfg.fun_name
+end
 
 let build : Cfg.t -> t =
  fun cfg ->
   let doms = compute_doms cfg in
   let dominance_frontiers = compute_dominance_frontiers cfg doms in
-  let dominator_forest_naive = compute_dominator_forest_naive cfg doms in
-  let dominator_forest_opt = compute_dominator_forest_opt cfg doms in
-  assert (equal_forest dominator_forest_naive dominator_forest_opt);
-  { entry_label = cfg.entry_label;
-    doms;
-    dominance_frontiers;
-    dominator_forest = dominator_forest_opt
-  }
+  let dominator_forest = compute_dominator_forest cfg doms in
+  if !Oxcaml_flags.cfg_dominators_validate
+  then
+    Profile.record ~accumulate:true "validate_dominators"
+      (Validator.validate_idom cfg)
+      doms;
+  { entry_label = cfg.entry_label; doms; dominance_frontiers; dominator_forest }
 
 let is_dominating t left right = is_dominating t.doms left right
 

@@ -34,25 +34,7 @@ module Validator : sig
   val validate_reachability : Cfg.t -> unit
 end = struct
   let z3_code_of_cfg (cfg : Cfg.t) =
-    let width =
-      match Label.Tbl.length cfg.blocks with
-      | 0 | 1 -> 1
-      | num_blocks -> 1 + Misc.log2 (num_blocks - 1)
-    in
-    let next_id = ref 0 in
-    let id_table = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-    let get_id label =
-      let id_number =
-        match Label.Tbl.find_opt id_table label with
-        | Some id -> id
-        | None ->
-          let id = !next_id in
-          incr next_id;
-          Label.Tbl.add id_table label id;
-          id
-      in
-      Printf.sprintf "(_ bv%d %d)" id_number width
-    in
+    let id_gen = Cfg_z3.Id_gen.create cfg in
     let buffer = Buffer.create 4096 in
     let fmt = Format.formatter_of_buffer buffer in
     Format.fprintf fmt
@@ -76,45 +58,15 @@ end = struct
 (rule (=> (and (reachable a) (edge a b)) (reachable b)))
 (rule (=> (and (not (reachable a)) (is-node a)) (unreachable a)))
 |}
-      width;
-    Label.Tbl.iter
-      (fun label (value : Cfg.basic_block) ->
-        let id = get_id label in
-        if not (Cfg.is_never_terminator value.terminator.desc)
-        then Format.fprintf fmt "(rule (is-node %s))\n" id;
-        Cfg.successor_labels ~exn:true ~normal:true value
-        |> Label.Set.iter (fun succ_label ->
-            let succ_id = get_id succ_label in
-            Format.fprintf fmt "(rule (edge %s %s))\n" id succ_id))
-      cfg.blocks;
-    Format.fprintf fmt "(rule (entry %s))" (get_id cfg.entry_label);
+      (Cfg_z3.Id_gen.width id_gen);
+    Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
     Format.fprintf fmt "\n%s" "(query unreachable)";
     Format.pp_print_flush fmt ();
     Buffer.contents buffer
 
-  let run_z3 code =
-    let with_temp_file suffix f =
-      let filename = Filename.temp_file "oxcaml-z3-" suffix in
-      Misc.try_finally
-        (fun () -> f filename)
-        ~always:(fun () -> Misc.remove_file filename)
-    in
-    with_temp_file ".smt2" @@ fun input_file ->
-    with_temp_file ".out" @@ fun output_file ->
-    Out_channel.with_open_text input_file (fun out_channel ->
-        Out_channel.output_string out_channel code);
-    let command =
-      Filename.quote_command "z3" ["-smt2"; input_file] ~stderr:output_file
-        ~stdout:output_file
-    in
-    let ret = Ccomp.command command in
-    if ret <> 0 then Misc.fatal_errorf "Z3 failed with return code %d" ret;
-    let output = In_channel.with_open_text output_file In_channel.input_all in
-    output
-
   let validate_reachability (cfg : Cfg.t) =
     let z3_code = z3_code_of_cfg cfg in
-    let z3_output = run_z3 z3_code |> String.trim in
+    let z3_output = Cfg_z3.run_z3 z3_code |> String.trim in
     if not (String.equal z3_output "unsat")
     then
       Misc.fatal_errorf

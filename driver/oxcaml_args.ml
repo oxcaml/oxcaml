@@ -177,6 +177,16 @@ let mk_no_cfg_eliminate_dead_code_validate f =
     Arg.Unit f,
     " Do not validate the eliminate dead code pass" )
 
+let mk_cfg_dominators_validate f =
+  ( "-cfg-dominators-validate",
+    Arg.Unit f,
+    " Validate CFG dominators using Z3" )
+
+let mk_no_cfg_dominators_validate f =
+  ( "-no-cfg-dominators-validate",
+    Arg.Unit f,
+    " Do not validate CFG dominators using Z3" )
+
 let mk_cfg_prologue_validate f =
   ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
 
@@ -1299,6 +1309,8 @@ module type Oxcaml_options = sig
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_eliminate_dead_code_validate : unit -> unit
   val no_cfg_eliminate_dead_code_validate : unit -> unit
+  val cfg_dominators_validate : unit -> unit
+  val no_cfg_dominators_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -1488,6 +1500,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
       mk_no_cfg_eliminate_dead_code_validate
         F.no_cfg_eliminate_dead_code_validate;
+      mk_cfg_dominators_validate F.cfg_dominators_validate;
+      mk_no_cfg_dominators_validate F.no_cfg_dominators_validate;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
@@ -1826,6 +1840,9 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_eliminate_dead_code_validate =
     clear' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let cfg_dominators_validate = set' Oxcaml_flags.cfg_dominators_validate
+  let no_cfg_dominators_validate = clear' Oxcaml_flags.cfg_dominators_validate
 
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
@@ -2392,6 +2409,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-eliminate-dead-code-validate" ->
         set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+    | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
