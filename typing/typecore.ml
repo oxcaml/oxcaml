@@ -6155,7 +6155,36 @@ end = struct
         not (head_is_send funct)
     | _ -> false
 
+  let is_never_returning_prim_apply exp =
+    match exp.exp_desc with
+    | Texp_apply (funct, args, _, _, _, _) -> (
+        match funct.exp_desc with
+        | Texp_ident
+            { desc = { val_kind = Val_prim p; _ }; kind = Id_prim _; _ } ->
+            let result_layout_is_any =
+              match snd p.prim_native_repr_res with
+              | Repr_never_returns -> true
+              | Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _
+              | Unboxed_vector _ | Unboxed_mask
+              | Unboxed_or_untagged_integer _
+              | Unpacked_product _ -> false
+            in
+            (match
+               Primitive.classify_return_behavior ~name:p.prim_name
+                 ~result_layout_is_any
+             with
+             | Returns -> false
+             | Never_returns_layout_any | Never_returns_representable -> true)
+            && List.length args >= p.prim_arity
+            && List.for_all
+                 (fun (_, arg) ->
+                   match arg with Arg _ -> true | Omitted _ -> false)
+                 args
+        | _ -> false)
+    | _ -> false
+
   let record_site demand exp =
+    if is_never_returning_prim_apply exp then () else
     let env = exp.exp_env in
     let loc = proper_exp_loc exp in
     let forwarder = is_return_forwarder_shape exp in

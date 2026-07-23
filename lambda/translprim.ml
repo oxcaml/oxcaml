@@ -219,12 +219,16 @@ let extern_repr_of_native_repr:
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
     Same_as_ocaml_repr sort
+  | Repr_never_returns, _ -> Repr_never_returns
 
 let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
+    Jkind.Sort.Const.Base Scannable
+  | Repr_never_returns ->
+    (* CR dkalinichenko: use bottom return layout instead *)
     Jkind.Sort.Const.Base Scannable
 
 let to_lambda_prim prim ~poly_sort =

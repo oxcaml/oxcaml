@@ -657,6 +657,9 @@ let unarize_extern_repr ~machine_width alloc_mode
     Misc.fatal_error "unarize_extern_repr: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+  | Repr_never_returns ->
+    Misc.fatal_error "unarize_extern_repr: never-returning primitives are \
+                      not lowered to external calls"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
   | Unboxed_float Boxed_float64 ->
