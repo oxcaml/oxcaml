@@ -3218,11 +3218,11 @@ and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
 and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
     smod =
   (* If the module is an identifier, there might be locks between the
-     declaration site and the use site.
-     - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
-     - If [hold_locks] is [false], the locks are walked.
+  declaration site and the use site.
+  - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
+  - If [hold_locks] is [false], the locks are walked.
 
-     If the module is not an identifier, [hold_locks] has no effect. *)
+  If the module is not an identifier, [hold_locks] has no effect. *)
   match smod.pmod_desc with
     Pmod_ident lid ->
       let path, mode_with_locks =

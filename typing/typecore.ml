@@ -1518,7 +1518,10 @@ let type_continuation_pat env expected_ty sp =
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | _ -> Error.log_and_raise loc env Invalid_continuation_pattern
 
-(* unification inside type_exp and type_expect *)
+(* unification inside type_exp and type_expect
+
+   [sexp] is used by error messages to report literals in their original
+   formatting *)
 let unify_exp_types ?sexp loc env ty expected_ty =
   (* Format.eprintf "@[%a@ %a@]@." Printtyp.raw_type_expr exp.exp_type
     Printtyp.raw_type_expr expected_ty; *)
