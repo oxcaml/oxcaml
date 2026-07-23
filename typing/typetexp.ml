@@ -45,10 +45,10 @@ type unbound_variable_reason = | Upstream_compatibility
 type jkind_initialization_choice = Sort | Any
 
 type value_loc =
-    Tuple | Poly_variant | Object_field | Optional_arg
+    Tuple | Poly_variant | Object_field
 
 type sort_loc =
-    Fun_arg | Fun_ret
+    Fun_arg | Fun_ret | Optional_arg
 
 type cannot_quantify_reason =
   | Unified of type_expr
@@ -1017,15 +1017,16 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
               let arg_mono = Btype.tpoly_get_mono arg_ty in
-              (* CR lmaurer: remove value requirement *)
               begin match
-                constrain_type_jkind env arg_mono Predef.option_argument_jkind
+                constrain_type_jkind env arg_mono
+                  (Predef.optional_argument_jkind
+                     ~level:(Ctype.get_current_level ()))
               with
               | Ok _ -> ()
               | Error e ->
                 raise (Error(arg.ptyp_loc, env,
-                             Non_value {vloc = Optional_arg; err = e;
-                                        typ = arg_mono}))
+                             Non_sort {vloc = Optional_arg; err = e;
+                                       typ = arg_mono}))
               end;
               newmono (newconstr Predef.path_option [arg_mono])
             end
@@ -2062,7 +2063,6 @@ let report_error_doc loc env = function
       | Tuple -> "Tuple element"
       | Poly_variant -> "Polymorphic variant constructor argument"
       | Object_field -> "Object field"
-      | Optional_arg -> "Optional argument"
     in
     Location.errorf ~loc "%s types must have layout value.@ %a"
       s (Jkind.Violation.report_with_offender
@@ -2073,6 +2073,7 @@ let report_error_doc loc env = function
       match vloc with
       | Fun_arg -> "Function argument"
       | Fun_ret -> "Function return"
+      | Optional_arg -> "Optional argument"
     in
     Location.errorf ~loc "%s types must have a representable layout.@ %a"
       s (Jkind.Violation.report_with_offender

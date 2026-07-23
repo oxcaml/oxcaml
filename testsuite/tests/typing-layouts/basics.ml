@@ -1550,47 +1550,24 @@ val f : ('a. 'a t2_float) -> 'b t2_float = <fun>
 
 (* CR layouts v5: bring void version here from layouts_alpha *)
 
+(* Representable non-value layouts are allowed. *)
+
 let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
 
 [%%expect{|
-Line 1, characters 11-20:
-1 | let f : ?x:t_float64 -> unit -> unit = fun ?x () -> ignore x
-               ^^^^^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of an optional argument.
+val f : ?x:t_float64 -> unit -> unit = <fun>
 |}]
 
 let f (g : ?x:t_float64 -> unit) = g
 
 [%%expect{|
-Line 1, characters 14-23:
-1 | let f (g : ?x:t_float64 -> unit) = g
-                  ^^^^^^^^^
-Error: Optional argument types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of an optional argument.
+val f : (?x:t_float64 -> unit) -> ?x:t_float64 -> unit = <fun>
 |}]
-
-(* The next two are rejected by unification in [Typecore] rather than the
-   check in [Typetexp] *)
 
 let f ?x:(y : t_float64 option) () = ignore y
 
 [%%expect{|
-Line 1, characters 10-30:
-1 | let f ?x:(y : t_float64 option) () = ignore y
-              ^^^^^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "t_float64 option"
-       but a pattern was expected which matches values of type "'a option"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of an optional argument.
+val f : ?x:t_float64 -> unit -> unit = <fun>
 |}]
 
 let f (x : t_float64) =
@@ -1598,14 +1575,84 @@ let f (x : t_float64) =
   ()
 
 [%%expect{|
-Line 2, characters 16-17:
-2 |   let _g ?(x2 = x) () = () in
-                    ^
-Error: The value "x" has type "t_float64" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
+val f : t_float64 -> unit = <fun>
+|}]
+
+(* Unrepresentable layouts are rejected: such a function could never be
+   applied to its optional argument. *)
+
+let f : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 11-16:
+1 | let f : ?x:t_any -> unit -> unit = fun ?x () -> ignore x
+               ^^^^^
+Error: Optional argument types must have a representable layout.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be representable
+         because it's the type of an optional argument.
+|}]
+
+let f (g : ?x:t_any -> unit) = g
+
+[%%expect{|
+Line 1, characters 14-19:
+1 | let f (g : ?x:t_any -> unit) = g
+                  ^^^^^
+Error: Optional argument types must have a representable layout.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be representable
+         because it's the type of an optional argument.
+|}]
+
+(* This one used to reach a fatal error in [type_option_some] via the
+   unchecked [val] declaration. *)
+
+module type S = sig
+  val f : ?x:t_any -> unit -> unit
+end
+
+[%%expect{|
+Line 2, characters 13-18:
+2 |   val f : ?x:t_any -> unit -> unit
+                 ^^^^^
+Error: Optional argument types must have a representable layout.
+       The layout of "t_any" is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of "t_any" must be representable
+         because it's the type of an optional argument.
+|}]
+
+(* The inference route is rejected by unification in [Typecore] rather than
+   the check in [Typetexp] *)
+
+let f ?x () = (x : t_any option)
+
+[%%expect{|
+Line 1, characters 15-16:
+1 | let f ?x () = (x : t_any option)
+                   ^
+Error: The value "x" has type "'a option" but an expression was expected of type
+         "t_any option"
+       The layout of t_any is any
+         because of the definition of t_any at line 5, characters 0-18.
+       But the layout of t_any must be representable
+         because it's the type of an optional argument.
+|}]
+
+(* An explicitly quantified variable of kind [any] is caught by the
+   quantification check *)
+
+let f : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
+
+[%%expect{|
+Line 1, characters 8-41:
+1 | let f : ('a : any). ?x:'a -> unit -> unit = fun ?x () -> ignore x
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The universal type variable 'a was declared to have kind any.
+       But it was inferred to have a representable kind
          because it's the type of an optional argument.
 |}]
 

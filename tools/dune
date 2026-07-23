@@ -116,7 +116,7 @@
 (library
   (name debug_printers)
   (modes byte)
-  (libraries ocamlcommon)
+  (libraries ocamlcommon flambda2_kinds)
   (modules debug_printers))
 
 (rule

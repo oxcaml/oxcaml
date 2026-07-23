@@ -1,15 +1,7 @@
 (* TEST
  include stdlib_stable;
  include stdlib_upstream_compatible;
- flags = "-extension small_numbers -dlambda";
- (* Soon this file is expected to compile and run. At that point the remainder
-    of this test spec can simply be deleted. *)
- {
-   setup-ocamlc.byte-build-env;
-   ocamlc_byte_exit_status = "2";
-   ocamlc.byte;
-   check-ocamlc.byte-output;
- }
+ flags = "-extension small_numbers";
 *)
 
 module Int8_u = Stdlib_stable.Int8_u
@@ -92,4 +84,28 @@ let () =
   print_multiple () ~u:#() ~i64:#40L;
   print_multiple () ~f32:#41.0s ~f64:#50.0;
   print_multiple () ~i64:#40L ~f32:#41.0s ~f64:#50.0 ~u:#()
+;;
+
+module M : sig
+  val print_f64 : ?f:float# -> unit -> unit
+end = struct
+  let print_f64 ?(f = #6.0) () = pr (Float_u.to_string f)
+end
+
+let () =
+  pr "\n--- Printing through a signature ---";
+  M.print_f64 ();
+  M.print_f64 () ?f:None;
+  M.print_f64 () ?f:(Some #60.0);
+  M.print_f64 () ~f:#61.0
+;;
+
+(* Eliminating an optional argument by coercion to a less general function
+   type (the eta-expansion path in [Typecore.type_argument]) *)
+
+let apply (h : unit -> unit) = h ()
+
+let () =
+  pr "\n--- Eliminating an optional argument ---";
+  apply M.print_f64
 ;;

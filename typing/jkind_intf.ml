@@ -326,6 +326,7 @@ module History = struct
     | External_argument
     | External_result
     | Statement
+    | Optional_argument
     | Optional_arg_default
     | Layout_poly_in_external
     | Unboxed_tuple_element
@@ -393,7 +394,6 @@ module History = struct
     | Array_comprehension_element
     | Array_comprehension_iterator_element
     | Idx_base
-    | Optional_argument
 
   type value_creation_reason =
     | Class_let_binding
