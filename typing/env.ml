@@ -3800,10 +3800,11 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [None] when the function is used on modules and classes.
 
     [pp] is the pinpoint used in errors. *)
-(* [locks] is ordered from the definition site (outermost) to the use site
-   (innermost). If there is a [Zero_alloc_lock], returns [Some (outer, inner)]
-   where [outer] is everything up to and including the last such lock, and
-   [inner] is the locks pushed inside the innermost [zero_alloc_] region. *)
+(* CR dkalinichenko: [locks] is ordered from the definition site
+   (outermost) to the use site (innermost). If there is a
+   [Zero_alloc_lock], returns [Some (outer, inner)] where [outer] is
+   everything up to and including the last such lock, and [inner] is the
+   locks pushed inside the innermost [zero_alloc_] region. *)
 let split_at_last_zero_alloc_lock locks =
   (* Printf.eprintf "ZA locks: %d\n" (List.length locks); *)
   let rec go acc found = function
@@ -3833,7 +3834,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   match split_at_last_zero_alloc_lock locks with
   | None -> List.fold_left walk_one mode locks
   | Some (outer, inner) ->
-      (* Mask the allocation axis while walking the locks outside the [zero_alloc_] region:
+      (* CR dkalinichenko: Mask the allocation axis while walking the locks outside the [zero_alloc_] region:
          the region neither constrains enclosing closures on that axis, nor is
          constrained by them. The axis is then restored, so that the locks
          inside the region still apply. *)
@@ -3871,13 +3872,13 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
 let walk_locks_for_legacy_construct ~env pp =
   ignore (walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy)
 
-(* The allocation ceiling demanded of values entering the current context
-   from a [zero_alloc_] region: leaving the region is a capture by the
-   enclosing function, so the region result must satisfy the innermost
-   enclosing noalloc obligation. Locks are scanned from the use site
-   outwards; a [Zero_alloc_lock] means the current context is itself inside
-   a [zero_alloc_] region (whose own exit performs this check), so there is
-   no obligation here. *)
+(* CR dkalinichenko: The allocation ceiling demanded of values entering
+   the current context from a [zero_alloc_] region: leaving the region is
+   a capture by the enclosing function, so the region result must satisfy
+   the innermost enclosing noalloc obligation. Locks are scanned from the
+   use site outwards; a [Zero_alloc_lock] means the current context is
+   itself inside a [zero_alloc_] region (whose own exit performs this
+   check), so there is no obligation here. *)
 let enclosing_noalloc_ceiling env =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in

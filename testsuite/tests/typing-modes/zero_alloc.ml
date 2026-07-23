@@ -2166,7 +2166,8 @@ Line 13, characters 65-66:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
-(* Allocations inside a [noalloc_strict] / [noalloc] closure are allowed. *)
+(* CR dkalinichenko: Allocations inside a [noalloc_strict] / [noalloc]
+   closure are allowed. *)
 let (za_alloc_ss @ noalloc_strict) () = zero_alloc_ { x = 1.; y = 2. }
 [%%expect{|
 val za_alloc_ss : unit -> record_t = <fun>
@@ -2226,7 +2227,7 @@ Error: The value "alloc_fun" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* A closure defined inside the region is still checked. *)
+(* CR dkalinichenko: A closure defined inside the region is still checked. *)
 let (za_nested_closure @ noalloc_strict) () =
   zero_alloc_ (let (g @ noalloc_strict) () = { x = 1.; y = 2. } in g ())
 [%%expect{|
@@ -2239,21 +2240,22 @@ Error: The allocation is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* The keyword binds loosely: the whole sequence to its right is inside
-   the region. *)
+(* CR dkalinichenko: The keyword binds loosely: the whole sequence to
+   its right is inside the region. *)
 let (za_seq @ noalloc_strict) (r : int ref) =
   zero_alloc_ incr r; { x = 1.; y = 2. }
 [%%expect{|
 val za_seq : int ref -> record_t = <fun>
 |}]
 
-(* [zero_alloc_] is a no-op in a context that already allows allocation. *)
+(* CR dkalinichenko: [zero_alloc_] is a no-op in a context that already
+   allows allocation. *)
 let za_noop () = zero_alloc_ { x = 1.; y = 2. }
 [%%expect{|
 val za_noop : unit -> record_t = <fun>
 |}]
 
-(* Nested regions. *)
+(* CR dkalinichenko: Nested regions. *)
 let (za_nested @ noalloc_strict) () =
   zero_alloc_ (zero_alloc_ { x = 1.; y = 2. })
 [%%expect{|
@@ -2313,7 +2315,7 @@ Line 2, characters 14-15:
 Error: This value is "stateful" but is expected to be "stateless".
 |}]
 
-(* [zero_alloc_] is transparent for type inference. *)
+(* CR dkalinichenko: [zero_alloc_] is transparent for type inference. *)
 let za_infer = zero_alloc_ (ref [])
 let () = za_infer := [1]
 let za_contents = !za_infer
@@ -2322,7 +2324,7 @@ val za_infer : 'a list ref = {contents = []}
 val za_contents : 'a list = [<poly>]
 |}]
 
-(* [zero_alloc_] under quotation. *)
+(* CR dkalinichenko: [zero_alloc_] under quotation. *)
 
 #syntax quotations on
 

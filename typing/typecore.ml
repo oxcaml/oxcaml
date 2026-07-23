@@ -5275,7 +5275,8 @@ let rec is_nonexpansive exp =
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
-  (* A zero-alloc expression cannot create fresh mutable state: *)
+  (* CR dkalinichenko: A zero-alloc expression cannot create fresh
+     mutable state: *)
   | Texp_zero_alloc _ -> true
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
