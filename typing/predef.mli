@@ -34,7 +34,7 @@ type abstract_type_constr = [
   | `Iarray
   | `Atomic_loc
   | `Lexing_position
-  | `Code
+  | `Expr
   | `Eval
   | `Box
   | `Float32
@@ -116,7 +116,7 @@ val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
-val type_code: type_expr -> type_expr
+val type_expr: type_expr -> type_expr
 val type_unboxed_unit: type_expr
 val type_unboxed_bool: type_expr
 val type_unboxed_float:type_expr
@@ -209,7 +209,7 @@ val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_continuation: Path.t
 val path_lexing_position: Path.t
-val path_code: Path.t
+val path_expr: Path.t
 val path_eval: Path.t
 val path_box: Path.t
 

@@ -50,7 +50,7 @@ type abstract_type_constr = [
   | `Iarray
   | `Atomic_loc
   | `Lexing_position
-  | `Code
+  | `Expr
   | `Eval
   | `Box
   | `Float32
@@ -181,7 +181,7 @@ let small_number_extension_type_constrs : type_constr list = [
 ]
 
 let metaprogramming_extension_type_constrs : type_constr list = [
-  `Code;
+  `Expr;
   `Eval;
 ]
 
@@ -220,9 +220,7 @@ and ident_floatarray = ident_create "floatarray"
 and ident_iarray = ident_create "iarray"
 and ident_atomic_loc = ident_create "atomic_loc"
 and ident_lexing_position = ident_create "lexing_position"
-(* CR metaprogramming aivaskovic: there is a question about naming;
-   keep `expr` for now instead of `code` *)
-and ident_code = ident_create "expr"
+and ident_expr = ident_create "expr"
 and ident_eval = ident_create "eval"
 and ident_box = ident_create "box"
 
@@ -283,7 +281,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Iarray -> ident_iarray
   | `Atomic_loc -> ident_atomic_loc
   | `Lexing_position -> ident_lexing_position
-  | `Code -> ident_code
+  | `Expr -> ident_expr
   | `Eval -> ident_eval
   | `Box -> ident_box
   | `Float32 -> ident_float32
@@ -357,7 +355,7 @@ and path_uint32_u = Pident ident_uint32_u
 and path_uint64_u = Pident ident_uint64_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
-and path_code = Pident ident_code
+and path_expr = Pident ident_expr
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
 
@@ -448,7 +446,7 @@ and type_floatarray = tconstr path_floatarray []
 and type_iarray t = tconstr path_iarray [t]
 and type_atomic_loc t = tconstr path_atomic_loc [t]
 and type_lexing_position = tconstr path_lexing_position []
-and type_code t = tconstr path_code [t]
+and type_expr t = tconstr path_expr [t]
 
 and type_unboxed_unit = tconstr path_unboxed_unit []
 and type_unboxed_bool = tconstr path_unboxed_bool []
@@ -995,7 +993,7 @@ let decl_of_type_constr type_constr =
          of_builtin Const.Builtin.immutable_data
            ~why:(Primitive ident_lexing_position))
        ()
-  | `Code ->
+  | `Expr ->
     decl1
        ~variance:Variance.covariant
        ~separability:Separability.Ind
