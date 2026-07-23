@@ -96,6 +96,30 @@ module Pcompare_string = struct
     | Pcmpistrz -> "pcmpistrz"
 end
 
+module Kflag = struct
+  (* Mask flag-reader pseudo-ops: KORTEST/KTEST followed by a SETcc reading ZF
+     (the [z] forms) or CF (the [c] forms). The mask width is carried by the
+     underlying instruction. *)
+  type t =
+    | Kortestz
+    | Kortestc
+    | Ktestz
+    | Ktestc
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Kortestz, Kortestz | Kortestc, Kortestc | Ktestz, Ktestz | Ktestc, Ktestc
+      ->
+      true
+    | (Kortestz | Kortestc | Ktestz | Ktestc), _ -> false
+
+  let mnemonic = function
+    | Kortestz -> "kortestz"
+    | Kortestc -> "kortestc"
+    | Ktestz -> "ktestz"
+    | Ktestc -> "ktestc"
+end
+
 module Seq = struct
   type id =
     | Sqrtss
@@ -113,6 +137,7 @@ module Seq = struct
     | Vptestz_Y
     | Vptestc_Y
     | Vptestnzc_Y
+    | Kflag of Kflag.t
 
   type nonrec t =
     { id : id;
@@ -185,6 +210,14 @@ module Seq = struct
 
   let vptestnzc_Y = { id = Vptestnzc_Y; instr = vptest_r64_Y_Ym256 }
 
+  let kortestz instr = { id = Kflag Kortestz; instr }
+
+  let kortestc instr = { id = Kflag Kortestc; instr }
+
+  let ktestz instr = { id = Kflag Ktestz; instr }
+
+  let ktestc instr = { id = Kflag Ktestc; instr }
+
   let mnemonic ({ id; _ } : t) =
     match id with
     | Sqrtss -> "sqrtss"
@@ -199,6 +232,7 @@ module Seq = struct
     | Vptestz_X | Vptestz_Y -> "vptestz"
     | Vptestc_X | Vptestc_Y -> "vptestc"
     | Vptestnzc_X | Vptestnzc_Y -> "vptestnzc"
+    | Kflag k -> Kflag.mnemonic k
 
   let equal { id = id0; instr = instr0 } { id = id1; instr = instr1 } =
     let return_true () =
@@ -223,9 +257,13 @@ module Seq = struct
     | Pcompare_string p1, Pcompare_string p2
     | Vpcompare_string p1, Vpcompare_string p2 ->
       if Pcompare_string.equal p1 p2 then return_true () else false
+    | Kflag k0, Kflag k1 ->
+      (* Distinct mask widths share a [Kflag] kind but differ in [instr]. *)
+      Kflag.equal k0 k1 && Amd64_simd_instrs.equal instr0 instr1
     | ( ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
         | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
-        | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y ),
+        | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y
+        | Kflag _ ),
         _ ) ->
       false
 end

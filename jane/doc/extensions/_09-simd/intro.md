@@ -6,8 +6,8 @@ title: Intro
 
 # Using SIMD processor extensions in OxCaml
 
-The OxCaml compiler provides built-in 128 and 256-bit SIMD vector types, as well
-as intrinsics for amd64 SIMD instructions up to and including AVX2.
+The OxCaml compiler provides built-in 128, 256, and 512-bit SIMD vector types,
+as well as intrinsics for amd64 SIMD instructions up to and including AVX512.
 
 To get started with SIMD, add
 [`ocaml_simd`](https://github.com/janestreet/ocaml_simd/tree/with-extensions)
@@ -20,19 +20,26 @@ defining constants like blend and shuffle masks.
 When SIMD is enabled, the following SIMD vector types are available:
 
 ```
-int8x16         int8x32
-int8x16#        int8x32#
-int16x8         int16x16
-int16x8#        int16x16#
-int32x4         int32x8
-int32x4#        int32x8#
-int64x2         int64x4
-int64x2#        int64x4#
-float32x4       float32x8
-float32x4#      float32x8#
-float64x2       float64x4
-float64x2#      float64x4#
+int8x16         int8x32         int8x64
+int8x16#        int8x32#        int8x64#
+int16x8         int16x16        int16x32
+int16x8#        int16x16#       int16x32#
+int32x4         int32x8         int32x16
+int32x4#        int32x8#        int32x16#
+int64x2         int64x4         int64x8
+int64x2#        int64x4#        int64x8#
+float32x4       float32x8       float32x16
+float32x4#      float32x8#      float32x16#
+float64x2       float64x4       float64x8
+float64x2#      float64x4#      float64x8#
 ```
+
+The 512-bit types (and the AVX512 intrinsics) additionally require the
+`simd_alpha` extension level. AVX512 also provides an opaque write-mask type
+`mask` (and unboxed `mask#`), which lives in the `k0`-`k7` mask registers.
+Masks convert to and from integers with the `caml_mask_of_int64` /
+`caml_int64_of_mask` builtins; at C boundaries they are passed in
+general-purpose registers, per the C ABI.
 
 The types ending with `#` are unboxed: they are passed between functions in
 XMM/YMM registers, stored in structures as flat data, and may be stored in flat
@@ -89,6 +96,62 @@ let y = Int32x4.set 1 3 5 7
 let z = Int32x4.blend [%blend 0, 1, 0, 1] x y
 ```
 
+## AVX512
+
+AVX512 support is gated by CPU extension flags: `-favx512f` enables the
+foundation instructions and, because the hardware sets are mutually required,
+implies `-favx512cd`, `-favx512dq`, `-favx512bw`, and `-favx512vl` (and
+transitively AVX2 and below). Building with these flags assumes the resulting
+binary runs on a machine with the corresponding CPUID bits.
+
+Unlike the hand-written SSE/AVX intrinsics, the AVX512 surface is generated
+from the Intel Intrinsics Guide data by `tools/simdgen`: every supported Intel
+intrinsic `_mm*` is recognized as a builtin external named `caml` followed by
+the Intel name (e.g. `caml_mm512_add_ps`, `caml_mm512_mask_add_epi32`). The
+supported set covers register, load/store, and gather/scatter forms of the
+AVX512 F/CD/DQ/BW/VL intrinsics; intrinsics that expand to instruction
+*sequences* (e.g. `_mm512_set1_epi8`, the reductions, SVML) are deliberately
+not compiler builtins and belong in libraries. The exact set is recorded in
+`tools/simdgen/amd64_simd_intrins_skiplist.txt`: every in-scope intrinsic is
+either recognized or listed there with a reason.
+
+The externals follow the C signatures with these conventions:
+
+- `__m512`/`__m512d`/`__m512i` map to `float32x16`/`float64x8`/the integer
+  vector type matching the element width, and similarly for 256/128-bit types;
+- `__mmask8/16/32/64` all map to `mask`;
+- *immediate* parameters move to the front of the argument list, in C order,
+  and are passed as `(int [@untagged])`; they must be compile-time constants,
+  and out-of-range values are compile-time errors;
+- scalar operands map to `(int32 [@unboxed])`, `(int64 [@unboxed])`, or
+  `(int [@untagged])` for sub-word types; pointers map to `nativeint#`;
+- embedded-rounding intrinsics (`_mm512_*_round_*`) accept the C macro values
+  (`_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC` = 8, ..., and
+  `_MM_FROUND_CUR_DIRECTION` = 4), selecting the rounded or plain instruction.
+
+```ocaml
+external add_ps :
+  (float32x16[@unboxed]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed])
+  = "caml_vec512_unreachable" "caml_mm512_add_ps"
+[@@noalloc] [@@builtin]
+
+external mask_add_ps :
+  (float32x16[@unboxed]) -> (mask[@unboxed]) -> (float32x16[@unboxed]) ->
+  (float32x16[@unboxed]) -> (float32x16[@unboxed])
+  = "caml_vec512_unreachable" "caml_mm512_mask_add_ps"
+[@@noalloc] [@@builtin]
+
+external cmp_ps_mask :
+  (int[@untagged]) -> (float32x16[@unboxed]) -> (float32x16[@unboxed]) ->
+  (mask[@unboxed])
+  = "caml_vec512_unreachable" "caml_mm512_cmp_ps_mask"
+[@@noalloc] [@@builtin]
+```
+
+Note that if the required extension is *not* enabled, a builtin external is
+compiled as an ordinary C call, which fails at link time with an undefined
+symbol (the same behavior as the SSE/AVX intrinsics).
+
 ## C ABI
 
 Like floats, both boxed and unboxed SIMD vectors may be passed to C stubs. The
@@ -121,4 +184,4 @@ value boxed_vec256_stub(value v) {
 
 ## Future Work
 
-Support for NEON and AVX512 is coming soon.
+Support for NEON is coming soon.

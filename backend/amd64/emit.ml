@@ -1865,14 +1865,22 @@ let to_arg_with_width loc instr i =
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
+  (* The operand width can be narrower than the register's type, e.g. a 512-bit
+     vector whose low lane feeds an XMM operand. *)
+  | Some R128 -> arg_as_xmm (arg instr i)
+  | Some R256 -> arg_as_ymm (arg instr i)
+  | Some R512 -> arg_as_zmm (arg instr i)
+  | Some R64 | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256 | R512) | None -> res instr i
+  | Some R128 -> arg_as_xmm (res instr i)
+  | Some R256 -> arg_as_ymm (res instr i)
+  | Some R512 -> arg_as_zmm (res instr i)
+  | Some R64 | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -2011,6 +2019,16 @@ let emit_simd ?mode (op : Simd.operation) instr =
     | Ptestnzc | Vptestnzc_X | Vptestnzc_Y ->
       emit_simd_instr ?mode seq.instr imm instr;
       I.set A (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Kflag (Kortestz | Ktestz) ->
+      (* KORTEST/KTEST set ZF when the mask OR/AND is all-zero. *)
+      emit_simd_instr ?mode seq.instr imm instr;
+      I.set E (res8 instr 0);
+      I.movzx (res8 instr 0) (res instr 0)
+    | Kflag (Kortestc | Ktestc) ->
+      (* ... and CF when it is all-ones. *)
+      emit_simd_instr ?mode seq.instr imm instr;
+      I.set B (res8 instr 0);
       I.movzx (res8 instr 0) (res instr 0))
 
 let emit_simd_instr_with_memory_arg (simd : Simd.Mem.operation) i mode =
