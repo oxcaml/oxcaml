@@ -6493,9 +6493,46 @@ let add_zero_alloc_attribute expr attributes =
     end
   | _ -> expr
 
-let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
+(* CR shsong: This list duplicates primitive-allocation knowledge that
+   authoritatively lives in [Translprim] (the lambda phase), which [typing/]
+   cannot depend on. Clean up someday by lifting a shared classification into a
+   module below both [typing/] and [lambda/]. *)
+(* CR-soon shsong: also handle C externals with [prim_alloc = false] and
+   regular functions carrying a [zero_alloc] check. *)
+let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
+  match prim.prim_name with
+  | "%identity" | "%ignore" | "%obj_is_int"
+  (* CR shsong: [%revapply] ([|>]) and [%apply] ([@@]) are included here because
+     they compile to a direct application of their function argument and do not
+     themselves allocate. They are control-flow operators rather than
+     "non-allocating computations" like the arithmetic primitives above, so
+     revisit whether they belong in this list or deserve dedicated handling. *)
+  | "%revapply" | "%apply"
+  | "%addint" | "%subint" | "%mulint" | "%divint" | "%modint"
+  | "%negint" | "%succint" | "%predint"
+  | "%andint" | "%orint" | "%xorint" | "%lslint" | "%lsrint" | "%asrint"
+  | "%eq" | "%noteq" | "%ltint" | "%gtint" | "%leint" | "%geint"
+  | "%lessthan" | "%greaterthan" | "%lessequal" | "%greaterequal"
+  | "%compare" | "%equal" | "%notequal"
+  | "%boolnot" | "%sequand" | "%sequor" -> true
+  | _ -> false
+
+let relax_alloc desc mode =
+  match desc.val_kind with
+  | Val_prim prim when prim_is_noalloc_when_fully_applied prim ->
+    Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+  | _ -> mode
+
+let unrelax_alloc orig_mode actual_mode =
+  Value.join
+    [ actual_mode;
+      Value.min_with_comonadic Allocation
+        (Value.proj_comonadic Allocation orig_mode) ]
+
+let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(applied_arity=0)
+      env expected_mode sexp =
   (* We now delegate everything to type_expect *)
-  type_expect ?recarg ~overwrite env expected_mode sexp
+  type_expect ?recarg ~overwrite ~applied_arity env expected_mode sexp
     (mk_expected (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
 
 (* Typing of an expression with an expected type.
@@ -6509,13 +6546,14 @@ and check_layout_args_empty ~loc ~env layout_args ctx =
   if not (List.is_empty layout_args) then
     raise (Error (loc, env, Layout_poly_inst_not_yet_supported ctx))
 
-and type_expect ?recarg ?(overwrite=No_overwrite) env
+and type_expect ?recarg ?(overwrite=No_overwrite) ?(applied_arity=0) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
   let previous_saved_types = Cmt_format.get_saved_types () in
   let exp =
     Builtin_attributes.warning_scope sexp.pexp_attributes
       (fun () ->
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
+         type_expect_ ?recarg ~overwrite ~applied_arity env expected_mode sexp
+           ty_expected_explained
       )
   in
   Cmt_format.set_saved_types
@@ -6523,7 +6561,7 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
   exp
 
 and type_expect_
-    ?(recarg=Rejected) ?(overwrite=No_overwrite)
+    ?(recarg=Rejected) ?(overwrite=No_overwrite) ?(applied_arity=0)
     env (expected_mode : expected_mode) sexp ty_expected_explained =
   let { ty = ty_expected; explanation } = ty_expected_explained in
   let loc = sexp.pexp_loc in
@@ -6893,7 +6931,7 @@ and type_expect_
   match sexp.pexp_desc with
   | Pexp_ident lid ->
       let path, actual_mode, layout_args, desc, kind =
-        type_ident env ~recarg lid
+        type_ident env ~recarg ~applied_arity lid
       in
       let exp_desc =
         match desc.val_kind with
@@ -7212,10 +7250,10 @@ and type_expect_
       in
       (* one more level for warning on non-returning functions *)
       with_local_level_generalize ~before_generalize:ignore begin fun () ->
-      let type_sfunct sfunct =
+      let type_sfunct ~applied_arity sfunct =
         let funct =
           with_local_level_generalize_structure_if_principal
-            (fun () -> type_exp env funct_expected_mode sfunct)
+            (fun () -> type_exp ~applied_arity env funct_expected_mode sfunct)
         in
         let ty = instance funct.exp_type in
         let rt = wrap_trace_gadt_instances env (ret_tvar TypeSet.empty) ty in
@@ -7224,12 +7262,14 @@ and type_expect_
       let type_sfunct_args sfunct extra_args =
         match sfunct.pexp_desc with
         | Pexp_apply (sfunct, args) ->
-           type_sfunct sfunct, args @ extra_args
+           let all_args = args @ extra_args in
+           type_sfunct ~applied_arity:(List.length all_args) sfunct, all_args
         | _ ->
-           type_sfunct sfunct, extra_args
+           type_sfunct ~applied_arity:(List.length extra_args) sfunct,
+           extra_args
       in
       let (rt, funct), sargs =
-        let rt, funct = type_sfunct sfunct in
+        let rt, funct = type_sfunct ~applied_arity:(List.length sargs) sfunct in
         match funct.exp_desc, sargs with
         | Texp_ident { desc = {val_kind = Val_prim {prim_name = "%revapply"};
                                val_type};
@@ -9030,7 +9070,7 @@ and type_newtype
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
 
-and type_ident env ?(recarg=Rejected) lid =
+and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
   let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
@@ -9070,13 +9110,18 @@ and type_ident env ?(recarg=Rejected) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  (* CR shsong: the allocation axis is treated conservatively here -- any value
-     referenced at [alloc] (in particular every primitive) forces the enclosing
-     closures to [alloc], even when no allocation actually happens. *)
+  (* Relax mode for primtives that do not allocate when fully applied.
+    They may still trigger closure allocation when they are
+    (1) referenced with no arguments or (2) partially applied, which
+    will be handled by register_allocation_mode below. *)
+  let relax_mode = relax_alloc desc mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
-      (mode, locks)
+      (relax_mode, locks)
   in
+  (* We need to restore Allocation mode axis for primitives: they cannot
+     be noalloc since they allocates when partially applied. *)
+  let actual_mode = unrelax_alloc mode actual_mode in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
   and the second only deals with monadic. *)
@@ -9099,31 +9144,36 @@ and type_ident env ?(recarg=Rejected) lid =
   end;
   let layout_args, val_type, kind =
     match desc.val_kind with
-    (* Allocation axis: only [Val_prim] can allocate merely by being referenced
-       (the primitive's result). We register an allocation whenever one may
-       happen, not only for poly results as an optimization hint. *)
-    (* CR shsong: this check is currently masked by [walk_locks] above, which
-       already treats every primitive as [alloc]. *)
+    (* register_allocation_mode is used for two things:
+        1. if the locality of returned value of the primitive is poly
+          we then register allocation for further optimization
+        2. if the primitive is noalloc when fully applied, we prevent
+          it from forcing the closure to be noalloc, but need to register
+          closure allocation when it is (1) referenced with no arguments
+          or (2) partially applied *)
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
-       begin match prim.prim_native_repr_res, mode with
-       (* Poly result: register an allocation at the result's locality. *)
-       | (Prim_poly, _), Some mode ->
-           register_allocation_mode ~env ~loc:lid.loc
-             (Alloc.max_with_comonadic Areality mode)
-       | (Prim_poly, _), None ->
-           (* Unreachable: a poly result implies [mode = Some]. Conservatively
-              register a heap allocation rather than silently skip it. *)
-           register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
-       (* Global result: register a heap allocation. *)
-       | (Prim_global, _), _ ->
-           register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
-       (* Local result: a stack allocation, which does not count on the
-          allocation axis. *)
-       | (Prim_local, _), _ -> ()
+       if not (prim_is_noalloc_when_fully_applied prim) ||
+          prim.prim_arity = 0 || applied_arity < prim.prim_arity then begin
+         match prim.prim_native_repr_res, mode with
+         (* Poly result: register an allocation at the result's locality
+            for further optimization. *)
+         | (Prim_poly, _), Some mode ->
+             register_allocation_mode ~env ~loc:lid.loc
+               (Alloc.max_with_comonadic Areality mode)
+         | (Prim_poly, _), None ->
+             (* Unreachable: a poly result implies [mode = Some]. Conservatively
+                register a heap allocation rather than silently skip it. *)
+             register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
+         (* Global result: register a heap allocation. *)
+         | (Prim_global, _), _ ->
+             register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
+         (* Local result: a stack allocation, which does not count on the
+            allocation axis. *)
+         | (Prim_local, _), _ -> ()
        end;
        [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
     | _ ->
