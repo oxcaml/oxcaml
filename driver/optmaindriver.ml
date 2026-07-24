@@ -103,14 +103,16 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      Compenv.stop_early; output_c_object]) > 1
+                      reaper_rebuild; reaper_solve; Compenv.stop_early;
+                      output_c_object]) > 1
     then
     begin
       let module P = Clflags.Compiler_pass in
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -reaper-rebuild, \
+                         -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -152,6 +154,35 @@ let main unix argv ppf ~flambda2 =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_rebuild then begin
+      Compmisc.init_path ();
+      (match Compenv.get_objfiles ~with_ocamlparam:false with
+      | [] ->
+        Compenv.fatal
+          "Must specify at least one .cmr file with -reaper-rebuild"
+      | files ->
+        (* CR mvellacott: implement this *)
+        List.iter
+          (fun file -> Printf.printf "rebuilding from cmr: %s\n" file)
+          files
+        );
+      Warnings.check_fatal ();
+    end
+    else if !reaper_solve then begin
+      Compmisc.init_path ();
+      let output = Compenv.extract_output !output_name in
+      (match Compenv.get_objfiles ~with_ocamlparam:false with
+      | [] ->
+        Compenv.fatal "Must specify at least one .cmr file with -reaper-solve"
+      | inputs ->
+        (* CR mvellacott: implement this *)
+        List.iter
+          (fun file -> Printf.printf "solving from cmr: %s\n" file)
+          inputs;
+        Printf.printf "outputting cmsol to: %s\n" output;
+        ());
       Warnings.check_fatal ();
     end
     else if !shared then begin
