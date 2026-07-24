@@ -795,6 +795,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
+  | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+    num_nodes_visited,
+    add_nullability_from_ty env scty
+      (value_kind_of_scannable_jkind env (Jkind.disallow_right jkind))
   | _ ->
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
