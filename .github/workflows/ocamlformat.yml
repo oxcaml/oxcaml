@@ -9,13 +9,17 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 jobs:
   check:
     name: check (${{ matrix.system }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # read PR labels for the "skip 80ch" check
     strategy:
       matrix:
         include:
@@ -23,7 +27,9 @@ jobs:
             os: warp-ubuntu-latest-x64-32x
     steps:
       - name: Checkout the OxCaml repo
-        uses: actions/checkout@master
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Checkout the parent branch
         run: git fetch origin HEAD --deepen 1
@@ -33,7 +39,7 @@ jobs:
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
       - name: Set up Opam
-        uses: ocaml/setup-ocaml@v3
+        uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
         with:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
           opam-repositories: |

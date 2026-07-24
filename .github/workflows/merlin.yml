@@ -13,6 +13,12 @@ on:
   merge_group:
   workflow_dispatch:
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 # Overall approach to running the tests:
 #  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
 #  - Build OxCaml (which also requires installing OCaml 5.4).
@@ -28,6 +34,8 @@ jobs:
     # The type of runner that the job will run on
     name: merlin
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
 
     strategy:
       fail-fast: false
@@ -41,9 +49,10 @@ jobs:
 
     steps:
     - name: Checkout the oxcaml repo
-      uses: actions/checkout@master
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         path: 'oxcaml'
+        persist-credentials: false
 
     - name: Pretend we're running in a container (makes setup-ocaml go faster)
       if: runner.os == 'Linux'
@@ -51,7 +60,7 @@ jobs:
       # makes setup-ocaml skip apt-get, which is slow on first invocation
 
     - name: Set up Opam
-      uses: ocaml/setup-ocaml@v3
+      uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
       with:
         ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
         opam-repositories: |
@@ -66,18 +75,19 @@ jobs:
         opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
     - name: Restore OxCaml build
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       id: cache
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
         key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
 
     - name: Clone the OxCaml repo
-      uses: actions/checkout@master
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       if: steps.cache.outputs.cache-hit != 'true'
       with:
         repository: 'oxcaml/oxcaml'
         path: 'flambda-backend'
+        persist-credentials: false
 
     - name: Check out the OxCaml repo to the specified hash
       if: steps.cache.outputs.cache-hit != 'true'
@@ -109,7 +119,7 @@ jobs:
 
     - name: Upload OxCaml cache
       if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
         key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
