@@ -166,7 +166,7 @@ Lines 1-4, characters 0-11:
 3 |   | B of int * int
 4 | [@@or_null]
 Error: Invalid [@or_null] declaration:
-       it must have exactly one nullary constructor and one unary constructor.
+       each constructor must be nullary or unary.
 |}]
 
 (* Non-parameterized custom [@@or_null] types. *)
@@ -233,6 +233,289 @@ Error: This type "float_payload" should be an instance of type
        But the layout of float_payload must be a sublayout of
            value_or_null non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type void : void mod everything
+external void : unit -> void = "%unbox_unit"
+
+[%%expect{|
+type void : void mod everything
+external void : unit -> void = "%unbox_unit"
+|}]
+
+type void_null =
+  | Null_void of void
+  | This_void of int
+[@@or_null]
+
+[%%expect{|
+type void_null = Null_void of void | This_void of int [@@or_null]
+|}]
+
+type void_null_flipped =
+  | This_void_flipped of int
+  | Null_void_flipped of #(void * void)
+[@@or_null]
+
+[%%expect{|
+type void_null_flipped =
+    This_void_flipped of int
+  | Null_void_flipped of #(void * void) [@@or_null]
+|}]
+
+type void_null_succeeds_sep = void_null accepts_sep
+type void_null_succeeds_nonfloat = void_null accepts_nonfloat
+
+[%%expect{|
+type void_null_succeeds_sep = void_null accepts_sep
+type void_null_succeeds_nonfloat = void_null accepts_nonfloat
+|}]
+
+(* A void null constructor with a [float] payload is maybe-separable (like
+   [float or_null]), unlike the [int] payload above. Separability is a jkind
+   axis computed structurally from the payload and does not depend on the
+   flat-float-array optimization, so this is rejected identically under both
+   the flat-float-array and no-flat-float-array configurations. *)
+
+type void_null_float =
+  | Null_void_float of void
+  | This_void_float of float
+[@@or_null]
+
+[%%expect{|
+type void_null_float = Null_void_float of void | This_void_float of float [@@or_null]
+|}]
+
+type void_null_float_fails_sep = void_null_float accepts_sep
+
+[%%expect{|
+Line 1, characters 33-48:
+1 | type void_null_float_fails_sep = void_null_float accepts_sep
+                                     ^^^^^^^^^^^^^^^
+Error: This type "void_null_float" should be an instance of type
+         "('a : any separable)"
+       The layout of void_null_float is value_or_null
+         because of the definition of void_null_float at lines 1-4, characters 0-11.
+       But the layout of void_null_float must be a sublayout of any separable
+         because of the definition of accepts_sep at line 2, characters 0-41.
+|}]
+
+type void_null_float_fails_nonfloat = void_null_float accepts_nonfloat
+
+[%%expect{|
+Line 1, characters 38-53:
+1 | type void_null_float_fails_nonfloat = void_null_float accepts_nonfloat
+                                          ^^^^^^^^^^^^^^^
+Error: This type "void_null_float" should be an instance of type
+         "('a : value_or_null non_float)"
+       The layout of void_null_float is value_or_null
+         because of the definition of void_null_float at lines 1-4, characters 0-11.
+       But the layout of void_null_float must be a sublayout of
+           value_or_null non_float
+         because of the definition of accepts_nonfloat at line 3, characters 0-56.
+|}]
+
+type void_alias = void
+type 'a void_param : void
+
+[%%expect{|
+type void_alias = void
+type 'a void_param : void
+|}]
+
+type void_alias_null =
+  | Null_void_alias of void_alias
+  | This_void_alias of string
+[@@or_null]
+
+type 'a void_param_null =
+  | Null_void_param of 'a void_param
+  | This_void_param of int
+[@@or_null]
+
+[%%expect{|
+type void_alias_null =
+    Null_void_alias of void_alias
+  | This_void_alias of string [@@or_null]
+type 'a void_param_null =
+    Null_void_param of 'a void_param
+  | This_void_param of int [@@or_null]
+|}]
+
+type 'a constrained_void_null =
+  | Null_constrained of 'a
+  | This_constrained of int
+  constraint 'a = void
+[@@or_null]
+
+[%%expect{|
+type 'a constrained_void_null =
+    Null_constrained of 'a
+  | This_constrained of int constraint 'a = void [@@or_null]
+|}]
+
+type recursive_void_null =
+  | Null_recursive_void of recursive_void
+  | This_recursive_void of int
+[@@or_null]
+and recursive_void : void mod everything
+
+type recursive_void_alias = void
+and recursive_void_alias_null =
+  | Null_recursive_void_alias of recursive_void_alias
+  | This_recursive_void_alias of int
+[@@or_null]
+
+type recursive_payload = int
+and recursive_payload_null =
+  | Null_recursive_payload
+  | This_recursive_payload of recursive_payload
+[@@or_null]
+
+[%%expect{|
+type recursive_void_null =
+    Null_recursive_void of recursive_void
+  | This_recursive_void of int [@@or_null]
+and recursive_void : void mod everything
+type recursive_void_alias = void
+and recursive_void_alias_null =
+    Null_recursive_void_alias of recursive_void_alias
+  | This_recursive_void_alias of int [@@or_null]
+type recursive_payload = int
+and recursive_payload_null =
+    Null_recursive_payload
+  | This_recursive_payload of recursive_payload [@@or_null]
+|}]
+
+type no_nonvoid_payload =
+  | A_no_nonvoid
+  | B_no_nonvoid of void
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type no_nonvoid_payload =
+2 |   | A_no_nonvoid
+3 |   | B_no_nonvoid of void
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
+|}]
+
+type two_nonvoid_payloads =
+  | A_nonvoid of int
+  | B_nonvoid of string
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type two_nonvoid_payloads =
+2 |   | A_nonvoid of int
+3 |   | B_nonvoid of string
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
+|}]
+
+(* The null constructor's void argument counts towards the mod-bounds of the
+   type: matching on the null constructor synthesizes a value of the argument
+   type. *)
+
+type nonportable_void : void
+
+type crossing_void_null : value_or_null mod portable =
+  | Null_crossing_void of void
+  | This_crossing_void of int
+[@@or_null]
+
+type noncrossing_void_null : value_or_null mod portable =
+  | Null_noncrossing_void of nonportable_void
+  | This_noncrossing_void of int
+[@@or_null]
+
+[%%expect{|
+type nonportable_void : void
+type crossing_void_null =
+    Null_crossing_void of void
+  | This_crossing_void of int [@@or_null]
+Lines 8-11, characters 0-11:
+ 8 | type noncrossing_void_null : value_or_null mod portable =
+ 9 |   | Null_noncrossing_void of nonportable_void
+10 |   | This_noncrossing_void of int
+11 | [@@or_null]
+Error: The kind of type "noncrossing_void_null" is
+           immediate_or_null with nonportable_void
+         because an [@@or_null] type gets its kind by applying or_null to its
+         payload kind.
+       But the kind of type "noncrossing_void_null" must be a subkind of
+           value_or_null mod portable
+         because of the annotation on the declaration of the type noncrossing_void_null.
+|}]
+
+type two_nullary =
+  | A_nullary
+  | B_nullary
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type two_nullary =
+2 |   | A_nullary
+3 |   | B_nullary
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       it must have exactly one null constructor and one payload constructor.
+|}]
+
+(* Both arguments are aliases from the same recursive group, so neither can
+   be classified before the whole group is translated. *)
+
+type both_aliased_void = void
+and both_aliased_int = int
+and both_aliased_null =
+  | Null_both_aliased of both_aliased_void
+  | This_both_aliased of both_aliased_int
+[@@or_null]
+
+[%%expect{|
+type both_aliased_void = void
+and both_aliased_int = int
+and both_aliased_null =
+    Null_both_aliased of both_aliased_void
+  | This_both_aliased of both_aliased_int [@@or_null]
+|}]
+
+(* Null-first declarations exercise [Ctype.contained_without_boxing] (via the
+   unboxed-recursion check and the jkind update order) before argument sorts
+   are known, when the null constructor cannot yet be told apart from the
+   payload constructor. *)
+
+type null_first_rec =
+  | Null_first of void
+  | This_first of first_wrapper
+[@@or_null]
+and first_wrapper = { fw : int } [@@unboxed]
+
+[%%expect{|
+type null_first_rec = Null_first of void | This_first of first_wrapper [@@or_null]
+and first_wrapper = { fw : int; } [@@unboxed]
+|}]
+
+type bad_rec =
+  | Null_bad of void
+  | This_bad of bad_wrapper
+[@@or_null]
+and bad_wrapper = { bw : bad_rec } [@@unboxed]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type bad_rec =
+2 |   | Null_bad of void
+3 |   | This_bad of bad_wrapper
+4 | [@@or_null]
+Error: The definition of "bad_rec" is recursive without boxing:
+         "bad_rec" contains "bad_wrapper",
+         "bad_wrapper" contains "bad_rec"
 |}]
 
 type portable_payload : value_or_null mod portable =
