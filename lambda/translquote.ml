@@ -4015,6 +4015,9 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_overwrite _ ->
       fatal_errorf "Translquote [at %a]: Texp_overwrite" Location.print_loc
         (to_location loc)
+    | Texp_zero_alloc _ ->
+      fatal_errorf "Translquote [at %a]: Texp_zero_alloc" Location.print_loc
+        (to_location loc)
     | Texp_hole _ ->
       fatal_errorf "Translquote [at %a]: Texp_hole" Location.print_loc
         (to_location loc)

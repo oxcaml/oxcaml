@@ -3515,7 +3515,9 @@ and type_pat_aux
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            let kind = Val_mut (m0, sort) in
+            let kind =
+              Val_mut (m0, sort, Env.enclosing_noalloc_ceiling !!penv)
+            in
             mode, kind
       in
       let pat_desc =
@@ -5276,6 +5278,7 @@ let rec is_nonexpansive exp =
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
+  | Texp_zero_alloc e -> is_nonexpansive e
   (* The underlying mutation of exp1 can not be observed since we have the only reference
      to it. In fact, a completely valid model for Texp_overwrite would be to ignore exp1
      and just allocate a new cell for exp2: *)
@@ -5432,6 +5435,7 @@ let rec maybe_computation exp =
   | Texp_probe _
   | Texp_probe_is_enabled _
   | Texp_exclave _
+  | Texp_zero_alloc _
   | Texp_src_pos
   | Texp_overwrite _
   | Texp_antiquotation _
@@ -5467,7 +5471,7 @@ let rec check_captures_comonadic env (exp : expression) =
       match def with
       | Kept _ -> assert false
       | Overridden (_, e) -> check e) fields
-  | Texp_apply_layout (e, _) | Texp_exclave e -> check e
+  | Texp_apply_layout (e, _) | Texp_exclave e | Texp_zero_alloc e -> check e
   | _ -> fail ()
 
 let annotate_recursive_bindings env valbinds =
@@ -5872,7 +5876,7 @@ let check_partial_application ~statement exp =
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
-            | Texp_exclave e ->
+            | Texp_exclave e | Texp_zero_alloc e ->
                 check e
             | Texp_apply _ | Texp_send _ | Texp_new _ | Texp_letop _ ->
                 Location.prerr_warning exp_loc
@@ -6928,7 +6932,7 @@ and type_expect_
                          match lid.txt with
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
-        | Val_mut (_m0, _) -> begin
+        | Val_mut (_m0, _, _) -> begin
             if not (List.is_empty layout_args) then
               Misc.fatal_error "type_expect_: Val_mut with layout args";
             match path with
@@ -8569,6 +8573,26 @@ and type_expect_
            exp_type = instance ty_expected;
            exp_attributes = sexp.pexp_attributes;
            exp_env = env }
+  | Pexp_zero_alloc sbody ->
+      Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+      Env.check_no_open_quotations loc env Zero_alloc_qt;
+      (* CR dkalinichenko: explain *)
+      let body_mode =
+        mode_coerce
+          (Value.max_with_comonadic Allocation
+             (Env.enclosing_noalloc_ceiling env))
+          expected_mode
+      in
+      let new_env = Env.add_zero_alloc_lock env in
+      let body =
+        type_expect ~recarg new_env body_mode sbody ty_expected_explained
+      in
+      { exp_desc = Texp_zero_alloc body;
+        exp_loc = loc;
+        exp_extra = [];
+        exp_type = body.exp_type;
+        exp_attributes = sexp.pexp_attributes;
+        exp_env = env }
   | Pexp_stack e ->
       (* Allocation axis: suppress the axis lock-walk at the registration
           site *)

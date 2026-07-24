@@ -576,6 +576,7 @@ module E = struct
     | Pexp_extension x -> sub.extension sub x
     | Pexp_unreachable -> ()
     | Pexp_stack e -> sub.expr sub e
+    | Pexp_zero_alloc e -> sub.expr sub e
     | Pexp_comprehension e -> iter_comp_exp sub e
     | Pexp_overwrite (e1, e2) -> sub.expr sub e1; sub.expr sub e2
     | Pexp_quote e -> sub.expr sub e

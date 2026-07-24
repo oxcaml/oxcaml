@@ -1125,6 +1125,7 @@ let maybe_pmod_constraint mode expr =
 %token SIG                    "sig"
 %token LAYOUT                 "layout_"
 %token STACK                  "stack_"
+%token ZERO_ALLOC             "zero_alloc_"
 %token STAR                   "*"
 %token <string * Location.t * string option>
        STRING                 "\"hello\"" (* just an example *)
@@ -2893,6 +2894,8 @@ fun_expr:
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
      { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
+  | ZERO_ALLOC seq_expr
+     { mkexp ~loc:$sloc (Pexp_zero_alloc $2) }
 ;
 %inline expr:
   | or_function(fun_expr) { $1 }

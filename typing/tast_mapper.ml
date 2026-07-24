@@ -739,6 +739,8 @@ let expr sub x =
     | Texp_probe_is_enabled _ as e -> e
     | Texp_exclave exp ->
         Texp_exclave (sub.expr sub exp)
+    | Texp_zero_alloc exp ->
+        Texp_zero_alloc (sub.expr sub exp)
     | Texp_src_pos -> Texp_src_pos
     | Texp_overwrite (exp1, exp2) ->
         Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)

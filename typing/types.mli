@@ -727,7 +727,8 @@ module Vars  : Map.S with type key = string
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of
+      Mode.Value.Comonadic.lr * Jkind_types.Sort.t * Mode.Allocation.r
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)

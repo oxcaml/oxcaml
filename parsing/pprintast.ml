@@ -1017,7 +1017,7 @@ and expression ctxt f x =
       (attributes ctxt) x.pexp_attributes
   else match x.pexp_desc with
     | Pexp_function _ | Pexp_match _ | Pexp_try _ | Pexp_sequence _
-    | Pexp_newtype _
+    | Pexp_newtype _ | Pexp_zero_alloc _
       when ctxt.pipe || ctxt.semi ->
         paren true (expression reset_ctxt) f x
     | Pexp_ifthenelse _ | Pexp_sequence _ when ctxt.ifthenelse ->
@@ -1118,6 +1118,8 @@ and expression ctxt f x =
     | Pexp_stack e ->
         (* Similar to the common case of [Pexp_apply] *)
         pp f "@[<hov2>stack_@ %a@]" (expression2 reset_ctxt)  e
+    | Pexp_zero_alloc e ->
+        pp f "@[<2>zero_alloc_ %a@]" (expression ctxt) e
     | Pexp_construct (li, Some eo)
       when not (is_simple_construct (view_expr x))-> (* Not efficient FIXME*)
         (match view_expr x with

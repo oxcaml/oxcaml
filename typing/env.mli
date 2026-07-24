@@ -252,6 +252,7 @@ type no_open_quotations_context =
   | Layout_polymorphism_qt
   | Tconst_pat_qt of Longident.t
   | Class_type_qt
+  | Zero_alloc_qt
 
 type none_in_quotations_context =
   | Constructor
@@ -597,6 +598,18 @@ val add_closure_noalloc_lock : t -> t
 
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
+
+(* CR dkalinichenko: Add a lock recording entry into a [zero_alloc_]
+   expression: the allocation axis is unconstrained across this lock in
+   both directions. *)
+val add_zero_alloc_lock : t -> t
+
+(* CR dkalinichenko: The allocation ceiling demanded by the innermost
+   enclosing noalloc function, up to the nearest enclosing [zero_alloc_]
+   region. Values produced by a [zero_alloc_] region must satisfy it to
+   re-enter the enclosing context. [alloc] if there is no such
+   obligation. *)
+val enclosing_noalloc_ceiling : t -> Mode.Allocation.r
 val add_unboxed_lock : t -> t
 val enter_quotation : t -> t
 val enter_splice : loc:Location.t -> t -> t

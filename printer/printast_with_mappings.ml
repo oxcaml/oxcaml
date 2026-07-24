@@ -516,6 +516,9 @@ and expression i ppf x =
       payload i ppf arg
   | Pexp_unreachable ->
       line i ppf "Pexp_unreachable"
+  | Pexp_zero_alloc e ->
+      line i ppf "Pexp_zero_alloc\n";
+      expression i ppf e
   | Pexp_stack e ->
       line i ppf "Pexp_stack\n";
       expression i ppf e

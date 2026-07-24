@@ -180,6 +180,7 @@ type lock =
   | Closure_noalloc_lock
   | Region_lock
   | Exclave_lock
+  | Zero_alloc_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -842,6 +843,7 @@ type no_open_quotations_context =
   | Layout_polymorphism_qt
   | Tconst_pat_qt of Longident.t
   | Class_type_qt
+  | Zero_alloc_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -3138,6 +3140,8 @@ let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
+let add_zero_alloc_lock env = add_lock Zero_alloc_lock env
+
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
@@ -3796,22 +3800,61 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [None] when the function is used on modules and classes.
 
     [pp] is the pinpoint used in errors. *)
+(* CR dkalinichenko: [locks] is ordered from the definition site
+   (outermost) to the use site (innermost). If there is a
+   [Zero_alloc_lock], returns [Some (outer, inner)] where [outer] is
+   everything up to and including the last such lock, and [inner] is the
+   locks pushed inside the innermost [zero_alloc_] region. *)
+let split_at_last_zero_alloc_lock locks =
+  let rec go acc found = function
+    | [] -> found
+    | (Zero_alloc_lock as l) :: rest ->
+        go (l :: acc) (Some (List.rev (l :: acc), rest)) rest
+    | l :: rest -> go (l :: acc) found rest
+  in
+  go [] None locks
+
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
-  List.fold_left
-    (fun vmode lock ->
-      match lock with
-      | Region_lock -> region_mode vmode
-      | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode pp vmode closure_context comonadic
-      | Closure_lock (closure_context, comonadic) ->
-          closure_mode pp vmode closure_context comonadic
-      | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
-      | Exclave_lock ->
-          exclave_mode ~errors ~env ~pp vmode
-      | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
-          vmode
-    ) mode locks
+  let walk_one vmode lock =
+    match lock with
+    | Region_lock -> region_mode vmode
+    | Const_closure_lock (_, closure_context, comonadic) ->
+        const_closure_mode pp vmode closure_context comonadic
+    | Closure_lock (closure_context, comonadic) ->
+        closure_mode pp vmode closure_context comonadic
+    | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
+    | Exclave_lock ->
+        exclave_mode ~errors ~env ~pp vmode
+    | Zero_alloc_lock -> vmode
+    | Unboxed_lock ->
+        unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
+        vmode
+  in
+  match split_at_last_zero_alloc_lock locks with
+  | None -> List.fold_left walk_one mode locks
+  | Some (outer, inner) ->
+      (* CR dkalinichenko: Mask the allocation axis while walking the
+         locks outside the [zero_alloc_] region: the region neither
+         constrains enclosing closures on that axis, nor is constrained
+         by them. The axis is then restored, so that the locks inside
+         the region still apply. *)
+      let masked =
+        Mode.Value.meet_const_with Allocation
+          Mode.Allocation.Const.Noalloc_strict mode
+      in
+      let vmode = List.fold_left walk_one masked outer in
+      (* CR dkalinichenko: restoring the allocation axis here also
+         discards the [closure_noalloc_mode] marking that forces
+         allocations in enclosing noalloc closures to be local. Revisit
+         once the [Closure_noalloc_lock] detection (currently too
+         conservative) is fixed. *)
+      let vmode =
+        Mode.Value.join
+          [ vmode;
+            Mode.Value.min_with_comonadic Allocation
+              (Mode.Value.proj_comonadic Allocation mode) ]
+      in
+      List.fold_left walk_one vmode inner
 
 (** Constrains every enclosing closure lock with the given minimum mode. *)
 let walk_locks_with_mode_constraint ~env pp ~mode =
@@ -3828,6 +3871,24 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
   ignore (walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy)
+
+(* CR dkalinichenko: The allocation ceiling demanded of values entering
+   the current context from a [zero_alloc_] region: leaving the region is
+   a capture by the enclosing function, so the region result must satisfy
+   the innermost enclosing noalloc obligation. Locks are scanned from the
+   use site outwards; a [Zero_alloc_lock] means the current context is
+   itself inside a [zero_alloc_] region (whose own exit performs this
+   check), so there is no obligation here. *)
+let enclosing_noalloc_ceiling env =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  let rec go = function
+    | [] -> Mode.Allocation.alloc
+    | Zero_alloc_lock :: _ -> Mode.Allocation.alloc
+    | Closure_noalloc_lock :: _ -> Mode.Allocation.noalloc_strict
+    | _ :: rest -> go rest
+  in
+  Mode.Allocation.disallow_left (go (List.rev locks))
 
 (** Registers a use of an allocation, constraining every enclosing closure lock.
     Used for constructs with allocations that force enclosing functions to be
@@ -3854,7 +3915,7 @@ let walk_locks_for_allocation ~env pp =
 - Returns the expected mode of the new value at the usage site (if the usage is
   a write).
 *)
-let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
+let walk_locks_for_mutable_mode ~errors ~loc ~env ~region_ceiling locks m0 =
   let mode =
     m0
     |> mutable_mode |> Mode.Value.disallow_left
@@ -3878,6 +3939,10 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
       | Const_closure_lock (true, _, _) | Closure_noalloc_lock ->
           mode
+      | Zero_alloc_lock ->
+          Mode.Value.meet
+            [mode;
+             Mode.Value.max_with_comonadic Allocation region_ceiling]
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
@@ -3889,9 +3954,10 @@ let lookup_ident_value ~errors ~use ~loc name env =
   | Ok (path, locks, Val_bound vda) ->
       let stage_locks, locks = partition_locks locks in
       begin match vda with
-      | {vda_description={val_kind=Val_mut (m0, _); _}; _} ->
+      | {vda_description={val_kind=Val_mut (m0, _, region_ceiling); _}; _} ->
           m0
-          |> walk_locks_for_mutable_mode ~errors ~loc ~env locks
+          |> walk_locks_for_mutable_mode ~errors ~loc ~env ~region_ceiling
+               locks
           |> ignore
       | _ -> () end;
       check_cross_quotation ~errors ~loc_use:loc
@@ -4801,11 +4867,12 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           use_value ~use ~loc path vda;
           Instance_variable
             (path, mut, cl_num, Subst.Lazy.force_type_expr desc.val_type)
-      | Val_mut (m0, sort), Pident id ->
+      | Val_mut (m0, sort, region_ceiling), Pident id ->
           let val_type = Subst.Lazy.force_type_expr desc.val_type in
           let mode =
             m0
-            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
+            |> walk_locks_for_mutable_mode ~errors:true ~loc ~env
+                 ~region_ceiling locks
             |> Mode.Modality.Const.apply_right
                 Typemode.let_mutable_modalities
           in
@@ -5186,6 +5253,8 @@ let print_unsupported_quotation ppf =
         (Format.asprintf "%a" Pprintast.longident tconst)
   | Class_type_qt ->
       fprintf ppf "Using class type annotations"
+  | Zero_alloc_qt ->
+      fprintf ppf "The %a construct" (Style.inline_code) "zero_alloc_"
 
 let print_unbound_in_quotation ppf =
   function
