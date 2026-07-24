@@ -804,17 +804,28 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Scannable { separability } ->
+    let pointerness = pointerness_of_separability separability in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
+      (* The declared shape's separability can be more precise than what
+         [value_kind] computes here (e.g. for existential type variables), so
+         take the better of the two. *)
+      (* CR-someday rtjoa: The most precise thing would be a real meet of
+         value kinds, which could e.g. improve upon a [Pintval] with a
+         [Pvariant], keeping only the [Pvariant]'s constant constructors. *)
+      let kind =
+        match pointerness, kind.raw_kind with
+        | Immediate, Pgenval -> { kind with raw_kind = Pintval }
+        | Immediate, _ | Pointer, _ -> kind
+      in
       num_nodes_visited, Value kind
     | None ->
-      let raw_kind =
-        value_kind_of_pointerness (pointerness_of_separability separability)
-      in
-      num_nodes_visited, Value { generic_value with raw_kind }
+      num_nodes_visited,
+      Value
+        { generic_value with raw_kind = value_kind_of_pointerness pointerness }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
