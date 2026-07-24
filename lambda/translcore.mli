@@ -31,6 +31,7 @@ val transl_apply: scopes:scopes
                   -> ?specialised:specialise_attribute
                   -> ?position:region_close
                   -> ?mode:locality_mode
+                  -> ?yielding:yielding_kind
                   -> result_layout:Lambda.layout
                   -> lambda
                   -> (arg_label * apply_arg) list

@@ -623,19 +623,21 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
+        ap_yielding = lfun.yielding;
         ap_probe = None;
       }
     in
     let wrapper =
-      lfunction'
-        ~kind:lfun.kind
-        ~params
-        ~return:lfun.return
-        ~body
-        ~attr:default_stub_attribute
-        ~loc:no_loc
-        ~mode:lfun.mode
-        ~ret_mode:lfun.ret_mode
+      lfunction_with_yielding lfun.yielding
+        (lfunction'
+           ~kind:lfun.kind
+           ~params
+           ~return:lfun.return
+           ~body
+           ~attr:default_stub_attribute
+           ~loc:no_loc
+           ~mode:lfun.mode
+           ~ret_mode:lfun.ret_mode)
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
@@ -947,6 +949,9 @@ let compile_indirect newval =
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
     ap_mode = Lambda.alloc_heap;
+    (* [indirect] just allocates a forwarding block; it never runs user code,
+       so it can't yield *)
+    ap_yielding = Unyielding;
     ap_probe = None;
   }
 

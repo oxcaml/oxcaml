@@ -301,11 +301,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
-  | Lapply { ap_func; ap_args; ap_region_close } ->
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
     Apply
       { func = comp_expr ap_func;
         args = List.map comp_expr ap_args;
-        nontail = is_nontail ap_region_close
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
       }
   | Lsend (kind, met, obj, args, rc, _, _, _) ->
     Send
@@ -1407,7 +1408,12 @@ let thunkify_compilation_unit_initialization ~thunk_name blam =
             free_variables = Ident.Set.empty
           };
       body =
-        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
     }
 
 let blambda_of_lambda ~compilation_unit x =

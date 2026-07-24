@@ -495,6 +495,9 @@ and expression_desc =
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
+        yielding : Mode.Yielding.l;
+        (* Whether fully applying this function can perform a free effect. This
+           is the closure's own mode joined with its parameter modes. *)
         zero_alloc : Zero_alloc.t;
         (* zero-alloc attributes *)
       }
@@ -509,7 +512,7 @@ and expression_desc =
       *)
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
         (** E0 ~l1:E1 ... ~ln:En
 
             The expression can be Omitted if the expression is abstracted over
@@ -524,6 +527,10 @@ and expression_desc =
                         [(Nolabel, Omitted _);
                          (Labelled "y", Arg (Texp_constant Const_int 3))
                         ])
+
+            The [Mode.Yielding.l] is the join of the yielding modes of the
+            applied function and all of its arguments; if it is [Unyielding],
+            the application can never perform a free effect.
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
@@ -818,7 +825,11 @@ and function_cases =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
+      (** The [Mode.Yielding.l] is the join of the yielding modes of the
+          primitive's parameters, for when the primitive is closed over rather
+          than directly applied. *)
 
 and block_access =
   | Baccess_field of
@@ -998,8 +1009,12 @@ and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
   | Tmod_functor of functor_parameter * module_expr
-  | Tmod_apply of module_expr * module_expr * module_coercion
-  | Tmod_apply_unit of module_expr
+  | Tmod_apply of
+      module_expr * module_expr * module_coercion * Mode.Yielding.l
+        (** The [Mode.Yielding.l] is the join of the yielding modes of the
+            functor and its argument: if it is [Unyielding], applying the
+            functor can never perform a free effect. *)
+  | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
     (** ME          (constraint = Tmodtype_implicit)
@@ -1067,7 +1082,9 @@ and module_coercion =
       (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
          the list of fields in the input module *)
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
+  (** The [Mode.Yielding.l] is the yielding of an application of the coerced
+      functor *)
   | Tcoerce_primitive of primitive_coercion
   (** External declaration coerced to a regular value.
       {[
@@ -1109,6 +1126,8 @@ and primitive_coercion =
     pc_type: Types.type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
+    (** As the [Mode.Yielding.l] in [Id_prim]. *)
     pc_env: Env.t;
     pc_loc : Location.t;
   }
@@ -1197,6 +1216,7 @@ and include_kind =
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1206,8 +1226,15 @@ and include_kind =
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> () -> S2 *)
+      (* In both functor cases, the [Mode.Yielding.l] is the join of the
+         yielding modes of the functor and of the enclosing structure it is
+         applied to: if it is [Unyielding], the application can never perform a
+         free effect. For includes in signatures there is no module expression
+         (and no runtime application), so the field is a conservative
+         [Yielding.max]. *)
 
 and 'a include_infos =
     {

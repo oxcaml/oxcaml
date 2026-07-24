@@ -649,6 +649,12 @@ and locality_mode i ppf m =
   line i ppf "locality_mode %a\n"
     (Format_doc.compat (Mode.Locality.print ())) m
 
+and yielding_mode i ppf m =
+  line i ppf "yielding_mode %s\n"
+    (match Mode.Yielding.zap_to_floor m with
+     | Mode.Yielding.Const.Unyielding -> "unyielding"
+     | Mode.Yielding.Const.Yielding -> "yielding")
+
 and value_mode i ppf m =
   line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
 
@@ -681,13 +687,14 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am; ret_mode } ->
+  | Texp_function { params; body; alloc_mode = am; ret_mode; yielding = ym } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
+      yielding_mode i ppf ym;
       alloc_modes_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
-  | Texp_apply (e, l, m, am, za) ->
+  | Texp_apply (e, l, m, am, ym, za) ->
       line i ppf "Texp_apply\n";
       line i ppf "apply_mode %s\n"
         (match m with
@@ -695,6 +702,7 @@ and expression i ppf x =
          | Nontail -> "Nontail"
          | Default -> "Default");
       locality_mode i ppf am;
+      yielding_mode i ppf ym;
       Option.iter (zero_alloc_assume i ppf) za;
       expression i ppf e;
       list i label_x_apply_arg ppf l;
@@ -1294,11 +1302,11 @@ and module_expr i ppf x =
       module_type i ppf mt;
       module_expr i ppf me;
       alloc_modes i ppf ma;
-  | Tmod_apply (me1, me2, _) ->
+  | Tmod_apply (me1, me2, _, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
       module_expr i ppf me2;
-  | Tmod_apply_unit me1 ->
+  | Tmod_apply_unit (me1, _) ->
       line i ppf "Tmod_apply_unit\n";
       module_expr i ppf me1;
   | Tmod_constraint (me, _, Tmodtype_explicit (mt, modes), _) ->

@@ -1277,6 +1277,11 @@ let rec lam ppf = function
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let form =
+        match ap.ap_yielding with
+        | May_yield -> form ^ "[yielding]"
+        | Unyielding -> form
+      in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
         apply_tailcall_attribute ap.ap_tailcall

@@ -104,6 +104,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
         expression 
           Texp_function
           alloc_mode global,many,portable,forkable,unyielding,stateful;id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+          yielding_mode unyielding
           global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
           []
           []
@@ -129,6 +130,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                   Texp_apply
                   apply_mode Tail
                   locality_mode global
+                  yielding_mode unyielding
                   expression 
                     Texp_ident "Stdlib!.+"
                   [
@@ -138,6 +140,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                         Texp_apply
                         apply_mode Default
                         locality_mode global
+                        yielding_mode unyielding
                         expression 
                           Texp_ident "fib"
                         [
@@ -147,6 +150,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                               Texp_apply
                               apply_mode Default
                               locality_mode global
+                              yielding_mode unyielding
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -166,6 +170,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                         Texp_apply
                         apply_mode Default
                         locality_mode global
+                        yielding_mode unyielding
                         expression 
                           Texp_ident "fib"
                         [
@@ -175,6 +180,7 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                               Texp_apply
                               apply_mode Default
                               locality_mode global
+                              yielding_mode unyielding
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [

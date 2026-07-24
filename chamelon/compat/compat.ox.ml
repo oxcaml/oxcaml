@@ -61,15 +61,21 @@ let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
 type nonrec apply_arg = apply_arg
 
 type texp_apply_identifier =
-  apply_position * Locality.l * Builtin_attributes.zero_alloc_assume option
+  apply_position
+  * Locality.l
+  * Yielding.l
+  * Builtin_attributes.zero_alloc_assume option
 
 let mkTexp_apply
-    ?id:(pos, mode, za = Default, Locality.disallow_right Locality.legacy, None)
-    (exp, args) =
+    ?id:(pos, mode, yielding, za =
+        ( Default,
+          Locality.disallow_right Locality.legacy,
+          Yielding.disallow_right Yielding.yielding,
+          None )) (exp, args) =
   let args =
     List.map (fun (label, x) -> Typetexp.transl_label label None, x) args
   in
-  Texp_apply (exp, args, pos, mode, za)
+  Texp_apply (exp, args, pos, mode, yielding, za)
 
 type texp_tuple_identifier = string option list * alloc_mode
 
@@ -225,6 +231,7 @@ let mkTexp_function ?(id = texp_function_defaults)
       alloc_mode = id.alloc_mode;
       ret_sort = id.ret_sort;
       ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
+      yielding = Yielding.disallow_right Yielding.yielding;
       zero_alloc = id.zero_alloc
     }
 
@@ -282,9 +289,9 @@ let view_texp (e : expression_desc) =
   match e with
   | Texp_ident { path; lid; desc; kind; unique_use; _ } ->
     Texp_ident (path, lid, desc, (kind, unique_use))
-  | Texp_apply (exp, args, pos, mode, za) ->
+  | Texp_apply (exp, args, pos, mode, yielding, za) ->
     let args = List.map (fun (label, x) -> untype_label label, x) args in
-    Texp_apply (exp, args, (pos, mode, za))
+    Texp_apply (exp, args, (pos, mode, yielding, za))
   | Texp_construct (name, desc, repres, args, mode) ->
     Texp_construct (name, desc, args, (mode, repres))
   | Texp_record { fields; representation; extended_expression; alloc_mode } ->

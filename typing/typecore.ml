@@ -5185,7 +5185,7 @@ let rec is_nonexpansive exp =
       is_nonexpansive body
   | Texp_letmutable(pat_exp, body) ->
       is_nonexpansive pat_exp.vb_expr && is_nonexpansive body
-  | Texp_apply(e, (_,Omitted _)::el, _, _, _) ->
+  | Texp_apply(e, (_,Omitted _)::el, _, _, _, _) ->
       is_nonexpansive e && List.for_all is_nonexpansive_arg (List.map snd el)
   | Texp_match(e, _, cases, _, _) ->
      (* Not sure this is necessary, if [e] is nonexpansive then we shouldn't
@@ -5278,7 +5278,7 @@ let rec is_nonexpansive exp =
   | Texp_apply (
       { exp_desc =
         Texp_ident { desc = {val_kind = Val_prim prim}; kind = Id_prim _; _ } },
-        args, _, _, _) ->
+        args, _, _, _, _) ->
      is_nonexpansive_prim prim args
   | Texp_array (_, _, _ :: _, _)
   | Texp_apply _
@@ -7282,7 +7282,7 @@ and type_expect_
         | _ ->
             (rt, funct), sargs
       in
-      let (args, ty_ret, mode_ret, pm) =
+      let (args, ty_ret, mode_ret, pm, ap_yielding) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
       let mode_ret = Alloc.disallow_right mode_ret in
@@ -7306,7 +7306,7 @@ and type_expect_
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
         exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
-                              zero_alloc);
+                              ap_yielding, zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
@@ -8635,7 +8635,7 @@ and type_expect_
       | Texp_unboxed_unit -> always_static Unboxed_unit
       | Texp_unboxed_bool _ -> always_static Unboxed_bool
       | Texp_apply({ exp_desc =
-          Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _)
+          Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
           (* CR zqian: Move/Copy [Lambda.primitive_may_allocate] to [typing], then we can
           check primitive allocation here, and also improve the logic in [type_ident]. *)
@@ -9156,7 +9156,11 @@ and type_ident env ?(recarg=Rejected) lid =
            register_allocation_mode (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
-       [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
+       let yielding =
+         prim_params_yielding env ty ~arity:prim.prim_arity
+       in
+       [], ty,
+       Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with
@@ -10163,6 +10167,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               args @ [Nolabel, Arg (eta_var, arg_sort)],
               Nontail,
               Alloc.proj_comonadic Areality (Alloc.disallow_right mret),
+              Yielding.disallow_right Yielding.yielding,
               None)}
         in
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
@@ -10185,6 +10190,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
               ret_sort;
               alloc_mode;
+              yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
         }
@@ -10225,7 +10231,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
   match arg with
-  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_arg; sort_arg }) ->
+  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
@@ -10237,9 +10243,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
              (type_option(newvar Predef.option_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
-      (lbl, Arg (arg, mode_arg, sort_arg), None)
+      (lbl, Arg (arg, mode_arg, sort_arg), None,
+       ~mode_fun:(Mode.alloc_as_value mode_fun))
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
-                     mode_arg; wrapped_in_some; sort_arg }) ->
+                     mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
@@ -10294,17 +10301,23 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           {arg with exp_type = instance arg.exp_type}, sch
         end
       in
-      (lbl, Arg (arg, mode_arg, sort_arg), sch)
-  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
+      ( lbl, Arg (arg, mode_arg, sort_arg), sch,
+        ~mode_fun:(Mode.alloc_as_value mode_fun))
+  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label;
+                                   mode_fun; _ }) ->
       (match expected_label with
       | Optional _ ->
           let arg = type_option_none env (instance ty_arg) Location.none in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl,
+           Arg (arg, Mode.Value.legacy, sort_arg),
+           None, ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Position _ ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None,
+           ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Labelled _ | Nolabel -> assert false)
-  | Omitted _ as arg -> (lbl, arg, None)
+  | Omitted { mode_fun; _ } as arg ->
+      (lbl, arg, None, ~mode_fun:(Mode.alloc_as_value mode_fun))
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
@@ -10334,7 +10347,8 @@ and type_application env app_loc expected_mode position_and_mode
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
       check_partial_application ~statement:false exp;
       ([Nolabel, Arg (exp, arg_sort), None],
-       ty_ret, ret_mode, position_and_mode)
+       ty_ret, ret_mode, position_and_mode,
+       Yielding.disallow_right Yielding.yielding)
   | _ ->
     (* See Note [Type-checking applications] for an overview *)
       let ty = funct.exp_type in
@@ -10355,7 +10369,7 @@ and type_application env app_loc expected_mode position_and_mode
            true)
         end
       in
-      let ty_ret, mode_ret, args, position_and_mode =
+      let ty_ret, mode_ret, args, position_and_mode, ap_yielding =
         with_local_level_generalize_structure_if_principal begin fun () ->
           (* Consider for example the application
                [f n]
@@ -10383,6 +10397,25 @@ and type_application env app_loc expected_mode position_and_mode
                   ~position_and_mode ~partial_app arg)
               untyped_args
           in
+          (* The application can never perform a free effect if the function and
+             all of its arguments are unyielding. *)
+          let ap_yielding =
+            Mode.Value.proj_comonadic Yielding
+              (Mode.Value.join
+                 (funct_mode
+                  :: List.concat_map
+                       (fun (_, arg, _, ~mode_fun) ->
+                          mode_fun ::
+                          (match arg with
+                            | Arg (_, mode_arg, _) -> [mode_arg]
+                            | Omitted _ -> [] ))
+                       args))
+          in
+          let args =
+            List.map (fun (lbl, arg, sch, ~mode_fun:_) ->
+              (lbl, arg, sch))
+              args
+          in
           (* example: type-check [n] and generate [None] for [?opt].
              [args] becomes [(Label "a", Omitted bar);
                              (Optional "opt", Arg None);
@@ -10397,10 +10430,10 @@ and type_application env app_loc expected_mode position_and_mode
              [args] becomes [(Label "a", Omitted ());
                              (Optional "opt", Arg None);
                              (Nolabel, Arg n)] *)
-          ty_ret, mode_ret, args, position_and_mode
+          ty_ret, mode_ret, args, position_and_mode, ap_yielding
         end
       in
-      args, ty_ret, mode_ret, position_and_mode
+      args, ty_ret, mode_ret, position_and_mode, ap_yielding
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
@@ -11805,11 +11838,30 @@ and type_n_ary_function
         Zero_alloc.create_const zero_alloc
     in
     let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
+    (* [yielding] records whether *fully applying* this function can perform a
+       free effect: the closure may yield if it closes over a yielding value
+       (its own mode), or if any argument it is given is yielding (the
+       parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
+       this, since the wrapper is exactly a full application. *)
+    let param_alloc_modes =
+      List.map (fun (p : function_param) -> p.fp_mode.mode_modes) params
+    in
+    (* A [function | ...] body takes an extra implicit parameter that is not in
+       [params]; if that argument is yielding then the closure is yielding. *)
+    let param_alloc_modes =
+      match body with
+      | Tfunction_body _ -> param_alloc_modes
+      | Tfunction_cases fc -> fc.fc_arg_mode :: param_alloc_modes
+    in
+    let yielding =
+      Alloc.proj_comonadic Yielding
+        (Alloc.join (Alloc.disallow_right fun_alloc_mode :: param_alloc_modes))
+    in
     re
       { exp_desc =
           Texp_function
             { params; body; ret_sort;
-              alloc_mode; ret_mode;
+              alloc_mode; ret_mode; yielding;
               zero_alloc
             };
         exp_loc = loc;

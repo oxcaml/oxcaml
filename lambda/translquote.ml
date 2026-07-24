@@ -361,6 +361,9 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         (* These combinators build quotation AST; they never run the quoted
+            code, so they can't yield *)
+         ap_yielding = Unyielding;
          ap_loc = loc;
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
@@ -3440,11 +3443,11 @@ and quote_module_exp ~transl stage loc env mod_exp =
   | Tmod_ident (path, _) ->
     let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
-  | Tmod_apply (funct, arg, _) ->
+  | Tmod_apply (funct, arg, _, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     let transl_arg = quote_module_exp ~transl stage loc env arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap
-  | Tmod_apply_unit funct ->
+  | Tmod_apply_unit (funct, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     Module.apply_unit loc transl_funct |> Module.wrap
   | Tmod_constraint (mod_exp, _, _, _) ->
@@ -3776,7 +3779,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
           e.exp_extra
       in
       Exp_desc.function_ loc fn
-    | Texp_apply (fn, args, _, _, _) ->
+    | Texp_apply (fn, args, _, _, _, _) ->
       let fn = quote_expression ~scopes ~transl stage fn in
       let args =
         List.filter

@@ -318,7 +318,14 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_sort =
+        Jkind.Sort.default_for_transl_and_get method_.ret_sort
+      in
+      (* We keep the outer function's yielding mode and drop [method_]'s: object
+         code can never close over a yielding value, so the inner method is
+         always unyielding and contributes nothing to the join. *)
+      (* CR: if we ever infer modes for methods, we should handle yielding
+         here. *)
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
@@ -339,8 +346,9 @@ let rec iter_exn_names f pat =
 
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
-  | Val_prim p, Id_prim (poly_mode, poly_sort) ->
-      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
+  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
+        (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
@@ -441,15 +449,16 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
-                    zero_alloc } ->
+                    yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
-                                        kind = Id_prim (pmode, psort); _ };
+                                        kind = Id_prim (pmode, psort, _); _ };
                  exp_type = prim_type; } as funct,
-               oargs, pos, ap_mode, zero_alloc)
+               oargs, pos, ap_mode, ap_yielding, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
       let rec cut_args prim_repr oargs =
         match prim_repr, oargs with
@@ -478,6 +487,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let stack =
         List.exists (function (Texp_stack, _, _) -> true | _ -> false) e.exp_extra
       in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let lam =
         let loc =
           map_scopes
@@ -487,7 +497,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack
+          ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam
@@ -500,17 +510,18 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode
+             ~position ~mode ~yielding
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
-  | Texp_apply(funct, oargs, position, ap_mode, zero_alloc)
+  | Texp_apply(funct, oargs, position, ap_mode, ap_yielding, zero_alloc)
     ->
       let tailcall = Translattribute.get_tailcall_attribute funct in
       let inlined = Translattribute.get_inlined_attribute funct in
       let specialised = Translattribute.get_specialised_attribute funct in
       let position = transl_apply_position position in
       let mode = transl_locality_mode_l ap_mode in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
@@ -518,7 +529,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout:layout
-           ~position ~mode (transl_exp ~scopes Lambda.layout_function funct)
+           ~position ~mode ~yielding
+           (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -1133,6 +1145,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
+                    (* Object code can never close over a yielding value (see
+                       the OO tests in yielding_lambda.ml), so calling an
+                       ancestor method cannot yield *)
+                    ap_yielding = Unyielding;
                     ap_region_close = pos;
                     ap_probe = None;
                     ap_tailcall = Default_tailcall;
@@ -1152,6 +1168,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_result_layout=layout;
         ap_region_close=pos;
         ap_mode=alloc_heap;
+        (* [new] runs the object's initialization, but object code can never
+           close over a yielding value (see the OO tests in
+           yielding_lambda.ml), so it cannot yield *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1185,6 +1205,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
+             (* [copy] shallow-copies the object block; it never runs user
+                code, so it can't yield *)
+             ap_yielding=Unyielding;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -1434,6 +1457,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
+          (* The probe handler is the user's [%probe] body, so may yield *)
+          ap_yielding = May_yield;
           ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
@@ -1579,6 +1604,7 @@ and transl_apply ~scopes
       ?(assume_zero_alloc = Zero_alloc_utils.Assume_info.none)
       ?(position=Rc_normal)
       ?(mode=alloc_heap)
+      ?(yielding=May_yield)
       ~result_layout
       lam sargs loc
   =
@@ -1603,9 +1629,14 @@ and transl_apply ~scopes
         Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
     | Lapply ({ ap_region_close = (Rc_normal | Rc_nontail) } as ap),
       (Rc_normal | Rc_nontail) ->
+        (* The merged application applies more arguments through the
+           intermediate closure, so it is unyielding only if both layers
+           are. *)
         Lapply
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
-                   ap_region_close = pos; ap_mode = mode; ap_result_layout = result_layout }
+                   ap_region_close = pos; ap_mode = mode;
+                   ap_yielding = join_yielding_kind ap.ap_yielding yielding;
+                   ap_result_layout = result_layout }
     | lexp, _ ->
       (* [assume_zero_alloc] is not used in the cases above but
          Misplaced_attribute won't be reported for it.
@@ -1625,6 +1656,7 @@ and transl_apply ~scopes
           ap_result_layout=result_layout;
           ap_region_close=pos;
           ap_mode=mode;
+          ap_yielding=yielding;
           ap_tailcall=tailcall;
           ap_inlined=inlined;
           ap_specialised=specialised;
@@ -2082,7 +2114,7 @@ and transl_curried_function ~scopes loc repr params body
 
 and transl_function ~in_new_scope ~scopes e params body
       ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc =
+      ~zero_alloc ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2145,7 +2177,8 @@ and transl_function ~in_new_scope ~scopes e params body
   in
   let loc = of_location ~scopes e.exp_loc in
   let body = if region then maybe_region_layout return body else body in
-  let lam = lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lf = lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lam = Lfunction (lfunction_with_yielding yielding lf) in
   Translattribute.add_function_attributes lam e.exp_loc attrs
 
 (* Like transl_exp, but used when a new scope was just introduced. *)
@@ -2949,6 +2982,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
+               (* CR aspsmith: More precise inference for yielding once
+                  let-operators have mode inference *)
+               ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
@@ -3007,6 +3043,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    (* CR aspsmith: More precise inference for yielding once
+       let-operators have mode inference *)
+    ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
@@ -3027,13 +3066,13 @@ let transl_scoped_exp ~scopes layout exp =
   maybe_region_layout layout (transl_scoped_exp ~scopes layout exp)
 
 let transl_apply
-      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ~result_layout fn
-      args loc =
+      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ?yielding
+      ~result_layout fn args loc =
   maybe_region_layout result_layout
     (transl_apply
        ~scopes ?tailcall ?inlined ?specialised
        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none ?position ?mode
-       ~result_layout fn args loc)
+       ?yielding ~result_layout fn args loc)
 
 (* Error report *)
 
