@@ -152,7 +152,7 @@ end
 [%%expect{|
 module F :
   functor
-    (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end)
+    (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end @ static)
     -> sig val g : layout_ l. ('b : l). 'b -> unit end
 |}]
 
