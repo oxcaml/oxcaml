@@ -534,6 +534,38 @@ and variant_representation =
   | Variant_boxed of cstr_layout array
   | Variant_extensible
   | Variant_with_null
+  (* [@repr null] prototype: a single nullary constructor represented as the
+     null pointer, coexisting with ordinary constructors that are represented
+     exactly like [Variant_boxed] (constants as immediates, non-constants as
+     boxed blocks -- never payload-unboxed).  The array covers every
+     constructor in source order; the null constructor occupies a (dead)
+     nullary slot.
+
+     Generalized in tranche 2: each element also records an [erased_kind]
+     saying how that constructor is represented at run time.  [@repr null]
+     alone yields [Erased_null] for the null constructor and [Erased_boxed]
+     for the rest; [@repr immediate]/[@repr pointer] constructors carry
+     [Erased_immediate]/[Erased_pointer] and are payload-unboxed (the value is
+     the payload itself, distinguished at run time by isnull/isint). *)
+  | Variant_with_null_boxed of cstr_erased array
+
+and cstr_erased =
+  { layout : cstr_layout;
+    erased : erased_kind;
+  }
+
+and erased_kind =
+  | Erased_boxed
+  (* Ordinary constructor: constant -> immediate, non-constant -> boxed block,
+     exactly like [Variant_boxed]. *)
+  | Erased_null
+  (* The null pointer ([Const_null]). *)
+  | Erased_immediate
+  (* [@repr immediate]: the payload is passed through unchanged and is an
+     immediate (distinguished at run time by isint). *)
+  | Erased_pointer
+  (* [@repr pointer]: the payload is passed through unchanged and is a non-null
+     pointer (distinguished at run time by not-isint). *)
 
 and cstr_layout =
   | Cstr_layout_known of
@@ -940,6 +972,15 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
     -> false
 
+let equal_erased_kind (k1 : erased_kind) (k2 : erased_kind) =
+  match k1, k2 with
+  | Erased_boxed, Erased_boxed
+  | Erased_null, Erased_null
+  | Erased_immediate, Erased_immediate
+  | Erased_pointer, Erased_pointer -> true
+  | (Erased_boxed | Erased_null | Erased_immediate | Erased_pointer), _ ->
+    false
+
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
@@ -958,7 +999,21 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_extensible, Variant_extensible ->
       true
   | Variant_with_null, Variant_with_null -> true
-  | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null), _ ->
+  | Variant_with_null_boxed erased1, Variant_with_null_boxed erased2 ->
+      Misc.Stdlib.Array.equal
+        (fun e1 e2 ->
+           equal_erased_kind e1.erased e2.erased
+           && match e1.layout, e2.layout with
+           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_known { shape = s1; sorts = ss1 },
+             Cstr_layout_known { shape = s2; sorts = ss2 } ->
+             equal_constructor_representation_up_to_scannable_axes s1 s2
+             && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
+           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+        erased1
+        erased2
+  | (Variant_unboxed | Variant_boxed _ | Variant_extensible | Variant_with_null
+    | Variant_with_null_boxed _), _ ->
       false
 
 let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
@@ -1038,7 +1093,8 @@ let find_unboxed_type decl =
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
-                     | Variant_extensible | Variant_with_null), _)
+                     | Variant_extensible | Variant_with_null
+                     | Variant_with_null_boxed _), _)
   | Type_abstract _ | Type_open ->
     None
 

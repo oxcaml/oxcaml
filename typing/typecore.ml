@@ -6652,7 +6652,8 @@ and type_expect_
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
             -> false
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-          | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
+          | Record_inlined (_, _, (Variant_boxed _ | Variant_with_null_boxed _
+                                  | Variant_extensible))
           | Record_variable
             -> true
           | Record_dummy _ ->
@@ -10651,10 +10652,20 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
       Mode.Value.meet [ expected_mode.mode; constructor_mode ] }
   in
   let (argument_mode, alloc_mode) =
+    match erased_kind_of_constructor constr with
+    | Some (Erased_null | Erased_immediate | Erased_pointer) ->
+      (* No allocation: the null pointer, or a payload-unboxed
+         [@repr immediate]/[@repr pointer] value (the payload is the value). *)
+      expected_mode, None
+    | Some Erased_boxed | None ->
     match constr.cstr_repr with
     | Variant_unboxed | Variant_with_null -> expected_mode, None
-    | Variant_boxed _ when constr.cstr_constant -> expected_mode, None
-    | Variant_boxed _ | Variant_extensible ->
+    | (Variant_boxed _ | Variant_with_null_boxed _)
+      when constr.cstr_constant ->
+      (* Constant constructors (including the [@repr null] null pointer) are
+         immediates: no allocation. *)
+      expected_mode, None
+    | Variant_boxed _ | Variant_with_null_boxed _ | Variant_extensible ->
        let alloc_mode, argument_mode =
          register_allocation ~loc:sexp.pexp_loc expected_mode
        in
@@ -10700,7 +10711,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     begin match constr.cstr_repr with
     | Variant_extensible ->
         raise(Error(sexp.pexp_loc, env, Private_constructor (constr, ty_res)))
-    | Variant_boxed _ | Variant_unboxed ->
+    | Variant_boxed _ | Variant_unboxed | Variant_with_null_boxed _ ->
         raise (Error(sexp.pexp_loc, env, Private_type ty_res));
     | Variant_with_null -> assert false
       (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)

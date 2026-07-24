@@ -978,6 +978,35 @@ and variant_representation =
   *)
   | Variant_extensible
   | Variant_with_null
+  (* [@repr null] prototype: a single nullary constructor represented as the
+     null pointer, coexisting with ordinary constructors represented exactly
+     like [Variant_boxed].  The array has an element for each constructor (the
+     null constructor occupies a dead nullary slot).
+
+     Generalized in tranche 2: each element also records an [erased_kind]
+     saying how that constructor is represented at run time.  [@repr null]
+     alone yields [Erased_null] for the null constructor and [Erased_boxed]
+     for the rest; [@repr immediate]/[@repr pointer] constructors carry
+     [Erased_immediate]/[Erased_pointer] and are payload-unboxed. *)
+  | Variant_with_null_boxed of cstr_erased array
+
+and cstr_erased =
+  { layout : cstr_layout;
+    erased : erased_kind;
+  }
+
+and erased_kind =
+  | Erased_boxed
+  (* Ordinary constructor: constant -> immediate, non-constant -> boxed block,
+     exactly like [Variant_boxed]. *)
+  | Erased_null
+  (* The null pointer ([Const_null]). *)
+  | Erased_immediate
+  (* [@repr immediate]: the payload is passed through unchanged and is an
+     immediate (distinguished at run time by isint). *)
+  | Erased_pointer
+  (* [@repr pointer]: the payload is passed through unchanged and is a non-null
+     pointer (distinguished at run time by not-isint). *)
 
 and cstr_layout =
   | Cstr_layout_known of
@@ -1309,6 +1338,8 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
+
+val equal_erased_kind : erased_kind -> erased_kind -> bool
 
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element

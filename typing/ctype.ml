@@ -2779,6 +2779,9 @@ let unbox_once env ty =
                                    or_null = None }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
+        (* [@repr null] coexistence ([Variant_with_null_boxed]) types are
+           boxed, not unboxed, so they fall through to the [Final_result]
+           catch-all below. *)
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
@@ -3555,6 +3558,86 @@ let is_always_gc_ignorable env ty =
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
   || type_is_gc_ignorable_scannable env ty
+
+(* Conservative allowlist for [@repr pointer] payloads: returns [true] only when
+   the payload's values are DEFINITELY a non-null, non-immediate, non-float
+   boxed pointer, so that the runtime discrimination (isnull / isint) never
+   misclassifies one.  We look only at the expanded head (one [expand_head_opt],
+   which already chases abbreviations/aliases) and do not recurse into type
+   arguments or fuel-bound anything: a payload behind an abstract type or a type
+   variable is rejected.  Rejecting a genuine pointer is acceptable; accepting a
+   non-pointer is not.  Notably rejects [float]/[floatarray] (float guard: a
+   boxed float shares the flat-float-array representation), unboxed records and
+   unboxed products, [@@unboxed]/or_null/[@repr null]-coexistence variants (they
+   are payload-unboxed and may be immediates/floats), and any [Variant_boxed]
+   with an immediate inhabitant (a constant constructor). *)
+let repr_pointer_payload_ok env ty =
+  (* A constructor is "definitely non-constant" (hence a boxed block, never an
+     immediate) iff it has at least one field with a known non-void sort.  An
+     unknown ([None]) sort is treated conservatively as not-definitely-nonconst,
+     so a variant with any unresolved constructor is rejected. *)
+  let definitely_nonconstant (c : constructor_declaration) =
+    let known_nonvoid sort_opt =
+      match sort_opt with
+      | Some s -> not (Jkind_types.Sort.Const.all_void s)
+      | None -> false
+    in
+    match c.cd_args with
+    | Cstr_tuple [] | Cstr_record [] -> false
+    | Cstr_tuple args ->
+      List.exists (fun (ca : constructor_argument) -> known_nonvoid ca.ca_sort)
+        args
+    | Cstr_record lbls ->
+      List.exists (fun (ld : label_declaration) -> known_nonvoid ld.ld_sort)
+        lbls
+  in
+  match get_desc (expand_head_opt env ty) with
+  | Tarrow _ | Tobject _ | Ttuple _ | Tpackage _ -> true
+  | Tconstr (p, _, _) ->
+    if Path.same p Predef.path_string
+       || Path.same p Predef.path_bytes
+       || Path.same p Predef.path_exn
+       || Path.same p Predef.path_lazy_t
+       || Path.same p Predef.path_array
+       || Path.same p Predef.path_iarray
+    then true
+    (* [float]/[floatarray] deliberately rejected: float guard. *)
+    else begin
+      match Env.find_type p env with
+      | exception Not_found -> false
+      | decl ->
+        begin match decl.type_kind with
+        | Type_record (_, Record_boxed, _) -> true
+        | Type_record
+            (_, (Record_unboxed | Record_inlined _ | Record_float
+                | Record_ufloat | Record_mixed _ | Record_dummy _
+                | Record_variable), _) -> false
+        | Type_record_unboxed_product _ -> false
+        | Type_variant (cstrs, Variant_boxed _, _) ->
+          cstrs <> [] && List.for_all definitely_nonconstant cstrs
+        | Type_variant
+            (_, (Variant_unboxed | Variant_with_null | Variant_with_null_boxed _
+                | Variant_extensible), _) -> false
+        | Type_open -> true
+        | Type_abstract _ -> false
+        end
+    end
+  | Tvariant row ->
+    (* Closed polymorphic variant, every field present-with-argument (or a
+       non-empty conjunctive [Reither]) so no constant tag: a boxed block. *)
+    row_closed row
+    && List.for_all
+         (fun (_, field) ->
+            match row_field_repr field with
+            | Rpresent (Some _) -> true
+            | Reither (false, _ :: _, _) -> true
+            | Rpresent None | Reither _ | Rabsent -> false)
+         (row_fields row)
+  (* [Tbox] ([ty box]) is in fact a heap pointer, but we reject it
+     conservatively: this allowlist errs towards rejection. *)
+  | Tvar _ | Tunivar _ | Tnil | Tfield _ | Tlink _ | Tsubst _ | Tpoly _
+  | Tof_kind _ | Tunboxed_tuple _ | Tquote _ | Tsplice _ | Tquote_eval _
+  | Trepr _ | Tbox _ -> false
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with

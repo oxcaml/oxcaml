@@ -647,7 +647,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             | Variant_unboxed -> true
             | Variant_with_null when tag = -1 -> false
             | Variant_with_null -> true
-            | Variant_boxed _ | Variant_extensible -> false
+            | Variant_boxed _ | Variant_with_null_boxed _
+            | Variant_extensible -> false
           in
           match cd_args with
           | Cstr_tuple l ->

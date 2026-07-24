@@ -143,6 +143,11 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Erased_representation of
+      { name : string;
+        first : Types.erased_kind;
+        second : Types.erased_kind;
+      }
   | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch

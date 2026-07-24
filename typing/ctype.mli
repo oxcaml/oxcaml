@@ -762,6 +762,12 @@ val check_type_externality :
    platform. *)
 val is_always_gc_ignorable : Env.t -> type_expr -> bool
 
+(* Conservative allowlist for [@repr pointer] payloads: [true] only when the
+   payload's values are definitely a non-null, non-immediate, non-float boxed
+   pointer.  Looks only at the expanded head; rejects (soundly) anything it
+   cannot confirm.  See the definition for the exact accept/reject list. *)
+val repr_pointer_payload_ok : Env.t -> type_expr -> bool
+
 (* Check whether a type's nullability is less than some target.
    Potentially cheaper than just calling [type_jkind], because this can stop
    expansion once it succeeds. *)

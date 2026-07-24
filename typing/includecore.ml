@@ -415,6 +415,11 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Erased_representation of
+      { name : string;
+        first : Types.erased_kind;
+        second : Types.erased_kind;
+      }
   | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
@@ -835,6 +840,18 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null] or [%@%@or_null_reexport]."
+  | Erased_representation { name; first = k1; second = k2 } ->
+      let describe : Types.erased_kind -> string = function
+        | Erased_boxed -> "the ordinary boxed representation"
+        | Erased_null -> "[@repr null]"
+        | Erased_immediate -> "[@repr immediate]"
+        | Erased_pointer -> "[@repr pointer]"
+      in
+      pr "Their internal representations differ:@ \
+          constructor %s uses %s in %s %s but %s in %s %s."
+         name
+         (describe k1) first decl
+         (describe k2) second decl
   | Fixed_representation ord ->
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
@@ -1291,10 +1308,16 @@ module Variant_diffing = struct
       | Variant_boxed cstr_layouts1, Variant_boxed cstr_layouts2 ->
           Array.map shape_of_layout cstr_layouts1 |> Array.to_list,
           Array.map shape_of_layout cstr_layouts2 |> Array.to_list
+      | Variant_with_null_boxed erased1, Variant_with_null_boxed erased2 ->
+          Array.map (fun (e : Types.cstr_erased) -> shape_of_layout e.layout)
+            erased1 |> Array.to_list,
+          Array.map (fun (e : Types.cstr_erased) -> shape_of_layout e.layout)
+            erased2 |> Array.to_list
       | _, _ ->
-          (* Only need to compare shapes in the boxed-versus-boxed case. In
-             other cases, either the comparison is doomed anyway due to
-             different representations or the shapes aren't relevant. *)
+          (* Only need to compare shapes in the boxed-versus-boxed and
+             null-boxed-versus-null-boxed cases. In other cases, either the
+             comparison is doomed anyway due to different representations or the
+             shapes aren't relevant. *)
           List.map (fun _ -> None) cstrs1,
           List.map (fun _ -> None) cstrs2
     in
@@ -1313,6 +1336,35 @@ module Variant_diffing = struct
     | None, Variant_boxed _, Variant_boxed _
     | None, Variant_extensible, Variant_extensible
     | None, Variant_with_null, Variant_with_null -> None
+    | None, Variant_with_null_boxed erased1, Variant_with_null_boxed erased2 ->
+        (* The [erased_kind] array records the physical representation chosen by
+           the [@repr] attributes, which [compare_constructors] does not compare
+           (it checks constructor types and alerts, not [@repr]).  Two
+           constructor lists can therefore be equal while signature and
+           implementation disagree on layout -- a soundness hole -- so compare
+           the erased kinds element-wise here. *)
+        let names =
+          Array.of_list
+            (List.map
+               (fun (cd : Types.constructor_declaration) -> Ident.name cd.cd_id)
+               cstrs1)
+        in
+        let n =
+          min (Array.length erased1)
+            (min (Array.length erased2) (Array.length names))
+        in
+        let rec find i =
+          if i >= n then None
+          else
+            let k1 = (erased1.(i) : Types.cstr_erased).erased in
+            let k2 = (erased2.(i) : Types.cstr_erased).erased in
+            if Types.equal_erased_kind k1 k2 then find (i + 1)
+            else
+              Some
+                (Erased_representation
+                   { name = names.(i); first = k1; second = k2 })
+        in
+        find 0
     | Some err, _, _ ->
         Some (Variant_mismatch err)
     | None, Variant_unboxed, Variant_boxed _ ->
@@ -1326,6 +1378,10 @@ module Variant_diffing = struct
     | None, Variant_with_null, _ ->
       Some (With_null_representation First)
     | None, _, Variant_with_null ->
+      Some (With_null_representation Second)
+    | None, Variant_with_null_boxed _, _ ->
+      Some (With_null_representation First)
+    | None, _, Variant_with_null_boxed _ ->
       Some (With_null_representation Second)
 end
 

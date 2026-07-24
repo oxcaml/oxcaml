@@ -2193,7 +2193,18 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     { arg; binding_kind; mut; sort; layout } :: rem
   else
     match cstr.cstr_repr with
-    | Variant_boxed _ ->
+    | Variant_with_null_boxed _
+      when (match erased_kind_of_constructor cstr with
+            | Some (Erased_immediate | Erased_pointer) -> true
+            | Some (Erased_boxed | Erased_null) | None -> false) ->
+      (* [@repr immediate]/[@repr pointer]: payload-unboxed, so the argument is
+         the scrutinee itself (like the unboxed / [This] cases below). *)
+      { arg; binding_kind; mut; sort; layout } :: rem
+    | Variant_boxed _ | Variant_with_null_boxed _ ->
+      (* [@repr null] ordinary constructors are represented exactly like
+         [Variant_boxed]: read each field out of the block.  (The null
+         constructor is [cstr_constant] and carries no fields, so its patterns
+         reach here with an empty [arg_sorts].) *)
       List.mapi
       (fun i ca_sort ->
          make_field_access binding_kind ca_sort ~field:i ~pos:i)
@@ -2586,7 +2597,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let access, sort, layout =
         match lbl_repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value,
+                          (Variant_boxed _ | Variant_with_null_boxed _)) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_unboxed
@@ -2607,7 +2619,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, Constructor_mixed shape,
+                          (Variant_boxed _ | Variant_with_null_boxed _))
         | Record_mixed shape ->
             let shape =
               Lambda.transl_mixed_product_shape_for_read
@@ -3605,21 +3618,48 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
   in
   (lambda1, Jumps.union local_jumps total)
 
+(* Splits the constructor cases into buckets used to build the runtime
+   discrimination: constant constructors (immediates at tags 0..k), boxed
+   non-constant constructors (keyed by runtime tag), the null constructor, and
+   the single [@repr immediate] constructor whose payload spans the whole int
+   range.  The immediate bucket is exclusive with the constant bucket (enforced
+   at typedecl time), so it can take the whole isint-true side without a
+   switch. *)
 let split_cases tag_lambda_list =
   let rec split_rec = function
-    | [] -> ([], [], None)
-    | ({cstr_tag; cstr_repr; cstr_constant}, act) :: rem -> (
-        let consts, nonconsts, null = split_rec rem in
-        match cstr_tag, cstr_repr with
+    | [] -> ([], [], None, None, None)
+    | (cstr, act) :: rem -> (
+        let consts, nonconsts, null, immediate, pointer = split_rec rem in
+        match cstr.cstr_tag, cstr.cstr_repr with
         | Ordinary _, (Variant_unboxed | Variant_with_null) ->
-          (consts, (0, act) :: nonconsts, null)
-        | Ordinary {runtime_tag}, Variant_boxed _ when cstr_constant ->
-          ((runtime_tag, act) :: consts, nonconsts, null)
+          (* [Variant_unboxed] has a single constructor and [Variant_with_null]
+             a single (unboxed) non-null constructor, both at tag 0. *)
+          (consts, (0, act) :: nonconsts, null, immediate, pointer)
+        | Ordinary {runtime_tag}, Variant_boxed _ when cstr.cstr_constant ->
+          ((runtime_tag, act) :: consts, nonconsts, null, immediate, pointer)
         | Ordinary {runtime_tag}, Variant_boxed _ ->
-          (consts, (runtime_tag, act) :: nonconsts, null)
-        | Null, Variant_with_null ->
+          (consts, (runtime_tag, act) :: nonconsts, null, immediate, pointer)
+        | Ordinary {runtime_tag}, Variant_with_null_boxed _ ->
+          (match erased_kind_of_constructor cstr with
+           | Some Erased_immediate ->
+             (match immediate with
+              | None -> (consts, nonconsts, null, Some act, pointer)
+              | Some _ -> Misc.fatal_error
+                  "Multiple immediate cases in Matching.split_cases")
+           | Some Erased_pointer ->
+             (match pointer with
+              | None -> (consts, nonconsts, null, immediate, Some act)
+              | Some _ -> Misc.fatal_error
+                  "Multiple pointer cases in Matching.split_cases")
+           | Some (Erased_boxed | Erased_null) | None ->
+             if cstr.cstr_constant
+             then ((runtime_tag, act) :: consts, nonconsts, null, immediate,
+                   pointer)
+             else (consts, (runtime_tag, act) :: nonconsts, null, immediate,
+                   pointer))
+        | Null, (Variant_with_null | Variant_with_null_boxed _) ->
           (match null with
-          | None -> (consts, nonconsts, Some act)
+          | None -> (consts, nonconsts, Some act, immediate, pointer)
           | Some _ -> Misc.fatal_error
             "Multiple null cases in Matching.split_cases")
         | Null, (Variant_boxed _ | Variant_unboxed) ->
@@ -3628,8 +3668,9 @@ let split_cases tag_lambda_list =
         | Extension _, _ -> assert false
       )
   in
-  let const, nonconst, null = split_rec tag_lambda_list in
-  (sort_int_lambda_list const, sort_int_lambda_list nonconst, null)
+  let const, nonconst, null, immediate, pointer = split_rec tag_lambda_list in
+  (sort_int_lambda_list const, sort_int_lambda_list nonconst, null, immediate,
+   pointer)
 
 (* The bool tracks whether the constructor is constant, because we don't have a
    constructor_description available for polymorphic variants *)
@@ -3728,7 +3769,9 @@ let combine_regular_constructor value_kind loc arg cstr partial
       mk_failaction_pos partial constrs ctx def
   in
   let descr_lambda_list = fails @ descr_lambda_list in
-  let consts, nonconsts, null = split_cases descr_lambda_list in
+  let consts, nonconsts, null, immediate, pointer =
+    split_cases descr_lambda_list
+  in
   (* Our duty below is to generate code, for matching on a list of
      constructor+action cases, that is good for both bytecode and
      native-code compilation. (Optimizations that only work well
@@ -3751,80 +3794,150 @@ let combine_regular_constructor value_kind loc arg cstr partial
      switcher directly can result in more compact code. This is
      a reason to deviate from the one-instruction policy.
   *)
+  (* Build the switch over the (non-null) constant and block constructors,
+     given the number of constant/block constructors to switch over. *)
+  (* The blocks-only switch over the boxed non-constant constructors (the
+     isint-false side when a [@repr immediate] constructor is present). *)
+  let boxed_switch num_nonconsts nonconsts =
+    match nonconsts with
+    | [ (_, act) ] when Option.is_none fail_opt ->
+        (* A single boxed constructor: every block value is it, no tag test. *)
+        act
+    | _ ->
+        let sw =
+          { sw_numconsts = 0;
+            sw_consts = [];
+            sw_numblocks = num_nonconsts;
+            sw_blocks = nonconsts;
+            sw_failaction = fail_opt
+          }
+        in
+        let hs, sw = share_actions_sw value_kind sw in
+        let sw = reintroduce_fail sw in
+        hs (Lswitch (arg, sw, loc, value_kind))
+  in
+  (* The isint-false side.  A [@repr pointer] constructor takes the ENTIRE
+     non-immediate side (no ordinary boxed constructor can coexist, so
+     [nonconsts] is empty here); otherwise switch over the boxed blocks. *)
+  let nonimmediate_branch num_nonconsts nonconsts =
+    match pointer with
+    | Some pointer_act -> pointer_act
+    | None -> boxed_switch num_nonconsts nonconsts
+  in
+  let combine_non_null num_consts num_nonconsts consts nonconsts =
+    match immediate with
+    | Some immediate_act ->
+        (* [@repr immediate]: no ordinary constant constructor can coexist, so
+           [consts] is empty and the immediate payload takes the whole
+           isint-true side; the isint-false side is the pointer or the boxed
+           constructors (if any).
+
+           When a [@repr pointer] constructor is on the non-immediate side, that
+           value is a BARE non-immediate (e.g. a string), not a variant block,
+           so we must use [variant_only:false]: with [variant_only:true]
+           flambda2 would refine the false branch to "a variant block" and then
+           prove e.g. [String_length] on it invalid, miscompiling the match. *)
+        (match nonconsts, pointer with
+         | [], None -> immediate_act
+         | _ ->
+             let variant_only = Option.is_none pointer in
+             Lifthenelse
+               ( Lprim (Pisint { variant_only }, [ arg ], loc),
+                 immediate_act,
+                 nonimmediate_branch num_nonconsts nonconsts,
+                 value_kind ))
+    | None ->
+    match pointer with
+    | Some pointer_act ->
+        (* [@repr pointer] with no [@repr immediate]: no ordinary constant
+           constructor can coexist either, so every non-null value is the
+           pointer -- no isint test needed. *)
+        pointer_act
+    | None ->
+    match (num_consts, num_nonconsts, consts, nonconsts) with
+    | 1, 1, [ (0, act1) ], [ (0, act2) ]
+      when not (Clflags.is_flambda2 ()) ->
+        transl_match_on_option value_kind arg loc
+          ~if_none:act1 ~if_some:act2
+    | 0, _, [], [ (_, act) ] when Option.is_none fail_opt ->
+        (* A single non-null block constructor (the or_null / [@repr null]
+           unary case): no immediate to test, so no switch. *)
+        act
+    | n, 0, _, [] ->
+        (* The matched type defines constant constructors only.
+           (typically the constant cases are dense, so
+           call_switcher will generate a Lswitch, still one
+           instruction.) *)
+        call_switcher value_kind loc fail_opt arg
+          ~low:0 ~high:(n - 1) consts
+    | n, _, _, _ -> (
+        let act0 =
+          (* = Some act when all non-const constructors match to act *)
+          match (fail_opt, nonconsts) with
+          | Some a, [] -> Some a
+          | Some _, _ ->
+              if List.length nonconsts = num_nonconsts then
+                same_actions nonconsts
+              else
+                None
+          | None, _ -> same_actions nonconsts
+        in
+        match act0 with
+        | Some act when n > 0 ->
+            (* This case deviates from our policy, by typically
+               generating three bytecode instructions.
+
+               It can save a lot of bytecode space when matching
+               on a type with many non-constant constructors,
+               all sent to the same action. This pattern occurs
+               several times in the compiler codebase
+               (for example), due to code fragments such as the
+               following:
+
+                   match token with SEMISEMI -> true | _ -> false
+
+               (The type of tokens has more than 120 constructors.)
+               *)
+            Lifthenelse
+              ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
+                call_switcher value_kind loc fail_opt arg
+                  ~low:0 ~high:(n - 1) consts,
+                act, value_kind )
+        | Some _ | None ->
+            (* In the general case, emit a switch. *)
+            let sw =
+              { sw_numconsts = num_consts;
+                sw_consts = consts;
+                sw_numblocks = num_nonconsts;
+                sw_blocks = nonconsts;
+                sw_failaction = fail_opt
+              }
+            in
+            let hs, sw = share_actions_sw value_kind sw in
+            let sw = reintroduce_fail sw in
+            hs (Lswitch (arg, sw, loc, value_kind)))
+  in
   let lambda1 =
     match (fail_opt, same_actions descr_lambda_list) with
     | None, Some act ->
         (* Identical actions, no failure: 0 control-flow instructions. *)
         act
     | _ -> (
-        match
-          (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
-        with
-        | 1, 1, [ (0, act1) ], [ (0, act2) ], None
-          when not (Clflags.is_flambda2 ()) ->
-            transl_match_on_option value_kind arg loc
-              ~if_none:act1 ~if_some:act2
-        | 1, 1, [], [(_, act2)], Some act1 ->
-            (* The [Variant_with_null] case. *)
-            transl_match_on_or_null value_kind arg loc
-              ~if_null:act1 ~if_this:act2
-        | _, _, _, _, Some _ ->
-            Misc.fatal_error
-              "Matching.combine_regular_constructor: \
-               Unexpected Null case"
-        | n, 0, _, [], None ->
-            (* The matched type defines constant constructors only.
-               (typically the constant cases are dense, so
-               call_switcher will generate a Lswitch, still one
-               instruction.) *)
-            call_switcher value_kind loc fail_opt arg
-              ~low:0 ~high:(n - 1) consts
-        | n, _, _, _, None -> (
-            let act0 =
-              (* = Some act when all non-const constructors match to act *)
-              match (fail_opt, nonconsts) with
-              | Some a, [] -> Some a
-              | Some _, _ ->
-                  if List.length nonconsts = cstr.cstr_nonconsts then
-                    same_actions nonconsts
-                  else
-                    None
-              | None, _ -> same_actions nonconsts
+        match null with
+        | Some null_act ->
+            (* [@@or_null] / [@repr null]: test the null pointer, then switch
+               over the remaining non-null constructors.  The null constructor
+               is counted among [cstr_consts] but is not a real immediate, so
+               drop it from the constant count of the inner switch. *)
+            let if_this =
+              combine_non_null
+                (cstr.cstr_consts - 1) cstr.cstr_nonconsts consts nonconsts
             in
-            match act0 with
-            | Some act ->
-                (* This case deviates from our policy, by typically
-                   generating three bytecode instructions.
-
-                   It can save a lot of bytecode space when matching
-                   on a type with many non-constant constructors,
-                   all sent to the same action. This pattern occurs
-                   several times in the compiler codebase
-                   (for example), due to code fragments such as the
-                   following:
-
-                       match token with SEMISEMI -> true | _ -> false
-
-                   (The type of tokens has more than 120 constructors.)
-                   *)
-                Lifthenelse
-                  ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
-                    call_switcher value_kind loc fail_opt arg
-                      ~low:0 ~high:(n - 1) consts,
-                    act, value_kind )
-            | None ->
-                (* In the general case, emit a switch. *)
-                let sw =
-                  { sw_numconsts = cstr.cstr_consts;
-                    sw_consts = consts;
-                    sw_numblocks = cstr.cstr_nonconsts;
-                    sw_blocks = nonconsts;
-                    sw_failaction = fail_opt
-                  }
-                in
-                let hs, sw = share_actions_sw value_kind sw in
-                let sw = reintroduce_fail sw in
-                hs (Lswitch (arg, sw, loc, value_kind))))
+            transl_match_on_or_null value_kind arg loc
+              ~if_null:null_act ~if_this
+        | None ->
+            combine_non_null
+              cstr.cstr_consts cstr.cstr_nonconsts consts nonconsts)
   in
   (lambda1, Jumps.union local_jumps total1)
 

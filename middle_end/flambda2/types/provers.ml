@@ -145,7 +145,13 @@ let prove_is_int_generic_value ~variant_only env
   | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _
   | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_nativeint _
   | Closures _ | String _ | Array _ ->
-    if variant_only then Invalid else Proved false
+    (* [variant_only] means the test comes from variant matching, but with
+       constructor-level erased representations ([@repr pointer]/[@repr
+       immediate]) a variant inhabitant can be represented directly as a bare
+       non-immediate value (e.g. a string). So this is a live test that must
+       simplify to [false], not [Invalid] (which would delete a live branch). *)
+    let _ = variant_only in
+    Proved false
 
 let prove_is_int_generic ~variant_only env t =
   gen_value_to_gen (prove_is_int_generic_value ~variant_only) env t

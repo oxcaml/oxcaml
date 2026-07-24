@@ -124,6 +124,7 @@ let builtin_attrs =
   ; "layout_poly"
   ; "or_null"
   ; "or_null_reexport"
+  ; "repr"
   ; "no_recursive_modalities"
   ; "jane.non_erasable.instances"
   ; "cold"
@@ -709,6 +710,23 @@ let has_or_null attrs =
 
 let has_or_null_reexport attrs =
   has_attribute "or_null_reexport" attrs
+
+(* [@repr <ident>] constructor-level attribute prototype.  Returns the payload
+   identifier of the first [@repr ...] attribute, if any, e.g. [Some "null"]. *)
+let repr_payload_ident attrs =
+  List.find_map
+    (fun a ->
+       if attr_equals_builtin a "repr"
+       then (mark_used a.attr_name; ident_of_payload a.attr_payload)
+       else None)
+    attrs
+
+(* [@repr null]: a payloadless constructor represented as the null pointer,
+   coexisting with ordinary boxed constructors. *)
+let has_repr_null attrs =
+  match repr_payload_ident attrs with
+  | Some "null" -> true
+  | Some _ | None -> false
 
 let has_magic_staged_modes attrs =
   has_attribute "magic_staged_modes" attrs

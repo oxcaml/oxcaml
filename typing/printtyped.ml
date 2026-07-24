@@ -247,6 +247,20 @@ let variant_representation i ppf = let open Types in function
       layouts
   | Variant_extensible -> line i ppf "Variant_inlined\n"
   | Variant_with_null -> line i ppf "Variant_with_null\n"
+  | Variant_with_null_boxed erased ->
+    line i ppf "Variant_with_null_boxed %a\n"
+      (array (i+1) (fun _ ppf (e : Types.cstr_erased) ->
+         (match e.erased with
+          | Erased_boxed -> line (i+1) ppf "Erased_boxed\n"
+          | Erased_null -> line (i+1) ppf "Erased_null\n"
+          | Erased_immediate -> line (i+1) ppf "Erased_immediate\n"
+          | Erased_pointer -> line (i+1) ppf "Erased_pointer\n");
+         match e.layout with
+         | Cstr_layout_variable ->
+           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_known { sorts; _ } ->
+           sort_array (i+1) ppf sorts))
+      erased
 
 let mixed_block_element i ppf mixed_block_element =
   line i ppf "%s\n" (Types.mixed_block_element_to_string mixed_block_element)
