@@ -1323,6 +1323,10 @@ let layout_of_non_void_sort c =
       Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
 
+let layout_or_sort env loc sort ty =
+  try layout env loc sort ty
+  with Error (_, Non_value_layout _) -> layout_of_sort loc sort
+
 let function_return_layout env loc sort ty =
   match is_function_type env ty with
   | Some (_lhs, rhs) -> layout env loc sort rhs

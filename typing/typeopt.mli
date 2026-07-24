@@ -64,6 +64,11 @@ val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
 val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
 val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
 
+(* Like [layout], but falls back to the sort when the type does not determine a
+   value kind (e.g. has jkind [any]) *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
 (* Given a function type and the sort of its return type, compute the layout of
    its return type. *)
 val function_return_layout :
