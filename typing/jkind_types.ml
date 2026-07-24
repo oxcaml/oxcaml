@@ -1025,12 +1025,14 @@ module Addressability0 = struct
   (* The intrinsic addressability of a sort, as a verdict about its *plain*
      kind, insofar as it is determined: the addressability of an unfilled
      sort variable is not yet known ([Undetermined]). This is a mark-free
-     question, so it can be definite ([Id], not addressable) even while the
-     marks over the sort are undetermined. *)
+     question, so it can be definite ([Unaddressable]) even while the marks
+     over the sort are undetermined. *)
   let of_sort s =
     let rec go : Sort.t -> Verdict.t = function
       | Base b ->
-        if base_is_always_addressable b then Verdict.Addressable else Verdict.Id
+        if base_is_always_addressable b
+        then Verdict.Addressable
+        else Verdict.Unaddressable
       | Product sorts -> Verdict.combine_product (List.map go sorts)
       | Var _ | Univar _ -> Verdict.Undetermined
     in
@@ -1046,7 +1048,7 @@ module Addressability0 = struct
   let sort_is_always_addressable s =
     match of_sort s with
     | Verdict.Addressable -> true
-    | Verdict.Id | Verdict.Undetermined -> false
+    | Verdict.Unaddressable | Verdict.Undetermined -> false
 end
 
 module Addressability = Addressability0

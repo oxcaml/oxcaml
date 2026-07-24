@@ -413,7 +413,7 @@ module Layout = struct
            will be. *)
         match Addressability.of_sort s with
         | Addressable -> Addressable
-        | Id | Undetermined -> Undetermined))
+        | Unaddressable | Undetermined -> Undetermined))
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
       | Addressable -> Addressable

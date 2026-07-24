@@ -203,21 +203,22 @@ module Addressability = struct
 
   module Verdict = struct
     type t =
-      | Id
+      | Unaddressable
       | Addressable
       | Undetermined
 
     let consistent v1 v2 =
       match v1, v2 with
-      | Id, Addressable | Addressable, Id -> false
-      | (Id | Addressable | Undetermined), (Id | Addressable | Undetermined) ->
+      | Unaddressable, Addressable | Addressable, Unaddressable -> false
+      | ( (Unaddressable | Addressable | Undetermined),
+          (Unaddressable | Addressable | Undetermined) ) ->
         true
 
     let combine_product ts =
       List.fold_left
         (fun acc t ->
           match acc, t with
-          | Id, _ | _, Id -> Id
+          | Unaddressable, _ | _, Unaddressable -> Unaddressable
           | Undetermined, _ | _, Undetermined -> Undetermined
           | Addressable, Addressable -> Addressable)
         Addressable ts

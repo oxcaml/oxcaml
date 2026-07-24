@@ -175,7 +175,7 @@ module Addressability : sig
 
   module Verdict : sig
     type t = Jkind_axis.Addressability.Verdict.t =
-      | Id
+      | Unaddressable
       | Addressable
       | Undetermined
 
@@ -196,8 +196,8 @@ module Addressability : sig
   (** The intrinsic addressability of a sort, as a verdict about its *plain*
       kind, insofar as it is determined: the addressability of an unfilled sort
       variable is not yet known ([Undetermined]). This is a mark-free question,
-      so it can be definite ([Id], not addressable) even while the marks over
-      the sort are undetermined. *)
+      so it can be definite ([Unaddressable]) even while the marks over the sort
+      are undetermined. *)
   val of_sort : Sort.t -> Verdict.t
 
   (** Whether every kind with this sort is addressable, whatever its marks: the

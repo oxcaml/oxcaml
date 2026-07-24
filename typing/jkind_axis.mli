@@ -169,7 +169,7 @@ module Addressability : sig
       [Undetermined]. *)
   module Verdict : sig
     type t =
-      | Id
+      | Unaddressable
           (** Definitely not addressable: an unmarked (identity) form over a
               carrier resolved intrinsically unaddressable. *)
       | Addressable  (** Definitely addressable. *)
