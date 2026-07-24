@@ -75,7 +75,7 @@ gensym_exn ()
 val gensym_exn : unit -> <[int]> expr @ once = <fun>
 Exception:
 Failure
- "Identifier x bound at file , line 2, characters 1918-1956\nis extruded outside its scope:\nit is used at file , line 2, characters 1951-1952\ninside the quote at file , line 2, characters 1949-1954".
+ "Identifier x bound at file , line 2, characters 1924-1962\nis extruded outside its scope:\nit is used at file , line 2, characters 1957-1958\ninside the quote at file , line 2, characters 1955-1960".
 |}];;
 
 (* No scope extrusion in continuing effect handler *)
