@@ -900,23 +900,11 @@ let deduce_get_tag_simple ~machine_width blocks get_tag_var :
   | Unknown, Some var -> Ok (Simple.var var)
   | Unknown, None -> Unknown
 
-let n_way_join_simples env kind simples =
-  let canonical_simples =
-    List.map
-      (fun (id, simple) ->
-        ( id,
-          TE.get_canonical_simple_ignoring_name_mode
-            (Join_env.joined_env env id)
-            simple ))
-      simples
-  in
-  Join_env.n_way_join_simples env kind canonical_simples
-
 let n_way_join_relation_simples env simples_opt =
   match simples_opt with
   | None -> None, env
   | Some simples -> (
-    match n_way_join_simples env K.naked_immediate simples with
+    match Join_env.n_way_join_simples env K.naked_immediate simples with
     | Bottom, env -> None, env
     | Ok simple, env ->
       Simple.pattern_match' simple
@@ -1907,16 +1895,7 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       kind
   in
   let ts = List.filter (fun (_, ty) -> not (TG.is_obviously_bottom ty)) ts in
-  match
-    List.map
-      (fun (id, ty) ->
-        ( id,
-          TE.get_alias_then_canonical_simple_exn
-            ~min_name_mode:Name_mode.in_types
-            (Join_env.joined_env env id)
-            ty ))
-      ts
-  with
+  match List.map (fun (id, ty) -> id, TG.get_alias_exn ty) ts with
   | canonical_simples -> (
     match Join_env.n_way_join_simples env kind canonical_simples with
     | Bottom, join_env -> Known (MTC.bottom kind), join_env
@@ -2142,7 +2121,9 @@ and n_way_join_head_of_kind_value env
     | is_null_simples -> (
       (* Note: we ideally would use [n_way_join_relation_simples] here, but we
          need to store a [Not_null] constructor if the join is [false]. *)
-      match n_way_join_simples env K.naked_immediate is_null_simples with
+      match
+        Join_env.n_way_join_simples env K.naked_immediate is_null_simples
+      with
       | Bottom, env -> TG.Maybe_null { is_null = None }, env
       | Ok simple, env ->
         let is_null =
