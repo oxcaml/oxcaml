@@ -247,7 +247,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval | `Box)
+      | Some (`Lexing_position | `Expr | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try

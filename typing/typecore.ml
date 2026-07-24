@@ -8727,7 +8727,7 @@ and type_expect_
         |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
-      let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
+      let expr_ty = Predef.type_expr (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
       (* If we are checking staged modes in the metaprogram,
@@ -8762,7 +8762,7 @@ and type_expect_
       if not magic_staged_modes then
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
-      let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
+      let ty = Predef.type_expr (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
