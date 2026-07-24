@@ -1013,69 +1013,7 @@ module Identifier = struct
 
     let var v l = mk (TVar (v, l))
 
-    let int = TBuiltin "int" |> mk
-
-    let char = TBuiltin "char" |> mk
-
-    let string = TBuiltin "string" |> mk
-
-    let bytes = TBuiltin "bytes" |> mk
-
-    let float = TBuiltin "float" |> mk
-
-    let float32 = TBuiltin "float32" |> mk
-
-    let bool = TBuiltin "bool" |> mk
-
-    let unit = TBuiltin "unit" |> mk
-
-    let exn = TBuiltin "exn" |> mk
-
-    let array = TBuiltin "array" |> mk
-
-    let iarray = TBuiltin "iarray" |> mk
-
-    let list = TBuiltin "list" |> mk
-
-    let option = TBuiltin "option" |> mk
-
-    let nativeint = TBuiltin "nativeint" |> mk
-
-    let int32 = TBuiltin "int32" |> mk
-
-    let int64 = TBuiltin "int64" |> mk
-
-    let lazy_t = TBuiltin "lazy_t" |> mk
-
-    let extension_constructor = TBuiltin "extension_constructor" |> mk
-
-    let floatarray = TBuiltin "floatarray" |> mk
-
-    let lexing_position = TBuiltin "lexing_position" |> mk
-
-    let expr = TBuiltin "expr" |> mk
-
-    let eval = TBuiltin "eval" |> mk
-
-    let unboxed_float = TBuiltin "float#" |> mk
-
-    let unboxed_nativeint = TBuiltin "nativeint#" |> mk
-
-    let unboxed_int32 = TBuiltin "int32#" |> mk
-
-    let unboxed_int64 = TBuiltin "int64#" |> mk
-
-    let int8x16 = TBuiltin "int8x16" |> mk
-
-    let int16x8 = TBuiltin "int16x8" |> mk
-
-    let int32x4 = TBuiltin "int32x4" |> mk
-
-    let int64x2 = TBuiltin "int64x2" |> mk
-
-    let float32x4 = TBuiltin "float32x4" |> mk
-
-    let float64x2 = TBuiltin "float64x2" |> mk
+    let builtin name = TBuiltin name |> mk
   end
 
   module Module_type = struct

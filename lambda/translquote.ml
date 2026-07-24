@@ -693,69 +693,7 @@ module Identifier : sig
 
     val var : Debuginfo.Scoped_location.t -> Var.Type_constr.t -> Loc.t -> t'
 
-    val int : t'
-
-    val char : t'
-
-    val string : t'
-
-    val bytes : t'
-
-    val float : t'
-
-    val float32 : t'
-
-    val bool : t'
-
-    val unit : t'
-
-    val exn : t'
-
-    val array : t'
-
-    val iarray : t'
-
-    val list : t'
-
-    val option : t'
-
-    val nativeint : t'
-
-    val int32 : t'
-
-    val int64 : t'
-
-    val lazy_t : t'
-
-    val extension_constructor : t'
-
-    val floatarray : t'
-
-    val lexing_position : t'
-
-    val expr : t'
-
-    val eval : t'
-
-    val unboxed_float : t'
-
-    val unboxed_nativeint : t'
-
-    val unboxed_int32 : t'
-
-    val unboxed_int64 : t'
-
-    val int8x16 : t'
-
-    val int16x8 : t'
-
-    val int32x4 : t'
-
-    val int64x2 : t'
-
-    val float32x4 : t'
-
-    val float64x2 : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Module_type : sig
@@ -888,69 +826,7 @@ end = struct
     let var loc a1 a2 =
       apply2 "Identifier.Type" "var" loc (extract a1) (extract a2)
 
-    let int = use "Identifier.Type" "int"
-
-    let char = use "Identifier.Type" "char"
-
-    let string = use "Identifier.Type" "string"
-
-    let bytes = use "Identifier.Type" "bytes"
-
-    let float = use "Identifier.Type" "float"
-
-    let float32 = use "Identifier.Type" "float32"
-
-    let bool = use "Identifier.Type" "bool"
-
-    let unit = use "Identifier.Type" "unit"
-
-    let exn = use "Identifier.Type" "exn"
-
-    let array = use "Identifier.Type" "array"
-
-    let iarray = use "Identifier.Type" "iarray"
-
-    let list = use "Identifier.Type" "list"
-
-    let option = use "Identifier.Type" "option"
-
-    let nativeint = use "Identifier.Type" "nativeint"
-
-    let int32 = use "Identifier.Type" "int32"
-
-    let int64 = use "Identifier.Type" "int64"
-
-    let lazy_t = use "Identifier.Type" "lazy_t"
-
-    let extension_constructor = use "Identifier.Type" "extension_constructor"
-
-    let floatarray = use "Identifier.Type" "floatarray"
-
-    let lexing_position = use "Identifier.Type" "lexing_position"
-
-    let expr = use "Identifier.Type" "expr"
-
-    let eval = use "Identifier.Type" "eval"
-
-    let unboxed_float = use "Identifier.Type" "unboxed_float"
-
-    let unboxed_nativeint = use "Identifier.Type" "unboxed_nativeint"
-
-    let unboxed_int32 = use "Identifier.Type" "unboxed_int32"
-
-    let unboxed_int64 = use "Identifier.Type" "unboxed_int64"
-
-    let int8x16 = use "Identifier.Type" "int8x16"
-
-    let int16x8 = use "Identifier.Type" "int16x8"
-
-    let int32x4 = use "Identifier.Type" "int32x4"
-
-    let int64x2 = use "Identifier.Type" "int64x2"
-
-    let float32x4 = use "Identifier.Type" "float32x4"
-
-    let float64x2 = use "Identifier.Type" "float64x2"
+    let builtin loc a1 = apply1 "Identifier.Type" "builtin" loc (string ~loc a1)
   end
 
   module Module_type = struct
@@ -2459,44 +2335,17 @@ let type_for_path_opt loc env = function
     let+ t =
       match Hashtbl.find_opt vars_env.env_tys id with
       | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
-      | None -> (
-        match Ident.name id with
-        | "int" -> Some Identifier.Type.int
-        | "char" -> Some Identifier.Type.char
-        | "string" -> Some Identifier.Type.string
-        | "bytes" -> Some Identifier.Type.bytes
-        | "float" -> Some Identifier.Type.float
-        | "float32" -> Some Identifier.Type.float32
-        | "bool" -> Some Identifier.Type.bool
-        | "unit" -> Some Identifier.Type.unit
-        | "exn" -> Some Identifier.Type.exn
-        | "array" -> Some Identifier.Type.array
-        | "iarray" -> Some Identifier.Type.iarray
-        | "list" -> Some Identifier.Type.list
-        | "option" -> Some Identifier.Type.option
-        | "nativeint" -> Some Identifier.Type.nativeint
-        | "int32" -> Some Identifier.Type.int32
-        | "int64" -> Some Identifier.Type.int64
-        | "lazy_t" -> Some Identifier.Type.lazy_t
-        | "extension_constructor" -> Some Identifier.Type.extension_constructor
-        | "floatarray" -> Some Identifier.Type.floatarray
-        | "lexing_position" -> Some Identifier.Type.lexing_position
-        | "expr" -> Some Identifier.Type.expr
-        | "eval" -> Some Identifier.Type.eval
-        | "float#" -> Some Identifier.Type.unboxed_float
-        | "nativeint#" -> Some Identifier.Type.unboxed_nativeint
-        | "int32#" -> Some Identifier.Type.unboxed_int32
-        | "int64#" -> Some Identifier.Type.unboxed_int64
-        | "nativeint_u" -> Some Identifier.Type.unboxed_nativeint
-        | "int32_u" -> Some Identifier.Type.unboxed_int32
-        | "int64_u" -> Some Identifier.Type.unboxed_int64
-        | "int8x16" -> Some Identifier.Type.int8x16
-        | "int16x8" -> Some Identifier.Type.int16x8
-        | "int32x4" -> Some Identifier.Type.int32x4
-        | "int64x2" -> Some Identifier.Type.int64x2
-        | "float32x4" -> Some Identifier.Type.float32x4
-        | "float64x2" -> Some Identifier.Type.float64x2
-        | _ -> None)
+      | None ->
+        (* CR-someday jbachurski: I am fairly sure we can retire this check as
+           it is redundant with what the environment already does. However,
+           we can keep it if it does not get in the way. *)
+        let name = Ident.name id in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            Predef.builtin_type_constrs
+        then Some (Identifier.Type.builtin loc name)
+        else None
     in
     Identifier.Type.wrap t
   | Path.Pdot (p, s) ->

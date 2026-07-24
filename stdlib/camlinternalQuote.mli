@@ -136,69 +136,7 @@ module Identifier : sig
 
     val var : Var.Type_constr.t -> Loc.t -> t
 
-    val int : t
-
-    val char : t
-
-    val string : t
-
-    val bytes : t
-
-    val float : t
-
-    val float32 : t
-
-    val bool : t
-
-    val unit : t
-
-    val exn : t
-
-    val array : t
-
-    val iarray : t
-
-    val list : t
-
-    val option : t
-
-    val nativeint : t
-
-    val int32 : t
-
-    val int64 : t
-
-    val lazy_t : t
-
-    val extension_constructor : t
-
-    val floatarray : t
-
-    val lexing_position : t
-
-    val expr : t
-
-    val eval : t
-
-    val unboxed_float : t
-
-    val unboxed_nativeint : t
-
-    val unboxed_int32 : t
-
-    val unboxed_int64 : t
-
-    val int8x16 : t
-
-    val int16x8 : t
-
-    val int32x4 : t
-
-    val int64x2 : t
-
-    val float32x4 : t
-
-    val float64x2 : t
+    val builtin : string -> t
   end
 
   module Module_type : sig

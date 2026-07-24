@@ -51,15 +51,12 @@ module type S = sig type exn += Exit end
 |}];;
 <[ fun (x : _ eff) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type eff - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) eff -> $('a) eff]> expr = <[fun (x : _ eff) -> x]>
 |}];;
 <[ fun (x : _ continuation) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-26]: cannot quote type continuation - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[($('a), $('b)) continuation -> ($('a), $('b)) continuation]> expr =
+<[fun (x : (_, _) continuation) -> x]>
 |}];;
 <[ fun (x : _ array) -> x ]>
 [%%expect {|
@@ -79,15 +76,11 @@ Uncaught exception: Misc.Fatal_error
 |}];;
 <[ fun (x : int8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-16]: cannot quote type int8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8 -> int8]> expr = <[fun (x : int8) -> x]>
 |}];;
 <[ fun (x : int16) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type int16 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16 -> int16]> expr = <[fun (x : int16) -> x]>
 |}];;
 <[ fun (x : int32) -> x ]>
 [%%expect {|
@@ -120,21 +113,17 @@ Uncaught exception: Misc.Fatal_error
 |}];;
 <[ fun (x : _ atomic_loc) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-24]: cannot quote type atomic_loc - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) atomic_loc -> $('a) atomic_loc]> expr =
+<[fun (x : _ atomic_loc) -> x]>
 |}];;
 <[ fun (x : lexing_position) -> x ]>
 [%%expect {|
 - : <[lexing_position -> lexing_position]> expr =
 <[fun (x : lexing_position) -> x]>
 |}];;
-<[ fun (x : _ code) -> x ]>
+<[ fun (x : _ expr) -> x ]>
 [%%expect {|
-Line 1, characters 14-18:
-1 | <[ fun (x : _ code) -> x ]>
-                  ^^^^
-Error: Unbound type constructor "code"
+- : <[$('a) expr -> $('a) expr]> expr = <[fun (x : _ expr) -> x]>
 |}];;
 <[ fun (x : _ eval) -> x ]>
 [%%expect {|
@@ -142,69 +131,53 @@ Error: Unbound type constructor "code"
 |}];;
 <[ fun (x : _ box) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type box - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) box -> $('a) box]> expr = <[fun (x : _ box) -> x]>
 |}];;
 <[ fun (x : nativeint_u) -> x ]>
 [%%expect {|
-- : <[nativeint_u -> nativeint_u]> expr = <[fun (x : nativeint#) -> x]>
+- : <[nativeint_u -> nativeint_u]> expr = <[fun (x : nativeint_u) -> x]>
 |}];;
 <[ fun (x : int32_u) -> x ]>
 [%%expect {|
-- : <[int32_u -> int32_u]> expr = <[fun (x : int32#) -> x]>
+- : <[int32_u -> int32_u]> expr = <[fun (x : int32_u) -> x]>
 |}];;
 <[ fun (x : int64_u) -> x ]>
 [%%expect {|
-- : <[int64_u -> int64_u]> expr = <[fun (x : int64#) -> x]>
+- : <[int64_u -> int64_u]> expr = <[fun (x : int64_u) -> x]>
 |}];;
 <[ fun (x : float32_u) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float32_u - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float32_u -> float32_u]> expr = <[fun (x : float32_u) -> x]>
 |}];;
 <[ fun (x : uint8_u) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type uint8_u - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[uint8_u -> uint8_u]> expr = <[fun (x : uint8_u) -> x]>
 |}];;
 <[ fun (x : uint16_u) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint16_u - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[uint16_u -> uint16_u]> expr = <[fun (x : uint16_u) -> x]>
 |}];;
 <[ fun (x : uint32_u) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint32_u - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[uint32_u -> uint32_u]> expr = <[fun (x : uint32_u) -> x]>
 |}];;
 <[ fun (x : uint64_u) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint64_u - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[uint64_u -> uint64_u]> expr = <[fun (x : uint64_u) -> x]>
 |}];;
 <[ fun (x : _ or_null) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type or_null - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) or_null -> $('a) or_null]> expr = <[fun (x : _ or_null) -> x]>
 |}];;
 <[ fun (x : _ idx_imm) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type idx_imm - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[($('a), $('b)) idx_imm -> ($('a), $('b)) idx_imm]> expr =
+<[fun (x : (_, _) idx_imm) -> x]>
 |}];;
 <[ fun (x : _ idx_mut) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type idx_mut - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[($('a), $('b)) idx_mut -> ($('a), $('b)) idx_mut]> expr =
+<[fun (x : (_, _) idx_mut) -> x]>
 |}];;
 <[ fun (x : int8x16) -> x ]>
 [%%expect {|
@@ -224,9 +197,7 @@ Uncaught exception: Misc.Fatal_error
 |}];;
 <[ fun (x : float16x8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float16x8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float16x8 -> float16x8]> expr = <[fun (x : float16x8) -> x]>
 |}];;
 <[ fun (x : float32x4) -> x ]>
 [%%expect {|
@@ -238,86 +209,59 @@ Uncaught exception: Misc.Fatal_error
 |}];;
 <[ fun (x : int8x32) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int8x32 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8x32 -> int8x32]> expr = <[fun (x : int8x32) -> x]>
 |}];;
 <[ fun (x : int16x16) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int16x16 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16x16 -> int16x16]> expr = <[fun (x : int16x16) -> x]>
 |}];;
 <[ fun (x : int32x8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int32x8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int32x8 -> int32x8]> expr = <[fun (x : int32x8) -> x]>
 |}];;
 <[ fun (x : int64x4) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int64x4 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int64x4 -> int64x4]> expr = <[fun (x : int64x4) -> x]>
 |}];;
 <[ fun (x : float16x16) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float16x16 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float16x16 -> float16x16]> expr = <[fun (x : float16x16) -> x]>
 |}];;
 <[ fun (x : float32x8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float32x8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float32x8 -> float32x8]> expr = <[fun (x : float32x8) -> x]>
 |}];;
 <[ fun (x : float64x4) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float64x4 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float64x4 -> float64x4]> expr = <[fun (x : float64x4) -> x]>
 |}];;
 <[ fun (x : int8x64) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int8x64 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8x64 -> int8x64]> expr = <[fun (x : int8x64) -> x]>
 |}];;
 <[ fun (x : int16x32) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int16x32 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16x32 -> int16x32]> expr = <[fun (x : int16x32) -> x]>
 |}];;
 <[ fun (x : int32x16) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int32x16 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int32x16 -> int32x16]> expr = <[fun (x : int32x16) -> x]>
 |}];;
 <[ fun (x : int64x8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int64x8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[int64x8 -> int64x8]> expr = <[fun (x : int64x8) -> x]>
 |}];;
 <[ fun (x : float16x32) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float16x32 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float16x32 -> float16x32]> expr = <[fun (x : float16x32) -> x]>
 |}];;
 <[ fun (x : float32x16) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float32x16 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[float32x16 -> float32x16]> expr = <[fun (x : float32x16) -> x]>
 |}];;
 <[ fun (x : float64x8) -> x ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float64x8 - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
+- : <[float64x8 -> float64x8]> expr = <[fun (x : float64x8) -> x]>
 |}];;
 
 <[ fun (x : my_type) -> x ]> (* sanity check *)
