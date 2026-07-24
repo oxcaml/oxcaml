@@ -2287,8 +2287,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Record_unboxed ->
     let jkind =
-      Ctype.type_jkind env ld_type |>
-      Jkind.apply_modality_l lbl.Types.ld_modalities
+      Jkind.for_at_at_unboxed_record
+        ~get_ty_base:(Ctype.type_jkind_base env)
+        ~lbl
+        ~ld_type
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =
@@ -2500,7 +2502,7 @@ let rec update_decl_jkind env dpath decl =
   let decl = { decl with type_unboxed_version } in
 
   (* returns updated constructors, updated rep, and updated jkind *)
-  let update_variant_kind loc cstrs rep =
+  let update_variant_kind loc (cstrs : Types.constructor_declaration list) rep =
     (* CR layouts: factor out duplication *)
     match cstrs, rep with
     | _, Variant_with_null ->
@@ -2545,33 +2547,30 @@ let rec update_decl_jkind env dpath decl =
       | None ->
         Misc.fatal_error "Invalid constructor for Variant_with_null"
       end
-    | [{Types.cd_args} as cstr], Variant_unboxed -> begin
-        match cd_args with
-        | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
-            let jkind = Ctype.type_jkind env ty in
-            let sort = Jkind.sort_option_of_jkind env jkind in
-            let ca_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
-            in
-            if Option.is_none sort then assert_any_args_support loc;
-            [{ cstr with Types.cd_args =
-                           Cstr_tuple [{ arg with ca_sort }] }],
-            Variant_unboxed, jkind
-          end
-        | Cstr_record [{ld_type} as lbl] -> begin
-            let jkind = Ctype.type_jkind env ld_type in
-            let sort = Jkind.sort_option_of_jkind env jkind in
-            let ld_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
-            in
-            if Option.is_none sort then assert_any_args_support loc;
-            [{ cstr with Types.cd_args =
-                           Cstr_record [{ lbl with ld_sort }] }],
-            Variant_unboxed, jkind
-          end
+    | [ cstr ], Variant_unboxed ->
+      let jkind =
+        Jkind.for_unboxed_variant
+        ~decl_params:decl.type_params
+        ~type_apply:(Ctype.apply env)
+        ~get_free_vars:(Ctype.free_variable_set_of_list env)
+        ~get_ty_base:(Ctype.type_jkind_base env)
+        cstr
+      in
+      let sort =
+        Jkind.sort_option_of_jkind env jkind
+        |> fun s -> Option.bind s Jkind.Sort.default_to_scannable_and_get_some
+      in
+      if Option.is_none sort then assert_any_args_support loc;
+      let cstr =
+        match cstr.cd_args with
+        | Cstr_tuple [ arg ] ->
+          { cstr with cd_args = Cstr_tuple [ { arg with ca_sort = sort } ] }
+        | Cstr_record [ lbl] ->
+          { cstr with cd_args = Cstr_record [ { lbl with ld_sort = sort } ] }
         | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
           assert false
-      end
+      in
+      [ cstr ], Variant_unboxed, jkind
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
         List.mapi (fun idx cstr ->

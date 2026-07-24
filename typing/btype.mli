@@ -737,6 +737,20 @@ module Jkind0 : sig
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
 
+    val for_unboxed_variant :
+      decl_params:Types.type_expr list ->
+      type_apply:
+        (Types.type_expr list ->
+        Types.type_expr ->
+        Types.type_expr list ->
+        Types.type_expr) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_ty_base:
+        (Types.type_expr ->
+        Jkind_types.Sort.t Jkind_types.Layout.t jkind_base) ->
+      Types.constructor_declaration ->
+      Types.jkind_l
+
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->
