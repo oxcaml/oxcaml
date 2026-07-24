@@ -769,6 +769,8 @@ module type S = sig
 
     val to_const_exn : lr -> Const.t
 
+    val to_of_const_exn : lr -> lr
+
     module List : sig
       (* No new types exposed to avoid too many type names *)
       include Allow_disallow with type (_, _, 'd) sided = 'd t list
@@ -802,6 +804,18 @@ module type S = sig
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
     val zap_to_legacy : lr -> Const.t
+
+    module Guts : sig
+      (** Zap a mode toward the floor of [towards]. Axes that are either
+          strictly above or below [towards] end up as close as possible to the
+          semantic lower bound of [towards] *)
+      val zap_towards_floor_of : lr -> towards:lr -> Const.t
+
+      (** Zap a mode toward the ceil of [towards]. Axes that are either strictly
+          above or below [towards] end up as close as possible to the semantic
+          upper bound of [towards] *)
+      val zap_towards_ceil_of : lr -> towards:lr -> Const.t
+    end
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->

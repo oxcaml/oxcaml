@@ -437,8 +437,8 @@ let report_modality_sub_error first second ppf e =
     first
     (print_modality "not") left
 
-let report_mode_sub_error ~pp got expected ppf e =
-  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
+let report_mode_sub_error_printers got expected ppf
+    ({ left; right } : Mode_intf.print_error) =
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -449,6 +449,10 @@ let report_mode_sub_error ~pp got expected ppf e =
   end;
   ignore (right ppf);
   fprintf ppf ".@]"
+
+let report_mode_sub_error ~pp got expected ppf e =
+  report_mode_sub_error_printers got expected ppf
+    (Mode.Value.print_error pp e)
 
 let report_modality_equate_error first second ppf
   ((equate_step, sub_error) : Modality.equate_error) =

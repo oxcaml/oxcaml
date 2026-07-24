@@ -40,6 +40,8 @@ Error: Signature mismatch:
        The type "unit -> [ `A | `B of 'a -> 'a ]"
        is not compatible with the type
          "unit -> [ `A | `B of 'a -> 'a ] @ portable"
+       The mode of the return in the implementation is "nonportable"
+       but the interface expects it to be "portable".
 |}]
 
 (* In this example, the inferred type does not allow crossing portability, but
@@ -68,15 +70,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : unit -> int @ local end
+         sig val f : unit -> int @ local forkable unyielding end
        is not included in
          sig val f : unit -> int end
        Values do not match:
-         val f : unit -> int @ local
+         val f : unit -> int @ local forkable unyielding
        is not included in
          val f : unit -> int
-       The type "unit -> int @ local" is not compatible with the type
-         "unit -> int"
+       The type "unit -> int @ local forkable unyielding"
+       is not compatible with the type "unit -> int"
+       The mode of the return in the implementation is "local"
+       but the interface expects it to be "global".
 |}]
 
 module M : sig
