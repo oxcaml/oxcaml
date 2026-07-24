@@ -273,6 +273,10 @@ module Typing_env : sig
 
   val aliases_of_simple :
     t -> min_name_mode:Name_mode.t -> Simple.t -> Alias_set.t
+
+  val add_param_projection : t -> Name.t -> Param_projection.t -> t
+
+  val is_param_projection : t -> Name.t -> Param_projection.t option
 end
 
 val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t

@@ -129,6 +129,59 @@ let add_extra_params_from_join_analysis denv analysis use_envs_with_ids' =
   in
   denv, extra_params_and_args
 
+(* The projection (if any) described by [simple] in the use environment
+   [tenv_at_use], looking through aliases. *)
+let projection_of_simple_at_use tenv_at_use simple =
+  Simple.pattern_match simple
+    ~const:(fun _ -> None)
+    ~name:(fun name ~coercion:_ ->
+      let canonical =
+        match
+          TE.get_canonical_simple_exn ~min_name_mode:Name_mode.normal
+            tenv_at_use (Simple.name name)
+        with
+        | exception Not_found -> Simple.name name
+        | canonical -> canonical
+      in
+      Simple.pattern_match canonical
+        ~const:(fun _ -> None)
+        ~name:(fun name ~coercion:_ -> TE.is_param_projection tenv_at_use name))
+
+(* For each variable created during the join, propagate the parameter projection
+   information if all of its definitions across the uses agree on the same
+   projection. This is conservative but sound: the resulting projection is valid
+   on every branch reaching the join. *)
+let add_name_info_from_join_analysis handler_env analysis ~use_tenvs_by_id =
+  Join_analysis.fold_variables_created_at_join
+    ~f:(fun new_name simples _kind handler_env ->
+      let exception Not_uniform in
+      let projection =
+        try
+          Join_analysis.Simples_at_join.fold_definitions_at_uses
+            (fun use_id (At_normal_mode simple) acc ->
+              match
+                Apply_cont_rewrite_id.Map.find_opt use_id use_tenvs_by_id
+              with
+              | None -> raise Not_uniform
+              | Some tenv_at_use -> (
+                match projection_of_simple_at_use tenv_at_use simple with
+                | None -> raise Not_uniform
+                | Some proj -> (
+                  match acc with
+                  | None -> Some proj
+                  | Some prev ->
+                    if Param_projection.equal prev proj
+                    then acc
+                    else raise Not_uniform)))
+            simples None
+        with Not_uniform -> None
+      in
+      match projection with
+      | None -> handler_env
+      | Some param_projection ->
+        TE.add_param_projection handler_env new_name param_projection)
+    analysis ~init:handler_env
+
 let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
     ~previous_extra_params_and_args =
   let definition_scope = DE.get_continuation_scope denv in
@@ -176,6 +229,19 @@ let join ?cut_after denv params ~consts_lifted_after_fork ~use_envs_with_ids
     | None -> handler_env
     | Some cse_join_result ->
       TE.add_env_extension handler_env cse_join_result.env_extension
+  in
+  let handler_env =
+    match join_analysis with
+    | None -> handler_env
+    | Some join_analysis ->
+      let use_tenvs_by_id =
+        List.fold_left
+          (fun acc (tenv_at_use, use_id, _kind) ->
+            Apply_cont_rewrite_id.Map.add use_id tenv_at_use acc)
+          Apply_cont_rewrite_id.Map.empty use_envs_with_ids'
+      in
+      add_name_info_from_join_analysis handler_env join_analysis
+        ~use_tenvs_by_id
   in
   let denv =
     let denv = DE.with_typing_env denv handler_env in
