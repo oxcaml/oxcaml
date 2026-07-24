@@ -16,6 +16,10 @@ module Verdict : sig
 end
 
 module Outcome : sig
+  type gate_stage =
+    | Fe_gate
+    | Be_gate
+
   (* Because the program carries both annotations, a frontend rejection is a
      type error: the program does not compile, so the backend check cannot run
      on it. There is no FE-reject & BE-pass quadrant anymore; frontend
@@ -26,7 +30,14 @@ module Outcome : sig
       (* FE accepts, BE rejects -- ambiguous (backend may be imprecise),
          triage *)
     | Fe_reject of { cause : string }
-  (* FE rejects -- possible precision gap; not confirmable by the backend *)
+      (* FE rejects -- possible precision gap; not confirmable by the backend *)
+    | Prelude_reject of
+        { stage : gate_stage;
+          cause : string
+        }
+  (* the prelude alone failed its own FE or BE check: a checked prelude
+     annotation is inconsistent with its (random) body -- expected occasionally
+     -- or a compiler bug on the prelude itself *)
 end
 
 (* [compiler] must be an absolute path to the built [ocamlopt.opt]; it is
@@ -40,4 +51,11 @@ val run_backend : compiler:string -> file:string -> Verdict.t
    then the backend zero_alloc check only if the frontend accepts. [Error] means
    a check failed for a reason unrelated to the property under test, i.e. a
    generator bug. *)
-val check : compiler:string -> file:string -> (Outcome.t, string) result
+(* [prelude_file] contains the prelude alone and is gate-checked (FE then BE)
+   before [file], the full program, goes through the frontend-then-backend
+   pipeline. *)
+val check :
+  compiler:string ->
+  prelude_file:string ->
+  file:string ->
+  (Outcome.t, string) result

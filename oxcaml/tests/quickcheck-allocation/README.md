@@ -26,13 +26,21 @@ Flags:
   FE-accept & BE-reject bugs; `completeness` favors non-allocating
   computation the frontend may conservatively reject
 - `-out DIR` -- save witness .ml files to DIR (created if missing): every
-  soundness suspect, plus the first-seen witness of each distinct
-  frontend-rejection cause. File names embed the seed
+  soundness suspect, every FE-accept & BE-pass program (`agree_seed0123.ml`,
+  corpus material), plus the first-seen witness of each distinct
+  frontend-rejection and prelude-rejection cause. File names embed the seed
   (`suspect_seed0042.ml`, `fe_reject_seed0007.ml`). Without this flag,
   nothing is saved: programs live in temp files only for the duration of
   their compiles, and results exist only on stdout
 - `-max-decls N` -- max type declarations generated per program; the count is
   drawn uniformly from min(2, N) to N (default 4)
+- `-allow-assume` -- render the assume annotation lane on prelude functions as
+  `[@zero_alloc assume]` instead of checked `[@zero_alloc]` (experimental,
+  default off). The lane is always drawn, so the same seed generates the same
+  program modulo the `assume` keyword: runs with and without the flag are
+  seed-for-seed comparable. Assume lets the backend trust an unchecked
+  annotation, so suspects found in such runs may implicate a wrong assumption
+  rather than the mode axis
 
 Pass the compiler as an absolute path (it is invoked via the shell). The fuzz
 loop can also be run via its alias, which uses the just-built `ocamlopt.opt`
@@ -60,6 +68,13 @@ agree(noalloc)=22 suspects=0 fe_rejects=38 gen_errors=0
   frequency-ranked table of rejection causes (the frontend-improvement
   backlog). Since the program carries both annotations, a rejected program
   does not compile, so the backend cannot confirm these
+- `prelude_rejects` -- the prelude alone (type declarations, values, functions
+  carrying random mode / zero_alloc annotations, and modules whose derived
+  signatures may abstract their type, hide members, or add allocation
+  modalities on vals) failed its own FE or BE gate check before the main
+  function was tested: usually an annotation or modality inconsistent with the
+  random definition underneath, but worth skimming for compiler bugs on the
+  prelude itself
 - `gen_errors` -- compile failures unrelated to either check, i.e. generator
   bugs; should be 0
 

@@ -15,9 +15,11 @@ let out_dir = ref ""
 
 let max_decls = ref 4
 
+let allow_assume = ref false
+
 let usage_msg =
   "main.exe <ocamlopt-path> [-count N] [-seed S] [-mode \
-   soundness|completeness] [-out DIR] [-max-decls N]"
+   soundness|completeness] [-out DIR] [-max-decls N] [-allow-assume]"
 
 let speclist =
   [ ( "-count",
@@ -46,7 +48,13 @@ let speclist =
           else max_decls := n),
       Printf.sprintf
         "N  max type declarations per program, min(2, N) to N (default %d)"
-        !max_decls ) ]
+        !max_decls );
+    ( "-allow-assume",
+      Arg.Set allow_assume,
+      "  render the assume annotation lane as [@zero_alloc assume] instead of \
+       checked [@zero_alloc]; same seed generates the same program modulo the \
+       keyword (experimental; suspects from such runs may implicate a wrong \
+       assumption rather than the mode axis; default off)" ) ]
 
 let anon_arg s =
   if !compiler = ""
@@ -62,7 +70,7 @@ let () =
     exit 2);
   let stats =
     Fuzzer.run ~compiler:!compiler ~count:!count ~seed0:!seed0 ~mode:!mode
-      ~max_decls:!max_decls
+      ~max_decls:!max_decls ~allow_assume:!allow_assume
   in
   Fuzzer.report stats;
   if !out_dir <> "" then Fuzzer.save stats ~dir:!out_dir

@@ -60,9 +60,14 @@ module Mode = struct
 end
 
 module Sample = struct
-  type t = { source : string }
+  type t =
+    { prelude_source : string;
+          (* the prelude alone (type declarations + values / functions), for the
+             oracle's gate compile *)
+      source : string (* the full program: prelude + main function *)
+    }
 
-  let to_string { source } = source
+  let to_string { prelude_source = _; source } = source
 end
 
 module Arg_label = struct
@@ -77,6 +82,29 @@ module Arg_label = struct
     | Labelled l1, Labelled l2 | Optional l1, Optional l2 -> String.equal l1 l2
     | (Nolabel | Labelled _ | Optional _), _ -> false
 end
+
+(* Identifiers may be paths ("M0.p3", "M0.t2"): dots become [Longident.Ldot], so
+   module members print correctly. Operator names ([+.], [~-.], ...) also
+   contain dots but are NOT paths; only split when every dot-separated component
+   is an ordinary identifier. *)
+let lid_of_string s =
+  let is_ident_char = function
+    | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> true
+    | _ -> false
+  in
+  let components = String.split_on_char '.' s in
+  let is_path =
+    List.for_all
+      (fun part -> String.length part > 0 && String.for_all is_ident_char part)
+      components
+  in
+  match components with
+  | first :: (_ :: _ as rest) when is_path ->
+    List.fold_left
+      (fun acc part ->
+        Longident.Ldot (Location.mknoloc acc, Location.mknoloc part))
+      (Longident.Lident first) rest
+  | _ -> Longident.Lident s
 
 module Ty = struct
   module Constant = struct
@@ -129,7 +157,7 @@ module Ty = struct
 
   let rec to_core_type ty =
     let constr name args =
-      Ast_helper.Typ.constr (Location.mknoloc (Longident.Lident name)) args
+      Ast_helper.Typ.constr (Location.mknoloc (lid_of_string name)) args
     in
     match ty with
     | Constant c -> constr (Constant.name c) []
@@ -146,6 +174,18 @@ module Ty = struct
       let params, result = arrows ret in
       (label, arg) :: params, result
     | ty -> [], ty
+
+  (* Rewrite references to a module-local type into its qualified path, for the
+     module's outside view (e.g. [t5] -> [M0.t5]). *)
+  let rec qualify ~local_id ~qualified_id ty =
+    let q = qualify ~local_id ~qualified_id in
+    match ty with
+    | Constant _ -> ty
+    | Tuple ts -> Tuple (List.map q ts)
+    | List t -> List (q t)
+    | Array t -> Array (q t)
+    | Constr id -> if Id.equal id local_id then Constr qualified_id else ty
+    | Arrow { label; arg; ret } -> Arrow { label; arg = q arg; ret = q ret }
 
   let exclave_candidate = function
     | Tuple _ | List _ | Array _ | Constr _ | Arrow _ -> true
@@ -169,42 +209,59 @@ module Ty = struct
     type kind =
       | Record of field list (* invariant: non-empty *)
       | Variant of constructor list
-    (* invariants: non-empty, and at least one nullary base constructor so
-       values are constructible at exhausted fuel *)
+        (* invariants: non-empty, and at least one nullary base constructor so
+           values are constructible at exhausted fuel *)
+      | Abstract of
+          { producer : string; (* a val of type [producer_arg -> this type] *)
+            producer_arg : t (* a constant, so construction bottoms out *)
+          }
+    (* a module type hidden by its signature: values can only be obtained by
+       calling [producer] (the constructibility invariant generalized) *)
 
     type decl =
       { id : Id.t;
         kind : kind
       }
 
-    let to_structure_item { id; kind } =
-      let kind =
-        match kind with
-        | Record fields ->
-          Parsetree.Ptype_record
-            (List.map
-               (fun { f_name; f_ty; f_mutable } ->
-                 Ast_helper.Type.field
-                   ~mut:
-                     (if f_mutable then Asttypes.Mutable else Asttypes.Immutable)
-                   (Location.mknoloc f_name) (to_core_type f_ty))
-               fields)
-        | Variant constrs ->
-          Parsetree.Ptype_variant
-            (List.map
-               (fun { c_name; c_args } ->
-                 Ast_helper.Type.constructor
-                   ~args:
-                     (Parsetree.Pcstr_tuple
-                        (List.map
-                           (fun t ->
-                             Ast_helper.Type.constructor_arg (to_core_type t))
-                           c_args))
-                   (Location.mknoloc c_name))
-               constrs)
-      in
-      Ast_helper.Str.type_ Asttypes.Recursive
-        [Ast_helper.Type.mk ~kind (Location.mknoloc (Id.name id))]
+    (* The type_kind of a declaration; [None] for [Abstract], which only ever
+       appears in signatures. *)
+    let to_type_kind kind =
+      match kind with
+      | Abstract _ -> None
+      | Record fields ->
+        Some
+          (Parsetree.Ptype_record
+             (List.map
+                (fun { f_name; f_ty; f_mutable } ->
+                  Ast_helper.Type.field
+                    ~mut:
+                      (if f_mutable
+                       then Asttypes.Mutable
+                       else Asttypes.Immutable)
+                    (Location.mknoloc f_name) (to_core_type f_ty))
+                fields))
+      | Variant constrs ->
+        Some
+          (Parsetree.Ptype_variant
+             (List.map
+                (fun { c_name; c_args } ->
+                  Ast_helper.Type.constructor
+                    ~args:
+                      (Parsetree.Pcstr_tuple
+                         (List.map
+                            (fun t ->
+                              Ast_helper.Type.constructor_arg (to_core_type t))
+                            c_args))
+                    (Location.mknoloc c_name))
+                constrs))
+
+    let to_type_declaration { id; kind } =
+      match to_type_kind kind with
+      | Some kind -> Ast_helper.Type.mk ~kind (Location.mknoloc (Id.name id))
+      | None -> Ast_helper.Type.mk (Location.mknoloc (Id.name id))
+
+    let to_structure_item decl =
+      Ast_helper.Str.type_ Asttypes.Recursive [to_type_declaration decl]
   end
 
   (* The per-program type environment, in declaration order. *)
@@ -225,7 +282,7 @@ end
 module Expr = struct
   let mknoloc = Location.mknoloc
 
-  let lid s = mknoloc (Longident.Lident s)
+  let lid s = mknoloc (lid_of_string s)
 
   let var x = Ast_helper.Exp.ident (lid x)
 
@@ -387,8 +444,14 @@ type ctx =
     mutable next_ty : int;
     mutable next_field : int;
     mutable next_constr : int;
+    mutable next_prelude : int;
+    mutable next_module : int;
     mutable tenv : Ty.Tenv.t;
-    mode : Mode.t
+    mode : Mode.t;
+    allow_assume : bool
+        (* whether the assume lane renders as [@zero_alloc assume]; without it
+           the same draws render as checked [@zero_alloc], keeping programs
+           seed-for-seed comparable. See [gen_annot]. *)
   }
 
 let fresh_name counter prefix ctx =
@@ -426,6 +489,22 @@ let fresh_constr ctx =
       ctx.next_constr <- n + 1;
       n)
     "C" ctx
+
+let fresh_prelude ctx =
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_prelude in
+      ctx.next_prelude <- n + 1;
+      n)
+    "p" ctx
+
+let fresh_module ctx =
+  fresh_name
+    (fun ctx ->
+      let n = ctx.next_module in
+      ctx.next_module <- n + 1;
+      n)
+    "M" ctx
 
 (* Pick among weighted alternatives; entries with weight 0 are disabled. *)
 let choose ctx options =
@@ -685,6 +764,14 @@ and gen_apply ctx env fuel candidates =
   let args =
     List.map
       (fun ((label : Arg_label.t), arg_ty) ->
+        (* Supplying an [Optional] parameter's PAYLOAD is the [~l:e] form, i.e.
+           [Labelled] in [Pexp_apply]; an [Optional]-labeled argument would be
+           [?l:e], which passes an option. *)
+        let label : Arg_label.t =
+          match label with
+          | Optional l -> Labelled l
+          | Nolabel | Labelled _ -> label
+        in
         label, gen_expr ctx env arg_ty (fuel - 1))
       supplied
   in
@@ -828,6 +915,15 @@ and structural_productions ctx env ty fuel =
       ) ]
   | Ty.Constr id -> (
     match Ty.Tenv.lookup ctx.tenv id with
+    | Ty.Decl.Abstract { producer; producer_arg } ->
+      (* An abstract module type: the only construction is calling its producer.
+         Not [deep]-gated (it is this type's base case, like a nullary
+         constructor); [producer_arg] is a constant, so the argument bottoms
+         out. *)
+      [ ( 4,
+          fun () ->
+            Expr.app (Expr.var producer)
+              [Arg_label.Nolabel, gen_expr ctx env producer_arg (fuel - 1)] ) ]
     | Ty.Decl.Record fields ->
       [ ( 4,
           fun () ->
@@ -869,21 +965,494 @@ let maybe_exclave ctx ty body =
 
 let initial_fuel = 5
 
-let generate ~max_decls ~mode ~seed =
+(* ---- Prelude values and functions (milestone 1 of the prelude plan) ----
+
+   Top-level items the main function can reference; they enter the generation
+   environment, so [app_candidates] calls prelude functions with no extra logic.
+   Bodies reuse [gen_expr] at small fuel. Items may only reference strictly
+   earlier items, like type declarations. *)
+
+let prelude_fuel = 2
+
+(* Annotation lanes for prelude functions: - [No_annot]: arbitrary body; calls
+   to it are BE-rejecting by construction (no annotation for the backend to
+   trust) -- contrast material. - checked [Zero_alloc] / [Zero_alloc_strict] and
+   [Mode_noalloc_strict]: arbitrary bodies; the oracle's prelude gate CLASSIFIES
+   inconsistent annotation/body pairs as [Prelude_reject] rather than filtering
+   them silently. - [Zero_alloc_assume]: arbitrary body that the backend trusts
+   UNCHECKED -- the deliberate "whitewashing" instrument. The lane is always
+   drawn, but without [ctx.allow_assume] (the [-allow-assume] flag, default off)
+   it degrades to checked [Zero_alloc]: the PRNG draw sequence is thus identical
+   in both configurations, so a seed generates the same program modulo the
+   [assume] keyword -- seed-for-seed comparable experiment pairs. Rationale for
+   the flag: once the frontend exempts zero_alloc functions, a suspect caused by
+   a wrong assumption implicates the assumption, not the mode axis, so
+   assume-enabled runs need separate interpretation. *)
+type prelude_annot =
+  | No_annot
+  | Zero_alloc
+  | Zero_alloc_strict
+  | Zero_alloc_assume
+  | Mode_noalloc_strict
+
+let gen_annot ctx =
+  choose ctx
+    [ (4, fun () -> No_annot);
+      (2, fun () -> Zero_alloc);
+      (1, fun () -> Zero_alloc_strict);
+      (2, fun () -> Mode_noalloc_strict);
+      (2, fun () -> if ctx.allow_assume then Zero_alloc_assume else Zero_alloc)
+    ]
+
+let zero_alloc_attr payload =
+  Ast_helper.Attr.mk
+    (Location.mknoloc "zero_alloc")
+    (match payload with
+    | None -> Parsetree.PStr []
+    | Some word ->
+      Parsetree.PStr
+        [ Ast_helper.Str.eval
+            (Ast_helper.Exp.ident (Location.mknoloc (Longident.Lident word))) ])
+
+let prelude_binding ~annot name expr =
+  let attrs =
+    match annot with
+    | No_annot | Mode_noalloc_strict -> []
+    | Zero_alloc -> [zero_alloc_attr None]
+    | Zero_alloc_strict -> [zero_alloc_attr (Some "strict")]
+    | Zero_alloc_assume -> [zero_alloc_attr (Some "assume")]
+  in
+  let modes =
+    match annot with
+    | Mode_noalloc_strict -> [Location.mknoloc (Parsetree.Mode "noalloc_strict")]
+    | No_annot | Zero_alloc | Zero_alloc_strict | Zero_alloc_assume -> []
+  in
+  Ast_helper.Str.value Asttypes.Nonrecursive
+    [ Ast_helper.Vb.mk ~attrs ~modes
+        (Ast_helper.Pat.var (Location.mknoloc name))
+        expr ]
+
+(* A top-level constant. Unannotated for now. *)
+let gen_prelude_value ctx env name =
+  let ty = component_ty ctx ~self:None in
+  let body = gen_expr ctx env ty prelude_fuel in
+  prelude_binding ~annot:No_annot name body, ty
+
+(* A top-level function. Annotated lanes force a syntactic lambda (the
+   annotations attach to a function definition); the unannotated lane may
+   produce any function-typed expression, e.g. an alias or partial application
+   of an earlier prelude function. *)
+let gen_prelude_function ctx env name =
+  let annot = gen_annot ctx in
+  let ty = fun_ty ctx in
+  let body =
+    match annot with
+    | No_annot -> gen_expr ctx env ty prelude_fuel
+    | Zero_alloc | Zero_alloc_strict | Zero_alloc_assume | Mode_noalloc_strict
+      ->
+      gen_lambda ctx env ty prelude_fuel
+  in
+  prelude_binding ~annot name body, ty
+
+(* The closure-factory pattern, probing "whitewashed" allocations
+   ([let[@zero_alloc] f () = let g () = <alloc> in g]): zero_alloc is a
+   first-order contract about [f]'s own execution, so allocations under the
+   returned [g] do not count against [f] -- but they escape to whoever calls
+   [g]. Whether [g] may capture [f]'s parameter is a coin flip: a non-capturing
+   [g] is statically allocated (so [f] can genuinely pass a checked zero_alloc),
+   while a capturing one allocates a closure when [f] runs. [g] is returned
+   either directly or tucked inside a tuple. *)
+let gen_prelude_factory ctx env name =
+  let annot = gen_annot ctx in
+  let p = fresh ctx in
+  let p_ty = component_ty ctx ~self:None in
+  let g_arg = fresh ctx in
+  let g_arg_ty = component_ty ctx ~self:None in
+  let g_ret_ty = component_ty ctx ~self:None in
+  let may_capture = Random.State.int ctx.rng 2 = 0 in
+  let inner_env =
+    (g_arg, g_arg_ty) :: (if may_capture then (p, p_ty) :: env else env)
+  in
+  let g_body = gen_expr ctx inner_env g_ret_ty prelude_fuel in
+  let g_ty =
+    Ty.Arrow { label = Arg_label.Nolabel; arg = g_arg_ty; ret = g_ret_ty }
+  in
+  let g_name = fresh ctx in
+  let g_lam = Expr.lam [Expr.param_positional g_arg g_arg_ty] g_body in
+  let wrap_ty, wrap =
+    choose ctx
+      [ (2, fun () -> g_ty, Expr.var g_name);
+        ( 1,
+          fun () ->
+            ( Ty.Tuple [g_ty; Ty.Constant Ty.Constant.Int],
+              Expr.tuple [Expr.var g_name; Expr.int_lit 0] ) ) ]
+  in
+  let body = Expr.let_ g_name g_lam wrap in
+  let f_lam = Expr.lam [Expr.param_positional p p_ty] body in
+  let f_ty =
+    Ty.Arrow { label = Arg_label.Nolabel; arg = p_ty; ret = wrap_ty }
+  in
+  prelude_binding ~annot name f_lam, f_ty
+
+(* A module with a derived, ascribed signature (milestone 2 of the prelude
+   plan): [module M0 : sig ... end = struct ... end].
+
+   The struct is generated first and the signature is DERIVED from it, so
+   "signature matches struct" holds by construction: - one local type
+   declaration, kept transparent in the signature or made abstract (a fresh
+   mode-analysis boundary: outside, nothing is known about its layout); - a
+   producer [val pN : int -> tK], always exported -- the constructibility
+   invariant generalized: when [tK] is abstract, calling the producer is the
+   only way to build a value (registered as [Ty.Decl.Abstract]); - optionally a
+   consumer [val pN : tK -> int]; - 0..2 further function members via the
+   ordinary lanes ([gen_annot]); members may be hidden from the signature, and
+   exported ones may carry an allocation MODALITY ([@@ noalloc] / [@@
+   noalloc_strict]) -- the signature may thus strengthen, weaken, or hide the
+   mode information of the definition underneath, which is exactly the
+   ascription surface we want the frontend checked on (inconsistencies are
+   caught by the prelude gate).
+
+   The module's exported members enter the environment under qualified names
+   ("M0.p3"), and its type -- qualified as "M0.tK" -- is registered in
+   [ctx.tenv], so later items and the main function use both with no extra
+   logic. *)
+let gen_module_modality ctx =
+  choose ctx
+    [ (3, fun () -> None);
+      (1, fun () -> Some "noalloc");
+      (2, fun () -> Some "noalloc_strict") ]
+
+(* A module whose abstract type is secretly a FUNCTION type:
+
+   [module M : sig type t val p : int -> t val c : t -> r end = struct type t =
+   <arrow> let p (x : int) = <expr of arrow type> ... end]
+
+   This is the "whitewashed allocating closure" scenario: the producer (which
+   may carry any annotation lane, including a checked or assumed zero_alloc)
+   returns a possibly-allocating function hidden behind the abstraction, and the
+   consumer takes a [t] and CALLS it -- so the main function can route an
+   allocation through [M.c (M.p e)] without any function type appearing in its
+   own interface. The alias is always abstract in the signature (a transparent
+   [type t = int -> int] would make [t] and the arrow interchangeable and adds
+   nothing); the consumer is therefore always exported, since it is the only way
+   the hidden function can be applied. *)
+let gen_fun_alias_module ctx env name =
+  let local_id = fresh_ty_name ctx in
+  let qualified_id = name ^ "." ^ local_id in
+  let underlying = fun_ty ctx in
+  let params, result = Ty.arrows underlying in
+  (* struct: type tK = <underlying> *)
+  let alias_item =
+    Ast_helper.Str.type_ Asttypes.Recursive
+      [ Ast_helper.Type.mk
+          ~manifest:(Ty.to_core_type underlying)
+          (Location.mknoloc local_id) ]
+  in
+  (* producer: val pN : int -> tK, body generated at the underlying arrow type
+     (the alias makes them equal inside the struct) *)
+  let producer_name = fresh_prelude ctx in
+  let producer_arg = Ty.Constant Ty.Constant.Int in
+  let producer_item =
+    let annot = gen_annot ctx in
+    let x = fresh ctx in
+    prelude_binding ~annot producer_name
+      (Expr.lam
+         [Expr.param_positional x producer_arg]
+         (gen_expr ctx ((x, producer_arg) :: env) underlying prelude_fuel))
+  in
+  (* consumer: val cN : tK -> <result>, body fully applies the hidden
+     function *)
+  let consumer_name = fresh_prelude ctx in
+  let consumer_item =
+    let x = fresh ctx in
+    let args =
+      List.map
+        (fun ((label : Arg_label.t), arg_ty) ->
+          let label : Arg_label.t =
+            match label with
+            | Optional l -> Labelled l
+            | Nolabel | Labelled _ -> label
+          in
+          label, gen_expr ctx env arg_ty (prelude_fuel - 1))
+        params
+    in
+    prelude_binding ~annot:No_annot consumer_name
+      (Expr.lam
+         [Expr.param_positional x (Ty.Constr local_id)]
+         (Expr.app (Expr.var x) args))
+  in
+  let modality_of ctx =
+    match gen_module_modality ctx with
+    | None -> []
+    | Some m -> [Location.mknoloc (Parsetree.Modality m)]
+  in
+  let sig_items =
+    [ Ast_helper.Sig.type_ Asttypes.Recursive
+        [Ast_helper.Type.mk (Location.mknoloc local_id)];
+      Ast_helper.Sig.value
+        (Ast_helper.Val.mk ~modalities:(modality_of ctx)
+           (Location.mknoloc producer_name)
+           (Ty.to_core_type
+              (Ty.Arrow
+                 { label = Arg_label.Nolabel;
+                   arg = producer_arg;
+                   ret = Ty.Constr local_id
+                 })));
+      Ast_helper.Sig.value
+        (Ast_helper.Val.mk ~modalities:(modality_of ctx)
+           (Location.mknoloc consumer_name)
+           (Ty.to_core_type
+              (Ty.Arrow
+                 { label = Arg_label.Nolabel;
+                   arg = Ty.Constr local_id;
+                   ret = result
+                 }))) ]
+  in
+  let item =
+    Ast_helper.Str.module_
+      (Ast_helper.Mb.mk
+         (Location.mknoloc (Some name))
+         (Ast_helper.Mod.constraint_
+            (Some (Ast_helper.Mty.signature (Ast_helper.Sg.mk sig_items)))
+            []
+            (Ast_helper.Mod.structure
+               [alias_item; producer_item; consumer_item])))
+  in
+  (* Outside view: abstract, produced only via the producer. [result] cannot
+     mention [tK] ([underlying] is built from [component_ty], which never sees
+     the alias), so only the producer / consumer types need qualifying. *)
+  ctx.tenv
+    <- ctx.tenv
+       @ [ { Ty.Decl.id = qualified_id;
+             kind =
+               Ty.Decl.Abstract
+                 { producer = name ^ "." ^ producer_name; producer_arg }
+           } ];
+  let exported_env =
+    [ ( name ^ "." ^ producer_name,
+        Ty.Arrow
+          { label = Arg_label.Nolabel;
+            arg = producer_arg;
+            ret = Ty.Constr qualified_id
+          } );
+      ( name ^ "." ^ consumer_name,
+        Ty.Arrow
+          { label = Arg_label.Nolabel;
+            arg = Ty.Constr qualified_id;
+            ret = result
+          } ) ]
+  in
+  item, exported_env
+
+let gen_data_module ctx env name =
+  let local_id = fresh_ty_name ctx in
+  let qualified_id = name ^ "." ^ local_id in
+  let kind =
+    choose ctx
+      [ (1, fun () -> gen_record ctx);
+        (1, fun () -> gen_variant ctx ~id:local_id) ]
+  in
+  let local_decl = { Ty.Decl.id = local_id; kind } in
+  (* While generating member bodies, the local type is in scope unqualified. *)
+  let outer_tenv = ctx.tenv in
+  ctx.tenv <- ctx.tenv @ [local_decl];
+  let local_ty = Ty.Constr local_id in
+  let qualify = Ty.qualify ~local_id ~qualified_id in
+  (* Producer: always present and always exported. *)
+  let producer_name = fresh_prelude ctx in
+  let producer_arg = Ty.Constant Ty.Constant.Int in
+  let producer_ty =
+    Ty.Arrow { label = Arg_label.Nolabel; arg = producer_arg; ret = local_ty }
+  in
+  let producer_item =
+    let x = fresh ctx in
+    prelude_binding ~annot:No_annot producer_name
+      (Expr.lam
+         [Expr.param_positional x producer_arg]
+         (gen_expr ctx [x, producer_arg] local_ty prelude_fuel))
+  in
+  (* Optional consumer [tK -> int]. *)
+  let consumer =
+    if Random.State.int ctx.rng 2 = 0
+    then begin
+      let cname = fresh_prelude ctx in
+      let cty =
+        Ty.Arrow
+          { label = Arg_label.Nolabel;
+            arg = local_ty;
+            ret = Ty.Constant Ty.Constant.Int
+          }
+      in
+      let x = fresh ctx in
+      let item =
+        prelude_binding ~annot:No_annot cname
+          (Expr.lam
+             [Expr.param_positional x local_ty]
+             (gen_expr ctx ((x, local_ty) :: env) (Ty.Constant Ty.Constant.Int)
+                prelude_fuel))
+      in
+      [cname, cty, item]
+    end
+    else []
+  in
+  (* Further ordinary function members. *)
+  let extras =
+    List.init (Random.State.int ctx.rng 3) (fun _ ->
+        let mname = fresh_prelude ctx in
+        let item, ty = gen_prelude_function ctx env mname in
+        mname, ty, item)
+  in
+  let members =
+    (producer_name, producer_ty, producer_item) :: (consumer @ extras)
+  in
+  (* Derive the signature. The type is transparent or abstract; the producer is
+     always exported; other members are exported (possibly with a modality) or
+     hidden. *)
+  let abstract = Random.State.int ctx.rng 3 = 0 in
+  let type_sig_item =
+    let decl =
+      if abstract
+      then
+        { Ty.Decl.id = local_id;
+          kind = Ty.Decl.Abstract { producer = ""; producer_arg }
+        }
+      else local_decl
+    in
+    Ast_helper.Sig.type_ Asttypes.Recursive [Ty.Decl.to_type_declaration decl]
+  in
+  let exported =
+    List.filter_map
+      (fun (mname, ty, _item) ->
+        let is_producer = String.equal mname producer_name in
+        if (not is_producer) && Random.State.int ctx.rng 4 = 0
+        then None (* hidden *)
+        else begin
+          let modalities =
+            match gen_module_modality ctx with
+            | None -> []
+            | Some m -> [Location.mknoloc (Parsetree.Modality m)]
+          in
+          Some
+            ( mname,
+              ty,
+              Ast_helper.Sig.value
+                (Ast_helper.Val.mk ~modalities (Location.mknoloc mname)
+                   (Ty.to_core_type ty)) )
+        end)
+      members
+  in
+  let sig_items = type_sig_item :: List.map (fun (_, _, s) -> s) exported in
+  let struct_items =
+    Ty.Decl.to_structure_item local_decl
+    :: List.map (fun (_, _, i) -> i) members
+  in
+  let item =
+    Ast_helper.Str.module_
+      (Ast_helper.Mb.mk
+         (Location.mknoloc (Some name))
+         (Ast_helper.Mod.constraint_
+            (Some (Ast_helper.Mty.signature (Ast_helper.Sg.mk sig_items)))
+            []
+            (Ast_helper.Mod.structure struct_items)))
+  in
+  (* Outside view: the local type leaves scope; register the qualified type in
+     [ctx.tenv] and return the exported members under qualified names. *)
+  let registered_kind =
+    if abstract
+    then
+      Ty.Decl.Abstract { producer = name ^ "." ^ producer_name; producer_arg }
+    else
+      begin match kind with
+      | Ty.Decl.Record fields ->
+        Ty.Decl.Record
+          (List.map
+             (fun (f : Ty.Decl.field) ->
+               { f with f_name = name ^ "." ^ f.f_name; f_ty = qualify f.f_ty })
+             fields)
+      | Ty.Decl.Variant constrs ->
+        Ty.Decl.Variant
+          (List.map
+             (fun (c : Ty.Decl.constructor) ->
+               { Ty.Decl.c_name = name ^ "." ^ c.c_name;
+                 c_args = List.map qualify c.c_args
+               })
+             constrs)
+      | Ty.Decl.Abstract _ -> assert false
+      end
+  in
+  ctx.tenv
+    <- outer_tenv @ [{ Ty.Decl.id = qualified_id; kind = registered_kind }];
+  let exported_env =
+    List.map (fun (mname, ty, _) -> name ^ "." ^ mname, qualify ty) exported
+  in
+  item, exported_env
+
+let gen_prelude_module ctx env name =
+  choose ctx
+    [ (2, fun () -> gen_data_module ctx env name);
+      (1, fun () -> gen_fun_alias_module ctx env name) ]
+
+(* Generate 0..3 prelude items, each seeing only the strictly earlier ones.
+   Returns the structure items and the (name, type) environment they
+   contribute. *)
+let gen_prelude_items ctx =
+  let n = Random.State.int ctx.rng 4 in
+  let rec go i env rev_items =
+    if i = n
+    then List.rev rev_items, List.rev env
+    else begin
+      let entries, item =
+        choose ctx
+          [ ( 1,
+              fun () ->
+                let name = fresh_prelude ctx in
+                let item, ty = gen_prelude_value ctx env name in
+                [name, ty], item );
+            ( 3,
+              fun () ->
+                let name = fresh_prelude ctx in
+                let item, ty = gen_prelude_function ctx env name in
+                [name, ty], item );
+            ( 2,
+              fun () ->
+                let name = fresh_prelude ctx in
+                let item, ty = gen_prelude_factory ctx env name in
+                [name, ty], item );
+            ( 2,
+              fun () ->
+                let name = fresh_module ctx in
+                let item, exported = gen_prelude_module ctx env name in
+                exported, item ) ]
+      in
+      go (i + 1) (List.rev_append entries env) (item :: rev_items)
+    end
+  in
+  go 0 [] []
+
+let generate ~max_decls ~allow_assume ~mode ~seed =
   let ctx =
     { rng = Random.State.make [| seed |];
       next_var = 0;
       next_ty = 0;
       next_field = 0;
       next_constr = 0;
+      next_prelude = 0;
+      next_module = 0;
       tenv = Ty.Tenv.empty;
-      mode
+      mode;
+      allow_assume
     }
   in
   gen_decls ctx ~max_decls;
+  (* Snapshot the top-level type declarations now: [gen_prelude_items] also
+     registers module types (qualified, possibly [Abstract]) in [ctx.tenv] for
+     the benefit of later generation, and those must not be printed as top-level
+     items. *)
+  let type_items = Ty.Tenv.to_structure_items ctx.tenv in
+  let prelude_items, prelude_env = gen_prelude_items ctx in
   let int_ty = Ty.Constant Ty.Constant.Int in
   let float_ty = Ty.Constant Ty.Constant.Float in
-  let env = ["x0", int_ty; "x1", float_ty] in
+  let env = ["x0", int_ty; "x1", float_ty] @ prelude_env in
   let ty = goal_ty ctx in
   let body = maybe_exclave ctx ty (gen_expr ctx env ty initial_fuel) in
   (* No return-type annotation is emitted since a plain [: ty] could interact
@@ -893,29 +1462,25 @@ let generate ~max_decls ~mode ~seed =
      forces the body's allocations local), and the [@zero_alloc strict]
      attribute on the binding makes the backend check exactly that typed
      program. *)
-  let zero_alloc =
-    Ast_helper.Attr.mk
-      (Location.mknoloc "zero_alloc")
-      (Parsetree.PStr
-         [ Ast_helper.Str.eval
-             (Ast_helper.Exp.ident
-                (Location.mknoloc (Longident.Lident "strict"))) ])
-  in
   let binding =
-    Ast_helper.Vb.mk ~attrs:[zero_alloc]
+    Ast_helper.Vb.mk
+      ~attrs:[zero_alloc_attr (Some "strict")]
       ~modes:[Location.mknoloc (Parsetree.Mode "noalloc_strict")]
       (Ast_helper.Pat.var (Location.mknoloc "f"))
       (Expr.lam
          [Expr.param_positional "x0" int_ty; Expr.param_positional "x1" float_ty]
          body)
   in
+  let prelude_structure = type_items @ prelude_items in
   let structure =
-    Ty.Tenv.to_structure_items ctx.tenv
-    @ [Ast_helper.Str.value Asttypes.Nonrecursive [binding]]
+    prelude_structure @ [Ast_helper.Str.value Asttypes.Nonrecursive [binding]]
   in
   let header =
     Printf.sprintf "(* goal: %s *)\n"
       (Format.asprintf "%a" Pprintast.core_type (Ty.to_core_type ty))
   in
+  let prelude_source =
+    Format.asprintf "%a@." Pprintast.structure prelude_structure
+  in
   let source = header ^ Format.asprintf "%a@." Pprintast.structure structure in
-  { Sample.source }
+  { Sample.prelude_source; source }

@@ -16,6 +16,17 @@ module Gap : sig
     }
 end
 
+module Prelude_reject : sig
+  type t =
+    { seed : int;
+      stage : Oracle.Outcome.gate_stage;
+      cause : string;
+      sample : Gen.Sample.t
+    }
+
+  val stage_to_string : Oracle.Outcome.gate_stage -> string
+end
+
 module Stats : sig
   type t
 
@@ -23,10 +34,14 @@ module Stats : sig
 
   val gen_errors : t -> int
 
-  (* Both lists are in generation order. *)
+  (* All lists are in generation order. *)
+  val agrees : t -> (int * Gen.Sample.t) list
+
   val suspects : t -> Suspect.t list
 
   val gaps : t -> Gap.t list
+
+  val prelude_rejects : t -> Prelude_reject.t list
 end
 
 val run :
@@ -35,6 +50,7 @@ val run :
   seed0:int ->
   mode:Gen.Mode.t ->
   max_decls:int ->
+  allow_assume:bool ->
   Stats.t
 
 val report : Stats.t -> unit

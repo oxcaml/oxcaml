@@ -28,12 +28,21 @@ module Verdict = struct
 end
 
 module Outcome = struct
+  type gate_stage =
+    | Fe_gate
+    | Be_gate
+
   type t =
     | Agree_noalloc (* FE accepts, BE passes -- agree *)
     | Soundness_suspect of { backend_error : string }
       (* FE accepts, BE rejects -- ambiguous, triage *)
     | Fe_reject of { cause : string }
-  (* FE rejects -- possible precision gap; not confirmable by the backend *)
+      (* FE rejects -- possible precision gap; not confirmable by the backend *)
+    | Prelude_reject of
+        { stage : gate_stage;
+          cause : string
+        }
+  (* the prelude alone failed its own FE or BE check *)
 end
 
 (* Run [compiler] with [args], returning (exit_code, captured_stderr). stdout is
@@ -122,15 +131,36 @@ let run_backend ~compiler ~file =
   then Verdict.Reject text
   else Verdict.Gen_error text
 
-let check ~compiler ~file =
-  match run_frontend ~compiler ~file with
-  | Verdict.Gen_error e -> Error e
-  | Verdict.Reject _ as frontend ->
-    (* The program does not typecheck, so the backend check cannot run on it. *)
-    Ok (Outcome.Fe_reject { cause = Verdict.cause frontend })
+(* The gate: the prelude must pass both checks on its own before the main
+   function's verdicts mean anything (a checked prelude annotation that is
+   inconsistent with its body would otherwise masquerade as a main-function
+   result). *)
+let check_prelude ~compiler ~prelude_file =
+  match run_frontend ~compiler ~file:prelude_file with
+  | Verdict.Gen_error e -> Error (`Gen_error e)
+  | Verdict.Reject _ as v -> Error (`Reject (Outcome.Fe_gate, Verdict.cause v))
   | Verdict.Accept -> (
-    match run_backend ~compiler ~file with
+    match run_backend ~compiler ~file:prelude_file with
+    | Verdict.Gen_error e -> Error (`Gen_error e)
+    | Verdict.Reject _ as v ->
+      Error (`Reject (Outcome.Be_gate, Verdict.cause v))
+    | Verdict.Accept -> Ok ())
+
+let check ~compiler ~prelude_file ~file =
+  match check_prelude ~compiler ~prelude_file with
+  | Error (`Gen_error e) -> Error e
+  | Error (`Reject (stage, cause)) ->
+    Ok (Outcome.Prelude_reject { stage; cause })
+  | Ok () -> (
+    match run_frontend ~compiler ~file with
     | Verdict.Gen_error e -> Error e
-    | Verdict.Accept -> Ok Outcome.Agree_noalloc
-    | Verdict.Reject backend_error ->
-      Ok (Outcome.Soundness_suspect { backend_error }))
+    | Verdict.Reject _ as frontend ->
+      (* The program does not typecheck, so the backend check cannot run on
+         it. *)
+      Ok (Outcome.Fe_reject { cause = Verdict.cause frontend })
+    | Verdict.Accept -> (
+      match run_backend ~compiler ~file with
+      | Verdict.Gen_error e -> Error e
+      | Verdict.Accept -> Ok Outcome.Agree_noalloc
+      | Verdict.Reject backend_error ->
+        Ok (Outcome.Soundness_suspect { backend_error })))
