@@ -136,69 +136,7 @@ module Identifier : sig
 
     val var : Var.Type_constr.t -> Loc.t -> t
 
-    val int : t
-
-    val char : t
-
-    val string : t
-
-    val bytes : t
-
-    val float : t
-
-    val float32 : t
-
-    val bool : t
-
-    val unit : t
-
-    val exn : t
-
-    val array : t
-
-    val iarray : t
-
-    val list : t
-
-    val option : t
-
-    val nativeint : t
-
-    val int32 : t
-
-    val int64 : t
-
-    val lazy_t : t
-
-    val extension_constructor : t
-
-    val floatarray : t
-
-    val lexing_position : t
-
-    val expr : t
-
-    val eval : t
-
-    val unboxed_float : t
-
-    val unboxed_nativeint : t
-
-    val unboxed_int32 : t
-
-    val unboxed_int64 : t
-
-    val int8x16 : t
-
-    val int16x8 : t
-
-    val int32x4 : t
-
-    val int64x2 : t
-
-    val float32x4 : t
-
-    val float64x2 : t
+    val builtin : string -> t
   end
 
   module Module_type : sig
@@ -212,45 +150,7 @@ module Identifier : sig
 
     val dot : Module.t -> string -> t
 
-    val false_ : t
-
-    val true_ : t
-
-    val void : t
-
-    val nil : t
-
-    val cons : t
-
-    val none : t
-
-    val some : t
-
-    val match_failure : t
-
-    val out_of_memory : t
-
-    val out_of_fibers : t
-
-    val invalid_argument : t
-
-    val failure : t
-
-    val not_found : t
-
-    val sys_error : t
-
-    val end_of_file : t
-
-    val division_by_zero : t
-
-    val stack_overflow : t
-
-    val sys_blocked_io : t
-
-    val assert_failure : t
-
-    val undefined_recursive_module : t
+    val builtin : string -> t
   end
 
   module Field : sig

@@ -1013,69 +1013,7 @@ module Identifier = struct
 
     let var v l = mk (TVar (v, l))
 
-    let int = TBuiltin "int" |> mk
-
-    let char = TBuiltin "char" |> mk
-
-    let string = TBuiltin "string" |> mk
-
-    let bytes = TBuiltin "bytes" |> mk
-
-    let float = TBuiltin "float" |> mk
-
-    let float32 = TBuiltin "float32" |> mk
-
-    let bool = TBuiltin "bool" |> mk
-
-    let unit = TBuiltin "unit" |> mk
-
-    let exn = TBuiltin "exn" |> mk
-
-    let array = TBuiltin "array" |> mk
-
-    let iarray = TBuiltin "iarray" |> mk
-
-    let list = TBuiltin "list" |> mk
-
-    let option = TBuiltin "option" |> mk
-
-    let nativeint = TBuiltin "nativeint" |> mk
-
-    let int32 = TBuiltin "int32" |> mk
-
-    let int64 = TBuiltin "int64" |> mk
-
-    let lazy_t = TBuiltin "lazy_t" |> mk
-
-    let extension_constructor = TBuiltin "extension_constructor" |> mk
-
-    let floatarray = TBuiltin "floatarray" |> mk
-
-    let lexing_position = TBuiltin "lexing_position" |> mk
-
-    let expr = TBuiltin "expr" |> mk
-
-    let eval = TBuiltin "eval" |> mk
-
-    let unboxed_float = TBuiltin "float#" |> mk
-
-    let unboxed_nativeint = TBuiltin "nativeint#" |> mk
-
-    let unboxed_int32 = TBuiltin "int32#" |> mk
-
-    let unboxed_int64 = TBuiltin "int64#" |> mk
-
-    let int8x16 = TBuiltin "int8x16" |> mk
-
-    let int16x8 = TBuiltin "int16x8" |> mk
-
-    let int32x4 = TBuiltin "int32x4" |> mk
-
-    let int64x2 = TBuiltin "int64x2" |> mk
-
-    let float32x4 = TBuiltin "float32x4" |> mk
-
-    let float64x2 = TBuiltin "float64x2" |> mk
+    let builtin name = TBuiltin name |> mk
   end
 
   module Module_type = struct
@@ -1099,45 +1037,7 @@ module Identifier = struct
       let+ t = t in
       CDot (t, s)
 
-    let false_ = CBuiltin "false" |> mk
-
-    let true_ = CBuiltin "true" |> mk
-
-    let void = CBuiltin "()" |> mk
-
-    let nil = CBuiltin "[]" |> mk
-
-    let cons = CBuiltin "::" |> mk
-
-    let none = CBuiltin "None" |> mk
-
-    let some = CBuiltin "Some" |> mk
-
-    let match_failure = CBuiltin "Match_failure" |> mk
-
-    let out_of_memory = CBuiltin "Out_of_memory" |> mk
-
-    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
-
-    let invalid_argument = CBuiltin "Invalid_argument" |> mk
-
-    let failure = CBuiltin "Failure" |> mk
-
-    let not_found = CBuiltin "Not_found" |> mk
-
-    let sys_error = CBuiltin "Sys_error" |> mk
-
-    let end_of_file = CBuiltin "End_of_file" |> mk
-
-    let division_by_zero = CBuiltin "Division_by_zero" |> mk
-
-    let stack_overflow = CBuiltin "Stack_overflow" |> mk
-
-    let sys_blocked_io = CBuiltin "Sys_blocked_io" |> mk
-
-    let assert_failure = CBuiltin "Assert_failure" |> mk
-
-    let undefined_recursive_module = CBuiltin "Undefined_recursive_module" |> mk
+    let builtin name = CBuiltin name |> mk
   end
 
   module Field = struct

@@ -693,69 +693,7 @@ module Identifier : sig
 
     val var : Debuginfo.Scoped_location.t -> Var.Type_constr.t -> Loc.t -> t'
 
-    val int : t'
-
-    val char : t'
-
-    val string : t'
-
-    val bytes : t'
-
-    val float : t'
-
-    val float32 : t'
-
-    val bool : t'
-
-    val unit : t'
-
-    val exn : t'
-
-    val array : t'
-
-    val iarray : t'
-
-    val list : t'
-
-    val option : t'
-
-    val nativeint : t'
-
-    val int32 : t'
-
-    val int64 : t'
-
-    val lazy_t : t'
-
-    val extension_constructor : t'
-
-    val floatarray : t'
-
-    val lexing_position : t'
-
-    val expr : t'
-
-    val eval : t'
-
-    val unboxed_float : t'
-
-    val unboxed_nativeint : t'
-
-    val unboxed_int32 : t'
-
-    val unboxed_int64 : t'
-
-    val int8x16 : t'
-
-    val int16x8 : t'
-
-    val int32x4 : t'
-
-    val int64x2 : t'
-
-    val float32x4 : t'
-
-    val float64x2 : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Module_type : sig
@@ -781,45 +719,7 @@ module Identifier : sig
 
     val dot : Debuginfo.Scoped_location.t -> Module.t -> string -> t'
 
-    val false_ : t'
-
-    val true_ : t'
-
-    val void : t'
-
-    val nil : t'
-
-    val cons : t'
-
-    val none : t'
-
-    val some : t'
-
-    val match_failure : t'
-
-    val out_of_memory : t'
-
-    val out_of_fibers : t'
-
-    val invalid_argument : t'
-
-    val failure : t'
-
-    val not_found : t'
-
-    val sys_error : t'
-
-    val end_of_file : t'
-
-    val division_by_zero : t'
-
-    val stack_overflow : t'
-
-    val sys_blocked_io : t'
-
-    val assert_failure : t'
-
-    val undefined_recursive_module : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Field : sig
@@ -888,69 +788,7 @@ end = struct
     let var loc a1 a2 =
       apply2 "Identifier.Type" "var" loc (extract a1) (extract a2)
 
-    let int = use "Identifier.Type" "int"
-
-    let char = use "Identifier.Type" "char"
-
-    let string = use "Identifier.Type" "string"
-
-    let bytes = use "Identifier.Type" "bytes"
-
-    let float = use "Identifier.Type" "float"
-
-    let float32 = use "Identifier.Type" "float32"
-
-    let bool = use "Identifier.Type" "bool"
-
-    let unit = use "Identifier.Type" "unit"
-
-    let exn = use "Identifier.Type" "exn"
-
-    let array = use "Identifier.Type" "array"
-
-    let iarray = use "Identifier.Type" "iarray"
-
-    let list = use "Identifier.Type" "list"
-
-    let option = use "Identifier.Type" "option"
-
-    let nativeint = use "Identifier.Type" "nativeint"
-
-    let int32 = use "Identifier.Type" "int32"
-
-    let int64 = use "Identifier.Type" "int64"
-
-    let lazy_t = use "Identifier.Type" "lazy_t"
-
-    let extension_constructor = use "Identifier.Type" "extension_constructor"
-
-    let floatarray = use "Identifier.Type" "floatarray"
-
-    let lexing_position = use "Identifier.Type" "lexing_position"
-
-    let expr = use "Identifier.Type" "expr"
-
-    let eval = use "Identifier.Type" "eval"
-
-    let unboxed_float = use "Identifier.Type" "unboxed_float"
-
-    let unboxed_nativeint = use "Identifier.Type" "unboxed_nativeint"
-
-    let unboxed_int32 = use "Identifier.Type" "unboxed_int32"
-
-    let unboxed_int64 = use "Identifier.Type" "unboxed_int64"
-
-    let int8x16 = use "Identifier.Type" "int8x16"
-
-    let int16x8 = use "Identifier.Type" "int16x8"
-
-    let int32x4 = use "Identifier.Type" "int32x4"
-
-    let int64x2 = use "Identifier.Type" "int64x2"
-
-    let float32x4 = use "Identifier.Type" "float32x4"
-
-    let float64x2 = use "Identifier.Type" "float64x2"
+    let builtin loc a1 = apply1 "Identifier.Type" "builtin" loc (string ~loc a1)
   end
 
   module Module_type = struct
@@ -978,46 +816,8 @@ end = struct
     let dot loc a1 a2 =
       apply2 "Identifier.Constructor" "dot" loc (extract a1) (string ~loc a2)
 
-    let false_ = use "Identifier.Constructor" "false_"
-
-    let true_ = use "Identifier.Constructor" "true_"
-
-    let void = use "Identifier.Constructor" "void"
-
-    let nil = use "Identifier.Constructor" "nil"
-
-    let cons = use "Identifier.Constructor" "cons"
-
-    let none = use "Identifier.Constructor" "none"
-
-    let some = use "Identifier.Constructor" "some"
-
-    let match_failure = use "Identifier.Constructor" "match_failure"
-
-    let out_of_memory = use "Identifier.Constructor" "out_of_memory"
-
-    let out_of_fibers = use "Identifier.Constructor" "out_of_fibers"
-
-    let invalid_argument = use "Identifier.Constructor" "invalid_argument"
-
-    let failure = use "Identifier.Constructor" "failure"
-
-    let not_found = use "Identifier.Constructor" "not_found"
-
-    let sys_error = use "Identifier.Constructor" "sys_error"
-
-    let end_of_file = use "Identifier.Constructor" "end_of_file"
-
-    let division_by_zero = use "Identifier.Constructor" "division_by_zero"
-
-    let stack_overflow = use "Identifier.Constructor" "stack_overflow"
-
-    let sys_blocked_io = use "Identifier.Constructor" "sys_blocked_io"
-
-    let assert_failure = use "Identifier.Constructor" "assert_failure"
-
-    let undefined_recursive_module =
-      use "Identifier.Constructor" "undefined_recursive_module"
+    let builtin loc a1 =
+      apply1 "Identifier.Constructor" "builtin" loc (string ~loc a1)
   end
 
   module Field = struct
@@ -2420,9 +2220,11 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let module_for_path loc env path =
+let ( let+ ) f x = Option.map x f
+
+let module_for_path_opt loc env path =
   Env.add_required_global_for_quote path env;
-  let rec module_for_path path =
+  let rec go path =
     match path with
     | Path.Pident id ->
       (match Hashtbl.find_opt vars_env.env_mod id with
@@ -2434,85 +2236,69 @@ let module_for_path loc env path =
             (* We must be in a [Toplevel_lock_for_directive] if we are quoting
              a non-global module. *)
             Ident.name id |> Identifier.Module.toplevel_module loc))
-      |> Identifier.Module.wrap
+      |> Identifier.Module.wrap |> Option.some
     | Path.Pdot (p, s) ->
-      Identifier.Module.dot loc (module_for_path p) s |> Identifier.Module.wrap
-    | _ -> raise Exit
+      let+ m = go p in
+      Identifier.Module.dot loc m s |> Identifier.Module.wrap
+    | _ -> None
   in
-  module_for_path path
+  go path
 
-let module_type_for_path loc env = function
+let module_type_for_path_opt loc env = function
   | Path.Pident id ->
-    Module_type.of_string loc (Ident.name id) |> Module_type.wrap
+    Module_type.of_string loc (Ident.name id) |> Module_type.wrap |> Option.some
   | Path.Pdot (p, s) ->
+    let+ m = module_for_path_opt loc env p in
     Module_type.ident loc
-      (Identifier.Module_type.dot loc (module_for_path loc env p) s
-      |> Identifier.Module_type.wrap)
+      (Identifier.Module_type.dot loc m s |> Identifier.Module_type.wrap)
     |> Module_type.wrap
-  | _ -> raise Exit
+  | _ -> None
 
-let type_for_path loc env = function
+let type_for_path_opt loc env = function
   | Path.Pident id ->
-    (match Hashtbl.find_opt vars_env.env_tys id with
-      | Some t -> Identifier.Type.var loc t (quote_loc loc)
-      | None -> (
-        match Ident.name id with
-        | "int" -> Identifier.Type.int
-        | "char" -> Identifier.Type.char
-        | "string" -> Identifier.Type.string
-        | "bytes" -> Identifier.Type.bytes
-        | "float" -> Identifier.Type.float
-        | "float32" -> Identifier.Type.float32
-        | "bool" -> Identifier.Type.bool
-        | "unit" -> Identifier.Type.unit
-        | "exn" -> Identifier.Type.exn
-        | "array" -> Identifier.Type.array
-        | "iarray" -> Identifier.Type.iarray
-        | "list" -> Identifier.Type.list
-        | "option" -> Identifier.Type.option
-        | "nativeint" -> Identifier.Type.nativeint
-        | "int32" -> Identifier.Type.int32
-        | "int64" -> Identifier.Type.int64
-        | "lazy_t" -> Identifier.Type.lazy_t
-        | "extension_constructor" -> Identifier.Type.extension_constructor
-        | "floatarray" -> Identifier.Type.floatarray
-        | "lexing_position" -> Identifier.Type.lexing_position
-        | "expr" -> Identifier.Type.expr
-        | "eval" -> Identifier.Type.eval
-        | "float#" -> Identifier.Type.unboxed_float
-        | "nativeint#" -> Identifier.Type.unboxed_nativeint
-        | "int32#" -> Identifier.Type.unboxed_int32
-        | "int64#" -> Identifier.Type.unboxed_int64
-        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
-        | "int32_u" -> Identifier.Type.unboxed_int32
-        | "int64_u" -> Identifier.Type.unboxed_int64
-        | "int8x16" -> Identifier.Type.int8x16
-        | "int16x8" -> Identifier.Type.int16x8
-        | "int32x4" -> Identifier.Type.int32x4
-        | "int64x2" -> Identifier.Type.int64x2
-        | "float32x4" -> Identifier.Type.float32x4
-        | "float64x2" -> Identifier.Type.float64x2
-        | _ -> raise Exit))
-    |> Identifier.Type.wrap
+    let+ t =
+      match Hashtbl.find_opt vars_env.env_tys id with
+      | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
+      | None ->
+        (* CR-someday jbachurski: I am fairly sure we can retire this check as
+           it is redundant with what the environment already does. However,
+           we can keep it if it does not get in the way. *)
+        let name = Ident.name id in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            Predef.builtin_type_constrs
+        then Some (Identifier.Type.builtin loc name)
+        else None
+    in
+    Identifier.Type.wrap t
   | Path.Pdot (p, s) ->
-    Identifier.Type.dot loc (module_for_path loc env p) s
-    |> Identifier.Type.wrap
-  | _ -> raise Exit
+    let+ m = module_for_path_opt loc env p in
+    Identifier.Type.dot loc m s |> Identifier.Type.wrap
+  | _ -> None
 
-let type_constr_for_path loc env path arity =
-  Type.constr loc
-    (type_for_path loc env path)
-    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
-  |> Type.wrap
-
-let value_for_path loc env = function
+let value_for_path_opt loc env = function
   | Path.Pdot (p, s) ->
-    Identifier.Value.dot loc (module_for_path loc env p) s
-    |> Identifier.Value.wrap
-  | _ -> raise Exit
+    let+ m = module_for_path_opt loc env p in
+    Identifier.Value.dot loc m s |> Identifier.Value.wrap
+  | _ -> None
 
-let value_for_path_opt loc env p =
-  match value_for_path loc env p with res -> Some res | exception Exit -> None
+let try_path kind path_for_kind_opt loc env path =
+  match path_for_kind_opt loc env path with
+  | Some x -> x
+  | None ->
+    fatal_errorf
+      "Translquote [at %a]: cannot quote %s %s - this is either unsupported or \
+       a bug"
+      Location.print_loc (to_location loc) kind (Path.name path)
+
+let module_for_path loc env path =
+  try_path "module" module_for_path_opt loc env path
+
+let module_type_for_path loc env path =
+  try_path "module" module_type_for_path_opt loc env path
+
+let type_for_path loc env path = try_path "type" type_for_path_opt loc env path
 
 let quote_value_ident_path loc env path =
   match value_for_path_opt loc env path with
@@ -2540,6 +2326,12 @@ let type_path env ty =
   let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
+let type_constr_for_path loc env path arity =
+  Type.constr loc
+    (type_for_path loc env path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
+
 let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
   | None ->
@@ -2556,55 +2348,51 @@ let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
       Location.print_loc (to_location loc)
 
 let quote_constructor loc env (constr : Data_types.constructor_description) =
-  let exception Non_builtin of string in
-  (try
-     Identifier.Constructor.wrap
-       (match constr.cstr_tag with
-       | Extension (Path.Pdot (p, name)) ->
-         Identifier.Constructor.dot loc (module_for_path loc env p) name
-       | Extension (Path.Pident name) -> raise (Non_builtin (Ident.name name))
-       | Extension _ ->
-         fatal_errorf "Translquote [at %a]: Papply in extension constructor."
-           Location.print_loc (to_location loc)
-       | Ordinary _ | Null -> (
-         match type_path env constr.cstr_res with
-         | None ->
-           fatal_errorf "Translquote [at %a]: no global path for constructor"
-             Location.print_loc (to_location loc)
-         | Some (Path.Pident _) -> (
-           match constr.cstr_name with
-           | "false" -> Identifier.Constructor.false_
-           | "true" -> Identifier.Constructor.true_
-           | "()" -> Identifier.Constructor.void
-           | "[]" -> Identifier.Constructor.nil
-           | "::" -> Identifier.Constructor.cons
-           | "None" -> Identifier.Constructor.none
-           | "Some" -> Identifier.Constructor.some
-           | "Match_failure" -> Identifier.Constructor.match_failure
-           | "Out_of_memory" -> Identifier.Constructor.out_of_memory
-           | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
-           | "Invalid_argument" -> Identifier.Constructor.invalid_argument
-           | "Failure" -> Identifier.Constructor.failure
-           | "Not_found" -> Identifier.Constructor.not_found
-           | "Sys_error" -> Identifier.Constructor.sys_error
-           | "End_of_file" -> Identifier.Constructor.end_of_file
-           | "Division_by_zero" -> Identifier.Constructor.division_by_zero
-           | "Stack_overflow" -> Identifier.Constructor.stack_overflow
-           | "Sys_blocked_io" -> Identifier.Constructor.sys_blocked_io
-           | "Assert_failure" -> Identifier.Constructor.assert_failure
-           | "Undefined_recursive_module" ->
-             Identifier.Constructor.undefined_recursive_module
-           | name -> raise (Non_builtin name))
-         | Some (Path.Pdot (p, _)) ->
-           Identifier.Constructor.dot loc
-             (module_for_path loc env p)
-             constr.cstr_name
-         | _ ->
-           fatal_errorf
-             "Translquote [at %a]: unsupported constructor type detected."
-             Location.print_loc (to_location loc)))
-     |> Constructor.ident loc
-   with Non_builtin name -> Constructor.of_string loc name)
+  let local id = Constructor.of_string loc id in
+  let persistent id =
+    id |> Identifier.Constructor.wrap |> Constructor.ident loc
+  in
+  (* CR-someday jbachurski: Similarly to [type_for_path], I'm fairly sure
+     checking for builtin names is redundant. Secondly, I'm not sure
+     why these code paths are split between [Extension] and the rest,
+     nor certain that the [type_path] check is helpful. *)
+  (match constr.cstr_tag with
+    | Extension (Path.Pdot (p, name)) ->
+      Identifier.Constructor.dot loc (module_for_path loc env p) name
+      |> persistent
+    | Extension (Path.Pident id) ->
+      let name = Ident.name id in
+      if
+        List.exists
+          (fun (name', _) -> String.equal name name')
+          Predef.builtin_exns
+      then Identifier.Constructor.builtin loc name |> persistent
+      else local name
+    | Extension _ ->
+      fatal_errorf "Translquote [at %a]: Papply in extension constructor."
+        Location.print_loc (to_location loc)
+    | Ordinary _ | Null -> (
+      match type_path env constr.cstr_res with
+      | None ->
+        fatal_errorf "Translquote [at %a]: no global path for constructor"
+          Location.print_loc (to_location loc)
+      | Some (Path.Pident _) ->
+        let name = constr.cstr_name in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            Predef.builtin_constrs
+        then Identifier.Constructor.builtin loc name |> persistent
+        else local name
+      | Some (Path.Pdot (p, _)) ->
+        Identifier.Constructor.dot loc
+          (module_for_path loc env p)
+          constr.cstr_name
+        |> persistent
+      | _ ->
+        fatal_errorf
+          "Translquote [at %a]: unsupported constructor type detected."
+          Location.print_loc (to_location loc)))
   |> Constructor.wrap
 
 let rec quote_modtype_path_of_lid loc = function

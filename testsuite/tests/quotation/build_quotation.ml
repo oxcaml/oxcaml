@@ -386,7 +386,8 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
    We should also support this construct (ticket 6790). *)
 <[ let f : type a. a -> a = fun x -> x in f ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 19-20]: cannot quote type a - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 
