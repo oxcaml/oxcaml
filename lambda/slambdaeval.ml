@@ -557,14 +557,6 @@ and eval_prim env prim =
 
 exception Found_a_splice
 
-let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
-  | Psplicevar _ -> raise Found_a_splice
-  | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
-    ()
-  | Punboxed_product layouts ->
-    List.iter assert_layout_contains_no_splices layouts
-
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
@@ -576,6 +568,34 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
 
 let assert_mixed_block_shape_contains_no_splices shape =
   Array.iter assert_mixed_block_element_contains_no_splices shape
+
+let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
+  | Psplicevar _ -> raise Found_a_splice
+  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ ->
+    ()
+  | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
+  | Punboxed_product layouts ->
+    List.iter assert_layout_contains_no_splices layouts
+
+and assert_value_kind_contains_no_splices { raw_kind; nullable = _ } =
+  assert_raw_value_kind_contains_no_splices raw_kind
+
+and assert_raw_value_kind_contains_no_splices = function
+  | Pvariant { consts = _; non_consts } ->
+    List.iter
+      (fun (_, constructor_shape) ->
+        assert_constructor_shape_contains_no_splices constructor_shape)
+      non_consts
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ ->
+    ()
+
+and assert_constructor_shape_contains_no_splices = function
+  | Constructor_uniform value_kinds ->
+    List.iter assert_value_kind_contains_no_splices value_kinds
+  | Constructor_mixed mixed_block_shape ->
+    assert_mixed_block_shape_contains_no_splices mixed_block_shape
 
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
