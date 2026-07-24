@@ -2850,6 +2850,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_float32 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_float32 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_float32 ty'
@@ -2891,6 +2892,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_int8 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_int8 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_int8 ty'
@@ -2911,6 +2913,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_int16 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_int16 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_int16 ty'
@@ -2995,6 +2998,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_vec128 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_vec128 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_vec128 ty'
@@ -3015,6 +3019,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_vec256 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_vec256 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_vec256 ty'
@@ -3035,6 +3040,7 @@ let rec project_variables_out ~to_project ~expand t =
         ~free_names_head:free_names_head_of_kind_naked_vec512 ~to_project
         ~expand:expand_with_coercion
         ~project_head:(project_head_of_kind_naked_vec512 ~to_project ~expand)
+        ~project_coercion:(project_coercion ~to_project ~expand)
         ty
     in
     if ty == ty' then t else Naked_vec512 ty'
@@ -3315,7 +3321,8 @@ and project_head_of_kind_rec_info ~to_project ~expand head =
         | Unknown -> raise Depth_variable_removed
       end
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_int32 _
-        | Naked_int64 _ | Naked_nativeint _ | Region _ ) as ty ->
+        | Naked_int64 _ | Naked_nativeint _ | Region _ | Naked_float32 _|Naked_int8 _|Naked_int16 _|Naked_vec128 _|
+    Naked_vec256 _|Naked_vec512 _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Rec_info], got type %a"
           Variable.print var print ty)
@@ -3328,7 +3335,7 @@ and project_coercion ~to_project ~expand (coercion : Coercion.t) :
     try
       let from' = project_head_of_kind_rec_info ~to_project ~expand from in
       let to_' = project_head_of_kind_rec_info ~to_project ~expand to_ in
-      if from == from' && to_ = to_'
+      if from == from' && to_ == to_'
       then Known coercion
       else Known (Coercion.change_depth ~from:from' ~to_:to_')
     with Depth_variable_removed -> Unknown)
