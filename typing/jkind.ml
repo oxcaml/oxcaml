@@ -368,7 +368,16 @@ module Layout = struct
      sorts do not carry addressability, so resolving a sort to [bits8] pins
      nothing - a join is still the join of [bits8] and [bits8 addressable],
      and only the stored slot records which. Use this for the left of a
-     subkind check and for equality. *)
+     subkind check and for equality.
+
+     Caveat: for an [Id] slot over an *unfilled* sort - a rigid layout
+     variable [x] - the [Id] result is not a semantic verdict ([x] may yet
+     resolve addressable) but the exact reading: checks must treat rigid [x]
+     as incomparable with its marked form, and every consumer of this
+     function errs conservatively (a rejection) on that corner. A consumer
+     that would turn [Id] into a *proof* - definite disjointness, as
+     [has_intersection] provides for [Ctype.mcomp] - must use
+     [lenient_addressability] instead. *)
   let rec addressability : Sort.t t -> Addressability.t = function
     | Any (_, a) -> Addressability.of_action_on_undetermined a
     | Sort (s, _, a) -> (
