@@ -18,7 +18,7 @@ module Width_in_bits = struct
     | Byte_unsigned | Byte_signed -> W8
     | Sixteen_unsigned | Sixteen_signed -> W16
     | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> W32
-    | Word_int | Word_val | Double -> W64
+    | Word_int | Word_val | Word_code_pointer | Double -> W64
     | Onetwentyeight_unaligned | Onetwentyeight_aligned -> W128
     | Twofiftysix_unaligned | Twofiftysix_aligned -> W256
     | Fivetwelve_unaligned | Fivetwelve_aligned -> W512
@@ -129,6 +129,10 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
        [Addr], we could generalize [machtype], but for simplicity do not
        vectorize [Addr]. *)
     false
+  | Code_pointer, _ | _, Code_pointer ->
+    (* [Code_pointer] tracks per-slot GC liveness for unloadable code; do not
+       vectorize, by analogy with [Addr]. *)
+    false
   | ( (Vec128 | Vec256 | Vec512 | Valx2),
       (Val | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2) )
   | (Val | Int | Float | Float32), (Vec128 | Vec256 | Vec512 | Valx2) ->
@@ -153,6 +157,8 @@ let vectorize_machtypes (pack : Reg.t list) : Cmm.machtype_component =
         Printreg.reglist pack;
     match hd.typ, List.length pack with
     | Addr, _ -> Misc.fatal_errorf "Unexpected machtype for %a" Printreg.reg hd
+    | Code_pointer, _ ->
+      Misc.fatal_errorf "Unexpected machtype for %a" Printreg.reg hd
     | Float, 2 | Float32, 4 -> Vec128
     | Int, _ ->
       (* [Int] may be used for int32, width should be correct by construction of

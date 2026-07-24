@@ -110,6 +110,10 @@ val use_linscan : bool ref
 val link_everything : bool ref
 val requires_metaprogramming : bool ref
 val uses_metaprogramming : bool ref
+val unit_is_unloadable : bool ref
+(* Internal flag: this CU's compiled output should be eligible for
+   unloading when no live reference remains. Not exposed as a CLI option;
+   set programmatically by [Eval.eval] and [expectnat]. *)
 val custom_runtime : bool ref
 val no_check_prims : bool ref
 val bytecode_compatible_32 : bool ref

@@ -53,5 +53,8 @@ val find : t -> string -> Address.t option
 (** Lookup a symbol's address in the given symbol map. If it is missing from the map
     look it up using dlsym. *)
 
+val fold : t -> init:'a -> f:('a -> string -> Address.t -> 'a) -> 'a
+(** Fold over the local symbol mapping (does not consult dlsym). *)
+
 val dprint : t -> unit
 (** Debug printer for symbol table *)

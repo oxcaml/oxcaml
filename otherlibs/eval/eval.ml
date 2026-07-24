@@ -233,7 +233,17 @@ let eval (expr : 'a expr) =
         ("Cannot find module block symbol '" ^ linkage_name
        ^ "' which should have been output by the JIT")
   in
+  (* Why this is safe for unloading: once the unit has been activated (its
+     static blocks donated to the major heap as an extent, at the end of
+     [Jit.jit_load_program]), the unit is kept alive by the pin set in
+     [Globals.unloadable_pin] until we clear it below — by which point
+     [struct_obj] and [obj] are ordinary values on our frame, visible to the GC.
+     Once the caller drops the result, no reference into the unit remains, its
+     extent blocks die, and the GC reclaims the unit. The
+     `run_heap_value_returned_directly` regression test in [eval_test_unload.ml]
+     confirms this. *)
   let obj = Obj.field struct_obj 0 in
+  Jit.clear_unloadable_pin ();
   (Obj.obj obj : 'a eval)
 
 let compile_mutex = Mutex.create ()
@@ -247,3 +257,9 @@ let eval code =
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
+
+external unloadable_units_registered_total : unit -> int
+  = "caml_eval_unloadable_units_registered_total"
+
+external unloadable_units_unloaded_total : unit -> int
+  = "caml_eval_unloadable_units_unloaded_total"

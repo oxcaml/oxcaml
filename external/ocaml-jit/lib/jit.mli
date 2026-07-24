@@ -36,6 +36,13 @@ val jit_load_program :
 
 val jit_lookup_symbol : string -> Obj.t option
 
+(** Drop the pin that keeps the most recently activated unloadable unit's
+    module block alive (see [Globals.unloadable_pin]). Call once the caller
+    holds its own reference to the unit's result; after this, the unit is
+    kept alive only by ordinary GC-visible references and may be unloaded
+    when they are gone. *)
+val clear_unloadable_pin : unit -> unit
+
 val set_debug : unit -> unit
 (** Enables debugging if the OCAML_JIT_DEBUG env var is set. *)
 

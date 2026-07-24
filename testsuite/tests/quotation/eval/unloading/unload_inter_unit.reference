@@ -1,0 +1,7 @@
+start: registered=0 unloaded=0 live=0
+composed 5 = 21
+composed 10 = 41
+after populate: registered=2 unloaded=0 live=2
+after Gc.compact (composed held — both units must stay): registered=2 unloaded=0 live=2
+composed still works: 29
+after release composed + Gc.compact: registered=2 unloaded=2 live=0

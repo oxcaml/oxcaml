@@ -149,6 +149,11 @@ val get_code_metadata : t -> Code_id.t -> Code_metadata.t
     projections. *)
 val exported_offsets : t -> Exported_offsets.t
 
+(** Retrieve the [Exported_code.t] (i.e., functions_info) as passed to [create].
+    Used by [To_cmm_code_blocks] to compute dependency lists when emitting
+    [Code_block]s for unloadable functions. *)
+val all_code : t -> Exported_code.t
+
 (** {2 Variable bindings} *)
 
 (** Create (and bind) a Cmm variable for the given Flambda variable, returning

@@ -74,6 +74,7 @@ type codegen_option =
   | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
+  | Unloadable
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;

@@ -114,15 +114,37 @@ val infix_header : int -> nativeint
 
 val black_custom_header : size:int -> nativeint
 
-val pack_closure_info : arity:int -> startenv:int -> is_last:bool -> nativeint
+(** [unit_*_header] variants are aliases for the corresponding black-header
+    functions. Static data of unloadable compilation units is also emitted black
+    (NOT_MARKABLE): the blocks are invisible to the GC while the unit's
+    initialiser runs and are donated to the major heap afterwards (via
+    [caml_activate_unloadable_unit]), which forces their headers to the current
+    allocation colour. Use these in to_cmm code paths that emit static data for
+    the current CU, i.e. blocks that end up inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket. *)
+val unit_block_header : int -> int -> nativeint
 
-(** Closure info for a closure of given arity and distance to environment *)
-val closure_info : arity:arity -> startenv:int -> is_last:bool -> nativeint
+val unit_mixed_block_header :
+  int -> int -> scannable_prefix_len:int -> nativeint
+
+val unit_closure_header : int -> nativeint
+
+val unit_custom_header : size:int -> nativeint
+
+val pack_closure_info :
+  arity:int -> startenv:int -> is_last:bool -> is_unloadable:bool -> nativeint
+
+(** Closure info for a closure of given arity and distance to environment.
+    [is_unloadable] indicates that this closure's code lives in an unloadable
+    compilation unit, so the GC must treat the code pointer specially. *)
+val closure_info :
+  arity:arity -> startenv:int -> is_last:bool -> is_unloadable:bool -> nativeint
 
 val closure_info' :
   arity:Lambda.function_kind * 'a list ->
   startenv:int ->
   is_last:bool ->
+  is_unloadable:bool ->
   nativeint
 
 (** Wrappers *)
@@ -757,6 +779,36 @@ val cdefine_symbol : symbol -> data_item list
     contain additional data items afterwards). *)
 val emit_block : symbol -> nativeint -> data_item list -> data_item list
 
+(** Like [emit_block], but for static data belonging to the CU under compilation
+    (in unloadable mode, blocks emitted this way end up inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket). *)
+val emit_unit_block : symbol -> nativeint -> data_item list -> data_item list
+
+(** The CU-relative basenames of the symbols bracketing the contiguous run of
+    static data blocks in an unloadable CU. Everything between the two symbols
+    must be well-formed blocks with no intervening padding; the JIT loader
+    passes the delimited region to the runtime, which donates it to the major
+    heap as a heap extent once the unit's initialiser has run. The full linkage
+    names are obtained via [make_symbol]. *)
+val unloadable_blocks_start_symbol_basename : string
+
+val unloadable_blocks_end_symbol_basename : string
+
+(** Register an unloadable function entry's linkage name so that to_cmm can emit
+    the [unloadable_code_blocks] sentinel array. No-op if the CU is not
+    unloadable. *)
+val register_unloadable_code_block_entry : string -> unit
+
+(** Retrieve and clear the list of registered unloadable function entry linkage
+    names. Called once per compilation unit by [to_cmm.ml]. *)
+val flush_unloadable_code_block_entries : unit -> string list
+
+(** The CU-relative basename of the sentinel array emitted by to_cmm to
+    enumerate the unit's unloadable functions as
+    [(entry_address, code_block_address)] pairs. The full linkage name is
+    obtained via [make_symbol]. *)
+val unloadable_code_blocks_symbol_basename : string
+
 (** Emit specific kinds of constant blocks as data items *)
 val emit_float32_constant : symbol -> float -> data_item list -> data_item list
 
@@ -1162,6 +1214,14 @@ val cmm_arith_size : expression -> int option
 
 (* CR lmaurer: Return [Linkage_name.t] instead *)
 val make_symbol : ?compilation_unit:Compilation_unit.t -> string -> string
+
+(** [code_block_symbol_name entry_linkage_name] is the linkage name of the
+    [Code_block] static-data symbol associated with the function whose entry has
+    the given linkage name. The to_cmm Code_block emission pass produces these
+    symbols (when the CU is unloadable); the per-function back-pointer emitted
+    just ahead of each function entry refers to them via this naming convention.
+*)
+val code_block_symbol_name : string -> string
 
 val machtype_of_layout : Lambda.layout -> machtype
 

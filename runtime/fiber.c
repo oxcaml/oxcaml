@@ -44,6 +44,7 @@
 #ifdef NATIVE_CODE
 #include "caml/stack.h"
 #include "caml/frame_descriptors.h"
+#include "caml/unloadable.h"
 #endif
 #if defined(USE_MMAP_MAP_STACK) || !defined(STACK_CHECKS_ENABLED)
 #include <sys/mman.h>
@@ -610,6 +611,17 @@ next_chunk:
     d = caml_find_frame_descr(fds, retaddr);
     CAMLassert(d);
     if (!frame_return_to_C(d)) {
+      /* F.2: stack RA scan. If this frame's return address is in unloadable
+         code, look up the function entry via the registered code fragment
+         and darken its Code_block. Fires before live_ofs scan so the
+         Code_block is darkened even if the frame holds no other refs. */
+      if (frame_is_unloadable(d)) {
+        struct code_fragment *cf =
+          caml_find_code_fragment_by_pc((char *)retaddr);
+        if (cf != NULL) {
+          caml_visit_code_block_for_entry(f, fdata, (value)cf->code_start);
+        }
+      }
       /* Scan the roots in this frame */
       if (frame_is_long(d)) {
         frame_descr_long *dl = frame_as_long(d);
@@ -636,6 +648,14 @@ next_chunk:
           }
           visit (f, fdata, locals, colors, root);
         }
+      }
+      /* F.3: parallel code-pointer slot scan. If the frame has live
+         Code_pointer-typed slots, darken the Code_block of each whose
+         target is in unloadable code. Fires regardless of
+         [frame_is_unloadable]: a non-unloadable frame may hold an
+         unloadable code pointer in flight to an indirect call. */
+      if (frame_has_code_ptr_slots(d)) {
+        caml_visit_frame_code_ptr_slots(f, fdata, d, sp, regs);
       }
       /* Move to next frame */
       sp += frame_size(d);

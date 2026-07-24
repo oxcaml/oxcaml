@@ -1,0 +1,8 @@
+start: registered=0 unloaded=0 live=0
+Kept 2-tuple call: 42
+after keep_tupled: registered=1 unloaded=0 live=1
+after Gc.compact (kept live): registered=1 unloaded=0 live=1
+3-tuple call: 6
+after call_tupled_dropped: registered=2 unloaded=0 live=2
+after Gc.compact (drop unloads): registered=2 unloaded=1 live=1
+after release kept + Gc.compact: registered=2 unloaded=2 live=0

@@ -31,6 +31,17 @@ module K = Flambda_kind
 module P = Flambda_primitive
 module VB = Bound_var
 
+(* The [is_unloadable] bit is sourced from [!Clflags.unit_is_unloadable] at
+   several function-creation sites in this module and in
+   [simplify_apply_expr.ml]. The bit must follow the CU that *defined* the
+   function. Today no path in the compiler runs simplification/closure-
+   conversion for one CU while reading flags of another, but if cross-CU
+   inlining of unloadable IR is ever added the global flag would silently stamp
+   the wrong value. This helper asserts the invariant. *)
+let unloadable_bit_for_code_id code_id =
+  assert (Compilation_unit.is_current (Code_id.get_compilation_unit code_id));
+  !Clflags.unit_is_unloadable
+
 type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
@@ -2531,8 +2542,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
         (Zero_alloc_attribute.from_lambda
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
-      ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
-      ~cost_metrics
+      ~cold:false
+      ~is_unloadable:(unloadable_bit_for_code_id code_id)
+      ~is_opaque:false ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
       ~absolute_history ~relative_history ~loopify:Never_loopify
@@ -2944,6 +2956,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
            (Function_decl.zero_alloc_attribute decl))
       ~is_a_functor:(Function_decl.is_a_functor decl)
       ~cold:(Function_decl.cold decl)
+      ~is_unloadable:(unloadable_bit_for_code_id main_code_id)
       ~is_opaque:(Function_decl.is_opaque decl)
       ~recursive ~newer_version_of:None ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
@@ -3108,6 +3121,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
             ~zero_alloc_attribute ~poll_attribute ~regalloc_attribute
             ~regalloc_param_attribute ~cold:(Function_decl.cold decl)
+            ~is_unloadable:(unloadable_bit_for_code_id code_id)
             ~is_a_functor:(Function_decl.is_a_functor decl)
             ~is_opaque:(Function_decl.is_opaque decl)
             ~recursive:(Function_decl.recursive decl)

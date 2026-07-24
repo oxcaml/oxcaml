@@ -1,0 +1,22 @@
+start: registered=0 unloaded=0 live=0
+0 -> alpha
+1 -> bravo
+2 -> charlie
+3 -> delta
+4 -> echo
+5 -> foxtrot
+6 -> golf
+7 -> hotel
+8 -> india
+9 -> juliet
+10 -> kilo
+11 -> lima
+12 -> mike
+13 -> november
+14 -> oscar
+15 -> papa
+16 -> unknown
+after populate: registered=1 unloaded=0 live=1
+stable: 7=hotel 13=november
+after 3x Gc.compact (held): registered=1 unloaded=0 live=1
+after release: registered=1 unloaded=1 live=0

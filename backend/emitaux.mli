@@ -48,6 +48,12 @@ val record_frame_descr :
   (* Size of stack frame *)
   live_offset:int list ->
   (* Offsets/regs of live addresses *)
+  code_ptr_live_offset:int list ->
+  (* Offsets/regs of live Code_pointer-typed slots, encoded the same way as
+     [live_offset] *)
+  unloadable:bool ->
+  (* Whether this frame's return address points into an unloadable compilation
+     unit *)
   frame_debuginfo ->
   (* Location, if any *)
   unit

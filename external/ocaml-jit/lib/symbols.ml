@@ -131,6 +131,9 @@ let find t name =
             name dlsym_name (Address.to_int64 addr);
         Some addr))
 
+let fold t ~init ~f =
+  String.Map.fold t ~init ~f:(fun ~key ~data acc -> f acc key data)
+
 let dprint t =
   Printf.printf "------ Symbols -----\n%!";
   String.Map.iter

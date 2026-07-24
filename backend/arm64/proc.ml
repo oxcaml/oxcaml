@@ -45,14 +45,15 @@ open Arch
 
 let types_are_compatible left right =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | (Int | Val | Addr | Code_pointer), (Int | Val | Addr | Code_pointer)
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
   | (Vec256 | Vec512), _ | _, (Vec256 | Vec512) ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
-  | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
+  | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2 | Code_pointer), _ ->
+    false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -75,9 +76,9 @@ let precolored_regs =
   let phys_regs = Reg.set_of_array all_phys_regs in
   fun () -> phys_regs
 
-let phys_reg typ phys_reg =
+let phys_reg (typ : Cmm.machtype_component) phys_reg =
   let index_in_class = Regs.index_in_class phys_reg in
-  match (typ : Cmm.machtype_component) with
+  match typ with
   | Int | Addr | Val ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
@@ -87,6 +88,11 @@ let phys_reg typ phys_reg =
     if !Clflags.llvm_backend
     then Reg.create_alias r ~typ
     else r
+  | Code_pointer ->
+    (* Preserve [Code_pointer] machtype on physical regs so that
+       frame-descriptor emission can identify code-pointer slots for the
+       parallel [code_ptr_live_ofs] array. *)
+    Reg.create_alias hard_int_reg.(index_in_class) ~typ
   | Float -> hard_float_reg.(index_in_class)
   | Float32 -> hard_float32_reg.(index_in_class)
   | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
@@ -111,7 +117,7 @@ let calling_conventions
     let ty : Cmm.machtype_component = arg.(i) in
     let registers, size =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
+      | Val | Int | Addr | Code_pointer -> int_registers, size_int
       | Float | Float32 -> float_registers, Arch.size_float
       | Vec128 -> float_registers, Arch.size_vec128
       | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -294,12 +300,13 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Load
           {memory_chunk=(Byte_unsigned|Byte_signed|Sixteen_unsigned|
                          Sixteen_signed|Thirtytwo_unsigned|Thirtytwo_signed|
-                         Word_int|Word_val|Double|Onetwentyeight_unaligned|
-                         Onetwentyeight_aligned);
+                         Word_int|Word_val|Word_code_pointer|Double|
+                         Onetwentyeight_unaligned|Onetwentyeight_aligned);
            _ })
   | Op (Store
           ((Byte_unsigned|Byte_signed|Sixteen_unsigned|Sixteen_signed|
-            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_val|Double|
+            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_val|
+            Word_code_pointer|Double|
             Onetwentyeight_unaligned|Onetwentyeight_aligned),
            _, _))
     -> [||]

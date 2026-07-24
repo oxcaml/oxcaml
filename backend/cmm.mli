@@ -27,6 +27,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec512
   | Float32
   | Valx2
+  | Code_pointer
 
 (*=- [Val] denotes a valid OCaml value: either a pointer to the beginning
      of a heap block, an infix pointer if it is preceded by the correct
@@ -75,6 +76,8 @@ val typ_vec128 : machtype
 val typ_vec256 : machtype
 
 val typ_vec512 : machtype
+
+val typ_code_pointer : machtype
 
 val typ_int128 : machtype
 
@@ -317,6 +320,10 @@ type memory_chunk =
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
   | Word_val (* pointer inside heap or encoded int *)
+  | Word_code_pointer
+      (** Like [Word_int] but the loaded value carries the [Code_pointer]
+          machtype, so the GC tracks it via the parallel [code_ptr_live_ofs]
+          frame-descriptor array. *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
   | Double (* word-aligned 64-bit float see PR#10433 *)
@@ -588,6 +595,9 @@ type codegen_option =
   | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
+  | Unloadable
+      (** This function lives in an unloadable compilation unit; frames need
+          their UNLOADABLE bit set, etc. *)
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;
@@ -706,6 +716,8 @@ val is_val : machtype_component -> bool
 val is_int : machtype_component -> bool
 
 val is_addr : machtype_component -> bool
+
+val is_code_pointer : machtype_component -> bool
 
 val is_exn_handler : ccatch_flag -> bool
 

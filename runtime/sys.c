@@ -147,10 +147,12 @@ CAMLexport void caml_do_exit(int retcode)
         + (double) domain_state->allocated_words;
       double allocated_words = minwords + majwords
         - s.alloc_stats.promoted_words;
-      intnat heap_words =
-        s.heap_stats.pool_words + s.heap_stats.large_words;
-      intnat top_heap_words =
-        s.heap_stats.pool_max_words + s.heap_stats.large_max_words;
+      intnat heap_words = (s.heap_stats.pool_words
+                           + s.heap_stats.large_words
+                           + s.heap_stats.extent_words);
+      intnat top_heap_words = (s.heap_stats.pool_max_words
+                               + s.heap_stats.large_max_words
+                               + s.heap_stats.extent_max_words);
 
       if (heap_words == 0) {
         heap_words = Wsize_bsize(caml_heap_size(Caml_state->shared_heap));

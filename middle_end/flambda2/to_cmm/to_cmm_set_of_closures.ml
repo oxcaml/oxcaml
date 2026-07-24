@@ -253,9 +253,13 @@ end = struct
         let (kind, params_ty, result_ty), closure_code_pointers, dbg =
           get_func_decl_params_arity env code_id
         in
+        let is_unloadable =
+          Env.get_code_metadata env code_id |> Code_metadata.is_unloadable
+        in
         let closure_info =
           C.closure_info' ~arity:(kind, params_ty)
             ~startenv:(startenv - slot_offset) ~is_last:last_function_slot
+            ~is_unloadable
         in
         (* We build here the **reverse** list of fields for the function slot *)
         match closure_code_pointers with
@@ -317,9 +321,13 @@ end = struct
              deleted of size %d"
             Function_slot.print function_slot size function_slot_size;
         let closure_info =
+          (* Deleted slots represent code that was eliminated; they don't carry
+             a live code pointer, so [is_unloadable] is irrelevant here — pick
+             [false] for safety. *)
           C.pack_closure_info
             ~arity:(if size = 2 then 1 else 2)
             ~startenv:(startenv - slot_offset) ~is_last:last_function_slot
+            ~is_unloadable:false
         in
         let acc, chunk_acc =
           match size with
@@ -461,6 +469,10 @@ let transl_regalloc_param_attrib :
 let transl_cold_attrib (cold : bool) : Cmm.codegen_option list =
   if cold then [Cmm.Cold] else []
 
+(* Translation of unloadable attribute on functions. *)
+let transl_unloadable_attrib (is_unloadable : bool) : Cmm.codegen_option list =
+  if is_unloadable then [Cmm.Unloadable] else []
+
 (* Translation of the bodies of functions. *)
 
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
@@ -553,11 +565,15 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     Env.get_code_metadata env code_id |> Code_metadata.regalloc_param_attribute
   in
   let cold = Env.get_code_metadata env code_id |> Code_metadata.cold in
+  let is_unloadable =
+    Env.get_code_metadata env code_id |> Code_metadata.is_unloadable
+  in
   let fun_flags =
     transl_check_attrib zero_alloc_attribute
     @ transl_regalloc_attrib regalloc_attribute
     @ transl_regalloc_param_attrib regalloc_param_attribute
     @ transl_cold_attrib cold
+    @ transl_unloadable_attrib is_unloadable
     @
     if Flambda_features.optimize_for_speed () then [] else [Cmm.Reduce_code_size]
   in
@@ -683,8 +699,12 @@ let let_static_set_of_closures0 env res closure_symbols
   let block =
     match l with
     | _ :: _ ->
-      let header = C.cint (C.black_closure_header length) in
-      header :: l
+      (* Static closure blocks are emitted with black (NOT_MARKABLE) headers in
+         all modes. For unloadable units, the block lives inside the
+         [unloadable_blocks_start]/[unloadable_blocks_end] bracket and is
+         donated to the major heap (with its header colour rewritten) by
+         [caml_activate_unloadable_unit] once the unit's initialiser has run. *)
+      C.cint (C.unit_closure_header length) :: l
     | [] ->
       Misc.fatal_error "Cannot statically allocate an empty set of closures"
   in

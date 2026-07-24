@@ -60,6 +60,8 @@ module type Code_metadata_accessors_result_type = sig
 
   val cold : 'a t -> bool
 
+  val is_unloadable : 'a t -> bool
+
   val is_a_functor : 'a t -> bool
 
   val is_opaque : 'a t -> bool
@@ -108,6 +110,7 @@ type 'a create_type =
   regalloc_attribute:Regalloc_attribute.t ->
   regalloc_param_attribute:Regalloc_param_attribute.t ->
   cold:bool ->
+  is_unloadable:bool ->
   is_a_functor:bool ->
   is_opaque:bool ->
   recursive:Recursive.t ->

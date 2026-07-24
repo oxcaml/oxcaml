@@ -19,3 +19,10 @@ open! Import
 val symbols : Symbols.t ref
 
 val debug : bool ref
+
+(** Keeps the most recently activated unloadable unit's module block alive
+    from the moment the unit's static blocks are donated to the major heap
+    until the caller has obtained its own reference to the module block
+    (see [Jit.clear_unloadable_pin]). Being a global of this AOT library,
+    this ref is scanned by the GC every cycle. *)
+val unloadable_pin : Obj.t option ref

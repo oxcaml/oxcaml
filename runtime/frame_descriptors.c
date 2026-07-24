@@ -25,6 +25,7 @@
 #include "caml/fail.h"
 #include "caml/shared_heap.h"
 #include <stddef.h>
+#include <string.h>
 
 struct caml_frame_descrs {
   int num_descr;
@@ -84,6 +85,18 @@ static frame_descr * next_frame_descr(frame_descr * d) {
       /* Align to 32 bits */
       p = Align_to(p, uint32_t);
       p += sizeof(uint32_t) * (frame_has_allocs(d) ? num_allocs : 1);
+    }
+    /* Skip parallel code_ptr_live_ofs array if present */
+    if (frame_has_code_ptr_slots(d)) {
+      if (frame_is_long(d)) {
+        p = Align_to(p, uint32_t);
+        uint32_t n = *(uint32_t *)p;
+        p += sizeof(uint32_t) * (1 + n);
+      } else {
+        p = Align_to(p, uint16_t);
+        uint16_t n = *(uint16_t *)p;
+        p += sizeof(uint16_t) * (1 + n);
+      }
     }
     /* Align to word size */
     p = Align_to(p, void*);
@@ -306,6 +319,48 @@ void caml_register_frametables(void **table, int ntables) {
 
   do {} while (!caml_try_run_on_all_domains(
                  &stw_register_frametables, new_frametables, 0));
+}
+
+void caml_unregister_frametable_from_stw_single(intnat *frametable)
+{
+  /* Caller must hold the STW barrier (e.g. from
+     [cycle_major_heap_from_stw_single]). Walks the frametables linked list
+     for an entry whose [frametable] field matches [frametable], unlinks it,
+     and rebuilds the descriptor hashtable from the remaining entries.
+
+     Unlike [caml_unregister_frametables], this removes the descriptors
+     immediately rather than parking the entry on the zombie list, so the
+     frametable memory may be freed as soon as this returns. This is what
+     the unloadable-unit unload path needs: its frametables live inside the
+     unit's buffer (they cannot be copied on registration because
+     [retaddr_rel] fields are 32-bit self-relative and the buffer is not
+     guaranteed to be within 2GB of any copy), and the buffer is freed
+     during the same STW section. */
+  caml_frametable_list **link = &current_frame_descrs.frametables;
+  caml_frametable_list *removed = NULL;
+  while (*link != NULL) {
+    if ((*link)->frametable == frametable) {
+      removed = *link;
+      *link = (*link)->next;
+      break;
+    }
+    link = &(*link)->next;
+  }
+  if (removed == NULL) return; /* not registered, nothing to do */
+
+  intnat removed_descrs = *((intnat *) removed->frametable);
+  current_frame_descrs.num_descr -= removed_descrs;
+  caml_stat_free(removed);
+
+  /* Rebuild the hashtable from the remaining frametables. Capacity is
+     preserved (we never shrink on a single-unit unload); we just zero out
+     the descriptor array and re-fill from the list. */
+  int tblsize = current_frame_descrs.mask + 1;
+  if (current_frame_descrs.descriptors != NULL && tblsize > 0) {
+    memset(current_frame_descrs.descriptors, 0,
+           tblsize * sizeof(frame_descr *));
+    fill_hashtable(&current_frame_descrs, current_frame_descrs.frametables);
+  }
 }
 
 void caml_copy_and_register_frametables(

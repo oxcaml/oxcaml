@@ -1,0 +1,10 @@
+start: registered=0 unloaded=0 live=0
+Kept 2-arg full apply: 42
+Kept 2-arg partial then full: 123
+after keep_two_arg: registered=1 unloaded=0 live=1
+after Gc.compact (kept live): registered=1 unloaded=0 live=1
+3-arg full apply: 123
+4-arg full apply: 100
+after dropped calls: registered=3 unloaded=0 live=3
+after Gc.compact (drops only unload): registered=3 unloaded=2 live=1
+after release kept + Gc.compact: registered=3 unloaded=3 live=0

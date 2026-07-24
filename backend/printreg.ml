@@ -46,7 +46,8 @@ let reg ppf r =
     | Vec256 -> "Y"
     | Vec512 -> "Z"
     | Valx2 -> "VV"
-    | Float32 -> "S");
+    | Float32 -> "S"
+    | Code_pointer -> "C");
   fprintf ppf "/%s" (Reg.Stamp.to_string r.stamp);
   loc
     ~wrap_out:(fun ppf f -> fprintf ppf "[%t]" f)
@@ -92,7 +93,9 @@ let regsetaddr' ?(print_reg = reg) ppf s =
       match r.typ with
       | Val -> fprintf ppf "*"
       | Addr -> fprintf ppf "!"
-      | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 -> ())
+      | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2 | Code_pointer
+        ->
+        ())
     s
 
 let regsetaddr ppf s = regsetaddr' ppf s
