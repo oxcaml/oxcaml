@@ -318,7 +318,14 @@ Uncaught exception: Misc.Fatal_error
 [%%expect {|
 >> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float64x8 - this is either unsupported or a bug
 Uncaught exception: Misc.Fatal_error
+|}];;
 
+<[ fun (x : my_type) -> x ]> (* sanity check *)
+[%%expect {|
+Line 1, characters 12-19:
+1 | <[ fun (x : my_type) -> x ]> (* sanity check *)
+                ^^^^^^^
+Error: Unbound type constructor "my_type"
 |}];;
 
 (* Exceptions *)
@@ -380,6 +387,15 @@ Uncaught exception: Misc.Fatal_error
 - : 'a expr = <[Stdlib.raise Continuation_already_taken]>
 |}];;
 
+<[ raise My_exception ]> (* sanity check *)
+[%%expect {|
+Line 1, characters 9-21:
+1 | <[ raise My_exception ]> (* sanity check *)
+             ^^^^^^^^^^^^
+Error: This variant expression is expected to have type "exn"
+       There is no constructor "My_exception" within type "exn"
+|}];;
+
 (* Constructors *)
 
 <[ false ]>
@@ -417,6 +433,14 @@ Uncaught exception: Misc.Fatal_error
 <[ This () ]>
 [%%expect {|
 - : <[unit or_null]> expr = <[This ()]>
+|}];;
+
+<[ My_constructor () ]> (* sanity check *)
+[%%expect {|
+Line 1, characters 3-17:
+1 | <[ My_constructor () ]> (* sanity check *)
+       ^^^^^^^^^^^^^^
+Error: Unbound constructor "My_constructor"
 |}];;
 
 (** Shadowing builtins in quotes **)
