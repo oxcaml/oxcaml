@@ -70,8 +70,7 @@ Environment: ((defined_symbols { }) (code_age_relation {})
                        {(tag_0 => (Known 2),
                          ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1mz/5N[0m))
                           (Val!
-                           (Variant
-                            (tagged_imms (Naked_immediate ({ 0 1 })))))))}))))
+                           (Variant (tagged_imms (Naked_immediate { 0 1 }))))))}))))
                   [0m[38;5;111;1mz/5N[0m :
                    (Val!
                     (Variant
@@ -80,8 +79,7 @@ Environment: ((defined_symbols { }) (code_age_relation {})
                        {(tag_0 => (Known 2),
                          ((Val [0m[38;5;37;1m⊤[0m)
                           (Val!
-                           (Variant
-                            (tagged_imms (Naked_immediate ({ 1 2 })))))))})))))))))
+                           (Variant (tagged_imms (Naked_immediate { 1 2 }))))))})))))))))
               (aliases
                ((canonical_elements {}) (aliases_of_canonical_names {})
                 (aliases_of_consts {}))))
@@ -100,7 +98,7 @@ New environment:
          (known
           {(tag_0 => (Known 2),
             ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1mz/5N[0m))
-             (Val! (Variant (tagged_imms (Naked_immediate ({ 0 1 })))))))}))))
+             (Val! (Variant (tagged_imms (Naked_immediate { 0 1 }))))))}))))
      [0m[38;5;111;1my/4N[0m : (Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1mx/3N[0m))
      [0m[38;5;111;1mz/5N[0m : (Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1mx/3N[0m)))))))
  (aliases
