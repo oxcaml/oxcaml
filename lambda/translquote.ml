@@ -2348,39 +2348,40 @@ let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
       Location.print_loc (to_location loc)
 
 let quote_constructor loc env (constr : Data_types.constructor_description) =
-  let exception Non_builtin of string in
-  (try
-     Identifier.Constructor.wrap
-       (match constr.cstr_tag with
-       | Extension (Path.Pdot (p, name)) ->
-         Identifier.Constructor.dot loc (module_for_path loc env p) name
-       | Extension (Path.Pident name) -> raise (Non_builtin (Ident.name name))
-       | Extension _ ->
-         fatal_errorf "Translquote [at %a]: Papply in extension constructor."
-           Location.print_loc (to_location loc)
-       | Ordinary _ | Null -> (
-         match type_path env constr.cstr_res with
-         | None ->
-           fatal_errorf "Translquote [at %a]: no global path for constructor"
-             Location.print_loc (to_location loc)
-         | Some (Path.Pident _) ->
-           let name = constr.cstr_name in
-           if
-             List.exists
-               (fun (name', _) -> String.equal name name')
-               (Predef.builtin_exns @ Predef.builtin_constrs)
-           then Identifier.Constructor.builtin loc name
-           else raise (Non_builtin name)
-         | Some (Path.Pdot (p, _)) ->
-           Identifier.Constructor.dot loc
-             (module_for_path loc env p)
-             constr.cstr_name
-         | _ ->
-           fatal_errorf
-             "Translquote [at %a]: unsupported constructor type detected."
-             Location.print_loc (to_location loc)))
-     |> Constructor.ident loc
-   with Non_builtin name -> Constructor.of_string loc name)
+  let local id = Constructor.of_string loc id in
+  let persistent id =
+    id |> Identifier.Constructor.wrap |> Constructor.ident loc
+  in
+  (match constr.cstr_tag with
+    | Extension (Path.Pdot (p, name)) ->
+      Identifier.Constructor.dot loc (module_for_path loc env p) name
+      |> persistent
+    | Extension (Path.Pident id) -> Ident.name id |> local
+    | Extension _ ->
+      fatal_errorf "Translquote [at %a]: Papply in extension constructor."
+        Location.print_loc (to_location loc)
+    | Ordinary _ | Null -> (
+      match type_path env constr.cstr_res with
+      | None ->
+        fatal_errorf "Translquote [at %a]: no global path for constructor"
+          Location.print_loc (to_location loc)
+      | Some (Path.Pident _) ->
+        let name = constr.cstr_name in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            (Predef.builtin_exns @ Predef.builtin_constrs)
+        then Identifier.Constructor.builtin loc name |> persistent
+        else local name
+      | Some (Path.Pdot (p, _)) ->
+        Identifier.Constructor.dot loc
+          (module_for_path loc env p)
+          constr.cstr_name
+        |> persistent
+      | _ ->
+        fatal_errorf
+          "Translquote [at %a]: unsupported constructor type detected."
+          Location.print_loc (to_location loc)))
   |> Constructor.wrap
 
 let rec quote_modtype_path_of_lid loc = function
