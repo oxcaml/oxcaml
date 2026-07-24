@@ -709,8 +709,7 @@ let () =
     fun t v -> t.x <- v
   in
   let t = { x = #("s", 1) } in
-  (* CR rtjoa: should be 1; the ['a] word is immediate *)
-  test ~expect_caml_modifies:2
+  test ~expect_caml_modifies:1
     (fun () -> set t #("u", 2); ignore (Sys.opaque_identity t))
 
 (* Same, via a polymorphic record field *)
@@ -721,8 +720,7 @@ let () =
   end in
   let s = Sys.opaque_identity { apply = fun t v -> t.x <- v } in
   let t = { x = #("s", 1) } in
-  (* CR rtjoa: should be 1; the ['b] word is immediate *)
-  test ~expect_caml_modifies:2
+  test ~expect_caml_modifies:1
     (fun () -> s.apply t #("u", 2); ignore (Sys.opaque_identity t))
 
 (* Same, where the parameter is instantiated to an unboxed existential *)
@@ -733,6 +731,5 @@ let () =
   end in
   let[@inline never] set (t : u t) v = t.x <- v in
   let t = { x = #("s", U 1) } in
-  (* CR rtjoa: should be 1; the [u] word is immediate *)
-  test ~expect_caml_modifies:2
+  test ~expect_caml_modifies:1
     (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))
