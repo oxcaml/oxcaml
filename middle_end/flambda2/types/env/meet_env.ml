@@ -529,6 +529,8 @@ let[@inline always] meet_type env t1 t2 ~meet_expanded_head : TG.t meet_result =
   map_result ~f:ET.to_type
     ((meet [@inlined never]) env t1 t2 ~meet_expanded_head)
 
+let current_typing_env t = t.typing_env
+
 let rec final_typing_env_exn ~meet_expanded_head ({ delayed_equations; _ } as t)
     =
   match delayed_equations with
