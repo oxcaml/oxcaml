@@ -7,11 +7,19 @@ let fatal = Misc.fatal_errorf
 
 let debug = false
 
-let compute_back_edges cfg dominators =
+let compute_back_edges (cfg : Cfg.t) dominators =
+  if cfg.allowed_to_be_irreducible
+  then
+    fatal
+      "cannot compute back edges since the CFG is not guaranteed to be \
+       reducible";
   Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
     ~f:(fun src_label src_block acc ->
       let dst_labels =
-        (* CR-soon xclerc for xclerc: probably safe to pass `~exn:false`. *)
+        (* [~exn:true] is required: these back edges feed GC poll insertion in
+           [Cfg_polling], whose unsafe-path search also follows exceptional
+           successors. With [~exn:false] an exception-closed cycle could be
+           missed and a required poll omitted. *)
         Cfg.successor_labels ~normal:true ~exn:true src_block
       in
       Label.Set.fold
@@ -119,11 +127,23 @@ let compute_loop_depths cfg header_map =
     Cfg.fold_blocks cfg ~init:Label.Map.empty ~f:(fun label _block acc ->
         Label.Map.add label 0 acc)
   in
+  (* A block's depth is the number of loops containing it, counting one loop per
+     header (a header's body being the union of its back edges' loops, since
+     several back edges to one header form a single multi-latch loop).
+
+     Counting per header gives the true nesting depth: the CFG is reducible
+     (checked in [build]), so natural loops are properly nested -- any two are
+     disjoint or one contains the other. Genuinely nested loops therefore have
+     distinct headers (a shared header would be a single loop) and live in
+     distinct [header_map] entries, so a block in k enclosing loops is counted k
+     times. *)
   Label.Map.fold
     (fun _header loop_list acc ->
-      List.fold_left loop_list ~init:acc ~f:incr_loop)
-    (Label.Map.map merge_loops header_map)
-    init
+      let loop =
+        List.fold_left loop_list ~init:Label.Set.empty ~f:Label.Set.union
+      in
+      incr_loop acc loop)
+    header_map init
 
 (* CR-someday xclerc for xclerc: all uses of `header_map` do merge the loops, so
    we should consider having the "merged" version in `header_map`, and maybe
