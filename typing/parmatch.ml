@@ -1200,12 +1200,13 @@ let build_other ext env =
               ' ', '~' ; Char.chr 0 , Char.chr 255] d env
       | Constant Const_untagged_char _ ->
           build_exhaustable_constant
-            ~to_int:Char.code
-            ~proj:(function Constant(Const_untagged_char c) -> Char.code c
+            ~to_int:Fun.id
+            ~proj:(function Constant(Const_untagged_char c) -> c
                           | _ -> assert false)
-            ~make:(fun i -> Const_untagged_char (Char.chr i))
-            [ 'a', 'z' ; 'A', 'Z' ; '0', '9' ;
-              ' ', '~' ; Char.chr 0 , Char.chr 255] d env
+            ~make:(fun i -> Const_untagged_char i)
+            [ Char.code 'a', Char.code 'z' ; Char.code 'A', Char.code 'Z' ;
+              Char.code '0', Char.code '9' ; Char.code ' ', Char.code '~' ;
+              0, 0x7f ; -0x80, -1 ] d env
       | Constant Const_int _ ->
           build_other_constant
             (function Constant(Const_int i) -> i | _ -> assert false)

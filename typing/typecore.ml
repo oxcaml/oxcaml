@@ -1019,7 +1019,9 @@ let constant_desc
   | Pconst_char c -> Ok (Const_char c)
   | Pconst_untagged_char c ->
       if Language_extension.is_enabled Small_numbers
-      then Ok (Const_untagged_char c)
+      then
+        let extra_bits = Sys.int_size - 8 in
+        Ok (Const_untagged_char ((Char.code c lsl extra_bits) asr extra_bits))
       else Error (Untagged_char_literal c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -3666,7 +3668,8 @@ and type_pat_aux
         expand_interval (Char.code c1) (Char.code c2)
           ~make:(fun loc i -> Const.char ~loc (Char.chr i))
       | Const_untagged_char c1, Const_untagged_char c2 ->
-        expand_interval (Char.code c1) (Char.code c2)
+        (* Intervals are specified by character code, as for [char]. *)
+        expand_interval (c1 land 0xff) (c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
         raise (Error (loc, !!penv, Invalid_interval))
