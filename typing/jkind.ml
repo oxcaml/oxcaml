@@ -650,11 +650,13 @@ module Layout = struct
         [Layout_disagreement])
 
   (* The marks of the two kinds, met; [None] means the kinds are disjoint.
-     A join slot stays undetermined whether or not its sort has resolved
-     (sorts don't pin addressability), so the reads don't depend on the
-     sort equations [intersection] performs. (Note that, as for the
-     scannable axes in [sub], sorts equated by a failing intersection stay
-     equated.) *)
+     As in [sub], callers must perform their sort equations (including any
+     component intersections) BEFORE reading: filling a sort variable can
+     collapse an [Exact Id] slot to [Exact Addressable] - e.g. an instance
+     copy of a rigid binder meeting [bits64], whose plain and marked forms
+     coincide - so reading first finds disjointness where none exists.
+     (Note that, as for the scannable axes in [sub], sorts equated by a
+     failing intersection stay equated.) *)
   let meet_marks t1 t2 = Addressability.meet (mark t1) (mark t2)
 
   let rec intersection t1 t2 =
@@ -667,36 +669,43 @@ module Layout = struct
       Option.map
         (fun t2 -> meet_root_scannable_axes t2 sa1)
         (meet_root_addressability t2 a1)
-    | Sort (s1, sa1, _), Sort (s2, sa2, _) -> (
-      match meet_marks t1 t2 with
-      | None -> None
-      | Some a ->
-        if Sort.equate s1 s2
-        then Some (Sort (s1, Scannable_axes.meet sa1 sa2, a))
-        else None)
-    | Product (ts1, a1), Product (ts2, a2) ->
-      if List.compare_lengths ts1 ts2 = 0
+    | Sort (s1, sa1, _), Sort (s2, sa2, _) ->
+      if Sort.equate s1 s2
       then
         match meet_marks t1 t2 with
         | None -> None
-        | Some _ ->
+        | Some a -> Some (Sort (s1, Scannable_axes.meet sa1 sa2, a))
+      else None
+    | Product (ts1, a1), Product (ts2, a2) ->
+      if List.compare_lengths ts1 ts2 = 0
+      then
+        (* Components before roots, as in [sub]: the component
+           intersections' sort equations refine the root marks. *)
+        match
           intersect_products
             ~root_action:(Addressability.Action.compose a1 a2)
             ts1 ts2
+        with
+        | None -> None
+        | Some p -> (
+          match meet_marks t1 t2 with None -> None | Some _ -> Some p)
       else None
     | (Product (ts, pa) as prod), (Sort (sort, _, sslot) as srt)
     | (Sort (sort, _, sslot) as srt), (Product (ts, pa) as prod) -> (
-      match meet_marks prod srt with
+      match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
       | None -> None
-      | Some _ -> (
-        match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
-        | None -> None
-        | Some components ->
+      | Some components -> (
+        (* Components before roots, as in [sub]. *)
+        match
           intersect_products
             ~root_action:
               (Addressability.Action.compose pa
                  (Addressability.forget_join sslot))
-            ts components))
+            ts components
+        with
+        | None -> None
+        | Some p -> (
+          match meet_marks prod srt with None -> None | Some _ -> Some p)))
 
   (* Intersect two products componentwise ([ts1] and [ts2] must have the
      same length). The result is marked addressable iff either input is

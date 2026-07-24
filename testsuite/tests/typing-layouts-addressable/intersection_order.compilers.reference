@@ -1,9 +1,6 @@
-File "intersection_order.ml", line 25, characters 15-21:
-25 |   let ok () = (M.g () : ('r : bits64))
-                    ^^^^^^
-Error: This expression has type ('a : '_representable_layout_1)
-       but an expression was expected of type ('r : bits64)
-       The layout of 'r is bits64
-         because of the annotation on the type variable 'r.
-       But the layout of 'r must be representable
-         because of the definition of g at file "intersection_order.ml", line 23, characters 2-41.
+module UseScalar :
+  functor (M : sig val g : layout_ l. ('a : l). unit -> 'a end) ->
+    sig val ok : ('r : bits64). unit -> 'r end
+module UseProduct :
+  functor (M : sig val g : layout_ l. ('a : l). unit -> 'a end) ->
+    sig val ok : ('r : bits64 & bits64). unit -> 'r end
