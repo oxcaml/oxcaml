@@ -250,6 +250,37 @@ Error:
          because of the definition of nt2 at line 1, characters 0-64.
 |}]
 
+(* F1: recursive payload under a Tmod cap -- the legacy jkind normalizer runs
+   out of fuel on the recursive with-bound introduced by the capped projection
+   and conservatively rejects. The ikind engine accepts this declaration (see
+   gadt_ikinds.ml). *)
+type 'a cell : mutable_data with 'a =
+  | Nil
+  | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
+[%%expect{|
+Lines 1-3, characters 0-87:
+1 | type 'a cell : mutable_data with 'a =
+2 |   | Nil
+3 |   | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
+Error: The kind of type "cell" is
+           mutable_data
+             with ('a @@ portable)
+             with ('a @@ portable) cell @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "cell" must be a subkind of mutable_data with 'a
+         because of the annotation on the declaration of the type cell.
+
+       The first mode-crosses less than the second along:
+         portability:
+           mod portable with ('a @@ portable) with ('a @@ portable) cell ≰
+           mod portable with 'a
+         statefulness:
+           mod stateless with ('a @@ portable) with ('a @@ portable) cell ≰
+           mod stateless with 'a
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
 (***********************************************************************)
 (* This test is about trying to avoid inconsistent contexts.
    See

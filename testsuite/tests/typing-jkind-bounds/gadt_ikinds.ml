@@ -293,6 +293,20 @@ Error:
          because of the definition of nt2 at line 1, characters 0-64.
 |}]
 
+(* F1: recursive payload under a Tmod cap -- accepted by the ikind engine. The
+   legacy jkind normalizer runs out of fuel on the recursive with-bound
+   introduced by the capped projection and conservatively rejects this
+   declaration (see gadt.ml). *)
+type 'a cell : mutable_data with 'a =
+  | Nil
+  | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
+[%%expect{|
+type 'a cell =
+    Nil
+  | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell;
+    } -> 'b cell
+|}]
+
 (***********************************************************************)
 (* This test is about trying to avoid inconsistent contexts.
    See
