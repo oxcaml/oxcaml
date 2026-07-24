@@ -60,6 +60,29 @@ module type S = sig
 
   val solve_pending : unit -> unit
 
+  (** Number of greatest-fixpoint constraints currently enqueued (waiting for
+      [solve_pending]). Telemetry only. *)
+  val pending_count : unit -> int
+
+  (** [with_isolated_pending f] runs [f] with a FRESH, empty pending-gfp list,
+      restoring the caller's pending list afterwards (exception-safe). Any gfps
+      [f] enqueues are private to [f] and any it leaves un-drained are
+      discarded; the caller's queued gfps are neither seen nor solved by [f].
+      Used to make a derivation run for PRINTING re-entrancy-safe: its
+      [solve_pending] must not drain an outer (mid-check) solve's pending gfps.
+
+      ISOLATION BOUNDARY: this isolates ONLY [gfp_pending]. The rigid-variable
+      interning table and the monotonic fresh-id counter are deliberately NOT
+      isolated -- rigids are keyed by a stable, global param id, so reuse across
+      an outer solve and an inner print is correct (same param => same var), and
+      the id counter is monotonic (advancing it only consumes ids, never
+      corrupts). The Unknown-uid counter (fresh_unknown_uid) is shared in the
+      same monotonic, consume-only category: a print derivation over open
+      rows/first-class modules may mint Unknown uids, which is benign.
+      Solver-cache isolation (ty->kind / constr->coeffs) is handled separately
+      by the caller's scratch context. *)
+  val with_isolated_pending : (unit -> 'a) -> 'a
+
   (** [decompose_into_linear_terms ~universe n] returns a base term and a list
       of linear coefficients, one per variable in [universe]. *)
   val decompose_into_linear_terms :
@@ -74,6 +97,27 @@ module type S = sig
   val is_const : node -> bool
 
   val map_rigid : (Name.t -> node) -> node -> node
+
+  (** [to_terms n] decomposes [n] into its ZDD terms, each a coefficient and the
+      set of rigid atom [Name.t]s on that term; the base term is the one with an
+      empty name list. [n] must be rigid-inlined (this calls
+      [inline_solved_vars]); raises on an unsolved var. Name-preserving analog
+      of the internal polynomial pretty-printer; the residue form used for
+      print-from-ikind and cmi save/load. *)
+  val to_terms : node -> (Axis_lattice.t * Name.t list) list
+
+  (** [of_terms ts] is the algebraic inverse of [to_terms]: each term
+      [(coeff, names)] is read as [coeff \u2293 \u2293names] and all are
+      [join]ed. Total and order-insensitive; duplicate name-sets are joined
+      (never an error); [Unknown] atoms keep their fixed [Uid] (no re-mint).
+      [of_terms [] = bot], [of_terms [(c, [])] = const c].
+      [of_terms (to_terms n)] is semantically equal to [n]. *)
+  val of_terms : (Axis_lattice.t * Name.t list) list -> node
+
+  (** [filter_out_pure_terms drop n] rebuilds [n] dropping every non-base term
+      whose rigid atoms ALL satisfy [drop]; the base term and any term with at
+      least one non-[drop] atom are kept exactly. *)
+  val filter_out_pure_terms : (Name.t -> bool) -> node -> node
 
   (** Pretty printers and checks. *)
   val pp : node -> string

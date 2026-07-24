@@ -580,10 +580,6 @@ module With_bounds = struct
       Axis_set.complement relevant_axes
   end
 
-  let to_best_eff_map = function
-    | No_with_bounds -> With_bounds_types.empty
-    | With_bounds bounds -> bounds
-
   let to_list : type d. d with_bounds -> _ = function
     | No_with_bounds -> []
     | With_bounds tys -> tys |> With_bounds_types.to_seq |> List.of_seq
@@ -787,7 +783,7 @@ module Base_and_axes = struct
   let jkind_desc_of_const const =
     { const with base = Base.map_layout ~f:Layout.of_const const.base }
 
-  let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
+  let debug_print format_layout ppf { base; mod_bounds; with_bounds; _ } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
       (Base.format format_layout)
       base Mod_bounds.debug_print mod_bounds With_bounds.debug_print with_bounds
@@ -1434,13 +1430,15 @@ module Jkind_desc = struct
   let rec equate_or_equal ~allow_mutation env t1 t2 =
     let { base = base1;
           mod_bounds = mod_bounds1;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          _
         } =
       t1
     in
     let { base = base2;
           mod_bounds = mod_bounds2;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          _
         } =
       t2
     in
@@ -1459,9 +1457,9 @@ module Jkind_desc = struct
       | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
 
   let sub_expanded (type l r)
-      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1 } :
+      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1; _ } :
         (allowed * r) jkind_desc)
-      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
+      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds; _ } :
         (l * allowed) jkind_desc) =
     (* Rather than carefully expanding only as much as needed, this assumes both
        kinds are fully expanded, and that [sub] is Ignore_best normalized. See
@@ -1521,10 +1519,10 @@ module Jkind_desc = struct
     sub_expanded sub super
 
   let rec intersection env
-      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 } as
-       t1)
-      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } as
-       t2) =
+      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1; _ }
+       as t1)
+      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2; _ }
+       as t2) =
     let make_intersection base =
       Intersection
         { base;
@@ -1679,6 +1677,37 @@ module Const = struct
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
+  (* Stage-4c print-from-ikind: derive a with-bounds-free jkind's mod-bounds
+     floor from its ikind instead of the legacy [mod_bounds] field.  The record
+     keeps the field polymorphic in the allowance; [Ikind] installs it at
+     startup (Jkind is below Ikind in the module DAG, so this is the same
+     ref-injection pattern as [outcometrees_of_types]).  The installed function
+     returns [None] -- printing falls back to the legacy field -- when ikinds
+     are disabled, the jkind has with-bounds (whose surface syntax the LDD
+     cannot reconstruct), or derivation fails.  Stage-5c: this fires on the
+     DEFAULT print path, not only under [-print-from-ikinds]. *)
+  type floor_from_ikind =
+    { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
+
+  let floor_from_ikind = ref { derive = (fun _ _ -> None) }
+
+  let set_floor_from_ikind f = floor_from_ikind := f
+
+  (* Stage-4c print-from-ikind (full rendering): under [-print-from-ikinds],
+     render the ENTIRE jkind from its ikind, including [with]-clauses NORMALIZED
+     from the LDD terms (constructor-atom paths + param references).  Installed
+     by [Ikind]; returns [None] for the with-bounds-FREE case (the byte-identical
+     floor path via [convert_with_base] handles those) and on any failure, and
+     [Some] only for with-bounds jkinds under the flag -- whose normalized
+     rendering intentionally diverges from legacy surface syntax (opt-in). *)
+  type render_from_ikind =
+    { render : 'l 'r. Env.t -> ('l * 'r) t -> Outcometree.out_jkind_const option
+    }
+
+  let render_from_ikind = ref { render = (fun _ _ -> None) }
+
+  let set_render_from_ikind f = render_from_ikind := f
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that
@@ -1802,9 +1831,16 @@ module Const = struct
           ~base:(get_scannable_axes_of_fully_expanded base_jkind)
           (get_scannable_axes_of_fully_expanded actual)
       in
+      let actual_mod_bounds =
+        (* Stage-5c: on the default print path, derive the floor from the
+           ikind for with-bounds-free jkinds; [None] => legacy fallback. *)
+        match !floor_from_ikind.derive env actual with
+        | Some mod_bounds -> mod_bounds
+        | None -> actual.mod_bounds
+      in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
-          actual.mod_bounds
+          actual_mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -1868,64 +1904,40 @@ module Const = struct
       | [] -> None
 
     let convert ~(verbosity : Format_verbosity.t) env (jkind : _ t) =
-      let jkind =
-        match verbosity with
-        | Not_verbose -> jkind
-        | Expanded | Expanded_with_all_mod_bounds ->
-          Base_and_axes.fully_expand_aliases_const env jkind
-      in
-      (* For each primitive jkind, we try to print the jkind in terms of it
+      match !render_from_ikind.render env jkind with
+      | Some out -> out
+      | None ->
+        let jkind =
+          match verbosity with
+          | Not_verbose -> jkind
+          | Expanded | Expanded_with_all_mod_bounds ->
+            Base_and_axes.fully_expand_aliases_const env jkind
+        in
+        (* For each primitive jkind, we try to print the jkind in terms of it
          (this is possible if the primitive is a subjkind of it). We then choose
          the "simplest". The "simplest" is taken to mean the one with the least
          number of modes that need to follow the [mod]. *)
-      let simplest =
-        match verbosity with
-        | Not_verbose ->
-          Builtin.common_jkinds
-          |> List.filter_map (fun base ->
-              convert_with_base env ~verbosity ~base jkind)
-          |> select_simplest
-        | Expanded | Expanded_with_all_mod_bounds -> None
-      in
-      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
-        match simplest with
-        | Some simplest -> simplest
-        | None -> (
-          (* CR layouts v2.8: sometimes there is no valid way to build a jkind
+        let simplest =
+          match verbosity with
+          | Not_verbose ->
+            Builtin.common_jkinds
+            |> List.filter_map (fun base ->
+                convert_with_base env ~verbosity ~base jkind)
+            |> select_simplest
+          | Expanded | Expanded_with_all_mod_bounds -> None
+        in
+        let { base; scannable_axes; modal_bounds; printable_with_bounds } =
+          match simplest with
+          | Some simplest -> simplest
+          | None -> (
+            (* CR layouts v2.8: sometimes there is no valid way to build a jkind
              from a built-in abbreviation. For now, we just pretend that the
              layout name is a valid jkind abbreviation whose modal bounds are
              all max, even though this is a lie. Internal ticket 3284. *)
-          let layout_to_string =
-            match (verbosity : Format_verbosity.t) with
-            | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
-            | Not_verbose | Expanded -> Layout.Const.to_string
-          in
-          let out_jkind_verbose =
-            convert_with_base ~verbosity env
-              ~base:
-                { jkind =
-                    { base = jkind.base;
-                      mod_bounds = Mod_bounds.max;
-                      with_bounds = No_with_bounds
-                    };
-                  name = Base.to_string layout_to_string jkind.base
-                }
-              jkind
-          in
-          match out_jkind_verbose with
-          | Some out_jkind -> out_jkind
-          | None ->
-            (* If we fail, try again with nullable/maybe-separable
-               jkinds. *)
-            let expanded = Base_and_axes.fully_expand_aliases_const env jkind in
-            let layout_str =
-              match (expanded.base : Layout.Const.t jkind_base) with
-              | Layout (Base (Scannable, _)) ->
-                (* As a special case, we'd still like to print in terms
-                   of the value_or_null alias, even if we're printing an
-                   expanded jkind. *)
-                "value_or_null"
-              | _ -> Base.to_string layout_to_string expanded.base
+            let layout_to_string =
+              match (verbosity : Format_verbosity.t) with
+              | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
+              | Not_verbose | Expanded -> Layout.Const.to_string
             in
             let out_jkind_verbose =
               convert_with_base ~verbosity env
@@ -1935,26 +1947,57 @@ module Const = struct
                         mod_bounds = Mod_bounds.max;
                         with_bounds = No_with_bounds
                       };
-                    name = layout_str
+                    name = Base.to_string layout_to_string jkind.base
                   }
                 jkind
             in
-            (* convert_with_base is guaranteed to succeed since the
+            match out_jkind_verbose with
+            | Some out_jkind -> out_jkind
+            | None ->
+              (* If we fail, try again with nullable/maybe-separable
+               jkinds. *)
+              let expanded =
+                Base_and_axes.fully_expand_aliases_const env jkind
+              in
+              let layout_str =
+                match (expanded.base : Layout.Const.t jkind_base) with
+                | Layout (Base (Scannable, _)) ->
+                  (* As a special case, we'd still like to print in terms
+                   of the value_or_null alias, even if we're printing an
+                   expanded jkind. *)
+                  "value_or_null"
+                | _ -> Base.to_string layout_to_string expanded.base
+              in
+              let out_jkind_verbose =
+                convert_with_base ~verbosity env
+                  ~base:
+                    { jkind =
+                        { base = jkind.base;
+                          mod_bounds = Mod_bounds.max;
+                          with_bounds = No_with_bounds
+                        };
+                      name = layout_str
+                    }
+                  jkind
+              in
+              (* convert_with_base is guaranteed to succeed since the
                layout matches and the modal bounds are all max *)
-            Option.get out_jkind_verbose)
-      in
-      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
-      (* Add on [mod] bounds, if there are any *)
-      let base =
-        if modal_bounds = []
-        then base
-        else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
-      in
-      (* Finally, add on the [with]-types and their modalities *)
-      List.fold_left
-        (fun jkind (ty, modalities) ->
-          Outcometree.Ojkind_const_with (jkind, ty, modalities))
-        base printable_with_bounds
+              Option.get out_jkind_verbose)
+        in
+        let base =
+          Outcometree.Ojkind_const_abbreviation (base, scannable_axes)
+        in
+        (* Add on [mod] bounds, if there are any *)
+        let base =
+          if modal_bounds = []
+          then base
+          else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
+        in
+        (* Finally, add on the [with]-types and their modalities *)
+        List.fold_left
+          (fun jkind (ty, modalities) ->
+            Outcometree.Ojkind_const_with (jkind, ty, modalities))
+          base printable_with_bounds
   end
 
   let to_out_jkind_const jkind =
@@ -2035,7 +2078,7 @@ module Const = struct
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds } =
+      let { base; mod_bounds; with_bounds; _ } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
       let layout =
@@ -2614,17 +2657,12 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
        this function is mainly used for mode crossing or optimizations, we don't
        expect this to come up much. *)
     Mod_bounds.max
-  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds } ->
+  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
+    ->
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
-
-let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
-  let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:Axis_set.all_nonmodal_axes env jk
-  in
-  Mod_bounds.crossing mod_bounds
 
 let to_unsafe_mode_crossing jkind =
   { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
@@ -3432,24 +3470,6 @@ module Violation = struct
            @[Note: The kinds mutable_data, immutable_data, and sync_data have@ \
            the layout value non_float.@]"
 
-  let report_fuel ppf violation =
-    let report_fuel_for_type which =
-      fprintf ppf
-        "@;\
-         @[Note: I gave up trying to find the simplest kind for the %s,@,\
-         as it is very large or deeply recursive.@]"
-        which
-    in
-    let first_ran_out, second_ran_out =
-      match violation with
-      | Not_a_subjkind (k1, k2, _) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
-      | No_intersection (k1, k2) ->
-        k1.ran_out_of_fuel_during_normalize, k2.ran_out_of_fuel_during_normalize
-    in
-    if first_ran_out then report_fuel_for_type "first";
-    if second_ran_out then report_fuel_for_type "second"
-
   let categorize_mismatch env t =
     let expand k1 k2 =
       (* We fully expand aliases here so that we can:
@@ -3622,8 +3642,7 @@ module Violation = struct
     report_missing_cmis ppf missing_cmis;
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
-    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
-    if not !Clflags.ikinds then report_fuel ppf t.violation
+    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout
 
   let pp_t ppf x = fprintf ppf "%t" x
 
@@ -3674,6 +3693,48 @@ let score_reason = function
   | Creation (Concrete_creation _ | Concrete_legacy_creation _) -> -1
   | _ -> 0
 
+(* Stage-5d S4: hook + validate/measure-gated differential proving the ikind
+   sub verdict selects the IDENTICAL history as the legacy [Jkind_desc.sub] in
+   [combine_histories] (the M4 zero-churn condition; the chosen history feeds
+   error text, so the switch itself rides with the M5 project).  BEHAVIOUR IS
+   UNCHANGED: the legacy result still chooses the history; the ikind verdict runs
+   only under the gate and is compared.  [Ikind] installs [verdict]; when unset
+   (ikinds not linked) or when the gate is off the differential is a no-op -- no
+   ikind computation on the ~267k-call combine path. *)
+type sub_verdict_from_ikind =
+  { verdict :
+      'la 'ra 'lb 'rb.
+      context:jkind_context ->
+      Env.t ->
+      ('la * 'ra) jkind ->
+      ('lb * 'rb) jkind ->
+      Misc.Le_result.t option
+  }
+
+let sub_verdict_from_ikind : sub_verdict_from_ikind option ref = ref None
+
+let set_sub_verdict_from_ikind f = sub_verdict_from_ikind := Some f
+
+let combine_history_measure = Sys.getenv_opt "OXCAML_IK5D_MEASURE" <> None
+
+let combine_history_checks = ref 0
+
+let combine_history_agreements = ref 0
+
+let combine_history_mismatches = ref 0
+
+let () =
+  at_exit (fun () ->
+      if
+        (!Clflags.ikinds_validate || combine_history_measure)
+        && !combine_history_checks > 0
+      then
+        Format.eprintf
+          "[ikind-combine-history] checks=%d agreements=%d mismatches=%d@."
+          !combine_history_checks
+          !combine_history_agreements
+          !combine_history_mismatches)
+
 let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     (Pack_jkind k2) =
   if flattened_histories
@@ -3683,11 +3744,52 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
       then history_a
       else history_b
     in
-    let choose_subjkind_history k_a history_a roofdn_a k_b history_b =
-      match
+    (* Stage-5d S4: the ikind sub verdict for the two FULL jkinds being combined
+       ([jkind_a] <= [jkind_b]), computed only under the gate.  When the gate is
+       off (the common case) this returns [None] without touching the ikind
+       engine, so the ~267k-call combine path is unperturbed. *)
+    let ikind_verdict_of : type la ra lb rb.
+        (la * ra) jkind -> (lb * rb) jkind -> Misc.Le_result.t option =
+     fun jkind_a jkind_b ->
+      if !Clflags.ikinds_validate || combine_history_measure
+      then
+        match !sub_verdict_from_ikind with
+        | None -> None
+        | Some { verdict } -> verdict ~context env jkind_a jkind_b
+      else None
+    in
+    let choose_subjkind_history ~ikind_verdict k_a history_a roofdn_a k_b
+        history_b =
+      let result =
         Jkind_desc.sub ~type_equal ~sub_previously_ran_out_of_fuel:roofdn_a
           ~context env k_a k_b
-      with
+      in
+      (* S4 differential: compare the ikind verdict to the legacy [result]; the
+         legacy value still chooses the history below (behaviour unchanged). *)
+      (match ikind_verdict with
+      | None -> ()
+      | Some ikind ->
+        incr combine_history_checks;
+        let to_string (le : Misc.Le_result.t) =
+          match le with
+          | Misc.Le_result.Less -> "Less"
+          | Misc.Le_result.Equal -> "Equal"
+          | Misc.Le_result.Not_le -> "Not_le"
+        in
+        let legacy : Misc.Le_result.t =
+          match result with
+          | Less -> Misc.Le_result.Less
+          | Equal -> Misc.Le_result.Equal
+          | Not_le _ -> Misc.Le_result.Not_le
+        in
+        if String.equal (to_string legacy) (to_string ikind)
+        then incr combine_history_agreements
+        else begin
+          incr combine_history_mismatches;
+          Format.eprintf "[ikind-combine-history] MISMATCH legacy=%s ikind=%s@."
+            (to_string legacy) (to_string ikind)
+        end);
+      match result with
       | Less -> history_a
       | Not_le _ ->
         (* CR layouts: this will be wrong if we ever have a non-trivial meet in
@@ -3697,13 +3799,13 @@ let combine_histories ~type_equal ~context env reason (Pack_jkind k1)
     in
     match Base_and_axes.(try_allow_l k1.jkind, try_allow_r k2.jkind) with
     | Some k1_l, Some k2_r ->
-      choose_subjkind_history k1_l k1.history
-        k1.ran_out_of_fuel_during_normalize k2_r k2.history
+      choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k1 k2) k1_l
+        k1.history k1.ran_out_of_fuel_during_normalize k2_r k2.history
     | _ -> (
       match Base_and_axes.(try_allow_r k1.jkind, try_allow_l k2.jkind) with
       | Some k1_r, Some k2_l ->
-        choose_subjkind_history k2_l k2.history
-          k2.ran_out_of_fuel_during_normalize k1_r k1.history
+        choose_subjkind_history ~ikind_verdict:(ikind_verdict_of k2 k1) k2_l
+          k2.history k2.ran_out_of_fuel_during_normalize k1_r k1.history
       | _ -> choose_higher_scored_history k1.history k2.history)
   else
     Interact
@@ -3775,39 +3877,10 @@ let round_up (type l r) ~context env (t : (allowed * r) jkind) :
       }
   | With_bounds _ -> None
 
-(* this is hammered on; it must be fast! *)
-let check_sub ~context env sub super =
-  Jkind_desc.sub ~context env sub.jkind super.jkind
-
-let sub_with_reason ~type_equal ~context env sub super =
-  Sub_result.require_le
-    (check_sub ~type_equal
-       ~sub_previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-       ~context env sub super)
-
-let sub ~type_equal ~context env sub super =
-  Result.is_ok (sub_with_reason ~type_equal ~context env sub super)
-
 type sub_or_intersect =
   | Sub
   | Disjoint of Violation.Sub_failure_reason.t Nonempty_list.t
   | May_have_intersection of Violation.Sub_failure_reason.t Nonempty_list.t
-
-let sub_or_intersect ~type_equal ~context env t1 t2 =
-  match sub_with_reason ~type_equal ~context env t1 t2 with
-  | Ok () -> Sub
-  | Error reason ->
-    if may_have_intersection env t1 t2
-    then May_have_intersection reason
-    else Disjoint reason
-
-let sub_or_error ~type_equal ~context env t1 t2 =
-  match sub_or_intersect ~type_equal ~context env t1 t2 with
-  | Sub -> Ok ()
-  | Disjoint reason | May_have_intersection reason ->
-    Error
-      (Violation.of_ ~context env
-         (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
 let sub_layout_or_error ~context env t1 t2 =
   match Jkind_desc.sub_layout env t1.jkind t2.jkind with
@@ -3817,125 +3890,27 @@ let sub_layout_or_error ~context env t1 t2 =
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
-    =
-  (* This function implements the "SUB" judgement from kind-inference.md. *)
-  let open Misc.Stdlib.Monad.Result.Syntax in
-  let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
-              version of sub, but the original super. When this check fails, it
-              is usually the case that the super was written by the user and the
-              sub was inferred. Thus, we should display the user-written jkind,
-              but simplify the inferred one, since the inferred one is probably
-              overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
-              violation occurred, specifically which axes the violation is
-              along. Internal ticket 5100. *)
-        let best_sub = normalize ~mode:Require_best ~context env sub in
-        Violation.of_ ~context env
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-  in
-  let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
-  let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
-  let* () =
-    (* Validate layouts *)
-    require_le (Base.sub_expanded sub_jkind.base super_jkind.base)
-  in
-  match allow_any_crossing with
-  | true -> Ok ()
-  | false -> (
-    let best_super, _ =
-      (* MB_EXPAND_R *)
-      Base_and_axes.normalize ~context ~skip_axes:Axis_set.empty
-        ~mode:Require_best ~previously_ran_out_of_fuel:false env super_jkind
-    in
-    let right_bounds = With_bounds.to_best_eff_map best_super.with_bounds in
-    let axes_max_on_right =
-      (* If the upper_bound is max on the right, then that axis is irrelevant -
-         the left will always satisfy the right along that axis. This is an
-         optimization, not necessary for correctness *)
-      Mod_bounds.get_max_axes best_super.mod_bounds
-    in
-    let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
-    let sub, _ =
-      (* MB_EXPAND_L *)
-      (* Here we progressively expand types on the left.
-
-         Every time we see a type [ty] on the left, we first look to see if [ty]
-         occurs on the right. If it does, then we can skip* [ty]. There is an *
-         on skip because we can actually only skip on a per-axis basis - if [ty]
-         is relevant only along the portability axis on the right, then [ty] is
-         no longer relevant to portability on the left, but it is still relevant
-         to all other axes. So really, we subtract the axes that are relevant to
-         the right from the axes that are relevant to the left.  We can also
-         skip [ty] on any axes that are max on the right since anything is <=
-         max. Hence, we can also subtract [axes_max_on_right].
-
-         After finding which axes [ty] is relevant along, we lookup [ty]'s jkind
-         and join it with the [mod_bounds] along the relevant axes. *)
-      (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
-         joining.  [map_type_info] handles looking for [ty] on the right and
-         removing irrelevant axes. *)
-      Base_and_axes.normalize env sub_jkind ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
-        ~context ~mode:Ignore_best
-        ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
-          let right_relevant_axes =
-            (* Look for [ty] on the right. There may be multiple occurrences of
-               it on the right; if so, we union together the relevant axes. *)
-            right_bounds_seq
-            (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
-               type map? Internal ticket 5086. *)
-            |> Seq.fold_left
-                 (fun acc (ty2, ti) ->
-                   match type_equal ty ty2 with
-                   | true ->
-                     Axis_set.union acc ti.With_bounds_type_info.relevant_axes
-                   | false -> acc)
-                 Axis_set.empty
-          in
-          (* MB_WITH : drop types from the left that appear on the right *)
-          { relevant_axes = Axis_set.diff left_relevant_axes right_relevant_axes
-          })
-    in
-    match sub with
-    | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
-      ->
-      let* () =
-        (* MB_MODE : verify that the remaining upper_bounds from sub are <=
-           super's bounds *)
-        let super_lower_bounds = best_super.mod_bounds in
-        require_le
-          (Mod_bounds.less_or_equal sub_upper_bounds super_lower_bounds)
-      in
-      Ok ()
-    | { base = Kconstr _; with_bounds = With_bounds _; _ } ->
-      require_le (Not_le [With_bounds_on_left])
-    | { base = Layout _; with_bounds = With_bounds _; _ } ->
-      Misc.fatal_error
-        "Jkind.sub_jkind_l: Ignore_best normalize invariant violation.")
-
 let is_obviously_max (t : (_ * allowed) jkind) =
   match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds };
+        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds; _ };
       _
     } ->
     Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
-  | { jkind = { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _ };
+  | { jkind =
+        { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _; _ };
       _
     } ->
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   match t with
-  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds; _ }; _ } ->
     Mod_bounds.is_max mod_bounds
-  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
+  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _; _ }; _ }
+    ->
     false
 
 let fully_expand_aliases env ({ jkind; _ } as jk) =
@@ -4224,7 +4199,7 @@ module Debug_printers = struct
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ base; mod_bounds; with_bounds } : _ Const.t) =
+    let t ppf ({ base; mod_bounds; with_bounds; _ } : _ Const.t) =
       fprintf ppf
         "@[<v 2>{ base = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
         (Base.format Layout.Const.Debug_printers.t)

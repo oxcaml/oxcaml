@@ -306,6 +306,26 @@ module Const : sig
     ('l * allowed) t
 
   val expand_once : Env.t -> (_, 'd) Types.base_and_axes -> 'd t option
+
+  (** Stage-4c print-from-ikind: a wrapper (needed to keep the allowance
+      polymorphic in a ref) around a function deriving a jkind's mod-bounds
+      floor from its ikind. [Ikind] installs it at startup; default derives
+      nothing. *)
+  type floor_from_ikind =
+    { derive : 'l 'r. Env.t -> ('l * 'r) t -> Mod_bounds.t option }
+
+  val set_floor_from_ikind : floor_from_ikind -> unit
+
+  (** Stage-4c print-from-ikind (full rendering): under [-print-from-ikinds],
+      render the entire jkind (with normalized [with]-clauses) from its ikind.
+      [Ikind] installs it; default renders nothing. Returns [None] for the
+      with-bounds-free case (handled byte-identically elsewhere) and on failure.
+  *)
+  type render_from_ikind =
+    { render : 'l 'r. Env.t -> ('l * 'r) t -> Outcometree.out_jkind_const option
+    }
+
+  val set_render_from_ikind : render_from_ikind -> unit
 end
 
 module Builtin : sig
@@ -635,10 +655,6 @@ val get_layout : Env.t -> 'd Types.jkind -> Layout.Const.t option
     [Error p] if the kind is abstract (and its layout is therefore unknown). *)
 val extract_layout : Env.t -> 'd Types.jkind -> (Sort.t Layout.t, Path.t) result
 
-(** Gets the mode crossing for types of this jkind. *)
-val get_mode_crossing :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Mode.Crossing.t
-
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
 val get_externality_upper_bound :
@@ -828,16 +844,6 @@ val intersection_or_error :
   ('l2 * allowed) Types.jkind ->
   (('l1 * allowed) Types.jkind, Violation.t) Result.t
 
-(** [sub t1 t2] says whether [t1] is a subjkind of [t2]. Might update either
-    [t1] or [t2] to make their layouts equal.*)
-val sub :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  bool
-
 type sub_or_intersect =
   | Sub  (** The first jkind is a subjkind of the second. *)
   | Disjoint of Sub_failure_reason.t Misc.Nonempty_list.t
@@ -845,26 +851,6 @@ type sub_or_intersect =
   | May_have_intersection of Sub_failure_reason.t Misc.Nonempty_list.t
       (** The first jkind is not a subjkind of the second, but the two jkinds
           may have an intersection: try harder. *)
-
-(** [sub_or_intersect t1 t2] does a subtype check, returning a
-    [sub_or_intersect]; see comments there for more info. *)
-val sub_or_intersect :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  sub_or_intersect
-
-(** [sub_or_error t1 t2] does a subtype check, returning an appropriate
-    [Violation.t] upon failure. *)
-val sub_or_error :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  Env.t ->
-  (allowed * 'r) Types.jkind ->
-  ('l * allowed) Types.jkind ->
-  (unit, Violation.t) result
 
 (** [sub_layout t1 t2] says whether [t1]'s layout is a sublayout of [t2]s. Might
     update either [t1] or [t2] to make their layouts equal. Does not check
@@ -876,17 +862,21 @@ val sub_layout_or_error :
   ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
-(** Like [sub], but compares a left jkind against another left jkind.
-    Pre-condition: the super jkind must be fully settled; no variables which
-    might be filled in later. *)
-val sub_jkind_l :
-  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
-  context:jkind_context ->
-  ?allow_any_crossing:bool ->
-  Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
-  (unit, Violation.t) result
+(** Stage-5d S4: hook installed by [Ikind] returning the ikind sub verdict
+    ([Less]/[Equal]/[Not_le]) for two jkinds, used by [combine_histories]'
+    history- ordering coexistence differential. [None] result means the ikind
+    derivation was skipped (ikinds disabled) or raised. *)
+type sub_verdict_from_ikind =
+  { verdict :
+      'la 'ra 'lb 'rb.
+      context:jkind_context ->
+      Env.t ->
+      ('la * 'ra) Types.jkind ->
+      ('lb * 'rb) Types.jkind ->
+      Misc.Le_result.t option
+  }
+
+val set_sub_verdict_from_ikind : sub_verdict_from_ikind -> unit
 
 (** "round up" a [jkind_l] to a [jkind_r] such that the input is less than the
     output. If the base is abstract, it may not be possible to eliminate the

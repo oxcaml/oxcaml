@@ -507,6 +507,17 @@ module Make (V : Ordered) = struct
 
   let solve_pending () : unit = solve_pending_gfps ()
 
+  let pending_count () : int = List.length !gfp_pending
+
+  (* See [Ldd_intf.S.with_isolated_pending] for the contract and the isolation
+     boundary (only [gfp_pending] is swapped; rigid interning + the monotonic
+     id counter stay shared, deliberately). Exception-safe: a raising [f] still
+     restores the caller's pending list. *)
+  let with_isolated_pending (type a) (f : unit -> a) : a =
+    let saved = !gfp_pending in
+    gfp_pending := [];
+    Fun.protect ~finally:(fun () -> gfp_pending := saved) f
+
   (** Decompose into linear terms over [universe]. *)
   let decompose_into_linear_terms ~(universe : var list) (n : node) =
     (* Successive restriction over [universe]. *)
@@ -567,6 +578,110 @@ module Make (V : Ordered) = struct
         | Solved _ ->
           failwith "solved vars should not appear after inline_solved_vars")
       node
+
+  (* Name-preserving analog of [to_named_terms]: the same ZDD walk, but each
+     term keeps its atoms as [Name.t] rather than stringifying them via
+     [V.to_string].  The node must be rigid-inlined (this calls
+     [inline_solved_vars]); an [Unsolved] var raises, since it has no [Name] to
+     preserve (a rigid-inlined stored/derived node never has one).  Terms are
+     returned in ZDD-walk order; WITHIN each term the [Name.t]s are sorted by
+     [V.compare] (canonical, so the residue is byte-reproducible independent of
+     the internal variable/intern order); the base (varless) term is the element
+     with an empty name list.  This is the residue form
+     [base \u2294 \u03a3 (coeff \u2293 names)] consumed by print-from-ikind and by cmi
+     save/load; [of_terms] is its inverse.  Edge: [to_terms bot = []],
+     [to_terms top = [(top, [])]]. *)
+  let to_terms (node : node) : (Axis_lattice.t * V.t list) list =
+    let rec aux (acc_vars : V.t list) (node : node)
+        (acc_terms : (Axis_lattice.t * V.t list) list) =
+      if is_leaf node
+      then
+        let c = Unsafe.leaf_value node in
+        if Axis_lattice.equal c Axis_lattice.bot
+        then acc_terms
+        else (c, List.sort V.compare acc_vars) :: acc_terms
+      else
+        let block = Unsafe.node_block node in
+        let acc_terms = aux acc_vars block.lo acc_terms in
+        let name =
+          match block.v.state with
+          | Rigid name -> name
+          | Unsolved ->
+            failwith "Ldd.to_terms: unsolved var (node not rigid-inlined)"
+          | Solved _ ->
+            failwith "solved vars should not appear after inline_solved_vars"
+        in
+        aux (name :: acc_vars) block.hi acc_terms
+    in
+    aux [] (inline_solved_vars node) [] |> List.rev
+
+  (* Algebraic inverse of [to_terms]: interpret each term [(coeff, names)] as
+     [coeff \u2293 \u2293names] and [join] them all (base [\u2294 \u03a3]).  Total and
+     order-insensitive: [meet]/[join] are commutative+associative so within-term
+     [Name] order is irrelevant, and DUPLICATE name-sets are simply joined (their
+     coeffs meet-into-place via the join), never an error.  Rigid atoms are
+     re-interned by [rigid] through the deterministic name hash, so [Unknown]
+     atoms keep their fixed decl-time [Uid] (no re-mint).  Edge: [of_terms [] =
+     bot], [of_terms [(c, [])] = const c].  [of_terms (to_terms n)] is
+     semantically equal to [n]; [to_terms (of_terms ts)] is [ts] up to the
+     canonical form ([to_terms]'s within-term [V.compare] sort + duplicate
+     name-set coeff-join). *)
+  let of_terms (terms : (Axis_lattice.t * V.t list) list) : node =
+    List.fold_left
+      (fun acc (c, names) ->
+        let term =
+          List.fold_left
+            (fun t name -> meet t (node_of_var (rigid name)))
+            (const c) names
+        in
+        join acc term)
+      bot terms
+
+  (* Rebuild [node] dropping every non-base term whose rigid atoms ALL satisfy
+     [drop]. A term is one ZDD path (a leaf and the set of hi-edge vars taken
+     to reach it, semantics [lo \u2294 (v \u2293 hi)]); it is dropped iff it is
+     non-empty and every var on it is [Rigid] with a [Name] satisfying [drop].
+     The base (varless) term and any term carrying a non-[drop] atom (or an
+     [Unsolved] var) are reconstructed exactly. Used by the stage-4a carrier
+     validation to strip pure constructor-atom (Atom/KAtom) terms so an
+     abstract-with-manifest scope divergence is distinguishable from a Param
+     relabel bug (which always leaves a Param on the divergent term). *)
+  (* No memoization: this is validation-only and runs on small rigid-inlined
+     carrier nodes, so the plain recursive walk is fine. *)
+  let filter_out_pure_terms (drop : Name.t -> bool) (node : node) : node =
+    let rec aux (has_var : bool) (all_drop : bool) (acc : node) (node : node) :
+        node =
+      if is_leaf node
+      then
+        let c = Unsafe.leaf_value node in
+        if Axis_lattice.equal c Axis_lattice.bot
+        then bot
+        else if has_var && all_drop
+        then bot
+        else meet (const c) acc
+      else
+        let block = Unsafe.node_block node in
+        let lo = aux has_var all_drop acc block.lo in
+        let this_drop =
+          match block.v.state with
+          | Rigid name -> drop name
+          | Unsolved -> false
+          (* [Unsolved -> keep] (drop=false) is conservative: an [Unsolved]
+             var makes its term non-pure so the term is retained and compared,
+             never silently dropped. It should not appear on a rigid-inlined
+             carrier, but keeping it is the safe default if one does. *)
+          | Solved _ ->
+            failwith
+              "filter_out_pure_terms: solved var after inline_solved_vars"
+        in
+        let hi =
+          aux true (all_drop && this_drop)
+            (meet acc (node_of_var block.v))
+            block.hi
+        in
+        join lo hi
+    in
+    aux false true top (inline_solved_vars node)
 
   let pp (w : node) : string =
     let pp_coeff = Axis_lattice.to_string in

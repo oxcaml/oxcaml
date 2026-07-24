@@ -828,11 +828,12 @@ let mk_dump_into_file f =
 let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
-let mk_no_ikinds f =
-  "-no-ikinds", Arg.Unit f, " Disable ikinds-based kind checker"
-
 let mk_ikinds_debug f =
   "-ikinds-debug", Arg.Unit f, " Enable ikinds debug logging"
+
+let mk_print_from_ikinds f =
+  "-print-from-ikinds", Arg.Unit f,
+  " Derive jkind printing from the ikind representation (dev)"
 
 let mk_extension f =
   let available_extensions =
@@ -1146,8 +1147,8 @@ module type Common_options = sig
   val _no_locs : unit -> unit
   val _alert : string -> unit
   val _i_variance : unit -> unit
-  val _no_ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
+  val _print_from_ikinds : unit -> unit
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
@@ -1503,8 +1504,8 @@ struct
     mk_config_var F._config_var;
     mk_custom F._custom;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_dllib F._dllib;
     mk_dllpath F._dllpath;
@@ -1664,8 +1665,8 @@ struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -1774,8 +1775,8 @@ struct
     mk_config_var F._config_var;
     mk_dtypes F._annot;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -2003,8 +2004,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
     mk_disable_all_extensions F._disable_all_extensions;
-    mk_no_ikinds F._no_ikinds;
     mk_ikinds_debug F._ikinds_debug;
+    mk_print_from_ikinds F._print_from_ikinds;
     mk_only_erasable_extensions F._only_erasable_extensions;
     mk_extension F._extension;
     mk_no_extension F._no_extension;
@@ -2390,8 +2391,8 @@ module Default = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
     let _alert = Warnings.parse_alert_option
-    let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
+    let _print_from_ikinds = set Clflags.print_from_ikinds
     let _alias_deps = clear no_alias_deps
     let _app_funct = set applicative_functors
     let _i_variance = set print_variance

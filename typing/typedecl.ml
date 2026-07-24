@@ -3105,7 +3105,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   | None -> ()
   | Some { base = Layout _; _ } -> ()
   | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
-            with_bounds = No_with_bounds }
+            with_bounds = No_with_bounds; _ }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
     else
@@ -3132,7 +3132,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         else
           match (Env.find_jkind current env).jkind_manifest with
           | Some ({ base = Kconstr (next, _); mod_bounds = _;
-                    with_bounds = No_with_bounds } as m) ->
+                    with_bounds = No_with_bounds; _ } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
           | exception Not_found -> None
@@ -4894,6 +4894,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_arity = arity;
           type_kind;
           type_jkind;
+          (* Deliberately [No_constructor_ikind]; see the note at the boxed
+             with-constraint site below (stage-2 use-scope recompute). *)
           type_ikind =
             (let reason =
                Format.asprintf "transl_with_constraint unboxed path=%a"
@@ -4933,6 +4935,17 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_arity = arity;
       type_kind;
       type_jkind;
+      (* Stage 2 (ikind-unification): deliberately [No_constructor_ikind]; the
+         ikind is recomputed from the manifest at *use* scope. Eagerly storing
+         the manifest ikind here (via
+         [Ikind.type_declaration_ikind_of_manifest] in [sig_env]) is unsafe
+         under the authority flip: it captures the manifest's kind at the
+         constraint's *elaboration* scope, which diverges from the use-time kind
+         when the manifest depends on a functor parameter refined between
+         elaboration and use. Measured: gadt_ikinds.ml F2/F3 then regress
+         (previously-accepted functors rejected), and the ticket-4973
+         abstract-with-[with] case is the unsound direction. A safe store needs
+         the stage-3 scope-consistent (Param-relabel) machinery. *)
       type_ikind =
         (let reason =
            Format.asprintf "transl_with_constraint path=%a"
@@ -5319,7 +5332,7 @@ module Reaching_path = struct
   (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
      loops on the very cycles we're reporting. *)
   let pp_kind_manifest ppf
-        ({ base; mod_bounds; with_bounds = No_with_bounds}
+        ({ base; mod_bounds; with_bounds = No_with_bounds; _ }
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)

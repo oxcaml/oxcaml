@@ -12,18 +12,258 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Global feature toggles for ikinds. These are intended to be easy to flip
-   while iterating on performance or correctness. *)
-(* CR jujacobs: remove toggles in the final version. *)
-let enable_crossing = true
+(* Stage-5m: the ikind engine is the sole kind checker.  The [enable_*] seam
+   toggles (stage-5a) and the [-no-ikinds] legacy fallback (stage-5d/5m) are
+   gone; the seams are unconditional. *)
 
-let enable_sub_jkind_l = true
+(* Stage-1 validation harness (see STAGE1-DESIGN.md). When
+   [Clflags.ikinds_validate] (env var OXCAML_IKINDS_VALIDATE) is set, each kind
+   subcheck / crossing query re-derives the ikind twice -- once using the
+   stored decl ikinds ([type_declaration.type_ikind]) and once forcing a full
+   recompute from each declaration -- and asserts the two agree. This is the
+   representation-level "stored ikind agrees with the derived-on-the-fly one".
+   It is inert (default builds byte-identical) unless the flag is set. *)
+let () =
+  match Sys.getenv_opt "OXCAML_IKINDS_VALIDATE" with
+  | Some ("1" | "true" | "yes" | "on") -> Clflags.ikinds_validate := true
+  | Some _ | None -> ()
 
-let enable_sub_or_intersect = true
+(* Env alias for [-print-from-ikinds], so the full expect-test suite can be run
+   flag-on through the real [make test-one] runner (which fixes the compiler's
+   command-line flags) without a rebuild.  Same idiom as OXCAML_IKINDS_VALIDATE. *)
+let () =
+  match Sys.getenv_opt "OXCAML_PRINT_FROM_IKINDS" with
+  | Some ("1" | "true" | "yes" | "on") -> Clflags.print_from_ikinds := true
+  | Some _ | None -> ()
 
-let enable_sub_or_error = false
+(* When set, [lookup_of_env] ignores any stored [Constructor_ikind] and takes
+   the recompute-from-declaration fallback. Used only by the validation harness
+   to obtain the "derived on the fly" reference. *)
+let force_recompute_ikinds = ref false
 
-let reset_constructor_ikind_on_substitution = false
+(* When set (together with [force_recompute_ikinds]), [lookup_of_env] keeps the
+   stored ikind for a recursive-module fixpoint residue (a [Type_abstract
+   Definition] decl whose stored ikind carries a foreign [Param]).  Only the
+   validation harness sets it, to build the CLASS-B residue-trusting
+   reference. *)
+let trust_residue_stored = ref false
+
+(* Seeded-fault hook (test/debug only; env [OXCAML_IKIND_RESIDUE_FAULT]).  When
+   set, the residue-trusting reference derivation returns a deliberately-wrong
+   (top-joined) value for a residue instead of its stored ikind.  This leaves
+   the compile path and the stored/coarse derivations untouched -- so the
+   SAME divergences are detected -- but makes [recomputed_residue] disagree with
+   [stored], demonstrating that (a) every residue-trust decision is still
+   COUNTED under [residue_trusted] (the tag fires; the trust boundary is not
+   a blind spot), and (b) a residue-trust value that does not match the
+   stored fixpoint value is NOT silently classified CLASS-B -- it escalates
+   to a HARD mismatch.
+   Gated so it can only ever perturb the validation harness -- default off, so
+   ordinary builds (flag-on and flag-off) are byte-identical.  See
+   STAGE4B-DESIGN.md. *)
+let residue_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_RESIDUE_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> residue_fault := true
+  | Some _ | None -> ()
+
+(* Counts how many times the print-from-ikind floor deriver actually fired
+   (a with-bounds-free jkind printed under [-print-from-ikinds]).  Evidence the
+   seam is exercised corpus-wide. *)
+let print_floor_derivations = ref 0
+
+(* Coverage counters for the full-rendering path (with-bounds jkinds under the
+   flag): how many were rendered normalized from the ikind vs fell back to the
+   legacy renderer because the derivation raised (the genuinely-underivable
+   class). *)
+let print_withbounds_rendered = ref 0
+
+let print_render_fallbacks = ref 0
+
+(* Seeded-fault hook (test/debug only; env [OXCAML_PRINT_FLOOR_FAULT]).  When
+   set, the print-from-ikind floor deriver returns a deliberately-wrong value
+   ([top] = crosses everything) instead of the true floor, so the printed
+   mod-bounds diverge from the legacy value.  This proves the flag-on
+   differential (expect corpus, flag on) can FIRE: with the fault on, at least
+   one printed kind must change.  Default off, so flag-on output is otherwise
+   byte-identical. *)
+let print_floor_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_PRINT_FLOOR_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> print_floor_fault := true
+  | Some _ | None -> ()
+
+(* Stage-5a re-entrancy probe: global Solver-cache entries a print-path context
+   creation EVICTS.  With the pre-fix clearing [create_ctx] this counts the warm
+   cache a mid-print [create_ctx] wipes (hazard H1); after the scratch-ctx fix it
+   stays 0 (the scratch ctx allocates fresh tables and never touches the
+   globals).  Reported in the [-ikinds-debug] at_exit summary. *)
+let print_ctx_evicted_entries = ref 0
+
+(* Stage-5a re-entrancy REGRESSION probe (env [OXCAML_IK5A_REENTRANCY_PROBE],
+   test/debug only, default off).  On the first [crossing_of_jkind] of a compile
+   it fabricates an outer mid-check state (a pending gfp; the seam has already
+   warmed the Solver caches), then PRINTS the jkind through the real print funnel
+   under [-print-from-ikinds] -- a genuinely nested, mid-check jkind print -- and
+   reports whether the outer Solver-cache size and pending-gfp count SURVIVED.
+   With the fix (scratch ctx + [with_isolated_pending]) both are untouched
+   (evicted=0, drained=0 => OK); a regression to the clearing ctx or an
+   un-isolated [solve_pending] would evict/drain (=> CORRUPTION).  The whole
+   probe is sandboxed in [with_isolated_pending] so it cannot perturb the live
+   check it runs inside, and default-off so ordinary builds are unaffected. *)
+let reentrancy_probe = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IK5A_REENTRANCY_PROBE" with
+  | Some ("1" | "true" | "yes" | "on") -> reentrancy_probe := true
+  | Some _ | None -> ()
+
+let reentrancy_probe_done = ref false
+
+(* Stage-4d cross-unit seeded-fault hook (test/debug only; env
+   [OXCAML_IKIND_SAVE_FAULT]).  When set, a decl ikind is deliberately corrupted
+   (base -> bottom, the tighter/genuine-finding direction) ON THE cmi SAVE PATH
+   only.  The defining unit compiles unaffected (the corruption happens while
+   preparing the signature for saving, after its own checks); the corruption
+   rides into the .cmi, so an importing unit loads a wrong stored ikind while the
+   defining unit's legacy jkind fields (from which the importer recomputes the
+   reference) stay intact.  Under [OXCAML_IKINDS_VALIDATE] the importer's harness
+   then sees stored < recompute and escalates to a HARD mismatch -- demonstrating
+   that the cmi boundary is not a validation blind spot.  Default off, so
+   ordinary builds (flag-on and flag-off) are byte-identical. *)
+let save_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_SAVE_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> save_fault := true
+  | Some _ | None -> ()
+
+(* Stage-4d cross-unit [Param]-id collision DETECTOR (validate-only, read-side
+   bookkeeping; no persistence-format or CLASS-B change).  A foreign [Param] in
+   a persisted (imported) decl ikind keys off a stale live-[type_expr] id from
+   the defining unit; if it numerically collides with a [Param] id the importer
+   mints for one of its OWN live type variables (rigids intern by [stable_hash
+   name]), [decompose_into_linear_terms] can conflate them and mis-attribute the
+   residue's contribution -- a narrow, pre-existing potential unsound accept
+   (STAGE4D-DESIGN.md, stage-5 MUST-FIX).  Until the stage-5 residue
+   representation removes the stale id, this converts the hazard from silent to
+   OBSERVABLE: [imported_foreign_param_ids] records every foreign [Param] id seen
+   in an IMPORTED stored decl ikind (recorded at the load/lookup site, BEFORE
+   interning, so no post-intern marker is needed to tell persisted-origin ids
+   apart), and each live [Param] mint checks membership, counting overlaps.
+   Over-approximate (flags numeric overlap even absent a shared [decompose]) --
+   acceptable for a detector.  Gated on [ikinds_validate]; ordinary builds pay
+   nothing and are byte-identical. *)
+let imported_foreign_param_ids : (int, unit) Hashtbl.t = Hashtbl.create 16
+
+let param_id_collisions = ref 0
+
+(* Seeded negative control (env [OXCAML_IKIND_COLLISION_FAULT]): inject a
+   synthetic collision by recording each live-minted [Param] id into the
+   imported set just before the membership check, so the very next check on that
+   id fires.  Proves the counter can increment (a real numeric collision is not
+   source-constructible -- [type_expr] id allocation is not controllable).
+   Default off. *)
+let collision_fault = ref false
+
+let () =
+  match Sys.getenv_opt "OXCAML_IKIND_COLLISION_FAULT" with
+  | Some ("1" | "true" | "yes" | "on") -> collision_fault := true
+  | Some _ | None -> ()
+
+(* Detector check at a live [Param] mint: [id] is a [type_expr] id the current
+   unit is turning into a [Param] rigid.  If it numerically matches an id
+   recorded from an imported (persisted) decl ikind, count the overlap.  Called
+   at EVERY live-param mint, including the [decompose_into_linear_terms] universe
+   sites (the actual collision-harm site -- see STAGE4D-DESIGN.md), not just
+   [Solver.rigid].  Validate-gated. *)
+let check_live_param_id (id : int) : unit =
+  if !Clflags.ikinds_validate
+  then (
+    (* Seeded control ([OXCAML_IKIND_COLLISION_FAULT]) injects a collision by
+       recording the id first, so the check then fires. *)
+    if !collision_fault then Hashtbl.replace imported_foreign_param_ids id ();
+    if Hashtbl.mem imported_foreign_param_ids id then incr param_id_collisions)
+
+let validate_checks = ref 0
+
+let validate_mismatches = ref 0
+
+(* Benign class (stage 3): a divergence where the stored derivation is a
+   conservative OVER-approximation of the recompute ([recompute <= stored]). The
+   L-jkind carrying with-bounds is always the SUB of a [sub <= super] check
+   ([Ldd.leq_with_reason sub super]; see [compute_subcheck_polys] below), so a
+   larger stored value can only make the check HARDER -- conservative
+   over-rejection, never an unsound acceptance. Divergences in the OTHER
+   direction ([stored <= recompute], stored strictly tighter) are NOT
+   whitelisted: they stay hard mismatches and are a genuine-soundness-finding
+   trigger. Counted and reported separately. *)
+let validate_benign = ref 0
+
+(* CLASS-B (stage 4b): a divergence fully explained by recursive-module
+   fixpoint-residue trust -- the stored ikind of a [Type_abstract Definition]
+   decl carrying a foreign [Param] is TRUSTED rather than independently
+   validated, because a from-scratch reference cannot reconstruct the
+   declaration-time recursive-module fixpoint (the same trust boundary as
+   CLASS-A's fresh-[Tvar] temp decls).  We do NOT hard-fail these, but we COUNT
+   and LOG every one so the trust decision stays auditable -- a deliberately
+   wrong residue stored ikind still lands here (the tag fires), never silently
+   absorbed. *)
+let validate_class_b = ref 0
+
+(* Lookup-level audit tag: counts every residue-trust DECISION -- each time the
+   residue-trusting reference derivation keeps a residue's stored ikind instead
+   of recomputing it.  Fires regardless of whether that stored value is correct,
+   so it is the visibility guarantee the trust boundary needs: a wrong residue
+   stored ikind (e.g. under [OXCAML_IKIND_RESIDUE_FAULT]) is still counted here,
+   never a silent blind spot.  Only ever incremented in the harness (guarded by
+   [force_recompute_ikinds] && [trust_residue_stored]). *)
+let residue_trusted = ref 0
+
+(* Counts, in the normal (non-forced) path, how many constructor lookups used a
+   stored decl ikind vs fell back to recompute. *)
+let stored_decl_ikind_hits = ref 0
+
+let recomputed_decl_ikind = ref 0
+
+(* Stage-5b telemetry (validate/debug only): [residue_neutralized] counts foreign
+   [Param] residues rewritten to unit-qualified [Residue] on the cmi save path;
+   [imported_residues] counts [Residue] atoms seen in imported stored decl ikinds.
+   Corroboration for the coexistence-window: residues cross the cmi as [Residue]
+   (imported-residues > 0) and [param-id-collisions] stays 0 (no live-[Param] can
+   alias a [Residue] -- collision-free by construction). *)
+let residue_neutralized = ref 0
+
+let imported_residues = ref 0
+
+let () =
+  at_exit (fun () ->
+      if !Clflags.ikinds_validate
+      then
+        Format.eprintf
+          "[ikind-validate] summary: checks=%d mismatches=%d benign=%d \
+           class_b=%d residue_trusted=%d; decl-ikind stored=%d recomputed=%d; \
+           imported-foreign-params=%d param-id-collisions=%d; \
+           residue-neutralized=%d imported-residues=%d@."
+          !validate_checks !validate_mismatches !validate_benign
+          !validate_class_b !residue_trusted !stored_decl_ikind_hits
+          !recomputed_decl_ikind
+          (Hashtbl.length imported_foreign_param_ids)
+          !param_id_collisions !residue_neutralized !imported_residues)
+
+let () =
+  at_exit (fun () ->
+      (* Gated on [-ikinds-debug] (not the flag itself) so [-print-from-ikinds]
+         does not spew to stderr and pollute captured compiler output. *)
+      if !Clflags.print_from_ikinds && !Clflags.ikinds_debug
+      then
+        Format.eprintf
+          "[ikind-print] floor derivations=%d with-bounds rendered=%d render \
+           fallbacks=%d fault=%b ctx-evicted=%d@."
+          !print_floor_derivations !print_withbounds_rendered
+          !print_render_fallbacks !print_floor_fault !print_ctx_evicted_entries)
 
 module Ldd = Types.Ldd
 
@@ -101,6 +341,28 @@ module Solver = struct
       constr_to_coeffs = global_constr_to_coeffs
     }
 
+  (* Stage-5a probe: total live entries in the two GLOBAL caches.  A print-path
+     [create_ctx] clears both, evicting exactly this many; measured to quantify
+     the re-entrancy hazard H1 (STAGE5A-NOTES.md). *)
+  let global_cache_size () : int =
+    TyTbl.length global_ty_to_kind + ConstrTbl.length global_constr_to_coeffs
+
+  (* Stage-5a re-entrancy fix: a per-print SCRATCH context.  Unlike [create_ctx]
+     it allocates FRESH cache tables and neither clears nor reuses the globals,
+     so a derivation run for PRINTING cannot evict or corrupt the cache an outer
+     solve is using mid-flight.  Behaviourally identical to the cleared-global
+     ctx for the derivation itself: [create_ctx] already cleared the globals on
+     every call, so the cache was always a per-derivation memo; this just makes
+     that memo genuinely private instead of a shared table it wipes. *)
+  let create_scratch_ctx ~(mode : mode) ~(env : Env.t option)
+      ~(lookup_of_env : Env.t -> Path.t -> constr_decl) =
+    { env;
+      lookup_of_env;
+      mode;
+      ty_to_kind = TyTbl.create 1;
+      constr_to_coeffs = ConstrTbl.create 1
+    }
+
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
@@ -111,6 +373,7 @@ module Solver = struct
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     let param_id = Types.get_id ty in
+    check_live_param_id param_id;
     rigid_name ctx (Ldd.Name.param param_id)
 
   let type_may_be_circular (ty : Types.type_expr) : bool =
@@ -164,7 +427,7 @@ module Solver = struct
            [c] are kept rigid to avoid infinite expansion. *)
         let instantiate (name : Ldd.Name.t) : Ldd.node =
           match name with
-          | Param _ | Unknown _ -> rigid_name ctx name
+          | Param _ | Unknown _ | Residue _ -> rigid_name ctx name
           | KAtom kpath -> (
             match ctx.env with
             | None -> rigid_name ctx name
@@ -208,7 +471,10 @@ module Solver = struct
         ConstrTbl.add ctx.constr_to_coeffs path (base_poly, coeffs_poly);
         let rigid_vars =
           List.map
-            (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty)))
+            (fun ty ->
+              let id = Types.get_id ty in
+              check_live_param_id id;
+              Ldd.rigid (Ldd.Name.param id))
             params
         in
         (* We add the parameters to the TyTbl so that they will refer to
@@ -353,42 +619,6 @@ module Solver = struct
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
    fun ctx jkind -> ckind_of_jkind_desc ctx jkind.jkind
 
-  and mod_bounds_floor_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
-   fun ctx jkind_desc ->
-    let mod_bounds, unresolved_base =
-      let rec expand : type b.
-          (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
-       fun jkind_desc ->
-        match ctx.env with
-        | None ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
-          in
-          jkind_desc.mod_bounds, unresolved_base
-        | Some env -> (
-          match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
-          | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
-            in
-            jkind_desc.mod_bounds, unresolved_base)
-      in
-      expand jkind_desc
-    in
-    match unresolved_base with
-    | Some _ -> None
-    | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
-
-  and mod_bounds_floor_of_jkind : type l r.
-      ctx -> (l * r) Types.jkind -> Ldd.node option =
-   fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
-
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
       (ty : Types.type_expr) : Ldd.node =
@@ -531,9 +761,7 @@ let pp_coeffs (coeffs : Ldd.node array) : string =
 
 let with_ikinds_enabled (f : unit -> Types.constructor_ikind) : Types.type_ikind
     =
-  if not !Clflags.ikinds
-  then Types.ikinds_todo "ikinds disabled"
-  else Types.Constructor_ikind (f ())
+  Types.Constructor_ikind (f ())
 
 let origin_suffix_of = function None -> "" | Some o -> " origin=" ^ o
 
@@ -555,22 +783,18 @@ let label_mutability_contribution (lbl : Types.label_declaration) =
 
 let sum_record_label_contributions ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
-    ~(validate_label : Types.label_declaration -> unit)
+    ~(mutability_contribution : Types.label_declaration -> Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
-      validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_contribution lbl)
+        (mutability_contribution lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
 
-let no_validation (_ : Types.label_declaration) = ()
-
-let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
-  | Immutable -> ()
-  | Mutable _ ->
-    failwith "ikind: mutable fields in unboxed records are not supported"
+(* Unboxed records ignore field mutability: with no heap identity to mutate
+   through, mutability adds nothing to the kind. This matches the legacy
+   [Jkind_desc.product], which never consults [ld_mutable]. *)
+let no_mutability_contribution (_ : Types.label_declaration) = Ldd.bot
 
 (* Gather constructor-local vars from [tys]. *)
 let collect_type_vars (tys : Types.type_expr list) :
@@ -683,7 +907,8 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
                   | Some bound -> bound
                   | None -> Ldd.const Axis_lattice.top
                 else Solver.node_of_name ctx name)
-            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
+            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _
+            | Ldd.Name.Residue _ ->
               Solver.node_of_name ctx name
           in
           fun ty ->
@@ -692,6 +917,83 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
       | _ ->
         failwith
           "ikind: expected GADT constructor result to be a type constructor")
+
+(* A stored constructor ikind for a [Type_abstract Definition] decl that carries
+   a [Param] atom foreign to the decl's own type parameters is a
+   recursive-module
+   fixpoint residue: the declaration-time fixpoint (in the module-type-body
+   scope) gated a recursive sibling's contribution on a symbolic atom that a
+   from-scratch recompute cannot reproduce -- recompute resolves the closed
+   manifest coarsely (e.g. an object to [object_legacy]) instead. Stored decl
+   ikinds are otherwise free of foreign [Param] atoms (parameter dependence is
+   captured positionally in the coeff array), so this is a precise signature of
+   the residue. See STAGE4B-DESIGN.md. *)
+let stored_ikind_has_foreign_param ~(own_params : Types.type_expr list)
+    (base : Ldd.node) (coeffs : Ldd.node array) : bool =
+  let own_ids = List.map Types.get_id own_params in
+  let found = ref false in
+  let visit (name : Ldd.Name.t) : Ldd.node =
+    (match name with
+    | Ldd.Name.Param id when not (List.mem id own_ids) -> found := true
+    (* An imported residue is a [Residue] atom (neutralized on save, stage 5b);
+       the distinct constructor IS the CLASS-B marker -- recognize it here so
+       residue recognition survives the save-path neutralization. *)
+    | Ldd.Name.Residue _ -> found := true
+    | _ -> ());
+    Ldd.node_of_var (Ldd.rigid name)
+  in
+  ignore (Ldd.map_rigid visit base : Ldd.node);
+  Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs;
+  !found
+
+(* Stage-4d detector: record every foreign [Param] id carried by a persisted
+   (imported) decl ikind into [imported_foreign_param_ids].  Called at the
+   load/lookup site, so the id's persisted origin is known WITHOUT a post-intern
+   marker.  Validate-only. *)
+let record_imported_foreign_params ~(own_params : Types.type_expr list)
+    (base : Ldd.node) (coeffs : Ldd.node array) : unit =
+  let own_ids = List.map Types.get_id own_params in
+  let visit (name : Ldd.Name.t) : Ldd.node =
+    (match name with
+    | Ldd.Name.Param id when not (List.mem id own_ids) ->
+      Hashtbl.replace imported_foreign_param_ids id ()
+    (* A neutralized residue arrives as a [Residue] atom, not a foreign [Param];
+       count it separately (telemetry) -- it can never alias a live [Param]. *)
+    | Ldd.Name.Residue _ -> incr imported_residues
+    | _ -> ());
+    Ldd.node_of_var (Ldd.rigid name)
+  in
+  ignore (Ldd.map_rigid visit base : Ldd.node);
+  Array.iter (fun c -> ignore (Ldd.map_rigid visit c : Ldd.node)) coeffs
+
+(* Stage-4d detector: is [uid] a decl minted in a DIFFERENT compilation unit
+   (i.e. imported from a cmi)?  Keys on the decl's OWN uid origin, not the
+   syntactic access path, so a module ALIAS / functor-param / local bind
+   ([module L = Foo; L.t]) is still recognized as imported -- the syntactic
+   [Path.head]/[Ident.is_global] gate missed those (reviewer blind-spot repro).
+   [comp_unit] is [Compilation_unit.full_path_as_string] of the defining unit
+   (see [Shape.Uid.mk]); compare against the current unit's, computed the same
+   way. *)
+let decl_is_imported (uid : Types.Uid.t) : bool =
+  let current =
+    match Env.get_current_unit () with
+    | Some ui ->
+      Some (Compilation_unit.full_path_as_string (Unit_info.modname ui))
+    | None -> None
+  in
+  match uid with
+  | Types.Uid.Item { comp_unit; _ } | Types.Uid.Compilation_unit comp_unit -> (
+    match current with
+    | Some cur -> not (String.equal comp_unit cur)
+    (* No current unit (toplevel / special tools): there is no cmi-import
+       boundary to police, so treat as NOT imported.  [None -> true] here would
+       flag every same-session decl as imported and produce massive false-
+       positive self-collisions in the toplevel (the detector is over-approximate
+       but must not fire on a single in-memory session). Batch compilation -- the
+       real cross-cmi scenario -- always has [Some] current unit. *)
+    | None -> false)
+  | Types.Uid.Predef _ | Types.Uid.Internal | Types.Uid.Unboxed_version _ ->
+    false
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
@@ -764,7 +1066,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
            fun (ctx : Solver.ctx) ->
             sum_record_label_contributions ~base:immutable_base
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:no_validation lbls
+              ~mutability_contribution:label_mutability_contribution lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
@@ -773,7 +1075,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
             let base = Ldd.const Axis_lattice.immediate in
             sum_record_label_contributions ~base
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:validate_immutable_unboxed_label lbls
+              ~mutability_contribution:no_mutability_contribution lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
@@ -833,7 +1135,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
                     Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind
-                  ~validate_label:no_validation lbls
+                  ~mutability_contribution:label_mutability_contribution lbls
             in
             Ldd.sum cstrs ~base:(Ldd.const base_lat0) ~f:constructor_contrib
           in
@@ -852,15 +1154,90 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         *)
         )
     in
+    (* CLASS-A (stage 3, validate-only): a [Type_abstract Definition] decl with a
+       fresh [Tvar] manifest is the temporary declaration [Typedecl.enter_type]
+       enters for a (possibly recursive) type before its body is analyzed. Its
+       stored ikind is the user's DECLARED jkind; its manifest is a placeholder
+       type variable collecting usage constraints, NOT the real body. So a
+       from-scratch recompute -- which follows that fresh Tvar -- is not a valid
+       reference for this decl, and the validation harness keeps the stored
+       (declared) ikind even in the recompute reference.
+
+       Soundness (exhaustive case split; the stored value IS the declared jkind):
+       - enclosing type ACCEPTED => the decl kind-check proved [body <= declared],
+         so [stored(declared) >= true body kind] = over-approximation = sound
+         (over-reject only);
+       - [declared] too tight ([stored <= true]) => the decl kind-check FAILS and
+         the type is REJECTED => the tight stored is discarded, never
+         authoritatively accepts anything.
+       A too-tight declared jkind rejects the DEFINITION; it can never accept a
+       USE. *)
+    let is_def_tvar_temp_decl =
+      match type_decl.type_kind, type_decl.type_manifest with
+      | Types.Type_abstract Types.Definition, Some body_ty -> (
+        match Types.get_desc body_ty with Types.Tvar _ -> true | _ -> false)
+      | _ -> false
+    in
+    (* Stage 4b: a recursive-module fixpoint residue gets the same
+       reference-exclusion as CLASS-A, detected by a foreign [Param] in the
+       stored ikind rather than a fresh-[Tvar] manifest. See
+       STAGE4B-DESIGN.md. *)
+    let is_def_abstract =
+      match type_decl.type_kind with
+      | Types.Type_abstract Types.Definition -> true
+      | _ -> false
+    in
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
       match type_decl.type_ikind with
-      | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
+      | Types.Constructor_ikind { base; coeffs }
+        when not !force_recompute_ikinds ->
+        if !Clflags.ikinds_validate then incr stored_decl_ikind_hits;
+        (* Detector: an IMPORTED decl's stored ikind (persistent path head) may
+           carry a foreign [Param] with a stale live id; record it. *)
+        if !Clflags.ikinds_validate && decl_is_imported type_decl.type_uid
+        then
+          record_imported_foreign_params ~own_params:type_decl.type_params base
+            coeffs;
         Solver.Poly (base, coeffs)
+      | Types.Constructor_ikind { base; coeffs }
+        when !force_recompute_ikinds && is_def_tvar_temp_decl ->
+        (* CLASS-A: keep the stored (declared) ikind in the recompute reference;
+           the fresh Tvar manifest is a placeholder, not the body. *)
+        Solver.Poly (base, coeffs)
+      | Types.Constructor_ikind { base; coeffs }
+        when !force_recompute_ikinds && !trust_residue_stored && is_def_abstract
+             && stored_ikind_has_foreign_param ~own_params:type_decl.type_params
+                  base coeffs ->
+        (* CLASS-B (stage 4b, residue-trusting reference only): a
+           recursive-module
+           fixpoint residue -- a [Type_abstract Definition] whose stored ikind
+           carries a foreign [Param].  A from-scratch recompute cannot reproduce
+           the declaration-time recursive-module fixpoint, so it is not a valid
+           independent reference; the validation harness re-derives with this
+           branch enabled and COUNTS the resulting agreement under CLASS-B
+           rather
+           than hard-failing.  Never fires at compile time (guarded by
+           [force_recompute_ikinds], set only by the harness). *)
+        incr residue_trusted;
+        if !residue_fault
+        then Solver.Poly (Ldd.join base (Ldd.const Axis_lattice.top), coeffs)
+        else Solver.Poly (base, coeffs)
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
+        if !Clflags.ikinds_validate && not !force_recompute_ikinds
+        then incr recomputed_decl_ikind;
         fallback ()
-      | Types.Constructor_ikind _ -> fallback ()
+      | Types.Constructor_ikind _ ->
+        if !Clflags.ikinds_validate && not !force_recompute_ikinds
+        then incr recomputed_decl_ikind;
+        fallback ()
+      | Types.Saved_ikind _ ->
+        (* Invariant: the cmi deserialize boundary rehydrates every persisted
+           Saved_ikind to a Constructor_ikind before any consumer runs, so a
+           Saved_ikind here is a bug (stage-5 format lock-in). *)
+        Misc.fatal_error
+          "ikind: unrehydrated Saved_ikind reached the decl lookup"
     in
     (if !Clflags.ikinds_debug
      then
@@ -882,6 +1259,25 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
 let create_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
   Solver.create_ctx ~mode ~env ~lookup_of_env:(fun env path ->
       lookup_of_env ~env path)
+
+let create_scratch_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
+  Solver.create_scratch_ctx ~mode ~env ~lookup_of_env:(fun env path ->
+      lookup_of_env ~env path)
+
+(* Stage-5a: context-creation helper for the two print-from-ikind derivations.
+   The print path builds a SCRATCH context (fresh tables, globals untouched) so
+   it is re-entrant by construction -- a print mid-check cannot wipe the outer
+   solve's cache.  Eviction is still measured FAITHFULLY (global cache size
+   immediately before vs after the context creation): the probe counter summed
+   >0 with the old clearing [create_ctx] and must now stay 0, so the counter is
+   a live regression guard, not a value hard-coded to 0. *)
+let create_print_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
+  let before = Solver.global_cache_size () in
+  let ctx = create_scratch_ctx ~mode ~env in
+  let after = Solver.global_cache_size () in
+  print_ctx_evicted_entries
+    := !print_ctx_evicted_entries + max 0 (before - after);
+  ctx
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   let ctx = create_ctx ~mode:Solver.Normal ~env in
@@ -925,7 +1321,12 @@ let type_declaration_ikind_of_jkind ~(env : Env.t option)
   with_ikinds_enabled (fun () ->
       let poly = normalize ~env type_jkind in
       let rigid_vars =
-        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+        List.map
+          (fun ty ->
+            let id = Types.get_id ty in
+            check_live_param_id id;
+            Ldd.rigid (Ldd.Name.param id))
+          params
       in
       let base, coeffs =
         Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
@@ -938,6 +1339,167 @@ let type_declaration_ikind_of_jkind ~(env : Env.t option)
           (Ldd.pp payload.base) (pp_coeffs payload.coeffs);
       payload)
 
+(* Compute a declaration's ikind from its manifest body over [params]. This is
+   the eager form of the recompute [lookup_of_env] performs for a manifest decl
+   carrying [No_constructor_ikind]; it mirrors [Solver.constr_kind]'s [Ty]
+   branch (parameters bound to rigid vars, plain type variables capped by their
+   written jkind) so the stored ikind equals that recompute. Used to fill in
+   the ikind at manifest-installing sites (e.g. with-constraints) that today
+   fall back to env-recompute -- see STAGE1-DESIGN.md and STAGE0C-CENSUS.md. *)
+let type_declaration_ikind_of_manifest ~(env : Env.t option)
+    ~(params : Types.type_expr list) (manifest : Types.type_expr) :
+    Types.type_ikind =
+  with_ikinds_enabled (fun () ->
+      let ctx = create_ctx ~mode:Solver.Normal ~env in
+      let rigid_vars =
+        List.map
+          (fun ty ->
+            let id = Types.get_id ty in
+            check_live_param_id id;
+            Ldd.rigid (Ldd.Name.param id))
+          params
+      in
+      List.iter2
+        (fun ty var ->
+          let param_kind =
+            match Types.get_desc ty with
+            | Types.Tvar { jkind; _ } ->
+              Ldd.meet (Ldd.node_of_var var) (Solver.ckind_of_jkind ctx jkind)
+            | Types.Tunivar _ ->
+              Misc.fatal_error
+                "Ikind.type_declaration_ikind_of_manifest: unexpected Tunivar"
+            | _ -> Ldd.node_of_var var
+          in
+          Solver.TyTbl.add ctx.Solver.ty_to_kind ty param_kind)
+        params rigid_vars;
+      let body_kind = Solver.kind ~use_tables:true ctx manifest in
+      Ldd.solve_pending ();
+      let base, coeffs =
+        Ldd.decompose_into_linear_terms ~universe:rigid_vars body_kind
+      in
+      let coeffs = Array.of_list coeffs in
+      let payload = constructor_ikind ~base ~coeffs in
+      if !Clflags.ikinds_debug
+      then
+        Format.eprintf "[ikind] from manifest: base=%s; coeffs=[%s]@."
+          (Ldd.pp payload.base) (pp_coeffs payload.coeffs);
+      payload)
+
+(* Stage-4c print-from-ikind: derive a WITH-BOUNDS-FREE const jkind's mod-bounds
+   floor from its ikind (round_up of the derived LDD), installed into
+   [Jkind.Const.floor_from_ikind].  Stage-5c: this fires on the DEFAULT print
+   path (ikinds on), not just under [-print-from-ikinds] -- the floor is now
+   read from the ikind rather than the legacy [mod_bounds] field.  Re-entrancy-
+   safe by construction: 5a re-homed it onto a scratch ctx + isolated pending.
+   Returns [None] -- printing then falls back to the legacy [mod_bounds] field
+   -- when the jkind carries with-bounds (whose surface
+   [with]-clause syntax the LDD cannot reconstruct, see STAGE4C-DESIGN.md P2, so
+   the floor keeps reading [mod_bounds] there), or the derivation raises.  For
+   the with-bounds-free case the ikind is a pure floor (a const, or a const meet
+   a KAtom that rounds up to top), so [round_up] returns exactly
+   [to_axis_lattice mod_bounds] and [of_axis_lattice] round-trips it to the
+   floor -- i.e. byte-identical to the legacy read (STAGE4C P1, corpus-proven). *)
+let mod_bounds_floor_for_printing : type l r.
+    Env.t -> (l * r) Jkind.Const.t -> Jkind.Mod_bounds.t option =
+ fun env jkind ->
+  match jkind.Types.with_bounds with
+  | Types.With_bounds _ -> None
+  | Types.No_with_bounds -> (
+    match
+      (* Scratch ctx (fresh caches) + isolated pending: a print mid-check
+           perturbs neither the outer solve's Solver caches nor its pending
+           gfps. *)
+      Ldd.with_isolated_pending (fun () ->
+          let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+          Solver.round_up (Solver.ckind_of_jkind_desc ctx jkind))
+    with
+    | exception _ -> None
+    | lat ->
+      incr print_floor_derivations;
+      let lat = if !print_floor_fault then Axis_lattice.top else lat in
+      Some (Jkind.Mod_bounds.of_axis_lattice lat))
+
+let () =
+  Jkind.Const.set_floor_from_ikind
+    { Jkind.Const.derive = mod_bounds_floor_for_printing }
+
+(* Stage-4c full print-from-ikind: render an entire WITH-BOUNDS jkind from its
+   ikind, with [with]-clauses NORMALIZED from the LDD terms.  Installed into
+   [Jkind.Const.render_from_ikind].  Returns [None] (=> legacy renderer, which
+   for the with-bounds-free case applies the byte-identical floor seam) when the
+   flag is off, ikinds are disabled, the jkind is with-bounds-free, or the
+   derivation raises.  For with-bounds jkinds the normalized rendering
+   intentionally diverges from legacy surface syntax (opt-in under the flag):
+   the base (names=[]) term is the unconditional floor, rendered via the normal
+   path on a synthetic with-bounds-free jkind (so the layout/abbreviation choice
+   matches legacy), and each non-base term [(coeff, names)] is rendered as a
+   [with] clause [with (name1 & name2 ... @ coeff)] mirroring the LDD algebra. *)
+let render_jkind_from_ikind : type l r.
+    Env.t -> (l * r) Jkind.Const.t -> Outcometree.out_jkind_const option =
+ fun env jkind ->
+  if not !Clflags.print_from_ikinds
+  then None
+  else
+    match jkind.Types.with_bounds with
+    | Types.No_with_bounds -> None
+    | Types.With_bounds _ -> (
+      match
+        (* Scratch ctx (fresh caches) + isolated pending: this derivation's
+           solve_pending drains only its OWN gfps, never an outer mid-check
+           solve's pending. *)
+        Ldd.with_isolated_pending (fun () ->
+            let ctx = create_print_ctx ~mode:Solver.Normal ~env:(Some env) in
+            let node = Solver.ckind_of_jkind_desc ctx jkind in
+            Ldd.solve_pending ();
+            Ldd.to_terms (Ldd.inline_solved_vars node))
+      with
+      | exception _ ->
+        incr print_render_fallbacks;
+        None
+      | terms ->
+        incr print_withbounds_rendered;
+        let floor =
+          List.fold_left
+            (fun acc (c, names) ->
+              match names with [] -> Axis_lattice.join acc c | _ -> acc)
+            Axis_lattice.bot terms
+        in
+        let base_jkind : (l * r) Jkind.Const.t =
+          { jkind with
+            Types.mod_bounds = Jkind.Mod_bounds.of_axis_lattice floor;
+            Types.with_bounds = Types.No_with_bounds
+          }
+        in
+        let base_out = Jkind.Const.to_out_jkind_const env base_jkind in
+        let with_clauses =
+          List.filter_map
+            (fun (c, names) ->
+              match names with
+              | [] -> None
+              | _ ->
+                let names_str =
+                  String.concat " & "
+                    (List.map Types.Rigid_name.to_string names)
+                in
+                let stuff =
+                  if Axis_lattice.equal c Axis_lattice.top
+                  then names_str
+                  else
+                    Printf.sprintf "%s @ %s" names_str
+                      (Axis_lattice.to_string c)
+                in
+                Some (Outcometree.Otyp_stuff stuff))
+            terms
+        in
+        Some
+          (List.fold_left
+             (fun acc oty -> Outcometree.Ojkind_const_with (acc, oty, []))
+             base_out with_clauses))
+
+let () =
+  Jkind.Const.set_render_from_ikind
+    { Jkind.Const.render = render_jkind_from_ikind }
+
 let predef_ikind_of_jkind ~params type_jkind =
   type_declaration_ikind_of_jkind ~env:None ~params type_jkind
 
@@ -946,7 +1508,6 @@ let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 type subcheck_fast_path =
   | No_fast_path
   | Rhs_top_fast_path
-  | Lhs_mod_bounds_floor_fast_path
 
 type subcheck_polys =
   { lhs_for_leq : Ldd.node;
@@ -959,6 +1520,135 @@ type subcheck_polys =
    - fast path: if [super] is constant top, no need to compute [sub]
    - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
    - otherwise, only round up [sub] if [super] is constant *)
+(* Stage-1 validation harness helpers (see STAGE1-DESIGN.md). *)
+
+(* Unknown atoms ([fresh_unknown_uid]: open rows, first-class modules, some
+   existential projections) get a fresh, non-deterministic uid on every
+   derivation, so two independent derivations of the same jkind disagree on
+   their identity. Canonicalize all unknowns to a single atom before comparing,
+   so the harness compares the determinate structure rather than reporting these
+   as spurious mismatches. *)
+let canonical_unknown_node : Ldd.node =
+  Ldd.node_of_var (Ldd.rigid (Ldd.Name.unknown (fresh_unknown_uid ())))
+
+let canonicalize_unknowns (n : Ldd.node) : Ldd.node =
+  Ldd.map_rigid
+    (fun (name : Ldd.Name.t) ->
+      match name with
+      | Ldd.Name.Unknown _ -> canonical_unknown_node
+      | Ldd.Name.Param _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _
+      | Ldd.Name.Residue _ ->
+        Ldd.node_of_var (Ldd.rigid name))
+    n
+
+(* Semantic (not structural) equality of two ikinds: mutual subsumption, modulo
+   unknown-atom identity. Two derivations of the same jkind may differ
+   structurally (fresh var ids) while denoting the same kind, and mutual [leq]
+   is exactly the "they agree" property stage 2 relies on. *)
+let ldd_semantically_equal (a : Ldd.node) (b : Ldd.node) : bool =
+  Ldd.solve_pending ();
+  let a = canonicalize_unknowns a in
+  let b = canonicalize_unknowns b in
+  (match Ldd.leq_with_reason a b with [] -> true | _ -> false)
+  && match Ldd.leq_with_reason b a with [] -> true | _ -> false
+
+(* One-directional [a <= b], modulo unknown-atom identity (same canonicalization
+   as [ldd_semantically_equal]). *)
+let ldd_leq (a : Ldd.node) (b : Ldd.node) : bool =
+  Ldd.solve_pending ();
+  let a = canonicalize_unknowns a in
+  let b = canonicalize_unknowns b in
+  match Ldd.leq_with_reason a b with [] -> true | _ -> false
+
+(* Derive the ikind of [jkind] in [mode], either using stored decl ikinds
+   ([use_stored:true]) or forcing a full recompute from each declaration
+   ([use_stored:false]). Allocates its own solver context, so it must only be
+   called at a top-level seam entry, never inside another derivation. *)
+let derive_ikind ~(use_stored : bool) ?(trust_residue = false)
+    ~(mode : Solver.mode) env (jkind : ('l * 'r) Types.jkind) : Ldd.node =
+  let saved = !force_recompute_ikinds in
+  let saved_tr = !trust_residue_stored in
+  force_recompute_ikinds := not use_stored;
+  trust_residue_stored := trust_residue;
+  Fun.protect
+    ~finally:(fun () ->
+      force_recompute_ikinds := saved;
+      trust_residue_stored := saved_tr)
+    (fun () ->
+      let ctx = create_ctx ~mode ~env:(Some env) in
+      let node = Solver.ckind_of_jkind ctx jkind in
+      Ldd.solve_pending ();
+      node)
+
+(* Assert that the stored-ikind derivation of [jkind] agrees with a full
+   recompute, in both solver modes. Inert unless [ikinds_validate] is set. *)
+let validate_ikind ~(in_sub_position : bool) ~(origin : string option) env
+    (jkind : ('l * 'r) Types.jkind) : unit =
+  if !Clflags.ikinds_validate
+  then
+    List.iter
+      (fun mode ->
+        let stored = derive_ikind ~use_stored:true ~mode env jkind in
+        let recomputed = derive_ikind ~use_stored:false ~mode env jkind in
+        incr validate_checks;
+        if not (ldd_semantically_equal stored recomputed)
+        then
+          let mode_s =
+            match mode with
+            | Solver.Normal -> "normal"
+            | Solver.Round_up -> "round_up"
+          in
+          (* Classify (see [validate_benign]): [recomputed <= stored] is the
+             conservative over-approximation direction, but it is sound to
+             whitelist ONLY in the SUB (LHS) position of [leq_with_reason sub
+             super]. A larger stored SUB makes the check harder (over-reject,
+             never unsound accept). In the SUPER (RHS) position a larger stored
+             instead EASES the check -- and [sub_jkind_l] takes [super] as a
+             [jkind_l], which can carry a with-bound and therefore diverge -- and
+             [crossing_of_jkind] is not a subsumption check at all. So over-
+             approximation at a super/crossing site is NOT provably benign;
+             restrict the whitelist to [in_sub_position] and keep every
+             super/crossing divergence a hard mismatch regardless of direction. *)
+          if in_sub_position && ldd_leq recomputed stored
+          then incr validate_benign
+          else
+            (* Stage 4b CLASS-B: is the divergence fully explained by
+               recursive-module fixpoint-residue trust?  Re-derive the reference
+               trusting the stored ikind ONLY for [Type_abstract Definition]
+               decls whose stored ikind carries a foreign [Param].  If that
+               residue-trusting reference matches the stored derivation, the
+               whole
+               divergence is residue-caused -- a from-scratch reference cannot
+               reconstruct the declaration-time recursive-module fixpoint, so it
+               is not a valid independent reference (the same trust boundary as
+               CLASS-A).  Count and log it (auditable) rather than hard-fail; a
+               deliberately-wrong residue stored ikind still lands here. *)
+            let recomputed_residue =
+              derive_ikind ~use_stored:false ~trust_residue:true ~mode env jkind
+            in
+            if ldd_semantically_equal stored recomputed_residue
+            then (
+              incr validate_class_b;
+              Format.eprintf
+                "[ikind-validate] CLASS-B%s mode=%s (recursive-module \
+                 fixpoint-residue: stored trusted, not independently \
+                 validated)@;\
+                 @;\
+                 stored=%s@;\
+                 recompute=%s@."
+                (origin_suffix_of origin) mode_s (Ldd.pp stored)
+                (Ldd.pp recomputed))
+            else (
+              incr validate_mismatches;
+              Format.eprintf
+                "[ikind-validate] MISMATCH%s mode=%s@;\
+                 @;\
+                 stored=%s@;\
+                 recompute=%s@."
+                (origin_suffix_of origin) mode_s (Ldd.pp stored)
+                (Ldd.pp recomputed)))
+      [Solver.Normal; Solver.Round_up]
+
 let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     (super : ('l2 * 'r2) Types.jkind) : subcheck_polys =
   let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
@@ -976,117 +1666,196 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
       fast_path = Rhs_top_fast_path
     }
   else
-    let floor_fast_path =
+    (* Stage-5c: the legacy [mod_bounds]-floor fast path is gone (§C.2
+       differential proved it verdict-equivalent to this full derivation
+       corpus-wide).  When [super] is constant we derive the sub polynomial in
+       [Round_up] mode, exactly as before; the LDD is now the sole answering
+       engine for the floor. *)
+    let sub_ctx =
       if super_is_constant
-      then
-        match Solver.mod_bounds_floor_of_jkind ctx sub with
-        | None -> None
-        | Some lhs_floor ->
-          let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
-          if
-            Axis_lattice.equal
-              (Ldd.round_up lhs_floor_or_super)
-              Axis_lattice.top
-          then Some lhs_floor
-          else None
-      else None
+      then Solver.reset_for_mode ctx ~mode:Solver.Round_up
+      else ctx
     in
-    match floor_fast_path with
-    | Some lhs_floor ->
-      { lhs_for_leq = lhs_floor;
-        rhs_for_leq = super_poly;
-        fast_path = Lhs_mod_bounds_floor_fast_path
-      }
-    | None ->
-      let sub_ctx =
-        if super_is_constant
-        then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-        else ctx
-      in
-      let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
-      { lhs_for_leq = sub_poly;
-        rhs_for_leq = super_poly;
-        fast_path = No_fast_path
-      }
+    let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
+    { lhs_for_leq = sub_poly;
+      rhs_for_leq = super_poly;
+      fast_path = No_fast_path
+    }
+
+(* Stage-5d S4: ikind sub verdict for [combine_histories]' history-ordering
+   differential, installed into [Jkind.set_sub_verdict_from_ikind].  Returns the
+   ikind verdict [Less]/[Equal]/[Not_le] for [a] vs [b] by deriving both
+   polynomials and comparing them with [Ldd.leq_with_reason] in both directions
+   (M4's intended replacement for the legacy [Jkind_desc.sub] there).
+   [combine_histories] runs mid-check, so the derivation uses a SCRATCH ctx +
+   [with_isolated_pending] (the 5a re-entrancy helpers) and cannot perturb the
+   outer solve.  Returns [None] (=> the differential skips this combine) when
+   ikinds are disabled or the derivation raises. *)
+let sub_verdict_for_history : type la ra lb rb.
+    context:Jkind.jkind_context ->
+    Env.t ->
+    (la * ra) Types.jkind ->
+    (lb * rb) Types.jkind ->
+    Misc.Le_result.t option =
+ fun ~context:_ env a b ->
+  match
+    Ldd.with_isolated_pending (fun () ->
+        (* Derive both polynomials in ONE scratch ctx (Normal mode) so shared
+             type params get identical rigid names, then raw [leq_with_reason]
+             both directions -- the ordering comparison M4 would use, without the
+             one-directional sub-check fast paths (Rhs_top/round-up) that would
+             coarsen an order into spurious Equals. *)
+        let ctx = create_scratch_ctx ~mode:Solver.Normal ~env:(Some env) in
+        let a_poly = Solver.ckind_of_jkind ctx a in
+        let b_poly = Solver.ckind_of_jkind ctx b in
+        Ldd.solve_pending ();
+        let leq x y =
+          match Ldd.leq_with_reason x y with [] -> true | _ -> false
+        in
+        leq a_poly b_poly, leq b_poly a_poly)
+  with
+  | exception _ -> None
+  | true, true -> Some Misc.Le_result.Equal
+  | true, false -> Some Misc.Le_result.Less
+  | false, _ -> Some Misc.Le_result.Not_le
+
+let () =
+  Jkind.set_sub_verdict_from_ikind { Jkind.verdict = sub_verdict_for_history }
 
 let sub_jkind_l ?allow_any_crossing ?origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
-  if not (enable_sub_jkind_l && !Clflags.ikinds)
-  then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
-  else
-    (* Check layouts first; if that fails, print both sides with full
-       info and return the error. *)
-    let* () =
-      match Jkind.sub_layout_or_error ~context env sub super with
-      | Ok () -> Ok ()
-      | Error v -> Error v
-    in
-    let allow_any =
-      match allow_any_crossing with Some true -> true | _ -> false
-    in
-    if allow_any
+  let () =
+    if !Clflags.ikinds_validate
     then (
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
-      Ok ())
-    else
-      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
-        compute_subcheck_polys ~context env sub super
-      in
-      let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         let fast_path =
-           match fast_path with
-           | No_fast_path -> "none"
-           | Rhs_top_fast_path -> "rhs_top"
-           | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
-         in
-         Format.eprintf
-           "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
-            @;\
-            sub_poly=%s@;\
-            super_poly=%s@."
-           origin_suffix fast_path (Ldd.pp sub_poly) (Ldd.pp super_poly));
-      match violating_axes with
-      | [] -> Ok ()
-      | _ ->
-        let () =
-          if !Clflags.ikinds_debug
-          then
-            let axes = pp_axes violating_axes in
-            Format.eprintf "[ikind-subjkind] failure on axes: %s@." axes
-        in
-        (* Do not try to adjust allowances; Violation.Not_a_subjkind
-           accepts an r-jkind. *)
-        let axis_reasons = axis_disagreement_reasons violating_axes in
-        Error
-          (Jkind.Violation.of_ ~context env
-             (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
-
-let crossing_of_jkind ~(context : Jkind.jkind_context) env
-    (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
-  if not (enable_crossing && !Clflags.ikinds)
-  then Jkind.get_mode_crossing ~context env jkind
+      validate_ikind ~in_sub_position:true ~origin env sub;
+      validate_ikind ~in_sub_position:false ~origin env super)
+  in
+  (* Check layouts first; if that fails, print both sides with full
+       info and return the error. *)
+  let* () =
+    match Jkind.sub_layout_or_error ~context env sub super with
+    | Ok () -> Ok ()
+    | Error v -> Error v
+  in
+  let allow_any =
+    match allow_any_crossing with Some true -> true | _ -> false
+  in
+  if allow_any
+  then (
+    (if !Clflags.ikinds_debug
+     then
+       let origin_suffix = origin_suffix_of origin in
+       Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
+    Ok ())
   else
-    let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
-      function
-      | No_with_bounds -> true
-      | With_bounds _ -> false
+    let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
+      compute_subcheck_polys ~context env sub super
     in
-    match jkind.jkind.base with
-    | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
-      Jkind.get_mode_crossing ~context env jkind
+    let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
+    (if !Clflags.ikinds_debug
+     then
+       let origin_suffix = origin_suffix_of origin in
+       let fast_path =
+         match fast_path with
+         | No_fast_path -> "none"
+         | Rhs_top_fast_path -> "rhs_top"
+       in
+       Format.eprintf
+         "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
+          @;\
+          sub_poly=%s@;\
+          super_poly=%s@."
+         origin_suffix fast_path (Ldd.pp sub_poly) (Ldd.pp super_poly));
+    match violating_axes with
+    | [] -> Ok ()
     | _ ->
-      let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-      let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-      Axis_lattice.to_mode_crossing lat
+      let () =
+        if !Clflags.ikinds_debug
+        then
+          let axes = pp_axes violating_axes in
+          Format.eprintf "[ikind-subjkind] failure on axes: %s@." axes
+      in
+      (* Do not try to adjust allowances; Violation.Not_a_subjkind
+           accepts an r-jkind. *)
+      let axis_reasons = axis_disagreement_reasons violating_axes in
+      Error
+        (Jkind.Violation.of_ ~context env
+           (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
+
+let crossing_of_jkind ~context:(_ : Jkind.jkind_context) env
+    (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
+  let () =
+    if !reentrancy_probe && not !reentrancy_probe_done
+    then begin
+      reentrancy_probe_done := true;
+      (* Sandbox the whole probe so it cannot perturb the live check it runs
+         inside: [with_isolated_pending] restores the check's pending list. *)
+      Ldd.with_isolated_pending (fun () ->
+          (* Run the print-path derivation core (scratch ctx + solve) as the
+             derivers do, ONCE without and ONCE with [with_isolated_pending],
+             each against a fresh outer pending gfp [v].  The scratch ctx keeps
+             the Solver caches safe in BOTH cases (cache eviction is measured
+             corpus-wide by the [ctx-evicted] counter); the gfp DRAIN is the H2
+             signal isolated here: un-isolated, the print's [solve_pending]
+             drains the outer [v]; isolated, [v] survives. *)
+          let drain ~isolate =
+            let v = Ldd.new_var () in
+            Ldd.enqueue_gfp v (Ldd.const Axis_lattice.bot);
+            let p0 = Ldd.pending_count () in
+            let body () =
+              let pctx =
+                create_print_ctx ~mode:Solver.Round_up ~env:(Some env)
+              in
+              try
+                ignore
+                  (Solver.round_up (Solver.ckind_of_jkind pctx jkind)
+                    : Axis_lattice.t)
+              with _ -> ()
+            in
+            if isolate then Ldd.with_isolated_pending body else body ();
+            let p1 = Ldd.pending_count () in
+            p0, p1
+          in
+          let a0, a1 = drain ~isolate:false in
+          let b0, b1 = drain ~isolate:true in
+          Format.eprintf
+            "[ik5a-reentrancy] gfp drain by a mid-check print: un-isolated \
+             %d->%d (drained=%d, the H2 hazard); isolated %d->%d (drained=%d, \
+             fixed) -- %s@."
+            a0 a1
+            (max 0 (a0 - a1))
+            b0 b1
+            (max 0 (b0 - b1))
+            (if a1 < a0 && b1 = b0
+             then "OK (with_isolated_pending prevents the drain)"
+             else "UNEXPECTED"))
+    end
+  in
+  let () =
+    if !Clflags.ikinds_validate
+    then
+      validate_ikind ~in_sub_position:false ~origin:(Some "crossing") env jkind
+  in
+  let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
+    function
+    | No_with_bounds -> true
+    | With_bounds _ -> false
+  in
+  match jkind.jkind.base with
+  | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
+    (* Stage-5d S1: the mode crossing of a with-bounds-free jkind is the
+         crossing of its lattice floor -- the ikind const base, which STAGE5C
+         proved equals [to_axis_lattice mod_bounds] for this class.  Read it
+         directly (no legacy [normalize], no LDD build). *)
+    let floor = Jkind.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds in
+    Axis_lattice.to_mode_crossing floor
+  | _ ->
+    let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
+    let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+    Axis_lattice.to_mode_crossing lat
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
@@ -1157,7 +1926,8 @@ let fast_sub : type r1 l2.
                  nullability = Jkind_axis.Nullability.Maybe_null
                } ));
       mod_bounds;
-      with_bounds = Types.No_with_bounds
+      with_bounds = Types.No_with_bounds;
+      _
     } ->
     fast_sub_of_sort_super super_sort mod_bounds sub
   | { base =
@@ -1167,13 +1937,14 @@ let fast_sub : type r1 l2.
                nullability = Jkind_axis.Nullability.Maybe_null
              });
       mod_bounds;
-      with_bounds = Types.No_with_bounds
+      with_bounds = Types.No_with_bounds;
+      _
     } ->
     fast_sub_of_any_super mod_bounds sub
   | _ -> false
 
 let sub_or_intersect ?origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
@@ -1197,19 +1968,21 @@ let sub_or_intersect ?origin
        1) gate on env-aware layout subchecking
        2) if layouts are compatible, decide based on ikind polynomials *)
     match Jkind.sub_layout_or_error ~context env t1 t2 with
-    | Error _ -> (
-      (* Keep Jkind as the source of Disjoint vs May_have_intersection
-         classification when layouts fail. *)
-      match Jkind.sub_or_intersect ~type_equal ~context env t1 t2 with
-      | Jkind.Disjoint _ as disjoint ->
-        debug_polys ~outcome:"Disjoint" ();
-        disjoint
-      | Jkind.May_have_intersection _ as maybe ->
+    | Error _ ->
+      (* Layouts are incompatible, so the sub necessarily fails.  Classify
+         Disjoint vs May_have_intersection via [may_have_intersection] (a [Base]
+         intersection question) and build the failure reason ikind-natively: a
+         layout disagreement is what a layout-incompatible pair fails on. *)
+      let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
+        [Jkind.Sub_failure_reason.Layout_disagreement]
+      in
+      if Jkind.may_have_intersection env t1 t2
+      then (
         debug_polys ~outcome:"May_have_intersection" ();
-        maybe
-      | Jkind.Sub ->
-        debug_polys ~outcome:"Sub" ();
-        Jkind.Sub)
+        Jkind.May_have_intersection reasons)
+      else (
+        debug_polys ~outcome:"Disjoint" ();
+        Jkind.Disjoint reasons)
     | Ok () -> (
       let subcheck = compute_subcheck_polys ~context env t1 t2 in
       let sub_poly = subcheck.lhs_for_leq in
@@ -1235,9 +2008,11 @@ let sub_or_intersect ?origin
         in
         Jkind.May_have_intersection reasons)
   in
-  if not (enable_sub_or_intersect && !Clflags.ikinds)
-  then Jkind.sub_or_intersect ~type_equal ~context env t1 t2
-  else if fast_sub ~context env t1 t2
+  if !Clflags.ikinds_validate
+  then (
+    validate_ikind ~in_sub_position:true ~origin env t1;
+    validate_ikind ~in_sub_position:false ~origin env t2);
+  if fast_sub ~context env t1 t2
   then (
     (if !Clflags.ikinds_debug
      then
@@ -1247,23 +2022,35 @@ let sub_or_intersect ?origin
     Jkind.Sub)
   else generic_sub_or_intersect ()
 
-let sub_or_error ?origin:_origin
-    ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
+let sub_or_error ?origin
+    ~type_equal:(_ : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
-  if not (enable_sub_or_error && !Clflags.ikinds)
-  then Jkind.sub_or_error ~type_equal ~context env t1 t2
-  else
+  let () =
+    if !Clflags.ikinds_validate
+    then (
+      validate_ikind ~in_sub_position:true ~origin env t1;
+      validate_ikind ~in_sub_position:false ~origin env t2)
+  in
+  (* The ikind engine owns the verdict AND the error.  Layout check first: on
+       failure return that layout violation (as [sub_jkind_l] does).  Otherwise
+       the modal-axis subcheck decides; a non-empty violating-axes list is the
+       reject, synthesized ikind-natively into [Not_a_subjkind]. *)
+  match Jkind.sub_layout_or_error ~context env t1 t2 with
+  | Error _ as layout_err -> layout_err
+  | Ok () -> (
     let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
       compute_subcheck_polys ~context env t1 t2
     in
     match Ldd.leq_with_reason sub_poly super_poly with
     | [] -> Ok ()
-    | _ ->
-      (* Delegate to Jkind for detailed error reporting. *)
-      Jkind.sub_or_error ~type_equal ~context env t1 t2
+    | violating_axes ->
+      let reasons = axis_disagreement_reasons violating_axes in
+      Error
+        (Jkind.Violation.of_ ~context env
+           (Jkind.Violation.Not_a_subjkind (t1, t2, reasons))))
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)
@@ -1283,15 +2070,25 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   in
   base, Array.of_list coeffs
 
+(* Full path of the unit currently being compiled/saved, used to unit-qualify
+   [Residue] atoms on the cmi save path (stage 5b).  Same identity the stage-4d
+   import detector uses ([full_path_as_string]). *)
+let current_unit_full_path () : string =
+  Compilation_unit.full_path_as_string
+    (Compilation_unit.get_current_or_dummy ())
+
 let substitute_decl_ikind_with_lookup
     ~(lookup_type : Path.t -> Subst.Ikind_substitution.type_lookup_result)
     ~(lookup_jkind : Path.t -> Subst.Ikind_substitution.jkind_lookup_result)
-    (ikind_entry : Types.type_ikind) : Types.type_ikind =
+    ~(for_saving : bool) (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
   | No_constructor_ikind _ -> ikind_entry
-  | Constructor_ikind _ when reset_constructor_ikind_on_substitution ->
-    Types.ikinds_todo "ikind substitution reset"
+  | Saved_ikind _ ->
+    (* Live code only ever holds Constructor_ikind (deserialize rehydrates);
+       a Saved_ikind reaching subst is a stage-5 format-lock-in bug. *)
+    Misc.fatal_error
+      "ikind: Saved_ikind reached substitute_decl_ikind_with_lookup"
   | Constructor_ikind packed ->
     let payload = packed in
     let memo : (Path.t, Ldd.node * Ldd.node array) Hashtbl.t =
@@ -1302,8 +2099,24 @@ let substitute_decl_ikind_with_lookup
       Ldd.map_rigid (map_name expanding) poly
     and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
       match name with
+      | Param id when for_saving ->
+        (* Stage 5b soundness gate: neutralize a foreign [Param] residue to a
+           unit-qualified [Residue] on the cmi save path ONLY.  Stored decl
+           ikinds are otherwise Param-free (own params are factored positionally
+           by [decompose_into_linear_terms]), so any [Param] reaching a save is a
+           recursive-module fixpoint residue carrying a stale live-[type_expr] id.
+           Tagging it with the defining unit makes it collision-free BY
+           CONSTRUCTION (an importer's live [Param n] can never alias
+           [Residue {unit; n}]) and keeps it recognizable for CLASS-B (a distinct
+           constructor).  Within-unit ([for_saving]=false) the [Param] is kept --
+           the fixpoint value is meaningful there (stage 4b). *)
+        if !Clflags.ikinds_validate || !Clflags.ikinds_debug
+        then incr residue_neutralized;
+        Ldd.node_of_var
+          (Ldd.rigid (Ldd.Name.residue (current_unit_full_path ()) id))
       | Param _ -> Ldd.node_of_var (Ldd.rigid name)
       | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
+      | Residue _ -> Ldd.node_of_var (Ldd.rigid name)
       | KAtom path -> (
         match lookup_jkind path with
         | Subst.Ikind_substitution.Lookup_jkind_identity ->
@@ -1352,6 +2165,10 @@ let substitute_decl_ikind_with_lookup
     in
     let base_poly = map_poly Path.Set.empty payload.base in
     let coeffs_poly = Array.map (map_poly Path.Set.empty) payload.coeffs in
+    (* Stage-4d cross-unit seeded fault: corrupt the persisted ikind (base ->
+       bottom) so an importer loads a wrong stored value while the defining
+       unit's legacy fields stay intact.  See [save_fault]. *)
+    let base_poly = if for_saving && !save_fault then Ldd.bot else base_poly in
     let payload = constructor_ikind ~base:base_poly ~coeffs:coeffs_poly in
     Types.Constructor_ikind payload
 
