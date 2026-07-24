@@ -2122,8 +2122,18 @@ let boxing_primitive (k : Function_decl.unboxing_kind) alloc_mode
 let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     ~unarized_params:params params_arity ~unarized_param_modes:param_modes
     function_slot compute_body return return_continuation unboxed_params
-    unboxed_return unboxed_function_slot =
+    unboxed_return unboxed_function_slot ~need_region_wrapper =
   let my_closure_duid = Flambda_debug_uid.none in
+  let local_param_region =
+    if need_region_wrapper
+    then Some (Variable.create "unboxed_param_region" K.region)
+    else None
+  in
+  let param_alloc_region =
+    match local_param_region with
+    | None -> my_region
+    | Some region -> Some region
+  in
   let rec box_params params params_arity param_modes params_unboxing body =
     match params, params_arity, param_modes, params_unboxing with
     | [], [], [], [] -> [], [], [], body
@@ -2148,7 +2158,8 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
           let acc, body = body acc in
           let alloc_mode =
             Alloc_mode.For_allocations.from_lambda
-              ~current_alloc_region:my_alloc_region ~current_region:my_region
+              ~current_alloc_region:my_alloc_region
+              ~current_region:param_alloc_region
               (Alloc_mode.For_types.to_lambda param_mode)
           in
           let param_duid = Flambda_debug_uid.none in
@@ -2195,11 +2206,52 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
            main_code_params_arity) ]
   in
   let acc, unboxed_body, result_arity_main_code, unboxed_return_continuation =
-    match unboxed_return with
-    | None ->
+    match unboxed_return, local_param_region with
+    | None, None ->
       let acc, body = body acc in
       acc, body, return, return_continuation
-    | Some k ->
+    | None, Some local_param_region ->
+      let outer_return_continuation =
+        Continuation.create ~sort:Return ~name:"return" ()
+      in
+      let handler_params =
+        Bound_parameters.create
+          (List.mapi
+             (fun i kind ->
+               let var =
+                 Variable.create
+                   ("unboxed_param_result" ^ string_of_int i)
+                   (Flambda_kind.With_subkind.kind kind)
+               in
+               Bound_parameter.create var kind Flambda_debug_uid.none)
+             (Flambda_arity.unarized_components return))
+      in
+      let handler acc =
+        let acc, apply_cont =
+          Apply_cont_with_acc.create acc outer_return_continuation
+            ~args:
+              (List.map Bound_parameter.simple
+                 (Bound_parameters.to_list handler_params))
+            ~dbg:Debuginfo.none
+        in
+        let acc, apply_cont = Expr_with_acc.create_apply_cont acc apply_cont in
+        Let_with_acc.create acc
+          (Bound_pattern.singleton
+             (Bound_var.create
+                (Variable.create "unit" K.value)
+                Flambda_debug_uid.none Name_mode.normal))
+          (Named.create_prim
+             (Flambda_primitive.Unary
+                (End_region { ghost = false }, Simple.var local_param_region))
+             Debuginfo.none)
+          ~body:apply_cont
+      in
+      let acc, unboxed_body =
+        Let_cont_with_acc.build_non_recursive acc return_continuation
+          ~handler_params ~handler ~body ~is_exn_handler:false ~is_cold:false
+      in
+      acc, unboxed_body, return, outer_return_continuation
+    | Some k, _ ->
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
         Continuation.create ~sort:Return ~name:"unboxed_return" ()
@@ -2228,6 +2280,21 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
             ~dbg:Debuginfo.none
         in
         let acc, apply_cont = Expr_with_acc.create_apply_cont acc apply_cont in
+        let acc, expr =
+          match local_param_region with
+          | None -> acc, apply_cont
+          | Some local_param_region ->
+            Let_with_acc.create acc
+              (Bound_pattern.singleton
+                 (Bound_var.create
+                    (Variable.create "unit" K.value)
+                    Flambda_debug_uid.none Name_mode.normal))
+              (Named.create_prim
+                 (Flambda_primitive.Unary
+                    (End_region { ghost = false }, Simple.var local_param_region))
+                 Debuginfo.none)
+              ~body:apply_cont
+        in
         let (acc, expr), _ =
           List.fold_left
             (fun ((acc, expr), i) (var, var_duid, _kind) ->
@@ -2240,7 +2307,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      Debuginfo.none)
                   ~body:expr,
                 Target_ocaml_int.(add (one (Acc.machine_width acc)) i) ))
-            ((acc, apply_cont), Target_ocaml_int.zero (Acc.machine_width acc))
+            ((acc, expr), Target_ocaml_int.zero (Acc.machine_width acc))
             vars_with_kinds
         in
         acc, expr
@@ -2254,6 +2321,19 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         Flambda_arity.create_singletons
           (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
         unboxed_return_continuation )
+  in
+  let acc, unboxed_body =
+    match local_param_region with
+    | None -> acc, unboxed_body
+    | Some local_param_region ->
+      Let_with_acc.create acc
+        (Bound_pattern.singleton
+           (Bound_var.create local_param_region Flambda_debug_uid.none
+              Name_mode.normal))
+        (Named.create_prim
+           (Flambda_primitive.Variadic (Begin_region { ghost = false }, []))
+           Debuginfo.none)
+        ~body:unboxed_body
   in
   let my_unboxed_closure = Variable.create "my_unboxed_closure" K.value in
   let acc, unboxed_body =
@@ -2840,11 +2920,15 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         return_continuation,
         my_closure )
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          need_region_wrapper
+        } ->
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
-        compute_body return return_continuation unboxed_params unboxed_return
-        unboxed_function_slot
+        compute_body return return_continuation params_unboxing return_unboxing
+        unboxed_function_slot ~need_region_wrapper
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
@@ -2956,14 +3040,18 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Normal_calling_convention ->
       main_code, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          need_region_wrapper = _
+        } ->
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
         contains_no_escaping_local_allocs cost_metrics dbg is_tupled
         inlining_decision absolute_history relative_history main_code
-        by_function_slot function_code_ids unboxed_function_slot unboxed_params
-        unboxed_return
+        by_function_slot function_code_ids unboxed_function_slot params_unboxing
+        return_unboxing
   in
   let approx =
     let code = Code_or_metadata.create code in

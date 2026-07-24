@@ -783,7 +783,11 @@ module Function_decls = struct
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list * unboxing_kind option * Function_slot.t
+          { params_unboxing : unboxing_kind option list;
+            return_unboxing : unboxing_kind option;
+            unboxed_function_slot : Function_slot.t;
+            need_region_wrapper : bool
+          }
 
     type t =
       { let_rec_ident : Ident.t;
