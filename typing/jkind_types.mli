@@ -132,8 +132,8 @@ end
 
 (** See [Jkind_axis.Addressability] for an overview of actions ([Action.t], on
     [Any]/[Product]/[Kconstr] nodes) vs the full [t] with [Exact] forms and the
-    [Join] (on [Sort] nodes, also the type of normalized-mark readings) vs
-    verdicts ([Verdict.t], the type of "is this kind addressable?" answers). *)
+    [Join] (on [Sort] nodes, also the type of mark readings) vs verdicts
+    ([Verdict.t], the type of "is this kind addressable?" answers). *)
 module Addressability : sig
   module Action : sig
     type t = Jkind_axis.Addressability.Action.t =
@@ -266,16 +266,16 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    (** The normalized mark of a constant layout: which of the forms over its
-        sort the kind is. A [Join] slot on a base collapses only when the base
-        is intrinsically addressable, where its branches coincide, and is
+    (** The addressability mark of a constant layout: which of the forms over
+        its sort the kind is. A [Join] slot on a base collapses only when the
+        base is intrinsically addressable, where its branches coincide, and is
         otherwise preserved - the join is information (a flexible [bits8] bound
         still admits [bits8 addressable]) and must survive [equal]; only
         printing elides it. An unmarked product derives its mark from its
         components; [Univar]/[Genvar] layouts read their stored slot ([Exact Id]
         on a rigid variable is exactly the plain form, with no claim about its
         addressability). *)
-    val normalized_mark : t -> Addressability.t
+    val mark : t -> Addressability.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

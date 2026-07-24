@@ -79,14 +79,14 @@ end
       sort the variable resolves to, and it persists after the variable
       resolves, since resolving a sort determines none of the marks.
 
-    [t] is also the result type of *normalized-mark* readings of a kind
-    ([Jkind.Layout.normalized_mark]), which answer how the kind stands to
-    whole-marking: [Exact Addressable] means the kind is addressable, so marking
-    it is a no-op; [Exact Id] means its root is exactly unmarked and the kind is
-    not known addressable, so it is distinct from its whole-marked form and
-    fails an [addressable] requirement; [Join] means the root mark is flexible.
-    On a [Sort] node this is exactly which form over the sort the kind is (any
-    slot collapses to [Exact Addressable] once the sort resolves intrinsically
+    [t] is also the result type of *mark* readings of a kind
+    ([Jkind.Layout.mark]), which answer how the kind stands to whole-marking:
+    [Exact Addressable] means the kind is addressable, so marking it is a no-op;
+    [Exact Id] means its root is exactly unmarked and the kind is not known
+    addressable, so it is distinct from its whole-marked form and fails an
+    [addressable] requirement; [Join] means the root mark is flexible. On a
+    [Sort] node this is exactly which form over the sort the kind is (any slot
+    collapses to [Exact Addressable] once the sort resolves intrinsically
     addressable, where all forms coincide); on an unmarked [Product] it is
     derived from the components ([combine_product]). A mark reading of
     [Exact Id] says nothing about whether the kind is addressable: the plain

@@ -1084,7 +1084,7 @@ module Layout = struct
      leaves the kind the join of [bits8] and [bits8 addressable]. Readers
      collapse any slot to [Exact Addressable] only when the resolved sort is
      intrinsically addressable, where all forms denote the same kind (see
-     [Jkind.Layout.normalized_mark]).
+     [Jkind.Layout.mark]).
 
      Construction discipline:
      - A fresh flexible BOUND - something that must admit every kind at
@@ -1144,7 +1144,7 @@ module Layout = struct
 
     let max = Any (Scannable_axes.max, Addressability.Action.Id)
 
-    (* The normalized mark of a constant layout: which of the forms over its
+    (* The addressability mark of a constant layout: which of the forms over its
        sort the kind is. A join slot on a base collapses only when the base
        is intrinsically addressable, where its branches coincide; it is
        otherwise PRESERVED - the join is information (e.g. a flexible
@@ -1153,7 +1153,7 @@ module Layout = struct
        saving cmis). Only printing elides the join
        ([Jkind.Addressability.to_string_list_diff]). An unmarked product
        derives its mark from its components. *)
-    let rec normalized_mark : t -> Addressability.t = function
+    let rec mark : t -> Addressability.t = function
       | Base (b, _, a) -> (
         match a with
         | Join ->
@@ -1165,7 +1165,7 @@ module Layout = struct
       | Product (ts, a) -> (
         match (a : Addressability.Action.t) with
         | Addressable -> Addressability.Exact Addressable
-        | Id -> Addressability.combine_product (List.map normalized_mark ts))
+        | Id -> Addressability.combine_product (List.map mark ts))
       | Univar (_, _, a) | Genvar (_, _, a) ->
         (* The carrier is never resolved, so the slot is the mark: [Exact
            Id] on a rigid variable is exactly the plain form (whose
@@ -1180,8 +1180,7 @@ module Layout = struct
            slots necessarily agree. *)
         Scannable_axes.equal sa1 sa2
       | (Base (b1, _, _) as c1), (Base (b2, _, _) as c2) ->
-        Sort.equal_base b1 b2
-        && Addressability.equal (normalized_mark c1) (normalized_mark c2)
+        Sort.equal_base b1 b2 && Addressability.equal (mark c1) (mark c2)
       | Any (sa1, a1), Any (sa2, a2) ->
         Scannable_axes.equal sa1 sa2 && Addressability.Action.equal a1 a2
       | (Product (cs1, _) as c1), (Product (cs2, _) as c2) ->
@@ -1189,7 +1188,7 @@ module Layout = struct
         (* Comparing the roots distinguishes a marked product of
            unaddressable kinds from the unmarked product; marking a product
            of addressable kinds does nothing. *)
-        && Addressability.equal (normalized_mark c1) (normalized_mark c2)
+        && Addressability.equal (mark c1) (mark c2)
       | Univar (uv1, sa1, a1), Univar (uv2, sa2, a2) ->
         Sort.equal_univar_univar uv1 uv2
         && Scannable_axes.equal sa1 sa2

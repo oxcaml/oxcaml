@@ -100,8 +100,8 @@ end
     is stored on [Any]/[Product]/[Kconstr] nodes, while [Sort] nodes carry the
     full [t] - [Exact a] for exactly the form obtained by applying [a] to the
     plain kind of the sort, [Join] for the join of the two exact forms (flexible
-    sort-variable bounds). [t] is also the type of normalized-mark readings;
-    verdicts ("is this kind addressable?") have their own type,
+    sort-variable bounds). [t] is also the type of mark readings; verdicts ("is
+    this kind addressable?") have their own type,
     [Jkind_axis.Addressability.Verdict.t]. *)
 module Addressability : sig
   module Action : sig
@@ -604,10 +604,10 @@ module Desc : sig
 
   val of_const : 'd Const.t -> 'd t
 
-  (** The normalized mark of the kind a (flattened) layout describes (which of
-      the forms over its sort the kind is; see [Jkind_axis.Addressability]);
+  (** The addressability mark of the kind a (flattened) layout describes (which
+      of the forms over its sort the kind is; see [Jkind_axis.Addressability]);
       used to decide whether an [addressable] mark is worth printing. *)
-  val layout_normalized_mark : Sort.Flat.t Layout.t -> Addressability.t
+  val layout_mark : Sort.Flat.t Layout.t -> Addressability.t
 
   val format : Env.t -> Format_doc.formatter -> 'd t -> unit
 end
