@@ -124,6 +124,11 @@ val size_int : int
 
 val size_float : int
 
+(** Registers encodable in the short frame descriptors' hot-register bitmap,
+    numbered as in [compute_live_offset]; must agree with
+    [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h. *)
+val frame_hot_regs : int array
+
 val size_vec128 : int
 
 val size_vec256 : int

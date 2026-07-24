@@ -52,6 +52,19 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** The backends call this whenever they switch text section, with the section's
+    name. A "short" frame descriptor encodes its return address as a delta from
+    the previous descriptor's; that delta is only an assembly-time constant
+    within one section, so descriptors escape at a section change. Re-entering
+    the current section does not bump the epoch: deltas chain across function
+    boundaries in a shared [.text]. *)
+val enter_code_section : string -> unit
+
+(* When set before [emit_frames], every frame descriptor escapes to the normal
+   format instead of the short encoding. Backends set this when the short format
+   cannot be emitted (currently only MASM, which lacks .uleb128). *)
+val disable_short_descriptors : bool ref
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a
@@ -68,8 +81,19 @@ type emit_frame_actions =
     efa_word : int -> unit;
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
+    efa_label_delta : Label.t -> Label.t -> unit;
     efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_string : string -> unit;
+    (* Switch to / from mergeable string section, used for debuginfo filename
+       and defname strings. While it is open, [efa_def_string_label] defines a
+       label and [efa_string] emits a string; references from frametables to
+       those labels use [efa_label_rel]. *)
+    efa_open_string_section : unit -> unit;
+    efa_close_string_section : unit -> unit;
+    efa_def_string_label : Label.t -> unit;
+    (* Like [efa_label_rel], for labels defined via [efa_def_string_label]
+       (which the backends may render in a different form). *)
+    efa_string_label_rel : Label.t -> int32 -> unit
   }
 
 val emit_frames : emit_frame_actions -> unit

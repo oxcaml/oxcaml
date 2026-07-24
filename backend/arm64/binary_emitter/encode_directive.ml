@@ -590,6 +590,12 @@ let emit_directive state ~current_section ~all_sections
     match eval_constant state ~all_sections constant with
     | Some value -> D.Directive.emit_uleb128 buf value
     | None -> Misc.fatal_error "Cannot emit ULEB128 for external symbol")
+  | Frame_descr_delta { delta } -> (
+    (* ULEB128 difference of two labels in the same text section *)
+    match eval_constant state ~all_sections delta with
+    | Some value -> D.Directive.emit_uleb128 buf value
+    | None ->
+      Misc.fatal_error "Frame_descr_delta: cannot resolve label difference")
   (* Directives that don't emit data *)
   | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc | Cfi_offset _
   | Cfi_startproc | Cfi_remember_state | Cfi_restore_state

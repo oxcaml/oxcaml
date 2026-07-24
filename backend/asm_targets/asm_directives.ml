@@ -128,10 +128,17 @@ module Directive = struct
             && Int64.compare n (-0x8000_0000L) >= 0
           then Buffer.add_string buf (Int64.to_string n)
           else bprintf buf "0x%Lx" n)
-      | Unsigned_int n ->
-        (* We can use the printer for [Signed_int] since we always print as an
-           unsigned hex representation. *)
-        print_aux_subterm ~force_decimal buf (Signed_int (Uint64.to_int64 n))
+      | Unsigned_int n -> (
+        (* Small values print in decimal like [Signed_int]; larger ones (e.g.
+           bit-packed words and biased suffix-jump offsets) print in hex for
+           readability. *)
+        let i = Uint64.to_int64 n in
+        if force_decimal || Int64.compare i 0xFFFFL <= 0
+        then print_aux_subterm ~force_decimal buf (Signed_int i)
+        else
+          match TS.assembler () with
+          | MASM -> bprintf buf "0%LxH" i
+          | MacOS | GAS_like -> bprintf buf "0x%Lx" i)
       | Add (c1, c2) ->
         bprintf buf "(%a + %a)"
           (print_aux_subterm ~force_decimal)
@@ -283,8 +290,19 @@ module Directive = struct
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Frame_descr_delta of { delta : Constant.t }
+  (* Variable-width return-address delta for a "small" frame descriptor *)
 
   let bprintf = Printf.bprintf
+
+  (* Fresh names for Mach-O [Frame_descr_delta] .set temporaries. Never reset:
+     uniqueness within each emitted file is all that is required. *)
+  let macho_delta_counter = ref 0
+
+  let new_macho_delta_var () =
+    let id = !macho_delta_counter in
+    incr macho_delta_counter;
+    Printf.sprintf "Lfd_delta%d" id
 
   let string_of_substring_literal ~start:k ~length:n s =
     let between x low high =
@@ -411,6 +429,20 @@ module Directive = struct
       | _, _ -> print_ascii_string_gas ~chunk_size:80 buf str);
       bprintf buf "%s" (gas_comment_opt comment)
     | Comment s -> if emit_comments () then bprintf buf "\t\t\t\t/* %s */" s
+    | Frame_descr_delta { delta } -> (
+      (* The delta is a difference of two same-section labels. Emit as ULEB128
+         so the assembler can compute it. Always positive, so it never starts
+         with a 0 byte *)
+      match TS.assembler () with
+      | MacOS ->
+        (* Mach-O assemblers refuse a cross-atom label difference emitted
+           inline, but accept one bound with .set, which forces assembly-time
+           evaluation (compare [Direct_assignment]). The L prefix keeps the
+           temporary assembler-local. *)
+        let temp = new_macho_delta_var () in
+        bprintf buf "\t.set %s, (%a)\n\t.uleb128 %s" temp Constant.print delta
+          temp
+      | _ -> bprintf buf "\t.uleb128 (%a)" Constant.print delta)
     | Global sym -> bprintf buf "\t.globl\t%s" (Asm_symbol.encode sym)
     | New_label (Label lbl, _typ) -> bprintf buf "%s:" (Asm_label.encode lbl)
     | New_label (Symbol sym, _typ) -> bprintf buf "%s:" (Asm_symbol.encode sym)
@@ -573,6 +605,7 @@ module Directive = struct
     | External sym -> bprintf buf "\tEXTRN\t%s: NEAR" (Asm_symbol.encode sym)
     (* The only supported "type" on EXTRN declarations is NEAR. *)
     | Reloc _ -> unsupported "Reloc"
+    | Frame_descr_delta _ -> unsupported "Frame_descr_delta"
 
   let print b t =
     match TS.assembler () with
@@ -663,6 +696,13 @@ module Directive = struct
       | This | Label _ | Symbol _ | Variable _ | Add _ | Sub _ ->
         Misc.fatal_error
           "increment_offset_in_bytes: uleb128 with non-integer constant")
+    | Frame_descr_delta _ ->
+      (* Variable-width, and the delta's value is not available here:
+         offset-accounting callers must special-case this directive by
+         evaluating the label difference themselves (see
+         [Arm64_binary_emitter.Binary_emitter.iter]). *)
+      Misc.fatal_error
+        "increment_offset_in_bytes: Frame_descr_delta is not supported"
     (* Directives that don't contribute to section size *)
     | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_endproc
     | Cfi_offset _ | Cfi_startproc | Cfi_remember_state | Cfi_restore_state
@@ -1126,6 +1166,13 @@ let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
   (* CR poechsel: use the arguments *)
   Misc.fatal_error "between_labels_64_bit not implemented yet"
 
+let frame_descr_delta ~upper ~lower =
+  let delta =
+    Directive.Constant.Sub
+      (Directive.Constant.Label upper, Directive.Constant.Label lower)
+  in
+  emit (Frame_descr_delta { delta })
+
 let between_labels_64_bit_with_offsets ?comment:_comment ~upper ~upper_offset
     ~lower ~lower_offset () =
   Option.iter comment _comment;
@@ -1150,7 +1197,14 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
         Asm_label.print upper Asm_section.print upper_section Asm_section.print
         this_section);
   let offset_upper = Targetint.to_int64 offset_upper in
-  let expr = Add (Sub (Label upper, This), Signed_int offset_upper) in
+  let offset_const =
+    (* [Unsigned_int] so that large offsets (bit-packed record words, biased
+       suffix-jump offsets) print in hex. *)
+    if Int64.compare offset_upper 0xFFFFL > 0
+    then Unsigned_int (Uint64.of_nonnegative_int64_exn offset_upper)
+    else Signed_int offset_upper
+  in
+  let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
 
 let between_symbol_in_current_unit_and_label_offset ?comment:_comment ~upper

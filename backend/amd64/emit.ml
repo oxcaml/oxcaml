@@ -402,6 +402,7 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -420,16 +421,23 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.switch_to_section_raw
-        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      let name =
+        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+      in
+      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [frame_descr_delta] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -593,9 +601,8 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
 (* CR sspies: Consider whether more of [record_frame_label] can be shared with
    the Arm backend. *)
 
-let record_frame_label live dbg =
+let compute_live_offset live =
   let encode_reg_offset n = (n lsl 1) + 1 in
-  let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   let simd = must_save_simd_regs live in
   Reg.Set.iter
@@ -622,10 +629,14 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
     live;
+  !live_offset
+
+let record_frame_label live dbg =
+  let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(frame_size ())
-    ~live_offset:!live_offset dbg;
+    ~live_offset:(compute_live_offset live) dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame live dbg =
@@ -637,7 +648,14 @@ let record_frame live dbg =
 type gc_call =
   { gc_lbl : L.t; (* Entry label *)
     gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame : L.t; (* Label of frame descriptor *)
+    (* The frame descriptor is recorded (and its return-address label defined)
+       when the out-of-line GC stub is emitted, rather than at the allocation
+       site, so that frame descriptors are emitted in increasing return-address
+       order. *)
+    gc_frame_lbl : Label.t; (* Linear label of the frame descriptor *)
+    gc_frame_size : int;
+    gc_live_offset : int list;
+    gc_frame_dbg : frame_debuginfo; (* debuginfo for the frame descriptor *)
     gc_dbg : Debuginfo.t; (* Location of the original instruction *)
     gc_save_simd : Regs.Save_simd_regs.t
         (* What SIMD regs, if any, we need to save *)
@@ -655,7 +673,12 @@ let emit_call_gc gc =
   D.define_label gc.gc_lbl;
   emit_debug_info gc.gc_dbg;
   emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
-  D.define_label gc.gc_frame;
+  (* Record the frame descriptor here, where its return-address label is about
+     to be defined, so that frame descriptors are recorded (and hence emitted)
+     in increasing return-address order. *)
+  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+  D.define_label (label_to_asm_label ~section:Text gc.gc_frame_lbl);
   I.jmp (emit_asm_label_arg gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
@@ -2197,7 +2220,7 @@ let emit_instr ~first ~last ~fallthrough i =
       I.sub (int n) r15;
       I.cmp (domain_field Domainstate.Domain_young_limit) r15;
       let lbl_call_gc = L.create Text in
-      let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
+      let lbl_frame = Cmm.new_label () in
       I.jb (emit_asm_label_arg lbl_call_gc);
       let lbl_after_alloc = L.create Text in
       D.define_label lbl_after_alloc;
@@ -2206,7 +2229,10 @@ let emit_instr ~first ~last ~fallthrough i =
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
              gc_dbg = i.dbg;
-             gc_frame = lbl_frame;
+             gc_frame_lbl = lbl_frame;
+             gc_frame_size = frame_size ();
+             gc_live_offset = compute_live_offset i.live;
+             gc_frame_dbg = Dbg_alloc dbginfo;
              gc_save_simd
            }
            :: !call_gc_sites)
@@ -2244,13 +2270,16 @@ let emit_instr ~first ~last ~fallthrough i =
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
     let gc_call_label = L.create Text in
     let lbl_after_poll = L.create Text in
-    let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
+    let lbl_frame = Cmm.new_label () in
     I.jbe (emit_asm_label_arg gc_call_label);
     call_gc_sites
       := { gc_lbl = gc_call_label;
            gc_return_lbl = lbl_after_poll;
            gc_dbg = i.dbg;
-           gc_frame = lbl_frame;
+           gc_frame_lbl = lbl_frame;
+           gc_frame_size = frame_size ();
+           gc_live_offset = compute_live_offset i.live;
+           gc_frame_dbg = Dbg_alloc [];
            gc_save_simd = must_save_simd_regs i.live
          }
          :: !call_gc_sites;
@@ -3132,6 +3161,41 @@ let end_assembly () =
   let frametable_section : Asm_targets.Asm_section.t =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
+  (* Mergeable string section for debuginfo filename and defname strings (so the
+     linker will de-dupe). On macOS they go to __cstring under l-prefixed
+     private symbols, since Mach-O relocations cannot target L temporaries;
+     under the internal assembler they stay in the frametable section as
+     same-section label differences. *)
+  let macos_cstrings =
+    is_macosx system && Option.is_none !X86_proc.internal_assembler
+  in
+  let debuginfo_strings_section : Asm_targets.Asm_section.t =
+    if macos_cstrings
+    then
+      Custom
+        { names = ["__TEXT"; "__cstring"];
+          flags = None;
+          args = ["cstring_literals"];
+          is_delayed = false
+        }
+    else if is_macosx system
+    then frametable_section
+    else
+      Custom
+        { names = [".rodata.str1.1"];
+          flags = Some "aMS";
+          args = ["@progbits"; "1"];
+          is_delayed = false
+        }
+  in
+  (* References carry the frametable section (the directive layer requires a
+     referenced label's section to match the current one); definitions carry the
+     strings section. The encoded name is the same either way. *)
+  let string_label ~section lbl =
+    if macos_cstrings
+    then L.create_private_int section (Label.to_int lbl)
+    else label_to_asm_label ~section lbl
+  in
   D.switch_to_section frametable_section;
   I.ud2 ();
   D.align
@@ -3139,6 +3203,9 @@ let end_assembly () =
     ~bytes:8;
   (* PR#7591 *)
   emit_global_label ~section:frametable_section "frametable";
+  (* MASM can't assemble computed ULEB128 constants, so can't do short frame
+     descriptors *)
+  Emitaux.disable_short_descriptors := X86_proc.masm;
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
     { efa_code_label =
@@ -3156,21 +3223,56 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
+      efa_align =
+        (fun n ->
+          (* Match GAS's implicit fill: zero in data sections, nops in text. *)
+          D.align
+            ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
+            ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
           let lbl = label_to_asm_label ~section:frametable_section lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
+      efa_label_delta =
+        (fun upper lower ->
+          (* The return-address labels live in the text section. *)
+          let upper = label_to_asm_label ~section:Text upper in
+          let lower = label_to_asm_label ~section:Text lower in
+          D.frame_descr_delta ~upper ~lower);
       efa_def_label =
         (fun l ->
           let lbl = label_to_asm_label ~section:frametable_section l in
           D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+      efa_string = (fun s -> D.string (s ^ "\000"));
+      efa_open_string_section =
+        (fun () -> D.switch_to_section debuginfo_strings_section);
+      efa_close_string_section =
+        (fun () -> D.switch_to_section frametable_section);
+      efa_def_string_label =
+        (fun l ->
+          D.define_label (string_label ~section:debuginfo_strings_section l));
+      efa_string_label_rel =
+        (fun lbl ofs ->
+          D.between_this_and_label_offset_32bit_expr
+            ~upper:(string_label ~section:frametable_section lbl)
+            ~offset_upper:(Targetint.of_int32 ofs))
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
+  (* Experimental: emit a pointer to this unit's frametable into a
+     linker-collected section, so the runtime can enumerate the frametable of
+     *every* linked unit, including ones that are not in caml_frametable[]. The
+     linker concatenates these per-unit entries and bounds them with
+     __start_/__stop_caml_all_frametables. ELF/GAS targets only. *)
+  (match[@ocaml.warning "-4"] system with
+  | S_macosx | S_win32 | S_win64 | S_mingw | S_mingw64 | S_cygwin | S_unknown ->
+    ()
+  | _ ->
+    D.switch_to_section_raw ~names:["caml_all_frametables"] ~flags:(Some "aw")
+      ~args:["@progbits"] ~is_delayed:false;
+    D.symbol frametable_sym);
   D.data ();
   Probe_emission.emit_probe_notes ~add_def_symbol;
   emit_trap_notes ();
