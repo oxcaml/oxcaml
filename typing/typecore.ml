@@ -3514,7 +3514,9 @@ and type_pat_aux
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            let kind = Val_mut (m0, sort) in
+            let kind =
+              Val_mut (m0, sort, Env.enclosing_noalloc_ceiling !!penv)
+            in
             mode, kind
       in
       let pat_desc =
@@ -6924,7 +6926,7 @@ and type_expect_
                          match lid.txt with
                              Longident.Lident txt -> { txt; loc = lid.loc }
                            | _ -> assert false)
-        | Val_mut (_m0, _) -> begin
+        | Val_mut (_m0, _, _) -> begin
             if not (List.is_empty layout_args) then
               Misc.fatal_error "type_expect_: Val_mut with layout args";
             match path with
