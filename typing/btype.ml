@@ -942,6 +942,20 @@ module Jkind0 = struct
     let[@inline] set_crossing crossing t = { t with crossing }
     let[@inline] set_externality externality t = { t with externality }
 
+    let crosses_contention crossing =
+      Crossing.Per_axis.le contention
+        (Crossing.proj contention crossing)
+        (Crossing.Per_axis.min contention)
+
+    let uic_after_setting_axes
+        t crossing ~axes_set_to_constant =
+      let open Jkind_axis.Axis_set in
+      if mem axes_set_to_constant (Modal contention)
+      then true
+      else if mem axes_set_to_constant (Modal uniqueness)
+      then crosses_contention crossing
+      else Crossing.unique_implies_uncontended t.crossing
+
     let[@inline] set_max_in_set t max_axes =
       let open Jkind_axis.Axis_set in
       let[@inline] modal ax =
@@ -973,7 +987,16 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended =
+            uic_after_setting_axes t
+              { crossing = { monadic; comonadic };
+                unique_implies_uncontended = false
+              }
+              ~axes_set_to_constant:max_axes
+        }
+      in
       {
         crossing;
         externality;
@@ -1010,7 +1033,16 @@ module Jkind0 = struct
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
           ~forkable ~statefulness
       in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
+      let crossing : Mode.Crossing.t =
+        { crossing = { monadic; comonadic };
+          unique_implies_uncontended =
+            uic_after_setting_axes t
+              { crossing = { monadic; comonadic };
+                unique_implies_uncontended = false
+              }
+              ~axes_set_to_constant:min_axes
+        }
+      in
       {
         crossing;
         externality;
@@ -1099,12 +1131,17 @@ module Jkind0 = struct
     let staticity_const t = extract_monadic staticity t
 
     let to_axis_lattice (t : t) : Axis_lattice.t =
-      Axis_lattice.create ~areality:(areality_const t)
+      let axis_lattice =
+        Axis_lattice.create ~areality:(areality_const t)
         ~linearity:(linearity_const t) ~uniqueness:(uniqueness_const t)
         ~portability:(portability_const t) ~contention:(contention_const t)
         ~forkable:(forkable_const t) ~yielding:(yielding_const t)
         ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
         ~staticity:(staticity_const t) ~externality:(externality t)
+      in
+      if Crossing.unique_implies_uncontended t.crossing
+      then Axis_lattice.allow_uic axis_lattice
+      else Axis_lattice.disable_uic axis_lattice
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
       let crossing = Axis_lattice.to_mode_crossing x in

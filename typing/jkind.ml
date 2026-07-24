@@ -1253,7 +1253,24 @@ module Base_and_axes = struct
                   ~statefulness:
                     (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              let crossing : Mod_bounds.Crossing.t =
+                let unique_implies_uncontended =
+                  if
+                    Axis_set.mem relevant_axes (Modal (Monadic Contention))
+                    || Axis_set.mem relevant_axes (Modal (Monadic Uniqueness))
+                  then
+                    Mod_bounds.Crossing.unique_implies_uncontended
+                      (Mod_bounds.crossing b1)
+                    && Mod_bounds.Crossing.unique_implies_uncontended
+                         (Mod_bounds.crossing b2)
+                  else
+                    Mod_bounds.Crossing.unique_implies_uncontended
+                      (Mod_bounds.crossing b1)
+                in
+                { crossing = { monadic; comonadic };
+                  unique_implies_uncontended
+                }
+              in
               Mod_bounds.create crossing
                 ~externality:(value_for_axis ~axis:(Nonmodal Externality))
             in
@@ -2491,7 +2508,11 @@ let for_object =
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
       mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
+        Mod_bounds.create
+          { crossing = { comonadic; monadic };
+            unique_implies_uncontended = false
+          }
+          ~externality:Externality.max;
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)

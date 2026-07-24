@@ -38,6 +38,83 @@ let fresh_unknown_uid () : Types.Uid.t =
   in
   Types.Uid.mk ~current_unit
 
+let axes_cross_uniqueness axes =
+  let open Jkind_axis in
+  Axis_set.mem axes (Axis.Modal Mode.Crossing.Axis.(Monadic Uniqueness))
+
+let kind_definitely_crosses_contention (kind : Ldd.node) =
+  match Axis_lattice.contention (Ldd.round_down kind) with
+  | Mode.Contention.Const.Contended -> true
+  | Corrupted | Shared | Uncontended -> false
+
+let kind_definitely_allows_uic (kind : Ldd.node) =
+  Axis_lattice.uic_allowed (Ldd.round_up kind)
+
+let uic_contribution_from_payload (payload_kind : Ldd.node) =
+  if kind_definitely_allows_uic payload_kind
+  then Ldd.bot
+  else Ldd.const Axis_lattice.uic_disabled
+
+(* With-bounds only remember relevant axes, not the concrete modality that
+   produced them. In this representation, an absent modal axis means that the
+   modality made that axis constant, but it does not say which constant was
+   used. For UIC, that distinction matters: [@@ contended] can allow UIC, but
+   [@@ uncontended] cannot because it is identity. Use a safe approximation
+   here and only allow UIC through a constant uniqueness axis when the payload
+   already crosses contention. Otherwise, preserve the payload's UIC
+   restriction. *)
+let apply_relevant_axes_to_kind (axes : Jkind_axis.Axis_set.t)
+    (payload_kind : Ldd.node) : Ldd.node =
+  if Jkind_axis.Axis_set.is_empty axes
+  then uic_contribution_from_payload payload_kind
+  else
+    let makes_uniqueness_constant = not (axes_cross_uniqueness axes) in
+    let payload_crosses_contention =
+      kind_definitely_crosses_contention payload_kind
+    in
+    let mask = Axis_lattice.of_axis_set axes in
+    let mask =
+      if makes_uniqueness_constant && payload_crosses_contention
+      then Axis_lattice.allow_uic mask
+      else Axis_lattice.disable_uic mask
+    in
+    let payload_kind = Ldd.meet (Ldd.const mask) payload_kind in
+    if makes_uniqueness_constant && not payload_crosses_contention
+    then Ldd.join payload_kind (Ldd.const Axis_lattice.uic_disabled)
+    else payload_kind
+
+let apply_modality_to_kind (modality : Mode.Modality.Const.t)
+    (payload_kind : Ldd.node) : Ldd.node =
+  let has_contended_contention =
+    Axis_lattice.modality_has_contended_contention modality
+  in
+  let makes_uniqueness_constant =
+    Axis_lattice.modality_makes_uniqueness_constant modality
+  in
+  let payload_crosses_contention =
+    kind_definitely_crosses_contention payload_kind
+  in
+  let base_mask = Axis_lattice.mask_of_modality modality in
+  if
+    Axis_lattice.equal base_mask Axis_lattice.bot
+    && not makes_uniqueness_constant
+  then uic_contribution_from_payload payload_kind
+  else
+    let mask =
+      if
+        has_contended_contention
+        || (makes_uniqueness_constant && payload_crosses_contention)
+      then Axis_lattice.allow_uic base_mask
+      else Axis_lattice.disable_uic base_mask
+    in
+    let payload_kind = Ldd.meet (Ldd.const mask) payload_kind in
+    if
+      (not has_contended_contention)
+      && makes_uniqueness_constant
+      && not payload_crosses_contention
+    then Ldd.join payload_kind (Ldd.const Axis_lattice.uic_disabled)
+    else payload_kind
+
 (** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
     The solver computes LDD polynomials of the form base ⊔ Σ_i (arg_i ⊓ coeff_i)
@@ -66,6 +143,8 @@ module Solver = struct
       what its kind is. *)
   type ckind = ctx -> Ldd.node
 
+  and cguard = ctx -> Types.type_expr list -> Ldd.node
+
   (** Result of constructor lookup. [Ty] describes a constructor declaration
       with arguments and a kind function; [Poly] provides a cached polynomial
       form. *)
@@ -73,9 +152,14 @@ module Solver = struct
     | Ty of
         { args : Types.type_expr list;
           kind : ckind;
-          abstract : bool
+          abstract : bool;
+          uic_guard : cguard
         }
-    | Poly of Ldd.node * Ldd.node array
+    | Poly of
+        { base : Ldd.node;
+          coeffs : Ldd.node array;
+          uic_guard : cguard
+        }
 
   and ctx =
     { env : Env.t option;
@@ -132,7 +216,7 @@ module Solver = struct
     let coeffs =
       Array.init arity (fun i -> node_of_var (rigid (Name.atomic path (i + 1))))
     in
-    Poly (base, coeffs)
+    Poly { base; coeffs; uic_guard = (fun _ _ -> Ldd.bot) }
 
   let lookup_constr (ctx : ctx) ~(min_arity : int) (path : Path.t) : constr_decl
       =
@@ -148,7 +232,7 @@ module Solver = struct
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
       match lookup_constr ctx ~min_arity path with
-      | Poly (base, coeffs) ->
+      | Poly { base; coeffs; uic_guard = _ } ->
         (* Install placeholder nodes before rehydrating cached
            polynomials.  This breaks recursion cycles between
            mutually-recursive types. *)
@@ -198,7 +282,7 @@ module Solver = struct
         in
         ConstrTbl.replace ctx.constr_to_coeffs path res;
         res
-      | Ty { args = params; kind = body; abstract } ->
+      | Ty { args = params; kind = body; abstract; uic_guard = _ } ->
         let base_var = Ldd.new_var () in
         let coeff_vars =
           Array.init (List.length params) (fun _ -> Ldd.new_var ())
@@ -280,17 +364,21 @@ module Solver = struct
   and constr (ctx : ctx) (path : Path.t) (args : Types.type_expr list) :
       Ldd.node =
     let base, coeffs = constr_kind ctx ~min_arity:(List.length args) path in
+    let uic_guard =
+      match lookup_constr ctx ~min_arity:(List.length args) path with
+      | Ty { uic_guard; _ } | Poly { uic_guard; _ } -> uic_guard
+    in
+    let arg_kinds = List.map (fun arg -> kind ~use_tables:true ctx arg) args in
     let rec loop acc remaining i =
       if i = Array.length coeffs
       then acc
       else
         match remaining with
-        | arg :: rest ->
-          let arg_kind = kind ~use_tables:true ctx arg in
+        | arg_kind :: rest ->
           loop (Ldd.join acc (Ldd.meet arg_kind coeffs.(i))) rest (i + 1)
         | [] -> failwith "Missing arg"
     in
-    loop base args 0
+    Ldd.join (loop base arg_kinds 0) (uic_guard ctx args)
 
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc : type a l r.
@@ -329,15 +417,22 @@ module Solver = struct
         expand
     in
     let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
-    let base_mod_bounds =
-      Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
-    in
+    let base_mod_bounds_lattice = Jkind.Mod_bounds.to_axis_lattice mod_bounds in
+    let base_mod_bounds = Ldd.const base_mod_bounds_lattice in
     let base =
       match unresolved_base with
       | None -> base_mod_bounds
       | Some path ->
         let atom = rigid_name ctx (Ldd.Name.katom path) in
-        Ldd.meet base_mod_bounds atom
+        let base_mod_bounds_mask =
+          if Axis_lattice.uic_allowed base_mod_bounds_lattice
+          then Axis_lattice.disable_uic base_mod_bounds_lattice
+          else base_mod_bounds_lattice
+        in
+        let base = Ldd.meet (Ldd.const base_mod_bounds_mask) atom in
+        if Axis_lattice.uic_allowed base_mod_bounds_lattice
+        then base
+        else Ldd.join base (Ldd.const Axis_lattice.uic_disabled)
     in
     (* For each with-bound (ty, axes), contribute
        modality(axes_mask, kind ty). *)
@@ -345,9 +440,8 @@ module Solver = struct
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
            let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
            let ty_kind = kind ~use_tables:true ctx ty in
-           Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+           Ldd.join acc (apply_relevant_axes_to_kind axes ty_kind))
          base
 
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
@@ -431,8 +525,17 @@ module Solver = struct
       | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions
-           under id modality. *)
-        let base = Ldd.const Axis_lattice.immutable_data in
+           under id modality. Tuple elements are immutable, so a uniquely-held
+           tuple reads each element at its own uniqueness (unique), exactly like
+           an immutable record field. Allow UIC on the base and let each
+           element's own UIC bit disable it as needed (an element that is not
+           UIC-safe carries [uic_disabled], which dominates under join). This
+           mirrors the immutable-field treatment in
+           [sum_record_label_contributions] and lets e.g. [int ref * int] carry
+           UIC just as [ref_record] does. *)
+        let base =
+          Ldd.const (Axis_lattice.allow_uic Axis_lattice.immutable_data)
+        in
         Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
       | Types.Tunboxed_tuple elts ->
         (* Unboxed tuples: per-element contributions; shallow axes relevant
@@ -515,6 +618,21 @@ module Solver = struct
     base, coeffs
 
   let round_up (k : Ldd.node) : Axis_lattice.t = Ldd.round_up k
+
+  let with_actual_args (ctx : ctx) (params : Types.type_expr list)
+      (actual_args : Types.type_expr list) (f : ctx -> Ldd.node) : Ldd.node =
+    if List.length params <> List.length actual_args
+    then Ldd.bot
+    else
+      let actual_arg_kinds =
+        List.map (fun arg -> kind ~use_tables:true ctx arg) actual_args
+      in
+      let ty_to_kind = TyTbl.copy ctx.ty_to_kind in
+      let ctx = { ctx with ty_to_kind } in
+      List.iter2
+        (fun param arg_kind -> TyTbl.replace ty_to_kind param arg_kind)
+        params actual_arg_kinds;
+      f ctx
 end
 
 let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
@@ -547,22 +665,33 @@ let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
 let label_mutability_contribution (lbl : Types.label_declaration) =
-  Ldd.const
-    (match lbl.ld_mutable with
+  let contribution =
+    match lbl.ld_mutable with
     | Immutable -> Axis_lattice.immediate
     | Mutable { atomic = Atomic; _ } -> Axis_lattice.sync_data
-    | Mutable { atomic = Nonatomic; _ } -> Axis_lattice.mutable_data)
+    | Mutable { atomic = Nonatomic; _ } -> Axis_lattice.mutable_data
+  in
+  Ldd.const (Axis_lattice.allow_uic contribution)
 
 let sum_record_label_contributions ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
     ~(validate_label : Types.label_declaration -> unit)
     (lbls : Types.label_declaration list) : Ldd.node =
+  let allow_uic_in_kind kind =
+    Ldd.meet kind (Ldd.const (Axis_lattice.allow_uic Axis_lattice.top))
+  in
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
-      let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
-      Ldd.join
-        (label_mutability_contribution lbl)
-        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
+      let field_kind =
+        apply_modality_to_kind lbl.ld_modalities (payload_kind lbl.ld_type)
+      in
+      let field_kind =
+        match lbl.ld_mutable with
+        | Immutable -> field_kind
+        | Mutable { atomic = Atomic; _ } -> allow_uic_in_kind field_kind
+        | Mutable { atomic = Nonatomic; _ } -> field_kind
+      in
+      Ldd.join (label_mutability_contribution lbl) field_kind)
 
 let no_validation (_ : Types.label_declaration) = ()
 
@@ -693,6 +822,40 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
         failwith
           "ikind: expected GADT constructor result to be a type constructor")
 
+let no_uic_guard : Solver.cguard = fun _ _ -> Ldd.bot
+
+let type_mentions_path (path : Path.t) (ty : Types.type_expr) =
+  let found = ref false in
+  Btype.iter_type_expr
+    (fun ty ->
+      match Types.get_desc ty with
+      | Types.Tconstr (ty_path, _, _) when Path.same path ty_path ->
+        found := true
+      | _ -> ())
+    ty;
+  !found
+
+let record_uic_guard (path : Path.t) (type_decl : Types.type_declaration)
+    (lbls : Types.label_declaration list) : Solver.cguard =
+ fun ctx actual_args ->
+  Solver.with_actual_args ctx type_decl.type_params actual_args (fun ctx ->
+      List.fold_left
+        (fun acc (lbl : Types.label_declaration) ->
+          match lbl.ld_mutable with
+          | Mutable { atomic = Atomic; _ } -> acc
+          | Immutable | Mutable { atomic = Nonatomic; _ } ->
+            let field_kind =
+              if type_mentions_path path lbl.ld_type
+              then Ldd.const Axis_lattice.uic_disabled
+              else
+                apply_modality_to_kind lbl.ld_modalities
+                  (Solver.kind ~use_tables:true ctx lbl.ld_type)
+            in
+            if kind_definitely_allows_uic field_kind
+            then acc
+            else Ldd.join acc (Ldd.const Axis_lattice.uic_disabled))
+        Ldd.bot lbls)
+
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
    type declaration in [env]. *)
@@ -709,8 +872,15 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
        non-recursive values. *)
     let unknown = Ldd.Name.unknown (fresh_unknown_uid ()) in
     let kind : Solver.ckind = fun _ctx -> Ldd.node_of_var (Ldd.rigid unknown) in
-    Solver.Ty { args = []; kind; abstract = true }
+    Solver.Ty { args = []; kind; abstract = true; uic_guard = no_uic_guard }
   | type_decl ->
+    let uic_guard =
+      match type_decl.type_kind with
+      | Types.Type_record (lbls, _, _) -> record_uic_guard path type_decl lbls
+      | Types.Type_abstract _ | Types.Type_record_unboxed_product _
+      | Types.Type_variant _ | Types.Type_open ->
+        no_uic_guard
+    in
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =
       (* When we have no stored ikind, we go to this fallback and compute. *)
@@ -721,7 +891,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
         let kind : Solver.ckind =
          fun ctx -> Solver.kind ~use_tables:true ctx body_ty
         in
-        Solver.Ty { args; kind; abstract = false }
+        Solver.Ty { args; kind; abstract = false; uic_guard }
       | None -> (
         (* No manifest: may still be "concrete" (record/variant/...).
            Build ckind. *)
@@ -738,7 +908,11 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
            fun ctx -> Solver.ckind_of_jkind ctx type_decl.type_jkind
           in
           Solver.Ty
-            { args = type_decl.type_params; kind; abstract = treat_as_abstract }
+            { args = type_decl.type_params;
+              kind;
+              abstract = treat_as_abstract;
+              uic_guard
+            }
         in
         match type_decl.type_kind with
         (* For abstract types and allow_any_crossing types, we derive the
@@ -753,12 +927,14 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
           (* Build from components: base (non-float value) + per-label
              contributions. *)
           let immutable_base =
-            Ldd.const
-              (match rep with
+            let base =
+              match rep with
               | Types.Record_unboxed -> Axis_lattice.immediate
               (* CR box: This will no longer be [non_float] once we update the
                  representation of singleton float64 records *)
-              | _ -> Axis_lattice.immutable_data)
+              | _ -> Axis_lattice.immutable_data
+            in
+            Ldd.const (Axis_lattice.allow_uic base)
           in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
@@ -766,7 +942,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:no_validation lbls
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false; uic_guard }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
@@ -775,7 +952,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:validate_immutable_unboxed_label lbls
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false; uic_guard }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
           (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
              captured by its constructors: nullability/separability and
@@ -811,12 +989,13 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base_lat0 =
-              match rep with
-              | Types.Variant_unboxed -> Axis_lattice.immediate
-              | _ ->
-                if all_args_void
-                then Axis_lattice.immediate
-                else Axis_lattice.immutable_data
+              (match rep with
+                | Types.Variant_unboxed -> Axis_lattice.immediate
+                | _ ->
+                  if all_args_void
+                  then Axis_lattice.immediate
+                  else Axis_lattice.immutable_data)
+              |> Axis_lattice.allow_uic
             in
             let payload_kind_of_constructor =
               make_gadt_payload_projector ~decl_params:type_decl.type_params ctx
@@ -827,17 +1006,16 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
               | Types.Cstr_tuple args ->
                 Ldd.sum args ~base:Ldd.bot
                   ~f:(fun (arg : Types.constructor_argument) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality arg.ca_modalities
-                    in
-                    Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
+                    apply_modality_to_kind arg.ca_modalities
+                      (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 sum_record_label_contributions ~base:Ldd.bot ~payload_kind
                   ~validate_label:no_validation lbls
             in
             Ldd.sum cstrs ~base:(Ldd.const base_lat0) ~f:constructor_contrib
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false; uic_guard }
         | Types.Type_open ->
           (* Use the stored jkind here in case it is `exn`,
              which is special. *)
@@ -848,7 +1026,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
             fun _ctx ->
              Ldd.const Axis_lattice.nonfloat_value
            in
-           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+           Solver.Ty
+             { args = type_decl.type_params;
+               kind;
+               abstract = false;
+               uic_guard
+             }
         *)
         )
     in
@@ -856,7 +1039,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
     let ikind =
       match type_decl.type_ikind with
       | Types.Constructor_ikind { base; coeffs } when !Clflags.ikinds ->
-        Solver.Poly (base, coeffs)
+        Solver.Poly { base; coeffs; uic_guard }
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
         fallback ()
@@ -867,7 +1050,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
        let ikind_msg =
          match ikind with
          | Solver.Ty _ -> "Ty"
-         | Solver.Poly (base, coeffs) ->
+         | Solver.Poly { base; coeffs; uic_guard = _ } ->
            let coeffs =
              coeffs |> Array.map Ldd.pp |> Array.to_list |> String.concat "; "
            in

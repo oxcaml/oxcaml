@@ -41,6 +41,18 @@ val of_axis_set : Jkind_axis.Axis_set.t -> t
 (** Relevant axes of a constant modality and the corresponding mask. *)
 val mask_of_modality : Mode.Modality.Const.t -> t
 
+val modality_makes_uniqueness_constant : Mode.Modality.Const.t -> bool
+
+val modality_has_contended_contention : Mode.Modality.Const.t -> bool
+
+val uic_disabled : t
+
+val disable_uic : t -> t
+
+val allow_uic : t -> t
+
+val uic_allowed : t -> bool
+
 val create :
   areality:Mode.Regionality.Const.t ->
   linearity:Mode.Linearity.Const.t ->
