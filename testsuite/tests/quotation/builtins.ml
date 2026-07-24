@@ -7,6 +7,14 @@
 
 (* This test file should be kept up to date with any [ident_*] in [predef.ml]. *)
 
+module type S = sig type exn += Exit end
+#mark_toplevel_in_quotations;;
+[%%expect {|
+module type S = sig type exn += Exit end
+|}];;
+
+(** Quoting **)
+
 (* Type constructors *)
 
 <[ fun (x : int) -> x ]>
@@ -410,3 +418,43 @@ Uncaught exception: Misc.Fatal_error
 [%%expect {|
 - : <[unit or_null]> expr = <[This ()]>
 |}];;
+
+(** Shadowing builtins in quotes **)
+
+(* Type *)
+(* CR jbachurski: This is wrong -- the [int] in [e] refers to prelude,
+   not the local one.  *)
+let e = <[ fun (x : int) -> x ]> in <[ fun (type int) () -> $e ]>
+[%%expect {|
+- : <[unit -> int -> int]> expr = <[fun (type int) () -> fun (x : int) -> x]>
+|}];;
+(* Exception *)
+let e = <[ raise Exit ]> in <[ let exception Exit in $e ]>
+[%%expect {|
+- : 'a expr = <[let exception Exit in Stdlib.raise Stdlib.Exit]>
+|}];;
+(* We can avoid the following two bugs by banning [let exception],
+   but they seem unlikely enough. *)
+(* CR jbachurski: This is wrong -- the inner [Exit] should refer to the
+   global [Stdlib], not the argument. *)
+<[ fun (module Stdlib : S) -> raise Exit ]>
+[%%expect {|
+- : <[(module S) -> $('a)]> expr =
+<[
+  fun (((module Stdlib) : (module S)) : (module S)) ->
+    Stdlib.raise Stdlib.Exit
+]>
+|}];;
+(* CR jbachurski: This is wrong -- the inner exn should refer to the
+   global [Stdlib], not the extension. *)
+let e = <[ raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
+[%%expect {|
+- : 'a expr =
+<[
+  let exception Continuation_already_taken in
+    Stdlib.raise Continuation_already_taken
+]>
+|}];;
+
+(* Similar examples to the above could be constructed for locally declared
+   types if we had struct syntax in quotes. *)
