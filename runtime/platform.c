@@ -73,6 +73,80 @@ void caml_plat_fatal_error(const char * action, int err)
 
 /* Mutexes */
 
+#ifdef CAML_BARE_METAL
+
+CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
+{
+  (void)m;
+}
+
+void caml_plat_assert_all_locks_unlocked(void)
+{
+}
+
+void caml_plat_mutex_free(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+void caml_plat_cond_init(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
+{
+  (void)cond;
+  (void)mut;
+  caml_fatal_error("caml_plat_wait cannot be used on bare metal");
+}
+
+void caml_plat_broadcast(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_signal(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_cond_free(caml_plat_cond* cond)
+{
+  (void)cond;
+}
+
+void caml_plat_latch_release(caml_plat_binary_latch* latch)
+{
+  atomic_store_release(&latch->value, Latch_released);
+}
+
+void caml_plat_latch_wait(caml_plat_binary_latch* latch)
+{
+  if (caml_plat_latch_is_set(latch))
+    caml_fatal_error("caml_plat_latch_wait would deadlock on bare metal");
+}
+
+void caml_plat_barrier_flip(caml_plat_barrier* barrier,
+                            barrier_status current_sense)
+{
+  atomic_store_relaxed(&barrier->arrived,
+                       current_sense ^ BARRIER_SENSE_BIT);
+  atomic_store_release(&barrier->futex.value,
+                       (caml_plat_futex_value)
+                         (current_sense ^ BARRIER_SENSE_BIT));
+}
+
+void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
+                                  barrier_status current_sense)
+{
+  if (!caml_plat_barrier_sense_has_flipped(barrier, current_sense))
+    caml_fatal_error("caml_plat_barrier_wait_sense would deadlock"
+                     " on bare metal");
+}
+
+#else /* !CAML_BARE_METAL */
+
 CAMLexport void caml_plat_mutex_init(caml_plat_mutex * m)
 {
   int rc;
@@ -400,6 +474,8 @@ void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
   latchlike_wait(&barrier->futex, sense_bit, sense_bit | 1);
 }
 
+#endif /* CAML_BARE_METAL */
+
 /* Memory management */
 
 intnat caml_plat_pagesize = 0;
@@ -455,6 +531,10 @@ void* caml_mem_map(uintnat size, uintnat flags, const char* name)
   return mem;
 }
 
+/* Not compiled on bare metal: there is no reserve-vs-commit
+   distinction there (caml_plat_mem_map returns real, malloc-backed
+   memory). */
+#ifndef CAML_BARE_METAL
 void* caml_mem_commit(void* mem, uintnat size, const char* name)
 {
   CAMLassert(Is_page_aligned(size));
@@ -473,6 +553,7 @@ void caml_mem_decommit(void* mem, uintnat size, const char* name)
     caml_plat_mem_decommit(mem, size, name);
   }
 }
+#endif /* !CAML_BARE_METAL */
 
 void caml_mem_unmap(void* mem, uintnat size)
 {
@@ -487,6 +568,9 @@ void caml_mem_unmap(void* mem, uintnat size)
   caml_plat_mem_unmap(mem, size);
 }
 
+/* Not compiled on bare metal: mapping names are debugging aids for OS
+   tools (/proc/PID/maps) */
+#ifndef CAML_BARE_METAL
 void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 {
   va_list args;
@@ -500,6 +584,7 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
   if ((n > 0) && (n < sizeof(mapping_name)))
     caml_plat_mem_name_map(mem, length, mapping_name);
 }
+#endif /* !CAML_BARE_METAL */
 
 #define Min_sleep_nsec  (10 * NSEC_PER_USEC) /* 10 usec */
 #define Slow_sleep_nsec  (1 * NSEC_PER_MSEC) /*  1 msec */
@@ -508,6 +593,11 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
                                  const struct caml_plat_srcloc* loc)
 {
+#ifdef CAML_BARE_METAL
+  (void)loc;
+  cpu_relax();
+  return sleep_nsec + 1;
+#else
   if (sleep_nsec < Min_sleep_nsec) sleep_nsec = Min_sleep_nsec;
   if (sleep_nsec > Max_sleep_nsec) sleep_nsec = Max_sleep_nsec;
   unsigned next_sleep_nsec = sleep_nsec + sleep_nsec / 4;
@@ -524,4 +614,5 @@ unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
   usleep(sleep_nsec / NSEC_PER_USEC);
 #endif
   return next_sleep_nsec;
+#endif
 }

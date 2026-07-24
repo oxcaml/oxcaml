@@ -2146,6 +2146,9 @@ AC_CHECK_FUNC([getentropy], [AC_DEFINE([HAS_GETENTROPY], [1])])
 ## getrusage
 AC_CHECK_FUNC([getrusage], [AC_DEFINE([HAS_GETRUSAGE], [1])])
 
+## getrlimit
+AC_CHECK_FUNC([getrlimit], [AC_DEFINE([HAS_GETRLIMIT], [1])])
+
 ## times
 AC_CHECK_FUNC([times], [AC_DEFINE([HAS_TIMES], [1])])
 

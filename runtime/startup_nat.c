@@ -107,7 +107,6 @@ extern void caml_install_invalid_parameter_handler(void);
 
 value caml_startup_common(char_os **argv, int pooling)
 {
-  const char_os * exe_name, * proc_self_exe;
   value res;
 
   caml_init_os_params();
@@ -140,6 +139,11 @@ value caml_startup_common(char_os **argv, int pooling)
   caml_win32_overflow_detection();
 #endif
   caml_debugger_init (); /* force debugger.o stub to be linked */
+#ifdef CAML_BARE_METAL
+  static char_os * empty_argv[] = { NULL };
+  caml_sys_init(T(""), argv == NULL ? empty_argv : argv);
+#else
+  const char_os * exe_name, * proc_self_exe;
   exe_name = argv[0];
   if (exe_name == NULL) exe_name = T("");
   proc_self_exe = caml_executable_name();
@@ -148,6 +152,7 @@ value caml_startup_common(char_os **argv, int pooling)
   else
     exe_name = caml_search_exe_in_path(exe_name);
   caml_sys_init(exe_name, argv);
+#endif
   caml_maybe_expand_stack();
   res = caml_start_program(Caml_state);
   /* ignore distinction between async and normal,

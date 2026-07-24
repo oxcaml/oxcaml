@@ -147,6 +147,30 @@ typedef uint64_t uintnat;
 
 #endif /* CAML_CONFIG_H_NO_TYPEDEFS */
 
+
+#if defined(CAML_BARE_METAL)
+#undef MULTIDOMAIN
+#undef POSIX_SIGNALS
+#undef BSD_SIGNALS
+#undef HAS_SYS_SHM_H
+#undef HAS_SHMAT
+#undef HAS_SYS_EPOLL_H
+#undef HAS_SYS_TIMERFD_H
+#undef HAS_SYS_EVENTFD_H
+#undef HAS_GETRLIMIT
+#undef HAS_LOCALE_H
+#undef HAS_XLOCALE_H
+#undef HAS_LOCALE
+
+#undef OCAML_OS_TYPE
+#define OCAML_OS_TYPE "none"
+
+#ifndef STACK_CHECKS_ENABLED
+#define STACK_CHECKS_ENABLED
+#endif
+
+#endif
+
 /* Endianness of floats */
 
 /* ARCH_FLOAT_ENDIANNESS encodes the byte order of doubles as follows:
@@ -199,7 +223,8 @@ typedef uint64_t uintnat;
 #endif
 
 /* Whether to use guard pages for fiber stacks */
-#if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
+#if defined(POSIX_SIGNALS) && !defined(USE_MMAP_MAP_STACK) \
+  && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
 #define STACK_GUARD_PAGES
 #endif
 
