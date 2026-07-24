@@ -170,6 +170,59 @@ let test_double_recursion () =
       env
   | Bottom -> Format.eprintf "Bottom@."
 
+let test_precision_loss () =
+  (* This test demonstrates a case where the BFS meet strategy is required in
+     order to avoid loss of precision -- we expect the second field of the block
+     to have the singleton `{ 1 }` as a type, but with the DFS meet strategy it
+     has the pair `{ 0, 1 }` as a type instead). *)
+  let env = TE.create ~resolver:(fun _ -> None) ~machine_width:Sixty_four in
+  let machine_width = TE.machine_width env in
+  let var_x = Variable.create "x" Flambda_kind.value in
+  let var_y = Variable.create "y" Flambda_kind.value in
+  let var_z = Variable.create "z" Flambda_kind.value in
+  let n_x = Name.var var_x in
+  let n_y = Name.var var_y in
+  let n_z = Name.var var_z in
+  let nb_x = Bound_name.create n_x Name_mode.normal in
+  let nb_y = Bound_name.create n_y Name_mode.normal in
+  let nb_z = Bound_name.create n_z Name_mode.normal in
+  let env = TE.add_definition env nb_x Flambda_kind.value in
+  let env = TE.add_definition env nb_y Flambda_kind.value in
+  let env = TE.add_definition env nb_z Flambda_kind.value in
+  let alias name = T.alias_type_of Flambda_kind.value (Simple.name name) in
+  let one_of ints =
+    T.these_tagged_immediates
+      (Target_ocaml_int.Set.of_list
+         (List.map (Target_ocaml_int.of_int machine_width) ints))
+  in
+  let ty_x =
+    T.immutable_block ~is_unique:false Tag.zero
+      ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
+      ~fields:[alias n_y; T.any_value]
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
+  in
+  let ty_y =
+    T.immutable_block ~is_unique:false Tag.zero
+      ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
+      ~fields:[alias n_z; one_of [0; 1]]
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
+  in
+  let ty_z =
+    T.immutable_block ~is_unique:false Tag.zero
+      ~shape:(Flambda_kind.Block_shape.Scannable Value_only)
+      ~fields:[T.any_value; one_of [1; 2]]
+      Alloc_mode.For_types.heap ~machine_width:Sixty_four
+  in
+  let env = TE.add_equation env n_x ty_x in
+  let env = TE.add_equation env n_y ty_y in
+  let env = TE.add_equation env n_z ty_z in
+  Format.eprintf "Environment: %a@." TE.print env;
+  match T.meet env (alias n_x) (alias n_y) with
+  | Ok (ty, env) ->
+    Format.eprintf "Result type: %a@.New environment:@ %a@." T.print ty TE.print
+      env
+  | Bottom -> Format.eprintf "Bottom@."
+
 let _ =
   let comp_unit =
     let linkage_name = Compilation_unit.Name.of_string "camlTest" in
@@ -177,4 +230,5 @@ let _ =
   in
   let unit_info = Unit_info.make_dummy ~input_name:"camlTest" comp_unit in
   Env.set_current_unit unit_info;
-  test_double_recursion ()
+  test_double_recursion ();
+  test_precision_loss ()

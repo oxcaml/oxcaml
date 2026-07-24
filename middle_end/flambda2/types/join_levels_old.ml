@@ -89,7 +89,8 @@ let join_types ~env_at_fork envs_with_levels =
         (* CR vlaviron: This is very likely quadratic (number of uses times
            number of variables in all uses). However it's hard to know how we
            could do better. *)
-        ME.use_meet_env base_env ~f:(fun base_env ->
+        ME.use_meet_env ~meet_expanded_head:Meet_and_join.meet_expanded_head
+          base_env ~f:(fun base_env ->
             ME.add_env_extension_maybe_bottom base_env
               (TEE.from_map joined_types)
               ~meet_expanded_head:Meet_and_join.meet_expanded_head)
@@ -337,7 +338,8 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
       ~extra_lifted_consts_in_use_envs ~extra_allowed_names
   in
   let result_env =
-    ME.use_meet_env definition_typing_env ~f:(fun target_env ->
+    ME.use_meet_env ~meet_expanded_head:Meet_and_join.meet_expanded_head
+      definition_typing_env ~f:(fun target_env ->
         ME.add_env_extension_from_level target_env level
           ~meet_expanded_head:Meet_and_join.meet_expanded_head)
   in
