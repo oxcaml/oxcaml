@@ -727,7 +727,7 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
-(* CR mvellacott: Update -[no-]-support-lto help text once implemented. *)
+(* CR mvellacott: Update help text for the following three once fully implemented. *)
 
 let mk_support_lto f =
   ( "-support-lto",
@@ -744,6 +744,18 @@ let mk_no_support_lto f =
       " Currently unimplemented. Will eventually be used to disable support \
        for link time optimisation.%s (Flambda2 only)"
       (format_not_default Flambda2.Default.support_lto) )
+
+let mk_reaper_rebuild f =
+  ( "-reaper-rebuild",
+    Arg.Unit f,
+    " Rebuild and compile units from .cmr files written by -support-lto \
+     (Flambda2 only)" )
+
+let mk_reaper_solve f =
+  ( "-reaper-solve",
+    Arg.Unit f,
+    " Run the reaper's whole-program solver over .cmr files written by \
+     -support-lto, producing a .cmsol file (Flambda2 only)" )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
@@ -1407,6 +1419,8 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val support_lto : unit -> unit
   val no_support_lto : unit -> unit
+  val reaper_rebuild : unit -> unit
+  val reaper_solve : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
@@ -1607,6 +1621,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_reaper_change_calling_conventions;
       mk_support_lto F.support_lto;
       mk_no_support_lto F.no_support_lto;
+      mk_reaper_rebuild F.reaper_rebuild;
+      mk_reaper_solve F.reaper_solve;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_flambda2_expert_fallback_inlining_heuristic
@@ -2082,6 +2098,8 @@ module Oxcaml_options_impl = struct
 
   let support_lto = set Flambda2.support_lto
   let no_support_lto = clear Flambda2.support_lto
+  let reaper_rebuild = set' Clflags.reaper_rebuild
+  let reaper_solve = set' Clflags.reaper_solve
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
