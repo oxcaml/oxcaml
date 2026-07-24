@@ -147,17 +147,171 @@ type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
 ;;
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-61:
-1 | type 'a t : value mod contended portable =
-2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
-3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value non_float mod portable immutable with 'a
+type 'a t =
+    Shared : ('b : value mod portable contended). 'b -> 'b t
+  | Unshared : (unit -> 'c) @@ portable -> 'c t
+|}]
+
+(***********************************************************************)
+type 'a et : value mod portable =
+  | K : ('b : value mod portable). 'b -> 'b et
+[%%expect{|
+type 'a et = K : ('b : value mod portable). 'b -> 'b et
+|}]
+
+let g (t : int et @ aliased) = use_unique t
+[%%expect{|
+Line 1, characters 42-43:
+1 | let g (t : int et @ aliased) = use_unique t
+                                              ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(***********************************************************************)
+
+type 'a box = { xx : 'a }
+type 'a nt : value mod portable =
+  | K : ('b : value mod portable). 'b box -> 'b nt
+[%%expect{|
+type 'a box = { xx : 'a; }
+type 'a nt = K : ('b : value mod portable). 'b box -> 'b nt
+|}]
+
+type 'a lt : value mod portable =
+  | K : ('b : value mod portable). 'b list -> 'b lt
+[%%expect{|
+type 'a lt = K : ('b : value mod portable). 'b list -> 'b lt
+|}]
+
+type 'a opaque
+type 'a at : value mod portable =
+  | K : ('b : value mod portable). 'b opaque -> 'b at
+[%%expect{|
+type 'a opaque
+Lines 2-3, characters 0-53:
+2 | type 'a at : value mod portable =
+3 |   | K : ('b : value mod portable). 'b opaque -> 'b at
+Error: The kind of type "at" is immutable_data with ('a @@ portable) opaque
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           value mod portable contended
-         because of the annotation on the declaration of the type t.
+       But the kind of type "at" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type at.
+|}]
+
+type 'a mbox = { mutable yy : 'a }
+type 'a ct : value mod contended =
+  | K : ('b : value mod contended). 'b mbox -> 'b ct
+[%%expect{|
+type 'a mbox = { mutable yy : 'a; }
+Lines 2-3, characters 0-52:
+2 | type 'a ct : value mod contended =
+3 |   | K : ('b : value mod contended). 'b mbox -> 'b ct
+Error: The kind of type "ct" is
+           mutable_data with 'a @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "ct" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type ct.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
+let smuggle (r : int ref) = Kbox { xx = (fun () -> ignore !r) }
+[%%expect{|
+type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
+Line 2, characters 40-61:
+2 | let smuggle (r : int ref) = Kbox { xx = (fun () -> ignore !r) }
+                                            ^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of value mod portable
+         because of the definition of nt2 at line 1, characters 0-64.
+|}]
+
+type 'a cell : mutable_data with 'a =
+  | Nil
+  | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
+[%%expect{|
+Lines 1-3, characters 0-87:
+1 | type 'a cell : mutable_data with 'a =
+2 |   | Nil
+3 |   | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
+Error: The kind of type "cell" is
+           mutable_data
+             with ('a @@ portable)
+             with ('a @@ portable) cell @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "cell" must be a subkind of mutable_data with 'a
+         because of the annotation on the declaration of the type cell.
+
+       The first mode-crosses less than the second along:
+         portability:
+           mod portable with ('a @@ portable) with ('a @@ portable) cell ≰
+           mod portable with 'a
+         statefulness:
+           mod stateless with ('a @@ portable) with ('a @@ portable) cell ≰
+           mod stateless with 'a
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
+type 'a t =
+  | Portable : ('a : value mod portable). 'a -> 'a t
+  | Nonportable : 'a -> 'a t
+[%%expect{|
+type 'a t =
+    Portable : ('a : value mod portable). 'a -> 'a t
+  | Nonportable : 'a -> 'a t
+|}]
+
+let f (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect{|
+Line 1, characters 58-59:
+1 | let f (t : (unit -> unit) t @ nonportable) = use_portable t
+                                                              ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+type 'a t =
+  | A : ('a : value mod portable contended). 'a -> 'a t
+  | B : ('a : value mod portable global). 'a -> 'a t
+[%%expect{|
+type 'a t =
+    A : ('a : value mod portable contended). 'a -> 'a t
+  | B : ('a : value mod global portable). 'a -> 'a t
+|}]
+
+let f (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect{|
+val f : (unit -> unit) t -> unit = <fun>
+|}]
+
+let f (t : int ref t @ contended) = use_uncontended t
+[%%expect{|
+Line 1, characters 52-53:
+1 | let f (t : int ref t @ contended) = use_uncontended t
+                                                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+type ('a, 'b) t =
+  | T : ('a : value mod portable) ('b : value mod contended). 'a * 'b -> ('a, 'b) t
+[%%expect{|
+type ('a, 'b) t =
+    T : ('a : value mod portable) ('b : value mod contended). 'a *
+      'b -> ('a, 'b) t
+|}]
+
+let f (t : (unit -> unit, int ref) t @ nonportable) = use_portable t
+[%%expect{|
+val f : (unit -> unit, int ref) t -> unit = <fun>
+|}]
+
+let f (t : (unit -> unit, int ref) t @ contended) = use_uncontended t
+[%%expect{|
+val f : (unit -> unit, int ref) t @ contended -> unit = <fun>
 |}]
 
 (***********************************************************************)
@@ -526,7 +680,6 @@ Line 1, characters 66-67:
                                                                       ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
-
 
 type (_, _) box2 = Box2 : 'a -> ('a, 'a) box2
 [%%expect{|

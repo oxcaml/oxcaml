@@ -2468,12 +2468,17 @@ module Jkind0 = struct
             acc
           else
             match get_desc res_arg with
-            | Tvar _ ->
+            | Tvar { jkind; _ } ->
               (* Only add types which are direct variables. Note that types
                  which aren't variables might themselves /contain/ variables; if
                  those variables don't show up on another parameter, they're
                  treated as orphaned. See example K2 from Note [With-bounds for
                  GADTs]. *)
+              let projected_param =
+                if Mod_bounds.is_max jkind.jkind.mod_bounds
+                then projected_param
+                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
+              in
               res_arg :: domain, projected_param :: range,
               TypeSet.add res_arg seen
             | _ -> acc)
