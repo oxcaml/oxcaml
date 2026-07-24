@@ -50,10 +50,6 @@ end = struct
 (declare-var a node)
 (declare-var b node)
 
-(rule (=> (edge a b) (is-node a)))
-(rule (=> (edge a b) (is-node b)))
-(rule (=> (entry a) (is-node a)))
-
 (rule (=> (entry a) (reachable a)))
 (rule (=> (and (reachable a) (edge a b)) (reachable b)))
 (rule (=> (and (not (reachable a)) (is-node a)) (unreachable a)))
@@ -147,10 +143,6 @@ end = struct
           block.terminator <- { block.terminator with desc = Cfg_intf.S.Never };
           block.exn <- None)
         unreachable_labels;
-      if !Oxcaml_flags.cfg_eliminate_dead_code_validate
-      then
-        Profile.record ~accumulate:true "validate_reachability"
-          Validator.validate_reachability cfg;
       unreachable_labels
 end
 
@@ -352,4 +344,9 @@ let run cfg_with_layout =
      second round of dead code elimination. *)
   Eliminate_dead_code.run cfg_with_layout |> acc;
   Cfg_with_layout.remove_blocks cfg_with_layout !dead_labels;
+  if !Oxcaml_flags.cfg_eliminate_dead_code_validate
+  then
+    Profile.record ~accumulate:true "validate_reachability"
+      Validator.validate_reachability
+      (Cfg_with_layout.cfg cfg_with_layout);
   cfg_with_layout

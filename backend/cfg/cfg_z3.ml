@@ -14,8 +14,10 @@ let run_z3 code =
       ~stdout:output_file
   in
   let ret = Ccomp.command command in
-  if ret <> 0 then Misc.fatal_errorf "Z3 failed with return code %d" ret;
   let output = In_channel.with_open_text output_file In_channel.input_all in
+  if ret <> 0
+  then
+    Misc.fatal_errorf "Z3 failed with return code %d. Output: @.%s" ret output;
   output
 
 module Id_gen = struct
@@ -63,8 +65,7 @@ let z3_graph_of_cfg fmt ~(cfg : Cfg.t) ~(id_gen : Id_gen.t) =
   Label.Tbl.iter
     (fun label (value : Cfg.basic_block) ->
       let id = Id_gen.get_id id_gen ~label in
-      if not (Cfg.is_never_terminator value.terminator.desc)
-      then Format.fprintf fmt "(rule (is-node %s))\n" id;
+      Format.fprintf fmt "(rule (is-node %s))\n" id;
       Cfg.successor_labels ~exn:true ~normal:true value
       |> Label.Set.iter (fun succ_label ->
           let succ_id = Id_gen.get_id id_gen ~label:succ_label in
@@ -91,10 +92,6 @@ let fmt_dom_code_begin fmt ~id_gen =
 (declare-var a node)
 (declare-var b node)
 (declare-var c node)
-
-(rule (=> (edge a b) (is-node a)))
-(rule (=> (edge a b) (is-node b)))
-(rule (=> (entry a) (is-node a)))
 
 (rule (=> (entry a) (reachable a)))
 (rule (=> (and (reachable a) (edge a b))

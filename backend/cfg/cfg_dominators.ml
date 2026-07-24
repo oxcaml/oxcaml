@@ -448,6 +448,13 @@ let compute_dominator_forest : Cfg.t -> doms -> dominator_tree list =
 module Validator : sig
   val validate_idom : Cfg.t -> doms -> unit
 end = struct
+  let debug_print_dom doms =
+    Label.Map.iter
+      (fun label immediate_dominator ->
+        Format.eprintf "%a -> %a@." Label.format label Label.format
+          immediate_dominator)
+      (Label.Tbl.to_map doms)
+
   let calculate_idom (cfg : Cfg.t) : doms =
     let buffer = Buffer.create 4096 in
     let fmt = Format.formatter_of_buffer buffer in
@@ -461,19 +468,24 @@ end = struct
 
   (* CR hwasilewski: add validators for the dominance frontier and forest. *)
   let validate_idom (cfg : Cfg.t) (doms : doms) =
+    (* CR hwasilewski: Note: we assume that cfg has no dead code here. *)
     let z3_doms = calculate_idom cfg in
     let doms_equal =
       Label.Map.equal Label.equal (Label.Tbl.to_map doms)
         (Label.Tbl.to_map z3_doms)
     in
     if not doms_equal
-    then
+    then (
+      Format.eprintf "CFG dominators:@.";
+      debug_print_dom doms;
+      Format.eprintf "Z3 dominators:@.";
+      debug_print_dom z3_doms;
       (* CR hwasilewski for xclerc: cannot import Printcfg here, it causes a
          cyclic dependency. *)
       Misc.fatal_errorf
         "validate_idoms: Dominator validation failed: dominator calculated by \
          Datalog does not agree with the Cfg_dominators, cfg '%s'"
-        cfg.fun_name
+        cfg.fun_name)
 end
 
 let build : Cfg.t -> t =
