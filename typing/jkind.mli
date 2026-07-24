@@ -98,10 +98,11 @@ end
 
 (** See [Jkind_axis.Addressability] for an overview: [Action.t] (marked or not)
     is stored on [Any]/[Product]/[Kconstr] nodes, while [Sort] nodes carry the
-    full [t], whose extra value [Id_or_addressable] is the join of a layout and
-    its marked form (flexible sort-variable bounds). [t] is also the type of
-    normalized-mark readings; verdicts ("is this kind addressable?") have their
-    own type, [Jkind_axis.Addressability.Verdict.t]. *)
+    full [t] - [Exact a] for exactly the form obtained by applying [a] to the
+    plain kind of the sort, [Join] for the join of the two exact forms (flexible
+    sort-variable bounds). [t] is also the type of normalized-mark readings;
+    verdicts ("is this kind addressable?") have their own type,
+    [Jkind_axis.Addressability.Verdict.t]. *)
 module Addressability : sig
   module Action : sig
     type t = Jkind_types.Addressability.Action.t =
@@ -110,11 +111,8 @@ module Addressability : sig
   end
 
   type t = Jkind_types.Addressability.t =
-    | Id
-    | Addressable
-    | Id_or_addressable
-
-  val of_action : Action.t -> t
+    | Exact of Action.t
+    | Join
 
   val of_action_on_undetermined : Action.t -> t
 end

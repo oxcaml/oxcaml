@@ -1328,7 +1328,7 @@ let lazy_val_requires_forward env loc ty =
       (* The scannable axes and addressability don't matter for the rest of
          the computation, so unconstrained values are totally fine. *)
       Jkind_types.Scannable_axes.max
-      Jkind_types.Addressability.Id_or_addressable
+      Jkind_types.Addressability.Join
   in
   let classify_product _ layouts =
     let layout =

@@ -1403,7 +1403,7 @@ module Jkind0 = struct
 
       let scannable =
         { jkind =
-            mk_jkind (Base (Scannable, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Scannable, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "scannable"
@@ -1415,7 +1415,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Maybe_null; separability = Maybe_separable },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value_or_null"
@@ -1427,7 +1427,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Maybe_null; separability = Separable },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value_maybe_null"
@@ -1439,7 +1439,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Non_null; separability = Maybe_separable },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value_maybe_separable"
@@ -1451,7 +1451,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Maybe_null; separability = Maybe_separable },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "value_or_null mod everything"
@@ -1459,7 +1459,8 @@ module Jkind0 = struct
 
       let value =
         { jkind =
-            mk_jkind (Base (Scannable, Scannable_axes.value_axes, Addressable))
+            mk_jkind
+              (Base (Scannable, Scannable_axes.value_axes, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value"
@@ -1467,7 +1468,8 @@ module Jkind0 = struct
 
       let value_mod_everything =
         { jkind =
-            mk_jkind (Base (Scannable, Scannable_axes.value_axes, Addressable))
+            mk_jkind
+              (Base (Scannable, Scannable_axes.value_axes, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "value mod everything"
@@ -1489,7 +1491,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Non_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1503,7 +1505,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Maybe_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = immutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1518,7 +1520,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Non_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1548,7 +1550,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Non_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1562,7 +1564,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Maybe_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = sync_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1585,7 +1587,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Non_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1599,7 +1601,7 @@ module Jkind0 = struct
                   (Base
                     ( Scannable,
                       { nullability = Maybe_null; separability = Non_float },
-                      Addressable ));
+                      Exact Addressable ));
               mod_bounds = mutable_data_mod_bounds;
               with_bounds = No_with_bounds
             };
@@ -1608,7 +1610,7 @@ module Jkind0 = struct
 
       let void =
         { jkind =
-            mk_jkind (Base (Void, Scannable_axes.max, Id))
+            mk_jkind (Base (Void, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "void"
@@ -1616,7 +1618,7 @@ module Jkind0 = struct
 
       let void_mod_everything =
         { jkind =
-            mk_jkind (Base (Void, Scannable_axes.max, Id))
+            mk_jkind (Base (Void, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "void mod everything"
@@ -1630,7 +1632,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Non_null; separability = Non_pointer },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "immediate"
@@ -1642,7 +1644,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Maybe_null; separability = Non_pointer },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "immediate_or_null"
@@ -1685,7 +1687,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Non_null; separability = Non_pointer64 },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:cross_all_except_staticity
               ~externality:External64;
           name = "immediate64"
@@ -1697,7 +1699,7 @@ module Jkind0 = struct
               (Base
                 ( Scannable,
                   { nullability = Maybe_null; separability = Non_pointer64 },
-                  Addressable ))
+                  Exact Addressable ))
               ~crossing:cross_all_except_staticity
               ~externality:External64;
           name = "immediate64_or_null"
@@ -1705,7 +1707,7 @@ module Jkind0 = struct
 
       let float64 =
         { jkind =
-            mk_jkind (Base (Float64, Scannable_axes.max, Id))
+            mk_jkind (Base (Float64, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "float64"
@@ -1713,7 +1715,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_float =
         { jkind =
-            mk_jkind (Base (Float64, Scannable_axes.max, Id))
+            mk_jkind (Base (Float64, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "float64 mod everything"
@@ -1721,7 +1723,7 @@ module Jkind0 = struct
 
       let float32 =
         { jkind =
-            mk_jkind (Base (Float32, Scannable_axes.max, Id))
+            mk_jkind (Base (Float32, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "float32"
@@ -1729,7 +1731,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_float32 =
         { jkind =
-            mk_jkind (Base (Float32, Scannable_axes.max, Id))
+            mk_jkind (Base (Float32, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "float32 mod everything"
@@ -1737,7 +1739,7 @@ module Jkind0 = struct
 
       let word =
         { jkind =
-            mk_jkind (Base (Word, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Word, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "word"
@@ -1745,7 +1747,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_nativeint =
         { jkind =
-            mk_jkind (Base (Word, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Word, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "word mod everything"
@@ -1754,7 +1756,7 @@ module Jkind0 = struct
       let untagged_immediate =
         { jkind =
             mk_jkind
-              (Base (Untagged_immediate, Scannable_axes.max, Id))
+              (Base (Untagged_immediate, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "untagged_immediate"
@@ -1763,7 +1765,7 @@ module Jkind0 = struct
       let kind_of_untagged_int =
         { jkind =
             mk_jkind
-              (Base (Untagged_immediate, Scannable_axes.max, Id))
+              (Base (Untagged_immediate, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "untagged_immediate mod everything"
@@ -1771,7 +1773,7 @@ module Jkind0 = struct
 
       let bits8 =
         { jkind =
-            mk_jkind (Base (Bits8, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits8, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "bits8"
@@ -1779,7 +1781,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_int8 =
         { jkind =
-            mk_jkind (Base (Bits8, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits8, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "bits8 mod everything"
@@ -1789,7 +1791,7 @@ module Jkind0 = struct
 
       let bits16 =
         { jkind =
-            mk_jkind (Base (Bits16, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits16, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "bits16"
@@ -1797,7 +1799,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_int16 =
         { jkind =
-            mk_jkind (Base (Bits16, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits16, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "bits16 mod everything"
@@ -1805,7 +1807,7 @@ module Jkind0 = struct
 
       let bits32 =
         { jkind =
-            mk_jkind (Base (Bits32, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits32, Scannable_axes.max, Exact Id))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "bits32"
@@ -1813,7 +1815,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_int32 =
         { jkind =
-            mk_jkind (Base (Bits32, Scannable_axes.max, Id))
+            mk_jkind (Base (Bits32, Scannable_axes.max, Exact Id))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "bits32 mod everything"
@@ -1821,7 +1823,7 @@ module Jkind0 = struct
 
       let bits64 =
         { jkind =
-            mk_jkind (Base (Bits64, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Bits64, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "bits64"
@@ -1829,7 +1831,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_int64 =
         { jkind =
-            mk_jkind (Base (Bits64, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Bits64, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "bits64 mod everything"
@@ -1837,7 +1839,7 @@ module Jkind0 = struct
 
       let kind_of_idx =
         { jkind =
-            mk_jkind (Base (Bits64, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Bits64, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "bits64 mod everything"
@@ -1845,7 +1847,7 @@ module Jkind0 = struct
 
       let vec128 =
         { jkind =
-            mk_jkind (Base (Vec128, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec128, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "vec128"
@@ -1853,7 +1855,7 @@ module Jkind0 = struct
 
       let vec256 =
         { jkind =
-            mk_jkind (Base (Vec256, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec256, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "vec256"
@@ -1861,7 +1863,7 @@ module Jkind0 = struct
 
       let vec512 =
         { jkind =
-            mk_jkind (Base (Vec512, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec512, Scannable_axes.max, Exact Addressable))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min;
           name = "vec512"
@@ -1869,7 +1871,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_128bit_vectors =
         { jkind =
-            mk_jkind (Base (Vec128, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec128, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "vec128 mod everything"
@@ -1877,7 +1879,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_256bit_vectors =
         { jkind =
-            mk_jkind (Base (Vec256, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec256, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "vec256 mod everything"
@@ -1885,7 +1887,7 @@ module Jkind0 = struct
 
       let kind_of_unboxed_512bit_vectors =
         { jkind =
-            mk_jkind (Base (Vec512, Scannable_axes.max, Addressable))
+            mk_jkind (Base (Vec512, Scannable_axes.max, Exact Addressable))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "vec512 mod everything"
@@ -2339,7 +2341,7 @@ module Jkind0 = struct
               (Sort
                  ( Base Scannable,
                    { nullability = Non_null; separability = Non_float },
-                   Addressable ));
+                   Exact Addressable ));
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2610,7 +2612,7 @@ module Jkind0 = struct
               (Sort
                  ( Base Scannable,
                    { nullability = Non_null; separability = Separable },
-                   Addressable ));
+                   Exact Addressable ));
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2624,7 +2626,7 @@ module Jkind0 = struct
               (Sort
                  ( Base Scannable,
                    { nullability = Non_null; separability = Separable },
-                   Addressable ));
+                   Exact Addressable ));
           mod_bounds = Mod_bounds.for_arrow;
           with_bounds = No_with_bounds
         }
@@ -2658,7 +2660,7 @@ module Jkind0 = struct
               (Sort
                  ( Base Scannable,
                    { nullability = Non_null; separability = Maybe_separable },
-                   Addressable ));
+                   Exact Addressable ));
           mod_bounds;
           with_bounds = No_with_bounds
         }

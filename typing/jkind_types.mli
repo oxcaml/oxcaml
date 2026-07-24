@@ -131,10 +131,9 @@ module Scannable_axes : sig
 end
 
 (** See [Jkind_axis.Addressability] for an overview of actions ([Action.t], on
-    [Any]/[Product]/[Kconstr] nodes) vs the full [t] with the join
-    [Id_or_addressable] (on [Sort] nodes, also the type of normalized-mark
-    readings) vs verdicts ([Verdict.t], the type of "is this kind addressable?"
-    answers). *)
+    [Any]/[Product]/[Kconstr] nodes) vs the full [t] with [Exact] forms and the
+    [Join] (on [Sort] nodes, also the type of normalized-mark readings) vs
+    verdicts ([Verdict.t], the type of "is this kind addressable?" answers). *)
 module Addressability : sig
   module Action : sig
     type t = Jkind_axis.Addressability.Action.t =
@@ -151,9 +150,8 @@ module Addressability : sig
   end
 
   type t = Jkind_axis.Addressability.t =
-    | Id
-    | Addressable
-    | Id_or_addressable
+    | Exact of Action.t
+    | Join
 
   val equal : t -> t -> bool
 
@@ -164,8 +162,6 @@ module Addressability : sig
   val meet : t -> t -> t option
 
   val combine_product : t list -> t
-
-  val of_action : Action.t -> t
 
   val of_action_on_undetermined : Action.t -> t
 
@@ -229,13 +225,13 @@ module Layout : sig
       product derives its addressability from its components at read time, and
       an unmarked [any] is the top kind). [Sort] nodes (and the [Const.Base],
       [Const.Univar], and [Const.Genvar] snapshots) carry a full
-      [Addressability.t]: [Addressable] when the base is intrinsically
-      addressable or the node was marked, [Id] for an exactly-plain kind, and
-      [Id_or_addressable] - the join of the layout and its marked form - for
-      flexible bounds (fresh variables, and the components of decomposed
-      products whose own root is the join; the analog of [Scannable_axes.max]
-      there). See the comment on the implementation's [Layout.t] for the full
-      invariants. *)
+      [Addressability.t]: [Exact a] for exactly the form obtained by applying
+      [a] to the plain kind of the sort (normalized to [Exact Addressable] on
+      intrinsically addressable bases), and [Join] - the join of the two exact
+      forms - for flexible bounds (fresh variables, and the components of
+      decomposed products whose own root is the join; the analog of
+      [Scannable_axes.max] there). See the comment on the implementation's
+      [Layout.t] for the full invariants. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t
@@ -271,14 +267,14 @@ module Layout : sig
     val is_scannable_or_any : t -> bool
 
     (** The normalized mark of a constant layout: which of the forms over its
-        sort the kind is. A join ([Id_or_addressable]) slot on a base collapses
-        only when the base is intrinsically addressable, where its branches
-        coincide, and is otherwise preserved - the join is information (a
-        flexible [bits8] bound still admits [bits8 addressable]) and must
-        survive [equal]; only printing elides it. An unmarked product derives
-        its mark from its components; [Univar]/[Genvar] layouts read their
-        stored slot ([Id] on a rigid variable is exactly the plain form, with no
-        claim about its addressability). *)
+        sort the kind is. A [Join] slot on a base collapses only when the base
+        is intrinsically addressable, where its branches coincide, and is
+        otherwise preserved - the join is information (a flexible [bits8] bound
+        still admits [bits8 addressable]) and must survive [equal]; only
+        printing elides it. An unmarked product derives its mark from its
+        components; [Univar]/[Genvar] layouts read their stored slot ([Exact Id]
+        on a rigid variable is exactly the plain form, with no claim about its
+        addressability). *)
     val normalized_mark : t -> Addressability.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.

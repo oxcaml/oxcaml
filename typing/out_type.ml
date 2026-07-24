@@ -1257,8 +1257,8 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   | Layout (Sort (Var n, sa, a)) ->
     let addressable_words =
       match (a : Jkind.Addressability.t) with
-      | Addressable -> ["addressable"]
-      | Id | Id_or_addressable -> []
+      | Exact Addressable -> ["addressable"]
+      | Exact Id | Join -> []
     in
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
@@ -1283,8 +1283,8 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
         List.exists
           (fun l ->
             match Jkind.Desc.layout_normalized_mark l with
-            | Jkind.Addressability.Addressable -> false
-            | Id | Id_or_addressable -> true)
+            | Jkind.Addressability.Exact Addressable -> false
+            | Exact Id | Join -> true)
           lays
     in
     if not mark_is_informative
@@ -1315,8 +1315,8 @@ let out_jkind_option_of_jkind ~ignore_null env jkind =
           (* X1; but an [addressable] constraint is load-bearing, so it is
              shown even when unconstrained sort-variable kinds are elided. *)
           match (a : Jkind.Addressability.t) with
-          | Addressable -> false
-          | Id | Id_or_addressable -> not !Clflags.verbose_types)
+          | Exact Addressable -> false
+          | Exact Id | Join -> not !Clflags.verbose_types)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)

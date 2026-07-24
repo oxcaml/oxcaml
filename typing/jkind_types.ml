@@ -1068,54 +1068,58 @@ module Layout = struct
      [Id] on [Any] is the top kind [any].
 
      [Sort] nodes (and the [Const.Base], [Const.Univar], and [Const.Genvar]
-     snapshots) carry a full [Addressability.t], whose third value
-     [Id_or_addressable] denotes the JOIN of the layout and its marked form -
-     over a product sort, the top of the whole fiber of kinds at that sort,
-     the marks being unknown deeply through the components
+     snapshots) carry a full [Addressability.t], describing the whole kind
+     as a position in the fiber over its sort. [Exact a] means exactly the
+     form obtained by applying [a] to the plain kind of the sort - whoever
+     the sort turns out to be: on an unfilled variable, [Exact Id] is
+     exactly the plain form of the eventual sort and [Exact Addressable]
+     exactly its whole-marked form. [Join] denotes the JOIN of the two exact
+     forms - over a product sort, the top of the whole fiber of kinds at
+     that sort, the marks being unknown deeply through the components
      ([Addressability.decomposed_component] regenerates the join on each
-     fabricated component).
-     The join is introduced only for flexible bounds - fresh sort variables
-     ([of_new_sort_var]), transfers of an [any] bound's action onto a
-     variable, and the components fabricated when decomposing or flattening
-     a product whose root slot is itself the join
-     ([Addressability.decomposed_component]; exact roots get exactly-plain
-     components) - which must admit both [L] and [L addressable] for
-     whatever [L] the variable resolves to. The join persists after its
-     variable resolves: sorts do not carry addressability, so filling the
-     variable with [bits8] leaves the kind the join of [bits8] and
-     [bits8 addressable]. Readers collapse the join only when the resolved
-     sort is intrinsically addressable, where the two branches denote the
-     same kind (see [Jkind.Layout.normalized_mark]).
+     fabricated component). The join persists after its variable resolves:
+     sorts do not carry addressability, so filling the variable with [bits8]
+     leaves the kind the join of [bits8] and [bits8 addressable]. Readers
+     collapse any slot to [Exact Addressable] only when the resolved sort is
+     intrinsically addressable, where all forms denote the same kind (see
+     [Jkind.Layout.normalized_mark]).
 
-     Construction invariants:
+     Construction discipline:
+     - A fresh flexible BOUND - something that must admit every kind at
+       whatever sort its variable resolves to - is born [Join]: fresh sort
+       variables ([of_new_sort_var]), transfers of an unmarked [any] bound's
+       action onto a variable, and the components fabricated when
+       decomposing or flattening a product whose own root slot is [Join].
+       Being born [Exact Id] instead would (soundly but wrongly) reject
+       marked kinds. Rigid stand-ins (lpoly layout variables; see
+       [Typetexp]) are the opposite: they transfer a pending action exactly
+       ([Exact a]), since rigid [x] and [x addressable] are incomparable
+       while [x] is unknown; being born [Join] instead would unsoundly
+       accept one below the other. Exact slots on unfilled variables also
+       arise from the flexible instance copies used to match rigid binders
+       and from the components fabricated when decomposing an [Exact] root -
+       in every case still meaning exactly [a] applied to the eventual plain
+       kind. Meets treat an exact-vs-marked mismatch over an unresolved sort
+       as "not definitely disjoint" ([Jkind.Layout.has_intersection]).
      - A [Sort]/[Const.Base] node of an intrinsically addressable base
        ([Addressability.base_is_always_addressable]) normalizes its slot to
-       [Addressable]
-       (e.g. [bits64 addressable] IS [bits64]); see [Const.Static.of_base].
-     - On an unaddressable base, [Id] and [Addressable] mean exactly the
-       plain and the marked kind.
-     - On an unfilled *flexible* variable the slot is [Id_or_addressable]
-       or, once constrained by [any addressable], [Addressable]. The latter
-       is a COMMITMENT, in the same family as sort defaulting: the variable's
-       kind becomes exactly the marked kind of whatever sort it resolves to.
-       At a base sort this loses nothing (there is exactly one addressable
-       kind per unaddressable base), so the commitment is complete there. At
-       a product sort it is deliberately incomplete: only the whole-marked
-       product satisfies it, and a component-marked product - a different,
-       incomparable addressable kind - is rejected (see
+       [Exact Addressable] (e.g. [bits64 addressable] IS [bits64]); see
+       [Const.Static.of_base].
+     - A flexible variable constrained by [any addressable] gets
+       [Exact Addressable]. This is a COMMITMENT, in the same family as sort
+       defaulting: the variable's kind becomes exactly the marked kind of
+       whatever sort it resolves to. At a base sort this loses nothing
+       (there is exactly one addressable kind per unaddressable base), so
+       the commitment is complete there. At a product sort it is
+       deliberately incomplete: only the whole-marked product satisfies it,
+       and a component-marked product - a different, incomparable
+       addressable kind - is rejected (see
        [Addressability.decomposed_component] and
        testsuite/tests/typing-layouts-addressable/instantiate.ml). This
        keeps every question the checker asks about an EXACT kind; asking
-       "is this some addressable kind at this sort?" would require a fourth
-       slot value distinguishing the constraint from the mark, which can
-       recover the completeness at products if it is ever needed. An [Id]
-       slot on an unfilled variable arises only from *rigid* stand-ins
-       (lpoly layout variables; see [Typetexp]) and the instance copies used
-       to match them, and means exactly the plain kind: [x] and
-       [x addressable] are incomparable while [x] is unknown, and readers
-       collapse either to the marked kind once [x] resolves intrinsically
-       addressable. Meets treat the rigid-unknown mismatch as "not
-       definitely disjoint" ([Jkind.Layout.has_intersection]). *)
+       "is this some addressable kind at this sort?" would require a third
+       slot shape distinguishing the constraint from the mark, which can
+       recover the completeness at products if it is ever needed. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t
@@ -1150,20 +1154,21 @@ module Layout = struct
     let rec normalized_mark : t -> Addressability.t = function
       | Base (b, _, a) -> (
         match a with
-        | Id_or_addressable ->
+        | Join ->
           if Addressability.base_is_always_addressable b
-          then Addressable
-          else Id_or_addressable
-        | Addressable | Id -> a)
+          then Exact Addressable
+          else Join
+        | Exact _ -> a)
       | Any (_, a) -> Addressability.of_action_on_undetermined a
       | Product (ts, a) -> (
         match (a : Addressability.Action.t) with
-        | Addressable -> Addressability.Addressable
+        | Addressable -> Addressability.Exact Addressable
         | Id -> Addressability.combine_product (List.map normalized_mark ts))
       | Univar (_, _, a) | Genvar (_, _, a) ->
-        (* The carrier is never resolved, so the slot is the mark: [Id] on a
-           rigid variable is exactly the plain form (whose addressability is
-           open until instantiation - a question for verdicts, not marks). *)
+        (* The carrier is never resolved, so the slot is the mark: [Exact
+           Id] on a rigid variable is exactly the plain form (whose
+           addressability is open until instantiation - a question for
+           verdicts, not marks). *)
         a
 
     let rec equal c1 c2 =
@@ -1242,107 +1247,107 @@ module Layout = struct
     let set_root_addressable t =
       match t with
       | Any (sa, _) -> Any (sa, Addressability.Action.Addressable)
-      | Base (b, sa, _) -> Base (b, sa, Addressability.Addressable)
+      | Base (b, sa, _) -> Base (b, sa, Addressability.Exact Addressable)
       | Product (ts, _) -> Product (ts, Addressability.Action.Addressable)
-      | Univar (uv, sa, _) -> Univar (uv, sa, Addressability.Addressable)
-      | Genvar (v, sa, _) -> Genvar (v, sa, Addressability.Addressable)
+      | Univar (uv, sa, _) -> Univar (uv, sa, Addressability.Exact Addressable)
+      | Genvar (v, sa, _) -> Genvar (v, sa, Addressability.Exact Addressable)
 
     module Static = struct
       let scannable_non_null_non_pointer =
         Base
           ( Sort.Scannable,
             { nullability = Non_null; separability = Non_pointer },
-            Addressable )
+            Exact Addressable )
 
       let scannable_non_null_non_pointer64 =
         Base
           ( Sort.Scannable,
             { nullability = Non_null; separability = Non_pointer64 },
-            Addressable )
+            Exact Addressable )
 
       let scannable_non_null_non_float =
         Base
           ( Sort.Scannable,
             { nullability = Non_null; separability = Non_float },
-            Addressable )
+            Exact Addressable )
 
       let scannable_non_null_separable =
         Base
           ( Sort.Scannable,
             { nullability = Non_null; separability = Separable },
-            Addressable )
+            Exact Addressable )
 
       let scannable_non_null_maybe_separable =
         Base
           ( Sort.Scannable,
             { nullability = Non_null; separability = Maybe_separable },
-            Addressable )
+            Exact Addressable )
 
       let scannable_maybe_null_non_pointer =
         Base
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Non_pointer },
-            Addressable )
+            Exact Addressable )
 
       let scannable_maybe_null_non_pointer64 =
         Base
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Non_pointer64 },
-            Addressable )
+            Exact Addressable )
 
       let scannable_maybe_null_non_float =
         Base
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Non_float },
-            Addressable )
+            Exact Addressable )
 
       let scannable_maybe_null_separable =
         Base
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Separable },
-            Addressable )
+            Exact Addressable )
 
       let scannable_maybe_null_maybe_separable =
         Base
           ( Sort.Scannable,
             { nullability = Maybe_null; separability = Maybe_separable },
-            Addressable )
+            Exact Addressable )
 
       (* For all non-[Scannable] layouts, the scannable axes are ignored. We
          have to pick something, though, so we pick [Scannable_axes.max].
-         The addressability slot of these constants is [Id] on intrinsically
-         unaddressable bases (the plain, unmarked kind) and [Addressable] on
-         intrinsically addressable ones
+         The addressability slot of these constants is [Exact Id] on
+         intrinsically unaddressable bases (the plain, unmarked kind) and
+         [Exact Addressable] on intrinsically addressable ones
          ([Addressability.base_is_always_addressable]). *)
 
-      let void = Base (Sort.Void, Scannable_axes.max, Id)
+      let void = Base (Sort.Void, Scannable_axes.max, Exact Id)
 
-      let float64 = Base (Sort.Float64, Scannable_axes.max, Id)
+      let float64 = Base (Sort.Float64, Scannable_axes.max, Exact Id)
 
-      let float32 = Base (Sort.Float32, Scannable_axes.max, Id)
+      let float32 = Base (Sort.Float32, Scannable_axes.max, Exact Id)
 
-      let word = Base (Sort.Word, Scannable_axes.max, Addressable)
+      let word = Base (Sort.Word, Scannable_axes.max, Exact Addressable)
 
       let untagged_immediate =
-        Base (Sort.Untagged_immediate, Scannable_axes.max, Id)
+        Base (Sort.Untagged_immediate, Scannable_axes.max, Exact Id)
 
-      let bits8 = Base (Sort.Bits8, Scannable_axes.max, Id)
+      let bits8 = Base (Sort.Bits8, Scannable_axes.max, Exact Id)
 
-      let bits16 = Base (Sort.Bits16, Scannable_axes.max, Id)
+      let bits16 = Base (Sort.Bits16, Scannable_axes.max, Exact Id)
 
-      let bits32 = Base (Sort.Bits32, Scannable_axes.max, Id)
+      let bits32 = Base (Sort.Bits32, Scannable_axes.max, Exact Id)
 
-      let bits64 = Base (Sort.Bits64, Scannable_axes.max, Addressable)
+      let bits64 = Base (Sort.Bits64, Scannable_axes.max, Exact Addressable)
 
-      let vec128 = Base (Sort.Vec128, Scannable_axes.max, Addressable)
+      let vec128 = Base (Sort.Vec128, Scannable_axes.max, Exact Addressable)
 
-      let vec256 = Base (Sort.Vec256, Scannable_axes.max, Addressable)
+      let vec256 = Base (Sort.Vec256, Scannable_axes.max, Exact Addressable)
 
-      let vec512 = Base (Sort.Vec512, Scannable_axes.max, Addressable)
+      let vec512 = Base (Sort.Vec512, Scannable_axes.max, Exact Addressable)
 
       let of_base (b : Sort.base) (sa : Scannable_axes.t) (a : Addressability.t)
           =
-        (* The addressability slot is normalized to [Addressable] on
+        (* The addressability slot is normalized to [Exact Addressable] on
            intrinsically addressable bases: applying [addressable] to such a
            kind does nothing (e.g. [bits64 addressable] IS [bits64]), and
            both branches of a join on them denote the same kind. *)
@@ -1394,16 +1399,16 @@ module Layout = struct
         | Vec128, _ -> vec128
         | Vec256, _ -> vec256
         | Vec512, _ -> vec512
-        | Void, Id -> void
-        | Untagged_immediate, Id -> untagged_immediate
-        | Float64, Id -> float64
-        | Float32, Id -> float32
-        | Bits8, Id -> bits8
-        | Bits16, Id -> bits16
-        | Bits32, Id -> bits32
+        | Void, Exact Id -> void
+        | Untagged_immediate, Exact Id -> untagged_immediate
+        | Float64, Exact Id -> float64
+        | Float32, Exact Id -> float32
+        | Bits8, Exact Id -> bits8
+        | Bits16, Exact Id -> bits16
+        | Bits32, Exact Id -> bits32
         | ( ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
             | Bits32 ),
-            ((Addressable | Id_or_addressable) as a) ) ->
+            ((Exact Addressable | Join) as a) ) ->
           Base (b, Scannable_axes.max, a)
     end
 
@@ -1470,5 +1475,5 @@ module Layout = struct
 
   let of_new_sort_var ~level sa =
     let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa, Addressability.Id_or_addressable), sort
+    Sort (sort, sa, Addressability.Join), sort
 end

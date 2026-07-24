@@ -65,31 +65,34 @@ end
     operator ([Addressable]) or nothing ([Id]). [Any], [Product], and [Kconstr]
     nodes store exactly an action.
 
-    [t] adds a third value, [Id_or_addressable], denoting the *join* of a layout
-    [L] and [L addressable] - and, over a product sort, the top of the whole
-    fiber of kinds at that sort: the marks are unknown deeply through the
-    components (one root slot suffices because decomposition regenerates the
-    join on each fabricated component; see [decomposed_component]). It is stored
-    only on [Sort] nodes and the constant snapshots of sorts and layout
-    variables ([Const.Base], [Const.Univar], [Const.Genvar]), where it arises
-    for flexible bounds: a fresh sort variable's bound must admit every kind
-    with whatever sort the variable resolves to, and it persists after the
-    variable resolves, since resolving a sort determines none of the marks.
+    [t], the type of [Sort]-node slots (and the constant snapshots of sorts and
+    layout variables: [Const.Base], [Const.Univar], [Const.Genvar]), describes a
+    whole kind as a position in the fiber over its sort. [Exact a] is exactly
+    the form obtained by applying the action [a] to the plain kind of the sort
+    - deeply: an exactly-plain product sort has exactly-plain components, and an
+      exactly whole-marked one also has exactly-plain components (the
+      whole-product mark does not distribute); see [decomposed_component].
+      [Join] denotes the *join* of the two exact forms - and, over a product
+      sort, the top of the whole fiber of kinds at that sort: the marks are
+      unknown deeply through the components. [Join] arises only for flexible
+      bounds: a fresh sort variable's bound must admit every kind with whatever
+      sort the variable resolves to, and it persists after the variable
+      resolves, since resolving a sort determines none of the marks.
 
     [t] is also the result type of *normalized-mark* readings of a kind: which
-    of the forms over its sort the kind is. There [Addressable] is the marked
-    form - or any form over a sort whose forms all coincide - [Id] is exactly
-    the plain form, and [Id_or_addressable] is the flexible join. A mark reading
-    of [Id] says nothing about whether the kind is addressable: the plain form
-    of a rigid layout variable [x] reads [Id] while the addressability of [x] is
-    still open. The question "is this kind addressable?" has a different answer
-    type, [Verdict.t], whose third case is an honest [Undetermined].
+    of the forms over its sort the kind is, where an [Exact] or [Join] slot
+    collapses to [Exact Addressable] once every form over the sort coincides. A
+    mark reading of [Exact Id] says nothing about whether the kind is
+    addressable: the plain form of a rigid layout variable [x] reads [Exact Id]
+    while the addressability of [x] is still open. The question "is this kind
+    addressable?" has a different answer type, [Verdict.t], whose third case is
+    an honest [Undetermined].
 
-    As an order on marks this is flat and partial: [Addressable] and [Id] are
+    As an order on marks this is flat and partial: the two exact forms are
     incomparable (the operator is a modifier, not a narrowing), and both are
-    below [Id_or_addressable]. Accordingly, [meet] is partial. This is also not
-    an [Axis.t]: it is not part of the mod- or with-bounds, but rather a
-    component of layouts. *)
+    below [Join]. Accordingly, [meet] is partial. This is also not an [Axis.t]:
+    it is not part of the mod- or with-bounds, but rather a component of
+    layouts. *)
 module Addressability : sig
   module Action : sig
     type t =
@@ -113,9 +116,8 @@ module Addressability : sig
   end
 
   type t =
-    | Id
-    | Addressable
-    | Id_or_addressable
+    | Exact of Action.t
+    | Join
 
   val equal : t -> t -> bool
 
@@ -123,25 +125,23 @@ module Addressability : sig
 
   val le : t -> t -> bool
 
-  (** [meet Addressable Id] is [None]; [Id_or_addressable] is the identity. *)
+  (** The meet of two exact forms is their equality or nothing; [Join] is the
+      identity. *)
   val meet : t -> t -> t option
 
-  (** The reading of a product of kinds from its components' readings: [Id] (not
-      addressable) if any component is, otherwise [Id_or_addressable] if any
-      component is undetermined, otherwise [Addressable]. This is not the [meet]
-      of the components. *)
+  (** The reading of a product of kinds from its components' readings:
+      [Exact Id] (not addressable) if any component is, otherwise [Join] if any
+      component is undetermined, otherwise [Exact Addressable]. This is not the
+      [meet] of the components. *)
   val combine_product : t list -> t
-
-  (** The exact embedding: the slot a *rigid* sort-variable bound (an lpoly
-      layout variable, which stands for one specific unknown layout) gets when a
-      pending action is transferred onto it. *)
-  val of_action : Action.t -> t
 
   (** The reading of an action stored on a node whose carrier's intrinsic
       addressability is undetermined ([any], an abstract kind, or an unfilled
       sort variable): applying no action leaves the addressability undetermined.
       Also the slot a *flexible* sort-variable bound gets when an [any] bound's
-      action is transferred onto it. *)
+      action is transferred onto it - in contrast with a *rigid* bound (an lpoly
+      layout variable, which stands for one specific unknown layout), which
+      transfers a pending action exactly ([Exact]). *)
   val of_action_on_undetermined : Action.t -> t
 
   (** The action recorded in a [Sort] node's slot, forgetting the join. Used
@@ -151,11 +151,10 @@ module Addressability : sig
   val forget_join : t -> Action.t
 
   (** The slot fabricated for the components of a decomposed sort-backed product
-      whose root slot is the argument. The exact roots have exact components:
-      [Id] is exactly the plain product and [Addressable] exactly the
-      whole-marked product, whose components are exactly plain in both cases
-      (the whole-product mark does not distribute). Only the flexible join
-      leaves the components unconstrained. *)
+      whose root slot is the argument: exact roots have exactly-plain
+      components, whether the whole is plain or whole-marked (the whole-product
+      mark does not distribute). Only the flexible [Join] leaves the components
+      unconstrained. *)
   val decomposed_component : t -> t
 
   (** Only [Addressable] is ever printed in user-facing output. *)
@@ -166,8 +165,8 @@ module Addressability : sig
   (** The result of an addressability *verdict* - "is this kind addressable?" -
       as opposed to a mark reading ([t]), which answers which form over its sort
       a kind is. The two differ exactly where honesty requires it: the plain
-      form of an unresolved layout reads mark [Id] but verdict [Undetermined].
-  *)
+      form of an unresolved layout reads mark [Exact Id] but verdict
+      [Undetermined]. *)
   module Verdict : sig
     type t =
       | Id

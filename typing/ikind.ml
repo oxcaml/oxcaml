@@ -1151,8 +1151,8 @@ let fast_sub : type r1 l2.
  fun ~context:_ _env (sub : (Allowance.allowed * r1) Types.jkind)
      (super : (l2 * Allowance.allowed) Types.jkind) ->
   (* The super-side patterns require an addressability slot that admits
-     everything: the join [Id_or_addressable] on a [Sort] bound, and the
-     unmarked action [Id] on [Any] (the top). [Any (_, Addressable)]
+     everything: the join ([Join]) on a [Sort] bound, and the unmarked
+     action [Id] on [Any] (the top). [Any (_, Addressable)]
      ([any addressable]) is NOT the top layout, and a constrained sort bound
      likewise rejects some addressabilities. Those cases take the slow
      path. *)
@@ -1165,7 +1165,7 @@ let fast_sub : type r1 l2.
                { separability = Jkind_axis.Separability.Maybe_separable;
                  nullability = Jkind_axis.Nullability.Maybe_null
                },
-               Jkind_axis.Addressability.Id_or_addressable ));
+               Jkind_axis.Addressability.Join ));
       mod_bounds;
       with_bounds = Types.No_with_bounds
     } ->

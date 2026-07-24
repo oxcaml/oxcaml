@@ -150,69 +150,54 @@ module Addressability = struct
   end
 
   type t =
-    | Id
-    | Addressable
-    | Id_or_addressable
+    | Exact of Action.t
+    | Join
 
   let equal a1 a2 =
     match a1, a2 with
-    | Id, Id | Addressable, Addressable | Id_or_addressable, Id_or_addressable
-      ->
-      true
-    | (Id | Addressable | Id_or_addressable), _ -> false
+    | Exact a1, Exact a2 -> Action.equal a1 a2
+    | Join, Join -> true
+    | (Exact _ | Join), _ -> false
 
   let less_or_equal a1 a2 : Misc.Le_result.t =
     match a1, a2 with
-    | Id, Id | Addressable, Addressable | Id_or_addressable, Id_or_addressable
-      ->
-      Equal
-    | (Id | Addressable), Id_or_addressable -> Less
-    | Id_or_addressable, (Id | Addressable) | Id, Addressable | Addressable, Id
-      ->
-      Not_le
+    | Exact a1, Exact a2 -> if Action.equal a1 a2 then Equal else Not_le
+    | Exact _, Join -> Less
+    | Join, Join -> Equal
+    | Join, Exact _ -> Not_le
 
   let le a1 a2 = Misc.Le_result.is_le (less_or_equal a1 a2)
 
   let meet a1 a2 =
     match a1, a2 with
-    | Id_or_addressable, a | a, Id_or_addressable -> Some a
-    | Addressable, Addressable -> Some Addressable
-    | Id, Id -> Some Id
-    | Addressable, Id | Id, Addressable -> None
+    | Join, a | a, Join -> Some a
+    | Exact a1, (Exact a2 as e) -> if Action.equal a1 a2 then Some e else None
 
   let combine_product ts =
     (* Combines component *readings* into a product's reading. Note that the
-       implicit order here ([Addressable] absorbed by [Id_or_addressable]
-       absorbed by [Id]) is not the subkind order, under which [Addressable]
-       and [Id] are incomparable. *)
+       implicit order here ([Exact Addressable] absorbed by [Join] absorbed
+       by [Exact Id]) is not the subkind order, under which the two exact
+       forms are incomparable. *)
     List.fold_left
       (fun acc t ->
         match acc, t with
-        | Id, _ | _, Id -> Id
-        | Id_or_addressable, _ | _, Id_or_addressable -> Id_or_addressable
-        | Addressable, Addressable -> Addressable)
-      Addressable ts
-
-  let of_action : Action.t -> t = function
-    | Id -> Id
-    | Addressable -> Addressable
+        | Exact Action.Id, _ | _, Exact Action.Id -> Exact Action.Id
+        | Join, _ | _, Join -> Join
+        | Exact Action.Addressable, Exact Action.Addressable ->
+          Exact Action.Addressable)
+      (Exact Action.Addressable) ts
 
   let of_action_on_undetermined : Action.t -> t = function
-    | Id -> Id_or_addressable
-    | Addressable -> Addressable
+    | Id -> Join
+    | Addressable -> Exact Addressable
 
-  let forget_join : t -> Action.t = function
-    | Addressable -> Addressable
-    | Id | Id_or_addressable -> Id
+  let forget_join : t -> Action.t = function Exact a -> a | Join -> Id
 
   let decomposed_component : t -> t = function
-    | Id | Addressable -> Id
-    | Id_or_addressable -> Id_or_addressable
+    | Exact _ -> Exact Id
+    | Join -> Join
 
-  let to_string = function
-    | Addressable -> "addressable"
-    | Id -> "id"
-    | Id_or_addressable -> "id_or_addressable"
+  let to_string = function Exact a -> Action.to_string a | Join -> "join"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 

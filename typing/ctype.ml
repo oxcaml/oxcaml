@@ -2088,8 +2088,8 @@ let instance_prim_layout env (desc : Primitive.description) ty =
     (* The scannable axes and addressability constraints of the [any] bound
        carry over to the sort variable's layout. A plain [any] bound (action
        [Id]) is the top kind, which on the variable becomes the join
-       [Id_or_addressable]: the variable must admit both [L] and
-       [L addressable] for whatever layout [L] it resolves to. *)
+       [Join]: the variable must admit both [L] and [L addressable] for
+       whatever layout [L] it resolves to. *)
     let jkind =
       Jkind.set_layout jkind
         (Jkind.Layout.Sort

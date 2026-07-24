@@ -1842,7 +1842,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
                  layout, so the pending action is transferred exactly: an
                  unmarked bound means exactly [x], never the join of [x] and
                  [x addressable] (the kinds are incomparable for rigid [x]). *)
-              let a = Jkind.Addressability.of_action a in
+              let a = Jkind.Addressability.Exact a in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
                 = Layout (Sort (Var v, sa, a)) in
               let desc = {desc with base} in
