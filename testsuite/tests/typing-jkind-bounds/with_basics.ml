@@ -592,6 +592,114 @@ Error: The kind of type "t" is immutable_data with 'a
          because of the annotation on the declaration of the type t.
 |}]
 
+(* The offending type is behind an alias. *)
+type u = int ref
+type t : value mod contended = {
+  a : u;
+}
+[%%expect {|
+type u = int ref
+Lines 2-4, characters 0-1:
+2 | type t : value mod contended = {
+3 |   a : u;
+4 | }
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* The same offending type occurs twice. *)
+type t : value mod contended = {
+  a : int ref;
+  b : int ref;
+}
+[%%expect {|
+Lines 1-4, characters 0-1:
+1 | type t : value mod contended = {
+2 |   a : int ref;
+3 |   b : int ref;
+4 | }
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* The offending type is an alias whose kind depends on its parameter. *)
+type 'a u : immutable_data with 'a
+type 'a t : immutable_data = Foo of 'a u
+[%%expect {|
+type 'a u : immutable_data with 'a
+Line 2, characters 0-40:
+2 | type 'a t : immutable_data = Foo of 'a u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a u
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A residual for a type-constructor occurrence covers only the
+   constructor's own contribution: [w] is blamed for the axes it fails on
+   any instantiation, while the parameter's flow is blamed on ['a]. *)
+type 'a w = { mutable x : int; y : 'a }
+type 'a c : value mod portable contended = { f : 'a w }
+[%%expect {|
+type 'a w = { mutable x : int; y : 'a; }
+Line 2, characters 0-55:
+2 | type 'a c : value mod portable contended = { f : 'a w }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is mutable_data with 'a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+(* GADTs: only the offending constructor's payload is reported. *)
+type _ t : value mod contended =
+  | I : int -> int t
+  | R : int ref -> string t
+[%%expect {|
+Lines 1-3, characters 0-27:
+1 | type _ t : value mod contended =
+2 |   | I : int -> int t
+3 |   | R : int ref -> string t
+Error: The kind of type "t" is mutable_data
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* GADTs: existential payloads. *)
+type t : value mod portable = Pack : ('a -> 'a) -> t
+[%%expect {|
+Line 1, characters 0-52:
+1 | type t : value mod portable = Pack : ('a -> 'a) -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* GADTs: a payload that mentions the index parameter. *)
+type 'a t : value mod contended =
+  | A : 'b ref -> 'b t
+[%%expect {|
+Lines 1-2, characters 0-22:
+1 | type 'a t : value mod contended =
+2 |   | A : 'b ref -> 'b t
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
 (***************)
 (* TEST: Loops *)
 

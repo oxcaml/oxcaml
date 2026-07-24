@@ -2341,10 +2341,8 @@ Lines 1-6, characters 0-30:
 4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
 5 |     d : char }
 6 |   constraint 'b = int * string
-Error: The kind of type "record" is value non_float mod immutable with 'a
-         because it's a boxed record type.
-       But the kind of type "record" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type record.
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because functions are not mod portable.
 |}]
 
 (****************************************************************************)

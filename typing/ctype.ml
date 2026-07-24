@@ -8739,11 +8739,13 @@ let constrain_decl_jkind env decl jkind =
       Ikind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with
-    | Ok () as ok -> ok
-    | Error _ as err ->
+    | Ok () -> Ok ()
+    | Error err ->
         match decl.type_manifest with
-        | None -> err
-        | Some ty -> constrain_type_jkind env ty jkind
+        | None -> Error (Ikind.Jkind_error err)
+        | Some ty ->
+          constrain_type_jkind env ty jkind
+          |> Result.map_error (fun err -> Ikind.Jkind_error err)
 
 let exn_constructor_crossing env lid ~args locks =
   let vmode =

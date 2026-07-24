@@ -14,10 +14,8 @@ val use_uncontended : 'a -> 'a = <fun>
 Line 5, characters 0-60:
 5 | type t : value mod contended = { mutable contents : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because mutable fields are not mod contended.
 |}]
 
 (* On the other hand, if we set the attribute, we shouldn't get an error. *)

@@ -143,10 +143,8 @@ type 'a t : immutable_data = { x : 'a }
 Line 1, characters 0-39:
 1 | type 'a t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type 'a t : immutable_data = { mutable x : 'a }
@@ -154,16 +152,10 @@ type 'a t : immutable_data = { mutable x : 'a }
 Line 1, characters 0-47:
 1 | type 'a t : immutable_data = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended
-         portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
-         visibility: mod read_write ≰ mod immutable
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because
+       - 'a is not mod stateless immutable
+       - mutable fields are not mod immutable
 |}]
 
 type t : immutable_data = { x : int ref }
@@ -171,10 +163,8 @@ type t : immutable_data = { x : int ref }
 Line 1, characters 0-41:
 1 | type t : immutable_data = { x : int ref }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because ref is not mod immutable.
 |}]
 
 type t : immutable_data = { x : unit -> unit }
@@ -182,10 +172,8 @@ type t : immutable_data = { x : unit -> unit }
 Line 1, characters 0-46:
 1 | type t : immutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because functions are not mod forkable unyielding many stateless.
 |}]
 
 type 'a t : immutable_data = { x : 'a option }
@@ -193,10 +181,8 @@ type 'a t : immutable_data = { x : 'a option }
 Line 1, characters 0-46:
 1 | type 'a t : immutable_data = { x : 'a option }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type t : immutable_data = { x : int; y : int; mutable z : int }
@@ -204,10 +190,8 @@ type t : immutable_data = { x : int; y : int; mutable z : int }
 Line 1, characters 0-63:
 1 | type t : immutable_data = { x : int; y : int; mutable z : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because mutable fields are not mod immutable.
 |}]
 
 type t : mutable_data = { x : unit -> unit }
@@ -215,10 +199,8 @@ type t : mutable_data = { x : unit -> unit }
 Line 1, characters 0-44:
 1 | type t : mutable_data = { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of mutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation mutable_data,
+       because functions are not mod forkable unyielding many stateless.
 |}]
 
 type ('a : value mod portable) t : value mod many = { x : 'a }
@@ -226,10 +208,8 @@ type ('a : value mod portable) t : value mod many = { x : 'a }
 Line 1, characters 0-62:
 1 | type ('a : value mod portable) t : value mod many = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod many
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod many,
+       because 'a is not mod many.
 |}]
 
 type ('a : value mod global) t : value mod global = { x : 'a }
@@ -237,10 +217,8 @@ type ('a : value mod global) t : value mod global = { x : 'a }
 Line 1, characters 0-62:
 1 | type ('a : value mod global) t : value mod global = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod global
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod global,
+       because boxed records are not mod global.
 |}]
 
 type ('a : value mod aliased) t : value mod aliased = { x : 'a }
@@ -248,10 +226,8 @@ type ('a : value mod aliased) t : value mod aliased = { x : 'a }
 Line 1, characters 0-64:
 1 | type ('a : value mod aliased) t : value mod aliased = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod aliased
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod aliased,
+       because boxed records are not mod aliased.
 |}]
 
 type ('a : value mod external_) t : value mod external_ = { x : 'a }
@@ -259,10 +235,8 @@ type ('a : value mod external_) t : value mod external_ = { x : 'a }
 Line 1, characters 0-68:
 1 | type ('a : value mod external_) t : value mod external_ = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod external_
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod external_,
+       because boxed records are not mod external_.
 |}]
 
 type t : sync_data = { mutable x : int ref [@atomic] }
@@ -270,10 +244,8 @@ type t : sync_data = { mutable x : int ref [@atomic] }
 Line 1, characters 0-54:
 1 | type t : sync_data = { mutable x : int ref [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of sync_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation sync_data,
+       because ref is not mod contended.
 |}]
 
 type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
@@ -281,13 +253,8 @@ type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
 Line 1, characters 0-69:
 1 | type ('a : mutable_data) t : sync_data = { mutable x : 'a [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is sync_data with 'a @@ forkable unyielding many
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of sync_data
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod contended with 'a ≰ mod contended
+Error: This type definition does not satisfy its kind annotation sync_data,
+       because 'a is not mod contended.
 |}]
 
 (**** Test 2: Annotations with "with" are accepted when appropriate ****)
@@ -323,14 +290,8 @@ type 'a t : immutable_data with 'a = { mutable x : 'a }
 Line 1, characters 0-55:
 1 | type 'a t : immutable_data with 'a = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended with 'a
-         visibility: mod read_write ≰ mod immutable with 'a
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because mutable fields are not mod immutable.
 |}]
 
 type 'a t : immutable_data with 'a = { x : 'a -> 'a }
@@ -338,10 +299,8 @@ type 'a t : immutable_data with 'a = { x : 'a -> 'a }
 Line 1, characters 0-53:
 1 | type 'a t : immutable_data with 'a = { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because functions are not mod forkable unyielding many stateless.
 |}]
 
 type 'a t : value mod global with 'a = { x : 'a }
@@ -349,10 +308,9 @@ type 'a t : value mod global with 'a = { x : 'a }
 Line 1, characters 0-49:
 1 | type 'a t : value mod global with 'a = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod global with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod global with 'a,
+       because boxed records are not mod global.
 |}]
 
 type 'a t : value mod aliased with 'a = { x : 'a }
@@ -360,10 +318,9 @@ type 'a t : value mod aliased with 'a = { x : 'a }
 Line 1, characters 0-50:
 1 | type 'a t : value mod aliased with 'a = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod aliased with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod aliased with 'a,
+       because boxed records are not mod aliased.
 |}]
 
 type 'a t : value mod external_ with 'a = { x : 'a }
@@ -371,11 +328,9 @@ type 'a t : value mod external_ with 'a = { x : 'a }
 Line 1, characters 0-52:
 1 | type 'a t : value mod external_ with 'a = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of
-           value mod external_ with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod external_ with 'a,
+       because boxed records are not mod external_.
 |}]
 
 (**** Test 3: Record values cross when appropriate ****)

@@ -169,22 +169,18 @@ type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[< `X | `Y of 'a ]" is value non_float
-         because it's a polymorphic variant type.
-       But the kind of type "[< `X | `Y of 'a ]" must be a subkind of
-           immutable_data with 'a
-         because of the definition of t at line 1, characters 0-66.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because polymorphic variants are not mod forkable unyielding many
+                 stateless immutable.
 |}]
 type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
 [%%expect{|
 Line 1, characters 0-66:
 1 | type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[> `X | `Y of 'a ]" is value non_float
-         because it's a polymorphic variant type.
-       But the kind of type "[> `X | `Y of 'a ]" must be a subkind of
-           immutable_data with 'a
-         because of the definition of u at line 1, characters 0-66.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because polymorphic variants are not mod forkable unyielding many
+                 stateless immutable.
 |}]
 
 (* less-than rows *)
@@ -209,11 +205,9 @@ end
 Line 2, characters 2-83:
 2 |   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" is value non_float
-         because it's a polymorphic variant type.
-       But the kind of type "[< `A of 'a | `B of 'a * 'a | `C ]" must be a subkind of
-         immutable_data with 'a
-         because of the definition of t at line 2, characters 2-83.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because polymorphic variants are not mod forkable unyielding many
+                 stateless immutable.
 |}]
 
 (* Tunivar-ified row variables *)
@@ -332,10 +326,11 @@ type t3 : value non_float mod everything with [ `A of string] t1 = C of string  
 Line 1, characters 0-78:
 1 | type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t3" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t3.
+Error: This type definition does not satisfy its kind annotation
+         value mod everything non_float with [ `A of string ] t1,
+       because
+       - boxed variants are not mod global external_
+       - string is not mod global external_
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
@@ -361,10 +356,11 @@ type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] 
 Line 1, characters 0-96:
 1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t3" is immutable_data
-         because it's a boxed variant type.
-       But the kind of type "t3" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t3.
+Error: This type definition does not satisfy its kind annotation
+         value mod everything non_float with [ `A of string | `B of int | `C ] t1,
+       because
+       - boxed variants are not mod global external_
+       - string is not mod global external_
 |}]
 
 module type S = sig

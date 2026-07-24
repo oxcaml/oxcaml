@@ -574,10 +574,8 @@ type t : immutable_data = { mutable x : int}
 Line 1, characters 0-44:
 1 | type t : immutable_data = { mutable x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because mutable fields are not mod immutable.
 |}]
 
 type ('a : mutable_data) t : immutable_data = { x : 'a }
@@ -585,10 +583,101 @@ type ('a : mutable_data) t : immutable_data = { x : 'a }
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod immutable.
+|}]
+
+(* The offending type is behind an alias. *)
+type u = int ref
+type t : value mod contended = {
+  a : u;
+}
+[%%expect {|
+type u = int ref
+Lines 2-4, characters 0-1:
+2 | type t : value mod contended = {
+3 |   a : u;
+4 | }
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because u is not mod contended.
+|}]
+
+(* The same offending type occurs twice. *)
+type t : value mod contended = {
+  a : int ref;
+  b : int ref;
+}
+[%%expect {|
+Lines 1-4, characters 0-1:
+1 | type t : value mod contended = {
+2 |   a : int ref;
+3 |   b : int ref;
+4 | }
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because ref is not mod contended.
+|}]
+
+(* The offending type is an alias whose kind depends on its parameter. *)
+type 'a u : immutable_data with 'a
+type 'a t : immutable_data = Foo of 'a u
+[%%expect {|
+type 'a u : immutable_data with 'a
+Line 2, characters 0-40:
+2 | type 'a t : immutable_data = Foo of 'a u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
+|}]
+
+(* A residual for a type-constructor occurrence covers only the
+   constructor's own contribution: [w] is blamed for the axes it fails on
+   any instantiation, while the parameter's flow is blamed on ['a]. *)
+type 'a w = { mutable x : int; y : 'a }
+type 'a c : value mod portable contended = { f : 'a w }
+[%%expect {|
+type 'a w = { mutable x : int; y : 'a; }
+Line 2, characters 0-55:
+2 | type 'a c : value mod portable contended = { f : 'a w }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - w is not mod contended
+       - 'a is not mod portable
+|}]
+
+(* GADTs: only the offending constructor's payload is reported. *)
+type _ t : value mod contended =
+  | I : int -> int t
+  | R : int ref -> string t
+[%%expect {|
+Lines 1-3, characters 0-27:
+1 | type _ t : value mod contended =
+2 |   | I : int -> int t
+3 |   | R : int ref -> string t
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because ref is not mod contended.
+|}]
+
+(* GADTs: existential payloads. *)
+type t : value mod portable = Pack : ('a -> 'a) -> t
+[%%expect {|
+Line 1, characters 0-52:
+1 | type t : value mod portable = Pack : ('a -> 'a) -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because functions are not mod portable.
+|}]
+
+(* GADTs: a payload that mentions the index parameter. *)
+type 'a t : value mod contended =
+  | A : 'b ref -> 'b t
+[%%expect {|
+Lines 1-2, characters 0-22:
+1 | type 'a t : value mod contended =
+2 |   | A : 'b ref -> 'b t
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because ref is not mod contended.
 |}]
 
 (***************)
@@ -1011,10 +1100,8 @@ type 'a u = Foo of { x : 'a; }
 Line 2, characters 0-53:
 2 | type 'a t : immutable_data = 'a u = Foo of { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 (**********************************)
