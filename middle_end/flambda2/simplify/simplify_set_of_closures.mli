@@ -45,7 +45,7 @@ val simplify_lifted_sets_of_closures :
   simplify_function_body:Simplify_common.simplify_function_body ->
   Bound_static.t * Rebuilt_static_const.Group.t * Downwards_acc.t
 
-val simplify_stub_function :
+val simplify_static_stub_function :
   Downwards_acc.t ->
   Code.t ->
   all_code:Code.t Code_id.Map.t ->
