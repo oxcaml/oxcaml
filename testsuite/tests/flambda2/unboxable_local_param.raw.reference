@@ -1,0 +1,77 @@
+(let code size(10)
+       f_1 (_x_unboxed : float)
+         my_unboxed_closure &my_alloc_region my_depth
+         -> return * k1
+         : imm tagged =
+   let my_closure =
+     %project_function_slot.[f_unboxed].[f] (my_unboxed_closure)
+   in
+   let unboxed_param_region = %begin_region () in
+   (let _x =
+      %box_num.`float`.my_alloc_region.`local`[unboxed_param_region]
+        (_x_unboxed)
+    in
+    let next_depth = rec_info (succ my_depth) in
+    cont return_wrapper (0))
+     where return_wrapper (unboxed_param_result0 : imm tagged) =
+       let `unit` = %end_region (unboxed_param_region) in
+       cont return (unboxed_param_result0)
+ in
+ let code loopify(never) size(10) stub
+       f_1_1 (_x : float boxed)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let _x_unboxed = %unbox_num.`float` (_x) in
+   let f_unboxed = %project_function_slot.[f].[f_unboxed] (my_closure) in
+   apply direct(f_1 &my_alloc_region)
+     (f_unboxed : _ -> imm tagged) (_x_unboxed) -> k1 * k2
+ in
+ let $camlUnboxable_local_param__float32 = 0x0p+0 in
+ let code size(11)
+       g_3 (_x_unboxed : float)
+         my_unboxed_closure &my_alloc_region my_depth
+         -> unboxed_return * k1
+         : float =
+   let my_closure =
+     %project_function_slot.[g_unboxed].[g] (my_unboxed_closure)
+   in
+   let unboxed_param_region = %begin_region () in
+   (let _x =
+      %box_num.`float`.my_alloc_region.`local`[unboxed_param_region]
+        (_x_unboxed)
+    in
+    let next_depth = rec_info (succ my_depth) in
+    cont return_wrapper ($camlUnboxable_local_param__float32))
+     where return_wrapper (boxed_result : float boxed) =
+       let result_unboxed = %unbox_num.`float` (boxed_result) in
+       let `unit` = %end_region (unboxed_param_region) in
+       cont unboxed_return (result_unboxed)
+ in
+ let code loopify(never) size(11) stub
+       g_3_1 (_x : float boxed)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : float boxed =
+   (let _x_unboxed = %unbox_num.`float` (_x) in
+    let g_unboxed = %project_function_slot.[g].[g_unboxed] (my_closure) in
+    apply direct(g_3 &my_alloc_region)
+      (g_unboxed : _ -> float) (_x_unboxed) -> k3 * k2)
+     where k3 (unboxed_return : float) =
+       let boxed_return = %box_num.`float`.my_alloc_region (unboxed_return)
+       in
+       cont k1 (boxed_return)
+ in
+ let f = closure f_1_1 @f &toplevel.alloc_region
+ and generated = closure f_1 @f_unboxed &toplevel.alloc_region
+ in
+ let g = closure g_3_1 @g &toplevel.alloc_region
+ and generated_1 = closure g_3 @g_unboxed &toplevel.alloc_region
+ in
+ let Pmakeblock = %block.[`0`].`toplevel` (f, g) in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
+    let $camlUnboxable_local_param = Block 0 (field_0, field_1) in
+    cont done ($camlUnboxable_local_param)

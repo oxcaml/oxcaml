@@ -1498,7 +1498,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~name:(Ident.name fid ^ "_unboxed")
           ~is_always_immediate:false Flambda_kind.value
       in
-      let unboxed_return =
+      let return_unboxing =
         if attr.unbox_return then unboxing_kind return else None
       in
       let unboxed_param (param : Lambda.lparam) =
@@ -1506,7 +1506,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         then unboxing_kind param.layout
         else None
       in
-      let unboxed_params =
+      let params_unboxing =
         List.concat
           (List.map2
              (fun param kinds ->
@@ -1517,15 +1517,29 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                  Misc.fatal_error "Trying to unbox an unboxed product.")
              params unarized_per_param)
       in
+      let need_region_wrapper =
+        Lambda.is_heap_mode ret_mode
+        && List.exists
+             (fun (param : Lambda.lparam) ->
+               param.attributes.unbox_param && Lambda.is_local_mode param.mode)
+             params
+      in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot)
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          need_region_wrapper
+        }
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
+    | Normal_calling_convention
+    | Unboxed_calling_convention
+        { return_unboxing = None; need_region_wrapper = false; _ } ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _) ->
-      Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
+    | Unboxed_calling_convention { need_region_wrapper = true; _ }
+    | Unboxed_calling_convention { return_unboxing = Some _; _ } ->
+      Continuation.create ~sort:Normal_or_exn ~name:"return_wrapper" ()
   in
   let body_exn_cont = Continuation.create () in
   let free_idents_of_body =
