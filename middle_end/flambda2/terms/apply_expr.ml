@@ -90,6 +90,17 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
     Format.fprintf ppf "@[<hov 1>(relative_history@ %a)@]@ "
       Inlining_history.Relative.print relative_history
 
+let [@ocamlformat "disable"] print_compact ppf
+    { callee; continuation; exn_continuation; args; _ } =
+  Format.fprintf ppf "@[<hov 1>(\
+      @[<hov 1>(%a\u{3008}%a\u{3009}\u{300a}%a\u{300b}\
+      (%a))@]\
+      )@]"
+    (Misc.Stdlib.Option.print Simple.print) callee
+    Result_continuation.print continuation
+    Exn_continuation.print exn_continuation
+    Simple.List.print args
+
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
       return_arity; call_kind; alloc_mode; dbg; inlined; inlining_state; probe;
@@ -155,7 +166,10 @@ let [@ocamlformat "disable"] print_effect ppf
 
 let print ppf t =
   match t.call_kind with
-  | Function _ | Method _ | C_call _ -> print_normal ppf t
+  | Function _ | Method _ | C_call _ ->
+    if Flambda_features.dump_compact ()
+    then print_compact ppf t
+    else print_normal ppf t
   | Effect _ -> print_effect ppf t
 
 let invariant
