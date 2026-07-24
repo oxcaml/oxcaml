@@ -92,6 +92,38 @@ val used_value_slots : t -> Name_occurrences.t
 
 val with_used_value_slots : t -> used_value_slots:Name_occurrences.t -> t
 
+(** Free names of the approximations reified by [Reify_approx]: the compilation
+    units they reference are marked as required by quotes, and the code they
+    reference is exported to this unit's cmx. See
+    [Simplify_unary_primitive.simplify_reify_approx]. *)
+val add_reified_approx_names : t -> Name_occurrences.t -> t
+
+val reified_approx_names : t -> Name_occurrences.t
+
+val with_reified_approx_names :
+  t -> reified_approx_names:Name_occurrences.t -> t
+
+(** Approximations of reified dynamic closures, registered under manufactured
+    lookup symbols; exported as extra symbol equations. See
+    [Simplify_unary_primitive.simplify_reify_approx]. *)
+val add_reified_lookup_approx :
+  t ->
+  Symbol.t ->
+  Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t ->
+  t
+
+val reified_lookup_approxs :
+  t ->
+  Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t
+  Symbol.Map.t
+
+val with_reified_lookup_approxs :
+  t ->
+  reified_lookup_approxs:
+    Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t
+    Symbol.Map.t ->
+  t
+
 val add_code_ids_to_remember : t -> Code_id.Set.t -> t
 
 val code_ids_to_remember : t -> Code_id.Set.t

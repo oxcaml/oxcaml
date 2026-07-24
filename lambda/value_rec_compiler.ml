@@ -441,6 +441,7 @@ let compute_static_size lam =
     | Patomic_compare_set_field _
     | Patomic_fetch_add_field
     | Popaque _
+    | Preify_approx
     | Pdls_get
     | Ptls_get
     | Pdomain_index

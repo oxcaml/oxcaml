@@ -37,6 +37,12 @@ val merge : t -> t -> t
 
 val mem : Code_id.t -> t -> bool
 
+(** Find code by the linkage name of its code ID (a linear scan). Used when
+    demarshalling standalone approximations, which preserve code IDs' linkage
+    names but not their stamps; see [Value_approximation.Standalone]. *)
+val find_by_linkage_name :
+  t -> Linkage_name.t -> (Code_id.t * Code_or_metadata.t) option
+
 (** This function raises an exception if the code ID is unbound. *)
 val find_exn : t -> Code_id.t -> Code_or_metadata.t
 

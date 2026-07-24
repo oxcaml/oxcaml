@@ -94,6 +94,13 @@ val read_library_info: string -> library_infos
 
 val record_external_symbols : unit -> unit
 
+(* Record compilation units referenced by approximations reified via
+   [%reify_approx] (see [Closure_conversion]); they are marked as required
+   by quotes ([ui_quoted_cmx]) so that their cmx data is available wherever
+   the marshalled approximations are demarshalled (e.g. at runtime by
+   [Eval]). *)
+val record_reified_approx_units : Compilation_unit.Set.t -> unit
+
 (* CR mshinwell: see comment in .ml
 val ensure_sharing_between_cmi_and_cmx_imports :
   (_ * (Compilation_unit.t * _) option) list ->

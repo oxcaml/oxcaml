@@ -878,6 +878,7 @@ let rec choice ctx t =
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
+    | Preify_approx
     | Pphys_equal _
     | Pscalar _
     (* Note for Pscalar: operations returning boxed values could be

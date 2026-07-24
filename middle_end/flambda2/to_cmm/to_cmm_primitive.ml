@@ -1256,6 +1256,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | End_region { ghost = true } | End_try_region { ghost = true } ->
     None, res, C.unit ~dbg
   | Get_header -> None, res, C.get_header arg dbg
+  | Reify_approx ->
+    Misc.fatal_error "[Reify_approx] should have been resolved by [Simplify]"
   | Peek kind ->
     let memory_chunk =
       K.Standard_int_or_float.to_kind_with_subkind kind

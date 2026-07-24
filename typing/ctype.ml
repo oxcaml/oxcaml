@@ -4227,6 +4227,56 @@ let rec is_flexible_ty ty =
   | Tsplice ty' -> is_flexible_ty ty'
   | _ -> false
 
+(* Checks if a type is a ground type on which [eval] acts as the identity:
+   built entirely from arrows, (unboxed) tuples and type constructors that
+   are toplevel in quotations, with no type variables, so that [<[ty]> eval]
+   reduces to [ty] (see [try_reduce_quote_eval]).  This justifies inverting
+   the [qeval] reduction during unification: an equation [<[s]> eval = ty]
+   with [ty] ground is solved by [s = ty].  (Used to permit e.g. unifying
+   ['a eval] with [int ref], giving ['a = <[int ref]>], as arises when
+   type-checking applications of [Eval.inject].)  Conservative: object,
+   variant and first-class-module types are excluded. *)
+let rec is_qeval_ground_ty env ty =
+  match get_desc ty with
+  | Tconstr (p, tl, _) ->
+    Env.path_is_toplevel_in_quotations env p
+    && List.for_all (is_qeval_ground_ty env) tl
+  | Tarrow (_, t1, t2, _) ->
+    is_qeval_ground_ty env t1 && is_qeval_ground_ty env t2
+  | Ttuple tl | Tunboxed_tuple tl ->
+    List.for_all (fun (_, t) -> is_qeval_ground_ty env t) tl
+  | Tbox t -> is_qeval_ground_ty env t
+  | Tpoly (t, []) -> is_qeval_ground_ty env t
+  | Tvar _ | Tunivar _ | Tobject _ | Tfield _ | Tnil | Tvariant _ | Tpoly _
+  | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tlink _ | Tsubst _
+  | Tof_kind _ | Trepr _ ->
+    false
+
+(* Stage-lifting of a ground type (see [is_qeval_ground_ty]): a structural
+   copy.  Since the type is built entirely from toplevel type constructors,
+   arrows and tuples, the copy is valid at any quotation stage.  (Sharing
+   the original nodes instead would build stage-incoherent types on which
+   the expand/reduce machinery does not terminate.) *)
+let rec lift_qeval_ground_ty ty =
+  let lift_labelled (l, t) = l, lift_qeval_ground_ty t in
+  let desc =
+    match get_desc ty with
+    | Tconstr (p, tl, _) ->
+      Tconstr (p, List.map lift_qeval_ground_ty tl, ref Mnil)
+    | Tarrow (a, t1, t2, c) ->
+      Tarrow (a, lift_qeval_ground_ty t1, lift_qeval_ground_ty t2, c)
+    | Ttuple tl -> Ttuple (List.map lift_labelled tl)
+    | Tunboxed_tuple tl -> Tunboxed_tuple (List.map lift_labelled tl)
+    | Tbox t -> Tbox (lift_qeval_ground_ty t)
+    | Tpoly (t, []) -> Tpoly (lift_qeval_ground_ty t, [])
+    | Tvar _ | Tunivar _ | Tobject _ | Tfield _ | Tnil | Tvariant _ | Tpoly _
+    | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tlink _ | Tsubst _
+    | Tof_kind _ | Trepr _ ->
+      (* Excluded by [is_qeval_ground_ty]. *)
+      assert false
+  in
+  newty2 ~level:(get_level ty) desc
+
 let is_aliasable p decl =
   not (non_aliasable p decl) && not (is_datatype decl)
 
@@ -5045,6 +5095,35 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
+  | (Tquote_eval s1, _)
+    when is_flexible_ty s1 && is_qeval_ground_ty (get_env uenv) t2' ->
+      (* [<[s1]> eval = t2'] with [s1] flexible and [t2'] ground is solved
+         by [s1 = t2'] lifted to the next stage (ground types are preserved
+         by [eval]); see [is_qeval_ground_ty].  (For rigid [s1] we fall
+         through to the ordinary error paths.) *)
+      unify_with_incr_stage uenv
+        (fun uenv -> unify uenv s1 (lift_qeval_ground_ty t2'))
+  | (_, Tquote_eval s2)
+    when is_flexible_ty s2 && is_qeval_ground_ty (get_env uenv) t1' ->
+      unify_with_incr_stage uenv
+        (fun uenv -> unify uenv (lift_qeval_ground_ty t1') s2)
+  | (Tconstr (p, [s1], _), _)
+    when Path.same p Predef.path_eval
+         && is_flexible_ty s1
+         && is_qeval_ground_ty (get_env uenv) t2' ->
+      (* The [eval] abbreviation does not expand when its argument is a
+         variable (see [expand_reducible_abbrevs]).  An equation
+         [s1 eval = t2'] with [t2'] ground is solved by [s1 = <[t2']>]
+         (with [t2'] lifted to the next stage inside the quote).  This
+         permits e.g. unifying ['a eval] with [int ref], giving
+         ['a = <[int ref]>], as arises when type-checking applications of
+         [Eval.inject]. *)
+      unify uenv s1 (new_quote_ty (lift_qeval_ground_ty t2'))
+  | (_, Tconstr (p, [s2], _))
+    when Path.same p Predef.path_eval
+         && is_flexible_ty s2
+         && is_qeval_ground_ty (get_env uenv) t1' ->
+      unify uenv (new_quote_ty (lift_qeval_ground_ty t1')) s2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->

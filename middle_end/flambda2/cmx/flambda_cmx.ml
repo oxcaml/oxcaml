@@ -107,7 +107,8 @@ let create_loader ~get_module_info =
 
 let get_imported_code loader () = loader.imported_code
 
-let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
+let compute_reachable_names_and_code ~module_symbol ~extra_root_names
+    ~free_names_of_name code =
   let rec fixpoint names_to_add names_already_added =
     if Name_occurrences.is_empty names_to_add
     then names_already_added
@@ -176,14 +177,23 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
       fixpoint from_names_and_code_ids names_already_added
   in
   let init_names =
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal
+    (* [extra_root_names] are additional roots, e.g. the free names of the
+       approximations reified by [%reify_approx]: the code they reference must
+       be exported so that it is available wherever the marshalled
+       approximations are demarshalled (see [Eval]). *)
+    Name_occurrences.union
+      (Name_occurrences.singleton_symbol module_symbol Name_mode.normal)
+      (Name_occurrences.with_only_names_and_code_ids_promoting_newer_version_of
+         extra_root_names)
   in
   fixpoint init_names Name_occurrences.empty
 
-let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
+let prepare_cmx ~module_symbol ~extra_root_names create_typing_env
+    ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
+    ~sections all_code =
   let reachable_names =
-    compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
+    compute_reachable_names_and_code ~module_symbol ~extra_root_names
+      ~free_names_of_name all_code
   in
   let all_code =
     (* CR mshinwell: do we need to remove unused function slot bindings from the
@@ -226,8 +236,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
-    ~exported_offsets ~sections all_code =
+let prepare_cmx_file_contents ~machine_width ~final_typing_env ~module_symbol
+    ~extra_root_names ~extra_approxs ~used_value_slots ~exported_offsets
+    ~sections all_code =
   match final_typing_env with
   | None ->
     Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
@@ -238,16 +249,42 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in
     let create_typing_env reachable_names =
-      TE.Serializable.create typing_env ~reachable_names
+      let serializable = TE.Serializable.create typing_env ~reachable_names in
+      (* [extra_approxs] provides equations for symbols that have no definition
+         in the typing env, e.g. the manufactured lookup symbols under which the
+         approximations of reified dynamic closures are registered (see
+         [Simplify_unary_primitive.simplify_reify_approx]). They are consulted
+         by [load_symbol_approx] at demarshalling time. *)
+      let extra_approxs =
+        Symbol.Map.filter
+          (fun sym _ -> Name_occurrences.mem_symbol reachable_names sym)
+          extra_approxs
+      in
+      if Symbol.Map.is_empty extra_approxs
+      then serializable
+      else
+        TE.Serializable.merge serializable
+          (TE.Serializable.create_from_closure_conversion_approx ~machine_width
+             extra_approxs)
     in
     let free_names_of_name name =
-      Some (T.free_names (TE.Pre_serializable.find typing_env name))
+      match
+        Name.pattern_match name
+          ~symbol:(fun symbol -> Symbol.Map.find_opt symbol extra_approxs)
+          ~var:(fun _ -> None)
+      with
+      | Some approx ->
+        Some
+          (Value_approximation.free_names
+             ~code_free_names:Code_or_metadata.free_names approx)
+      | None -> Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
+    prepare_cmx ~module_symbol ~extra_root_names create_typing_env
+      ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
+      ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
-    ~exported_offsets ~used_value_slots ~sections all_code =
+    ~extra_root_names ~exported_offsets ~used_value_slots ~sections all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -269,7 +306,7 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots
+    prepare_cmx ~module_symbol ~extra_root_names create_typing_env
+      ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
       ~exported_offsets ~sections all_code

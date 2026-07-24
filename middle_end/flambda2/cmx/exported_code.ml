@@ -58,6 +58,22 @@ let merge t1 t2 = Code_id.Map.union_total Code_or_metadata.merge t1 t2
 
 let mem code_id t = Code_id.Map.mem code_id t
 
+let find_by_linkage_name t linkage_name =
+  (* Linear scan; used only when demarshalling standalone approximations (which
+     do not preserve code ID stamps) at runtime, e.g. by [Eval]. *)
+  Code_id.Map.fold
+    (fun code_id code_or_metadata found ->
+      match found with
+      | Some _ -> found
+      | None ->
+        if
+          String.equal
+            (Linkage_name.to_string (Code_id.linkage_name code_id))
+            (Linkage_name.to_string linkage_name)
+        then Some (code_id, code_or_metadata)
+        else None)
+    t None
+
 let find_exn t code_id = Code_id.Map.find code_id t
 
 let find t code_id =

@@ -1248,6 +1248,7 @@ type unary_primitive =
   | End_try_region of { ghost : bool }
   | Obj_dup of { alloc_region : Variable.t }
   | Get_header
+  | Reify_approx
   | Peek of Flambda_kind.Standard_int_or_float.t
   | Make_lazy of
       { lazy_tag : Lazy_block_tag.t;
@@ -1287,6 +1288,8 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Project_function_slot _ | Project_value_slot _ -> false
   | Is_boxed_float | Is_flat_float_array -> true
   | End_region _ | End_try_region _ | Obj_dup _ | Peek _ | Make_lazy _ -> false
+  (* Resolved during [Simplify]; CSE would be pointless. *)
+  | Reify_approx -> false
 
 let compare_unary_primitive p1 p2 =
   let unary_primitive_numbering p =
@@ -1322,6 +1325,7 @@ let compare_unary_primitive p1 p2 =
     | Peek _ -> 28
     | Make_lazy _ -> 29
     | Reinterpret_boxed_vector -> 30
+    | Reify_approx -> 31
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1428,7 +1432,7 @@ let compare_unary_primitive p1 p2 =
       | Untag_immediate | Tag_immediate | Project_function_slot _
       | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
       | End_region _ | End_try_region _ | Obj_dup _ | Get_header | Peek _
-      | Make_lazy _ ),
+      | Make_lazy _ | Reify_approx ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -1496,6 +1500,7 @@ let print_unary_primitive ppf p =
   | Obj_dup { alloc_region } ->
     Format.fprintf ppf "(Obj_dup (alloc_region %a))" Variable.print alloc_region
   | Get_header -> Format.pp_print_string ppf "Get_header"
+  | Reify_approx -> Format.pp_print_string ppf "Reify_approx"
   | Peek kind ->
     fprintf ppf "@[(Peek@ %a)@]"
       Flambda_kind.Standard_int_or_float.print_lowercase kind
@@ -1536,6 +1541,7 @@ let arg_kind_of_unary_primitive p =
   | End_try_region _ -> K.region
   | Obj_dup _ -> K.value
   | Get_header -> K.value
+  | Reify_approx -> K.value
   | Peek _ -> K.naked_nativeint
   | Make_lazy _ -> K.value
 
@@ -1575,6 +1581,7 @@ let result_kind_of_unary_primitive p : result_kind =
   | End_try_region _ -> Singleton K.value
   | Obj_dup _ -> Singleton K.value
   | Get_header -> Singleton K.naked_nativeint
+  | Reify_approx -> Singleton K.value
   | Peek kind -> Singleton (K.Standard_int_or_float.to_kind kind)
   | Make_lazy _ -> Singleton K.value
 
@@ -1693,6 +1700,8 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
       Strict,
       Can't_move_before_any_branch )
   | Get_header -> No_effects, No_coeffects, Strict, Can't_move_before_any_branch
+  | Reify_approx ->
+    No_effects, No_coeffects, Strict, Can't_move_before_any_branch
   | Peek _ ->
     (* For the moment, prevent [Peek] from being moved. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
@@ -1717,6 +1726,7 @@ let unary_classify_for_printing p =
   | Is_boxed_float | Is_flat_float_array -> Neither
   | End_region _ | End_try_region _ -> Neither
   | Get_header -> Neither
+  | Reify_approx -> Neither
   | Peek _ -> Neither
   | Make_lazy _ -> Constructive
 
@@ -1744,7 +1754,7 @@ let free_names_unary_primitive p =
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
-  | End_try_region _ | Get_header
+  | End_try_region _ | Get_header | Reify_approx
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     Name_occurrences.empty
 
@@ -1793,7 +1803,7 @@ let apply_renaming_unary_primitive p renaming =
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
-  | Get_header
+  | Get_header | Reify_approx
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     p
 
@@ -1812,7 +1822,7 @@ let ids_for_export_unary_primitive p =
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
-  | Get_header
+  | Get_header | Reify_approx
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     Ids_for_export.empty
 

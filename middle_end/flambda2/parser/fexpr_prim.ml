@@ -1346,6 +1346,8 @@ module OfFlambda = struct
     | Tag_immediate -> tag_immediate env ()
     | Obj_dup { alloc_region } -> obj_dup env alloc_region
     | Get_header -> get_header env ()
+    | Reify_approx ->
+      Misc.fatal_error "[Reify_approx] not supported in Flambda expressions"
     | Reinterpret_boxed_vector -> reinterpret_boxed_vector env ()
     | Peek standard_int_or_float -> peek env standard_int_or_float
     | Duplicate_block { kind; alloc_region } ->
