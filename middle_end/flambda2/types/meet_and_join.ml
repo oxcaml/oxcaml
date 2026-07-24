@@ -1394,8 +1394,8 @@ and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     TG.head_of_kind_naked_immediate meet_result =
   let module I = Target_ocaml_int in
   match
-    ( reduce_head_of_kind_naked_immediate (ME.typing_env env) t1,
-      reduce_head_of_kind_naked_immediate (ME.typing_env env) t2 )
+    ( reduce_head_of_kind_naked_immediate (ME.current_typing_env env) t1,
+      reduce_head_of_kind_naked_immediate (ME.current_typing_env env) t2 )
   with
   | Bottom, Bottom -> Bottom Both_inputs
   | Bottom, Ok _ -> Bottom Left_input

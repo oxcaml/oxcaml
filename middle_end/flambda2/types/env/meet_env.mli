@@ -113,6 +113,13 @@ val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
 
 val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
 
+(** Return the current typing env at this stage of the meet, while there may
+    still be pending equations.
+
+    This should only be used during the meet when accessor functions on the
+    typing env (e.g. to get canonical simples) are required. *)
+val current_typing_env : t -> Typing_env.t
+
 (** Complete the meet and return the resulting typing env.
 
     The meet environment is allowed to delay the processing of some equations
