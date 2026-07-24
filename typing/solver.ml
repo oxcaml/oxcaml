@@ -440,6 +440,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** Levels *)
   let generic_level = Ident.highest_scope
 
+  let rigid_level = generic_level - 1
+
+  let fatal_if_rigid mutation v =
+    if v.level = rigid_level
+    then
+      Misc.fatal_errorf "Solver: attempted to %s rigid mode variable %x"
+        mutation v.id
+
   (** Prints a mode variable, including the set of variables related to it
       (recursively). To handle cycles, [traversed] is the set of variables that
       we have already printed and will be skipped. An example of cycle:
@@ -818,7 +826,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** Calling [update_lower ~log obj v a a_hint] assumes that
       [not (a <= v.lower)]. Arguments are not checked and used directly. They
       must satisfy the INVARIANT listed above. *)
-  let update_lower (type a) ~log (obj : a C.obj) v a a_hint =
+  let update_lower (type a) ~allow_rigid ~log (obj : a C.obj) v a a_hint =
+    if not allow_rigid then fatal_if_rigid "update the lower bound of" v;
     (match log with
     | None -> ()
     | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
@@ -828,7 +837,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** Calling [update_upper ~log obj v a a_hint] assumes that
       [not (v.upper <= a)]. Arguments are not checked and used directly. They
       must satisfy the INVARIANT listed above. *)
-  let update_upper (type a) ~log (obj : a C.obj) v a a_hint =
+  let update_upper (type a) ~allow_rigid ~log (obj : a C.obj) v a a_hint =
+    if not allow_rigid then fatal_if_rigid "update the upper bound of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
@@ -837,7 +847,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
-  let set_vlower ~log v vlower =
+  let set_vlower ~allow_rigid ~log v vlower =
+    if not allow_rigid
+    then fatal_if_rigid "update lower variable constraints of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cvlower (v, v.vlower) :: !log);
@@ -845,7 +857,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
-  let set_vupper ~log v vupper =
+  let set_vupper ~allow_rigid ~log v vupper =
+    if not allow_rigid
+    then fatal_if_rigid "update upper variable constraints of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
@@ -862,22 +876,106 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** Function used internally by generalize_structure to cache newly created
       copies *)
   let set_gencopy ~log v copy =
+    fatal_if_rigid "update generic copy cache of" v;
     (match log with
     | None -> ()
     | Some log -> log := Cgencopy (v, v.gencopy) :: !log);
     v.gencopy <- copy
 
   (** When called, graph must be fixed so maintain INVARIANT *)
-  let set_level ~log v level =
+  let set_level ~allow_rigid ~log v level =
+    if not allow_rigid then fatal_if_rigid "update the level of" v;
     (match log with
     | None -> ()
     | Some log -> log := Clevel (v, v.level) :: !log);
     v.level <- level
 
+  (** Returns the lower bound of [v] implied by the constraint graph: the join
+      of [v.lower] and the lower bounds of all variables reachable through
+      [vlower] edges. The traversal stops as soon as the accumulated bound is
+      above [stop]. *)
+  let floor_reachable_var : type a. a C.obj -> stop:a -> a var -> a =
+   fun obj ~stop v ->
+    let rec search :
+        (a, left_only) morphvar ->
+        a * a lmorphvar VarMap.t ->
+        a * a lmorphvar VarMap.t =
+     fun (Amorphvar (u, f, f_hint) as mv) ((lower, mvs) as acc) ->
+      if C.le obj stop lower
+      then acc
+      else
+        let key = get_key obj mv in
+        if VarMap.mem key mvs
+        then acc
+        else
+          let lower = C.join obj lower (mlower obj mv) in
+          let mvs = VarMap.add key mv mvs in
+          VarMap.fold
+            (fun _ (Amorphvar (w, g, g_hint)) acc ->
+              let fg = C.compose obj f g in
+              let fg_hint = Comp_hint.Morph_hint.Compose (f_hint, g_hint) in
+              search (Amorphvar (w, fg, fg_hint)) acc)
+            u.vlower (lower, mvs)
+    in
+    let lower, _ =
+      VarMap.fold
+        (fun _ mv acc -> search mv acc)
+        v.vlower (v.lower, VarMap.empty)
+    in
+    lower
+
+  let rigid_submode_cv : type a.
+      a C.obj -> a -> a var -> (unit, a * (a, right_only) Comp_hint.t) Result.t
+      =
+   fun obj a v ->
+    let lower = floor_reachable_var obj ~stop:a v in
+    if C.le obj a lower then Ok () else Error (lower, Comp_hint.Unknown lower)
+
+  (** Returns the upper bound of [v] implied by the constraint graph: the meet
+      of [v.upper] and the upper bounds of all variables reachable through
+      [vupper] edges. The traversal stops as soon as the accumulated bound is
+      below [stop]. *)
+  let ceil_reachable_var : type a. a C.obj -> stop:a -> a var -> a =
+   fun obj ~stop v ->
+    let rec search :
+        (a, right_only) morphvar ->
+        a * a rmorphvar VarMap.t ->
+        a * a rmorphvar VarMap.t =
+     fun (Amorphvar (u, f, f_hint) as mv) ((upper, mvs) as acc) ->
+      if C.le obj upper stop
+      then acc
+      else
+        let key = get_key obj mv in
+        if VarMap.mem key mvs
+        then acc
+        else
+          let upper = C.meet obj upper (mupper obj mv) in
+          let mvs = VarMap.add key mv mvs in
+          VarMap.fold
+            (fun _ (Amorphvar (w, g, g_hint)) acc ->
+              let fg = C.compose obj f g in
+              let fg_hint = Comp_hint.Morph_hint.Compose (f_hint, g_hint) in
+              search (Amorphvar (w, fg, fg_hint)) acc)
+            u.vupper (upper, mvs)
+    in
+    let upper, _ =
+      VarMap.fold
+        (fun _ mv acc -> search mv acc)
+        v.vupper (v.upper, VarMap.empty)
+    in
+    upper
+
+  let rigid_submode_vc : type a.
+      a C.obj -> a var -> a -> (unit, a * (a, left_only) Comp_hint.t) Result.t =
+   fun obj v a ->
+    let upper = ceil_reachable_var obj ~stop:a v in
+    if C.le obj upper a then Ok () else Error (upper, Comp_hint.Unknown upper)
+
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
       (read: strictly lower) guess to replace the constant argument that MIGHT
       succeed. *)
   let rec submode_cv : type a.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       a C.obj ->
@@ -885,28 +983,32 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, left_only) Comp_hint.t ->
       a var ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
-   fun (type a) ~log pp (obj : a C.obj) a' a'_hint v ->
+   fun (type a) ~allow_rigid ~log pp (obj : a C.obj) a' a'_hint v ->
     if C.le obj a' v.lower
     then Ok ()
     else if not (C.le obj a' v.upper)
     then Error (v.upper, v.upper_hint)
+    else if (not allow_rigid) && v.level = rigid_level
+    then rigid_submode_cv obj a' v
     else (
-      update_lower ~log obj v a' a'_hint;
+      update_lower ~allow_rigid ~log obj v a' a'_hint;
       let r =
         v.vupper
         |> find_error (fun mu ->
-            let r = submode_cmv ~log pp obj a' a'_hint mu in
+            let r = submode_cmv ~allow_rigid ~log pp obj a' a'_hint mu in
             (if Result.is_ok r
              then
                (* Optimization: update [v.upper] based on [mupper u].*)
                let mu_upper = mupper obj mu in
                if not (C.le obj v.upper mu_upper)
-               then update_upper ~log obj v mu_upper (mupper_hint mu));
+               then
+                 update_upper ~allow_rigid ~log obj v mu_upper (mupper_hint mu));
             r)
       in
       r)
 
   and submode_cmv : type a l.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       a C.obj ->
@@ -914,7 +1016,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, left_only) Comp_hint.t ->
       (a, l * allowed) morphvar ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
-   fun ~log pp obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
+   fun ~allow_rigid ~log pp obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
     let mlower = mlower obj mv in
     let mupper = mupper obj mv in
     let mupper_hint = mupper_hint mv in
@@ -932,7 +1034,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in
       let a' = C.apply src f' a in
       let a'_hint = Comp_hint.Apply (f'_hint, a_hint) in
-      match submode_cv ~log src_pp src a' a'_hint v with
+      match submode_cv ~allow_rigid ~log src_pp src a' a'_hint v with
       | Ok () -> Ok ()
       | Error (e, e_hint) ->
         Error
@@ -944,6 +1046,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (read: strictly higher) guess to replace the constant argument that MIGHT
       succeed. *)
   let rec submode_vc : type a.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       a C.obj ->
@@ -951,30 +1054,33 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       a ->
       (a, right_only) Comp_hint.t ->
       (unit, a * (a, left_only) Comp_hint.t) Result.t =
-   fun (type a) ~log pp (obj : a C.obj) v a' a'_hint ->
+   fun (type a) ~allow_rigid ~log pp (obj : a C.obj) v a' a'_hint ->
     if C.le obj v.upper a'
     then Ok ()
     else if not (C.le obj v.lower a')
     then Error (v.lower, v.lower_hint)
+    else if (not allow_rigid) && v.level = rigid_level
+    then rigid_submode_vc obj v a'
     else (
-      update_upper ~log obj v a' a'_hint;
+      update_upper ~allow_rigid ~log obj v a' a'_hint;
       let r =
         v.vlower
         |> find_error (fun mu ->
-            let r = submode_mvc ~log pp obj mu a' a'_hint in
+            let r = submode_mvc ~allow_rigid ~log pp obj mu a' a'_hint in
             (if Result.is_ok r
              then
                (* Optimization: update [v.lower] based on [mlower u].*)
                let mu_lower = mlower obj mu in
                let mu_lower_hint = mlower_hint mu in
                if not (C.le obj mu_lower v.lower)
-               then update_lower ~log obj v mu_lower mu_lower_hint);
+               then update_lower ~allow_rigid ~log obj v mu_lower mu_lower_hint);
             r)
       in
       r)
 
   and submode_mvc :
       'a 'r.
+      allow_rigid:bool ->
       log:change list ref option ->
       H.Pinpoint.t ->
       'a C.obj ->
@@ -982,7 +1088,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       'a ->
       ('a, right_only) Comp_hint.t ->
       (unit, 'a * ('a, left_only) Comp_hint.t) Result.t =
-   fun ~log pp obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
+   fun ~allow_rigid ~log pp obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
     (* See [submode_cmv] for why we need the following seemingly redundant
        lines. *)
     let mupper = mupper obj mv in
@@ -1003,12 +1109,71 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          [not (C.le obj (mlower obj mv) a)] should guarantee the following call
          to return [Ok ()]. However, [mlower] is not precise *)
       (* not using [Result.map_error] to avoid allocating closure *)
-      match submode_vc ~log src_pp src v a' a'_hint with
+      match submode_vc ~allow_rigid ~log src_pp src v a' a'_hint with
       | Ok () -> Ok ()
       | Error (e, e_hint) ->
         Error
           ( C.apply obj f e,
             Apply (Comp_hint.Morph_hint.disallow_right f_hint, e_hint) )
+
+  (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in case the
+      caller are only interested in the lower bound and wants to reverse the
+      zapping.
+
+      As mentioned in [var], [mlower mv] is not precise; to get the precise
+      lower bound of [mv], we call [submode mv (mlower mv)]. This will propagate
+      to all its children, which might fail because some children's lower bound
+      [a] is more up-to-date than [mv]. In that case, we call [submode mv a]. We
+      repeat this process until no failure, and we will get the precise lower
+      bound.
+
+      The loop is guaranteed to terminate, because for each iteration our
+      guessed lower bound is strictly higher; and all lattices are finite. *)
+  let zap_to_floor_morphvar_aux (type a r) (obj : a C.obj)
+      (mv : (a, allowed * r) morphvar) =
+    let rec loop lower =
+      let log = ref empty_changes in
+      (* We want a hint for why [lower] is low, but we only have hint for why [lower] is
+         high. There is no good hint to use. *)
+      let r =
+        submode_mvc ~allow_rigid:true ~log:(Some log) H.Pinpoint.unknown obj mv
+          lower (Unknown lower)
+      in
+      match r with
+      | Ok () -> !log, lower
+      | Error (a, _) ->
+        undo_changes !log;
+        loop (C.join obj a lower)
+    in
+    loop (mlower obj mv)
+
+  (** Zap [mv] to its upper bound. Returns the [log] of the zapping, in case the
+      caller are only interested in the lower bound and wants to reverse the
+      zapping.
+
+      [mupper mv] is not precise; to get the precise upper bound of [mv], we
+      call [submode (mupper mv) mv ]. This will propagate to all its children,
+      which might fail because some children's upper bound [a] is more
+      up-to-date than [mv]. In that case, we call [submode a mv]. We repeat this
+      process until no failure, and we will get the precise lower bound.
+
+      The loop is guaranteed to terminate, because for each iteration our
+      guessed lower bound is strictly higher; and all lattices are finite. *)
+  let zap_to_ceil_morphvar_aux (type a l) (obj : a C.obj)
+      (mv : (a, l * allowed) morphvar) =
+    let rec loop upper =
+      let log = ref empty_changes in
+      let r =
+        submode_cmv ~allow_rigid:true ~log:(Some log) H.Pinpoint.unknown obj
+          upper (Unknown upper) mv
+      in
+      match r with
+      | Ok () -> !log, upper
+      | Error (a, _) ->
+        undo_changes !log;
+        loop (C.meet obj a upper)
+    in
+    loop (mupper obj mv)
 
   let eq_morphvar : type a l0 r0 l1 r1.
       a C.obj -> (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool =
@@ -1027,14 +1192,153 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       | Misc.Is_not_eq -> false
       | Misc.Is_eq -> true
 
+  (** Handles [f v <= g u] where both [v] and [u] are rigid. Neither variable
+      can be mutated, so the constraint must already hold for all valuations of
+      [v] and [u] within their bounds; we check that the optimal ceiling of
+      [f v] is below the floor of [g u]. [v] is temporarily zapped to its
+      ceiling to make its bounds precise; the zapping is reverted before
+      returning. *)
+  let submode_mvmv_rigid : type a b c l r.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
+   fun ~log:_ _pp dst v f _f_hint u g _g_hint ->
+    let src_f = C.src dst f in
+    let src_g = C.src dst g in
+    let zap_log, _ =
+      zap_to_ceil_morphvar_aux src_f
+        (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id))
+    in
+    let ceil = C.apply dst f (ceil_reachable_var src_f ~stop:(C.min src_f) v) in
+    let floor =
+      C.apply dst g (floor_reachable_var src_g ~stop:(C.max src_g) u)
+    in
+    undo_changes zap_log;
+    if C.le dst ceil floor
+    then Ok ()
+    else Error (ceil, Comp_hint.Unknown ceil, floor, Comp_hint.Unknown floor)
+
+  (** Handles [f v <= g u] where [u] is rigid but [v] is not. We cannot add the
+      arrow [g' (f v)] to [u.vlower]; instead we enforce the bound requirement
+      the arrow would impose, namely that [v]'s upper bound stays below [u]'s
+      upper bound: we push [g (ceil u)] onto [v] as an upper bound. *)
+  let push_upper_bound_rigid : type a b c l r.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
+   fun ~log pp dst v f f_hint u g _g_hint ->
+    let src_g = C.src dst g in
+    let ceil = C.apply dst g (ceil_reachable_var src_g ~stop:(C.min src_g) u) in
+    match
+      submode_mvc ~allow_rigid:false ~log pp dst
+        (Amorphvar (v, f, f_hint))
+        ceil (Comp_hint.Unknown ceil)
+    with
+    | Ok () -> Ok ()
+    | Error (a, a_hint) -> Error (a, a_hint, ceil, Comp_hint.Unknown ceil)
+
+  (** Handles [f v <= g u] where [v] is rigid but [u] is not. We cannot add the
+      arrow [f' (g u)] to [v.vupper]; instead we enforce the bound requirement
+      the arrow would impose, namely that [u]'s lower bound stays above [v]'s
+      lower bound: we push [f (floor v)] onto [u] as a lower bound. *)
+  let push_lower_bound_rigid : type a b c l r.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
+   fun ~log pp dst v f _f_hint u g g_hint ->
+    let src_f = C.src dst f in
+    let floor =
+      C.apply dst f (floor_reachable_var src_f ~stop:(C.max src_f) v)
+    in
+    match
+      submode_cmv ~allow_rigid:false ~log pp dst floor (Comp_hint.Unknown floor)
+        (Amorphvar (u, g, g_hint))
+    with
+    | Ok () -> Ok ()
+    | Error (a, a_hint) -> Error (floor, Comp_hint.Unknown floor, a, a_hint)
+
+  (** Computes the morphism [g'f] whose arrow [g'f v] [add_vlower] would record
+      in [u.vlower] for the relationship [f v <= g u], along with its hint and
+      whether the arrow is already recorded. *)
+  let vlower_recorded : type a b c l r.
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      bool
+      * (a, c, left_only) C.morph
+      * (a, c, left_only) Comp_hint.Morph_hint.t =
+   fun pp dst v f f_hint u g g_hint ->
+    let g' = C.left_adjoint dst g in
+    let _, src, g'_hint = Comp_hint.Morph_hint.left_adjoint pp dst g_hint in
+    let g'f = C.compose src g' (C.disallow_right f) in
+    let g'f_hint =
+      Comp_hint.Morph_hint.compose g'_hint
+        (Comp_hint.Morph_hint.disallow_right f_hint)
+    in
+    let key = get_key src (Amorphvar (v, g'f, g'f_hint)) in
+    VarMap.mem key u.vlower, g'f, g'f_hint
+
+  (** Computes the morphism [f'g] whose arrow [f'g u] [add_vupper] would record
+      in [v.vupper] for the relationship [f v <= g u], along with its hint and
+      whether the arrow is already recorded. *)
+  let vupper_recorded : type a b c l r.
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      bool
+      * (c, a, right_only) C.morph
+      * (c, a, right_only) Comp_hint.Morph_hint.t =
+   fun pp dst v f f_hint u g g_hint ->
+    let f' = C.right_adjoint dst f in
+    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let f'g = C.compose src f' (C.disallow_left g) in
+    let f'g_hint =
+      Comp_hint.Morph_hint.compose f'_hint
+        (Comp_hint.Morph_hint.disallow_left g_hint)
+    in
+    let key = get_key src (Amorphvar (u, f'g, f'g_hint)) in
+    VarMap.mem key v.vupper, f'g, f'g_hint
+
   let rec submode_mvmv : type a l r.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       a C.obj ->
       (a, allowed * r) morphvar ->
       (a, l * allowed) morphvar ->
       (_, a * (a, _) Comp_hint.t * a * (a, _) Comp_hint.t) result =
-   fun ~log pp dst (Amorphvar (v, f, f_hint) as mv)
+   fun ~allow_rigid ~log pp dst (Amorphvar (v, f, f_hint) as mv)
        (Amorphvar (u, g, g_hint) as mu) ->
     if C.le dst (mupper dst mv) (mlower dst mu)
     then Ok ()
@@ -1052,60 +1356,80 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          6. If v.level > u.level adding f' (g u) to v.vupper, where f' is the right adjoint of f
          Steps 3 and 4 are implemented by [add_vlower], steps 5 and 6 by [add_vupper].
       *)
-      match submode_mvc ~log pp dst mv muupper muupper_hint with
+      match submode_mvc ~allow_rigid ~log pp dst mv muupper muupper_hint with
       | Error (a, a_hint) -> Error (a, a_hint, muupper, muupper_hint)
       | Ok () -> (
         let mvlower = mlower dst mv in
         let mvlower_hint = mlower_hint mv in
-        match submode_cmv ~log pp dst mvlower mvlower_hint mu with
+        match submode_cmv ~allow_rigid ~log pp dst mvlower mvlower_hint mu with
         | Error (a, a_hint) -> Error (mvlower, mvlower_hint, a, a_hint)
         | Ok () ->
           if v.level <= u.level
-          then add_vlower ~log pp dst v f f_hint mv u g g_hint
-          else add_vupper ~log pp dst v f f_hint u g g_hint mu)
+          then begin
+            let recorded, g'f, g'f_hint =
+              vlower_recorded pp dst v f f_hint u g g_hint
+            in
+            if recorded
+            then Ok ()
+            else if (not allow_rigid) && u.level = rigid_level
+            then
+              begin if v.level = rigid_level
+              then submode_mvmv_rigid ~log pp dst v f f_hint u g g_hint
+              else push_upper_bound_rigid ~log pp dst v f f_hint u g g_hint
+              end
+            else
+              add_vlower ~allow_rigid ~log pp dst v g'f g'f_hint mv u g g_hint
+          end
+          else begin
+            let recorded, f'g, f'g_hint =
+              vupper_recorded pp dst v f f_hint u g g_hint
+            in
+            if recorded
+            then Ok ()
+            else if v.level = rigid_level
+            then push_lower_bound_rigid ~log pp dst v f f_hint u g g_hint
+            else
+              add_vupper ~allow_rigid ~log pp dst v f f_hint u f'g f'g_hint mu
+          end)
 
-  (* Add a vlower entry for the relationship [f v <= g u] if necessary. *)
+  (* Record the arrow [g'f v] (i.e. [g' (f v)]) in [u.vlower] for the
+     relationship [f v <= g u]. The caller is responsible for checking that
+     the arrow is not already recorded. *)
   and add_vlower : type a b c l r.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
       a var ->
-      (a, b, allowed * r) C.morph ->
-      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      (a, c, left_only) C.morph ->
+      (a, c, left_only) Comp_hint.Morph_hint.t ->
       (b, allowed * r) morphvar ->
       c var ->
       (c, b, l * allowed) C.morph ->
       (c, b, l * allowed) Comp_hint.Morph_hint.t ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log pp dst v f f_hint mv u g g_hint ->
-    let g' = C.left_adjoint dst g in
-    let _, src, g'_hint = Comp_hint.Morph_hint.left_adjoint pp dst g_hint in
-    let g'f = C.compose src g' (C.disallow_right f) in
-    let g'f_hint =
-      Comp_hint.Morph_hint.compose g'_hint
-        (Comp_hint.Morph_hint.disallow_right f_hint)
-    in
+   fun ~allow_rigid ~log pp dst v g'f g'f_hint mv u g g_hint ->
+    let src = C.src dst g in
     let x = Amorphvar (v, g'f, g'f_hint) in
     let key = get_key src x in
-    if VarMap.mem key u.vlower
-    then Ok ()
-    else begin
-      set_vlower ~log u (VarMap.add key x u.vlower);
-      find_error
-        (fun (Amorphvar (w, h, h_hint)) ->
-          let gh = C.compose dst (C.disallow_left g) h in
-          let gh_hint =
-            Comp_hint.Morph_hint.compose
-              (Comp_hint.Morph_hint.disallow_left g_hint)
-              h_hint
-          in
-          let y = Amorphvar (w, gh, gh_hint) in
-          submode_mvmv ~log pp dst mv y)
-        u.vupper
-    end
+    set_vlower ~allow_rigid ~log u (VarMap.add key x u.vlower);
+    find_error
+      (fun (Amorphvar (w, h, h_hint)) ->
+        let gh = C.compose dst (C.disallow_left g) h in
+        let gh_hint =
+          Comp_hint.Morph_hint.compose
+            (Comp_hint.Morph_hint.disallow_left g_hint)
+            h_hint
+        in
+        let y = Amorphvar (w, gh, gh_hint) in
+        submode_mvmv ~allow_rigid ~log pp dst mv y)
+      u.vupper
 
-  (* Add a vupper entry for the relationship [f v <= g u] if necessary. *)
+  (* Record the arrow [f'g u] (i.e. [f' (g u)]) in [v.vupper] for the
+     relationship [f v <= g u]. The caller is responsible for checking that
+     the arrow is not already recorded. *)
   and add_vupper : type a b c l r.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
@@ -1113,40 +1437,31 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, allowed * r) C.morph ->
       (a, b, allowed * r) Comp_hint.Morph_hint.t ->
       c var ->
-      (c, b, l * allowed) C.morph ->
-      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      (c, a, right_only) C.morph ->
+      (c, a, right_only) Comp_hint.Morph_hint.t ->
       (b, l * allowed) morphvar ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log pp dst v f f_hint u g g_hint mu ->
-    let f' = C.right_adjoint dst f in
-    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
-    let f'g = C.compose src f' (C.disallow_left g) in
-    let f'g_hint =
-      Comp_hint.Morph_hint.compose f'_hint
-        (Comp_hint.Morph_hint.disallow_left g_hint)
-    in
+   fun ~allow_rigid ~log pp dst v f f_hint u f'g f'g_hint mu ->
+    let src = C.src dst f in
     let x = Amorphvar (u, f'g, f'g_hint) in
     let key = get_key src x in
-    if VarMap.mem key v.vupper
-    then Ok ()
-    else begin
-      set_vupper ~log v (VarMap.add key x v.vupper);
-      find_error
-        (fun (Amorphvar (w, h, h_hint)) ->
-          let fh = C.compose dst (C.disallow_right f) h in
-          let fh_hint =
-            Comp_hint.Morph_hint.compose
-              (Comp_hint.Morph_hint.disallow_right f_hint)
-              h_hint
-          in
-          let y = Amorphvar (w, fh, fh_hint) in
-          submode_mvmv ~log pp dst y mu)
-        v.vlower
-    end
+    set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper);
+    find_error
+      (fun (Amorphvar (w, h, h_hint)) ->
+        let fh = C.compose dst (C.disallow_right f) h in
+        let fh_hint =
+          Comp_hint.Morph_hint.compose
+            (Comp_hint.Morph_hint.disallow_right f_hint)
+            h_hint
+        in
+        let y = Amorphvar (w, fh, fh_hint) in
+        submode_mvmv ~allow_rigid ~log pp dst y mu)
+      v.vlower
 
   (* Tighten the lower bound of [u] based on the lower bound of [f' v].
   No recursion into [u.vuppers] *)
   let push_lower_bound : type a b r.
+      allow_rigid:bool ->
       log:_ ->
       b C.obj ->
       a var ->
@@ -1154,16 +1469,17 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, allowed * r) Comp_hint.Morph_hint.t ->
       b var ->
       unit =
-   fun ~log dst v f' f'_hint u ->
+   fun ~allow_rigid ~log dst v f' f'_hint u ->
     let mv = Amorphvar (v, f', f'_hint) in
     let mlower = mlower dst mv in
     let mlower_hint = mlower_hint mv in
     if not (C.le dst mlower u.lower)
-    then update_lower ~log dst u mlower mlower_hint
+    then update_lower ~allow_rigid ~log dst u mlower mlower_hint
 
   (* Tighten the upper bound of [u] based on the upper bound of [f' v].
   No recursion into [u.vlowers] *)
   let push_upper_bound : type a b l.
+      allow_rigid:bool ->
       log:_ ->
       b C.obj ->
       a var ->
@@ -1171,14 +1487,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, l * allowed) Comp_hint.Morph_hint.t ->
       b var ->
       unit =
-   fun ~log dst v f' f'_hint u ->
+   fun ~allow_rigid ~log dst v f' f'_hint u ->
     let mv = Amorphvar (v, f', f'_hint) in
     let mupper = mupper dst mv in
     let mupper_hint = mupper_hint mv in
     if not (C.le dst u.upper mupper)
-    then update_upper ~log dst u mupper mupper_hint
+    then update_upper ~allow_rigid ~log dst u mupper mupper_hint
 
   let add_vlower_nocheck : type a b r.
+      allow_rigid:bool ->
       log:_ ->
       a C.obj ->
       a var ->
@@ -1186,7 +1503,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (b, a, allowed * r) C.morph ->
       (b, a, allowed * r) Comp_hint.Morph_hint.t ->
       unit =
-   fun ~log dst v u f f_hint ->
+   fun ~allow_rigid ~log dst v u f f_hint ->
     let x =
       Amorphvar
         (u, C.disallow_right f, Comp_hint.Morph_hint.disallow_right f_hint)
@@ -1197,9 +1514,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let key = get_key dst x in
       if VarMap.mem key v.vlower
       then ()
-      else set_vlower ~log v (VarMap.add key x v.vlower)
+      else set_vlower ~allow_rigid ~log v (VarMap.add key x v.vlower)
 
   let add_vupper_nocheck : type a b l.
+      allow_rigid:bool ->
       log:_ ->
       a C.obj ->
       a var ->
@@ -1207,7 +1525,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (b, a, l * allowed) C.morph ->
       (b, a, l * allowed) Comp_hint.Morph_hint.t ->
       unit =
-   fun ~log dst v u f f_hint ->
+   fun ~allow_rigid ~log dst v u f f_hint ->
     let x =
       Amorphvar (u, C.disallow_left f, Comp_hint.Morph_hint.disallow_left f_hint)
     in
@@ -1217,13 +1535,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let key = get_key dst x in
       if VarMap.mem key v.vupper
       then ()
-      else set_vupper ~log v (VarMap.add key x v.vupper)
+      else set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper)
 
   (* Add a vlower entry for the relation [f' u <= v], tighten the upper bound of [u],
   and recursively add relations to maintain invariant.
   The lower and upper bounds of [u] and [v] are not checked, upper bound is not pushed
   down [u.vlower] *)
   let rec add_vlower_reversed : type a b l.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
@@ -1232,7 +1551,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, l * allowed) C.morph ->
       (a, b, l * allowed) Comp_hint.Morph_hint.t ->
       unit =
-   fun ~log pp dst v u f f_hint ->
+   fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.left_adjoint dst f in
     let src = C.src dst f in
     let f'_hint = Comp_hint.Morph_hint.Adjoint_l (f_hint, f') in
@@ -1241,8 +1560,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     if VarMap.mem key v.vlower
     then ()
     else begin
-      push_upper_bound ~log dst v f f_hint u;
-      set_vlower ~log v (VarMap.add key x v.vlower);
+      push_upper_bound ~allow_rigid ~log dst v f f_hint u;
+      set_vlower ~allow_rigid ~log v (VarMap.add key x v.vlower);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
           let fh = C.compose dst (C.disallow_left f) h in
@@ -1251,8 +1570,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_left f_hint, h_hint)
           in
           if w.level < u.level
-          then add_vupper_nocheck ~log dst u w fh fh_hint
-          else add_vlower_reversed ~log pp dst w u fh fh_hint)
+          then add_vupper_nocheck ~allow_rigid ~log dst u w fh fh_hint
+          else add_vlower_reversed ~allow_rigid ~log pp dst w u fh fh_hint)
         v.vupper
     end
 
@@ -1261,6 +1580,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     The lower and upper bounds of [u] and [v] are not checked, lower bound is not pushed
     down [u.vupper] *)
   let rec add_vupper_reversed : type a b r.
+      allow_rigid:bool ->
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
@@ -1269,7 +1589,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, b, allowed * r) C.morph ->
       (a, b, allowed * r) Comp_hint.Morph_hint.t ->
       unit =
-   fun ~log pp dst v u f f_hint ->
+   fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.right_adjoint dst f in
     let src = C.src dst f in
     let f'_hint = Comp_hint.Morph_hint.Adjoint_r (f_hint, f') in
@@ -1278,8 +1598,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     if VarMap.mem key v.vupper
     then ()
     else begin
-      push_lower_bound ~log dst v f f_hint u;
-      set_vupper ~log v (VarMap.add key x v.vupper);
+      push_lower_bound ~allow_rigid ~log dst v f f_hint u;
+      set_vupper ~allow_rigid ~log v (VarMap.add key x v.vupper);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
           let fh = C.compose dst (C.disallow_right f) h in
@@ -1288,13 +1608,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_right f_hint, h_hint)
           in
           if u.level < w.level
-          then add_vupper_reversed ~log pp dst w u fh fh_hint
-          else add_vlower_nocheck ~log dst u w fh fh_hint)
+          then add_vupper_reversed ~allow_rigid ~log pp dst w u fh fh_hint
+          else add_vlower_nocheck ~allow_rigid ~log dst u w fh fh_hint)
         v.vlower
     end
 
-  let update_level_finalize : type a. log:_ -> a C.obj -> int -> a var -> unit =
-   fun ~log dst level u ->
+  let update_level_finalize : type a.
+      allow_rigid:bool -> log:_ -> a C.obj -> int -> a var -> unit =
+   fun ~allow_rigid ~log dst level u ->
     let vupper_lt, vupper_ge =
       VarMap.partition (fun _ (Amorphvar (v, _, _)) -> v.level < level) u.vupper
     in
@@ -1303,30 +1624,32 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ (Amorphvar (v, _, _)) -> v.level <= level)
         u.vlower
     in
-    set_vlower ~log u vlower_le;
-    set_vupper ~log u vupper_lt;
+    set_vlower ~allow_rigid ~log u vlower_le;
+    set_vupper ~allow_rigid ~log u vupper_lt;
     VarMap.iter
       (fun _ (Amorphvar (v, f, f_hint)) ->
-        add_vupper_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
+        add_vupper_reversed ~allow_rigid ~log H.Pinpoint.unknown dst v u f
+          f_hint)
       vlower_gt;
     VarMap.iter
       (fun _ (Amorphvar (v, f, f_hint)) ->
-        add_vlower_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
+        add_vlower_reversed ~allow_rigid ~log H.Pinpoint.unknown dst v u f
+          f_hint)
       vupper_ge;
     (* optimization: if lower = upper, we can remove vuppers and vlowers since the
       information is as precise as it can get *)
     if C.le dst u.upper u.lower
     then begin
-      set_vlower ~log u VarMap.empty;
-      set_vupper ~log u VarMap.empty
+      set_vlower ~allow_rigid ~log u VarMap.empty;
+      set_vupper ~allow_rigid ~log u VarMap.empty
     end
 
   let update_level_v : type a. log:_ -> a C.obj -> int -> a var -> unit =
    fun ~log dst level u ->
     if u.level > level
     then begin
-      set_level ~log u level;
-      update_level_finalize ~log dst level u
+      set_level ~allow_rigid:true ~log u level;
+      update_level_finalize ~allow_rigid:true ~log dst level u
     end
 
   let vars = ref []
@@ -1423,7 +1746,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then ()
     else begin
       let new_level = generic_level + (u.level - current_level) in
-      set_level ~log u new_level;
+      set_level ~allow_rigid:true ~log u new_level;
       let do_gen _ (Amorphvar (v, _f, _f_hint)) =
         generalize_topology ~log ~current_level v
       in
@@ -1442,12 +1765,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then begin
       let copy = fresh ~upper:u.upper ~lower:u.lower ~level:current_level dst in
       let ok1 =
-        submode_mvmv ~log H.Pinpoint.unknown dst
+        submode_mvmv ~allow_rigid:true ~log H.Pinpoint.unknown dst
           (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
           (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
       in
       let ok2 =
-        submode_mvmv ~log H.Pinpoint.unknown dst
+        submode_mvmv ~allow_rigid:true ~log H.Pinpoint.unknown dst
           (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
           (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
       in
@@ -1499,8 +1822,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (* we optimize away vlower and vuppers if bounds are tight *)
       if C.le dst u.upper u.lower
       then begin
-        set_vlower ~log u VarMap.empty;
-        set_vupper ~log u VarMap.empty
+        set_vlower ~allow_rigid:true ~log u VarMap.empty;
+        set_vupper ~allow_rigid:true ~log u VarMap.empty
       end;
       generalize_topology ~log ~current_level u;
       update_level_v ~log dst generic_level u;
@@ -1575,7 +1898,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let undo_copy_change = function
     | Coptcopy (dst, update_to_level, v, copy) ->
       Option.iter
-        (fun u -> update_level_finalize ~log:None dst update_to_level u)
+        (fun u ->
+          update_level_finalize ~allow_rigid:true ~log:None dst update_to_level
+            u)
         v.subst;
       v.subst <- copy
 
@@ -1650,7 +1975,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           in
           copy.vupper <- vupper;
           copy.vlower <- vlower;
-          set_level ~log:None copy target_level;
+          set_level ~allow_rigid:true ~log:None copy target_level;
           copy)
       end
 
@@ -1735,18 +2060,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let submode_mvc ~log pp obj v right right_hint =
       Result.map_error
         (fun (left, left_hint) -> { left; left_hint; right; right_hint })
-        (submode_mvc ~log pp obj v right right_hint)
+        (submode_mvc ~allow_rigid:false ~log pp obj v right right_hint)
     in
     let submode_cmv ~log pp obj left left_hint v =
       Result.map_error
         (fun (right, right_hint) -> { left; left_hint; right; right_hint })
-        (submode_cmv ~log pp obj left left_hint v)
+        (submode_cmv ~allow_rigid:false ~log pp obj left left_hint v)
     in
     let submode_mvmv ~log pp obj v u =
       Result.map_error
         (fun (left, left_hint, right, right_hint) ->
           { left; left_hint; right; right_hint })
-        (submode_mvmv ~log pp obj v u)
+        (submode_mvmv ~allow_rigid:false ~log pp obj v u)
     in
     match a, b with
     | ( Amode (left, left_hint_lower, _left_hint_upper),
@@ -1910,65 +2235,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amodemeet (a, _a_hint, mvs) ->
       VarMap.fold (fun _ mv acc -> C.meet obj acc (mlower obj mv)) mvs a
 
-  (** Zap [mv] to its lower bound. Returns the [log] of the zapping, in case the
-      caller are only interested in the lower bound and wants to reverse the
-      zapping.
-
-      As mentioned in [var], [mlower mv] is not precise; to get the precise
-      lower bound of [mv], we call [submode mv (mlower mv)]. This will propagate
-      to all its children, which might fail because some children's lower bound
-      [a] is more up-to-date than [mv]. In that case, we call [submode mv a]. We
-      repeat this process until no failure, and we will get the precise lower
-      bound.
-
-      The loop is guaranteed to terminate, because for each iteration our
-      guessed lower bound is strictly higher; and all lattices are finite. *)
-  let zap_to_floor_morphvar_aux (type a r) (obj : a C.obj)
-      (mv : (a, allowed * r) morphvar) =
-    let rec loop lower =
-      let log = ref empty_changes in
-      (* We want a hint for why [lower] is low, but we only have hint for why [lower] is
-         high. There is no good hint to use. *)
-      let r =
-        submode_mvc ~log:(Some log) H.Pinpoint.unknown obj mv lower
-          (Unknown lower)
-      in
-      match r with
-      | Ok () -> !log, lower
-      | Error (a, _) ->
-        undo_changes !log;
-        loop (C.join obj a lower)
-    in
-    loop (mlower obj mv)
-
-  (** Zap [mv] to its upper bound. Returns the [log] of the zapping, in case the
-      caller are only interested in the lower bound and wants to reverse the
-      zapping.
-
-      [mupper mv] is not precise; to get the precise upper bound of [mv], we
-      call [submode (mupper mv) mv ]. This will propagate to all its children,
-      which might fail because some children's upper bound [a] is more
-      up-to-date than [mv]. In that case, we call [submode a mv]. We repeat this
-      process until no failure, and we will get the precise lower bound.
-
-      The loop is guaranteed to terminate, because for each iteration our
-      guessed lower bound is strictly higher; and all lattices are finite. *)
-  let zap_to_ceil_morphvar_aux (type a l) (obj : a C.obj)
-      (mv : (a, l * allowed) morphvar) =
-    let rec loop upper =
-      let log = ref empty_changes in
-      let r =
-        submode_cmv ~log:(Some log) H.Pinpoint.unknown obj upper (Unknown upper)
-          mv
-      in
-      match r with
-      | Ok () -> !log, upper
-      | Error (a, _) ->
-        undo_changes !log;
-        loop (C.meet obj a upper)
-    in
-    loop (mupper obj mv)
-
   (** Zaps a morphvar to its floor and returns the floor. [commit] could be
       [Some log], in which case the zapping is appended to [log]; it could also
       be [None], in which case the zapping is reverted. The latter is useful
@@ -1996,7 +2262,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv ->
           (* We want a hint for why [floor] is low. However, we only have hint
              for why [floor] is high. There is no hint to use. *)
-          submode_mvc H.Pinpoint.unknown obj mv floor (Unknown floor) ~log
+          submode_mvc ~allow_rigid:true H.Pinpoint.unknown obj mv floor
+            (Unknown floor) ~log
           |> Result.get_ok)
         mvs;
       floor
@@ -2027,7 +2294,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       VarMap.iter
         (fun _ mv ->
           let ok =
-            submode_cmv H.Pinpoint.unknown obj ceil (Unknown ceil) mv ~log
+            submode_cmv ~allow_rigid:true H.Pinpoint.unknown obj ceil
+              (Unknown ceil) mv ~log
           in
           assert (Result.is_ok ok))
         mvs;
@@ -2111,7 +2379,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        let ok = submode_mvmv ~log:None H.Pinpoint.unknown obj mv mu in
+        let ok =
+          submode_mvmv ~allow_rigid:false ~log:None H.Pinpoint.unknown obj mv mu
+        in
         assert (Result.is_ok ok);
         allow_right (Amodevar mu), true
     | Amodejoin (a, a_hint, mvs) ->
@@ -2127,11 +2397,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_cmv H.Pinpoint.unknown obj ~log:None a a_hint mu
+        submode_cmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None a a_hint
+          mu
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
-            let ok = submode_mvmv ~log:None H.Pinpoint.unknown obj mv mu in
+            let ok =
+              submode_mvmv ~allow_rigid:false ~log:None H.Pinpoint.unknown obj
+                mv mu
+            in
             assert (Result.is_ok ok))
           mvs;
         allow_right (Amodevar mu), true
@@ -2167,7 +2441,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_mvmv H.Pinpoint.unknown obj ~log:None mu mv |> Result.get_ok;
+        submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu mv
+        |> Result.get_ok;
         allow_left (Amodevar mu), true
     | Amodemeet (a, a_hint, mvs) ->
       if VarMap.for_all (fun _ (Amorphvar (v, _, _)) -> v.level < level) mvs
@@ -2182,11 +2457,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_mvc H.Pinpoint.unknown obj ~log:None mu a a_hint
+        submode_mvc ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu a
+          a_hint
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
-            submode_mvmv H.Pinpoint.unknown obj ~log:None mu mv |> Result.get_ok)
+            submode_mvmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu
+              mv
+            |> Result.get_ok)
           mvs;
         allow_left (Amodevar mu), true
 
