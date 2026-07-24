@@ -43,12 +43,14 @@
 |}];;
 <[ fun (x : _ eff) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type eff - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : _ continuation) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-26]: cannot quote type continuation - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : _ array) -> x ]>
@@ -69,12 +71,14 @@ Uncaught exception: Stdlib.Exit
 |}];;
 <[ fun (x : int8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-16]: cannot quote type int8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int16) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type int16 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int32) -> x ]>
@@ -108,7 +112,8 @@ Uncaught exception: Stdlib.Exit
 |}];;
 <[ fun (x : _ atomic_loc) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-24]: cannot quote type atomic_loc - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : lexing_position) -> x ]>
@@ -129,7 +134,8 @@ Error: Unbound type constructor "code"
 |}];;
 <[ fun (x : _ box) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-17]: cannot quote type box - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : nativeint_u) -> x ]>
@@ -146,42 +152,50 @@ Uncaught exception: Stdlib.Exit
 |}];;
 <[ fun (x : float32_u) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float32_u - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : uint8_u) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type uint8_u - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : uint16_u) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint16_u - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : uint32_u) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint32_u - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : uint64_u) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type uint64_u - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : _ or_null) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type or_null - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : _ idx_imm) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type idx_imm - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : _ idx_mut) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type idx_mut - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int8x16) -> x ]>
@@ -202,7 +216,8 @@ Uncaught exception: Stdlib.Exit
 |}];;
 <[ fun (x : float16x8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float16x8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float32x4) -> x ]>
@@ -215,72 +230,86 @@ Uncaught exception: Stdlib.Exit
 |}];;
 <[ fun (x : int8x32) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int8x32 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int16x16) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int16x16 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int32x8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int32x8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int64x4) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int64x4 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float16x16) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float16x16 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float32x8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float32x8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float64x4) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float64x4 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int8x64) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int8x64 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int16x32) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int16x32 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int32x16) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-20]: cannot quote type int32x16 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : int64x8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-19]: cannot quote type int64x8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float16x32) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float16x32 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float32x16) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-22]: cannot quote type float32x16 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 <[ fun (x : float64x8) -> x ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 12-21]: cannot quote type float64x8 - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 

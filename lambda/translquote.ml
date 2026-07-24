@@ -2420,9 +2420,11 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let module_for_path loc env path =
+let ( let+ ) f x = Option.map x f
+
+let module_for_path_opt loc env path =
   Env.add_required_global_for_quote path env;
-  let rec module_for_path path =
+  let rec go path =
     match path with
     | Path.Pident id ->
       (match Hashtbl.find_opt vars_env.env_mod id with
@@ -2434,85 +2436,96 @@ let module_for_path loc env path =
             (* We must be in a [Toplevel_lock_for_directive] if we are quoting
              a non-global module. *)
             Ident.name id |> Identifier.Module.toplevel_module loc))
-      |> Identifier.Module.wrap
+      |> Identifier.Module.wrap |> Option.some
     | Path.Pdot (p, s) ->
-      Identifier.Module.dot loc (module_for_path p) s |> Identifier.Module.wrap
-    | _ -> raise Exit
+      let+ m = go p in
+      Identifier.Module.dot loc m s |> Identifier.Module.wrap
+    | _ -> None
   in
-  module_for_path path
+  go path
 
-let module_type_for_path loc env = function
+let module_type_for_path_opt loc env = function
   | Path.Pident id ->
-    Module_type.of_string loc (Ident.name id) |> Module_type.wrap
+    Module_type.of_string loc (Ident.name id) |> Module_type.wrap |> Option.some
   | Path.Pdot (p, s) ->
+    let+ m = module_for_path_opt loc env p in
     Module_type.ident loc
-      (Identifier.Module_type.dot loc (module_for_path loc env p) s
-      |> Identifier.Module_type.wrap)
+      (Identifier.Module_type.dot loc m s |> Identifier.Module_type.wrap)
     |> Module_type.wrap
-  | _ -> raise Exit
+  | _ -> None
 
-let type_for_path loc env = function
+let type_for_path_opt loc env = function
   | Path.Pident id ->
-    (match Hashtbl.find_opt vars_env.env_tys id with
-      | Some t -> Identifier.Type.var loc t (quote_loc loc)
+    let+ t =
+      match Hashtbl.find_opt vars_env.env_tys id with
+      | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
       | None -> (
         match Ident.name id with
-        | "int" -> Identifier.Type.int
-        | "char" -> Identifier.Type.char
-        | "string" -> Identifier.Type.string
-        | "bytes" -> Identifier.Type.bytes
-        | "float" -> Identifier.Type.float
-        | "float32" -> Identifier.Type.float32
-        | "bool" -> Identifier.Type.bool
-        | "unit" -> Identifier.Type.unit
-        | "exn" -> Identifier.Type.exn
-        | "array" -> Identifier.Type.array
-        | "iarray" -> Identifier.Type.iarray
-        | "list" -> Identifier.Type.list
-        | "option" -> Identifier.Type.option
-        | "nativeint" -> Identifier.Type.nativeint
-        | "int32" -> Identifier.Type.int32
-        | "int64" -> Identifier.Type.int64
-        | "lazy_t" -> Identifier.Type.lazy_t
-        | "extension_constructor" -> Identifier.Type.extension_constructor
-        | "floatarray" -> Identifier.Type.floatarray
-        | "lexing_position" -> Identifier.Type.lexing_position
-        | "expr" -> Identifier.Type.expr
-        | "eval" -> Identifier.Type.eval
-        | "float#" -> Identifier.Type.unboxed_float
-        | "nativeint#" -> Identifier.Type.unboxed_nativeint
-        | "int32#" -> Identifier.Type.unboxed_int32
-        | "int64#" -> Identifier.Type.unboxed_int64
-        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
-        | "int32_u" -> Identifier.Type.unboxed_int32
-        | "int64_u" -> Identifier.Type.unboxed_int64
-        | "int8x16" -> Identifier.Type.int8x16
-        | "int16x8" -> Identifier.Type.int16x8
-        | "int32x4" -> Identifier.Type.int32x4
-        | "int64x2" -> Identifier.Type.int64x2
-        | "float32x4" -> Identifier.Type.float32x4
-        | "float64x2" -> Identifier.Type.float64x2
-        | _ -> raise Exit))
-    |> Identifier.Type.wrap
+        | "int" -> Some Identifier.Type.int
+        | "char" -> Some Identifier.Type.char
+        | "string" -> Some Identifier.Type.string
+        | "bytes" -> Some Identifier.Type.bytes
+        | "float" -> Some Identifier.Type.float
+        | "float32" -> Some Identifier.Type.float32
+        | "bool" -> Some Identifier.Type.bool
+        | "unit" -> Some Identifier.Type.unit
+        | "exn" -> Some Identifier.Type.exn
+        | "array" -> Some Identifier.Type.array
+        | "iarray" -> Some Identifier.Type.iarray
+        | "list" -> Some Identifier.Type.list
+        | "option" -> Some Identifier.Type.option
+        | "nativeint" -> Some Identifier.Type.nativeint
+        | "int32" -> Some Identifier.Type.int32
+        | "int64" -> Some Identifier.Type.int64
+        | "lazy_t" -> Some Identifier.Type.lazy_t
+        | "extension_constructor" -> Some Identifier.Type.extension_constructor
+        | "floatarray" -> Some Identifier.Type.floatarray
+        | "lexing_position" -> Some Identifier.Type.lexing_position
+        | "expr" -> Some Identifier.Type.expr
+        | "eval" -> Some Identifier.Type.eval
+        | "float#" -> Some Identifier.Type.unboxed_float
+        | "nativeint#" -> Some Identifier.Type.unboxed_nativeint
+        | "int32#" -> Some Identifier.Type.unboxed_int32
+        | "int64#" -> Some Identifier.Type.unboxed_int64
+        | "nativeint_u" -> Some Identifier.Type.unboxed_nativeint
+        | "int32_u" -> Some Identifier.Type.unboxed_int32
+        | "int64_u" -> Some Identifier.Type.unboxed_int64
+        | "int8x16" -> Some Identifier.Type.int8x16
+        | "int16x8" -> Some Identifier.Type.int16x8
+        | "int32x4" -> Some Identifier.Type.int32x4
+        | "int64x2" -> Some Identifier.Type.int64x2
+        | "float32x4" -> Some Identifier.Type.float32x4
+        | "float64x2" -> Some Identifier.Type.float64x2
+        | _ -> None)
+    in
+    Identifier.Type.wrap t
   | Path.Pdot (p, s) ->
-    Identifier.Type.dot loc (module_for_path loc env p) s
-    |> Identifier.Type.wrap
-  | _ -> raise Exit
+    let+ m = module_for_path_opt loc env p in
+    Identifier.Type.dot loc m s |> Identifier.Type.wrap
+  | _ -> None
 
-let type_constr_for_path loc env path arity =
-  Type.constr loc
-    (type_for_path loc env path)
-    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
-  |> Type.wrap
-
-let value_for_path loc env = function
+let value_for_path_opt loc env = function
   | Path.Pdot (p, s) ->
-    Identifier.Value.dot loc (module_for_path loc env p) s
-    |> Identifier.Value.wrap
-  | _ -> raise Exit
+    let+ m = module_for_path_opt loc env p in
+    Identifier.Value.dot loc m s |> Identifier.Value.wrap
+  | _ -> None
 
-let value_for_path_opt loc env p =
-  match value_for_path loc env p with res -> Some res | exception Exit -> None
+let try_path kind path_for_kind_opt loc env path =
+  match path_for_kind_opt loc env path with
+  | Some x -> x
+  | None ->
+    fatal_errorf
+      "Translquote [at %a]: cannot quote %s %s - this is either unsupported or \
+       a bug"
+      Location.print_loc (to_location loc) kind (Path.name path)
+
+let module_for_path loc env path =
+  try_path "module" module_for_path_opt loc env path
+
+let module_type_for_path loc env path =
+  try_path "module" module_type_for_path_opt loc env path
+
+let type_for_path loc env path = try_path "type" type_for_path_opt loc env path
 
 let quote_value_ident_path loc env path =
   match value_for_path_opt loc env path with
@@ -2539,6 +2552,12 @@ let quote_value_ident_path_as_exp loc env path =
 let type_path env ty =
   let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
+
+let type_constr_for_path loc env path arity =
+  Type.constr loc
+    (type_for_path loc env path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
 
 let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
