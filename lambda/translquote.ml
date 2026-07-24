@@ -719,45 +719,7 @@ module Identifier : sig
 
     val dot : Debuginfo.Scoped_location.t -> Module.t -> string -> t'
 
-    val false_ : t'
-
-    val true_ : t'
-
-    val void : t'
-
-    val nil : t'
-
-    val cons : t'
-
-    val none : t'
-
-    val some : t'
-
-    val match_failure : t'
-
-    val out_of_memory : t'
-
-    val out_of_fibers : t'
-
-    val invalid_argument : t'
-
-    val failure : t'
-
-    val not_found : t'
-
-    val sys_error : t'
-
-    val end_of_file : t'
-
-    val division_by_zero : t'
-
-    val stack_overflow : t'
-
-    val sys_blocked_io : t'
-
-    val assert_failure : t'
-
-    val undefined_recursive_module : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Field : sig
@@ -854,46 +816,8 @@ end = struct
     let dot loc a1 a2 =
       apply2 "Identifier.Constructor" "dot" loc (extract a1) (string ~loc a2)
 
-    let false_ = use "Identifier.Constructor" "false_"
-
-    let true_ = use "Identifier.Constructor" "true_"
-
-    let void = use "Identifier.Constructor" "void"
-
-    let nil = use "Identifier.Constructor" "nil"
-
-    let cons = use "Identifier.Constructor" "cons"
-
-    let none = use "Identifier.Constructor" "none"
-
-    let some = use "Identifier.Constructor" "some"
-
-    let match_failure = use "Identifier.Constructor" "match_failure"
-
-    let out_of_memory = use "Identifier.Constructor" "out_of_memory"
-
-    let out_of_fibers = use "Identifier.Constructor" "out_of_fibers"
-
-    let invalid_argument = use "Identifier.Constructor" "invalid_argument"
-
-    let failure = use "Identifier.Constructor" "failure"
-
-    let not_found = use "Identifier.Constructor" "not_found"
-
-    let sys_error = use "Identifier.Constructor" "sys_error"
-
-    let end_of_file = use "Identifier.Constructor" "end_of_file"
-
-    let division_by_zero = use "Identifier.Constructor" "division_by_zero"
-
-    let stack_overflow = use "Identifier.Constructor" "stack_overflow"
-
-    let sys_blocked_io = use "Identifier.Constructor" "sys_blocked_io"
-
-    let assert_failure = use "Identifier.Constructor" "assert_failure"
-
-    let undefined_recursive_module =
-      use "Identifier.Constructor" "undefined_recursive_module"
+    let builtin loc a1 =
+      apply1 "Identifier.Constructor" "builtin" loc (string ~loc a1)
   end
 
   module Field = struct
@@ -2439,30 +2363,14 @@ let quote_constructor loc env (constr : Data_types.constructor_description) =
          | None ->
            fatal_errorf "Translquote [at %a]: no global path for constructor"
              Location.print_loc (to_location loc)
-         | Some (Path.Pident _) -> (
-           match constr.cstr_name with
-           | "false" -> Identifier.Constructor.false_
-           | "true" -> Identifier.Constructor.true_
-           | "()" -> Identifier.Constructor.void
-           | "[]" -> Identifier.Constructor.nil
-           | "::" -> Identifier.Constructor.cons
-           | "None" -> Identifier.Constructor.none
-           | "Some" -> Identifier.Constructor.some
-           | "Match_failure" -> Identifier.Constructor.match_failure
-           | "Out_of_memory" -> Identifier.Constructor.out_of_memory
-           | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
-           | "Invalid_argument" -> Identifier.Constructor.invalid_argument
-           | "Failure" -> Identifier.Constructor.failure
-           | "Not_found" -> Identifier.Constructor.not_found
-           | "Sys_error" -> Identifier.Constructor.sys_error
-           | "End_of_file" -> Identifier.Constructor.end_of_file
-           | "Division_by_zero" -> Identifier.Constructor.division_by_zero
-           | "Stack_overflow" -> Identifier.Constructor.stack_overflow
-           | "Sys_blocked_io" -> Identifier.Constructor.sys_blocked_io
-           | "Assert_failure" -> Identifier.Constructor.assert_failure
-           | "Undefined_recursive_module" ->
-             Identifier.Constructor.undefined_recursive_module
-           | name -> raise (Non_builtin name))
+         | Some (Path.Pident _) ->
+           let name = constr.cstr_name in
+           if
+             List.exists
+               (fun (name', _) -> String.equal name name')
+               (Predef.builtin_exns @ Predef.builtin_constrs)
+           then Identifier.Constructor.builtin loc name
+           else raise (Non_builtin name)
          | Some (Path.Pdot (p, _)) ->
            Identifier.Constructor.dot loc
              (module_for_path loc env p)
