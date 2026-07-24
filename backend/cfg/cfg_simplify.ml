@@ -30,6 +30,46 @@ module C = Cfg
 module CL = Cfg_with_layout
 module DLL = Oxcaml_utils.Doubly_linked_list
 
+module Validator : sig
+  val validate_reachability : Cfg.t -> unit
+end = struct
+  let z3_code_of_cfg (cfg : Cfg.t) =
+    let id_gen = Cfg_z3.Id_gen.create cfg in
+    let buffer = Buffer.create 4096 in
+    let fmt = Format.formatter_of_buffer buffer in
+    Format.fprintf fmt
+      {|
+(set-option :fp.engine datalog)
+
+(define-sort node () (_ BitVec %d))
+(declare-rel entry (node))
+(declare-rel edge (node node))
+(declare-rel is-node (node))
+(declare-rel reachable (node))
+(declare-rel unreachable (node))
+(declare-var a node)
+(declare-var b node)
+
+(rule (=> (entry a) (reachable a)))
+(rule (=> (and (reachable a) (edge a b)) (reachable b)))
+(rule (=> (and (not (reachable a)) (is-node a)) (unreachable a)))
+|}
+      (Cfg_z3.Id_gen.width id_gen);
+    Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
+    Format.fprintf fmt "\n%s" "(query unreachable)";
+    Format.pp_print_flush fmt ();
+    Buffer.contents buffer
+
+  let validate_reachability (cfg : Cfg.t) =
+    let z3_code = z3_code_of_cfg cfg in
+    let z3_output = Cfg_z3.run_z3 z3_code |> String.trim in
+    if not (String.equal z3_output "unsat")
+    then
+      Misc.fatal_errorf
+        "validate_reachability: unreachable blocks found in cfg '%s'@.%a"
+        cfg.fun_name Printcfg.cfg cfg
+end
+
 module Eliminate_dead_code : sig
   val run : Cfg_with_layout.t -> Label.Set.t
 end = struct
@@ -304,4 +344,9 @@ let run cfg_with_layout =
      second round of dead code elimination. *)
   Eliminate_dead_code.run cfg_with_layout |> acc;
   Cfg_with_layout.remove_blocks cfg_with_layout !dead_labels;
+  if !Oxcaml_flags.cfg_eliminate_dead_code_validate
+  then
+    Profile.record ~accumulate:true "validate_reachability"
+      Validator.validate_reachability
+      (Cfg_with_layout.cfg cfg_with_layout);
   cfg_with_layout

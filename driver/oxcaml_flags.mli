@@ -40,6 +40,8 @@ val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
 val cfg_eliminate_dead_trap_handlers : bool ref
+val cfg_eliminate_dead_code_validate : bool ref
+val cfg_dominators_validate : bool ref
 
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
