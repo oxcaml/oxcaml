@@ -153,49 +153,13 @@ module Addressability = struct
     | Exact of Action.t
     | Join
 
+  type slot = t
+
   let equal a1 a2 =
     match a1, a2 with
     | Exact a1, Exact a2 -> Action.equal a1 a2
     | Join, Join -> true
     | (Exact _ | Join), _ -> false
-
-  let less_or_equal a1 a2 : Misc.Le_result.t =
-    match a1, a2 with
-    | Exact a1, Exact a2 -> if Action.equal a1 a2 then Equal else Not_le
-    | Exact _, Join -> Less
-    | Join, Join -> Equal
-    | Join, Exact _ -> Not_le
-
-  let le a1 a2 = Misc.Le_result.is_le (less_or_equal a1 a2)
-
-  let meet a1 a2 =
-    match a1, a2 with
-    | Join, a | a, Join -> Some a
-    | Exact a1, (Exact a2 as e) -> if Action.equal a1 a2 then Some e else None
-
-  let combine_product ts =
-    (* Combines component mark readings into an unmarked product's mark
-       reading; see the .mli. Note that the implicit order here
-       ([Exact Addressable] absorbed by [Join] absorbed by [Exact Id]) is
-       not the subkind order, under which the two exact forms are
-       incomparable. *)
-    List.fold_left
-      (fun acc t ->
-        match acc, t with
-        | Exact Action.Id, _ | _, Exact Action.Id -> Exact Action.Id
-        | Join, _ | _, Join -> Join
-        | Exact Action.Addressable, Exact Action.Addressable ->
-          Exact Action.Addressable)
-      (Exact Action.Addressable) ts
-
-  (* Whether kinds with these marks are all addressable - equivalently,
-     [combine_product] of them is [Exact Addressable], so a whole-product
-     mark over them would be a no-op. *)
-  let all_addressable ts =
-    List.for_all
-      (fun t ->
-        match t with Exact Addressable -> true | Exact Id | Join -> false)
-      ts
 
   let of_action_on_undetermined : Action.t -> t = function
     | Id -> Join
@@ -211,31 +175,108 @@ module Addressability = struct
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 
+  module Mark = struct
+    type t =
+      | Marked
+      | Unmarked
+      | Flexible
+
+    (* The raw embedding: the mark a slot denotes verbatim. Readers apply
+       the sort's collapse before falling back to this. *)
+    let of_slot : slot -> t = function
+      | Exact Addressable -> Marked
+      | Exact Id -> Unmarked
+      | Join -> Flexible
+
+    (* Store a computed mark back as a slot, for the meets' write-back.
+       Sound only because meets return marks that describe the written
+       node exactly (a meet of exact marks, or the join). *)
+    let to_slot : t -> slot = function
+      | Marked -> Exact Addressable
+      | Unmarked -> Exact Id
+      | Flexible -> Join
+
+    let equal m1 m2 =
+      match m1, m2 with
+      | Marked, Marked | Unmarked, Unmarked | Flexible, Flexible -> true
+      | (Marked | Unmarked | Flexible), _ -> false
+
+    let less_or_equal m1 m2 : Misc.Le_result.t =
+      match m1, m2 with
+      | Marked, Marked | Unmarked, Unmarked | Flexible, Flexible -> Equal
+      | (Marked | Unmarked), Flexible -> Less
+      | Flexible, (Marked | Unmarked) | Marked, Unmarked | Unmarked, Marked ->
+        Not_le
+
+    let le m1 m2 = Misc.Le_result.is_le (less_or_equal m1 m2)
+
+    let meet m1 m2 =
+      match m1, m2 with
+      | Flexible, m | m, Flexible -> Some m
+      | Marked, Marked -> Some Marked
+      | Unmarked, Unmarked -> Some Unmarked
+      | Marked, Unmarked | Unmarked, Marked -> None
+
+    let combine_product ts =
+      (* Combines component mark readings into an unmarked product's mark
+         reading; see the .mli. Note that the implicit order here ([Marked]
+         absorbed by [Flexible] absorbed by [Unmarked]) is not the subkind
+         order, under which [Marked] and [Unmarked] are incomparable. *)
+      List.fold_left
+        (fun acc t ->
+          match acc, t with
+          | Unmarked, _ | _, Unmarked -> Unmarked
+          | Flexible, _ | _, Flexible -> Flexible
+          | Marked, Marked -> Marked)
+        Marked ts
+
+    (* Whether kinds with these marks are all addressable - equivalently,
+       [combine_product] of them is [Marked], so a whole-product mark over
+       them would be a no-op. *)
+    let all_marked ts =
+      List.for_all
+        (fun t -> match t with Marked -> true | Unmarked | Flexible -> false)
+        ts
+
+    let of_action_on_undetermined : Action.t -> t = function
+      | Id -> Flexible
+      | Addressable -> Marked
+
+    (* Only [Marked] is ever printed in user-facing output. *)
+    let to_string = function
+      | Marked -> "addressable"
+      | Unmarked -> "unmarked"
+      | Flexible -> "flexible"
+  end
+
   module Verdict = struct
     type t =
-      | Unaddressable
-      | Addressable
+      | Known_unaddressable
+      | Known_addressable
       | Undetermined
 
     let consistent v1 v2 =
       match v1, v2 with
-      | Unaddressable, Addressable | Addressable, Unaddressable -> false
-      | ( (Unaddressable | Addressable | Undetermined),
-          (Unaddressable | Addressable | Undetermined) ) ->
+      | Known_unaddressable, Known_addressable
+      | Known_addressable, Known_unaddressable ->
+        false
+      | ( (Known_unaddressable | Known_addressable | Undetermined),
+          (Known_unaddressable | Known_addressable | Undetermined) ) ->
         true
 
     let combine_product ts =
       List.fold_left
         (fun acc t ->
           match acc, t with
-          | Unaddressable, _ | _, Unaddressable -> Unaddressable
+          | Known_unaddressable, _ | _, Known_unaddressable ->
+            Known_unaddressable
           | Undetermined, _ | _, Undetermined -> Undetermined
-          | Addressable, Addressable -> Addressable)
-        Addressable ts
+          | Known_addressable, Known_addressable -> Known_addressable)
+        Known_addressable ts
 
     let of_action_on_undetermined : Action.t -> t = function
       | Id -> Undetermined
-      | Addressable -> Addressable
+      | Addressable -> Known_addressable
   end
 end
 

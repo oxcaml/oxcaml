@@ -79,27 +79,12 @@ end
       sort the variable resolves to, and it persists after the variable
       resolves, since resolving a sort determines none of the marks.
 
-    [t] is also the result type of *mark* readings of a kind
-    ([Jkind.Layout.mark]), which answer how the kind stands to whole-marking:
-    [Exact Addressable] means the kind is addressable, so marking it is a no-op;
-    [Exact Id] means its root is exactly unmarked and the kind is not known
-    addressable, so it is distinct from its whole-marked form and fails an
-    [addressable] requirement; [Join] means the root mark is flexible. On a
-    [Sort] node this is exactly which form over the sort the kind is (any slot
-    collapses to [Exact Addressable] once the sort resolves intrinsically
-    addressable, where all forms coincide); on an unmarked [Product] it is
-    derived from the components ([combine_product]). A mark reading of
-    [Exact Id] says nothing about whether the kind is addressable: the plain
-    form of a rigid layout variable [x] reads [Exact Id] - it is distinct from
-    [x addressable] *as polymorphic kinds* - while the addressability of [x]
-    itself stays open. The question "is this kind addressable?" has a different
-    answer type, [Verdict.t], whose third case is an honest [Undetermined].
-
-    As an order on marks this is flat and partial: the two exact forms are
-    incomparable (the operator is a modifier, not a narrowing), and both are
-    below [Join]. Accordingly, [meet] is partial. This is also not an [Axis.t]:
-    it is not part of the mod- or with-bounds, but rather a component of
-    layouts. *)
+    Readings of a kind are separate types, so that a raw stored slot cannot be
+    compared without going through a reading: [Mark.t] answers how the kind
+    stands to whole-marking (the comparison operations live only there), and
+    [Verdict.t] answers "is this kind addressable?". This is also not an
+    [Axis.t]: it is not part of the mod- or with-bounds, but rather a component
+    of layouts. *)
 module Addressability : sig
   module Action : sig
     type t =
@@ -126,36 +111,19 @@ module Addressability : sig
     | Exact of Action.t
     | Join
 
+  (** An alias for [t], for referring to the slot type from within [Mark]. *)
+  type slot = t
+
+  (** Structural slot equality, for the constant snapshots whose carriers never
+      resolve ([Const.Univar]/[Const.Genvar]). Everything else must compare
+      *readings* ([Mark.equal] etc.), never raw slots. *)
   val equal : t -> t -> bool
 
-  val less_or_equal : t -> t -> Misc.Le_result.t
-
-  val le : t -> t -> bool
-
-  (** The meet of two exact forms is their equality or nothing; [Join] is the
-      identity. *)
-  val meet : t -> t -> t option
-
-  (** The mark reading of an unmarked product from its components' readings:
-      [Exact Addressable] when every component reads addressable (whole-marking
-      the product is then a no-op), [Exact Id] when any component reads
-      [Exact Id] (even if others are marked: the product is then distinct from
-      its whole-marked form and not known addressable), and otherwise [Join].
-      This is not the [meet] of the components. *)
-  val combine_product : t list -> t
-
-  (** Whether kinds with these marks are all addressable (equivalently,
-      [combine_product] of them is [Exact Addressable]): a whole-product mark
-      over them would be a no-op, so e.g. printing one is uninformative. *)
-  val all_addressable : t list -> bool
-
-  (** The reading of an action stored on a node whose carrier's intrinsic
-      addressability is undetermined ([any], an abstract kind, or an unfilled
-      sort variable): applying no action leaves the addressability undetermined.
-      Also the slot a *flexible* sort-variable bound gets when an [any] bound's
-      action is transferred onto it - in contrast with a *rigid* bound (an lpoly
-      layout variable, which stands for one specific unknown layout), which
-      transfers a pending action exactly ([Exact]). *)
+  (** The slot a *flexible* sort-variable bound gets when an [any] bound's
+      action is transferred onto it: applying no action leaves the whole fiber
+      admitted ([Join]) - in contrast with a *rigid* bound (an lpoly layout
+      variable, which stands for one specific unknown layout), which transfers a
+      pending action exactly ([Exact]). *)
   val of_action_on_undetermined : Action.t -> t
 
   (** The action recorded in a [Sort] node's slot, forgetting the join. Used
@@ -176,17 +144,85 @@ module Addressability : sig
 
   val print : Format_doc.formatter -> t -> unit
 
+  (** The result type of *mark* readings of a kind ([Jkind.Layout.mark]), which
+      answer how the kind stands to whole-marking: [Marked] means the kind
+      equals its whole-marked form (marked outright, committed, or over a sort
+      where every form coincides), so marking it is a no-op; [Unmarked] means
+      its root is exactly unmarked and the kind is not known addressable, so it
+      is distinct from its whole-marked form and fails an [addressable]
+      requirement; [Flexible] means the root mark is flexible (a [Join] slot,
+      which may yet be committed). On a [Sort] node this is exactly which form
+      over the sort the kind is (any slot collapses to [Marked] once the sort
+      resolves intrinsically addressable); on an unmarked [Product] it is
+      derived from the components ([combine_product]). A mark reading of
+      [Unmarked] says nothing about whether the kind is addressable: the plain
+      form of a rigid layout variable [x] reads [Unmarked] - it is distinct from
+      [x addressable] *as polymorphic kinds* - while the addressability of [x]
+      itself stays open (that question is [Verdict.t], whose [Undetermined] is
+      epistemic where [Flexible] is constrainable).
+
+      As an order on marks this is flat and partial: [Marked] and [Unmarked] are
+      incomparable (the operator is a modifier, not a narrowing), and both are
+      below [Flexible]. Accordingly, [meet] is partial. *)
+  module Mark : sig
+    type t =
+      | Marked
+      | Unmarked
+      | Flexible
+
+    (** The raw embedding: the mark a slot denotes verbatim. Readers apply the
+        sort's collapse before falling back to this. *)
+    val of_slot : slot -> t
+
+    (** Store a computed mark back as a slot, for the meets' write-back. Sound
+        only because meets return marks that describe the written node exactly
+        (a meet of exact marks, or the flexible join). *)
+    val to_slot : t -> slot
+
+    val equal : t -> t -> bool
+
+    val less_or_equal : t -> t -> Misc.Le_result.t
+
+    val le : t -> t -> bool
+
+    (** The meet of [Marked] and [Unmarked] is nothing; [Flexible] is the
+        identity. *)
+    val meet : t -> t -> t option
+
+    (** The mark reading of an unmarked product from its components' readings:
+        [Marked] when every component reads [Marked] (whole-marking the product
+        is then a no-op), [Unmarked] when any component reads [Unmarked] (even
+        if others are marked: the product is then distinct from its whole-marked
+        form and not known addressable), and otherwise [Flexible]. This is not
+        the [meet] of the components. *)
+    val combine_product : t list -> t
+
+    (** Whether kinds with these marks are all addressable (equivalently,
+        [combine_product] of them is [Marked]): a whole-product mark over them
+        would be a no-op, so e.g. printing one is uninformative. *)
+    val all_marked : t list -> bool
+
+    (** The mark reading of an action stored on a node whose carrier's intrinsic
+        addressability is undetermined ([any] or an abstract kind): applying no
+        action leaves the mark undetermined. *)
+    val of_action_on_undetermined : Action.t -> t
+
+    (** Only [Marked] is ever printed in user-facing output (as
+        ["addressable"]). *)
+    val to_string : t -> string
+  end
+
   (** The result of an addressability *verdict* - "is this kind addressable?" -
-      as opposed to a mark reading ([t]), which answers which form over its sort
-      a kind is. The two differ exactly where honesty requires it: the plain
-      form of an unresolved layout reads mark [Exact Id] but verdict
+      as opposed to a mark reading ([Mark.t]), which answers which form over its
+      sort a kind is. The two differ exactly where honesty requires it: the
+      plain form of an unresolved layout reads mark [Unmarked] but verdict
       [Undetermined]. *)
   module Verdict : sig
     type t =
-      | Unaddressable
+      | Known_unaddressable
           (** Definitely not addressable: an unmarked (identity) form over a
               carrier resolved intrinsically unaddressable. *)
-      | Addressable  (** Definitely addressable. *)
+      | Known_addressable  (** Definitely addressable. *)
       | Undetermined
           (** Not determined: a flexible join, an unmarked form over an
               unresolved sort (rigid or flexible), [any], or an abstract kind.

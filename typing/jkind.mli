@@ -114,9 +114,16 @@ module Addressability : sig
     | Exact of Action.t
     | Join
 
-  val all_addressable : t list -> bool
-
   val of_action_on_undetermined : Action.t -> t
+
+  module Mark : sig
+    type t = Jkind_types.Addressability.Mark.t =
+      | Marked
+      | Unmarked
+      | Flexible
+
+    val all_marked : t list -> bool
+  end
 end
 
 (* The layout of a type describes its memory layout. A layout is either the
@@ -609,7 +616,7 @@ module Desc : sig
   (** The addressability mark of the kind a (flattened) layout describes (which
       of the forms over its sort the kind is; see [Jkind_axis.Addressability]);
       used to decide whether an [addressable] mark is worth printing. *)
-  val layout_mark : Sort.Flat.t Layout.t -> Addressability.t
+  val layout_mark : Sort.Flat.t Layout.t -> Addressability.Mark.t
 
   val format : Env.t -> Format_doc.formatter -> 'd t -> unit
 end

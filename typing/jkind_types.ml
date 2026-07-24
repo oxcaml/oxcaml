@@ -1025,14 +1025,14 @@ module Addressability0 = struct
   (* The intrinsic addressability of a sort, as a verdict about its *plain*
      kind, insofar as it is determined: the addressability of an unfilled
      sort variable is not yet known ([Undetermined]). This is a mark-free
-     question, so it can be definite ([Unaddressable]) even while the marks
+     question, so it can be definite ([Known_unaddressable]) even while the marks
      over the sort are undetermined. *)
   let of_sort s =
     let rec go : Sort.t -> Verdict.t = function
       | Base b ->
         if base_is_always_addressable b
-        then Verdict.Addressable
-        else Verdict.Unaddressable
+        then Verdict.Known_addressable
+        else Verdict.Known_unaddressable
       | Product sorts -> Verdict.combine_product (List.map go sorts)
       | Var _ | Univar _ -> Verdict.Undetermined
     in
@@ -1042,13 +1042,13 @@ module Addressability0 = struct
   (* Whether every kind with this sort is addressable, whatever its marks:
      the plain kind is intrinsically addressable, so marking is a no-op and
      the plain, marked, and join forms all coincide. Readers use this to
-     collapse unmarked and join slots to [Addressable]. [false] means the
+     collapse unmarked and join slots to [Mark.Marked]. [false] means the
      forms either differ or are not yet known to coincide (an unfilled
      variable in the sort). *)
   let sort_is_always_addressable s =
     match of_sort s with
-    | Verdict.Addressable -> true
-    | Verdict.Unaddressable | Verdict.Undetermined -> false
+    | Verdict.Known_addressable -> true
+    | Verdict.Known_unaddressable | Verdict.Undetermined -> false
 end
 
 module Addressability = Addressability0
@@ -1082,7 +1082,7 @@ module Layout = struct
      fabricated component). The join persists after its variable resolves:
      sorts do not carry addressability, so filling the variable with [bits8]
      leaves the kind the join of [bits8] and [bits8 addressable]. Readers
-     collapse any slot to [Exact Addressable] only when the resolved sort is
+     collapse any slot to [Mark.Marked] only when the resolved sort is
      intrinsically addressable, where all forms denote the same kind (see
      [Jkind.Layout.mark]).
 
@@ -1153,25 +1153,22 @@ module Layout = struct
        saving cmis). Only printing elides the join
        ([Jkind.Addressability.to_string_list_diff]). An unmarked product
        derives its mark from its components. *)
-    let rec mark : t -> Addressability.t = function
-      | Base (b, _, a) -> (
-        match a with
-        | Join ->
-          if Addressability.base_is_always_addressable b
-          then Exact Addressable
-          else Join
-        | Exact _ -> a)
-      | Any (_, a) -> Addressability.of_action_on_undetermined a
+    let rec mark : t -> Addressability.Mark.t = function
+      | Base (b, _, a) ->
+        if Addressability.base_is_always_addressable b
+        then Marked
+        else Addressability.Mark.of_slot a
+      | Any (_, a) -> Addressability.Mark.of_action_on_undetermined a
       | Product (ts, a) -> (
         match (a : Addressability.Action.t) with
-        | Addressable -> Addressability.Exact Addressable
-        | Id -> Addressability.combine_product (List.map mark ts))
+        | Addressable -> Addressability.Mark.Marked
+        | Id -> Addressability.Mark.combine_product (List.map mark ts))
       | Univar (_, _, a) | Genvar (_, _, a) ->
-        (* The carrier is never resolved, so the slot is the mark: [Exact
-           Id] on a rigid variable is exactly the plain form (whose
-           addressability is open until instantiation - a question for
-           verdicts, not marks). *)
-        a
+        (* The carrier is never resolved, so the slot is the mark: an
+           [Exact Id] slot on a rigid variable is exactly the plain form
+           (whose addressability is open until instantiation - a question
+           for verdicts, not marks). *)
+        Addressability.Mark.of_slot a
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -1180,7 +1177,7 @@ module Layout = struct
            slots necessarily agree. *)
         Scannable_axes.equal sa1 sa2
       | (Base (b1, _, _) as c1), (Base (b2, _, _) as c2) ->
-        Sort.equal_base b1 b2 && Addressability.equal (mark c1) (mark c2)
+        Sort.equal_base b1 b2 && Addressability.Mark.equal (mark c1) (mark c2)
       | Any (sa1, a1), Any (sa2, a2) ->
         Scannable_axes.equal sa1 sa2 && Addressability.Action.equal a1 a2
       | (Product (cs1, _) as c1), (Product (cs2, _) as c2) ->
@@ -1188,7 +1185,7 @@ module Layout = struct
         (* Comparing the roots distinguishes a marked product of
            unaddressable kinds from the unmarked product; marking a product
            of addressable kinds does nothing. *)
-        && Addressability.equal (mark c1) (mark c2)
+        && Addressability.Mark.equal (mark c1) (mark c2)
       | Univar (uv1, sa1, a1), Univar (uv2, sa2, a2) ->
         Sort.equal_univar_univar uv1 uv2
         && Scannable_axes.equal sa1 sa2

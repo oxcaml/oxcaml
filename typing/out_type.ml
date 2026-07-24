@@ -1280,7 +1280,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
       match (a : Jkind.Addressability.Action.t) with
       | Id -> false
       | Addressable ->
-        not (Jkind.Addressability.all_addressable
+        not (Jkind.Addressability.Mark.all_marked
                (List.map Jkind.Desc.layout_mark lays))
     in
     if not mark_is_informative

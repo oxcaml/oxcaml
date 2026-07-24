@@ -104,21 +104,26 @@ end
 module Addressability = struct
   include Jkind_types.Addressability
 
-  (* Like [Scannable_axes.to_string_list_diff]: the suffix words needed to
-     print the mark [actual] in terms of a base with mark [base], or [None]
-     if that's not possible (there is no word for unaddressability). *)
-  let to_string_list_diff ~base actual =
-    if equal actual base
-    then Some []
-    else
-      match actual with
-      | Exact Addressable -> Some [to_string actual]
-      | Join ->
-        (* Display defaulting: an undetermined join prints like the plain
-           base, with no suffix word. (Semantic operations must NOT collapse
-           the join like this; see [Layout.Const.mark].) *)
-        Some []
-      | Exact Id -> None
+  module Mark = struct
+    include Jkind_types.Addressability.Mark
+
+    (* Like [Scannable_axes.to_string_list_diff]: the suffix words needed to
+       print the mark [actual] in terms of a base with mark [base], or
+       [None] if that's not possible (there is no word for
+       unaddressability). *)
+    let to_string_list_diff ~base actual =
+      if equal actual base
+      then Some []
+      else
+        match actual with
+        | Marked -> Some [to_string actual]
+        | Flexible ->
+          (* Display defaulting: an undetermined join prints like the plain
+             base, with no suffix word. (Semantic operations must NOT
+             collapse the join like this; see [Layout.Const.mark].) *)
+          Some []
+        | Unmarked -> None
+  end
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -249,7 +254,7 @@ module Layout = struct
                print it when it isn't implied by the components. *)
             match (a : Addressability.Action.t) with
             | Addressable ->
-              not (Addressability.all_addressable (List.map mark ts))
+              not (Addressability.Mark.all_marked (List.map mark ts))
             | Id -> false
           in
           match marked_and_informative with
@@ -350,32 +355,32 @@ module Layout = struct
     | Equal_mutated_both ->
       true
 
-  (* The kind's addressability mark: [Exact Addressable] = addressable, so
-     marking is a no-op; [Exact Id] = root exactly unmarked and not known
-     addressable; [Join] = flexible. See [Jkind_axis.Addressability] for the
-     full contract. A stored slot collapses to [Exact Addressable] once its
+  (* The kind's addressability mark: [Marked] = addressable, so marking is
+     a no-op; [Unmarked] = root exactly unmarked and not known addressable;
+     [Flexible] = a flexible root mark. See [Jkind_axis.Addressability.Mark]
+     for the full contract. A stored slot collapses to [Marked] once its
      sort resolves intrinsically addressable, where all forms coincide -
      e.g. [Sort (v, _, Join)] with [v] filled by [bits64] IS [bits64] - but
      NEVER the other way: sorts do not carry addressability, so resolving a
      sort to [bits8] pins nothing, and a join stays the join of [bits8] and
-     [bits8 addressable]. Note [Exact Id] is not an addressability verdict
+     [bits8 addressable]. Note [Unmarked] is not an addressability verdict
      (that question is [verdict]): a rigid layout variable [x] reads
-     [Exact Id] - exactly the plain [x] - with the addressability of [x]
+     [Unmarked] - exactly the plain [x] - with the addressability of [x]
      itself still open. Equal kinds read equal marks: use this for the left
      of a subkind check and for equality. *)
-  let rec mark : Sort.t t -> Addressability.t = function
-    | Any (_, a) -> Addressability.of_action_on_undetermined a
+  let rec mark : Sort.t t -> Addressability.Mark.t = function
+    | Any (_, a) -> Addressability.Mark.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Exact Addressable -> a
+      | Exact Addressable -> Addressability.Mark.Marked
       | Exact Id | Join ->
         if Addressability.sort_is_always_addressable s
-        then Exact Addressable
-        else a)
+        then Marked
+        else Addressability.Mark.of_slot a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
-      | Addressable -> Addressability.Exact Addressable
-      | Id -> Addressability.combine_product (List.map mark ts))
+      | Addressable -> Addressability.Mark.Marked
+      | Id -> Addressability.Mark.combine_product (List.map mark ts))
 
   (* Whether the kind a layout describes is addressable, insofar as it is
      determined. Unlike the mark readings, this is a semantic verdict: the
@@ -388,7 +393,7 @@ module Layout = struct
     | Any (_, a) -> Addressability.Verdict.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Exact Addressable -> Addressable
+      | Exact Addressable -> Known_addressable
       | Exact Id ->
         (* Unmarked: the verdict on the plain kind of the sort. *)
         Addressability.of_sort s
@@ -397,11 +402,11 @@ module Layout = struct
            branch always is); otherwise it is unknown which branch the kind
            will be. *)
         match Addressability.of_sort s with
-        | Addressable -> Addressable
-        | Unaddressable | Undetermined -> Undetermined))
+        | Known_addressable -> Known_addressable
+        | Known_unaddressable | Undetermined -> Undetermined))
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
-      | Addressable -> Addressable
+      | Addressable -> Known_addressable
       | Id -> Addressability.Verdict.combine_product (List.map verdict ts))
 
   (* As [mark], for a layout used as a bound (the right of a subkind
@@ -413,19 +418,19 @@ module Layout = struct
      [x] is unknown - [x addressable <= x] must not hold - but accepts
      marked claims once [x] resolves intrinsically addressable, where the
      plain and marked kinds coincide. *)
-  let rec mark_of_bound : Sort.t t -> Addressability.t = function
-    | Any (_, a) -> Addressability.of_action_on_undetermined a
+  let rec mark_of_bound : Sort.t t -> Addressability.Mark.t = function
+    | Any (_, a) -> Addressability.Mark.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Exact Addressable | Join -> a
+      | Exact Addressable | Join -> Addressability.Mark.of_slot a
       | Exact Id ->
         if Addressability.sort_is_always_addressable s
-        then Exact Addressable
-        else a)
+        then Marked
+        else Addressability.Mark.of_slot a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
-      | Addressable -> Addressability.Exact Addressable
-      | Id -> Addressability.combine_product (List.map mark_of_bound ts))
+      | Addressable -> Addressability.Mark.Marked
+      | Id -> Addressability.Mark.combine_product (List.map mark_of_bound ts))
 
   (* The component kinds of a [Sort (sort, _, slot)] node viewed as a
      product of [arity] components, or [None] if [sort] cannot be one:
@@ -450,7 +455,7 @@ module Layout = struct
        [Addressable], and nodes with differing marks otherwise are
        (conservatively) unequal, mirroring the treatment of scannable axes
        below. *)
-    let marks_equal t1 t2 = Addressability.equal (mark t1) (mark t2) in
+    let marks_equal t1 t2 = Addressability.Mark.equal (mark t1) (mark t2) in
     match t1, t2 with
     | Sort (s1, sa1, _), Sort (s2, sa2, _) ->
       sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
@@ -550,17 +555,17 @@ module Layout = struct
         Some (Any (sa, Addressability.Action.Addressable))
       | Sort (s, sa, _) ->
         Option.map
-          (fun a -> Sort (s, sa, a))
-          (Addressability.meet (Addressability.Exact Addressable) (mark t))
+          (fun m -> Sort (s, sa, Addressability.Mark.to_slot m))
+          (Addressability.Mark.meet Marked (mark t))
       | Product (ts, _) -> (
         match mark t with
-        | Exact Addressable ->
+        | Marked ->
           (* Already addressable (marked, or derived from the components);
              in particular, don't turn a derived addressability into a
              mark. *)
           Some t
-        | Exact Id -> None
-        | Join ->
+        | Unmarked -> None
+        | Flexible ->
           (* Not yet determined: record the constraint as a mark. *)
           Some (Product (ts, Addressability.Action.Addressable))))
 
@@ -574,9 +579,9 @@ module Layout = struct
          which the collapses depend. *)
       let mark_sub t1 t2 : Misc.Le_result.t =
         let m1 = mark t1 in
-        if not (Addressability.le m1 (mark_of_bound t2))
+        if not (Addressability.Mark.le m1 (mark_of_bound t2))
         then Not_le
-        else if Addressability.equal m1 (mark t2)
+        else if Addressability.Mark.equal m1 (mark t2)
         then Equal
         else Less
       in
@@ -587,9 +592,9 @@ module Layout = struct
            is strictly below the top [any]. *)
         Misc.Le_result.combine
           (Scannable_axes.less_or_equal sa1 sa2)
-          (Addressability.less_or_equal
-             (Addressability.of_action_on_undetermined a1)
-             (Addressability.of_action_on_undetermined a2))
+          (Addressability.Mark.less_or_equal
+             (Addressability.Mark.of_action_on_undetermined a1)
+             (Addressability.Mark.of_action_on_undetermined a2))
       | Sort (sort, sa1, _), Any (sa2, _) ->
         (* CR layouts-scannable: If [sort] has not been filled and
            [sa1] </= [sa2], we conservatively say that it is [Not_le].
@@ -652,12 +657,12 @@ module Layout = struct
   (* The marks of the two kinds, met; [None] means the kinds are disjoint.
      As in [sub], callers must perform their sort equations (including any
      component intersections) BEFORE reading: filling a sort variable can
-     collapse an [Exact Id] slot to [Exact Addressable] - e.g. an instance
+     collapse an [Exact Id] slot to a [Marked] reading - e.g. an instance
      copy of a rigid binder meeting [bits64], whose plain and marked forms
      coincide - so reading first finds disjointness where none exists.
      (Note that, as for the scannable axes in [sub], sorts equated by a
      failing intersection stay equated.) *)
-  let meet_marks t1 t2 = Addressability.meet (mark t1) (mark t2)
+  let meet_marks t1 t2 = Addressability.Mark.meet (mark t1) (mark t2)
 
   let rec intersection t1 t2 =
     match t1, t2 with
@@ -674,7 +679,10 @@ module Layout = struct
       then
         match meet_marks t1 t2 with
         | None -> None
-        | Some a -> Some (Sort (s1, Scannable_axes.meet sa1 sa2, a))
+        | Some a ->
+          Some
+            (Sort
+               (s1, Scannable_axes.meet sa1 sa2, Addressability.Mark.to_slot a))
       else None
     | Product (ts1, a1), Product (ts2, a2) ->
       if List.compare_lengths ts1 ts2 = 0
@@ -809,7 +817,7 @@ module Layout = struct
             :: addressable_words a ~implied:false))
       | Product (ts, a) -> (
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        let implied = Addressability.all_addressable (List.map mark ts) in
+        let implied = Addressability.Mark.all_marked (List.map mark ts) in
         match action_words a ~implied with
         | [] -> Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
         | words ->
@@ -1113,9 +1121,9 @@ module Base = struct
       match
         Misc.Le_result.combine
           (Scannable_axes.less_or_equal sa_k sa_any)
-          (Addressability.less_or_equal
-             (Addressability.of_action_on_undetermined a_k)
-             (Addressability.of_action_on_undetermined a_any))
+          (Addressability.Mark.less_or_equal
+             (Addressability.Mark.of_action_on_undetermined a_k)
+             (Addressability.Mark.of_action_on_undetermined a_any))
       with
       | Equal | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -1259,7 +1267,7 @@ module Base_and_axes = struct
               match jkind.base with
               | Kconstr (_, _, a') -> Addressability.Action.equal a' Addressable
               | Layout l ->
-                Addressability.equal (Layout.Const.mark l) (Exact Addressable))
+                Addressability.Mark.equal (Layout.Const.mark l) Marked)
           in
           addressable_mark_won't_change_jkind
         then
@@ -2025,9 +2033,9 @@ module Jkind_desc = struct
         match
           Misc.Le_result.combine
             (Scannable_axes.less_or_equal sa_k sa_any)
-            (Addressability.less_or_equal
-               (Addressability.of_action_on_undetermined a_k)
-               (Addressability.of_action_on_undetermined a_any))
+            (Addressability.Mark.less_or_equal
+               (Addressability.Mark.of_action_on_undetermined a_k)
+               (Addressability.Mark.of_action_on_undetermined a_any))
         with
         | Equal | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -2132,7 +2140,7 @@ module Const = struct
     | Layout l -> Layout.Const.mark l
     | Kconstr (_, _, a) ->
       (* The mark of a pending action on an abstract kind. *)
-      Addressability.of_action_on_undetermined a
+      Addressability.Mark.of_action_on_undetermined a
 
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
@@ -2284,7 +2292,7 @@ module Const = struct
             (get_scannable_axes_of_fully_expanded actual)
         in
         let addressability_diff =
-          Addressability.to_string_list_diff
+          Addressability.Mark.to_string_list_diff
             ~base:(get_mark_of_fully_expanded base_jkind)
             (get_mark_of_fully_expanded actual)
         in
@@ -2518,9 +2526,9 @@ module Const = struct
   let apply_addressable ?prior_annot ~warn env ~loc t =
     let t = Base_and_axes.fully_expand_aliases_const env t in
     let already_addressable =
-      Addressability.equal
+      Addressability.Mark.equal
         (get_mark_of_fully_expanded t)
-        (Addressability.Exact Addressable)
+        Addressability.Mark.Marked
     in
     if already_addressable
     then (
@@ -2804,19 +2812,19 @@ module Desc = struct
     | Var _ | Genvar _ | Univar _ -> false
 
   (* As [Layout.mark], over flat sorts. *)
-  let rec layout_mark : Sort.Flat.t Layout.t -> Addressability.t = function
-    | Any (_, a) -> Addressability.of_action_on_undetermined a
+  let rec layout_mark : Sort.Flat.t Layout.t -> Addressability.Mark.t = function
+    | Any (_, a) -> Addressability.Mark.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
-      | Exact Addressable -> a
+      | Exact Addressable -> Addressability.Mark.Marked
       | Exact Id | Join ->
         if flat_sort_is_always_addressable s
-        then Addressability.Exact Addressable
-        else a)
+        then Addressability.Mark.Marked
+        else Addressability.Mark.of_slot a)
     | Product (ts, a) -> (
       match (a : Addressability.Action.t) with
-      | Addressable -> Addressability.Exact Addressable
-      | Id -> Addressability.combine_product (List.map layout_mark ts))
+      | Addressable -> Addressability.Mark.Marked
+      | Id -> Addressability.Mark.combine_product (List.map layout_mark ts))
 
   let format_verbose ~verbosity env ppf t =
     let rec format_desc ~nested ppf (desc : _ t) =
@@ -2845,7 +2853,7 @@ module Desc = struct
         let implied =
           (* Whether the components already imply addressability, making a
              root mark uninformative. *)
-          Addressability.all_addressable (List.map layout_mark lays)
+          Addressability.Mark.all_marked (List.map layout_mark lays)
         in
         match (a : Addressability.Action.t) with
         | Addressable when not implied ->

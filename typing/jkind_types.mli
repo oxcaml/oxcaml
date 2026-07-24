@@ -153,17 +153,9 @@ module Addressability : sig
     | Exact of Action.t
     | Join
 
+  type slot = t
+
   val equal : t -> t -> bool
-
-  val less_or_equal : t -> t -> Misc.Le_result.t
-
-  val le : t -> t -> bool
-
-  val meet : t -> t -> t option
-
-  val combine_product : t list -> t
-
-  val all_addressable : t list -> bool
 
   val of_action_on_undetermined : Action.t -> t
 
@@ -175,10 +167,37 @@ module Addressability : sig
 
   val print : Format_doc.formatter -> t -> unit
 
+  module Mark : sig
+    type t = Jkind_axis.Addressability.Mark.t =
+      | Marked
+      | Unmarked
+      | Flexible
+
+    val of_slot : slot -> t
+
+    val to_slot : t -> slot
+
+    val equal : t -> t -> bool
+
+    val less_or_equal : t -> t -> Misc.Le_result.t
+
+    val le : t -> t -> bool
+
+    val meet : t -> t -> t option
+
+    val combine_product : t list -> t
+
+    val all_marked : t list -> bool
+
+    val of_action_on_undetermined : Action.t -> t
+
+    val to_string : t -> string
+  end
+
   module Verdict : sig
     type t = Jkind_axis.Addressability.Verdict.t =
-      | Unaddressable
-      | Addressable
+      | Known_unaddressable
+      | Known_addressable
       | Undetermined
 
     val consistent : t -> t -> bool
@@ -198,14 +217,14 @@ module Addressability : sig
   (** The intrinsic addressability of a sort, as a verdict about its *plain*
       kind, insofar as it is determined: the addressability of an unfilled sort
       variable is not yet known ([Undetermined]). This is a mark-free question,
-      so it can be definite ([Unaddressable]) even while the marks over the sort
-      are undetermined. *)
+      so it can be definite ([Known_unaddressable]) even while the marks over
+      the sort are undetermined. *)
   val of_sort : Sort.t -> Verdict.t
 
   (** Whether every kind with this sort is addressable, whatever its marks: the
       plain kind is intrinsically addressable, so the plain, marked, and join
       forms all coincide, and readers may collapse unmarked and join slots to
-      [Addressable]. *)
+      [Mark.Marked]. *)
   val sort_is_always_addressable : Sort.t -> bool
 end
 
@@ -277,7 +296,7 @@ module Layout : sig
         components; [Univar]/[Genvar] layouts read their stored slot ([Exact Id]
         on a rigid variable is exactly the plain form, with no claim about its
         addressability). *)
-    val mark : t -> Addressability.t
+    val mark : t -> Addressability.Mark.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
