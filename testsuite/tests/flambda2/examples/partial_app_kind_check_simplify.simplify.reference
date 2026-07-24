@@ -1,33 +1,10 @@
-let code f_1 deleted in
-let code loopify(never) size(7) stub
-      partial_f_2 (param1)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  let f = %project_value_slot.[partial_f].[f] (my_closure) in
-  apply &my_alloc_region (f : val * val -> imm tagged) (0, param1) -> k * k1
-in
 let code test_0 deleted in
-let code inline(never) loopify(never) size(1) newer_version_of(f_1)
-      f_1_1 (param, param_1)
-        my_closure &my_alloc_region my_depth
-        -> k * k1
-        : imm tagged =
-  cont k (0)
-in
-let $camlPartial_app_kind_check_simplify__f_4 =
-  closure f_1_1 @f &toplevel.alloc_region
-in
-let $camlPartial_app_kind_check_simplify__partial_f_5 =
-  closure partial_f_2 @partial_f &toplevel.alloc_region
-  with { f = $camlPartial_app_kind_check_simplify__f_4 }
-in
-let code loopify(never) size(1) newer_version_of(test_0)
+let code loopify(never) size(0) newer_version_of(test_0)
       test_0_1 (u : imm tagged, a, b)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int64 =
-  cont k ($camlPartial_app_kind_check_simplify__partial_f_5)
+  invalid "(Application_result_kind_mismatch\n (result_arity \240\157\149\141?) (apply_expr\n  (((Some\n    Partial_app_kind_check_simplify.camlPartial_app_kind_check_simplify__f_5)\227\128\136k32\227\128\137\227\128\138k31\227\128\139(0))\n   (args_arity \240\157\149\141=tagged_\226\132\149\240\157\149\154) (return_arity \226\132\149\240\157\159\158\240\157\159\156)\n   (call_kind\n    (Function\n     (function_call (Direct camlPartial_app_kind_check_simplify__f_2_5_code))))\n   (alloc_mode (Heap (alloc my_alloc_region/85N)))\n   (dbg partial_app_kind_check_simplify.ml:16,2--14) (inline Default_inlined)\n   (inlining_state (depth 0, arguments O3)) (probe ()) (position Normal))))"
 in
 let $camlPartial_app_kind_check_simplify__test_3 =
   closure test_0_1 @test &toplevel.alloc_region
