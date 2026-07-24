@@ -81,6 +81,9 @@ val function_arg_layout :
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
 
+(* Locally enable caching of [value_kind] *)
+val with_cache : (unit -> 'a) -> 'a
+
 val transl_mixed_block_element :
   Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
   -> unit Lambda.mixed_block_element
