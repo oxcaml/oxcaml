@@ -13,8 +13,8 @@ in
 let code loopify(never) size(22) newer_version_of(f_1)
       f_1_1
         (c : imm tagged,
-         m : [ 0 | 0 of val ],
-         n : [ 0 | 0 of val ],
+         m : [ 0 | 0 of imm tagged ],
+         n : [ 0 | 0 of imm tagged ],
          x' : imm tagged,
          y' : imm tagged)
         my_closure &my_alloc_region my_depth

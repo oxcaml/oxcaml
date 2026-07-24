@@ -574,14 +574,14 @@ and ident_some = ident_create "Some"
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
 
-let option_argument_sort = Jkind_types.Sort.Const.scannable
-let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
+let option_argument_sort = None
+let option_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
-    ca_sort=Jkind_types.Sort.Const.some ca_sort;
+    ca_sort;
     ca_modalities=Mode.Modality.Const.id;
     ca_loc=Location.none
   }
@@ -601,8 +601,8 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = Jkind_types.Sort.Const.scannable
-let list_argument_sort = Jkind_types.Sort.Const.scannable
+let list_sort = Jkind_types.Sort.Const.(some scannable)
+let list_argument_sort = Jkind_types.Sort.Const.(some scannable)
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
@@ -629,7 +629,7 @@ let add_predef_jkinds add_jkind env =
     (fun env (id, jkind) -> add_jkind id jkind env) env
     predef_jkinds
 
-let or_null_argument_sort = Jkind_types.Sort.Const.scannable
+let or_null_argument_sort = Jkind_types.Sort.Const.(some scannable)
 
 let or_null_jkind param =
   Jkind.Const.Builtin.value_or_null_mod_everything
@@ -1244,3 +1244,9 @@ let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
 
 let builtin_idents = List.rev !builtin_idents
+
+(* Externally, this is the jkind of an optional argument, as opposed to the
+   jkind of the argument to the [option] type. *)
+(* CR-soon lmaurer: Remove this when these are once again the same. *)
+let option_argument_jkind =
+  Jkind.Builtin.value_or_null ~why:Optional_argument
