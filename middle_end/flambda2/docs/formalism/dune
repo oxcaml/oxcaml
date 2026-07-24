@@ -1,0 +1,50 @@
+;; Written by Claude.
+;;
+;; Regenerates the formalism's rule-index.md and the rule/case-study counts
+;; in README.md via tools/regen_rule_index.py. Not part of the default
+;; build; from the repository root, run
+;;
+;;   dune build --root=. --workspace=duneconf/main.ws \
+;;     @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote
+;;
+;; to regenerate and promote the results into the tree.
+
+;; The Rocq mechanization under rocq/ builds independently via _CoqProject +
+;; rocq makefile; keep dune from scanning it (its in-tree .vo/.glob artifacts
+;; would otherwise become spurious deps of the regen rule below).
+(dirs :standard \ rocq)
+
+(rule
+ (targets rule-index.new.md README.new.md)
+ (deps
+  ;; The script, the chapters, the case studies, and every source file the
+  ;; chapters' CODE anchors can point at. Anchor paths are resolved against
+  ;; both the repository root and middle_end/flambda2/, so depend on all of
+  ;; middle_end/flambda2/ plus the specific out-of-subtree files currently
+  ;; anchored. If a chapter gains a CODE anchor outside these roots, add the
+  ;; file here.
+  (source_tree ../..)
+  ../../../../backend/cmm.mli
+  ../../../../backend/cmm_helpers.ml
+  ../../../../driver/oxcaml_args.ml
+  ../../../../driver/oxcaml_flags.ml)
+ (action
+  (run
+   python3
+   %{dep:tools/regen_rule_index.py}
+   --out-index
+   rule-index.new.md
+   --out-readme
+   README.new.md)))
+
+(rule
+ (mode promote)
+ (alias regen-rule-index)
+ (action
+  (diff rule-index.md rule-index.new.md)))
+
+(rule
+ (mode promote)
+ (alias regen-rule-index)
+ (action
+  (diff README.md README.new.md)))

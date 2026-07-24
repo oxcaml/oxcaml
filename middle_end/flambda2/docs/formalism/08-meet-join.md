@@ -1,0 +1,950 @@
+# Meet, join, provers and reification
+
+*Part of the Flambda 2 formalism; see [README.md](README.md).*
+
+Chapter [`07-types-domain.md`](07-types-domain.md) defines the abstract domain:
+the type grammar (metavariable `T`, code type `Type_grammar.t`), typing
+environments (`E`, `Typing_env.t`), environment extensions (`ε`,
+`Typing_env_extension.t`), and the concretization `γ_E(T) ⊆ Val` — the set of
+runtime values a type denotes in an environment. This chapter covers the four
+operations Simplify performs *on* that domain:
+
+- **meet** (`⊓`) — the greatest lower bound, used by every transfer function
+  that *adds* a constraint (branch conditions, subkind constraints from the
+  OCaml type system, projections). Meet also drives reduction, so it returns not
+  just a type but an environment extension `ε` recording newly-learned equations.
+- **join** (`⊔`) — the least upper bound, used at control-flow merge points
+  (continuation handlers with several predecessors).
+- **provers** — read-only queries (`E ⊢ prove_X(s) ⇒ r`) that Simplify uses to
+  decide whether a rewrite is applicable.
+- **expand_head** and **reify** — expansion of an alias/type to its head, and
+  the conversion of a type back to a term or static constant when it denotes a
+  single known value (used for constant propagation and lifting).
+
+This chapter references the domain and `γ_E` from [§07](07-types-domain.md); it does not
+redefine them. It introduces two chapter-local judgment forms for expansion and
+reification (declared in their sections), in addition to the meet/join/prove
+forms declared in the README.
+
+## Implementation variants and dispatch
+
+There are two implementations of meet and join, selected together by the
+`-flambda2-join-algorithm` flag (`Oxcaml_flags.join_algorithm`, values `Binary`
+| `N_way` | `Checked`; **default `Binary`**).
+
+- **`Binary`** (default): meet is `Meet_and_join.meet`; the merge at join points
+  is the old level-based binary join in `Join_levels_old.cut_and_n_way_join`,
+  which folds the branches pairwise through the binary `Meet_and_join.join`.
+- **`N_way`**: meet is `Meet_and_n_way_join.meet`; the merge is the true n-way
+  join `Join_env.cut_and_n_way_join_with_analysis`. Required by the
+  match-in-match optimization (`Flambda_features.join_algorithm` forces `N_way`
+  when `match_in_match` is on).
+- **`Checked`**: runs both join implementations and reports names whose joined
+  types differ (a debugging mode); the environment it returns is the new one.
+
+`Flambda_features.use_n_way_join` returns `true` only for `N_way`, and
+`Meet.meet` (`types/meet.ml`) dispatches the top-level meet on it. There is a
+separate legacy flag `-flambda2-meet-algorithm=basic|advanced`; it is accepted
+but is a **no-op** in the current code (it only validates its argument).
+
+Except where noted, the rules below describe the **default (`Binary`)** path.
+The soundness *specifications* (`normative` rules) are shared by both
+implementations; the *algorithmic* descriptions (`descriptive`) follow
+`Meet_and_join.ml` / `Join_levels_old`, with the n-way join described separately.
+
+```rule
+RULE T.Meet.Dispatch
+CLAIM descriptive
+CODE middle_end/flambda2/types/meet.ml#meet
+CODE middle_end/flambda2/ui/flambda_features.ml#use_n_way_join
+CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
+CAVEAT disclosure: -flambda2-meet-algorithm is accepted but a no-op in driver/oxcaml_args.ml; meet-vs-join algorithm selection is entirely via -flambda2-join-algorithm.
+---
+join_algorithm() = Binary  (default)
+--------------------------------------------------
+meet := Meet_and_join.meet    (binary)
+join-at-merge-points := Join_levels_old.cut_and_n_way_join (pairwise binary join)
+NOTES: N_way selects Meet_and_n_way_join.meet and Join_env.cut_and_n_way_join_with_analysis.
+  Checked runs both merges and diffs them. -flambda2-meet-algorithm is a no-op.
+```
+
+## 1. Meet
+
+### Specification
+
+The public entry point is
+`meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t`
+(`flambda2_types.mli`). Given `E`, `T₁`, `T₂` (necessarily of the same kind), it
+returns either `Bottom` or a pair `(T, E′)` where `E′` is `E` augmented with the
+equations learned during the meet. In the judgment `E ⊢ T₁ ⊓ T₂ = T ▷ ε`, the
+extension `ε` is exactly the delta `E′ ∖ E`; we write `E; ε` for `E′`.
+
+Meet is the operation by which Simplify *refines* what it knows. The
+safety-critical direction is therefore that meet must **not drop** any value
+consistent with both inputs.
+
+```rule
+RULE T.Meet.Sound
+CLAIM normative
+CODE middle_end/flambda2/types/meet.ml#meet
+CODE middle_end/flambda2/types/env/meet_env.ml#meet
+---
+E ⊢ T₁ ⊓ T₂ = T ▷ ε
+--------------------------------------------------
+γ_{E;ε}(T) ⊇ γ_E(T₁) ∩ γ_E(T₂)
+NOTES: Over-approximation of the intersection. The *ideal* meet is exact,
+  γ_{E;ε}(T) = γ_E(T₁) ∩ γ_E(T₂); the domain returns a representable type that
+  contains the intersection when it cannot represent it exactly. This is the
+  direction that makes refinement sound: whatever value a name really has, if it
+  was in both γ_E(T₁) and γ_E(T₂), it is still in the refined type. The
+  extension ε is likewise sound: any concrete valuation of E in which the
+  meet'd value lies in both γ_E(T₁) and γ_E(T₂) satisfies ε.
+```
+
+```rule
+RULE T.Meet.Bottom
+CLAIM normative
+CODE middle_end/flambda2/types/meet.ml#meet
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+---
+E ⊢ T₁ ⊓ T₂ = ⊥
+--------------------------------------------------
+γ_E(T₁) ∩ γ_E(T₂) = ∅
+NOTES: A ⊥ result asserts the two facts are jointly unsatisfiable, i.e. the
+  program point is unreachable. This must hold on the nose: Simplify turns a ⊥
+  meet into dead code / Invalid, so an unsound ⊥ would delete live code.
+```
+
+Meet is also intended to be a genuine lower bound (`γ_{E;ε}(T) ⊆ γ_E(T₁)` and
+`⊆ γ_E(T₂)`), i.e. the *greatest* lower bound in the lattice — the `.mli`
+describes it as "greatest lower bound of two types". The implementation aims for
+exactness; the lower-bound property can be lost only in the incomplete corners
+of the `Row_like` domain (partially-known tag/size; see [§07](07-types-domain.md) and the
+`join` incompleteness note below). We record this as the design intent rather
+than a separately-verified guarantee.
+
+```rule
+RULE T.Meet.GreatestLowerBound
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.mli#meet
+CAVEAT known-false: GLB fails as a universal claim — Variant ⊓ Mutable_block discards Row_like equations (meet_and_join.ml ~line 1017), returning a sound lower bound that is not greatest; sharpest witness T.Meet.MutableBlockMissedBottom, whose result γ is disjoint from an input's.
+---
+E ⊢ T₁ ⊓ T₂ = T ▷ ε
+--------------------------------------------------
+γ_{E;ε}(T) ⊆ γ_E(T₁)   and   γ_{E;ε}(T) ⊆ γ_E(T₂)
+NOTES: Design intent (GLB). Combined with T.Meet.Sound this would make meet
+  exact. It is *refutable* as a universal claim: the Variant-vs-Mutable_block
+  case in meet_head_of_kind_value_non_null returns a Mutable_block carrying only
+  the met alloc modes, discarding the Row_like equations on the known immutable
+  fields of the Variant input (the code comment there gives a concrete example
+  where sharing is lost). The result's concretization is then *not* ⊆ the
+  Variant input's. The sharpest witnessed form of this failure is
+  T.Meet.MutableBlockMissedBottom: an immediates-only variant (blocks = Known ⊥)
+  ⊓ Mutable_block returns Mutable_block, whose γ is DISJOINT from the left input's
+  γ — the meet result denotes a set sharing no value with an input, not merely a
+  set larger than the ideal GLB. Exactness holds elsewhere; the code itself
+  documents this and the other incomplete Row_like corners as precision
+  losses. Not separately verified.
+```
+
+### The three input shapes: aliases first
+
+The top-level meet (`Meet_env.meet`, called via `Meet_and_join.meet`) classifies
+each input by whether it is (or canonicalizes to) an *alias* type `= s`. Writing
+`can_E(T)` for the canonical simple of `T` when `T` is an alias:
+
+```rule
+RULE T.Meet.AliasAlias
+CLAIM normative
+CODE middle_end/flambda2/types/env/meet_env.ml#meet
+CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
+---
+can_E(T₁) = s₁     can_E(T₂) = s₂
+ε records the alias equation s₁ = s₂ (demoting the later-bound to the earlier)
+the underlying types of s₁ and s₂ are met, contributing further equations to ε
+--------------------------------------------------
+E ⊢ T₁ ⊓ T₂ = (= s₁) ▷ ε        (equivalently (= s₂); both are correct)
+NOTES: Meeting two aliases always records their equality, so returning either
+  alias is sound (the code returns Both_inputs). Canonicalization uses the total
+  order on names (binding times) from [§07](07-types-domain.md): the later name is demoted, its
+  previous concrete type is met onto the canonical one so no information is lost.
+```
+
+```rule
+RULE T.Meet.AliasConcrete
+CLAIM normative
+CODE middle_end/flambda2/types/env/meet_env.ml#meet
+CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
+---
+can_E(T₁) = s₁     T₂ is a non-alias (concrete) type
+ε refines the type of s₁ by meeting its existing type with T₂ (and any
+  reductions that triggers)
+--------------------------------------------------
+E ⊢ T₁ ⊓ T₂ = (= s₁) ▷ ε
+NOTES: The result is the alias; the informative part is ε. Symmetric case
+  (concrete on the left, alias on the right) returns (= s₂). When both inputs
+  are concrete, the result is the meet of their expanded heads (next section).
+```
+
+`add_concrete_equation_on_canonical` is where reduction happens: adding a type
+to a canonical name meets it with the name's *existing* type, and recursively
+propagates demotions (`record_demotion`) and relational reductions. Recursive
+equations on a name already being updated are dropped
+(`adding_equation_for_name`), which is what bounds the reduction fixpoint.
+
+When the canonical simple carries a non-identity coercion, the meet result is
+stored coercion-erased — a value-level-sound skew the inliner can nonetheless
+observe.
+
+```rule
+RULE T.Meet.Store.CoercionErasure
+CLAIM descriptive
+CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
+CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
+CODE middle_end/flambda2/identifiers/coercion0.mli#change_depth
+CODE middle_end/flambda2/types/grammar/type_grammar.ml#apply_coercion
+CHECKED @ 7bf23efaf6
+CAVEAT disclosure: rec_info skew is replacement, not composition — apply_coercion_function_type ignores `from` (CR lmaurer, type_grammar.ml:2154-58).
+CAVEAT disclosure: silent coercion erasure reachable for closures/Unknown/alias canonicals and for heads apply_coercion passes untouched (Mutable_block, Region, Value heads with non_null Unknown/Bottom); the is_id-gated concrete heads (Variant, Boxed_*, String, Array) instead fatal-error at store time (meet_env.ml:161) — crash landmine, not soundness hole, for those.
+CAVEAT watch(W-37): soundness rests on coercions being value-preserving and γ ignoring Rec_info; a future non-value-preserving coercion or Rec_info-sensitive γ breaks soundness at this store point.
+---
+add_equation resolves a name x to its canonical simple  y @ co  with co ≠ Id;
+the incoming fact ty (a type of y @ co) meets the coerced existing type
+apply_coercion(T_y, co), producing Left_input or New_result ty'
+--------------------------------------------------
+meet_env stores ty' DIRECTLY on y (replace_concrete_equation env name ty'),
+without applying co⁻¹. The stored equation is thus the type of y @ co, not of y:
+the coercion is erased at store time. This is value-level sound ONLY because a
+coercion "must not alter the run-time value of its argument" (coercion0.mli; the
+only non-Id coercion is Change_depth), so γ — which ignores Rec_info
+([§07](07-types-domain.md) §6) — is coercion-invariant; but the rec_info/depth
+components recorded on y are skewed by co, and those are exactly what the inliner
+reads ([§11](11-inlining.md)).
+NOTES: The same erasure occurs on the demotion path (record_demotion). Nothing in
+meet_env checks Coercion.is_id before replace_concrete_equation. Two sharpenings:
+(a) the rec_info skew is REPLACEMENT, not composition — apply_coercion_function_type
+ignores `from` (CR lmaurer, type_grammar.ml:2154-58); (b) the silent erasure is
+NOT confined to CLOSURES / Unknown / alias canonicals: apply_coercion passes
+Mutable_block (type_grammar.ml:1923), Region, and Value heads whose non_null is
+Unknown/Bottom untouched under any coercion, so those store silently too; only
+the is_id-gated concrete heads (Variant, Boxed_*, String, Array) yield Bottom
+on a non-Id coercion and FATAL-ERROR at store time (meet_env.ml:161) — a crash
+landmine, not a soundness hole, for those heads. If a future coercion violated
+value-preservation, or if γ ever constrained Rec_info, this point is where
+soundness would break. Composes:
+T.Meet.AliasConcrete, T.Env.Canonical.Least, [§07](07-types-domain.md) §6.
+```
+
+### Head-vs-head meet
+
+When both inputs are concrete, meet expands each to a head
+(`Expand_head.expand_head0`) and dispatches on the kind
+(`meet_expanded_head0`). Naked-number kinds meet by finite-set intersection;
+`Value` heads meet structurally.
+
+```rule
+RULE T.Meet.NakedNumber
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_expanded_head0
+CODE middle_end/flambda2/types/meet_and_join.ml#set_meet
+---
+T₁, T₂ are heads of the same naked-number kind, denoting immediate sets S₁, S₂
+--------------------------------------------------
+E ⊢ T₁ ⊓ T₂ = (the head for S₁ ∩ S₂) ▷ ∅        (⊥ if S₁ ∩ S₂ = ∅)
+NOTES: Naked floats/int8/16/32/64/nativeint/vec128/256/512 and naked immediates.
+  No extension is produced (no relational content), except naked-immediate meet
+  which additionally reduces is_int/get_tag/is_null relations (T.Meet.Relational).
+```
+
+```rule
+RULE T.Meet.ValueHeadIncompatible
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+CAVEAT disclosure: ⊥ for differing value-head constructors assumes no dubious Obj uses mixing representations; per the code comment it "could break very hard" otherwise.
+---
+T₁, T₂ are non-null value heads with different top constructors
+  (e.g. Variant vs Boxed_float, String vs Closures, ...)
+(excluding the Variant/Mutable_block pair, handled specially)
+--------------------------------------------------
+E ⊢ T₁ ⊓ T₂ = ⊥
+NOTES: "This assumes that all the different constructors are incompatible. This
+  could break very hard for dubious uses of Obj." Boxed numbers of matching
+  flavour, closures, strings and arrays meet componentwise; Variant meets
+  Variant via T.Meet.Variant. Mutable_block vs Variant is treated as
+  Mutable_block being the more precise (meeting only the alloc modes).
+```
+
+The Mutable_block-vs-Variant case is the sharpest witnessed failure of the GLB
+reading: it inspects only the alloc mode and can return a type whose γ is disjoint
+from an input's.
+
+```rule
+RULE T.Meet.MutableBlockMissedBottom
+CLAIM descriptive
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+CHECKED @ 7bf23efaf6
+CAVEAT disclosure: no in-compiler trigger known (Mutable_block types attach only to fresh names; shapes never Mutable_block) — domain-level types-API counterexample, not a witnessed Simplify miscompile; same flank as S.Struct.EnvRefineOnly (b).
+CAVEAT disclosure: after the missed ⊥, downstream prover answers about the name are vacuously sound but epistemically garbage; Simplify also misses the Invalid/dead-code detection.
+---
+meeting T₁ = Variant{immediates = S ≠ ⊥, blocks = Known B} against
+T₂ = Mutable_block, where γ_E(T₁) ∩ γ_E(T₂) = ∅ (e.g. B the empty row-like: T₁ an
+immediates-only variant, denoting no blocks at all)
+--------------------------------------------------
+E ⊢ T₁ ⊓ T₂ = Mutable_block (alloc modes met) — NOT ⊥. The case inspects ONLY
+`blocks`'s alloc mode; it ignores the immediates arm and does not check whether
+the blocks arm is inhabited. Traced through the meet (types API; not a
+checked-in test): these_tagged_immediates {-1,0,1} ⊓ Mutable_block Heap =
+(Val! (Mutable_block Heap)), not Bottom.
+NOTES: meet_alloc_mode has NO Bottom result (meet_and_join.ml:696-703), so nothing
+downstream of the alloc-mode meet can rescue the ⊥ — the miss is structural. No
+normative rule is violated (T.Meet.Bottom constrains only ⊥ results; T.Meet.Sound
+holds vacuously, ⊇ ∅), but the result γ is DISJOINT from the left input's, with
+two costs: (a) Simplify misses turning the point into Invalid (missed dead-code
+detection); (b) every downstream prover answer about the name is vacuously sound
+but epistemically garbage. Reachability caveat (same flank as
+S.Struct.EnvRefineOnly (b)): no in-compiler trigger is known — Mutable_block types
+attach only to fresh names, and shapes are never Mutable_block — so this is a
+domain-level (types-API) counterexample, not a witnessed Simplify miscompile.
+Sharpens the T.Meet.GreatestLowerBound corner. Composes: T.Meet.Bottom,
+T.Meet.GreatestLowerBound.
+```
+
+The `Value` kind additionally carries a nullability component (`is_null`):
+`Not_null` meets `Maybe_null` to `Not_null`, and two `Maybe_null` components meet
+their `is_null` relation variables. This is folded together with the non-null
+head via `meet_disjunction`.
+
+### Variants: relational information and per-case extensions
+
+A `Variant` head bundles the immediates (tagged-integer constructors), the
+`Row_like_for_blocks` (boxed constructors), and relational fields `is_int`,
+`get_tag`, and per-disjunct `extensions` ([§07](07-types-domain.md)). Meeting variants must
+preserve and propagate this relational content.
+
+```rule
+RULE T.Meet.Variant
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_variant
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_relation
+---
+meeting Variant{is_int₁,get_tag₁,blocks₁,imms₁,ext₁} with Variant{is_int₂,...}
+--------------------------------------------------
+immediates := imms₁ ⊓ imms₂        blocks := blocks₁ ⊓ blocks₂ (Row_like meet)
+is_int, get_tag: the relation variables are aliased (meet_relation)
+extensions: joined across the surviving disjuncts (meet_disjunction)
+result is ⊥ iff both the immediates and the blocks components are ⊥
+NOTES: get_tag is met *inside* meet_disjunction because reductions it triggers
+  (learning the tag) are only valid when the value is a block, so they must be
+  captured in an extension rather than added to the ambient environment. is_int
+  is met outside, in the ambient environment, because every variant has a
+  well-defined is_int. is_unique is the OR of the inputs (propagated for both
+  meet and join). This is the mechanism the types.md "extensions in the
+  environment" section describes: when only one disjunct survives, its extension
+  is added to the result.
+```
+
+```rule
+RULE T.Meet.BlockShape
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks
+CODE middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks
+CODE middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape
+CODE middle_end/flambda2/kinds/flambda_kind.ml#Block_shape.equal
+VERIFIED 14-validation/mixed-04-join.md @ c59c5780b0
+---
+meeting two block cases with shapes σ₁, σ₂ (as part of the Row_like block meet):
+  Block_shape.equal σ₁ σ₂  ⟹  the met index keeps shape σ₁ (fields met pointwise)
+  ¬ Block_shape.equal σ₁ σ₂ ⟹  the two cases do not meet (that index pair is ⊥)
+joining two block cases:
+  Block_shape.equal σ₁ σ₂  ⟹  the joined index keeps shape σ₁
+  ¬ Block_shape.equal σ₁ σ₂ ⟹  the shape is Unknown for that index
+--------------------------------------------------
+Block-case meet/join require equal Block_shape (incl. equal Mixed_record σ);
+otherwise meet yields ⊥ for that case and join drops to Unknown shape.
+NOTES: meet_row_like_for_blocks passes meet_shape = (fun σ₁ σ₂ -> if
+Block_shape.equal σ₁ σ₂ then Ok σ₁ else Bottom); join_row_like_for_blocks passes
+join_shape = (fun σ₁ σ₂ -> if Block_shape.equal σ₁ σ₂ then Known σ₁ else Unknown).
+When join keeps a shape but a field join is Unknown, join_int_indexed_product
+fills that field with unknown_from_shape(σ, i) (the per-field top of the shape's
+element kind, [§07](07-types-domain.md)) rather than a bare Unknown, so the field-kind discipline
+of the shape is preserved. Block_shape.equal is exact (no subshaping): two mixed
+shapes differing in prefix size or any flat_suffix_element are incompatible.
+```
+
+```rule
+RULE T.Meet.Relational
+CLAIM descriptive
+CODE middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_naked_immediate
+---
+meeting a naked-immediate type carrying inverse relations Is_null / Is_int / Get_tag
+against a narrowed immediate set S
+--------------------------------------------------
+if S determines the relation, add the implied equation to the related name:
+  Is_int, S={1}  ⟹  related value : any_tagged_immediate
+  Is_int, S={0}  ⟹  related value : any_block
+  Get_tag, S determines tags  ⟹  related value : blocks_with_these_tags
+  (Is_null analogous with null / any_non_null_value)
+  S = ∅  ⟹  ⊥
+NOTES: This is the reduction from the tag/is_int relational domain back onto the
+  block/variant it constrains. Reverse reductions are only performed for
+  relations not already known on that side (avoids redundant work / loops).
+```
+
+### Termination
+
+Meet can recurse (head meet → field meet → ...) and the top-level extension
+must itself be re-applied by a further meet
+(`add_concrete_equation_on_canonical` meets against existing types).
+Convergence is guaranteed *not* by widening but by two structural facts, per
+types.md: the domains have no infinite descending chains, and meet never
+generates an extension that fails to strictly constrain the environment.
+`adding_equation_for_name` additionally drops equations on a name already being
+updated, breaking cycles through aliases.
+
+```rule
+RULE T.Meet.Terminates
+CLAIM descriptive
+CODE middle_end/flambda2/types/env/meet_env.ml#adding_equation_for_name
+CODE middle_end/flambda2/types/meet_and_join.ml#meet
+---
+--------------------------------------------------
+The meet/reduction fixpoint terminates: no infinite descending chains in the
+domains, extensions strictly constrain, recursive equations on an in-progress
+name are dropped.
+```
+
+## 2. Join
+
+### Specification
+
+Join is used to combine what is known on several incoming edges of a
+control-flow merge (a continuation handler with multiple predecessors). It must
+**over-approximate the union**: no value possible on any incoming edge may be
+lost.
+
+```rule
+RULE T.Join.Sound
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#join
+CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
+VERIFIED 14-validation/n_way_join_null.md @ 1c1940b7ea
+VERIFIED 14-validation/n_way_join_preserves_null.md @ 1c1940b7ea
+CAVEAT disclosure: least-upper-bound-ness is intent only; only the over-approximation direction (γ_E(T) ⊇ union of branch γ) is normative — join may legally return larger types up to Unknown.
+---
+E ⊢ T₁ ⊔ ⋯ ⊔ Tₙ = T
+--------------------------------------------------
+γ_E(T) ⊇ γ_E(T₁) ∪ ⋯ ∪ γ_E(Tₙ)
+NOTES: Least upper bound (intent). Unlike meet, join produces no extension: its
+  result type is added to the fork environment for the joined names. Join is
+  allowed to be imprecise (return a larger type, up to Unknown); it must never
+  be *smaller* than the union. There is no ⊥ result for a non-empty join (⊥
+  inputs are absorbed: joining ⊥ with T gives T).
+```
+
+Join has no widening (types.md, Introduction): the analysis is single-pass, so
+there is no fixpoint to widen. Imprecision is bounded instead by falling back to
+`Unknown`.
+
+### Binary join (default)
+
+The binary join (`Meet_and_join.join`) operates in a `Join_env` carrying three
+environments: the left branch env, the right branch env, and the *target*
+(the common ancestor / fork env into which the result is written). It prefers to
+return a **shared alias**: if `T₁` canonicalizes to `s₁` in the left env and `T₂`
+to `s₂` in the right, and the two names have a common alias that is bound
+strictly earlier than the name being defined, that alias is the join result.
+
+```rule
+RULE T.Join.SharedAlias
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#join
+---
+all_aliases_of(s₁) in target  ∩  all_aliases_of(s₂) in target  ∋  s
+(and, if joining under a bound_name, s is bound strictly earlier than bound_name)
+--------------------------------------------------
+E ⊢ T₁ ⊔ T₂ = (= s)
+NOTES: Aliases are preferred because the alias typically carries a concrete
+  equation anyway. Self-aliases and mutually-redundant equations (x:(=y),
+  y:(=x)) are filtered out via alias_is_bound_strictly_earlier.
+```
+
+A special case of the shared-alias mechanism: when every live branch agrees on the
+same constant, the join is exactly that constant — the join half of
+constant-propagation persistence.
+
+```rule
+RULE T.Join.ConstAgreement
+CLAIM normative
+CODE middle_end/flambda2/types/meet_and_join.ml#join
+CODE middle_end/flambda2/types/env/aliases.mli#find_best
+CODE middle_end/flambda2/types/env/typing_env.ml#alias_is_bound_strictly_earlier
+CODE middle_end/flambda2/types/env/binding_time.ml#consts
+---
+Flambda_features.join_points() = true (NOT the default; enabled at -O2/-O3 — at
+  default flags compute_handler_env SKIPS the join for ≥2 uses and the params get
+  subkind-only types, so a ≥2-use merge does NOT fold);
+E ⊢ T₁ ⊔ ⋯ ⊔ Tₙ at a merge point (either join algorithm);
+every branch i whose expanded head is not Bottom has canonical_{Eᵢ}(Tᵢ) = c for
+  the SAME constant c
+--------------------------------------------------
+the join result is exactly (= c) — not merely an over-approximation. Combined with
+T.Env.ConstCanonicalPersists this closes the loop: a proven constant survives both
+straight-line refinement and every control-flow merge whose live edges agree (a
+constant-propagation persistence theorem, conditioned on join_points()).
+NOTES: Mechanism (all in meet_and_join.ml#join): constants are self-canonical in
+every env (binding time consts = 0, T.Env.Canonical.Least), so each branch's
+canonical_simple is literally c; Simple.same returns the singleton {c}; the
+Bottom-branch cases return the live side's singleton (dead edges cannot destroy
+constant-ness); alias_is_bound_strictly_earlier passes (0 < any variable's binding
+time); find_best prefers constants. The pairwise Binary fold preserves this at
+every step ((= c) ⊔ (= c) = (= c), ⊥ absorbed). Witnessed under BOTH algorithms in
+meet_test.ml (join of two envs each with x = 42 ⟹ x : (= 42)). The
+join_points()-gate is the SAME flag gate as S.Struct.JoinParams.AnalysisExtraParams
+— the ch-09 open question resolved from the types side. Composes:
+T.Join.SharedAlias, T.Env.Canonical.Least, T.Env.ConstCanonicalPersists,
+T.Join.Sound.
+```
+
+```rule
+RULE T.Join.Head
+CLAIM descriptive
+CODE middle_end/flambda2/types/meet_and_join.ml#join_expanded_head
+CODE middle_end/flambda2/types/meet_and_join.ml#join_head_of_kind_value_non_null
+---
+no shared alias
+--------------------------------------------------
+E ⊢ T₁ ⊔ T₂ = to_type(join of expanded heads)
+  Bottom ⊔ H = H;  H ⊔ Bottom = H;  Unknown ⊔ _ = Unknown;  _ ⊔ Unknown = Unknown
+  Value/naked-number heads joined structurally (set union for finite sets,
+    componentwise for products, disjunct-wise for Row_like)
+NOTES: When two alias types are joined and neither the shared-alias case nor a
+  structural join applies, the relation variables (is_int/get_tag) are kept only
+  if syntactically equal (join_relation); otherwise dropped.
+```
+
+```rule
+RULE T.Join.Cutoff
+CLAIM descriptive
+CODE middle_end/flambda2/types/meet_and_join.ml#join
+CODE middle_end/flambda2/ui/flambda_features.ml#join_depth
+---
+join is already recursively joining the pair (s₁, s₂), or join depth exceeded
+--------------------------------------------------
+E ⊢ T₁ ⊔ T₂ = Unknown
+NOTES: already_joining / now_joining track in-progress pairs; -flambda2-join-depth
+  bounds recursion. This (not widening) is what tames recursive/cyclic types:
+  the join returns Unknown rather than diverging.
+```
+
+### N-way join and levels
+
+To avoid a full environment join at every merge point, environments are divided
+into **levels** (types.md, "Typing_env_level"). Each branch shares a common
+ancestor env (the fork). Rather than joining full environments, the join joins
+the *level extensions* — the equations added since the fork — of all branches at
+once, and adds their join to the ancestor (as if by a meet).
+
+```rule
+RULE T.Join.Levels
+CLAIM descriptive
+CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
+CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
+---
+fork env E₀; branches E₀;εᵢ (i = 1..n), each cut after scope [cut_after]
+--------------------------------------------------
+result = E₀ extended by (⊔ᵢ εᵢ), computed over the levels created since the fork.
+NOTES: Binary mode (default) folds the branches pairwise (Join_levels_old);
+  N_way mode joins all n at once in a fixpoint loop (cut_and_n_way_join0) that
+  repeatedly joins canonicals and their types until no new equations appear,
+  returning a Join_analysis describing per-use refinements. The n-way join is
+  the only path that can produce the Join_analysis consumed by match-in-match.
+```
+
+### Existential variables
+
+Names defined *after* the fork exist in a branch but not in the ancestor. On
+join, each such name that survives is turned into an **existential variable**
+([§07](07-types-domain.md)): its type is kept in the result but it is quantified existentially
+in the concretization. Names present in only one branch are introduced in the
+others with a special "poison"/bottom-like value that does not make the whole
+environment bottom (types.md, "Join algorithm").
+
+```rule
+RULE T.Join.Existentials
+CLAIM descriptive
+CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
+CODE middle_end/flambda2/types/join_levels_old.ml#cut_and_n_way_join
+---
+name x defined after the fork, surviving the join
+--------------------------------------------------
+x is introduced into the result as an existential (In_types name mode)
+NOTES: Continuation parameters are the exception: they are defined at the very
+  end of each branch (as aliases to the continuation arguments) but correspond
+  to real program variables, so they must NOT be existentially quantified
+  (types.md, "Typing_env_level").
+```
+
+### Recursive continuation parameters
+
+Recursive continuations create a genuine cycle: a handler's parameter types
+would depend on uses that include the handler itself. Because there is no
+fixpoint/widening, Simplify does **not** join the back-edge into the parameter
+types. Instead the parameters of a recursive handler are given `Unknown` types
+before the handler is simplified.
+
+```rule
+RULE T.Join.RecursiveParamsUnknown
+CLAIM descriptive
+CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
+CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types
+---
+handler is recursive
+--------------------------------------------------
+each handler's own (variant) parameters are added to its handler env with
+  Unknown types (DE.add_parameters_with_unknown_types), not the join of the
+  argument types
+NOTES: This is why loops lose type information at variant recursive-continuation
+  parameters: there is no join over the back edge. simplify_single_recursive_handler
+  calls add_parameters_with_unknown_types on exactly the per-handler [params].
+  The *invariant* parameters (passed unchanged around the loop) are the exception:
+  they DO receive the n-way join of their arguments over the uses seen in the
+  body (a single pass, via compute_handler_env with is_recursive), so they are
+  not Unknown — but they are still not re-refined by any fixpoint over the back
+  edge. Fuller treatment belongs to [§09](09-simplify-structure.md)
+  (S.Struct.Rec.InvariantVsVariant).
+```
+
+## 3. Provers
+
+Provers are read-only queries over a type in an environment. They live in
+`Provers` (`types/provers.mli`) and are the interface Simplify's rewrites use to
+test applicability. Two result flavours encode the two naming conventions:
+
+- `prove_X : E -> T -> r proof_of_property`, where `proof_of_property` is
+  `Proved of r | Unknown`. A pure read of the type; never reports a
+  contradiction.
+- `meet_X : E -> T -> r meet_shortcut`, where `meet_shortcut` is
+  `Known_result of r | Need_meet | Invalid`. Computes the result *as if by
+  meeting `T` with a shape*, so it can additionally detect `Invalid` (the meet
+  would be `⊥` — a contradiction) and `Need_meet` (couldn't be answered cheaply;
+  the caller should fall back to a full meet). `meet_X` returns a value, not a
+  refined environment — the "meet" refers to the internal computation.
+
+```rule
+RULE T.Prove.Sound
+CLAIM normative
+CODE middle_end/flambda2/types/provers.mli#proof_of_property
+CODE middle_end/flambda2/types/provers.ml#prove_is_int
+---
+E ⊢ prove_X(T) ⇒ Proved(r)
+--------------------------------------------------
+every v ∈ γ_E(T) satisfies property X with witness r
+NOTES: Proved is a universal claim over the concretization. Unknown is always a
+  sound answer (claims nothing). A prover must never return Proved(r) unless the
+  property holds for *all* concrete values of T.
+```
+
+```rule
+RULE T.Prove.MeetShortcut
+CLAIM normative
+CODE middle_end/flambda2/types/provers.mli#meet_shortcut
+CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
+CAVEAT disclosure: Known_result is universal only over γ_E(T) ∩ γ_E(shape), not all γ_E(T) when Null ∈ γ; consumers must treat it as shape-conditional (UB-licensed otherwise); per T.Prove.MeetShortcut.NullPremise.
+---
+E ⊢ meet_X(T) ⇒ r'
+--------------------------------------------------
+Known_result(r):  every v ∈ γ_E(T) ∩ γ_E(shape X) has property X with witness r
+                   (universal over the INTERSECTION, not over all of γ_E(T))
+Invalid:           γ_E(T) ∩ γ_E(shape X) = ∅   (T is incompatible with X: ⊥)
+Need_meet:         no cheap answer; equivalent to Unknown for soundness
+NOTES: The Known_result meaning is stated over γ_E(T) ∩ γ_E(shape X) — the
+  intersection reading the .mli gestures at ("computes the result as if by
+  meeting T with a shape"). This is the corrected statement per
+  T.Prove.MeetShortcut.NullPremise: the underlying gen_value_to_meet discards the
+  nullability flag and answers from the non-null head, so Known_result is NOT
+  universal over all of γ_E(T) when Null ∈ γ_E(T) — it is universal over the
+  intersection with the (null-free) shape. Consumers must therefore treat
+  Known_result as conditional on the value matching the shape (UB-licensed
+  otherwise), which is how the current call sites behave. Invalid may only be
+  returned when the intersection is genuinely empty (cf. T.Meet.Bottom). Because
+  meet_X meets against a shape, it can be strictly more precise than the
+  corresponding prove_X, which reads the existing type over all of γ_E(T).
+```
+
+```rule
+RULE T.Prove.MeetShortcut.NullPremise
+CLAIM descriptive
+CODE middle_end/flambda2/types/provers.ml#gen_value_to_meet
+CODE middle_end/flambda2/types/provers.ml#gen_value_to_proof
+CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
+CHECKED @ 7bf23efaf6
+CAVEAT disclosure: the naïve reading "Known_result r is universal over γ_E(t)" is refuted — gen_value_to_meet discards is_null; traced at the prover level (Null ∈ γ yet Known_result {1}), not a checked-in test.
+CAVEAT disclosure: gen_value_to_proof returns Unknown on Maybe_null while gen_value_to_meet answers from the non-null head; the asymmetry is deliberate but was previously recorded nowhere.
+CAVEAT disclosure: no live miscompile — every current meet_* consumer is UB on Null or frontend-guarded; null-DEFINED operations (prove_physical_equality, reify) do their own Null handling.
+CAVEAT watch(W-38): a future meet_* consumer well-defined on Null becomes a live hazard with no local signal; audit new meet-shortcut call sites for Null-definedness.
+---
+t : Value type with is_null = Maybe_null (Null ∈ γ_E(t));
+meet_X ∈ the meet-shortcut provers built on gen_value_to_meet
+  (meet_is_int_variant_only, meet_equals_tagged_immediates, meet_variant_like,
+  meet_is_flat_float_array, meet_single_closures_entry, meet_is_immutable_array,
+  meet_is_non_empty_naked_number_array, meet_strings, meet_tagging_of_simple,
+  meet_block_field_simple, meet_project_function_slot_simple,
+  meet_project_value_slot_simple)
+--------------------------------------------------
+meet_X(t) computes its answer from the NON-NULL head alone — gen_value_to_meet
+matches `{ is_null = _; non_null = Ok head }` and discards is_null — so a naïve
+"Known_result r is universal over γ_E(t)" reading is REFUTED at the prover level.
+The corrected T.Prove.MeetShortcut (Known_result universal over γ_E(T) ∩ γ_E(shape))
+holds: every shape is null-free, so the intersection excludes Null and discarding
+nullability is sound. gen_value_to_meet returns Invalid for the type-of-exactly-Null
+({non_null = Bottom}), correct because γ(T) ∩ γ(shape) = ∅ there.
+NOTES: Traced (not a checked-in test): join of the Null constant with tagged
+immediate 1 gives x : (Val? (Variant (tagged_imms (= #1)))), and meet_equals_tagged_immediates
+answers Known_result {1} though Null ∈ γ and Null ≠ 1 — sound only under the
+intersection reading. The parallel wrapper gen_value_to_proof carefully returns
+Unknown on Maybe_null; the asymmetry is deliberate but was recorded nowhere. No
+live miscompile: current consumers (Boolean_not, untag/unbox, block/closure
+projections, variant discrimination) are UB on Null or frontend-guarded; the
+null-DEFINED operations do their own handling (prove_physical_equality:
+Null/Null ⟹ true, any Maybe_null ⟹ Unknown; reify sends Maybe_null to
+try_canonical_simple). Escalation flank: a future meet_* consumer well-defined on
+Null would be a live hazard with no local signal. Composes: T.Prove.MeetShortcut,
+T.Gamma.Value.Nullability, T.Prove.Sound.
+```
+
+```rule
+RULE T.Prove.SimpleModeBoundary
+CLAIM normative
+CODE middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind
+CODE middle_end/flambda2/types/provers.ml#meet_block_field_simple
+CODE middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
+CHECKED @ 7bf23efaf6
+---
+a prover returns a Simple s intended for TERM substitution
+(prove_equals_to_simple_of_kind, meet_tagging_of_simple,
+meet_boxed_*_containing_simple, meet_block_field_simple,
+meet_project_function_slot_simple, meet_project_value_slot_simple)
+--------------------------------------------------
+s is canonical AT OR ABOVE the requested min_name_mode: every such prover funnels
+through TE.get_canonical_simple_exn ~min_name_mode (hardcoded Name_mode.normal in
+prove_equals_to_simple_of_kind; threaded from the bound variable's own mode by
+Simplify's callers, e.g. simplify_project_value_slot passes min_name_mode =
+Bound_var.name_mode result_var). Since a variable out of scope has its mode forced
+to In_types ([§07](07-types-domain.md) T.Env.Scope.Existential), a
+join-introduced existential CANNOT be returned for substitution into a Normal-mode
+term: the mode floor filters it and the prover degrades gracefully
+(Not_found ⟹ Unknown / Need_meet) instead of leaking it.
+NOTES: The enforcement point of the types/terms boundary ([§07](07-types-domain.md)
+§3.3): types may mention In_types existentials, terms may not; the only channel by
+which the types domain injects a name into rebuilt terms is a Simple-returning
+prover, and every such channel carries the mode floor. Without it, a projection
+simplified via meet_block_field_simple could rewrite a term to reference a variable
+existing only inside the typing env (a WF violation, not a mere imprecision).
+Composes: T.Env.Scope.Existential, T.Env.Canonical.Least, the term-rebuild
+discipline ([§09](09-simplify-structure.md)/[§10](10-simplify-rewrites.md)).
+```
+
+Prover families (from `provers.mli`), grouped by what they establish:
+
+- **Immediates / scalars.** `prove_equals_tagged_immediates`,
+  `meet_equals_tagged_immediates`, `meet_equals_single_tagged_immediate`,
+  `meet_naked_immediates`, and the per-kind `meet_naked_{float32,float,int8,
+  int16,int32,int64,nativeints,vec128,vec256,vec512}` — the finite set of
+  possible scalar values, used by constant folding.
+- **Discrimination (is_int / get_tag / tag+size).** `prove_is_int`,
+  `prove_is_not_a_pointer`, `meet_is_int_variant_only`, `prove_get_tag`,
+  `prove_unique_tag_and_size`, `meet_is_null` — used to simplify `Switch` and
+  `Is_int`/`Get_tag` primitives.
+- **Boxing / tagging.** `prove_is_a_boxed_{float32,float,int32,int64,nativeint,
+  vec128,vec256,vec512}`, `prove_is_a_tagged_immediate`,
+  `prove_is_a_boxed_or_tagged_number`, `prove_is_or_is_not_a_boxed_float`,
+  `prove_alloc_mode_of_boxed_number`, and the `meet_boxed_*_containing_simple` /
+  `meet_tagging_of_simple` family that extract the boxed/tagged contents as a
+  `Simple` (used to elide box/unbox pairs).
+- **Variants.** `prove_variant_like`, `meet_variant_like` —
+  the constant and non-constant constructors with their sizes.
+- **Blocks / arrays / strings.**
+  `prove_unique_fully_constructed_immutable_heap_block`,
+  `meet_block_field_simple`, `meet_is_flat_float_array`,
+  `meet_is_immutable_array`, `prove_is_immutable_array`,
+  `prove_is_immediates_array`, `meet_is_non_empty_naked_number_array`,
+  `prove_strings`, `meet_strings`.
+- **Closures.** `prove_single_closures_entry`, `meet_single_closures_entry`
+  (the sole function slot + closure contents of a known closure, used to turn an
+  indirect call into a direct one), `meet_project_value_slot_simple`,
+  `meet_project_function_slot_simple`.
+- **Misc.** `prove_equals_to_simple_of_kind` (the canonical simple a type is
+  equal to), `meet_rec_info`, `never_holds_locally_allocated_values`,
+  `prove_physical_equality`, `prove_nothing` (always `Unknown`).
+
+```rule
+RULE T.Prove.GetTag
+CLAIM normative
+CODE middle_end/flambda2/types/provers.ml#prove_get_tag
+---
+E ⊢ prove_get_tag(T) ⇒ Proved(tags)
+--------------------------------------------------
+every block v ∈ γ_E(T) has Tag(v) ∈ tags
+NOTES: Representative discrimination prover; drives Switch simplification in
+  [§10](10-simplify-rewrites.md) together with prove_is_int and prove_equals_tagged_immediates.
+```
+
+## 4. expand_head and reify
+
+### expand_head
+
+`expand_head E T` (`types/expand_head.ml`) resolves the outermost `Alias`: it
+looks up the canonical simple of `T` and returns that name's *concrete*
+(non-alias) head as an `Expanded_type.t`, or `Unknown`/`Bottom`. We write the
+chapter-local judgment `E ⊢ T ⇓ H` ("`T` expands to head `H`").
+
+```rule
+RULE T.Expand.Head
+CLAIM normative
+CODE middle_end/flambda2/types/expand_head.ml#expand_head
+CODE middle_end/flambda2/types/expand_head.ml#expand_head0
+---
+E ⊢ T ⇓ H
+--------------------------------------------------
+γ_E(T) = γ_E(H)        (expansion preserves concretization)
+NOTES: If T is not an alias, H is T's own head. If T = (= s), H is the head
+  stored for the canonical of s. Termination in one step rests on the
+  PATH-COMPRESSED aliases domain (T.Env.AliasesAuthoritative): expand_head0 looks
+  up the canonical via the compressed canonical_elements map, so it reaches the
+  canonical directly even though the stored Equals equations are NOT
+  path-compressed and may form Equals-to-Equals chains. The
+  no-Equals-on-canonical invariant ([§07](07-types-domain.md)
+  T.Env.Canonical.NoEqualsOnCanonical) then guarantees the canonical's stored type
+  is concrete. Phantom / absent canonicals expand to Unknown (sound: γ = all
+  values). expand_head0 takes the precomputed canonical to avoid recomputation and
+  is the form meet/join call.
+```
+
+### reify
+
+`reify` (`types/reify.ml`) attempts to turn a type back into a term: a `Simple`
+(a name or constant the value is known equal to) or an instruction to `Lift` a
+static constant (immutable block / boxed number / immutable array). It returns
+`reification_result = Lift of to_lift | Simple of Simple.t | Cannot_reify |
+Invalid`. We write `E ⊢ reify(T) ⇒ r`.
+
+```rule
+RULE T.Reify.Sound
+CLAIM normative
+CODE middle_end/flambda2/types/reify.ml#reify
+---
+E ⊢ reify(T) ⇒ r
+--------------------------------------------------
+r = Simple s   ⟹  every v ∈ γ_E(T) equals the value of s in E
+r = Lift lift  ⟹  every v ∈ γ_E(T) equals the statically-allocated value [lift]
+r = Invalid    ⟹  γ_E(T) = ∅
+r = Cannot_reify ⟹  no claim
+NOTES: Reify only commits to Simple / Lift when the type denotes a *single*
+  known value (get_singleton on the immediates, a unique tag+size block with
+  reifiable fields, etc.). Constant tagged immediates and fully-constructed
+  immutable blocks/arrays are the main lifted shapes.
+```
+
+```rule
+RULE T.Reify.LiftLocalGuard
+CLAIM normative
+CODE middle_end/flambda2/types/reify.ml#reify
+CODE middle_end/flambda2/types/provers.ml#never_holds_locally_allocated_values
+---
+reify considers lifting a block/array with fields that are variables
+--------------------------------------------------
+a field variable x is allowed only if x ∈ allowed_if_free_vars_defined_in (TE.mem
+  at min_name_mode) AND (x is a symbol projection, OR (x is defined at toplevel
+  AND, for a Local/Heap_or_local alloc mode, x provably never holds
+  locally-allocated values (never_holds_locally_allocated_values)))
+NOTES: A symbol projection bypasses BOTH the toplevel requirement and the
+  local-allocation guard: it projects from a heap symbol (static data), so it
+  cannot reach a locally-allocated value. Only the membership conjunct
+  (allowed_if_free_vars_defined_in) gates every case. Lifting a Local allocation
+  to a static constant would extend the lifetime of any local value reachable
+  from it past its region, so it is gated. Heap allocations are always liftable
+  (the OCaml type system validated them). Fields under a non-identity coercion
+  are not yet lifted.
+```
+
+Both `expand_head` and `reify` are read-only: neither adds equations to `E`.
+
+## 5. Worked examples
+
+These are adapted from `middle_end/flambda2/tests/meet_test.ml`, which drives the
+real `T.meet` / `T.cut_and_n_way_join` and prints the environments.
+
+### Example A — meet along an alias chain recovers a concrete type
+
+From `test_meet_chains_two_vars`. Initial environment:
+
+```
+var1 : (Block (tag 0) (size 2) [ any_tagged_immediate ])
+var2 : (= var1)
+my_symbol : ⊤        (just defined, no equation)
+```
+
+We then learn `var2 : (= my_symbol)` and meet the two facts about `var2`:
+`(= var1) ⊓ (= my_symbol)`. This is the alias-vs-alias case (`T.Meet.AliasAlias`):
+both are aliases, so the extension records the equality. Ordering by binding time
+(`var1` and `my_symbol` are both earlier than `var2`; the symbol is chosen as
+canonical), the result environment is:
+
+```
+var1 : (= my_symbol)                    (var1 demoted to the symbol)
+my_symbol : (Block (tag 0) (size 2) [ any_tagged_immediate ])   (block type moved here)
+var2 : (= var1)                         (STORED equation still targets var1)
+```
+
+The block type that was on `var1` is not lost: `record_demotion` meets it onto
+the new canonical `my_symbol`. Note the stored equation for `var2` is `(= var1)`,
+NOT `(= my_symbol)`: `record_demotion` rewrites only the demoted name's own
+equation, so `var2`'s stored `Equals` still points at `var1` even though the
+path-compressed `canonical_elements` map resolves `var2` directly to `my_symbol`
+(this is exactly `T.Env.AliasesAuthoritative` (b)/(c): stored equations are not
+path-compressed; reads resolve through the aliases domain). A canonical lookup of
+`var2` therefore yields `my_symbol`, but the stored `Equals` is `var1` — matching
+the checked-in `meet_test.expected`. The three-variable variant
+(`test_meet_chains_three_vars`) chains one step further and behaves the same way
+(stored `var3 : (= var1)`, `var2 : (= var1)`, canonical of all three is
+`my_symbol`).
+
+### Example B — meet with an incompatible constant yields Bottom
+
+From `test_meet_bottom_after_alias`. We have `x : {-1, 0, 1}` (three tagged
+immediates) and learn `x : (= 3)`. Meeting `{-1,0,1} ⊓ (= 3)` is the
+alias-vs-concrete case; expanding `(= 3)` to the head `{3}` and intersecting the
+immediate sets gives `{-1,0,1} ∩ {3} = ∅`. By `T.Meet.NakedNumber` /
+`T.Meet.Bottom` the meet is `⊥`, and `x` becomes `Bottom` — the program point is
+unreachable.
+
+### Example C — join of array element kinds falls back correctly
+
+From `test_meet_array_element_kinds`, which builds an "unknown array" by joining
+a mutable and an immutable array (`T.cut_and_n_way_join` over two branch
+environments), then meets it with a `Local` immutable float array. The join of a
+mutable and an immutable array produces an array type whose *element kind* is
+known but whose contents/mutability is `Unknown` (`T.Join.Head`). Meeting that
+with an immutable `naked_float` array whose element kind is incompatible with the
+joined `any_value` element kind yields `⊥` (`T.Meet.Bottom`) — the test exists
+precisely to confirm this is bottom rather than a bogus empty-kind array.
+
+## Summary: rule IDs in this chapter
+
+Meet: `T.Meet.Dispatch`, `T.Meet.Sound`, `T.Meet.Bottom`,
+`T.Meet.GreatestLowerBound`, `T.Meet.AliasAlias`, `T.Meet.AliasConcrete`,
+`T.Meet.Store.CoercionErasure`, `T.Meet.NakedNumber`,
+`T.Meet.ValueHeadIncompatible`, `T.Meet.MutableBlockMissedBottom`,
+`T.Meet.Variant`, `T.Meet.BlockShape`, `T.Meet.Relational`, `T.Meet.Terminates`.
+
+Join: `T.Join.Sound`, `T.Join.SharedAlias`, `T.Join.ConstAgreement`,
+`T.Join.Head`, `T.Join.Cutoff`, `T.Join.Levels`, `T.Join.Existentials`,
+`T.Join.RecursiveParamsUnknown`.
+
+Provers: `T.Prove.Sound`, `T.Prove.MeetShortcut`,
+`T.Prove.MeetShortcut.NullPremise`, `T.Prove.SimpleModeBoundary`,
+`T.Prove.GetTag`.
+
+Expand / reify: `T.Expand.Head`, `T.Reify.Sound`, `T.Reify.LiftLocalGuard`.
