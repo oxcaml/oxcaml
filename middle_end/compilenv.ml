@@ -132,6 +132,7 @@ let read_unit_info filename =
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+      ui_static_data = uir.uir_static_data;
       ui_file_sections = sections;
     }
     in
@@ -173,7 +174,7 @@ let get_export_info infos =
         export_info)
     infos.ui_export_info
 
-let get_unit_export_info comp_unit =
+let get_unit comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
@@ -183,45 +184,51 @@ let get_unit_export_info comp_unit =
   if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
   then
     Misc.fatal_error
-      "get_unit_export_info: unable to get unit_info for current unit"
-  else begin
-    let name = CU.to_global_name_without_prefix comp_unit in
-    try
-      let ui = Infos_table.find global_infos_table name in
-      Option.bind ui get_export_info
-    with Not_found ->
-      let (infos, crc) =
-        if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
-        else begin
-          let missing_extension =
-            match !Clflags.jsir with
-            | false -> "cmx"
-            | true -> "cmjx"
+      "get_unit_export_info: unable to get unit_info for current unit";
+  let name = CU.to_global_name_without_prefix comp_unit in
+  try
+    Infos_table.find global_infos_table name
+  with Not_found ->
+    let (infos, crc) =
+      if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
+      else begin
+        let missing_extension =
+          match !Clflags.jsir with
+          | false -> "cmx"
+          | true -> "cmjx"
+        in
+        try
+          let filename =
+            Load_path.find_normalized
+              (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+          let (ui, crc) = read_unit_info filename in
+          if not (CU.equal ui.ui_unit comp_unit) then
+            raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
+          cache_zero_alloc_info ui.ui_zero_alloc_info;
+          (Some ui, Some crc)
+        with Not_found ->
+          let warn =
+            Warnings.No_cmx_file
+              { missing_extension
+              ; module_name = Global_module.Name.to_string name }
           in
-          try
-            let filename =
-              Load_path.find_normalized
-                (CU.base_filename comp_unit ^ "." ^ missing_extension) in
-            let (ui, crc) = read_unit_info filename in
-            if not (CU.equal ui.ui_unit comp_unit) then
-              raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
-            cache_zero_alloc_info ui.ui_zero_alloc_info;
-            (Some ui, Some crc)
-          with Not_found ->
-            let warn =
-              Warnings.No_cmx_file
-                { missing_extension
-                ; module_name = Global_module.Name.to_string name }
-            in
-            Location.prerr_warning Location.none warn;
-            (None, None)
-          end
-      in
-      let import = Import_info.create_normal comp_unit ~crc in
-      current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
-      Infos_table.add global_infos_table name infos;
-      Option.bind infos get_export_info
-  end
+          Location.prerr_warning Location.none warn;
+          (None, None)
+        end
+    in
+    let import = Import_info.create_normal comp_unit ~crc in
+    current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
+    Infos_table.add global_infos_table name infos;
+    infos
+
+let get_unit_export_info comp_unit =
+  Option.bind (get_unit comp_unit) get_export_info
+
+let get_static_data comp_unit =
+  Option.map
+    (fun ui ->
+      Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
+    (get_unit comp_unit)
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
@@ -303,8 +310,9 @@ let write_unit_info info filename =
     uir_force_link = info.ui_force_link;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;
-    uir_sections_length = total_length;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
+    uir_static_data = info.ui_static_data;
+    uir_sections_length = total_length;
   } in
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
@@ -314,9 +322,14 @@ let write_unit_info info filename =
   let crc = Digest.file filename in
   Digest.output oc crc)
 
-let build_unit_info ~main_module_block_format ~arg_descr =
+let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
+  let static_data =
+    Slambdaeval.CU_data.write
+      ~sections:current_unit.uib_file_sections
+      static_data
+  in
   (* We could have [set_main_module_block_format] and [set_arg_descr] instead
      of passing these in as arguments but, unlike most of the state that this
      module keeps track of, they're not values that get accumulated over time,
@@ -335,13 +348,16 @@ let build_unit_info ~main_module_block_format ~arg_descr =
     ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
     ui_force_link = current_unit.uib_force_link;
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
+    ui_static_data = static_data;
+    ui_external_symbols = current_unit.uib_external_symbols;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
-    ui_external_symbols = current_unit.uib_external_symbols;
   }
 
-let save_unit_info filename ~main_module_block_format ~arg_descr =
-  let current_unit = build_unit_info ~main_module_block_format ~arg_descr in
+let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
+  let current_unit =
+    build_unit_info ~main_module_block_format ~arg_descr ~static_data
+  in
   write_unit_info current_unit filename
 
 let new_const_symbol () =

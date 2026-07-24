@@ -341,11 +341,12 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let { Slambda.slv_comptime = _; slv_runtime = rawlam } =
+  let (_static_data, rawlam) =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+    Slambda.eval ~cu_static_data:Compilenv.get_static_data
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
