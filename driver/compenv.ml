@@ -775,6 +775,10 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
+      (* CR mvellacott: in the future, cmr files will not exist, and
+         -reaper-rebuild and -reaper-solve will both accept cmx files. *)
+      else if Filename.check_suffix name ".cmr" && !reaper_rebuild then
+        objfiles := name :: !objfiles
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
         has_linker_inputs := true;

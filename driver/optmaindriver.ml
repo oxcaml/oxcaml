@@ -103,14 +103,16 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      Compenv.stop_early; output_c_object]) > 1
+                      reaper_rebuild; reaper_solve; Compenv.stop_early;
+                      output_c_object]) > 1
     then
     begin
       let module P = Clflags.Compiler_pass in
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -reaper-rebuild, \
+                         -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -152,6 +154,31 @@ let main unix argv ppf ~flambda2 =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_rebuild then begin
+      Compmisc.init_path ();
+      (* CR mvellacott: change validation: should take one .ltosol and many
+         .cmx files (potentially other files too?). *)
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let cmr_file, inputs = match
+        List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
+      with
+        | [cmr_file], inputs -> cmr_file, inputs
+        | _ ->
+          Compenv.fatal
+            "Must specify exactly one .cmr file with -reaper-rebuild"
+      in
+      (* CR mvellacott: implement this *)
+      Printf.printf "rebuilding from cmr: %s\n" cmr_file;
+      List.iter
+        (fun file -> Printf.printf "other rebuild input: %s\n" file)
+        inputs;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_solve then begin
+      Compmisc.init_path ();
+      (* CR mvellacott: TODO: validation and implementation *)
       Warnings.check_fatal ();
     end
     else if !shared then begin
