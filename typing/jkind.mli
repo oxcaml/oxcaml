@@ -103,6 +103,8 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
+        (** See the comment on this constructor in jkind_types.mli. *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t

@@ -64,6 +64,11 @@ module Sort : sig
 
   val equal_base : base -> base -> bool
 
+  (** Whether types of this base sort store all of their information in the data
+      portion of a block when boxed, so that interior pointers into the box can
+      address them. *)
+  val base_is_addressable : base -> bool
+
   type univar = { name : string option }
 
   type t =
@@ -71,6 +76,30 @@ module Sort : sig
     | Base of base
     | Product of t list
     | Univar of univar
+    | Addressable of t
+        (** [Addressable s] is the sort [s addressable]: a sort whose types
+            store all of their information in the data portion of a block when
+            boxed. Applying the operator to an already-addressable sort is the
+            identity ([s addressable = s] whenever [s] is addressable), so the
+            image of the operator is exactly the set of addressable sorts. Hence
+            [Addressable (Var v)] with [v] unfilled represents "some addressable
+            sort", and this constructor doubles as the constrained-addressable
+            form used during inference (see [constrain_addressable]).
+
+            Invariant: [Addressable s] is only built (via [addressable]) when
+            [s] is not known to be addressable at construction time. The
+            invariant can be broken by later instantiation of a variable inside
+            [s], leaving a redundant wrapper — including a nested reading like
+            [Addressable (Addressable _)] (equal to its payload) when the
+            variable is filled with another wrapped sort. So matching on
+            [Addressable] requires smart destruction, not just smart
+            construction: readers ([get], [default_to_scannable_and_get], the
+            predicates) re-normalize, and comparisons must too (see the [get]
+            normalization in [equate_sort_addressable] — in particular, two
+            wrapped sorts may not be compared by peeling one wrapper from each
+            side without it). Nothing may match on [Addressable] and treat the
+            wrapped sort as distinct from an addressable sort without first
+            checking addressability. *)
 
   and var
 
@@ -99,10 +128,29 @@ module Sort : sig
   (** Determines if the sort is [Scannable] or an unfilled sort variable *)
   val is_scannable_or_var : t -> bool
 
+  (** Whether the sort is known to be addressable. [false] means "not known to
+      be addressable": the sort may be definitely unaddressable (e.g. [bits8])
+      or not yet determined (an unfilled variable, or a univar). *)
+  val is_known_addressable : t -> bool
+
+  (** The [addressable] operator. Absorbs (returning the argument unchanged)
+      when the argument is already addressable. This is the only way to build
+      the [Addressable] constructor. *)
+  val addressable : t -> t
+
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
   val decompose_into_product : t -> int -> t list option
+
+  (** Like [decompose_into_product], but equates the input sort with the product
+      of the output sorts made addressable, i.e. decomposes it as an addressable
+      product. *)
+  val decompose_into_addressable_product : t -> int -> t list option
+
+  (** Require the sort to be an addressable sort (equating it with a fresh
+      variable made addressable), returning [false] if it cannot be one. *)
+  val constrain_addressable : t -> bool
 
   module Flat : sig
     type t =
@@ -111,6 +159,19 @@ module Sort : sig
       | Univar of univar
       | Base of base
   end
+end
+
+module Kind_operator : sig
+  (** An operator application pending on an abstract kind constructor
+      ([Types.jkind_base.Kconstr]). Since [jkind_base] is not recursive, the
+      [addressable] operator applied to a [Kconstr] is recorded here and applied
+      to the expansion whenever the constructor is expanded. [Id] is "no
+      operator". *)
+  type t =
+    | Id
+    | Addressable
+
+  val equal : t -> t -> bool
 end
 
 module Scannable_axes : sig
@@ -145,6 +206,32 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
+        (** The [addressable] operator, applied to a layout. Its meaning depends
+            on what it is applied to:
+
+            - On [Any sa] it is a *bound*: [Addressable (Any sa)] (written
+              [any addressable]) is the top of all addressable layouts. Every
+              addressable layout is below it, and it is strictly below [Any sa].
+
+            - On anything else it is a *claim*: a new, made-addressable layout
+              that is neither above nor below its argument — unless the argument
+              is already addressable, in which case the operator absorbs
+              ([l addressable = l]) and this constructor must not appear.
+
+            Invariant (for [Sort.t t] only): the argument is [Any _] or
+            [Product _]. It is never [Sort _], because addressability of a sort
+            slot is pushed into the sort itself (see [Sort.t]'s [Addressable]),
+            so that the constraint travels with the sort during unification. The
+            flattened [Sort.Flat.t t] view produced by [Jkind.Layout.get]
+            relaxes this: there, [Addressable] may wrap [Sort] nodes.
+
+            As with sorts, instantiating a sort variable inside a wrapped
+            [Product] payload can make the payload addressable and hence the
+            wrapper redundant, so matching on [Addressable] requires smart
+            destruction: comparisons apply [strip_redundant_addressable] before
+            matching. (Unlike sorts, nested wrappers cannot arise here: layout
+            nodes are immutable and only built by [addressable].) *)
 
   module Const : sig
     type t =
@@ -158,6 +245,10 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** See the comment on [Layout.t]'s [Addressable] constructor. Here
+              there is no [Sort] node to push into, so [Addressable] may
+              additionally wrap [Base], [Univar], and [Genvar]. *)
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
@@ -170,6 +261,16 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
+
+    (** Whether the layout is known to be addressable. [false] means "not known
+        to be addressable"; in particular [Any _] is [false], as [any] has
+        unaddressable subkinds. *)
+    val is_known_addressable : t -> bool
+
+    (** The [addressable] operator. Absorbs (returning the argument unchanged)
+        when the argument is already addressable. This is the only way to build
+        the [Addressable] constructor. *)
+    val addressable : t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
@@ -193,4 +294,20 @@ module Layout : sig
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
   val product : 'a t list -> 'a t
+
+  (** Whether the layout is known to be addressable. See
+      [Const.is_known_addressable]. *)
+  val is_known_addressable : Sort.t t -> bool
+
+  (** The [addressable] operator on layouts. Absorbs when the argument is
+      already addressable, and pushes into the sort of a [Sort] node (see the
+      invariant on [Addressable]). This is the only way to build the
+      [Addressable] constructor. *)
+  val addressable : Sort.t t -> Sort.t t
+
+  (** The smart destructor paired with [addressable]: removes wrappers made
+      redundant by sort-variable instantiation (a wrapper whose payload has
+      become addressable equals its payload). Comparisons must apply this before
+      matching on [Addressable]. *)
+  val strip_redundant_addressable : Sort.t t -> Sort.t t
 end

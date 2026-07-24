@@ -1829,7 +1829,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id, sa) ->
+          | Kconstr (Pident id, sa, op) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1838,8 +1838,13 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             in
             (match v_opt with
             | Some v ->
+              let sort : Jkind_types.Sort.t =
+                match op with
+                | Id -> Var v
+                | Addressable -> Jkind_types.Sort.addressable (Var v)
+              in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, sa)) in
+                = Layout (Sort (sort, sa)) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -2006,7 +2011,8 @@ let report_error_doc loc env = function
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
               | Layout (Sort (Univar _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _) | Kconstr _ ->
+              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _)
+              | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind

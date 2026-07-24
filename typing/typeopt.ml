@@ -122,6 +122,7 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Base _ -> true
   | Product sorts ->
     List.for_all layout_is_representable sorts
+  | Addressable l -> layout_is_representable l
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
@@ -194,9 +195,11 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env ty layout : _ classification =
+let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
+  (* [addressable] does not change the representation *)
+  | Addressable layout -> classify ~classify_product env ty layout
   | Base (Scannable, _sa) -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
@@ -314,6 +317,9 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
     raise (Error (loc, Unsupported_void_in_array))
   | Product sorts ->
     Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
+  (* [addressable] does not change the representation *)
+  | Addressable layout ->
+    sort_to_scannable_product_element_kind elt_ty_for_error loc layout
   | Univar _ ->
     Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
   | Genvar _ ->
@@ -349,6 +355,8 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     raise (Error (loc, Unsupported_vector_in_product_array))
   | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  (* [addressable] does not change the representation *)
+  | Addressable layout -> sort_to_ignorable_product_element_kind loc layout
   | Univar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
   | Genvar _ ->
@@ -508,6 +516,9 @@ let value_kind_of_scannable_jkind env jkind =
          | Product _
          | Univar _
          | Genvar _
+         (* [Addressable] never wraps a scannable layout (the operator
+            absorbs there) *)
+         | Addressable _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),
@@ -1241,6 +1252,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
+  (* [addressable] does not change the representation *)
+  | Addressable const ->
+    layout_of_const_sort_generic ~value_kind ~error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
   | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
 
@@ -1265,6 +1279,8 @@ let layout env loc sort ty =
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
+      (* [layout_of_const_sort_generic] unwraps [Addressable] *)
+      | Addressable _ -> assert false
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
@@ -1288,6 +1304,8 @@ let layout_of_sort loc sort =
       as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
+    (* [layout_of_const_sort_generic] unwraps [Addressable] *)
+    | Addressable _ -> assert false
     | Univar _ -> assert false
     | Genvar _ -> assert false
     )

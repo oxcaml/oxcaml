@@ -1267,6 +1267,21 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+  (* Analyze a made-addressable product before calling [get_const], for the
+     same reason as plain products (in particular, this avoids the const
+     machinery's fallback, which pretends the mod bounds are max and so
+     would print spurious [mod] bounds). Ditto for other non-constant
+     made-addressable layouts; the remaining constant ones are handled well
+     by the machinery. *)
+  | Layout (Addressable (Product _ as lay)) ->
+    Ojkind_operator
+      (out_jkind_of_desc env { desc with base = Layout lay },
+       ["addressable"])
+  | Layout (Addressable lay)
+    when Option.is_none (Jkind.Desc.get_const desc) ->
+    Ojkind_operator
+      (out_jkind_of_desc env { desc with base = Layout lay },
+       ["addressable"])
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)

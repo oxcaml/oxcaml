@@ -226,6 +226,8 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Void -> Product [||])
+  (* [addressable] does not change the runtime representation *)
+  | Addressable ly -> layout_to_types_layout ly
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
@@ -403,6 +405,8 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     match RS.Runtime_layout.of_base_layout b with
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
+  (* [addressable] does not change the runtime representation *)
+  | Addressable ly -> layout_to_unknown_shape ly
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
 
@@ -419,6 +423,10 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     else unknown_shape_exn ()
   in
   match type_shape.desc, type_layout with
+  (* [addressable] does not change the runtime representation, so strip it for
+     DWARF purposes. *)
+  | _, Some (Layout.Addressable ly) ->
+    type_shape_to_complex_shape_exn ~cache ~rec_env type_shape (Some ly)
   | Leaf, _ -> unknown_shape_exn ()
   | Unknown_type, _ -> unknown_shape_exn ()
   | Tuple args, (None | Some (Base Scannable)) -> (
@@ -500,6 +508,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       | Void -> void
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
     | (Some None | None), Some (Layout.Product _ as ly) ->
+      layout_to_unknown_shape ly
+    | (Some None | None), Some (Layout.Addressable _ as ly) ->
       layout_to_unknown_shape ly
     | (Some None | None), Some (Univar _) ->
       Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"

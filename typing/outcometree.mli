@@ -110,6 +110,10 @@ and out_jkind =
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
+  | Ojkind_operator of out_jkind * string list
+  (** A kind operator (like [addressable]) applied to a non-constant jkind,
+      e.g. a product containing sort variables. Constant jkinds print their
+      operators via [Ojkind_const_abbreviation] instead. *)
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list

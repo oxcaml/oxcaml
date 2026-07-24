@@ -553,6 +553,10 @@ let rec sort s srt =
     let sorts' = Misc.Stdlib.List.map_sharing (sort s) sorts in
     if sorts == sorts' then srt
     else Product sorts'
+  | Addressable inner ->
+    let inner' = sort s inner in
+    if inner == inner' then srt
+    else Jkind_types.Sort.addressable inner'
   | Var var ->
     let var' = sort_var s var in
     if var == var' then srt
@@ -566,6 +570,10 @@ let rec layout s l =
     let sorts' = Misc.Stdlib.List.map_sharing (layout s) sorts in
     if sorts == sorts' then l
     else Product sorts'
+  | Addressable inner ->
+    let inner' = layout s inner in
+    if inner == inner' then l
+    else Addressable inner'
   | Sort (sort_l, ax) ->
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
@@ -573,16 +581,16 @@ let rec layout s l =
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
       let const =
-        { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
+        { base = Jkind.Base_and_axes.apply_pending_ops base sa op;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
           with_bounds = jkind.with_bounds }
       in
@@ -596,15 +604,15 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
-      { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
+      { base = Jkind.Base_and_axes.apply_pending_ops base sa op;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
     end

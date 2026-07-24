@@ -8284,7 +8284,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr (p, _sa) -> begin
+  | Kconstr (p, _sa, _op) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->

@@ -430,6 +430,15 @@ module Jkind0 : sig
       Jkind_types.Scannable_axes.t ->
       Jkind_types.Layout.Const.t jkind_base
 
+    (** Apply the scannable-axes bound and pending kind operator stored on a
+        [Kconstr] to its expansion. Use this whenever a [Kconstr (p, sa, op)]
+        is replaced by what [p] stands for. *)
+    val apply_pending_ops :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Scannable_axes.t ->
+      Jkind_types.Kind_operator.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option

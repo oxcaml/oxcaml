@@ -633,6 +633,8 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
           arg_transformer = None;
           return_transformer = None
         } ])
+  (* [addressable] does not change the representation *)
+  | Addressable sort -> unarize_const_sort_for_extern_repr sort
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
@@ -655,6 +657,9 @@ let unarize_extern_repr ~machine_width alloc_mode
     Misc.fatal_error "unarize_extern_repr: unexpected genvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
+  (* [addressable] does not change the representation *)
+  | Same_as_ocaml_repr (Addressable sort) ->
+    unarize_const_sort_for_extern_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);

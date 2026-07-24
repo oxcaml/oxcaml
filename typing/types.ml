@@ -243,7 +243,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -1015,6 +1016,8 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  (* [addressable] does not change the representation *)
+  | Addressable sort -> mixed_block_element_of_const_sort sort
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 

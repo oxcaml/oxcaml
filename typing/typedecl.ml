@@ -1998,6 +1998,8 @@ module Element_repr = struct
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
+      (* [addressable] does not change the representation *)
+      | Addressable l -> layout_to_t l
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
@@ -3104,7 +3106,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
+  | Some ({ base = Kconstr (kpath, _, _); mod_bounds = _;
             with_bounds = No_with_bounds }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
@@ -3119,7 +3121,8 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
-           | Kconstr (base_path, _) -> [Contains (manifest, base_path); expand]
+           | Kconstr (base_path, _, _) ->
+             [Contains (manifest, base_path); expand]
            | Layout _ -> assert false)
       in
       let rec follow current acc visited =
@@ -3131,7 +3134,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr (next, _); mod_bounds = _;
+          | Some ({ base = Kconstr (next, _, _); mod_bounds = _;
                     with_bounds = No_with_bounds } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -3202,6 +3205,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
+      | Addressable l -> has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
@@ -4235,7 +4239,9 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
       match sort_or_poly with
       | Poly -> false
       | Sort (Base Scannable) -> true
-      | Sort (Base _ | Product _) -> false
+      (* [Addressable] never wraps [Base Scannable] (the operator absorbs
+         there) *)
+      | Sort (Base _ | Product _ | Addressable _) -> false
       | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
       | Sort (Genvar _) -> Misc.fatal_error "typedecl: Genvar in native repr"
     in
@@ -4355,7 +4361,9 @@ let make_native_repr
       let sort =
         type_sort_external ~is_layout_poly ~why env core_type.ptyp_loc ty
       in
-      Sort sort
+      (* Native reprs describe only the representation, which the
+         [addressable] operator does not change; erase it. *)
+      Sort (Jkind_types.Sort.Const.erase_addressable sort)
   in
   match get_native_repr_attribute
           core_type.ptyp_attributes ~global_repr,
@@ -4449,6 +4457,10 @@ let make_native_repr
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | (Native_repr_attr_absent | Native_repr_attr_present (Unboxed | Unpacked)),
+    Sort (Addressable _) ->
+    (* erased by [erase_addressable] when computing [sort_or_poly] *)
+    Misc.fatal_error "typedecl: Addressable in native repr"
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -5323,12 +5335,18 @@ module Reaching_path = struct
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
-      | Kconstr (p, sa) ->
-        (match Jkind.Scannable_axes.to_string_list sa with
+      | Kconstr (p, sa, op) ->
+        let word_strs =
+          Jkind.Scannable_axes.to_string_list sa
+          @ (match (op : Jkind_types.Kind_operator.t) with
+             | Id -> []
+             | Addressable -> ["addressable"])
+        in
+        (match word_strs with
          | [] -> Printtyp.path ppf p
-         | _ :: _ as sa_strs ->
+         | _ :: _ ->
            Fmt.fprintf ppf "%a %s" Printtyp.path p
-             (String.concat " " sa_strs))
+             (String.concat " " word_strs))
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds

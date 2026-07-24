@@ -66,12 +66,30 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** See the comment on [Sort.t]'s [Addressable] constructor in
+              jkind_types.mli. *)
 
     val equal : t -> t -> bool
 
     val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
+
+    (** Whether the sort is known to be addressable. [false] for univars and
+        genvars, whose addressability is unknown. *)
+    val is_known_addressable : t -> bool
+
+    (** The [addressable] operator. Absorbs (returning the argument unchanged)
+        when the argument is already addressable. This is the only way to build
+        the [Addressable] constructor. *)
+    val addressable : t -> t
+
+    (** Deeply erase the [addressable] operator, leaving only the underlying
+        representation. Only for consumers that care exclusively about the
+        representation (which the operator does not change), e.g. the native
+        reprs of externals. *)
+    val erase_addressable : t -> t
 
     val scannable : t
 
