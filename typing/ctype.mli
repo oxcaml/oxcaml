@@ -104,6 +104,7 @@ val new_global_var: ?name:string -> jkind_lr -> type_expr
 val newobj: type_expr -> type_expr
 val newconstr: Path.t -> type_expr list -> type_expr
 val newmono : type_expr -> type_expr
+        (* Create a new, monomorphic type *)
 val none: type_expr
         (* A dummy type expression *)
 
@@ -244,6 +245,12 @@ val instance_poly_fixed:
         (* Take an instance of a type scheme containing free univars for
            checking that an expression matches this scheme. *)
 
+val maybe_instance_poly: type_expr -> type_expr
+  (* If the type is a [Tpoly], we take an instance (replace
+     the corresponding [Tunivar] by [Tvar]) using
+     [instance_poly ~keep_names:true]; otherwise the
+     input type is returned unchanged. *)
+
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
 val instance_label:
@@ -355,26 +362,19 @@ val unify_delaying_jkind_checks :
            safe. *)
 
 type filtered_arrow =
-  { ty_arg : type_expr;
+  { ty_param : type_expr;
     arg_mode : Mode.Alloc.lr;
     ty_ret : type_expr;
     ret_mode : Mode.Alloc.lr
   }
 
-val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
-                  filtered_arrow
-        (* A special case of unification (with l:'a -> 'b). If
-           [force_poly] is false then the usual invariant that the
-           argument type be a [Tpoly] node is not enforced. Raises
-           [Filter_arrow_failed] instead of [Unify].  *)
-val filter_mono: type_expr -> type_expr
-        (* A special case of unification (with Tpoly('a, [])). Can
-           only be called on [Tpoly] nodes. Raises [Filter_mono_failed]
-           instead of [Unify] *)
-val filter_arrow_mono: Env.t -> type_expr -> arg_label -> filtered_arrow
-        (* A special case of unification. Composition of [filter_arrow]
-           with [filter_mono] on the argument type. Raises
-           [Filter_arrow_mono_failed] instead of [Unify] *)
+val filter_arrow: Env.t -> type_expr -> arg_label -> param_hole:bool ->
+        filtered_arrow
+        (* A special case of unification with [l:'a -> 'b]. If [param_hole] is
+           true then ['a] might be initialized with a [Tvar _] hole to be filled
+           later by a [Tpoly _].
+           Raises [Filter_arrow_failed] instead of [Unify]. *)
+val is_really_poly : Env.t -> type_expr -> bool
 val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
@@ -425,9 +425,6 @@ type filter_arrow_failure =
   | Jkind_error of type_expr * Jkind.Violation.t
 
 exception Filter_arrow_failed of filter_arrow_failure
-
-exception Filter_mono_failed
-exception Filter_arrow_mono_failed
 
 type filter_method_failure =
   | Unification_error of Errortrace.unification_error

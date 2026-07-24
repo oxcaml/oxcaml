@@ -95,7 +95,7 @@ type error =
   | Not_an_object of type_expr
   | Repeated_tuple_label of string
   | Unsupported_extension : _ Language_extension.t -> error
-  | Polymorphic_optional_param
+  | Polymorphic_optional_param of string
   | Non_value of
       {vloc : value_loc; typ : type_expr; err : Jkind.Violation.t}
   | Non_sort of
@@ -1012,13 +1012,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
           in
           let arg_ty =
-            if not (Btype.is_optional l) then arg_ty
-            else begin
-              if not (Btype.tpoly_is_mono arg_ty) then
-                raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
-                (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
-            end
+            match l with
+            | Nolabel | Labelled _ | Position _ -> arg_ty
+            | Optional l -> begin
+                if not (Btype.tpoly_is_mono arg_ty) then
+                  raise
+                    (Error (arg.ptyp_loc, env, Polymorphic_optional_param l));
+                newmono
+                  (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
+              end
           in
           let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
           let ret_mode_desc = Alloc.of_const ret_mode.mode_modes in
@@ -2044,8 +2046,6 @@ let report_error_doc loc env = function
       Location.errorf ~loc
         "The %s extension is disabled@ \
          To enable it, pass the '-extension %s' flag@]" ext ext
-  | Polymorphic_optional_param ->
-      Location.errorf ~loc "Optional parameters cannot be polymorphic"
   | Non_value {vloc; typ; err} ->
     let s =
       match vloc with
@@ -2102,6 +2102,9 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+  | Polymorphic_optional_param l ->
+      Location.errorf ~loc "@[Optional parameter %a cannot be polymorphic@]"
+        Style.inline_code l
 
 let () =
   Location.register_error_of_exn

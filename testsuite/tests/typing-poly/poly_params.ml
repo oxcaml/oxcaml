@@ -356,6 +356,47 @@ let foo (f : p1) : p2 = (fun id -> f id)
 val foo : p1 -> p2 = <fun>
 |}];;
 
+(* The typing of functions involves an extra step when
+   any parameter includes a GADT pattern. The below tests make sure
+   that this extra step is compatible with polymorphic
+   parameters. *)
+
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+
+[%%expect {|
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+|}];;
+
+let test_gadt1 (type b c) ~(run : 'a. 'a -> b -> b) (Eq : (b, c) eq) (b : b) : c =
+  run () b
+
+[%%expect {|
+val test_gadt1 : run:('a. 'a -> 'b -> 'b) -> ('b, 'c) eq -> 'b -> 'c = <fun>
+|}];;
+
+let test_gadt2 : type b c. run:('a. 'a -> b -> b) -> (b, c) eq -> b -> c =
+  fun ~run Eq b -> run () b
+
+[%%expect {|
+val test_gadt2 : run:('a. 'a -> 'b -> 'b) -> ('b, 'c) eq -> 'b -> 'c = <fun>
+|}];;
+
+let test_gadt_expected_fail : type a. ?eq:(a, int -> int) eq -> ('b. 'b -> 'b) -> a =
+  fun ?eq:(Eq : (a, int -> int) eq = assert false) id x -> id x
+
+[%%expect {|
+Line 2, characters 2-63:
+2 |   fun ?eq:(Eq : (a, int -> int) eq = assert false) id x -> id x
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The syntactic arity of the function doesn't match the type constraint:
+       This function has 3 syntactic arguments, but its type is constrained to
+         "?eq:(a, int -> int) eq -> ('b. 'b -> 'b) -> a".
+        Hint: consider splitting the function definition into
+          "fun ... gadt_pat -> fun ..."
+          where "gadt_pat" is the pattern with the GADT constructor that
+          introduces the local type equation on "a".
+|}];;
+
 (* Following the existing behaviour for polymorphic methods, you can
    subtype from a polymorphic parameter to a monomorphic
    parameter. Elsewhere it still behaves as invariant. *)
@@ -400,46 +441,125 @@ let foo (f : p1) : p2 = (fun id -> f id)
 val foo : p1 -> p2 = <fun>
 |}];;
 
-(* The typing of functions involves an extra step when
-   any parameter includes a GADT pattern. The below tests make sure
-   that this extra step is compatible with polymorphic
-   parameters. *)
-
-type ('a, 'b) eq = Eq : ('a, 'a) eq
-
+class c (f: 'a. 'a -> 'a) = object
+  method m = f 0
+  method n = f "a"
+end;;
 [%%expect {|
-type ('a, 'b) eq = Eq : ('a, 'a) eq
+Line 1, characters 9-24:
+1 | class c (f: 'a. 'a -> 'a) = object
+             ^^^^^^^^^^^^^^^
+Error: Class parameters cannot be polymorphic.
 |}];;
 
-let test_gadt1 (type b c) ~(run : 'a. 'a -> b -> b) (Eq : (b, c) eq) (b : b) : c =
-  run () b
-
+class c' (f: 'a. int -> int) = object
+  method m = f 0
+end;;
 [%%expect {|
-val test_gadt1 : run:('a. 'a -> 'b -> 'b) -> ('b, 'c) eq -> 'b -> 'c = <fun>
+Line 1, characters 10-27:
+1 | class c' (f: 'a. int -> int) = object
+              ^^^^^^^^^^^^^^^^^
+Error: Class parameters cannot be polymorphic.
 |}];;
 
-let test_gadt2 : type b c. run:('a. 'a -> b -> b) -> (b, c) eq -> b -> c =
-  fun ~run Eq b -> run () b
-
+let poly1' ~(id : 'a. 'a -> 'a) = id 3, id "three"
 [%%expect {|
-val test_gadt2 : run:('a. 'a -> 'b -> 'b) -> ('b, 'c) eq -> 'b -> 'c = <fun>
+val poly1' : id:('a. 'a -> 'a) -> int * string = <fun>
 |}];;
 
-let test_gadt_expected_fail : type a. ?eq:(a, int -> int) eq -> ('b. 'b -> 'b) -> a =
-  fun ?eq:(Eq : (a, int -> int) eq = assert false) id x -> id x
-
+let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
 [%%expect {|
-Line 2, characters 2-63:
-2 |   fun ?eq:(Eq : (a, int -> int) eq = assert false) id x -> id x
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The syntactic arity of the function doesn't match the type constraint:
-       This function has 3 syntactic arguments, but its type is constrained to
-         "?eq:(a, int -> int) eq -> ('b. 'b -> 'b) -> a".
-        Hint: consider splitting the function definition into
-          "fun ... gadt_pat -> fun ..."
-          where "gadt_pat" is the pattern with the GADT constructor that
-          introduces the local type equation on "a".
+Line 1, characters 13-30:
+1 | let poly2' ?(id : 'a. 'a -> 'a) = id 3, id "three"
+                 ^^^^^^^^^^^^^^^^^
+Error: The optional parameter "id" cannot have a polymorphic type.
 |}];;
+
+let poly3' ?(id : 'a. int -> int) = id 3
+[%%expect {|
+Line 1, characters 13-32:
+1 | let poly3' ?(id : 'a. int -> int) = id 3
+                 ^^^^^^^^^^^^^^^^^^^
+Error: The optional parameter "id" cannot have a polymorphic type.
+|}];;
+
+(* This test illustrate a new occurrence of the bug discussed in
+   https://github.com/ocaml/ocaml/pull/13984*)
+
+module type T = sig type 'a t = 'a list  end
+
+let rec f (x : (module T)) =
+  let (module LocalModule) = x in (assert false : ('a. 'a LocalModule.t) -> unit)
+
+[%%expect{|
+module type T = sig type 'a t = 'a list end
+Line 4, characters 58-69:
+4 |   let (module LocalModule) = x in (assert false : ('a. 'a LocalModule.t) -> unit)
+                                                              ^^^^^^^^^^^
+Error: Unbound module "LocalModule"
+|}]
+
+(* The following test requires full translation in the [approx_type] function if
+   the annotation is partial. *)
+let rec f () = g () Fun.id
+and g () : ('a. 'a -> 'a) -> unit = fun _ -> () ;;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : unit -> ('a. 'a -> 'a) -> unit = <fun>
+|}]
+
+let rec f () = g () Fun.id
+and g : unit -> ('a. 'a -> 'a) -> unit = fun () _ -> () ;;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : unit -> ('a. 'a -> 'a) -> unit = <fun>
+|}]
+
+
+(* Attempts at breaking type_pattern_approx *)
+let rec f ([] : 'a. 'a list) = ()
+
+[%%expect{|
+Line 1, characters 11-27:
+1 | let rec f ([] : 'a. 'a list) = ()
+               ^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "_::_"
+
+val f : ('a. 'a list) -> unit = <fun>
+|}]
+
+let rec f () : ('a. 'a list) -> unit = fun [] -> ()
+
+[%%expect{|
+Line 1, characters 43-45:
+1 | let rec f () : ('a. 'a list) -> unit = fun [] -> ()
+                                               ^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "_::_"
+
+val f : unit -> ('a. 'a list) -> unit = <fun>
+|}]
+
+
+(* New expert trick: use 'a. to trigger "exact approximation" *)
+let rec f () = g (module Map.Make(Int)) and g (m : (module Map.S)) = ();;
+
+[%%expect{|
+Line 1, characters 17-39:
+1 | let rec f () = g (module Map.Make(Int)) and g (m : (module Map.S)) = ();;
+                     ^^^^^^^^^^^^^^^^^^^^^^
+Error: The signature for this packaged module couldn't be inferred.
+|}]
+
+let rec f () = g (module Map.Make(Int)) and g (m : 'a. (module Map.S)) = ();;
+
+[%%expect{|
+val f : unit -> unit = <fun>
+val g : (module Map.S) -> unit = <fun>
+|}]
 
 (* Check that we are getting the right behaviour for polymorphic variants
    in polymorphic parameters. *)
@@ -452,4 +572,101 @@ let () = accept_poly_poly_var poly_poly_var
 [%%expect {|
 val poly_poly_var : [< `A | `B ] -> unit = <fun>
 val accept_poly_poly_var : ('a. ([< `A | `B ] as 'a) -> unit) -> unit = <fun>
+|}]
+
+let f (`B|_) = ()
+let h (f:'a. ([> `A ] as 'a) -> unit ) = f `B
+let error = h f
+[%%expect {|
+val f : [> `B ] -> unit = <fun>
+val h : ('a. ([> `A ] as 'a) -> unit) -> unit = <fun>
+Line 3, characters 14-15:
+3 | let error = h f
+                  ^
+Error: The value "f" has type "[> `B ] -> unit"
+       but an expression was expected of type "[> `A ] -> unit"
+       The second variant type is bound to the universal type variable "'a",
+       it may not allow the tag(s) "`B"
+|}]
+
+let (let*) x (id : 'a. 'a -> 'a) = id x, id 1
+[%%expect {|
+val ( let* ) : 'b -> ('a. 'a -> 'a) -> 'b * int = <fun>
+|}]
+
+let (let*) (x : 'a. 'a option) (id : 'a. 'a -> 'a) = id x, id 1
+[%%expect {|
+val ( let* ) : ('a. 'a option) -> ('a. 'a -> 'a) -> 'b option * int = <fun>
+|}]
+
+let y =
+  let* x = 3. in
+  x
+[%%expect {|
+Line 2, characters 2-6:
+2 |   let* x = 3. in
+      ^^^^
+Error: The operator "let*" has type
+         "('a. 'a option) -> ('a. 'a -> 'a) -> 'b option * int"
+       but it was expected to have type "'c -> ('d -> 'e) -> 'f"
+       The universal variable "'a" would escape its scope
+|}]
+
+let f ((g, x) : 'a. ('a -> int) * 'a) =
+  g 3, g "three"
+
+[%%expect{|
+val f : ('a. ('a -> int) * 'a) -> int * int = <fun>
+|}]
+
+
+let f (x: [< `A of ('a. 'a option) -> unit ]) = match x with `A f -> f None
+[%%expect{|
+val f : [< `A of ('a. 'a option) -> unit & 'b option -> 'c ] -> 'c = <fun>
+|}]
+
+let f: type a. unit -> (a, ('b. 'b -> 'b) -> int) Type.eq ->  a =
+  fun () Equal f -> f 0
+[%%expect{|
+Line 2, characters 2-23:
+2 |   fun () Equal f -> f 0
+      ^^^^^^^^^^^^^^^^^^^^^
+Error: The syntactic arity of the function doesn't match the type constraint:
+       This function has 3 syntactic arguments, but its type is constrained to
+         "unit -> (a, ('b. 'b -> 'b) -> int) Type.eq -> a".
+        Hint: consider splitting the function definition into
+          "fun ... gadt_pat -> fun ..."
+          where "gadt_pat" is the pattern with the GADT constructor that
+          introduces the local type equation on "a".
+|}]
+
+(* Exhaustiveness check works for annotated polymorphic
+   parameters.
+
+   See https://github.com/ocaml/ocaml/issues/14434 *)
+let should_not_be_exhaustive ([ bad ] : 'a. 'a list) = print_endline bad;;
+should_not_be_exhaustive []
+[%%expect{|
+Line 1, characters 30-51:
+1 | let should_not_be_exhaustive ([ bad ] : 'a. 'a list) = print_endline bad;;
+                                  ^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "bad::_::_"
+
+val should_not_be_exhaustive : ('a. 'a list) -> unit = <fun>
+Exception: Match_failure ("", 1, 29).
+|}]
+
+let should_not_be_exhaustive : ('a. 'a list) -> unit =
+  fun [ bad ] -> print_endline bad;;
+should_not_be_exhaustive []
+[%%expect{|
+Line 2, characters 6-13:
+2 |   fun [ bad ] -> print_endline bad;;
+          ^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "bad::_::_"
+
+val should_not_be_exhaustive : ('a. 'a list) -> unit = <fun>
+Exception: Match_failure ("", 2, 6).
 |}]

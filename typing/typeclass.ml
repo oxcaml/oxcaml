@@ -961,9 +961,8 @@ and class_field_second_pass cl_num sign met_env field =
       Warnings.with_state warning_state
         (fun () ->
            let ty = Btype.method_type label.txt sign in
-           let self_type = sign.Types.csig_self in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
-           let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
+           let self_param_type = Btype.newgenmono sign.Types.csig_self in
            let meth_type =
              Typecore.mk_expected (Btype.newgenty
                 (Tarrow(arrow_desc, self_param_type, ty, commu_ok)))
@@ -2403,7 +2402,7 @@ let report_error_doc env ppf =
       (Style.as_inline_code Printtyp.type_scheme) sign.csig_self
   | Polymorphic_class_parameter ->
       fprintf ppf
-        "Class parameters cannot be polymorphic"
+        "Class parameters cannot be polymorphic."
   | Non_value_binding (nm, err) ->
     fprintf ppf
       "@[Variables bound in a class must have layout value.@ %a@]"

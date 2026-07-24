@@ -310,7 +310,7 @@ type error =
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
-  | Optional_poly_param
+  | Optional_poly_param of string
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
@@ -1165,15 +1165,6 @@ let extract_label_names record_form env ty =
   | Record_type_of_other_form | Not_a_record_type | Maybe_a_record_type ->
     assert false
 
-let has_poly_constraint spat =
-  match spat.ppat_desc with
-  | Ppat_constraint(_, Some styp, _) -> begin
-      match styp.ptyp_desc with
-      | Ptyp_poly _ -> true
-      | _ -> false
-    end
-  | _ -> false
-
 (** Mode cross a mode whose monadic fragment is a right mode, and whose comonadic
     fragment is a left mode. *)
 let alloc_mode_cross_to_max_min env ty { monadic; comonadic } =
@@ -1380,6 +1371,25 @@ let disambiguate_array_literal ~loc env expected_ty =
     return None Immutable
   else
     { ty_elt = None; mut = Mutable }
+
+let has_poly_constraint spat =
+  match spat.ppat_desc with
+  | Ppat_constraint(_, Some styp, _) -> begin
+      match styp.ptyp_desc with
+      | Ptyp_poly _ -> true
+      | _ -> false
+    end
+  | _ -> false
+
+let check_poly_constraint spat env arg_label =
+  let has_poly = has_poly_constraint spat in
+  if has_poly then begin
+    match arg_label with
+    | Nolabel | Labelled _ | Position _ -> ()
+    | Optional l ->
+        raise(Error(spat.ppat_loc, env, Optional_poly_param l))
+  end;
+  has_poly
 
 (* Typing of patterns *)
 
@@ -2400,12 +2410,7 @@ let solve_Ppat_constraint tps loc env mode sty expected_ty =
   tps.tps_pattern_force <- force :: tps.tps_pattern_force;
   let ty, expected_ty' = instance ty, ty in
   unify_pat_types loc env ty (instance expected_ty);
-  let expected_ty' =
-    match get_desc expected_ty' with
-    | Tpoly (expected_ty', tl) ->
-        instance_poly ~keep_names:true tl expected_ty'
-    | _ -> expected_ty'
-  in
+  let expected_ty' = Ctype.maybe_instance_poly expected_ty' in
   (cty, ty, expected_ty')
 
 let solve_Ppat_variant loc env tag no_arg expected_ty =
@@ -3983,7 +3988,6 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
-      (* Pretend separate = true *)
       begin match sty with
       | Some sty ->
         let type_modes = Typemode.transl_alloc_mode ms in
@@ -4087,7 +4091,7 @@ let type_pattern_list
   (patl, !!new_penv, forces, pvs, mvs)
 
 let type_class_arg_pattern cl_num val_env met_env l spat =
-  let pvs, pat =
+  let pattern_variables, pat =
     with_local_level_generalize_structure_if_principal begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
       let nv = newvar (Jkind.Builtin.value ~why:Class_term_argument) in
@@ -4148,7 +4152,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             met_env
          in
          ((id', pv_id, pv_type)::pv, val_env, met_env))
-      pvs ([], val_env, met_env)
+      pattern_variables ([], val_env, met_env)
   in
   (pat, pv, val_env, met_env)
 
@@ -4369,6 +4373,7 @@ let enter_nonsplit_or info =
 let rec check_counter_example_pat
     ~info ~(penv : Pattern_env.t) type_pat_state tp expected_ty k =
   assert (penv.in_counterexample = true);
+  assert (not (is_Tpoly expected_ty));
   let check_rec ?(info=info) ?(penv=penv) =
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
@@ -4566,6 +4571,9 @@ let check_counter_example_pat ~counter_example_args penv tp expected_ty =
      way -- one of the functions it calls writes an entry into
      [tps_pattern_forces] -- so we can just ignore module patterns. *)
   let type_pat_state = create_type_pat_state Modules_ignored in
+  let expected_ty =
+    with_level ~level:generic_level (fun () -> maybe_instance_poly expected_ty)
+  in
   wrap_trace_gadt_instances ~force:true !!penv
     (check_counter_example_pat ~info:counter_example_args ~penv
        type_pat_state tp expected_ty)
@@ -4709,8 +4717,8 @@ type untyped_apply_arg =
        or the [commu_ok] case where a function type is known
        but not principally).
 
-       [ty_arg_mono] is the expected type of the argument, usually just
-       a fresh type variable. *)
+       [ty_arg is the expected type of the argument, usually just a fresh type
+       variable. *)
   | Eliminated_optional_arg of
       { expected_label: arg_label;
         mode_fun: Alloc.lr;
@@ -4912,8 +4920,8 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
           let ty_fun = expand_head env ty_fun in
           match get_desc ty_fun with
           | Tvar { jkind; _ } ->
-              let ty_arg_mono, sort_arg = new_rep_var ~why:Function_argument () in
-              let ty_arg = newmono ty_arg_mono in
+              let ty_arg, sort_arg = new_rep_var ~why:Function_argument () in
+              let ty_param = newmono ty_arg in
               let ty_res =
                 newvar (Jkind.of_new_sort ~why:Function_result
                           ~level:(Ctype.get_current_level ()))
@@ -4929,7 +4937,7 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
               let kind = (lbl, mode_arg, mode_ret) in
               begin try
                 unify env ty_fun
-                  (newty (Tarrow(kind,ty_arg,ty_res,commu_var ())));
+                  (newty (Tarrow(kind,ty_param,ty_res,commu_var ())));
               with
               | Unify _ ->
                 (* need to calculate a location containing the function
@@ -4944,18 +4952,18 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                             Impossible_function_jkind
                               { some_args_ok; ty_fun; jkind }))
               end;
-              (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
-        | Tarrow ((l, mode_arg, mode_ret), ty_arg, ty_res, _)
+              (sort_arg, mode_arg, ty_arg, mode_ret, ty_res)
+        | Tarrow ((l, mode_arg, mode_ret), ty_param, ty_res, _)
           when labels_match ~param:l ~arg:lbl ->
             let sort_arg =
               match
-                type_sort ~why:Function_argument ~fixed:false env ty_arg
+                type_sort ~why:Function_argument ~fixed:false env ty_param
               with
               | Ok sort -> sort
               | Error err -> raise(Error(funct.exp_loc, env,
-                                         Function_type_not_rep (ty_arg,err)))
+                                         Function_type_not_rep (ty_param,err)))
             in
-            (sort_arg, mode_arg, tpoly_get_mono ty_arg, mode_ret, ty_res)
+            (sort_arg, mode_arg, tpoly_get_mono ty_param, mode_ret, ty_res)
         | td ->
             let ty_fun = match td with Tarrow _ -> newty td | _ -> ty_fun in
             let ty_res =
@@ -5622,21 +5630,21 @@ let type_approx_constraint_opt ~loc env constraint_ ty_expected =
   | Some ty -> type_approx_constraint ~loc env ty ty_expected
 
 let type_approx_fun_one_param
-    env loc label spato ty_expected ~first ~in_function
+    env loc label default spato ty_expected ~first ~in_function
   =
+  (* [spato] is [None] when approximating a [Pfunction_cases],
+     the parameter is implicit in that case. *)
   let mode_annots, has_poly =
     match spato with
     | None -> None, false
     | Some spat ->
         let mode_annots = mode_annots_from_pat spat in
-        let has_poly = has_poly_constraint spat in
-        if has_poly && is_optional label then
-          raise(Error(spat.ppat_loc, env, Optional_poly_param));
+        let has_poly = check_poly_constraint spat env label in
         Some mode_annots, has_poly
   in
   let loc_fun, ty_fun = in_function in
-  let { ty_arg; arg_mode; ty_ret; _ } =
-    try filter_arrow env ty_expected label ~force_tpoly:(not has_poly)
+  let { ty_param; arg_mode; ty_ret; _ } =
+    try filter_arrow env ty_expected label ~param_hole:has_poly
     with Filter_arrow_failed err ->
       let err =
         error_of_filter_arrow_failure ~explanation:None ty_fun err ~first
@@ -5647,10 +5655,30 @@ let type_approx_fun_one_param
     (fun mode_annots ->
       apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
     mode_annots;
-  if has_poly then begin
+  begin
     match spato with
     | None -> ()
-    | Some spat -> type_pattern_approx env spat ty_arg
+    | Some spat ->
+        let ty_param =
+          match label, default with
+          | (Nolabel | Labelled _ | Position _), _ -> ty_param
+          | Optional _, None ->
+            let var =
+              newmono (type_option (newvar Predef.option_argument_jkind))
+            in
+            unify_pat_types spat.ppat_loc env ty_param var;
+            ty_param
+          | Optional _, Some _ ->
+            let ty_opt_param = newvar Predef.option_argument_jkind in
+            let ty_pat_param = newmono (type_option ty_opt_param) in
+            unify_pat_types spat.ppat_loc env ty_param ty_pat_param;
+            newmono ty_opt_param
+        in
+        let ty_param =
+          if has_poly || not (Btype.tpoly_is_mono ty_param) then ty_param
+          else Btype.tpoly_get_mono  ty_param
+        in
+        type_pattern_approx env spat ty_param;
   end;
   ty_ret
 
@@ -5702,11 +5730,11 @@ and type_approx_function =
     *)
     match params with
     | { pparam_desc = Pparam_newtype _ } :: _ -> ()
-    | { pparam_desc = Pparam_val (label, _, pat) } :: params ->
+    | { pparam_desc = Pparam_val (label, default, pat) } :: params ->
         let label, pat = Typetexp.transl_label_from_pat label pat in
         let ty_res =
-          type_approx_fun_one_param env loc label (Some pat) ty_expected
-            ~first ~in_function
+          type_approx_fun_one_param env loc label default (Some pat)
+            ty_expected ~first ~in_function
         in
         loop env params c body ty_res ~in_function ~first:false
     | [] ->
@@ -5721,7 +5749,7 @@ and type_approx_function =
             type_approx env body ty_expected
         | Pfunction_cases ({pc_rhs = e} :: _, _, _) ->
             let ty_res =
-              type_approx_fun_one_param env loc Nolabel None ty_expected
+              type_approx_fun_one_param env loc Nolabel None None ty_expected
                 ~in_function ~first
             in
             type_approx env e ty_res
@@ -6129,7 +6157,7 @@ let check_apply_prim_type prim typ =
             | Revapply -> c, a, d
           in
           begin match get_desc f with
-          | Tarrow((Nolabel,_,_),fl,fr,_) ->
+          | Tarrow((Nolabel,_,_),fl,fr,_) when tpoly_is_mono fl  ->
               let fl = tpoly_get_mono fl in
               is_Tvar fl && is_Tvar fr && is_Tvar x && is_Tvar res
               && Types.eq_type fl x && Types.eq_type fr res
@@ -6163,6 +6191,8 @@ let with_explanation explanation f =
         let err = Expr_type_clash(err', Some explanation, exp') in
         raise (Error (loc', env', err))
 
+
+
 (* Generalize expressions *)
 let may_lower_contravariant env exp =
   if maybe_expansive exp then lower_contravariant env exp.exp_type
@@ -6188,16 +6218,6 @@ let unique_use ~loc ~env mode_l mode_r  =
       Linearity.disallow_right (Value.proj_comonadic Linearity mode_l)
     in
     (uniqueness, linearity)
-
-let is_really_poly ~env ty =
-  let snap = Btype.snapshot () in
-  let any = Jkind.Builtin.any ~why:Dummy_jkind in
-  let really_poly =
-    try unify env (newmono (newvar any)) ty; false
-    with Unify _ -> true
-  in
-  Btype.backtrack snap;
-  really_poly
 
 (** The body of a constraint or coercion. The "body" may be either an expression
     or a list of function cases. This type is polymorphic in the data returned
@@ -6276,15 +6296,11 @@ let split_function_ty
       (Alloc.proj_comonadic Areality alloc_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
-  let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
+  let { ty_param; ty_ret; arg_mode; ret_mode } as filtered_arrow =
     with_local_level_generalize_structure_if separate begin fun () ->
-      let force_tpoly =
-        (* If [has_poly] is true then we rely on the later call to
-           type_pat to enforce the invariant that the parameter type
-           be a [Tpoly] node *)
-        not has_poly
-      in
-      try filter_arrow env (instance ty_expected) arg_label ~force_tpoly
+      (* If [has_poly] is true then we rely on the later call to type_pat to
+         enforce the invariant that the parameter type be a [Tpoly] node *)
+      try filter_arrow env (instance ty_expected) arg_label ~param_hole:has_poly
       with Filter_arrow_failed err ->
         let err =
           error_of_filter_arrow_failure ~explanation ~first:is_first_val_param
@@ -6296,10 +6312,11 @@ let split_function_ty
   apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
   apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
   let really_poly =
-    not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
+    not has_poly && not (tpoly_is_mono ty_param)
+    && Ctype.is_really_poly env ty_param
   in
   if really_poly &&
-     !Clflags.principal && get_level ty_arg < Btype.generic_level then
+     !Clflags.principal && get_level ty_param < Btype.generic_level then
     Location.prerr_warning loc
       (not_principal "this higher-rank function");
   let env =
@@ -6326,9 +6343,9 @@ let split_function_ty
       ret_value_mode
   in
   let ty_arg_mono =
-    if has_poly then ty_arg
+    if has_poly then ty_param
     else begin
-      let ty, vars = tpoly_get_poly ty_arg in
+      let ty, vars = tpoly_get_poly ty_param in
       if vars = [] then ty
       else begin
         with_level ~level:generic_level
@@ -6343,7 +6360,7 @@ let split_function_ty
     | Ok sort -> sort
     | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
   in
-  let arg_sort = type_sort ~why:Function_argument ty_arg in
+  let arg_sort = type_sort ~why:Function_argument ty_param in
   let ret_sort = type_sort ~why:Function_result ty_ret in
   env,
   { filtered_arrow; arg_sort; ret_sort;
@@ -8411,9 +8428,10 @@ and type_expect_
           let ty_result, op_result_sort = new_rep_var ~why:Function_result () in
           let ty_andops, sort_andops = new_rep_var ~why:Function_argument () in
           let ty_op =
-            newty (Tarrow(arrow_desc, newmono ty_andops,
-              newty (Tarrow(arrow_desc, newmono ty_func, ty_result, commu_ok)),
-                     commu_ok))
+            let ty_fun =
+              newty (Tarrow(arrow_desc, newmono ty_func, ty_result, commu_ok))
+            in
+            newty (Tarrow(arrow_desc, newmono ty_andops, ty_fun, commu_ok))
           in
           begin try
             unify env op_type ty_op
@@ -9257,9 +9275,7 @@ and type_function
         Typetexp.transl_label_from_pat arg_label pat
       in
       let mode_annots = mode_annots_from_pat pat in
-      let has_poly = has_poly_constraint pat in
-      if has_poly && is_optional_parsetree arg_label then
-        raise(Error(pat.ppat_loc, env, Optional_poly_param));
+      let has_poly = check_poly_constraint pat env typed_arg_label in
       if has_poly
       && not (Language_extension.is_enabled Polymorphic_parameters) then
         raise (Typetexp.Error (loc, env,
@@ -9291,7 +9307,7 @@ and type_function
           { mode_modes = Alloc.Const.Option.none; mode_desc = [] }
       in
       let env,
-          { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
+          { filtered_arrow = { ty_param; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             alloc_mode; really_poly
@@ -9382,7 +9398,9 @@ and type_function
                      uses the [arg_mode.comonadic] as a left mode, and
                      [arg_mode.monadic] as a right mode, hence they need to be
                      mode-crossed differently. *)
-                  let arg_mode = alloc_mode_cross_to_max_min env ty_arg arg_mode in
+                  let arg_mode =
+                    alloc_mode_cross_to_max_min env ty_param arg_mode
+                  in
                   begin match
                     Alloc.submode (Alloc.close_over arg_mode) fun_alloc_mode
                   with
@@ -9411,7 +9429,8 @@ and type_function
         instance
           (newgenty
              (Tarrow
-                ((typed_arg_label, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+                ((typed_arg_label, arg_mode, ret_mode), ty_param, ty_ret,
+                 commu_ok)))
       in
       (* This is quadratic, as it operates over the entire tail of the
          type for each new parameter. Now that functions are n-ary, we
@@ -9440,7 +9459,7 @@ and type_function
         then { pat with
           pat_extra =
             (Tpat_inspected_type (Polymorphic_parameter (
-              Param (Ctype.instance ~partial:true ty_arg))),
+              Param (Ctype.instance ~partial:true ty_param))),
              loc, [])
             :: pat.pat_extra }
         else pat
@@ -10255,7 +10274,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           end
         end else begin
           let sch =
-            let really_poly = is_really_poly ~env ty_arg in
+            let really_poly = Ctype.is_really_poly env ty_arg in
             if really_poly &&
                !Clflags.principal && get_level ty_arg < Btype.generic_level
             then
@@ -10308,6 +10327,15 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
+  let exception Filter_arrow_mono_failed in
+  let filter_arrow_mono env t l =
+    match filter_arrow env t l ~param_hole:false with
+    | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
+    | {ty_param; _} as farr  ->
+        match tpoly_get_mono_opt ty_param with
+        | None -> raise Filter_arrow_mono_failed
+        | Some ty_param -> { farr with ty_param }
+  in
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -10316,7 +10344,7 @@ and type_application env app_loc expected_mode position_and_mode
   match sargs with
   | (* Special case for ignore: avoid discarding warning *)
     [Parsetree.Nolabel, sarg] when is_ignore funct ->
-      let {ty_arg; arg_mode; ty_ret; ret_mode} =
+      let {ty_param; arg_mode; ty_ret; ret_mode} =
         with_local_level_generalize_structure_if_principal (fun () ->
           filter_arrow_mono env (instance funct.exp_type) Nolabel)
       in
@@ -10326,12 +10354,12 @@ and type_application env app_loc expected_mode position_and_mode
         | Error err ->
           raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
       in
-      let arg_sort = type_sort ~why:Function_argument ty_arg in
+      let arg_sort = type_sort ~why:Function_argument ty_param in
       let arg_mode, _ =
         mode_argument ~funct ~index:0 ~position_and_mode
           ~partial_app:false arg_mode
       in
-      let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
+      let exp = type_expect env arg_mode sarg (mk_expected ty_param) in
       check_partial_application ~statement:false exp;
       ([Nolabel, Arg (exp, arg_sort), None],
        ty_ret, ret_mode, position_and_mode)
@@ -11125,7 +11153,7 @@ and type_function_cases_expect
     env expected_mode ty_expected loc cases attrs ~first ~in_function =
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
-        { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
+        { filtered_arrow = { ty_param; ty_ret; arg_mode; ret_mode };
           arg_sort; ret_sort;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
@@ -11142,7 +11170,8 @@ and type_function_cases_expect
     let ty_fun =
       instance
         (newgenty
-           (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
+           (Tarrow ((Nolabel, arg_mode, ret_mode), ty_param, ty_ret,
+                    commu_ok)))
     in
     unify_exp_types loc env ty_fun (instance ty_expected);
     let param , param_uid = name_cases "param" cases in
@@ -11732,8 +11761,8 @@ and type_n_ary_function
     | No_gadt -> ()
     | Contains_gadt ->
         (* Assert that [ty] is a function, and return its return type. *)
-        let filter_ty_ret_exn ty arg_label ~force_tpoly =
-          match filter_arrow env ty arg_label ~force_tpoly with
+        let filter_ty_ret_exn ty arg_label ~param_hole =
+          match filter_arrow env ty arg_label ~param_hole with
           | { ty_ret; _ } -> ty_ret
           | exception (Filter_arrow_failed error) ->
               let trace =
@@ -11750,7 +11779,7 @@ and type_n_ary_function
                       (newty
                          (Tarrow
                             ( (arg_label, new_mode_var (), new_mode_var ())
-                            , new_ty_var Function_argument
+                            , newmono (new_ty_var Function_argument)
                             , new_ty_var Function_result
                             , commu_ok )));
                     in
@@ -11783,7 +11812,7 @@ and type_n_ary_function
         let ret_ty =
           List.fold_left (fun ret_ty { param; has_poly } ->
               filter_ty_ret_exn ret_ty param.fp_arg_label
-                ~force_tpoly:(not has_poly))
+                ~param_hole:has_poly)
             exp_type
             result_params
         in
@@ -11791,7 +11820,7 @@ and type_n_ary_function
         | Tfunction_body _ -> ()
         | Tfunction_cases _ ->
             ignore
-              (filter_ty_ret_exn ret_ty Nolabel ~force_tpoly:true : type_expr)
+              (filter_ty_ret_exn ret_ty Nolabel ~param_hole:false : type_expr)
     end;
     let zero_alloc =
       Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
@@ -13329,9 +13358,11 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[This expression is local because it is an exclave,@ \
           but was expected otherwise.@]"
-  | Optional_poly_param ->
+  | Optional_poly_param l ->
       Location.errorf ~loc
-        "Optional parameters cannot be polymorphic"
+        "@[The optional parameter %a \
+         cannot have a polymorphic type.@]"
+        Style.inline_code l
   | Function_returns_local ->
       Location.errorf ~loc
         "This function is local-returning, but was expected otherwise."
