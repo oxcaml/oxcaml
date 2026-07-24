@@ -850,7 +850,9 @@ let binding_op sub bop pat =
   let pbop_pat = sub.pat sub pat in
   let pbop_exp = sub.expr sub bop.bop_exp in
   let pbop_loc = bop.bop_loc in
-  {pbop_op; pbop_pat; pbop_exp; pbop_loc}
+  (* CR-soon aspsmith: Fill this in once typedtree has binding op modes *)
+  let pbop_modes = [] in
+  {pbop_op; pbop_pat; pbop_exp; pbop_loc; pbop_modes}
 
 let package_type sub pack =
   { ppt_path = map_loc sub pack.tpt_txt;

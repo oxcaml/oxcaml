@@ -8370,6 +8370,8 @@ and type_expect_
         exp_env = env;
       }
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
+      if not (List.is_empty slet.pbop_modes)
+      then Misc.fatal_error "Not yet implemented: Modes on binding operators";
       submode ~loc ~env Value.legacy expected_mode;
       let rec loop spat_acc ty_acc ty_acc_sort sands =
         match sands with
