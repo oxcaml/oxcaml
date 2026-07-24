@@ -114,6 +114,8 @@ module Addressability : sig
     | Exact of Action.t
     | Join
 
+  val all_addressable : t list -> bool
+
   val of_action_on_undetermined : Action.t -> t
 end
 

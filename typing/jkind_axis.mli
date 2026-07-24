@@ -144,6 +144,11 @@ module Addressability : sig
       This is not the [meet] of the components. *)
   val combine_product : t list -> t
 
+  (** Whether kinds with these marks are all addressable (equivalently,
+      [combine_product] of them is [Exact Addressable]): a whole-product mark
+      over them would be a no-op, so e.g. printing one is uninformative. *)
+  val all_addressable : t list -> bool
+
   (** The reading of an action stored on a node whose carrier's intrinsic
       addressability is undetermined ([any], an abstract kind, or an unfilled
       sort variable): applying no action leaves the addressability undetermined.

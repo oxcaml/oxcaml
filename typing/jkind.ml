@@ -216,6 +216,11 @@ module Layout = struct
         Misc.fatal_error "Jkind.Layout.Const.format_scannable_layout"
 
     let to_string t ~include_redundant_scannable_axes =
+      let with_mark_suffix base (a : Addressability.t) =
+        match a with
+        | Exact Addressable -> base ^ " " ^ Addressability.to_string a
+        | Exact Id | Join -> base
+      in
       let rec to_string nested (t : t) =
         match t with
         | Any (sa, a) ->
@@ -231,48 +236,33 @@ module Layout = struct
              slot. *)
           String.concat " "
             (format_scannable_layout ~include_redundant_scannable_axes sa)
-        | Base (b, _, a) -> (
+        | Base (b, _, a) ->
           let base = Sort.to_string_base b in
           (* The slot is implied on intrinsically addressable bases. *)
-          match a with
-          | Exact Addressable
-            when not (Addressability.base_is_always_addressable b) ->
-            base ^ " " ^ Addressability.to_string a
-          | Exact _ | Join -> base)
+          if Addressability.base_is_always_addressable b
+          then base
+          else with_mark_suffix base a
         | Product (ts, a) -> (
           let components = String.concat " & " (List.map (to_string true) ts) in
           let marked_and_informative =
             (* A mark on a product of addressable kinds is a no-op; only
                print it when it isn't implied by the components. *)
             match (a : Addressability.Action.t) with
-            | Addressable -> (
-              match Addressability.combine_product (List.map mark ts) with
-              | Exact Addressable -> false
-              | Exact Id | Join -> true)
+            | Addressable ->
+              not (Addressability.all_addressable (List.map mark ts))
             | Id -> false
           in
           match marked_and_informative with
           | true ->
-            String.concat ""
-              [ "(";
-                components;
-                ") ";
-                Addressability.to_string (Exact Addressable) ]
+            with_mark_suffix ("(" ^ components ^ ")") (Exact Addressable)
           | false ->
             String.concat ""
               [ (if nested then "(" else "");
                 components;
                 (if nested then ")" else "") ])
-        | Univar ({ name }, _, a) -> (
-          let base = match name with Some n -> n | None -> "_" in
-          match a with
-          | Exact Addressable -> base ^ " " ^ Addressability.to_string a
-          | Exact Id | Join -> base)
-        | Genvar (v, _, a) -> (
-          let base = Sort.to_string_genvar v in
-          match a with
-          | Exact Addressable -> base ^ " " ^ Addressability.to_string a
-          | Exact Id | Join -> base)
+        | Univar ({ name }, _, a) ->
+          with_mark_suffix (match name with Some n -> n | None -> "_") a
+        | Genvar (v, _, a) -> with_mark_suffix (Sort.to_string_genvar v) a
       in
       to_string false t
 
@@ -810,11 +800,7 @@ module Layout = struct
             :: addressable_words a ~implied:false))
       | Product (ts, a) -> (
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        let implied =
-          match Addressability.combine_product (List.map mark ts) with
-          | Exact Addressable -> true
-          | Exact Id | Join -> false
-        in
+        let implied = Addressability.all_addressable (List.map mark ts) in
         match action_words a ~implied with
         | [] -> Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
         | words ->
@@ -2850,14 +2836,14 @@ module Desc = struct
         let implied =
           (* Whether the components already imply addressability, making a
              root mark uninformative. *)
-          Addressability.combine_product (List.map layout_mark lays)
+          Addressability.all_addressable (List.map layout_mark lays)
         in
-        match (a : Addressability.Action.t), implied with
-        | Addressable, (Exact Id | Join) ->
+        match (a : Addressability.Action.t) with
+        | Addressable when not implied ->
           Fmt.fprintf ppf "%t %s"
             (fun ppf -> pp_components ~nested:true ppf)
             (Addressability.Action.to_string a)
-        | Addressable, Exact Addressable | Id, _ -> pp_components ~nested ppf)
+        | Addressable | Id -> pp_components ~nested ppf)
       | Layout _ | Kconstr _ -> (
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c

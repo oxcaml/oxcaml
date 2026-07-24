@@ -163,6 +163,8 @@ module Addressability : sig
 
   val combine_product : t list -> t
 
+  val all_addressable : t list -> bool
+
   val of_action_on_undetermined : Action.t -> t
 
   val forget_join : t -> Action.t

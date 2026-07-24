@@ -188,6 +188,15 @@ module Addressability = struct
           Exact Action.Addressable)
       (Exact Action.Addressable) ts
 
+  (* Whether kinds with these marks are all addressable - equivalently,
+     [combine_product] of them is [Exact Addressable], so a whole-product
+     mark over them would be a no-op. *)
+  let all_addressable ts =
+    List.for_all
+      (fun t ->
+        match t with Exact Addressable -> true | Exact Id | Join -> false)
+      ts
+
   let of_action_on_undetermined : Action.t -> t = function
     | Id -> Join
     | Addressable -> Exact Addressable
