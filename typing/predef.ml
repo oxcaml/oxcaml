@@ -1244,3 +1244,8 @@ let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
 
 let builtin_idents = List.rev !builtin_idents
+
+let builtin_type_constrs =
+  List.map
+    (fun t -> let id = ident_of_type_constr t in (Ident.name id, id))
+    all_type_constrs
