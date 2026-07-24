@@ -5,6 +5,10 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
 (** {0 OCaml compiler compatible command-line parameters} *)
 let cmi_file = ref None
 let include_dirs        = ref []
@@ -19,10 +23,11 @@ let real_paths          = ref true
 let recursive_types     = ref false
 let strict_sequence     = ref false
 let applicative_functors = ref true
+let typing_recovery     = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
-let open_modules        = ref []
+let open_args = ref ([] : open_arg list)
 let parameters          = ref ([] : string list)
 let as_parameter        = ref false
 let as_argument_for     = ref None

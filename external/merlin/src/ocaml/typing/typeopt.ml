@@ -248,7 +248,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval)
+      | Some (`Lexing_position | `Code | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -269,7 +269,7 @@ let classify ~classify_product env ty layout : _ classification =
       Addr
   (* Quotes are not representable, but it's safe to say they are [Any].
      Unreduced splices and evals might stand for anything. *)
-  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+  | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Trepr _ ->
@@ -346,7 +346,7 @@ let array_type_kind ~elt_ty env loc ty =
     | Some elt_ty ->
       let rhs = Jkind.Builtin.value ~why:Array_type_kind in
       begin match Ctype.constrain_type_jkind env elt_ty rhs with
-      | Ok _ -> Pgenarray
+      | Ok _ -> if Config.flat_float_array then Pgenarray else Paddrarray
       | Error e ->
         (* CR layouts v4: rather than constraining [elt_ty]'s jkind to be value,
            we could instead use its jkind to determine a non-value array kind.
@@ -646,7 +646,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited cstrs rep)
-        | Type_record (_, Record_variable, _) ->
+        | Type_record
+            (_, (Record_variable | Record_inlined (_, Constructor_variable, _)),
+             _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
@@ -767,7 +769,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           end
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
-        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ -> unknown ()
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
+          unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
         end
     in
@@ -850,6 +853,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_variable ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->
@@ -868,6 +874,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_variable ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (is_mutable, num_nodes_visited), fields
     in
@@ -956,7 +965,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_variable ->
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -971,7 +980,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ | Record_variable ->
+          | Record_unboxed | Record_dummy _ | Record_variable
+          | Record_inlined (_, Constructor_variable, _) ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)

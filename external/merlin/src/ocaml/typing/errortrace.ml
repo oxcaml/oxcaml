@@ -218,10 +218,5 @@ module Subtype = struct
 
   let map f t = List.map (map_elt f) t
 
-  let map_desc f { ty; expanded } =
-    let ty = f ty in
-    let expanded = f expanded in
-    { ty; expanded }
-
   let map_types f = map (map_desc f)
 end

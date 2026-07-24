@@ -47,7 +47,7 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
+  Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
 val transl_signature:
   Env.t -> Parsetree.signature -> Typedtree.signature
@@ -84,7 +84,7 @@ val package_units:
 val initial_env:
   loc:Location.t ->
   initially_opened_module:string option ->
-  open_implicit_modules:string list -> Env.t
+  open_implicit_args:Clflags.open_arg list -> Env.t
 
 module Sig_component_kind : sig
   type t =
@@ -178,8 +178,8 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
 
-exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+exception Errors of Location.t * Typing_recovery.Error_set.t
 
 val report_error: Env.t -> loc:Location.t -> error -> Location.error
 
@@ -189,11 +189,11 @@ val reset : preserve_persistent_env:bool -> unit
 
 (* merlin *)
 
+module Error : sig
+    type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
+
 val normalize_signature : Types.signature -> unit
-
-val merlin_type_structure:
-  Env.t -> Types.signature -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * (* Signature_names.t * *) Env.t
-
-val merlin_transl_signature:
-  Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature

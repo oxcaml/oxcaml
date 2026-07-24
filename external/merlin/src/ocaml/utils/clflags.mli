@@ -5,6 +5,10 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
 (** {0 OCaml compiler compatible command-line parameters}
 
     For compatibility with typechecker.
@@ -27,9 +31,10 @@ val real_paths           : bool ref
 val recursive_types      : bool ref
 val strict_sequence      : bool ref
 val applicative_functors : bool ref
+val typing_recovery      : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
-val open_modules         : string list ref
+val open_args            : open_arg list ref
 val parameters           : string list ref
 val as_parameter         : bool ref
 val as_argument_for      : string option ref

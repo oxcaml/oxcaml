@@ -433,6 +433,7 @@ val error_of_printer:
 
 val error_of_printer_file: ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
+val multiple_errors : ?loc:t -> error list -> error
 
 (** {1 Automatically reporting errors for raised exceptions} *)
 
