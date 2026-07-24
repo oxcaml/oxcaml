@@ -390,6 +390,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           match get_desc ty with
           | Tvar _ | Tunivar _ ->
               Oval_stuff "<poly>"
+          | Tmod _ ->
+              fatal_error "Printval.outval_of_value"
           | Tarrow _ ->
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->

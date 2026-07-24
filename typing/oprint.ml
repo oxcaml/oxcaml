@@ -494,6 +494,9 @@ and print_simple_out_type ppf =
   | Otyp_attribute (t, attr) ->
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
+  | Otyp_mod (t, modalities) ->
+      fprintf ppf "@[<1>(%a%a)@]"
+        print_out_type_0 t print_out_modalities modalities
   | Otyp_jkind_annot (t, jk) ->
     fprintf ppf "@[<1>(%a@ :@ %a)@]"
       print_out_type_0 t

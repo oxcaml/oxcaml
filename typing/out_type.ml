@@ -910,6 +910,8 @@ let printer_iter_type_expr f ty =
       if field_kind_repr kind = Fpublic then
         f ty1;
       f ty2
+  | Tmod (ty, _) ->
+      f ty
   | _ ->
       Btype.iter_type_expr f ty
 
@@ -1311,6 +1313,10 @@ let tree_of_modalities mut t =
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
+let out_modalities_of_mod_bounds mod_bounds =
+  Typemode.untransl_mod_bounds mod_bounds
+  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
@@ -1494,6 +1500,10 @@ let rec tree_of_modal_typexp mode modal ty =
         end
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
+    | Tmod (ty, mod_bounds) ->
+        Otyp_mod
+          ( tree_of_typexp mode alloc_mode ty,
+            out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
           (Env.enter_quotation !printing_env)

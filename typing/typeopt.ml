@@ -210,6 +210,7 @@ let classify ~classify_product env ty layout : _ classification =
   else match get_desc ty with
   | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
+  | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -842,6 +843,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tmod _ -> Misc.fatal_error "Typeopt: unexpected Tmod"
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()

@@ -522,34 +522,6 @@ module Mod_bounds = struct
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
 
-  (** Get all axes that are set to max *)
-  let get_max_axes t =
-    let[@inline] add_if b ax axis_set =
-      if b then Axis_set.add axis_set ax else axis_set
-    in
-    let[@inline] add_crossing_if ax axis_set =
-      if
-        Crossing.Per_axis.(
-          (le [@inlined hint]) ax ((max [@inlined hint]) ax)
-            ((Crossing.proj [@inlined hint]) ax (crossing t)))
-      then Axis_set.add axis_set (Modal ax)
-      else axis_set
-    in
-    Axis_set.empty
-    |> add_crossing_if (Comonadic Areality)
-    |> add_crossing_if (Comonadic Linearity)
-    |> add_crossing_if (Monadic Uniqueness)
-    |> add_crossing_if (Comonadic Portability)
-    |> add_crossing_if (Monadic Contention)
-    |> add_crossing_if (Comonadic Forkable)
-    |> add_crossing_if (Comonadic Yielding)
-    |> add_crossing_if (Comonadic Statefulness)
-    |> add_crossing_if (Monadic Visibility)
-    |> add_crossing_if (Monadic Staticity)
-    |> add_if
-         (Externality.le Externality.max (externality t))
-         (Nonmodal Externality)
-
   let to_mode_crossing t = crossing t
 end
 
@@ -1075,6 +1047,7 @@ module Base_and_axes = struct
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
+          | Tmod (ty, _) -> check ~relevant_axes t ty
           | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
@@ -1195,6 +1168,36 @@ module Base_and_axes = struct
             No_with_bounds,
             { ctl with fuel_status = Sufficient_fuel } )
         | (ty, ti) :: bs -> (
+          let join_bounds b1 b2 ~relevant_axes =
+            let value_for_axis (type a) ~(axis : a Axis.t) : a =
+              if Axis_set.mem relevant_axes axis
+              then
+                (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
+                  (Mod_bounds.get ~axis b2)
+              else Mod_bounds.get ~axis b1
+            in
+            let monadic =
+              Mod_bounds.Crossing.Monadic.create
+                ~uniqueness:(value_for_axis ~axis:(Modal (Monadic Uniqueness)))
+                ~contention:(value_for_axis ~axis:(Modal (Monadic Contention)))
+                ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
+                ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
+            in
+            let comonadic =
+              Mod_bounds.Crossing.Comonadic.create
+                ~regionality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
+                ~linearity:(value_for_axis ~axis:(Modal (Comonadic Linearity)))
+                ~portability:
+                  (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
+                ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
+                ~statefulness:
+                  (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+            in
+            let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+            Mod_bounds.create crossing
+              ~externality:(value_for_axis ~axis:(Nonmodal Externality))
+          in
           (* Map the type's info before expanding the type *)
           let ti =
             match map_type_info with
@@ -1222,65 +1225,54 @@ module Base_and_axes = struct
                thereby avoid doing the work of expanding it. *)
             loop ctl bounds_so_far relevant_axes bs
           | false -> (
-            let join_bounds b1 b2 ~relevant_axes =
-              let value_for_axis (type a) ~(axis : a Axis.t) : a =
-                if Axis_set.mem relevant_axes axis
-                then
-                  (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
-                    (Mod_bounds.get ~axis b2)
-                else Mod_bounds.get ~axis b1
+            match get_desc ty with
+            | Tmod (ty, mod_bounds) ->
+              let axes_not_constrained_by_mod =
+                Mod_bounds.get_max_axes mod_bounds
               in
-              let monadic =
-                Mod_bounds.Crossing.Monadic.create
-                  ~uniqueness:
-                    (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-                  ~contention:
-                    (value_for_axis ~axis:(Modal (Monadic Contention)))
-                  ~visibility:
-                    (value_for_axis ~axis:(Modal (Monadic Visibility)))
-                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
+              let axes_constrained_by_mod =
+                Axis_set.diff relevant_axes_for_ty axes_not_constrained_by_mod
               in
-              let comonadic =
-                Mod_bounds.Crossing.Comonadic.create
-                  ~regionality:
-                    (value_for_axis ~axis:(Modal (Comonadic Areality)))
-                  ~linearity:
-                    (value_for_axis ~axis:(Modal (Comonadic Linearity)))
-                  ~portability:
-                    (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
-                  ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-                  ~statefulness:
-                    (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+              let bounds_so_far =
+                join_bounds bounds_so_far mod_bounds
+                  ~relevant_axes:axes_constrained_by_mod
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
-              Mod_bounds.create crossing
-                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
-            in
-            let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
-                skippable_axes :
-                Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
-              let relevant_axes_for_ty =
-                Axis_set.diff relevant_axes_for_ty skippable_axes
+              let relevant_axes_for_inner =
+                Axis_set.intersection relevant_axes_for_ty
+                  axes_not_constrained_by_mod
               in
-              match quality, mode, t_has_abstract_base with
-              | Best, _, _ | Not_best, Ignore_best, false -> (
-                (* The relevant axes are the intersection of the relevant axes within our
+              if Axis_set.is_empty relevant_axes_for_inner
+              then loop ctl bounds_so_far relevant_axes bs
+              else
+                let ti : With_bounds_type_info.t =
+                  { relevant_axes = relevant_axes_for_inner }
+                in
+                loop ctl bounds_so_far relevant_axes ((ty, ti) :: bs)
+            | _ -> (
+              let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
+                  skippable_axes :
+                  Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
+                let relevant_axes_for_ty =
+                  Axis_set.diff relevant_axes_for_ty skippable_axes
+                in
+                match quality, mode, t_has_abstract_base with
+                | Best, _, _ | Not_best, Ignore_best, false -> (
+                  (* The relevant axes are the intersection of the relevant axes within our
                    branch of the with-bounds tree, and the relevant axes on this
                    particular with-bound *)
-                let bounds_so_far =
-                  join_bounds bounds_so_far b_upper_bounds
-                    ~relevant_axes:relevant_axes_for_ty
-                in
-                (* Descend into the with-bounds of each of our with-bounds types'
+                  let bounds_so_far =
+                    join_bounds bounds_so_far b_upper_bounds
+                      ~relevant_axes:relevant_axes_for_ty
+                  in
+                  (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
-                let bounds_so_far, nested_with_bounds, ctl =
-                  loop ctl bounds_so_far relevant_axes_for_ty
-                    (With_bounds.to_list b_with_bounds)
-                in
-                match ctl.fuel_status, mode with
-                | Ran_out_of_fuel, Ignore_best | Sufficient_fuel, _ ->
-                  (* CR layouts v2.8: we use the same [ctl] here, to avoid big
+                  let bounds_so_far, nested_with_bounds, ctl =
+                    loop ctl bounds_so_far relevant_axes_for_ty
+                      (With_bounds.to_list b_with_bounds)
+                  in
+                  match ctl.fuel_status, mode with
+                  | Ran_out_of_fuel, Ignore_best | Sufficient_fuel, _ ->
+                    (* CR layouts v2.8: we use the same [ctl] here, to avoid big
                      quadratic stack growth for very widely recursive types. This is
                      sad, since it prevents us from mode crossing a record with 20
                      lists with different payloads, but less sad than a stack
@@ -1288,55 +1280,56 @@ module Base_and_axes = struct
 
                      Ideally, this whole problem goes away once we rethink fuel.
                   *)
-                  let bounds, bs', ctl =
-                    loop ctl bounds_so_far relevant_axes bs
-                  in
-                  bounds, With_bounds.join nested_with_bounds bs', ctl
-                | Ran_out_of_fuel, Require_best ->
-                  (* See Note [Ran out of fuel when requiring best]. *)
-                  Mod_bounds.max, No_with_bounds, ctl)
-              | Not_best, Require_best, _ | Not_best, Ignore_best, true ->
-                (* CR layouts v2.8: The type annotation on the next line is
+                    let bounds, bs', ctl =
+                      loop ctl bounds_so_far relevant_axes bs
+                    in
+                    bounds, With_bounds.join nested_with_bounds bs', ctl
+                  | Ran_out_of_fuel, Require_best ->
+                    (* See Note [Ran out of fuel when requiring best]. *)
+                    Mod_bounds.max, No_with_bounds, ctl)
+                | Not_best, Require_best, _ | Not_best, Ignore_best, true ->
+                  (* CR layouts v2.8: The type annotation on the next line is
                    necessary only because [loop] is
                    local. Bizarre. Investigate. *)
-                let bounds_so_far, (bs' : (l * disallowed) With_bounds.t), ctl =
-                  loop ctl bounds_so_far relevant_axes bs
-                in
-                ( bounds_so_far,
-                  With_bounds.add ty
-                    { relevant_axes = relevant_axes_for_ty }
-                    bs',
-                  ctl )
-            in
-            match
-              Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
-            with
-            | Stop ctl -> (
-              match mode with
-              | Ignore_best ->
-                (* out of fuel, so assume [ty] has the worst possible bounds. *)
-                found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                  Axis_set.empty [@nontail]
-              | Require_best ->
-                (* See Note [Ran out of fuel when requiring best]. *)
-                Mod_bounds.max, No_with_bounds, ctl)
-            | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-            | Continue { ctl; skippable_axes } -> (
-              match context.jkind_of_type ty with
-              | Some b_jkind ->
-                let b_jkind_jkind =
-                  (* must expand aliases before trusting b_jkind's mod_bounds *)
-                  fully_expand_aliases env b_jkind.jkind
-                in
-                (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
-                   b_jkind_jkind.with_bounds b_jkind.quality skippable_axes
-                 [@nontail])
-              | None ->
-                (* kind of b is not principally known, so we treat it as having
+                  let bounds_so_far, (bs' : (l * disallowed) With_bounds.t), ctl
+                      =
+                    loop ctl bounds_so_far relevant_axes bs
+                  in
+                  ( bounds_so_far,
+                    With_bounds.add ty
+                      { relevant_axes = relevant_axes_for_ty }
+                      bs',
+                    ctl )
+              in
+              match
+                Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
+              with
+              | Stop ctl -> (
+                match mode with
+                | Ignore_best ->
+                  (* out of fuel, so assume [ty] has the worst possible bounds. *)
+                  found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
+                    Axis_set.empty [@nontail]
+                | Require_best ->
+                  (* See Note [Ran out of fuel when requiring best]. *)
+                  Mod_bounds.max, No_with_bounds, ctl)
+              | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
+              | Continue { ctl; skippable_axes } -> (
+                match context.jkind_of_type ty with
+                | Some b_jkind ->
+                  let b_jkind_jkind =
+                    (* must expand aliases before trusting b_jkind's mod_bounds *)
+                    fully_expand_aliases env b_jkind.jkind
+                  in
+                  (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
+                     b_jkind_jkind.with_bounds b_jkind.quality skippable_axes
+                   [@nontail])
+                | None ->
+                  (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
-                found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                  skippable_axes [@nontail])))
+                  found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
+                    skippable_axes [@nontail]))))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, ctl =

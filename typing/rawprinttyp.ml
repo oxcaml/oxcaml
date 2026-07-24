@@ -58,6 +58,10 @@ let string_of_label : Types.arg_label -> string = function
   | Labelled s | Position s -> s
   | Optional s -> "?"^s
 
+let out_modalities_of_mod_bounds mod_bounds =
+  Typemode.untransl_mod_bounds mod_bounds
+  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+
 let visited = ref []
 let rec raw_type ppf ty =
   let ty = safe_repr [] ty in
@@ -118,6 +122,10 @@ and raw_type_desc ppf ty =
       fprintf ppf "@[<hov1>Tconstr(@,%a,@,%a,@,%a)@]" path p
         raw_type_list tl
         (raw_list path) (list_of_memo !abbrev)
+  | Tmod (t, mod_bounds) ->
+      fprintf ppf "@[<hov1>Tmod(@,(%a @@ %s))@]"
+        raw_type t
+        (String.concat " " (out_modalities_of_mod_bounds mod_bounds))
   | Tobject (t, nm) ->
       fprintf ppf "@[<hov1>Tobject(@,%a,@,@[<1>ref%t@])@]" raw_type t
         (fun ppf ->
