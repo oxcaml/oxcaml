@@ -1453,6 +1453,12 @@ module Instruction_name : sig
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
         t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | UMAX_vector :
         ( triple,
           [ `Reg of

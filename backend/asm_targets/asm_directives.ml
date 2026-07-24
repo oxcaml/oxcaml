@@ -1269,7 +1269,7 @@ let offset_into_dwarf_section_symbol ?comment:_comment
         true
         (* CR mshinwell: old code was:
 
-           Compilation_unit.equal (Compilation_unit.get_current_exn ())
+           Compilation_unit.equal (Current_unit.get_cu_exn ())
            (Asm_symbol.compilation_unit upper) *)
       in
       if in_current_unit
@@ -1280,14 +1280,11 @@ let offset_into_dwarf_section_symbol ?comment:_comment
           (const_sub (const_symbol upper) (const_label lower))
       else
         Misc.fatal_errorf
-          "Don't know how to encode offset from start of section XXX to \
-           undefined symbol %a on macOS (current compilation unit %a, symbol \
-           in compilation unit XXX)"
-          (* Asm_section.print upper_section *) Asm_symbol.print upper
+          "Don't know how to encode offset from start of section %a to \
+           undefined symbol %a on macOS (current compilation unit %a)"
+          Asm_section.print (Asm_section.DWARF section) Asm_symbol.print upper
           (Format_doc.compat Compilation_unit.print)
-          (Compilation_unit.get_current_exn ())
-          (Format_doc.compat Compilation_unit.print)
-      (* (Asm_symbol.compilation_unit upper) *)
+          (Current_unit.get_cu_exn ())
     else const_symbol upper
   in
   match width with

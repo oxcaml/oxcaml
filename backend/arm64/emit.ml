@@ -1659,8 +1659,12 @@ let emit_instr env i =
   | Lop (Intop_imm (Icomp cmp, n)) ->
     emit_cmpimm (H.reg_x i.arg.(0)) n;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)
-  | Lop (Intop Imod) ->
-    A.ins3 SDIV reg_x_tmp1 (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1));
+  | Lop (Intop (Imod { signed })) ->
+    A.ins3
+      (if signed then SDIV else UDIV)
+      reg_x_tmp1
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1));
     A.ins4 MSUB
       (H.reg_x i.res.(0))
       reg_x_tmp1
@@ -1713,8 +1717,12 @@ let emit_instr env i =
     A.ins4 SUB_shifted_register rd rn rm O.optional_none
   | Lop (Intop Imul) ->
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
-  | Lop (Intop Idiv) ->
-    A.ins3 SDIV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
+  | Lop (Intop (Idiv { signed })) ->
+    A.ins3
+      (if signed then SDIV else UDIV)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
   | Lop (Intop_imm (Iand, n)) ->
     let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
     A.ins3 AND_immediate rd rn (O.bitmask (Nativeint.of_int n))
@@ -1730,7 +1738,8 @@ let emit_instr env i =
     A.ins_lsr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
-  | Lop (Intop_imm ((Imul | Idiv | Iclz | Ictz | Ipopcnt | Imod | Imulh _), _))
+  | Lop
+      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
@@ -2230,6 +2239,8 @@ let begin_assembly _unix =
 
 (* Not implemented for arm64 *)
 let register_expect_asm_callback (_ : string -> unit) = ()
+
+let expect_asm_whole_function = ref false
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in

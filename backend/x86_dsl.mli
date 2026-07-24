@@ -124,6 +124,8 @@ module I : sig
 
   val idiv : arg -> unit
 
+  val div : arg -> unit
+
   val imul : arg -> arg option -> unit
 
   val mul : arg -> unit

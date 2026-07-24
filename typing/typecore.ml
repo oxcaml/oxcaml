@@ -132,19 +132,31 @@ type submode_reason =
   | Constructor of Longident.t
   | Other
 
-type unsupported_stack_allocation =
+type always_heap_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
 
-let print_unsupported_stack_allocation ppf = function
+let print_always_heap_allocation ppf = function
   | Lazy -> Format_doc.fprintf ppf "lazy expressions"
   | Module -> Format_doc.fprintf ppf "modules"
   | Object -> Format_doc.fprintf ppf "objects"
   | List_comprehension -> Format_doc.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format_doc.fprintf ppf "array comprehensions"
+
+type always_static_allocation =
+  | Constant
+  | Src_pos
+  | Unboxed_unit
+  | Unboxed_bool
+
+let print_always_static_allocation ppf = function
+  | Constant -> Format_doc.fprintf ppf "literals"
+  | Src_pos -> Format_doc.fprintf ppf "source position literals"
+  | Unboxed_unit -> Format_doc.fprintf ppf "unboxed unit literals"
+  | Unboxed_bool -> Format_doc.fprintf ppf "unboxed boolean literals"
 
 type mutable_restriction =
   | In_group
@@ -246,6 +258,9 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
+  | Atomic_in_functional_update of label
+  | Mixed_record_atomic_access of Longident.t
+  | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -310,7 +325,8 @@ type error =
   | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Unsupported_stack_allocation of unsupported_stack_allocation
+  | Always_heap_allocation of always_heap_allocation
+  | Always_static_allocation of always_static_allocation
   | Not_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
@@ -1306,6 +1322,44 @@ let mode_spliced =
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
+
+(* Does this record representation permit atomic field usage? *)
+let allows_atomic_field_usage = function
+  | Record_boxed -> true
+  | Record_inlined (_tag, ctor_repres, _variant_repres) -> (
+      match ctor_repres with
+      | Constructor_uniform_value -> true
+      | Constructor_mixed _ -> false
+      (* At this point, we should know the constructor representation. *)
+      | Constructor_variable -> false)
+  (* Reads/writes of atomic record fields are currently only supported for
+     labels whose logical offset matches the physical field position. To support
+     mixed records, we will add atomic primitives to lambda that consider mixed
+     block field reordering. *)
+  | Record_mixed _ -> false
+  (* The remaining cases should be unreachable. *)
+  (* [@@unboxed] already prohibits mutable (and therefore atomic) fields. *)
+  | Record_unboxed
+  (* [@atomic] fields disable the float record optimization. *)
+  | Record_float | Record_ufloat
+  (* At this point, we should know the record representation. *)
+  | Record_dummy _ | Record_variable ->
+      false
+
+(* CR-soon jkerrigan: simplify after we allow access of atomic fields in mixed
+   records. *)
+type atomic_field_use = Access | Loc
+
+(* Raises if we try to use an atomic field from a mixed record. *)
+let check_atomic_field_usage ~usage ~loc ~env record_repres mutability lid =
+  if Types.is_atomic mutability && not (allows_atomic_field_usage record_repres)
+  then
+    let err =
+      match usage with
+      | Access -> Mixed_record_atomic_access lid
+      | Loc -> Mixed_record_atomic_loc lid
+    in
+    raise (Error (loc, env, err))
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -3252,6 +3306,10 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
+let forbid_atomic_in_record_update loc env lbl =
+  if Types.is_atomic lbl.lbl_mut then
+    raise (Error (loc, env, Atomic_in_functional_update lbl.lbl_name))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -3405,7 +3463,7 @@ and type_pat_aux
         let alloc_mode = simple_pat_mode mode in
         let ty_sort =
           match label_sort record_form label sorts with
-          | `Sort s -> Jkind.Sort.of_const s
+          | `Sort s -> s
           | `Same_as_record_sort -> record_sort
         in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
@@ -5171,7 +5229,7 @@ let rec is_nonexpansive exp =
            | Kept _ -> true)
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
-  | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
+  | Texp_atomic_loc { record = exp; _ } -> is_nonexpansive exp
   | Texp_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_unboxed_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
@@ -6686,6 +6744,7 @@ and type_expect_
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
                 (Record_field lbl.lbl_name) lbl.lbl_mut mode;
+              forbid_atomic_in_record_update extended_expr_loc env lbl;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (extended_expr_loc, Expression) }
@@ -7452,6 +7511,8 @@ and type_expect_
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
+      check_atomic_field_usage ~usage:Access ~loc:record.exp_loc ~env
+        record_repres label.lbl_mut lid.txt;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
@@ -7581,6 +7642,8 @@ and type_expect_
           ~why:Field_assignment
           ~containing_type:ty_record
       in
+      check_atomic_field_usage ~usage:Access ~loc ~env record_repres
+        label.lbl_mut lid.txt;
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8479,10 +8542,13 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, _, rmode, label, ambiguity, ty_arg, _ =
+          let record, record_sort, _, rmode, label, ambiguity, ty_arg,
+              record_repres =
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
+          check_atomic_field_usage ~usage:Loc ~loc:record.exp_loc ~env
+            record_repres label.lbl_mut lid.txt;
           Env.mark_label_used Env.Projection label.lbl_uid;
           if (not (Types.is_atomic label.lbl_mut))
           then raise (Error (loc, env, Label_not_atomic lid.txt));
@@ -8502,14 +8568,23 @@ and type_expect_
               (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
                 :: record.exp_extra }
           in
-          rue {
-            exp_desc =
-              Texp_atomic_loc
-                (record, record_sort, lid, label, alloc_mode);
-            exp_loc = loc; exp_extra = [];
-            exp_type = instance (Predef.type_atomic_loc ty_arg);
-            exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+          rue
+            {
+              exp_desc =
+                Texp_atomic_loc {
+                  record;
+                  record_sort;
+                  record_repres;
+                  lid;
+                  label;
+                  alloc_mode
+                };
+              exp_loc = loc;
+              exp_extra = [];
+              exp_type = instance (Predef.type_atomic_loc ty_arg);
+              exp_attributes = sexp.pexp_attributes;
+              exp_env = env;
+            }
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
@@ -8524,8 +8599,11 @@ and type_expect_
            exp_env = env }
   | Pexp_stack e ->
       let exp = type_expect env expected_mode e ty_expected_explained in
-      let unsupported category =
-        raise (Error (exp.exp_loc, env, Unsupported_stack_allocation category))
+      let always_heap category =
+        raise (Error (exp.exp_loc, env, Always_heap_allocation category))
+      in
+      let always_static category =
+        raise (Error (exp.exp_loc, env, Always_static_allocation category))
       in
       begin match exp.exp_desc with
       | Texp_function { alloc_mode; _} | Texp_tuple (_, alloc_mode)
@@ -8545,13 +8623,17 @@ and type_expect_
           in
           Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
-      | Texp_list_comprehension _ -> unsupported List_comprehension
-      | Texp_array_comprehension _ -> unsupported Array_comprehension
-      | Texp_new _ -> unsupported Object
-      | Texp_override _ -> unsupported Object
-      | Texp_lazy _ -> unsupported Lazy
-      | Texp_object _ -> unsupported Object
-      | Texp_pack _ -> unsupported Module
+      | Texp_list_comprehension _ -> always_heap List_comprehension
+      | Texp_array_comprehension _ -> always_heap Array_comprehension
+      | Texp_new _ -> always_heap Object
+      | Texp_override _ -> always_heap Object
+      | Texp_lazy _ -> always_heap Lazy
+      | Texp_object _ -> always_heap Object
+      | Texp_pack _ -> always_heap Module
+      | Texp_constant _ -> always_static Constant
+      | Texp_src_pos -> always_static Src_pos
+      | Texp_unboxed_unit -> always_static Unboxed_unit
+      | Texp_unboxed_bool _ -> always_static Unboxed_bool
       | Texp_apply({ exp_desc =
           Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
@@ -12940,6 +13022,23 @@ let report_error ~loc env =
          will happen during pattern matching:@ the field may be read@ \
          zero, one or several times depending on the patterns around it."
         quoted_longident lid
+  | Atomic_in_functional_update l ->
+      Location.errorf ~loc
+        "Functional updates that implicitly read atomic fields (here %a)@ \
+         are forbidden. @{<hint>Hint@}: if you intend to copy the value@ \
+         of an atomic field, do so explicitly:@ %a"
+        Style.inline_code l
+        Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
+  | Mixed_record_atomic_access lid ->
+      Location.errorf ~loc
+        "Accessing atomic fields (here %a) of mixed records is not yet@ \
+         supported."
+        quoted_longident lid
+  | Mixed_record_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a with mixed record fields (here %a) is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
@@ -13312,9 +13411,16 @@ let report_error ~loc env =
          automatically if omitted. It cannot be passed with '?'.@]"
       Style.inline_code label
       Style.inline_code "[%call_pos]"
-  | Unsupported_stack_allocation category ->
-    Location.errorf ~loc "@[Stack allocating %a is unsupported yet.@]"
-      print_unsupported_stack_allocation category
+  | Always_heap_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not yet supported;@ \
+         they are currently always heap allocated.@]"
+      print_always_heap_allocation category
+  | Always_static_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not supported;@ \
+         they are not allocated at runtime. @]"
+      print_always_static_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->

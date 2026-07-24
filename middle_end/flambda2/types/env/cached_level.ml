@@ -85,7 +85,7 @@ let find_symbol_projection t var =
 
 let clean_for_export t ~reachable_names =
   (* Names coming from other compilation units or unreachable are removed *)
-  let current_compilation_unit = Compilation_unit.get_current_exn () in
+  let current_compilation_unit = Current_unit.get_cu_exn () in
   let names_to_types =
     Name.Map.filter_map
       (fun name (ty, binding_time_and_mode) ->

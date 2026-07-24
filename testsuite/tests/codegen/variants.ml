@@ -62,6 +62,20 @@ Variant_with_uneven_mutability.get:
 |}]
 
 
+module Or_pattern_on_mutable = struct
+  type t =
+    | A of { mutable x : string }
+    | B of { mutable x : string }
+
+  let get (t : t) = match t with A { x } | B { x } -> x
+end
+[%%expect_asm X86_64{|
+Or_pattern_on_mutable.get:
+  movq  (%rax), %rax
+  ret
+|}]
+
+
 type t =
   | A
   | B

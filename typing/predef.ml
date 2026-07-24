@@ -61,6 +61,11 @@ type abstract_non_value_type_constr = [
   | `Nativeint_u
   | `Int32_u
   | `Int64_u
+  | `Float32_u
+  | `Uint8_u
+  | `Uint16_u
+  | `Uint32_u
+  | `Uint64_u
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -127,6 +132,10 @@ let base_type_constrs : type_constr list = [
   `Nativeint_u;
   `Int32_u;
   `Int64_u;
+  `Uint8_u;
+  `Uint16_u;
+  `Uint32_u;
+  `Uint64_u;
   `Idx_imm;
   `Idx_mut;
 ]
@@ -166,6 +175,7 @@ let simd_alpha_extension_type_constrs : type_constr list = [
 
 let small_number_extension_type_constrs : type_constr list = [
   `Float32;
+  `Float32_u;
   `Int8;
   `Int16;
 ]
@@ -219,6 +229,11 @@ and ident_box = ident_create "box"
 and ident_nativeint_u = ident_create "nativeint_u"
 and ident_int32_u = ident_create "int32_u"
 and ident_int64_u = ident_create "int64_u"
+and ident_float32_u = ident_create "float32_u"
+and ident_uint8_u = ident_create "uint8_u"
+and ident_uint16_u = ident_create "uint16_u"
+and ident_uint32_u = ident_create "uint32_u"
+and ident_uint64_u = ident_create "uint64_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
@@ -277,6 +292,11 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Nativeint_u -> ident_nativeint_u
   | `Int32_u -> ident_int32_u
   | `Int64_u -> ident_int64_u
+  | `Float32_u -> ident_float32_u
+  | `Uint8_u -> ident_uint8_u
+  | `Uint16_u -> ident_uint16_u
+  | `Uint32_u -> ident_uint32_u
+  | `Uint64_u -> ident_uint64_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Int8x16 -> ident_int8x16
@@ -330,6 +350,11 @@ and path_lexing_position = Pident ident_lexing_position
 and path_nativeint_u = Pident ident_nativeint_u
 and path_int32_u = Pident ident_int32_u
 and path_int64_u = Pident ident_int64_u
+and path_float32_u = Pident ident_float32_u
+and path_uint8_u = Pident ident_uint8_u
+and path_uint16_u = Pident ident_uint16_u
+and path_uint32_u = Pident ident_uint32_u
+and path_uint64_u = Pident ident_uint64_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_code = Pident ident_code
@@ -439,6 +464,11 @@ and type_unboxed_int16 = tconstr path_unboxed_int16 []
 and type_nativeint_u = tconstr path_nativeint_u []
 and type_int32_u = tconstr path_int32_u []
 and type_int64_u = tconstr path_int64_u []
+and type_float32_u = tconstr path_float32_u []
+and type_uint8_u = tconstr path_uint8_u []
+and type_uint16_u = tconstr path_uint16_u []
+and type_uint32_u = tconstr path_uint32_u []
+and type_uint64_u = tconstr path_uint64_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
@@ -890,6 +920,20 @@ let decl_of_type_constr type_constr =
   | `Int64_u ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64)
       ~manifest:(tconstr (Path.unboxed_version path_int64) []) ()
+  | `Float32_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_float32)
+      ~manifest:(tconstr (Path.unboxed_version path_float32) []) ()
+  (* The unboxed unsigned integer types are abstract: they support no
+     operations and exist only to be distinct from their signed
+     counterparts, e.g. for use as GADT indices. *)
+  | `Uint8_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int8) ()
+  | `Uint16_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int16) ()
+  | `Uint32_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32) ()
+  | `Uint64_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64) ()
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(

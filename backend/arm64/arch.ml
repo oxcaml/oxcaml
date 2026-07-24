@@ -298,6 +298,7 @@ let equal_arith_operation left right =
 
 let equal_specific_operation left right =
   match left, right with
+  | Ifar_poll, Ifar_poll -> true
   | Ifar_alloc { bytes = left_bytes; dbginfo = _; mode = left_mode },
     Ifar_alloc { bytes = right_bytes; dbginfo = _; mode = right_mode } ->
     Int.equal left_bytes right_bytes

@@ -27,7 +27,7 @@
 
 open! Int_replace_polymorphic_compare
 module C = Cfg
-module Dll = Oxcaml_utils.Doubly_linked_list
+module Dll = Doubly_linked_list
 
 (* Convert simple [Switch] to branches. *)
 let simplify_switch (block : C.basic_block) labels =
@@ -61,7 +61,11 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
     let desc =
       C.Int_test
         { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
@@ -112,7 +116,7 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      in the future; care is needed as some may clobber registers beyond
      [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
      writing only to the destination). *)
-  | Imul | Imulh _ | Idiv | Imod | Iclz | Ictz | Ipopcnt | Icomp _ -> None
+  | Imul | Imulh _ | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ -> None
 
 let eval_float_op op (left : float) (right : float option) : float option =
   match (op : Operation.float_operation) with
@@ -134,7 +138,7 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
       begin if f (Array.unsafe_get arr idx)
       then
         begin match acc with
-        | None -> find arr (idx - 1) f None
+        | None -> find arr (idx - 1) f (Some idx)
         | Some _ -> None
         end
       else find arr (idx - 1) f acc

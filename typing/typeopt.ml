@@ -1242,7 +1242,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1268,6 +1268,29 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
+
+let layout_of_ident env ident =
+  let path = Path.Pident ident in
+  match Env.find_module path env with
+  | _ -> Some layout_any_value
+  | exception Not_found ->
+    let value_desc =
+      try Env.find_value path env
+      with Not_found ->
+        Misc.fatal_errorf "Failed to find value_desc for %a"
+          Ident.print ident
+    in
+    let { val_type; val_kind; val_loc; _ } =
+      Subst.Lazy.force_value_description value_desc
+    in
+    match val_kind with
+    | Val_reg sort | Val_mut (_, sort) ->
+      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout env val_loc const_sort val_type in
+      Some layout
+    | Val_prim _ -> None
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some layout_any_value
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

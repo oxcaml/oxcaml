@@ -158,7 +158,7 @@ and _ poly_param =
 
 type record_sorts =
   | Fixed
-  | Variable of Jkind.Sort.Const.t array
+  | Variable of Jkind.sort array
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
@@ -326,9 +326,14 @@ and expression_desc =
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
-  | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * label_description *
-      alloc_mode
+  | Texp_atomic_loc of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      alloc_mode : alloc_mode;
+    }
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -1254,7 +1259,10 @@ let rec iter_bound_idents
   match pat.pat_desc with
   | Tpat_var { id; name = s; uid; sort; _ } ->
       f (id, s, pat.pat_type, sort, uid)
-  | Tpat_fun_layout { id; name = s; uid; sort; _ } ->
+  | Tpat_fun_layout { id; name = s; uid; sort; lpoly; _ } ->
+      let sort =
+        if Lpoly.is_empty_exn lpoly then sort else Jkind.Sort.scannable
+      in
       f (id, s, pat.pat_type, sort, uid)
   | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
       iter_bound_idents f p;
@@ -1613,7 +1621,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_letmutable (_, exp) -> fold_antiquote_exp f acc exp
   | Texp_mutvar _ -> acc
   | Texp_setmutvar (_, _, exp) -> fold_antiquote_exp f acc exp
-  | Texp_atomic_loc (exp, _, _, _, _) -> fold_antiquote_exp f acc exp
+  | Texp_atomic_loc { record = exp; _ } -> fold_antiquote_exp f acc exp
   | Texp_idx (_, _) -> acc
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
@@ -1691,7 +1699,7 @@ let label_sort (type rep)
   | _ ->
     begin match record_sorts, label.lbl_sort with
     | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort sort
+    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
     | Fixed, None ->
       Misc.fatal_errorf "no sort for label %s in fixed-sort record"
         label.lbl_name

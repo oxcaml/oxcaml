@@ -24,8 +24,6 @@
 open Config
 open Cmx_format
 
-module File_sections = Oxcaml_utils.File_sections
-
 module CU = Compilation_unit
 
 type error =
@@ -167,18 +165,18 @@ let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
   && List.equal equal_args (CU.instance_arguments cu1) (CU.instance_arguments cu2)
 
+let get_export_info infos =
+  Option.map
+    (fun export_info ->
+      Flambda2_cmx.Flambda_cmx_format.from_raw
+        ~sections:infos.ui_file_sections
+        export_info)
+    infos.ui_export_info
+
 let get_unit_export_info comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
-  let of_infos infos =
-    Option.map
-      (fun export_info ->
-        Flambda2_cmx.Flambda_cmx_format.from_raw
-          ~sections:infos.ui_file_sections
-          export_info)
-      infos.ui_export_info
-  in
   (* CR lmaurer: Surely this should just compare [comp_unit] to
      [current_unit.ui_unit], but doing so seems to break Closure. We should fix
      that. *)
@@ -190,7 +188,7 @@ let get_unit_export_info comp_unit =
     let name = CU.to_global_name_without_prefix comp_unit in
     try
       let ui = Infos_table.find global_infos_table name in
-      Option.bind ui of_infos
+      Option.bind ui get_export_info
     with Not_found ->
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
@@ -222,11 +220,11 @@ let get_unit_export_info comp_unit =
       let import = Import_info.create_normal comp_unit ~crc in
       current_unit.uib_imports_cmx <- import :: current_unit.uib_imports_cmx;
       Infos_table.add global_infos_table name infos;
-      Option.bind infos of_infos
+      Option.bind infos get_export_info
   end
 
 let which_cmx_file comp_unit =
-  CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
+  CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
 
 let get_global_export_info comp_unit =
   get_unit_export_info (which_cmx_file comp_unit)
@@ -347,7 +345,7 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
   write_unit_info current_unit filename
 
 let new_const_symbol () =
-  Symbol.for_new_const_in_current_unit ()
+  Current_unit.symbol_for_new_const ()
   |> Symbol.linkage_name
   |> Linkage_name.to_string
 

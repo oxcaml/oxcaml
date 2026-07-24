@@ -770,7 +770,8 @@ and expression i ppf x =
       line i ppf "Texp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
-  | Texp_atomic_loc (e, sort, li, _, amode) ->
+  | Texp_atomic_loc { record = e; record_sort = sort; lid = li;
+                      alloc_mode = amode } ->
       line i ppf "Texp_atomic_loc\n";
       expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;

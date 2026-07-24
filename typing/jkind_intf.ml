@@ -173,6 +173,9 @@ module type Sort = sig
         saved to a cmi. *)
     val is_cmi_var : var -> bool
 
+    (** Checks whether a [var] is "repr'd" - that is, it has no contents. *)
+    val is_root : var -> bool
+
     (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
         physical equality of [var]s. *)
     val get_id : var -> id
@@ -462,7 +465,6 @@ module History = struct
           position : int;
           arity : int
         }
-    | Overapproximation_of_with_bounds
     | Inside_quote
     | Evaluated_quote
     | Old_style_unboxed_type

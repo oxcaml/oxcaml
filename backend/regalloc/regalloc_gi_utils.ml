@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let gi_rng = Random.State.make [| 4; 6; 2 |]
 

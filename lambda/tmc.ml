@@ -685,7 +685,7 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ ->
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
       fatal_error_invalid_constructor t
 
   and choice_apply ctx ~tail apply =
@@ -907,8 +907,9 @@ let rec choice ctx t =
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
-    | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-    | Pwith_stack_bind_preemptible | Pperform | Presume | Preperform
+    | Pwith_stack | Pwith_stack_preemptible
+    | Pperform | Pcontinue | Pdiscontinue
+    | Pdiscontinue_with_backtrace | Preperform
     | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)

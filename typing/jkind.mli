@@ -474,8 +474,10 @@ val of_type_decl :
   (Types.jkind_l * Parsetree.jkind_annotation option) option
 
 (** Find a jkind from a type declaration in the same way as [of_type_decl], but
-    avoiding translating types in with-bounds. Overapproximates kinds containing
-    with-bounds as [any].
+    avoiding translating types in with-bounds. Over-approximates each
+    [with]-bound by raising the bounds of its base to top, keeping the layout
+    precise (except in the case of a truly-abstract kind, which is approximated
+    as [any]).
 
     Returns the jkind (at quality [Not_best]). *)
 val of_type_decl_overapproximate_unknown :
@@ -517,6 +519,23 @@ val for_boxed_variant :
   get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
+
+(** Choose an appropriate jkind for a user-defined [@@or_null] variant (a
+    [Variant_with_null]), given [payload_jkind], the inferred jkind of its
+    payload [payload_type]. Like the builtin ['a or_null], the result has the
+    builtin's mod-bounds (crossing everything except staticity) with the payload
+    added as a with-bound under [modality]; its layout is the payload's layout
+    adjusted by [apply_or_null_l]. Both the input and the output are [jkind_l]
+    because both are inferred, actual kinds of types (the payload's and the
+    declaration's), not requirements imposed on them. The result is marked best.
+    Returns [Error ()] if the payload's kind is maybe-null or has no known
+    scannable layout. *)
+val for_or_null_variant :
+  Env.t ->
+  payload_type:Types.type_expr ->
+  modality:Mode.Modality.Const.t ->
+  payload_jkind:Types.jkind_l ->
+  (Types.jkind_l, unit) result
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l

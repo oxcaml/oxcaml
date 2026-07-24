@@ -624,62 +624,78 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
   in
   modality_annots @ nonmodal_annots @ verbose_annots
 
-let sort_dedup_modalities ~warn l =
+let sort_dedup_modalities l =
   let open Modality in
   let compare { txt = Atom (ax0, _); loc = _ } { txt = Atom (ax1, _); loc = _ }
       =
-    let (P ax0) = Axis.to_value (P ax0) in
-    let (P ax1) = Axis.to_value (P ax1) in
-    Mode.Value.Axis.compare ax0 ax1
+    Axis.compare (P ax0) (P ax1)
   in
-  let dedup ~on_dup =
+  (* Keep the last atom on each axis (later modalities override earlier ones). *)
+  let dedup =
     let rec loop x = function
       | [] -> [x]
-      | y :: xs ->
-        if compare x y = 0
-        then (
-          on_dup x y;
-          loop y xs)
-        else x :: loop y xs
+      | y :: xs -> if compare x y = 0 then loop y xs else x :: loop y xs
     in
     function [] -> [] | x :: xs -> loop x xs
   in
-  let on_dup { txt = Atom (ax0, _); loc = loc0 }
-      { txt = Atom (ax1, a1); loc = _ } =
-    if warn
-    then
-      let (P ax0) = Axis.to_value (P ax0) in
-      let axis = Format_doc.asprintf "%a" Mode.Value.Axis.print ax0 in
-      let overriden_by =
-        Format_doc.asprintf "%a" (Modality.Per_axis.print ax1) a1
-      in
-      Location.prerr_warning loc0
-        (Warnings.Modal_axis_specified_twice { axis; overriden_by })
-  in
-  l |> List.stable_sort compare |> dedup ~on_dup |> List.map (fun x -> x.txt)
+  l |> List.stable_sort compare |> dedup
 
-let transl_modalities_with_default ~maturity ~default annots =
+let transl_modalities_with_default ?(allow_redundant_staticity = false)
+    ~maturity ~default annots =
   let modalities_loc =
     match List.map (fun { loc; _ } -> loc) annots with
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
   let annots = List.map (transl_modality ~maturity) annots in
-  (* axes listed in the order of implication. *)
-  let modalities = sort_dedup_modalities ~warn:true annots in
   let open Modality in
   (* - default is applied before explicit modalities.
      - explicit modalities can override default.
-     - For the same axis, later modalities overrides earlier modalities. *)
-  let modalities =
+     - for the same axis, later modalities override earlier ones. *)
+  let build atoms =
     List.fold_left
-      (fun m (Atom (ax, a) as t) ->
+      (fun m { txt = Atom (ax, a) as t; loc = _ } ->
         let m = Const.set ax a m in
         List.fold_left
           (fun m (Atom (ax, a)) -> Const.set ax a m)
           m (implied_modalities t))
-      default modalities
+      default
+      (sort_dedup_modalities atoms)
   in
+  let modalities = build annots in
+  (* Don't warn on [@@ static] on interface toplevel,
+     even though [@@ static] is the identity modality.  *)
+  let redundant_modality_allowed (Atom (ax, a)) =
+    allow_redundant_staticity
+    &&
+    match ax, a with
+    | Monadic Staticity, Join_const Static -> true
+    | _ -> false
+  in
+  let same_axis (Atom (ax0, _)) (Atom (ax1, _)) =
+    Axis.compare (P ax0) (P ax1) = 0
+  in
+  let indexed = List.mapi (fun i { txt; _ } -> i, txt) annots in
+  (* Keep the first modality on each axis and warn on every later modality
+     on that axis. A modality alone on its axis is redundant only if removing it
+     would not change the resolved modality. O(n^2), but n should be low. *)
+  List.iteri
+    (fun i { txt = t; loc } ->
+      let earlier_on_axis =
+        List.exists (fun (j, a) -> j < i && same_axis a t) indexed
+      in
+      let alone_on_axis =
+        not (List.exists (fun (j, a) -> j <> i && same_axis a t) indexed)
+      in
+      let removal_is_noop () =
+        let without = List.filteri (fun j _ -> j <> i) annots in
+        List.is_empty (Const.diff modalities (build without))
+      in
+      if
+        (earlier_on_axis || (alone_on_axis && removal_is_noop ()))
+        && not (redundant_modality_allowed t)
+      then Location.prerr_warning loc Warnings.Redundant_modality)
+    annots;
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
@@ -698,9 +714,10 @@ let atomic_mutable_modalities =
 
 let sort_dedup_modalities modalities =
   (* CR-someday lstevenson: Improve this. It's not great that we're just passing
-     a none location and disabling warnings. We should find a nicer solution. *)
+     a none location. We should find a nicer solution. *)
   List.map (fun x -> { txt = x; loc = Location.none }) modalities
-  |> sort_dedup_modalities ~warn:false
+  |> sort_dedup_modalities
+  |> List.map (fun x -> x.txt)
 
 let untransl_modalities t = List.map untransl_modality t.moda_desc
 

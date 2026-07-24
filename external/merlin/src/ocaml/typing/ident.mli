@@ -51,6 +51,9 @@ val rename: t -> t
 
 val name: t -> string
 val unique_name: t -> string
+val canonical_name: t -> string
+        (** [name] or [unique_name] following [-d(no)canonical-ids] flag *)
+
 val unique_toplevel_name: t -> string
 val same: t -> t -> bool
         (** Compare identifiers by binding location.
@@ -116,6 +119,8 @@ type 'a tbl
 val empty: 'a tbl
 val add: t -> 'a -> 'a tbl -> 'a tbl
 val find_same: t -> 'a tbl -> 'a
+(* Non-raising variant of [find_same]; unboxed under [@@or_null]. *)
+val find_same_or_null: t -> 'a tbl -> 'a Misc.Or_null.t
 val find_name: string -> 'a tbl -> t * 'a
 val find_all: string -> 'a tbl -> (t * 'a) list
 val find_all_seq: string -> 'a tbl -> (t * 'a) Seq.t

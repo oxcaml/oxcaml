@@ -2,7 +2,7 @@
    in a .cmir-cfg-regalloc file. *)
 
 module List = ListLabels
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let fatal : ('a, Format.formatter, unit, unit, unit, _) format6 -> 'a =
  fun fmt ->
