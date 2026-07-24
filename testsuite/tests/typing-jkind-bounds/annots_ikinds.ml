@@ -1385,7 +1385,7 @@ type t : bits64 mod portable aliased
 type u = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1394,7 +1394,7 @@ type t : bits64 mod portable aliased
 type u : bits64 = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1404,7 +1404,7 @@ type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]

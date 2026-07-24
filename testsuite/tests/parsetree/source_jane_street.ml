@@ -512,7 +512,7 @@ type ('a, 'b) labeled_fn =
     a:'a @ local unique portable contended ->
     ?b:'b @ local once portable contended ->
     'a @ local portable contended ->
-    (int -> 'b @ local unique once) @ portable
+    (int -> 'b @ local once unique) @ portable
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
