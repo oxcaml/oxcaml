@@ -16,7 +16,7 @@
 module type Iterator = sig
   type 'a t
 
-  val current : 'a t -> 'a option
+  val current : 'a t -> 'a Or_null.t
 
   val advance : 'a t -> unit
 
@@ -44,10 +44,10 @@ module Map (T : Container_types.S_plus_iterator) = struct
 
   let compare_key (type a) (Iterator _ : a t) : a -> a -> int = T.compare
 
-  let current (type a) (Iterator i : a t) : a option =
+  let current (type a) (Iterator i : a t) : a Or_null.t =
     match T.Map.current i.iterator with
-    | Some (key, _) -> Some key
-    | None -> None
+    | Some (key, _) -> This key
+    | None -> Null
 
   let advance (type a) (Iterator i : a t) : unit =
     i.iterator <- T.Map.advance i.iterator
@@ -77,25 +77,25 @@ end = struct
       mutable at_end : bool
     }
 
-  let current (type a) ({ iterators; at_end } : a t) : a option =
+  let current (type a) ({ iterators; at_end } : a t) : a Or_null.t =
     if at_end
-    then None
+    then Null
     else Iterator.current iterators.(Array.length iterators - 1)
 
-  let rec search : type a. a Iterator.t array -> int -> a -> a option =
+  let rec search : type a. a Iterator.t array -> int -> a -> a Or_null.t =
    fun iterators index_of_lowest_key highest_key ->
     let iterator_with_lowest_key = iterators.(index_of_lowest_key) in
     let equal = Iterator.equal_key iterator_with_lowest_key in
     match Iterator.current iterator_with_lowest_key with
-    | None -> None
-    | Some lowest_key when equal lowest_key highest_key ->
+    | Null -> Null
+    | This lowest_key when equal lowest_key highest_key ->
       (* All iterators are on the same key. *)
-      Some lowest_key
-    | Some _ -> (
+      This lowest_key
+    | This _ -> (
       Iterator.seek iterator_with_lowest_key highest_key;
       match Iterator.current iterator_with_lowest_key with
-      | None -> None
-      | Some new_highest_key ->
+      | Null -> Null
+      | This new_highest_key ->
         search iterators
           ((index_of_lowest_key + 1) mod Array.length iterators)
           new_highest_key)
@@ -106,11 +106,11 @@ end = struct
     then
       let iterator = iterators.(Array.length iterators - 1) in
       match Iterator.current iterator with
-      | None -> j.at_end <- true
-      | Some highest_key -> (
+      | Null -> j.at_end <- true
+      | This highest_key -> (
         match search iterators 0 highest_key with
-        | None -> j.at_end <- true
-        | Some _ -> ())
+        | Null -> j.at_end <- true
+        | This _ -> ())
 
   let advance (type a) ({ iterators; at_end } as t : a t) =
     if not at_end
@@ -135,13 +135,13 @@ end = struct
         (fun (it : a Iterator.t) ->
           Iterator.init it;
           match Iterator.current it with
-          | None -> raise Empty_iterator
-          | Some _ -> ())
+          | Null -> raise_notrace Empty_iterator
+          | This _ -> ())
         iterators;
       Array.sort
         (fun (it1 : a Iterator.t) (it2 : a Iterator.t) ->
           let compare = Iterator.compare_key it1 in
-          Option.compare compare (Iterator.current it1) (Iterator.current it2))
+          Or_null.compare compare (Iterator.current it1) (Iterator.current it2))
         iterators;
       j.at_end <- false;
       repair j

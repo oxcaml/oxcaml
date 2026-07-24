@@ -21,24 +21,24 @@ type vm_action =
   | Unless :
       ('t, 'k, 'v) Trie.is_trie
       * 't Channel.receiver
-      * 'k Option_receiver.hlist
+      * 'k Or_null_receiver.hlist
       * string
       * string list
       -> vm_action
   | Unless_eq :
-      'k option Channel.receiver
-      * 'k option Channel.receiver
+      'k Or_null_receiver.t
+      * 'k Or_null_receiver.t
       * string
       * string
       * 'k Value.repr
       -> vm_action
   | Filter :
-      ('k Constant.hlist -> bool) * 'k Option_receiver.hlist * string list
+      ('k Constant.hlist -> bool) * 'k Or_null_receiver.hlist * string list
       -> vm_action
 
 type action =
   | Bind_iterator :
-      'a option Channel.receiver with_name * 'a Trie.Iterator.t with_name
+      'a Or_null_receiver.t with_name * 'a Trie.Iterator.t with_name
       -> action
   | VM_action : vm_action -> action
 
@@ -118,7 +118,7 @@ module Level = struct
       actions : actions;
       mutable iterators : 'a Trie.Iterator.t with_name list;
       mutable output :
-        ('a option Channel.sender * 'a option Channel.receiver) with_name option;
+        ('a Or_null_sender.t * 'a Or_null_receiver.t) with_name option;
       mutable output_cardinality : cardinality
     }
 
@@ -139,7 +139,7 @@ module Level = struct
       <- max_cardinality level.output_cardinality cardinality;
     match level.output with
     | None ->
-      let channel = Channel.create None in
+      let channel = Channel.create_or_null Null in
       let output = { value = channel; name = level.name } in
       level.output <- Some output;
       { output with value = snd output.value }
@@ -278,7 +278,7 @@ let rec open_rev_vars : type a s.
         match var.output with
         | Some output -> { output with value = fst output.value }
         | None ->
-          let send, _recv = Channel.create None in
+          let send, _recv = Channel.create_or_null Null in
           { value = send; name = "_" }
       in
       let iterators = List.map (fun it -> it.value) var.iterators in
@@ -312,7 +312,7 @@ type call =
       { func : 'c -> 'a Constant.hlist -> unit;
         name : string;
         context : 'c;
-        args : 'a Option_receiver.hlist with_names
+        args : 'a Or_null_receiver.hlist with_names
       }
       -> call
 
@@ -379,19 +379,21 @@ let with_bound_cursor ?callback cursor db f =
 let evaluate = function
   | Unless (is_trie, cell, args, _cell_name, _args_names) ->
     if
-      Option.is_some
-        (Trie.find_opt is_trie (Option_receiver.recv args) (Channel.recv cell))
+      Or_null.is_this
+        (Trie.find_or_null is_trie
+           (Or_null_receiver.recv_hlist args)
+           (Channel.recv cell))
     then Virtual_machine.Skip
     else Virtual_machine.Accept
   | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, repr) ->
     if
       Value.equal_repr repr
-        (Option.get (Channel.recv cell1))
-        (Option.get (Channel.recv cell2))
+        (Or_null_receiver.recv cell1)
+        (Or_null_receiver.recv cell2)
     then Virtual_machine.Skip
     else Virtual_machine.Accept
   | Filter (f, args, _args_names) ->
-    if f (Option_receiver.recv args)
+    if f (Or_null_receiver.recv_hlist args)
     then Virtual_machine.Accept
     else Virtual_machine.Skip
 
@@ -422,7 +424,7 @@ let[@inline] seminaive_run cursor ~previous ~diff ~current =
 
 module With_parameters = struct
   type nonrec ('p, !'v) t =
-    { parameters : 'p Option_sender.hlist;
+    { parameters : 'p Or_null_sender.hlist;
       cursor : 'v t
     }
 
@@ -434,14 +436,14 @@ module With_parameters = struct
     { cursor = create ?calls ?output context; parameters }
 
   let naive_fold { parameters; cursor } ps db f acc =
-    Option_sender.send parameters ps;
+    Or_null_sender.send_hlist parameters ps;
     naive_fold cursor db f acc
 
   let naive_iter { parameters; cursor } ps db f =
-    Option_sender.send parameters ps;
+    Or_null_sender.send_hlist parameters ps;
     naive_iter cursor db f
 
   let seminaive_run { parameters; cursor } ps ~previous ~diff ~current =
-    Option_sender.send parameters ps;
+    Or_null_sender.send_hlist parameters ps;
     seminaive_run ~previous ~diff ~current cursor
 end
