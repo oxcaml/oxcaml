@@ -559,3 +559,69 @@ let project_int_via_index (t : _ t2) =
 [%%expect {|
 val project_int_via_index : 'a t2 -> int = <fun>
 |}]
+
+(* Constructing a record with an [any] field of undetermined sort must pin
+   the sort, which the representation depends on. Wrapped in modules so the
+   refining application is in the same phrase. *)
+
+module M = struct
+  type ('a : any) t3 = { x : 'a; y : int }
+
+  let f x =
+    let t = { x; y = 15 } in
+    t.y
+
+  let _ = f #3.14
+end
+[%%expect {|
+Line 8, characters 12-17:
+8 |   let _ = f #3.14
+                ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the definition of f at lines 4-6, characters 8-7.
+|}]
+
+module M = struct
+  type ('a : any) t3 = A of { x : 'a; y : int }
+
+  let f x =
+    let (A { y; _ }) = A { x; y = 15 } in
+    y
+
+  let _ = f #3.14
+end
+[%%expect {|
+Line 8, characters 12-17:
+8 |   let _ = f #3.14
+                ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the definition of f at lines 4-6, characters 8-5.
+|}]
+
+(* Computing the representation at a use site inside a GADT match must not
+   persist jkind-estimation side effects that use the local equation (see the
+   snapshotting in [Typedecl.update_record_representation] and the analogous
+   test in typing-local/crossing.ml); otherwise this fails with a spurious
+   equation-scope-escape error. *)
+
+type _ t_gadt = Int : int t_gadt
+type ('a : any) t_rec = { fld : 'a; fld2 : int }
+[%%expect {|
+type _ t_gadt = Int : int t_gadt
+type ('a : any) t_rec = { fld : 'a; fld2 : int; }
+|}]
+
+let f (type a) (x : a t_gadt) (y : a) =
+  match x with
+    Int -> { fld = y; fld2 = 0 }.fld
+[%%expect {|
+val f : 'a t_gadt -> 'a -> 'a = <fun>
+|}]

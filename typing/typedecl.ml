@@ -2471,7 +2471,11 @@ let update_record_representation
        and record representations and such shouldn't cause problems with
        information escaping GADT matches, but that could easily change with
        layout/mode polymorphism introducing concerns about principality of
-       inferred layouts/modes. *)
+       inferred layouts/modes.
+
+       Because we backtrack, we have to re-unify the sort constraints this
+       discovered, afterwards.
+    *)
     let snap = Btype.snapshot () in
     let ans =
       update_record_kind env loc form ~old_repres lbls_and_types ~warn
@@ -2479,7 +2483,22 @@ let update_record_representation
     Btype.backtrack snap;
     ans
   in
-  Result.map (fun rep -> sorts, rep) rep
+  (* Redo the defaulting the backtrack undid: [Legacy] reps commit a block
+     shape computed from it. Unboxed products commit no shape, so their sorts
+     stay live (see unboxed_record_any_field_inference.ml). *)
+  Result.map
+    (fun rep ->
+       (match form with
+        | Legacy ->
+          List.iter
+            (fun sort ->
+               ignore
+                 (Jkind.Sort.default_to_scannable_and_get sort
+                  : Jkind.Sort.Const.t))
+            sorts
+        | Unboxed_product -> ());
+       sorts, rep)
+    rep
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
