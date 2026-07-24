@@ -437,6 +437,22 @@ module Layout = struct
       | Addressable -> Addressability.Exact Addressable
       | Id -> Addressability.combine_product (List.map mark_of_bound ts))
 
+  (* The component kinds of a [Sort (sort, _, slot)] node viewed as a
+     product of [arity] components, or [None] if [sort] cannot be one:
+     decomposes [sort] (equating it with a product of fresh sort variables
+     if needed), giving every component unconstrained scannable axes
+     ([Scannable_axes.max]) and the component slot implied by [slot]
+     ([Addressability.decomposed_component]: exact roots have exactly-plain
+     components, a join root has join components). Used to compare a [Sort]
+     node against a [Product] node. *)
+  let decompose_sort sort ~arity ~slot =
+    match Sort.decompose_into_product sort arity with
+    | None -> None
+    | Some sorts ->
+      let component_slot = Addressability.decomposed_component slot in
+      Some
+        (List.map (fun s -> Sort (s, Scannable_axes.max, component_slot)) sorts)
+
   let rec equate_or_equal ~allow_mutation t1 t2 =
     (* Both sides of an equality are descriptions of kinds, and equal kinds
        have equal marks. The reads happen after the sort equation,
@@ -463,14 +479,10 @@ module Layout = struct
       else true
     | (Product (ts, _) as prod), (Sort (sort, _, sslot) as srt)
     | (Sort (sort, _, sslot) as srt), (Product (ts, _) as prod) -> (
-      match Sort.decompose_into_product sort (List.length ts) with
+      match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
       | None -> false
-      | Some sorts ->
-        let component_slot = Addressability.decomposed_component sslot in
-        let sorts =
-          List.map (fun x -> Sort (x, Scannable_axes.max, component_slot)) sorts
-        in
-        List.equal (equate_or_equal ~allow_mutation) ts sorts
+      | Some components ->
+        List.equal (equate_or_equal ~allow_mutation) ts components
         && marks_equal prod srt)
     | (Product (ts1, _) as p1), (Product (ts2, _) as p2) ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
@@ -625,58 +637,37 @@ module Layout = struct
           Misc.Le_result.combine components (mark_sub t1 t2)
         else Not_le
       | Product (ts1, _), Sort (s2, _, sslot2) -> (
-        match Sort.decompose_into_product s2 (List.length ts1) with
+        match decompose_sort s2 ~arity:(List.length ts1) ~slot:sslot2 with
         | None -> Not_le
-        | Some ss2 ->
-          let component_slot = Addressability.decomposed_component sslot2 in
-          let components =
-            Misc.Le_result.combine_list
-              (List.map2
-                 (fun t1 s2 ->
-                   sub t1 (Sort (s2, Scannable_axes.max, component_slot)))
-                 ts1 ss2)
-          in
-          Misc.Le_result.combine components (mark_sub t1 t2))
-      | Sort (s1, _, sslot1), Product (ts2, _) -> (
-        match Sort.decompose_into_product s1 (List.length ts2) with
-        | None -> Not_le
-        | Some ss1 ->
-          let component_slot = Addressability.decomposed_component sslot1 in
+        | Some components ->
           (* The components must be compared before the roots: their sort
-             equations refine the left's addressability reading. *)
-          let components =
-            Misc.Le_result.combine_list
-              (List.map2
-                 (fun s1 t2 ->
-                   sub (Sort (s1, Scannable_axes.max, component_slot)) t2)
-                 ss1 ts2)
+             equations refine the left's mark. *)
+          let components_sub =
+            Misc.Le_result.combine_list (List.map2 sub ts1 components)
           in
-          Misc.Le_result.combine components (mark_sub t1 t2))
+          Misc.Le_result.combine components_sub (mark_sub t1 t2))
+      | Sort (s1, _, sslot1), Product (ts2, _) -> (
+        match decompose_sort s1 ~arity:(List.length ts2) ~slot:sslot1 with
+        | None -> Not_le
+        | Some components ->
+          (* Likewise: components before roots. *)
+          let components_sub =
+            Misc.Le_result.combine_list (List.map2 sub components ts2)
+          in
+          Misc.Le_result.combine components_sub (mark_sub t1 t2))
     in
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
 
+  (* The marks of the two kinds, met; [None] means the kinds are disjoint.
+     A join slot stays undetermined whether or not its sort has resolved
+     (sorts don't pin addressability), so the reads don't depend on the
+     sort equations [intersection] performs. (Note that, as for the
+     scannable axes in [sub], sorts equated by a failing intersection stay
+     equated.) *)
+  let meet_marks t1 t2 = Addressability.meet (mark t1) (mark t2)
+
   let rec intersection t1 t2 =
-    (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
-    let products ~root_addressability ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
-      Option.map
-        (fun x -> Product (x, root_addressability))
-        (Misc.Stdlib.List.some_if_all_elements_are_some components)
-    in
-    (* The slot meets use the marks of both sides. A join slot
-       stays undetermined whether or not its sort has resolved (sorts don't
-       pin addressability), so the reads don't depend on the sort equations
-       this operation performs. (Note that, as for the scannable axes in
-       [sub], sorts equated by a failing intersection stay equated.) *)
-    let meet_marks t1 t2 = Addressability.meet (mark t1) (mark t2) in
-    (* The intersection of two products is marked addressable iff either
-       input is - the join of the marks, which coincides with
-       [Action.compose]. An unmarked result derives its addressability from
-       its intersected components, which carry the inputs' component meets,
-       so stamping a merely-derived addressability as a mark would only lose
-       structure. *)
-    let product_root_slot = Addressability.Action.compose in
     match t1, t2 with
     | _, Any (sa2, a2) ->
       Option.map
@@ -699,24 +690,34 @@ module Layout = struct
         match meet_marks t1 t2 with
         | None -> None
         | Some _ ->
-          products ~root_addressability:(product_root_slot a1 a2) ts1 ts2
+          intersect_products
+            ~root_action:(Addressability.Action.compose a1 a2)
+            ts1 ts2
       else None
-    | (Product (ts, pa) as prod), (Sort (sort, _, sa) as srt)
-    | (Sort (sort, _, sa) as srt), (Product (ts, pa) as prod) -> (
+    | (Product (ts, pa) as prod), (Sort (sort, _, sslot) as srt)
+    | (Sort (sort, _, sslot) as srt), (Product (ts, pa) as prod) -> (
       match meet_marks prod srt with
       | None -> None
       | Some _ -> (
-        match Sort.decompose_into_product sort (List.length ts) with
+        match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
         | None -> None
-        | Some sorts ->
-          let component_slot = Addressability.decomposed_component sa in
-          products
-            ~root_addressability:
-              (product_root_slot pa (Addressability.forget_join sa))
-            ts
-            (List.map
-               (fun x -> Sort (x, Scannable_axes.max, component_slot))
-               sorts)))
+        | Some components ->
+          intersect_products
+            ~root_action:
+              (Addressability.Action.compose pa
+                 (Addressability.forget_join sslot))
+            ts components))
+
+  (* Intersect two products componentwise ([ts1] and [ts2] must have the
+     same length). The result is marked addressable iff either input is
+     ([Action.compose] above); an unmarked result derives its
+     addressability from its intersected components, so stamping a
+     merely-derived addressability as a mark would only lose structure. *)
+  and intersect_products ~root_action ts1 ts2 =
+    let components = List.map2 intersection ts1 ts2 in
+    Option.map
+      (fun x -> Product (x, root_action))
+      (Misc.Stdlib.List.some_if_all_elements_are_some components)
 
   (* Whether two layouts may have an intersection. Unlike (the [Some]-ness
      of) [intersection], addressability is compared by *verdicts*
@@ -742,13 +743,9 @@ module Layout = struct
         List.compare_lengths ts1 ts2 = 0 && List.for_all2 go ts1 ts2
       | Product (ts, _), Sort (sort, _, sslot)
       | Sort (sort, _, sslot), Product (ts, _) -> (
-        match Sort.decompose_into_product sort (List.length ts) with
+        match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
         | None -> false
-        | Some sorts ->
-          let component_slot = Addressability.decomposed_component sslot in
-          List.for_all2
-            (fun t s -> go t (Sort (s, Scannable_axes.max, component_slot)))
-            ts sorts)
+        | Some components -> List.for_all2 go ts components)
     in
     go t1 t2
 
