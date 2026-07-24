@@ -15,12 +15,15 @@
 
 (* Compiling C files and building C libraries *)
 
-let command cmdline =
+let echo_if_verbose cmdline =
   if !Clflags.verbose then begin
     prerr_string "+ ";
     prerr_string cmdline;
     prerr_newline()
-  end;
+  end
+
+let command cmdline =
+  echo_if_verbose cmdline;
   let res = Sys.command cmdline in
   if res = 127 then raise (Sys_error cmdline);
   res

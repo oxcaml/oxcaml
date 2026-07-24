@@ -26,6 +26,17 @@ open Ast_helper
 
 module Genprintval = Genprintval_native
 
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
 type input =
   | Stdin
   | File of string
@@ -316,7 +327,7 @@ let default_load ppf (program : Lambda.program) =
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
-    (module Unix : Compiler_owee.Unix_intf.S)
+    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
     ~toplevel:need_symbol
     ~sourcefile:(Some filename) ~prefixname:filename
     ~pipeline ~ppf_dump:ppf
@@ -880,7 +891,7 @@ let run_script ppf name args =
 
 
 module Compiler = (val Optcompile.native
-                   (module Unix : Compiler_owee.Unix_intf.S)
+                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
                    ~flambda2:Flambda2.lambda_to_cmm)
 
 (* Load in-core a .cmxs file *)
