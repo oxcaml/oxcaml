@@ -282,7 +282,7 @@ Error: Unbound type constructor "my_type"
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Stdlib.Out_of_memory]>
 |}];;
-<[ raise Out_of_fibers ]>
+<[ raise Out_of_fibers ]> (* not re-exported by [Stdlib] *)
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Out_of_fibers]>
 |}];;
@@ -326,7 +326,7 @@ Error: Unbound type constructor "my_type"
 [%%expect {|
 - : 'a expr = <[Stdlib.raise (Stdlib.Undefined_recursive_module ("", 0, 0))]>
 |}];;
-<[ raise Continuation_already_taken ]>
+<[ raise Continuation_already_taken ]> (* not re-exported by [Stdlib] *)
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Continuation_already_taken]>
 |}];;
@@ -414,7 +414,8 @@ let e = <[ raise Exit ]> in <[ let exception Exit in $e ]>
 ]>
 |}];;
 (* CR jbachurski: This is wrong -- the inner exn should refer to the
-   global [Stdlib], not the extension. *)
+   global [Stdlib], not the extension.
+   Note [Continuation_already_taken] is not re-exported by [Stdlib] (bug?). *)
 let e = <[ raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
 [%%expect {|
 - : 'a expr =
