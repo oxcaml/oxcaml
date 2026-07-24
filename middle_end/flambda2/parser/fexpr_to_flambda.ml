@@ -107,7 +107,7 @@ let rec rec_info env (ri : Fexpr.rec_info) : Rec_info_expr.t =
   match ri with
   | Depth d -> Rec_info_expr.const ~depth:(Finite d) ~unrolling:US.not_unrolling
   | Infinity -> Rec_info_expr.const ~depth:Infinity ~unrolling:US.not_unrolling
-  | Do_not_inline -> Rec_info_expr.do_not_inline ()
+  | Do_not_inline -> Rec_info_expr.do_not_inline
   | Var dv -> Rec_info_expr.var (find_var env dv)
   | Succ ri -> Rec_info_expr.succ (rec_info env ri)
   | Unroll (u, Depth d) ->

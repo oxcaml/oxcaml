@@ -61,7 +61,7 @@ module type S = sig
 
   val unknown : t
 
-  val do_not_inline : unit -> t
+  val do_not_inline : t
 
   val const : depth:int Or_infinity.t -> unrolling:Unrolling_state.t -> t
 
