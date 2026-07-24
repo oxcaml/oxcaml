@@ -672,3 +672,29 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
+
+(* Unboxed GADT: the existential component's immediacy is only visible in the
+   declared [immediate & immediate] field shape *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type t : immediate & immediate = T : #('a t' * 'a) -> t [@@unboxed]
+    type holder = { mutable t : t }
+  end in
+  let r = { t = T #(Int, 1) } in
+  test ~expect_caml_modifies:0
+    (fun () -> r.t <- T #(Unit, ()); ignore (Sys.opaque_identity r));
+  let[@inline never] set r v = r.t <- v in
+  test ~expect_caml_modifies:0
+    (fun () -> set r (T #(Int, 2)); ignore (Sys.opaque_identity r))
+
+(* Same shape but with a genuinely pointer-carrying component *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type p : immediate & value = P : #('a t' * string) -> p [@@unboxed]
+    type holder = { mutable p : p }
+  end in
+  let r = { p = P #(Int, "a") } in
+  test ~expect_caml_modifies:1
+    (fun () -> r.p <- P #(Unit, "b"); ignore (Sys.opaque_identity r))
