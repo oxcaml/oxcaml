@@ -3,8 +3,8 @@ File "source_jane_street.ml", line 159, characters 12-39:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 184 [ignored-kind-modifier]: The kind modifier(s) non_pointer have no effect on the kind value & value.
 
-File "source_jane_street.ml", line 178, characters 0-24:
-178 | type t = #(int * float#)
+File "source_jane_street.ml", line 191, characters 0-24:
+191 | type t = #(int * float#)
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Multiple definition of the type name t.
        Names must be unique in a given structure or signature.

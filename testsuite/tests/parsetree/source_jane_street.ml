@@ -176,10 +176,10 @@ type t20 : bits8 addressable
 type t21 : (bits8 & value) addressable
 type t22 : any non_null addressable
 [%%expect{|
-Line 1, characters 15-26:
-1 | type t19 : any addressable
-                   ^^^^^^^^^^^
-Error: Unknown kind modifier addressable
+type t19 : any addressable
+type t20 : bits8 addressable
+type t21 : (bits8 & value) addressable
+type t22 : any addressable non_null
 |}]
 
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
