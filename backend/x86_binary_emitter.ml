@@ -99,6 +99,7 @@ type local_reloc =
   | RelocCall of string
   | RelocShortJump of string * int (* loc *)
   | RelocLongJump of string
+  | RelocRipRelative of string * int64 (* symbol, addend *)
   | RelocConstant of C.t * data_size
 
 type result =
@@ -169,6 +170,9 @@ let str_int64L s pos v =
    section is reassembled with that jump in long form. *)
 
 let local_relocs = ref []
+
+let record_local_reloc b ?(offset=0) local_reloc =
+  local_relocs := (Buffer.length b.buf + offset, local_reloc) :: !local_relocs
 
 let local_labels = String.Tbl.create 100
 
@@ -474,9 +478,14 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
       prefix b ~rex:0 ~rexr:(rexr_reg reg) ~rexb:0 ~rexx:0;
       buf_opcodes b opcodes;
       buf_int8 b (mod_rm_reg 0b00 0b101 reg);
-      record_reloc b (Buffer.length b.buf)
-        (Relocation.Kind.REL32 (symbol, Int64.of_int offset));
-      buf_int32L b 0L
+      if String.Tbl.mem local_labels symbol then (
+        record_local_reloc b
+          (RelocRipRelative (symbol, Int64.of_int offset));
+        buf_int32L b 0L)
+      else (
+        record_reloc b (Buffer.length b.buf)
+          (Relocation.Kind.REL32 (symbol, Int64.of_int offset));
+        buf_int32L b 0L)
   | Mem { arch; typ = _; idx; scale; base; sym; displ } -> (
       let offset =
         let displ = Int64.of_int displ in
@@ -1114,9 +1123,6 @@ let emit_SHR b dst src = emit_shift 5 b dst src
 
 let emit_SAR b dst src = emit_shift 7 b dst src
 
-let record_local_reloc b ?(offset=0) local_reloc =
-  local_relocs := (Buffer.length b.buf + offset, local_reloc) :: !local_relocs
-
 let emit_reloc_jump near_opcodes far_opcodes b loc symbol =
   if String.Tbl.mem local_labels symbol then
     (* local_reloc *)
@@ -1742,6 +1748,11 @@ and assemble_section0 _arch section =
                 (Relocation.Kind.REL32 (lbl, Int64.add offset 4L))
           | Rrel _, _ -> assert false
           | Rabs _, _ -> assert false)
+      | RelocRipRelative (label, addend) ->
+          let source_pos = pos + 4 in
+          let target_pos = label_pos b label in
+          let n = target_pos - source_pos + Int64.to_int addend in
+          add_patch b pos B32 (Int64.of_int n)
     in
 
     ListLabels.iter !local_relocs ~f:(fun (pos, local_reloc) ->
