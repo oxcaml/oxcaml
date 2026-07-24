@@ -154,17 +154,12 @@ type 'a t =
 |}]
 
 (***********************************************************************)
-(* E3: minimal distilled form -- a single-constructor datatype whose only
-   parameter is the direct projection of a bounded existential takes the
-   bound's cap and reaches its declared kind. *)
 type 'a et : value mod portable =
   | K : ('b : value mod portable). 'b -> 'b et
 [%%expect{|
 type 'a et = K : ('b : value mod portable). 'b -> 'b et
 |}]
 
-(* E4: axis-limited -- the portability bound grants nothing on uniqueness,
-   so int et @ aliased used as unique is still rejected. *)
 let g (t : int et @ aliased) = use_unique t
 [%%expect{|
 Line 1, characters 42-43:
@@ -174,13 +169,7 @@ Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (***********************************************************************)
-(* Nested payloads (synthesis). A bounded existential returned directly as a
-   parameter may appear *nested* inside a type constructor. The bound caps the
-   parameter's contribution wherever that constructor propagates the argument's
-   crossing. This is the capability that requires the Tmod node: the with-bounds
-   engine keys on a type_expr, so the cap must ride on the payload type. *)
 
-(* N1: nested under a propagating record -- ACCEPTED at value mod portable. *)
 type 'a box = { xx : 'a }
 type 'a nt : value mod portable =
   | K : ('b : value mod portable). 'b box -> 'b nt
@@ -189,16 +178,12 @@ type 'a box = { xx : 'a; }
 type 'a nt = K : ('b : value mod portable). 'b box -> 'b nt
 |}]
 
-(* N2: nested under a propagating stdlib constructor (list) -- ACCEPTED. *)
 type 'a lt : value mod portable =
   | K : ('b : value mod portable). 'b list -> 'b lt
 [%%expect{|
 type 'a lt = K : ('b : value mod portable). 'b list -> 'b lt
 |}]
 
-(* N3: nested under an OPAQUE abstract constructor -- REJECTED. An abstract type
-   does not propagate its argument's crossing, so the bound is inert here and the
-   declared kind is not granted (soundness: the cap must never over-apply). *)
 type 'a opaque
 type 'a at : value mod portable =
   | K : ('b : value mod portable). 'b opaque -> 'b at
@@ -213,8 +198,6 @@ Error: The kind of type "at" is immutable_data with ('a @@ portable) opaque
          because of the annotation on the declaration of the type at.
 |}]
 
-(* N4: soundness boundary -- a mutable record does NOT cross contention even when
-   its element does, so a contention bound on the element grants nothing. *)
 type 'a mbox = { mutable yy : 'a }
 type 'a ct : value mod contended =
   | K : ('b : value mod contended). 'b mbox -> 'b ct
@@ -233,9 +216,6 @@ Error: The kind of type "ct" is
          contention: mod uncontended ≰ mod contended
 |}]
 
-(* N5: soundness -- construction still enforces the existential's bound, so a
-   non-portable closure cannot be smuggled into a [_ box nt2]; the crossing
-   granted for N1 is therefore vacuously safe on uninhabited instantiations. *)
 type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
 let smuggle (r : int ref) = Kbox { xx = (fun () -> ignore !r) }
 [%%expect{|
@@ -250,10 +230,6 @@ Error:
          because of the definition of nt2 at line 1, characters 0-64.
 |}]
 
-(* F1: recursive payload under a Tmod cap -- the legacy jkind normalizer runs
-   out of fuel on the recursive with-bound introduced by the capped projection
-   and conservatively rejects. The ikind engine accepts this declaration (see
-   gadt_ikinds.ml). *)
 type 'a cell : mutable_data with 'a =
   | Nil
   | Cons : ('b : value mod portable). { value : 'b; mutable next : 'b cell } -> 'b cell
@@ -279,6 +255,63 @@ Error: The kind of type "cell" is
            mod stateless with 'a
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
+|}]
+
+type 'a t =
+  | Portable : ('a : value mod portable). 'a -> 'a t
+  | Nonportable : 'a -> 'a t
+[%%expect{|
+type 'a t =
+    Portable : ('a : value mod portable). 'a -> 'a t
+  | Nonportable : 'a -> 'a t
+|}]
+
+let f (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect{|
+Line 1, characters 58-59:
+1 | let f (t : (unit -> unit) t @ nonportable) = use_portable t
+                                                              ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+type 'a t =
+  | A : ('a : value mod portable contended). 'a -> 'a t
+  | B : ('a : value mod portable global). 'a -> 'a t
+[%%expect{|
+type 'a t =
+    A : ('a : value mod portable contended). 'a -> 'a t
+  | B : ('a : value mod global portable). 'a -> 'a t
+|}]
+
+let f (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect{|
+val f : (unit -> unit) t -> unit = <fun>
+|}]
+
+let f (t : int ref t @ contended) = use_uncontended t
+[%%expect{|
+Line 1, characters 52-53:
+1 | let f (t : int ref t @ contended) = use_uncontended t
+                                                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+type ('a, 'b) t =
+  | T : ('a : value mod portable) ('b : value mod contended). 'a * 'b -> ('a, 'b) t
+[%%expect{|
+type ('a, 'b) t =
+    T : ('a : value mod portable) ('b : value mod contended). 'a *
+      'b -> ('a, 'b) t
+|}]
+
+let f (t : (unit -> unit, int ref) t @ nonportable) = use_portable t
+[%%expect{|
+val f : (unit -> unit, int ref) t -> unit = <fun>
+|}]
+
+let f (t : (unit -> unit, int ref) t @ contended) = use_uncontended t
+[%%expect{|
+val f : (unit -> unit, int ref) t @ contended -> unit = <fun>
 |}]
 
 (***********************************************************************)
@@ -647,7 +680,6 @@ Line 1, characters 66-67:
                                                                       ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
-
 
 type (_, _) box2 = Box2 : 'a -> ('a, 'a) box2
 [%%expect{|
