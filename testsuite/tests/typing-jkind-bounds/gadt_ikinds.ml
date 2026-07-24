@@ -176,21 +176,121 @@ Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (***********************************************************************)
+type 'a t =
+  | K : ('b : value mod portable). 'b -> 'b t
+
+let foo (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect {|
+type 'a t = K : ('b : value mod portable). 'b -> 'b t
+val foo : (unit -> unit) t -> unit = <fun>
+|}]
+
+(***********************************************************************)
 type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
 ;;
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-61:
-1 | type 'a t : value mod contended portable =
-2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
-3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value non_float mod portable immutable with 'a
+type 'a t =
+    Shared : ('b : value mod portable contended). 'b -> 'b t
+  | Unshared : (unit -> 'c) @@ portable -> 'c t
+|}]
+
+(***********************************************************************)
+(* E3: minimal distilled form -- a single-constructor datatype whose only
+   parameter is the direct projection of a bounded existential takes the
+   bound's cap and reaches its declared kind. *)
+type 'a et : value mod portable =
+  | K : ('b : value mod portable). 'b -> 'b et
+[%%expect{|
+type 'a et = K : ('b : value mod portable). 'b -> 'b et
+|}]
+
+(* E4: axis-limited -- the portability bound grants nothing on uniqueness,
+   so int et @ aliased used as unique is still rejected. *)
+let g (t : int et @ aliased) = use_unique t
+[%%expect{|
+Line 1, characters 42-43:
+1 | let g (t : int et @ aliased) = use_unique t
+                                              ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(***********************************************************************)
+(* Nested payloads (synthesis). A bounded existential returned directly as a
+   parameter may appear *nested* inside a type constructor. The bound caps the
+   parameter's contribution wherever that constructor propagates the argument's
+   crossing. This is the capability that requires the Tmod node: the with-bounds
+   engine keys on a type_expr, so the cap must ride on the payload type. *)
+
+(* N1: nested under a propagating record -- ACCEPTED at value mod portable. *)
+type 'a box = { xx : 'a }
+type 'a nt : value mod portable =
+  | K : ('b : value mod portable). 'b box -> 'b nt
+[%%expect{|
+type 'a box = { xx : 'a; }
+type 'a nt = K : ('b : value mod portable). 'b box -> 'b nt
+|}]
+
+(* N2: nested under a propagating stdlib constructor (list) -- ACCEPTED. *)
+type 'a lt : value mod portable =
+  | K : ('b : value mod portable). 'b list -> 'b lt
+[%%expect{|
+type 'a lt = K : ('b : value mod portable). 'b list -> 'b lt
+|}]
+
+(* N3: nested under an OPAQUE abstract constructor -- REJECTED. An abstract type
+   does not propagate its argument's crossing, so the bound is inert here and the
+   declared kind is not granted (soundness: the cap must never over-apply). *)
+type 'a opaque
+type 'a at : value mod portable =
+  | K : ('b : value mod portable). 'b opaque -> 'b at
+[%%expect{|
+type 'a opaque
+Lines 2-3, characters 0-53:
+2 | type 'a at : value mod portable =
+3 |   | K : ('b : value mod portable). 'b opaque -> 'b at
+Error: The kind of type "at" is immutable_data with ('a @@ portable) opaque
          because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           value mod portable contended
-         because of the annotation on the declaration of the type t.
+       But the kind of type "at" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type at.
+|}]
+
+(* N4: soundness boundary -- a mutable record does NOT cross contention even when
+   its element does, so a contention bound on the element grants nothing. *)
+type 'a mbox = { mutable yy : 'a }
+type 'a ct : value mod contended =
+  | K : ('b : value mod contended). 'b mbox -> 'b ct
+[%%expect{|
+type 'a mbox = { mutable yy : 'a; }
+Lines 2-3, characters 0-52:
+2 | type 'a ct : value mod contended =
+3 |   | K : ('b : value mod contended). 'b mbox -> 'b ct
+Error: The kind of type "ct" is
+           mutable_data with 'a @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "ct" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type ct.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+(* N5: soundness -- construction still enforces the existential's bound, so a
+   non-portable closure cannot be smuggled into a [_ box nt2]; the crossing
+   granted for N1 is therefore vacuously safe on uninhabited instantiations. *)
+type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
+let smuggle (r : int ref) = Kbox { xx = (fun () -> ignore !r) }
+[%%expect{|
+type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
+Line 2, characters 40-61:
+2 | let smuggle (r : int ref) = Kbox { xx = (fun () -> ignore !r) }
+                                            ^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of 'a -> 'b is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of 'a -> 'b must be a subkind of value mod portable
+         because of the definition of nt2 at line 1, characters 0-64.
 |}]
 
 (***********************************************************************)
