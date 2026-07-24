@@ -25,7 +25,7 @@ val gensym_ref : unit -> <[int]> expr = <fun>
 let e = gensym_ref ()
 [%%expect {|
 val e : <[int]> expr =
-  Uncaught exception: Failure("Identifier x bound at file , line 3, characters 271-309\nis extruded outside its scope:\nit is used at file , line 3, characters 297-298\ninside the quote at file , line 3, characters 295-300")
+  Uncaught exception: Failure("Identifier x bound at file , line 3, characters 12-50\nis extruded outside its scope:\nit is used at file , line 3, characters 38-39\ninside the quote at file , line 3, characters 36-41")
 
 |}];;
 
@@ -34,7 +34,7 @@ let () = ignore <[ $(gensym_ref ()) ]>
 [%%expect {|
 Exception:
 Failure
- "Identifier x bound at file , line 3, characters 271-309\nis extruded outside its scope:\nit is used at file , line 3, characters 297-298\ninside the quote at file , line 3, characters 295-300".
+ "Identifier x bound at file , line 3, characters 12-50\nis extruded outside its scope:\nit is used at file , line 3, characters 38-39\ninside the quote at file , line 3, characters 36-41".
 |}];;
 
 (* Scope extrusion with an exception *)
@@ -62,7 +62,7 @@ let () = ignore <[ $(gensym_exn ()) ]>
 [%%expect {|
 Exception:
 Failure
- "Identifier x bound at file , line 3, characters 1156-1194\nis extruded outside its scope:\nit is used at file , line 3, characters 1189-1190\ninside the quote at file , line 3, characters 1187-1192".
+ "Identifier x bound at file , line 3, characters 9-47\nis extruded outside its scope:\nit is used at file , line 3, characters 42-43\ninside the quote at file , line 3, characters 40-45".
 |}];;
 
 (* should be caught early if we splice the [expr] earlier *)
@@ -75,7 +75,7 @@ gensym_exn ()
 val gensym_exn : unit -> <[int]> expr @ once = <fun>
 Exception:
 Failure
- "Identifier x bound at file , line 2, characters 1924-1962\nis extruded outside its scope:\nit is used at file , line 2, characters 1957-1958\ninside the quote at file , line 2, characters 1955-1960".
+ "Identifier x bound at file , line 2, characters 9-47\nis extruded outside its scope:\nit is used at file , line 2, characters 42-43\ninside the quote at file , line 2, characters 40-45".
 |}];;
 
 (* No scope extrusion in continuing effect handler *)
