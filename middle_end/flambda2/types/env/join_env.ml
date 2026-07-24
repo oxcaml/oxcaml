@@ -524,8 +524,6 @@ end
 module Simples_in_joined_envs : sig
   include Container_types.S with type t = Simple_in_one_joined_env.t Index.Map.t
 
-  val of_list : (Index.t * Simple.t) list -> t
-
   val choose_a_suitable_name : t -> string
 end = struct
   module T0 = struct
@@ -547,12 +545,6 @@ end = struct
 
   include T0
   include Container_types.Make (T0)
-
-  let of_list simples =
-    List.fold_left
-      (fun simples (index, simple) ->
-        Index.Map.add index (Simple_in_one_joined_env.create simple) simples)
-      Index.Map.empty simples
 
   let choose_a_suitable_name t =
     let shared_name =
@@ -981,6 +973,9 @@ module Joined_envs : sig
 
   val equal_in_all_joined_envs :
     t -> Simple_in_one_joined_env.t -> Simples_in_joined_envs.t -> bool
+
+  val get_canonical_simples_ignoring_name_mode :
+    t -> (Index.t * Simple.t) list -> Simples_in_joined_envs.t
 end = struct
   type t =
     { envs_and_equations :
@@ -1055,6 +1050,17 @@ end = struct
         then Some (Type_in_one_joined_env.create (TE.find env name (Some kind)))
         else None)
       (envs_and_equations t)
+
+  let get_canonical_simples_ignoring_name_mode t simples =
+    List.fold_left
+      (fun acc (index, simple) ->
+        let env = get_nth_joined_env t index in
+        let canonical =
+          Simple_in_one_joined_env.create
+            (TE.get_canonical_simple_ignoring_name_mode env simple)
+        in
+        Index.Map.add index canonical acc)
+      Index.Map.empty simples
 end
 
 module Aliases_of_existentials = struct
@@ -2104,7 +2110,9 @@ let n_way_join_simples t kind simples : _ Or_bottom.t * t =
   match simples with
   | [] -> Bottom, t
   | _ :: _ ->
-    let canonicals_in_joined_envs = Simples_in_joined_envs.of_list simples in
+    let canonicals_in_joined_envs =
+      Joined_envs.get_canonical_simples_ignoring_name_mode t.joined_envs simples
+    in
     (* CR-someday bclement: somehow mark the local variable as used, so that it
        can be re-processed in the current env extension if applicable (if a
        local variable is created while processing an env extension, we currently
