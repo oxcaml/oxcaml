@@ -73,6 +73,11 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 DEP_CC=@DEP_CC@ -MM
 COMPUTE_DEPS=@compute_deps@
 
+TEST_CXX = @ocamltest_CXX@
+TEST_CXX_CXXFLAGS = @common_cflags@
+TEST_CXX_CPPFLAGS = @common_cppflags@
+CXXFLAGS ?=
+
 # Default flags to use to compile C files
 OC_CFLAGS = @oc_cflags@
 
@@ -90,6 +95,9 @@ OC_CPPFLAGS = $(OC_INCLUDES) @oc_cppflags@
 OC_BYTECODE_CPPFLAGS = $(OC_INCLUDES) @oc_bytecode_cppflags@
 
 OC_NATIVE_CPPFLAGS = $(OC_INCLUDES) @oc_native_cppflags@
+
+EXTRA_WARNINGS_CFLAGS = @cc_extra_warnings@
+EXTRA_WARNINGS_CXXFLAGS = @cxx_extra_warnings@
 
 # Additional link-time options
 # To support dynamic loading of shared libraries (they need to look at

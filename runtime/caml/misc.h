@@ -841,6 +841,7 @@ CAMLextern int caml_snwprintf(wchar_t * buf,
 #define NSEC_PER_SEC  UINT64_C(1000000000)
 
 #include <time.h>
+#include <stdint.h>
 
 Caml_inline struct timespec caml_timespec_of_nsec(uint64_t nsec)
 {

@@ -20,6 +20,8 @@
 #include "misc.h"
 #include "camlatomic.h"
 #include "tsan.h"
+#include <stdint.h>
+#include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {

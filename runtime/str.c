@@ -18,7 +18,6 @@
 /* Operations on strings */
 
 #include <string.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include "caml/alloc.h"
