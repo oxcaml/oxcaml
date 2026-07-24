@@ -560,6 +560,7 @@ construction site.
 RULE WF.Syntax.Anf
 CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#expr_descr
+CHECKED @ 7bf23efaf6
 ---
 n is the defining expression of a Let binding
 --------------------------------------------------
@@ -689,14 +690,22 @@ confusion between the different [Simple]s" (which are carried inside [eff]).
 RULE WF.Syntax.ContSecondClass
 CLAIM normative
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
+CODE middle_end/flambda2/terms/trap_action.mli#t
+CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
+CHECKED @ 7bf23efaf6
 ---
 k is a continuation
 --------------------------------------------------
-k occurs only as the target of an Apply_cont, or as the result/exception
-continuation of an Apply, or as a bound continuation of a Let_cont; k is never
-stored in a variable, symbol, or block, and captures no variables
+k occurs only as the target or trap-action handler (Push/Pop exn_handler) of an
+Apply_cont, or as the result/exception continuation of an Apply, or as a bound
+continuation of a binder (Let_cont; a Function_params_and_body's or the
+Flambda_unit's return/exception continuations); k is never stored in a
+variable, symbol, or block, and captures no variables
 NOTES: "Continuations are second-class. Continuations do not capture variables."
-([Let_cont_expr] header.)
+([Let_cont_expr] header.) A Push/Pop trap action's exn_handler is a genuine
+occurrence — counted in free names (apply_cont_expr.ml) and possibly distinct
+from the Apply_cont's own target; Function_params_and_body and Flambda_unit
+bind return/exception continuations with no Let_cont.
 ```
 
 ```rule

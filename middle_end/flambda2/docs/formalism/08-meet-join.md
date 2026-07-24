@@ -203,8 +203,9 @@ CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonica
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
 CODE middle_end/flambda2/identifiers/coercion0.mli#change_depth
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#apply_coercion
+CHECKED @ 7bf23efaf6
 CAVEAT disclosure: rec_info skew is replacement, not composition — apply_coercion_function_type ignores `from` (CR lmaurer, type_grammar.ml:2154-58).
-CAVEAT disclosure: silent coercion erasure reachable only for closures/Unknown/alias canonicals; non-closure concrete heads instead fatal-error at store time (meet_env.ml:161) — crash landmine, not soundness hole.
+CAVEAT disclosure: silent coercion erasure reachable for closures/Unknown/alias canonicals and for heads apply_coercion passes untouched (Mutable_block, Region, Value heads with non_null Unknown/Bottom); the is_id-gated concrete heads (Variant, Boxed_*, String, Array) instead fatal-error at store time (meet_env.ml:161) — crash landmine, not soundness hole, for those.
 CAVEAT watch(W-37): soundness rests on coercions being value-preserving and γ ignoring Rec_info; a future non-value-preserving coercion or Rec_info-sensitive γ breaks soundness at this store point.
 ---
 add_equation resolves a name x to its canonical simple  y @ co  with co ≠ Id;
@@ -223,11 +224,14 @@ NOTES: The same erasure occurs on the demotion path (record_demotion). Nothing i
 meet_env checks Coercion.is_id before replace_concrete_equation. Two sharpenings:
 (a) the rec_info skew is REPLACEMENT, not composition — apply_coercion_function_type
 ignores `from` (CR lmaurer, type_grammar.ml:2154-58); (b) the silent erasure is
-reachable only for CLOSURES / Unknown / alias canonicals: for a non-closure
-concrete head, apply_coercion yields Bottom for a non-Id coercion and the store
-path FATAL-ERRORS (meet_env.ml:161) — so it is a crash landmine, not a soundness
-hole, for non-closures. If a future coercion violated value-preservation, or if γ
-ever constrained Rec_info, this point is where soundness would break. Composes:
+NOT confined to CLOSURES / Unknown / alias canonicals: apply_coercion passes
+Mutable_block (type_grammar.ml:1923), Region, and Value heads whose non_null is
+Unknown/Bottom untouched under any coercion, so those store silently too; only
+the is_id-gated concrete heads (Variant, Boxed_*, String, Array) yield Bottom
+on a non-Id coercion and FATAL-ERROR at store time (meet_env.ml:161) — a crash
+landmine, not a soundness hole, for those heads. If a future coercion violated
+value-preservation, or if γ ever constrained Rec_info, this point is where
+soundness would break. Composes:
 T.Meet.AliasConcrete, T.Env.Canonical.Least, [§07](07-types-domain.md) §6.
 ```
 
@@ -278,6 +282,7 @@ from an input's.
 RULE T.Meet.MutableBlockMissedBottom
 CLAIM descriptive
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+CHECKED @ 7bf23efaf6
 CAVEAT disclosure: no in-compiler trigger known (Mutable_block types attach only to fresh names; shapes never Mutable_block) — domain-level types-API counterexample, not a witnessed Simplify miscompile; same flank as S.Struct.EnvRefineOnly (b).
 CAVEAT disclosure: after the missed ⊥, downstream prover answers about the name are vacuously sound but epistemically garbage; Simplify also misses the Invalid/dead-code detection.
 ---
@@ -287,8 +292,9 @@ immediates-only variant, denoting no blocks at all)
 --------------------------------------------------
 E ⊢ T₁ ⊓ T₂ = Mutable_block (alloc modes met) — NOT ⊥. The case inspects ONLY
 `blocks`'s alloc mode; it ignores the immediates arm and does not check whether
-the blocks arm is inhabited. Witnessed (meet_test.ml): these_tagged_immediates
-{-1,0,1} ⊓ Mutable_block Heap = (Val! (Mutable_block Heap)), not Bottom.
+the blocks arm is inhabited. Traced through the meet (types API; not a
+checked-in test): these_tagged_immediates {-1,0,1} ⊓ Mutable_block Heap =
+(Val! (Mutable_block Heap)), not Bottom.
 NOTES: meet_alloc_mode has NO Bottom result (meet_and_join.ml:696-703), so nothing
 downstream of the alloc-mode meet can rescue the ⊥ — the miss is structural. No
 normative rule is violated (T.Meet.Bottom constrains only ⊥ results; T.Meet.Sound
@@ -672,7 +678,8 @@ CLAIM descriptive
 CODE middle_end/flambda2/types/provers.ml#gen_value_to_meet
 CODE middle_end/flambda2/types/provers.ml#gen_value_to_proof
 CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
-CAVEAT disclosure: the naïve reading "Known_result r is universal over γ_E(t)" is refuted — gen_value_to_meet discards is_null; witnessed in meet_test.ml (Null ∈ γ yet Known_result {1}).
+CHECKED @ 7bf23efaf6
+CAVEAT disclosure: the naïve reading "Known_result r is universal over γ_E(t)" is refuted — gen_value_to_meet discards is_null; traced at the prover level (Null ∈ γ yet Known_result {1}), not a checked-in test.
 CAVEAT disclosure: gen_value_to_proof returns Unknown on Maybe_null while gen_value_to_meet answers from the non-null head; the asymmetry is deliberate but was previously recorded nowhere.
 CAVEAT disclosure: no live miscompile — every current meet_* consumer is UB on Null or frontend-guarded; null-DEFINED operations (prove_physical_equality, reify) do their own Null handling.
 CAVEAT watch(W-38): a future meet_* consumer well-defined on Null becomes a live hazard with no local signal; audit new meet-shortcut call sites for Null-definedness.
@@ -681,8 +688,9 @@ t : Value type with is_null = Maybe_null (Null ∈ γ_E(t));
 meet_X ∈ the meet-shortcut provers built on gen_value_to_meet
   (meet_is_int_variant_only, meet_equals_tagged_immediates, meet_variant_like,
   meet_is_flat_float_array, meet_single_closures_entry, meet_is_immutable_array,
-  meet_strings, meet_tagging_of_simple, meet_block_field_simple,
-  meet_project_function_slot_simple, meet_project_value_slot_simple)
+  meet_is_non_empty_naked_number_array, meet_strings, meet_tagging_of_simple,
+  meet_block_field_simple, meet_project_function_slot_simple,
+  meet_project_value_slot_simple)
 --------------------------------------------------
 meet_X(t) computes its answer from the NON-NULL head alone — gen_value_to_meet
 matches `{ is_null = _; non_null = Ok head }` and discards is_null — so a naïve
@@ -691,8 +699,8 @@ The corrected T.Prove.MeetShortcut (Known_result universal over γ_E(T) ∩ γ_E
 holds: every shape is null-free, so the intersection excludes Null and discarding
 nullability is sound. gen_value_to_meet returns Invalid for the type-of-exactly-Null
 ({non_null = Bottom}), correct because γ(T) ∩ γ(shape) = ∅ there.
-NOTES: Witnessed (meet_test.ml): join of the Null constant with tagged immediate 1
-gives x : (Val? (Variant (tagged_imms (= #1)))), and meet_equals_tagged_immediates
+NOTES: Traced (not a checked-in test): join of the Null constant with tagged
+immediate 1 gives x : (Val? (Variant (tagged_imms (= #1)))), and meet_equals_tagged_immediates
 answers Known_result {1} though Null ∈ γ and Null ≠ 1 — sound only under the
 intersection reading. The parallel wrapper gen_value_to_proof carefully returns
 Unknown on Maybe_null; the asymmetry is deliberate but was recorded nowhere. No
@@ -712,6 +720,7 @@ CODE middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind
 CODE middle_end/flambda2/types/provers.ml#meet_block_field_simple
 CODE middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
+CHECKED @ 7bf23efaf6
 ---
 a prover returns a Simple s intended for TERM substitution
 (prove_equals_to_simple_of_kind, meet_tagging_of_simple,

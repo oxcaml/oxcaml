@@ -42,6 +42,7 @@ primitive, scalar or not:
 RULE P.Contract.NoRaiseNoControl
 CLAIM normative
 CODE middle_end/flambda2/terms/flambda_primitive.mli#t
+CHECKED @ 7bf23efaf6
 ---
 p is a primitive application, v̄ its argument values, H a heap
 --------------------------------------------------

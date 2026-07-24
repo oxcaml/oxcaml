@@ -4647,6 +4647,53 @@ RULES: none
   Nothing remains open on this entry.
 - Status: resolved — both asks landed and verified (entry 20 discipline sentence + W-34); nothing remains open.
 
+### KF-058 — T.Gamma.Closures.CodeAgeLoose: the symmetric "version-class" γ is refuted by sibling specializations; only the directional up-set reading validates meet_code_id (medium-high; code-read finding)
+RULES: T.Gamma.Closures.CodeAgeLoose
+- Chapter: 07-types-domain.md:789 (the rule block; the γ wording it constrains
+  is T.Gamma.Value.Closures at :768 — same defect, not yet named in RULES:
+  pending adjudication); Rocq: theories/Concretization.v:186-187
+  (code_age_same_class) and :722 (Theorem T_Gamma_Closures_CodeAgeLoose, Qed);
+  Owner: main.
+- What differs: the rule reads the code pointer "up to the newer_version_of
+  preorder" — a symmetric version class — and glosses meet_code_id's Bottom
+  as "provably unrelated cids". The code supports only the DIRECTIONAL up-set
+  reading. Witness: the relation is a newer↦older single-parent map
+  (code_age_relation.ml:18), so two respecializations of one ancestor
+  (Code_id.rename per set-of-closures simplification round,
+  simplify_set_of_closures_context.ml:223,240-245) yield siblings A1↦A,
+  A2↦A that ARE code-age-related through A; yet Code_age_relation.meet(A1,A2)
+  hits (Known false, Known false) → Bottom (code_age_relation.ml:96-98) and
+  meet_code_id returns Bottom (meet_and_join.ml:684). Under any symmetric
+  class/either-direction γ, γ(Closures A1) ∩ γ(Closures A2) contains closures
+  carrying A's code, so that Bottom violates the normative T.Meet.Bottom
+  (empty γ-intersection "on the nose"). The directional reading (cid_act is
+  cid or a NEWER version) validates every branch — sibling up-sets are
+  disjoint under the single-parent map — and is what the anchored file's own
+  docstring says (code_age_relation.ml:62-65, "only newer versions ... are
+  possible"). The mechanization transcribes the flawed reading faithfully:
+  Concretization.v:186-187 defines code_age_same_class as newer_eq in EITHER
+  direction, which also admits an OLDER actual code id than stated —
+  unjustified by the rule's own fact (b), whose direction is old stated cid /
+  newer actual code. Secondary: "add_to_code_age_relation records newer↦older
+  exactly when Simplify re-specializes" is falsified by the fexpr path
+  (fexpr_to_flambda.ml builds Code with newer_version_of from parsed input →
+  define_code → add_to_code_age_relation, no respecialization involved).
+- Why it matters: interpretive rule, so the remedy is doc/model-side, but it
+  is load-bearing: it fixes the γ against which ch. 08's meet soundness
+  (T.Meet.Bottom, normative) is judged, and as stated it renders the anchored
+  meet_code_id unsound at sibling meets — a shape the code's own docstring
+  calls the typical case.
+- Candidate fix: reword both blocks to the up-set γ (actual code id = the
+  stated cid or a newer version of it); re-gloss meet_code_id's Bottom as
+  "mutually incomparable in the age order (including sibling specializations
+  of a common ancestor)"; hedge the "exactly when Simplify re-specializes"
+  sentence (fexpr path); change Concretization.v's code_age_same_class to the
+  directional code_age_newer_eq E cid_act cid and re-review the Qed (the
+  constructor plumbing should survive unchanged).
+- Status: open — filed 2026-07-24 off the first CHECKED code-read pass (two
+  independent adversarial refutations plus reader evidence, session record);
+  doc + .v reword and fidelity re-review needed.
+
 <!-- Finding template (safe in any form: the parser blanks comment
      blocks before parsing — comments are not data):
 ### KF-NNN — <RULE id> (<severity: high/med/low>)

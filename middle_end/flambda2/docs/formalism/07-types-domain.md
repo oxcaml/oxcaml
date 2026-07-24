@@ -474,6 +474,7 @@ CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
 CODE middle_end/flambda2/types/env/aliases.mli#find_best
 CODE middle_end/flambda2/types/env/binding_time.ml#consts
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
+CHECKED @ 7bf23efaf6
 CAVEAT disclosure: read alias-class-only — non-constant Proved answers may degrade Proved→Unknown via non-GLB meet corner (T.Meet.GreatestLowerBound); raise_on_bottom:false silently drops conflicting const equations.
 ---
 canonical_E(x) = c for a constant c (x's alias class contains c);
@@ -497,8 +498,11 @@ still degrade Proved→Unknown through the non-GLB meet corner
 const equation is silently dropped rather than bottoming, keeping canonical = c.
 replace_concrete_equation normalizes a singleton concrete `x = c` into the
 indelible alias domain. Composes: T.Env.Canonical.Least, [§08](08-meet-join.md)
-meet. Witnessed in `middle_end/flambda2/tests/meet_test.ml`: `x = 3` then `x = 4`
-⟹ bottom; `y = 5` then `y = sym` ⟹ both typed `(= 5)`.
+meet. Predicted consequences (not checked in as tests): `x = 3` then `x = 4`
+⟹ bottom; `y = 5` then `y = sym` ⟹ both typed `(= 5)`. The nearest checked-in
+witness is test_meet_bottom_after_alias (meet_test.ml), where a concrete
+{-1,0,1} meets an alias to the constant 3 and bottoms via the constant-alias
+path.
 ```
 
 ```rule
@@ -508,6 +512,7 @@ CODE middle_end/flambda2/types/env/aliases.ml#add
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
 CODE middle_end/flambda2/types/expand_head.ml#expand_head0
 CODE middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias
+CHECKED @ 7bf23efaf6
 ---
 after any sequence of equation adds and alias demotions in a typing env
 --------------------------------------------------
@@ -676,6 +681,7 @@ obligations read names the way evaluation does, through `⟦·⟧ρ`.
 RULE T.Gamma.Kind
 CLAIM interpretive
 CODE middle_end/flambda2/types/grammar/type_grammar.mli#kind
+CHECKED @ 7bf23efaf6
 ---
 γ_E(T) ⊆ { v ∈ Val | v has kind κ(T) }. Concretization never crosses kinds; the
 kinds partition Val ([§03](03-kinds.md)).

@@ -19,22 +19,22 @@ hand-maintained (record 76)._
 ### Grades
 
 ```
-A          38  ████
-B           8  █
-C         310  ████████████████████████████████████████
+A          38  █████
+B          18  ██
+C         299  ████████████████████████████████████████
 D          97  ████████████
-DISPUTED    0
+DISPUTED    1  ▏
 ```
 
 - **By claim:** normative 365, descriptive 75, interpretive 13
-- **DISPUTED:** none. DISPUTED is the live under-investigation
-  state — an open FIDELITY.md finding naming a rule suspends its
-  letter; zero means no rule is currently under an open finding.
+- **DISPUTED (1):** each suspends its derived
+  letter until the named FIDELITY.md finding(s) close:
+  - `T.Gamma.Closures.CodeAgeLoose` — suspends C; open: KF-058
 
 ### Trust signals
 
 - **Caveats by kind** (urgency order): known-false 4, compiler-bug 2, pending-upstream 3, watch 9, disclosure 104
-- **Validation events:** 58 `VERIFIED` lines (58 commit-keyed) across 46 rules; 0 `CHECKED`.
+- **Validation events:** 58 `VERIFIED` lines (58 commit-keyed) across 46 rules; 10 `CHECKED`.
 - **Watched provisos** (pending-upstream; the reverse-proviso check
   watches these keys for their lift):
   - `P.Binary.StringOrBigstringLoad` — `flambda2-string-load-fold` @ 9712d270eb
@@ -44,13 +44,13 @@ DISPUTED    0
 
 ### By chapter
 
-- 02-syntax.md — 13 rules · A 1 · C 11 · D 1 · 4 caveats
+- 02-syntax.md — 13 rules · A 1 · B 2 · C 9 · D 1 · 4 caveats
 - 03-kinds.md — 27 rules · A 1 · C 24 · D 2 · 4 caveats
 - 04-opsem.md — 29 rules · A 2 · C 26 · D 1 · 3 caveats
-- 05-primitives-scalar.md — 31 rules · C 30 · D 1 · 6 caveats
+- 05-primitives-scalar.md — 31 rules · B 1 · C 29 · D 1 · 6 caveats
 - 06-primitives-memory.md — 69 rules · A 8 · B 1 · C 52 · D 8 · 8 caveats
-- 07-types-domain.md — 30 rules · A 2 · C 26 · D 2 · 8 caveats
-- 08-meet-join.md — 30 rules · A 2 · C 19 · D 9 · 14 caveats
+- 07-types-domain.md — 30 rules · A 2 · B 3 · C 22 · D 2 · DISPUTED 1 · 8 caveats
+- 08-meet-join.md — 30 rules · A 2 · B 4 · C 15 · D 9 · 14 caveats
 - 09-simplify-structure.md — 37 rules · B 1 · C 5 · D 31 · 13 caveats
 - 10-simplify-rewrites.md — 54 rules · A 17 · B 1 · C 27 · D 9 · 7 caveats
 - 11-inlining.md — 10 rules · A 1 · B 3 · C 3 · D 3 · 1 caveat
@@ -133,7 +133,7 @@ copies the regenerated files back into the source tree.
 
 | Rule ID | Claim | Grade | Chapter | Artifact | Code anchors | Verified |
 |---|---|---|---|---|---|---|
-| `WF.Syntax.Anf` | normative | C (proved-in-model) | 02-syntax.md | theorem-qed | `middle_end/flambda2/terms/flambda.mli#expr_descr` | — |
+| `WF.Syntax.Anf` | normative | B (proved-in-model) | 02-syntax.md | theorem-qed | `middle_end/flambda2/terms/flambda.mli#expr_descr` | — |
 | `WF.Syntax.LetKindUniform` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/bound_identifiers/bound_pattern.mli#t` | — |
 | `WF.Syntax.SingletonNotSetOfClosures` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/bound_identifiers/bound_pattern.mli#t` | — |
 | `WF.Syntax.SwitchScrutinee` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/terms/switch_expr.mli#t`<br>`middle_end/flambda2/terms/switch_expr.mli#create` | — |
@@ -141,7 +141,7 @@ copies the regenerated files back into the source tree.
 | `WF.Syntax.ExnHandlerNonRecursive` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/terms/flambda.mli#Continuation_handler`<br>`middle_end/flambda2/terms/flambda.mli#Let_cont_expr` | — |
 | `WF.Syntax.ExnHandlerFirstParamBucket` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/terms/exn_continuation.mli#arity`<br>`middle_end/flambda2/terms/flambda.mli#Continuation_handler` | — |
 | `WF.Syntax.EffectCalleeNone` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/terms/call_kind.mli#Effect`<br>`middle_end/flambda2/terms/apply_expr.mli#create` | — |
-| `WF.Syntax.ContSecondClass` | normative | C (proved-in-model) | 02-syntax.md | theorem-qed | `middle_end/flambda2/terms/flambda.mli#Let_cont_expr` | — |
+| `WF.Syntax.ContSecondClass` | normative | B (proved-in-model) | 02-syntax.md | theorem-qed | `middle_end/flambda2/terms/flambda.mli#Let_cont_expr`<br>`middle_end/flambda2/terms/trap_action.mli#t`<br>`middle_end/flambda2/terms/flambda.mli#Function_params_and_body` | — |
 | `WF.Syntax.NonRecOccursPositive` | normative | D | 02-syntax.md | documented-anchor | `middle_end/flambda2/terms/flambda.mli#let_cont_expr`<br>`middle_end/flambda2/terms/flambda.ml#Let_cont_expr.create_non_recursive0` | — |
 | `WF.Syntax.StaticRecThroughCode` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/bound_identifiers/bound_static.mli#create` | — |
 | `WF.Syntax.ImmutableArrayNonEmpty` | normative | C | 02-syntax.md | defining | `middle_end/flambda2/terms/static_const.mli#t` | — |
@@ -216,7 +216,7 @@ copies the regenerated files back into the source tree.
 
 | Rule ID | Claim | Grade | Chapter | Artifact | Code anchors | Verified |
 |---|---|---|---|---|---|---|
-| `P.Contract.NoRaiseNoControl` | normative | C (proved-in-model) | 05-primitives-scalar.md | theorem-qed | `middle_end/flambda2/terms/flambda_primitive.mli#t` | — |
+| `P.Contract.NoRaiseNoControl` | normative | B (proved-in-model) | 05-primitives-scalar.md | theorem-qed | `middle_end/flambda2/terms/flambda_primitive.mli#t` | — |
 | `P.Unary.IntArith.SwapByteEndianness` | normative | C | 05-primitives-scalar.md | defining | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Unary_int_arith`<br>`middle_end/flambda2/simplify/number_adjuncts.ml#For_int16s`<br>`middle_end/flambda2/numbers/target_ocaml_int.ml#get_least_significant_16_bits_then_byte_swap` | — |
 | `P.Unary.FloatArith` | normative | C | 05-primitives-scalar.md | defining | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op`<br>`middle_end/flambda2/numbers/numeric_types.ml#Float_by_bit_pattern_gen` | — |
 | `P.Unary.NumConv` | normative | C [compiler-bug] | 05-primitives-scalar.md | defining | `middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_int_conv`<br>`middle_end/flambda2/simplify/number_adjuncts.ml#Num_common` | — |
@@ -333,14 +333,14 @@ copies the regenerated files back into the source tree.
 | `T.Env.Canonical.Least` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/aliases.mli#get_canonical_element_exn`<br>`middle_end/flambda2/types/env/binding_time.ml#consts`<br>`middle_end/flambda2/types/env/aliases.mli#Alias_set.find_best` | — |
 | `T.Env.Canonical.NoEqualsOnCanonical` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias` | — |
 | `T.Env.Canonical.ConcreteOnCanonical` | descriptive | D | 07-types-domain.md | documented-anchor | `middle_end/flambda2/types/env/typing_env.ml#replace_equation` | — |
-| `T.Env.ConstCanonicalPersists` | normative | C (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals`<br>`middle_end/flambda2/types/env/aliases.mli#find_best`<br>`middle_end/flambda2/types/env/binding_time.ml#consts`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion` | — |
-| `T.Env.AliasesAuthoritative` | normative | C (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/env/aliases.ml#add`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion`<br>`middle_end/flambda2/types/expand_head.ml#expand_head0`<br>`middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias` | — |
+| `T.Env.ConstCanonicalPersists` | normative | B (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals`<br>`middle_end/flambda2/types/env/aliases.mli#find_best`<br>`middle_end/flambda2/types/env/binding_time.ml#consts`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion` | — |
+| `T.Env.AliasesAuthoritative` | normative | B (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/env/aliases.ml#add`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion`<br>`middle_end/flambda2/types/expand_head.ml#expand_head0`<br>`middle_end/flambda2/types/env/typing_env.ml#invariant_for_alias` | — |
 | `T.Env.Find.Canonical` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/typing_env.ml#type_simple_in_term_exn`<br>`middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn` | — |
 | `T.Env.Find.Bottom` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'`<br>`middle_end/flambda2/types/env/typing_env.ml#make_bottom` | — |
 | `T.Env.Find.SymbolDefault` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/typing_env.ml#find_with_binding_time_and_mode'`<br>`middle_end/flambda2/types/env/typing_env.ml#initial_symbol_type` | — |
 | `T.Env.Equation.Closed` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/typing_env.ml#invariant_for_new_equation` | — |
 | `T.Env.Scope.Existential` | normative | C | 07-types-domain.md | defining | `middle_end/flambda2/types/env/binding_time.ml#With_name_mode.scoped_name_mode`<br>`middle_end/flambda2/types/env/typing_env.mli#cut` | — |
-| `T.Gamma.Kind` | interpretive | C (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/grammar/type_grammar.mli#kind` | — |
+| `T.Gamma.Kind` | interpretive | B (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/grammar/type_grammar.mli#kind` | — |
 | `T.Gamma.TopBottom` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_descr.mli#unknown`<br>`middle_end/flambda2/types/grammar/type_descr.mli#bottom` | — |
 | `T.Gamma.Alias` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.mli#alias_type_of`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#get_alias_exn` | — |
 | `T.Gamma.Value.Nullability` | interpretive | A | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value` | 14-validation/n_way_join_preserves_null.md |
@@ -348,7 +348,7 @@ copies the regenerated files back into the source tree.
 | `T.Gamma.Value.RowLikeBlocks` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_blocks` | — |
 | `T.Gamma.Value.Boxed` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null` | — |
 | `T.Gamma.Value.Closures` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_closures`<br>`middle_end/flambda2/types/grammar/type_grammar.mli#closures_entry` | — |
-| `T.Gamma.Closures.CodeAgeLoose` | interpretive | C (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/meet_and_join.ml#meet_code_id`<br>`middle_end/flambda2/types/env/code_age_relation.ml#meet`<br>`middle_end/flambda2/types/env/typing_env.ml#add_to_code_age_relation` | — |
+| `T.Gamma.Closures.CodeAgeLoose` | interpretive | DISPUTED (KF-058) (proved-in-model) | 07-types-domain.md | theorem-qed | `middle_end/flambda2/types/meet_and_join.ml#meet_code_id`<br>`middle_end/flambda2/types/env/code_age_relation.ml#meet`<br>`middle_end/flambda2/types/env/typing_env.ml#add_to_code_age_relation` | — |
 | `T.Gamma.Naked.Set` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float` | — |
 | `T.Gamma.Naked.Relational` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate` | — |
 | `T.Gamma.EnvExtension` | interpretive | C | 07-types-domain.md | defining | `middle_end/flambda2/types/grammar/type_grammar.ml#env_extension`<br>`middle_end/flambda2/types/env/typing_env_extension.mli#t` | — |
@@ -359,10 +359,10 @@ copies the regenerated files back into the source tree.
 | `T.Meet.GreatestLowerBound` | normative | D [false-as-stated] | 08-meet-join.md | demoted-claim | `middle_end/flambda2/types/meet_and_join.mli#meet` | — |
 | `T.Meet.AliasAlias` | normative | C | 08-meet-join.md | defining | `middle_end/flambda2/types/env/meet_env.ml#meet`<br>`middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals` | — |
 | `T.Meet.AliasConcrete` | normative | C | 08-meet-join.md | defining | `middle_end/flambda2/types/env/meet_env.ml#meet`<br>`middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical` | — |
-| `T.Meet.Store.CoercionErasure` | descriptive | C (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion`<br>`middle_end/flambda2/identifiers/coercion0.mli#change_depth`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#apply_coercion` | — |
+| `T.Meet.Store.CoercionErasure` | descriptive | B (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical`<br>`middle_end/flambda2/types/env/meet_env.ml#record_demotion`<br>`middle_end/flambda2/identifiers/coercion0.mli#change_depth`<br>`middle_end/flambda2/types/grammar/type_grammar.ml#apply_coercion` | — |
 | `T.Meet.NakedNumber` | normative | C | 08-meet-join.md | defining | `middle_end/flambda2/types/meet_and_join.ml#meet_expanded_head0`<br>`middle_end/flambda2/types/meet_and_join.ml#set_meet` | — |
 | `T.Meet.ValueHeadIncompatible` | normative | C | 08-meet-join.md | defining | `middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null` | — |
-| `T.Meet.MutableBlockMissedBottom` | descriptive | C (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null` | — |
+| `T.Meet.MutableBlockMissedBottom` | descriptive | B (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null` | — |
 | `T.Meet.Variant` | normative | C | 08-meet-join.md | defining | `middle_end/flambda2/types/meet_and_join.ml#meet_variant`<br>`middle_end/flambda2/types/meet_and_join.ml#meet_relation` | — |
 | `T.Meet.BlockShape` | normative | A | 08-meet-join.md | defining | `middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks`<br>`middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks`<br>`middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape`<br>`middle_end/flambda2/kinds/flambda_kind.ml#Block_shape.equal` | 14-validation/mixed-04-join.md |
 | `T.Meet.Relational` | descriptive | D | 08-meet-join.md | documented-anchor | `middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations`<br>`middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_naked_immediate` | — |
@@ -377,8 +377,8 @@ copies the regenerated files back into the source tree.
 | `T.Join.RecursiveParamsUnknown` | descriptive | D | 08-meet-join.md | documented-anchor | `middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler`<br>`middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types` | — |
 | `T.Prove.Sound` | normative | C | 08-meet-join.md | theorem-admitted | `middle_end/flambda2/types/provers.mli#proof_of_property`<br>`middle_end/flambda2/types/provers.ml#prove_is_int` | — |
 | `T.Prove.MeetShortcut` | normative | C | 08-meet-join.md | theorem-admitted | `middle_end/flambda2/types/provers.mli#meet_shortcut`<br>`middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates` | — |
-| `T.Prove.MeetShortcut.NullPremise` | descriptive | C (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/provers.ml#gen_value_to_meet`<br>`middle_end/flambda2/types/provers.ml#gen_value_to_proof`<br>`middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates` | — |
-| `T.Prove.SimpleModeBoundary` | normative | C (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind`<br>`middle_end/flambda2/types/provers.ml#meet_block_field_simple`<br>`middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot` | — |
+| `T.Prove.MeetShortcut.NullPremise` | descriptive | B (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/provers.ml#gen_value_to_meet`<br>`middle_end/flambda2/types/provers.ml#gen_value_to_proof`<br>`middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates` | — |
+| `T.Prove.SimpleModeBoundary` | normative | B (proved-in-model) | 08-meet-join.md | theorem-qed | `middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind`<br>`middle_end/flambda2/types/provers.ml#meet_block_field_simple`<br>`middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn`<br>`middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot` | — |
 | `T.Prove.GetTag` | normative | C | 08-meet-join.md | theorem-admitted | `middle_end/flambda2/types/provers.ml#prove_get_tag` | — |
 | `T.Expand.Head` | normative | C | 08-meet-join.md | theorem-admitted | `middle_end/flambda2/types/expand_head.ml#expand_head`<br>`middle_end/flambda2/types/expand_head.ml#expand_head0` | — |
 | `T.Reify.Sound` | normative | C | 08-meet-join.md | theorem-admitted | `middle_end/flambda2/types/reify.ml#reify` | — |
