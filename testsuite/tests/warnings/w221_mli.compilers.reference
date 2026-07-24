@@ -1,0 +1,5 @@
+File "w221_mli.mli", line 17, characters 18-34:
+17 | val useless : int [@@alert "-foo"]  (* useless: warning 221 *)
+                       ^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert foo,
+  but it did not suppress any occurrence of the alert.
