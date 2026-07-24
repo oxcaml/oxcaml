@@ -116,7 +116,10 @@ module Addressability = struct
       then Some []
       else
         match actual with
-        | Marked -> Some [to_string actual]
+        | Marked | Requires ->
+          (* Both print as the word [addressable]: the requirement is
+             written [any addressable]. *)
+          Some [to_string actual]
         | Flexible ->
           (* Display defaulting: an undetermined join prints like the plain
              base, with no suffix word. (Semantic operations must NOT
@@ -147,17 +150,15 @@ module Layout = struct
       match s with
       | Base b -> Static.of_base b sa a
       | Product consts ->
-        (* The addressability slot stays on the product root as an action: it
-           marks the product as a whole, not its components. A join slot
-           becomes an unmarked root deriving from join components, which
-           reads the same; an exact slot has exactly-plain components
-           ([Addressability.decomposed_component]). (The scannable axes are
-           pushed into the components, as before; they are ignored on
+        (* The addressability slot flattens per
+           [Addressability.flatten_slot]: the root keeps an action marking
+           the product as a whole, not its components. (The scannable axes
+           are pushed into the components, as before; they are ignored on
            non-scannable layouts anyway.) *)
-        let component_slot = Addressability.decomposed_component a in
+        let root_action, component_slot = Addressability.flatten_slot a in
         Product
           ( List.map (fun s -> of_sort_const s sa component_slot) consts,
-            Addressability.forget_join a )
+            root_action )
       | Univar uv -> Univar (uv, sa, a)
       | Genvar v -> Genvar (v, sa, a)
 
@@ -223,7 +224,10 @@ module Layout = struct
     let to_string t ~include_redundant_scannable_axes =
       let with_mark_suffix base (a : Addressability.t) =
         match a with
-        | Exact Addressable -> base ^ " " ^ Addressability.to_string a
+        | Exact Addressable | Requires_addressable ->
+          (* Both print as the word [addressable]: the requirement is
+             written [any addressable]. *)
+          base ^ " " ^ Addressability.Action.to_string Addressable
         | Exact Id | Join -> base
       in
       let rec to_string nested (t : t) =
@@ -327,17 +331,17 @@ module Layout = struct
         Sort (Base b, sa, a)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
       | Product sorts ->
-        (* The node's addressability slot stays on the product root as an
-           action. A join slot (a flexible variable's bound filled with a
-           product sort) becomes an unmarked root deriving from join
-           components, which reads the same; an exact slot has exactly-plain
-           components ([Addressability.decomposed_component]). *)
-        let component_slot = Addressability.decomposed_component a in
+        (* The node's addressability slot flattens per
+           [Addressability.flatten_slot]: the root keeps an action, so a
+           join becomes an unmarked root with join components (which reads
+           the same) and a requirement commits to the whole-marked form
+           (see the CR on [flatten_slot]). *)
+        let root_action, component_slot = Addressability.flatten_slot a in
         Product
           ( List.map
               (fun s -> flatten_sort s Scannable_axes.max component_slot)
               sorts,
-            Addressability.forget_join a )
+            root_action )
       | Univar x -> Sort (Univar x, sa, a)
     in
     function
@@ -368,11 +372,24 @@ module Layout = struct
      [Unmarked] - exactly the plain [x] - with the addressability of [x]
      itself still open. Equal kinds read equal marks: use this for the left
      of a subkind check and for equality. *)
+  (* The mark of a [Requires_addressable] slot: the requirement collapses
+     to [Marked] wherever the addressable kind at the sort is unique - at
+     any resolved base sort, and at always-addressable sorts (where every
+     kind is the one addressable kind). Only at unresolved sorts and
+     not-always-addressable product sorts does it stay a genuine bound. *)
+  let requirement_mark s : Addressability.Mark.t =
+    match Sort.get s with
+    | Base _ -> Marked
+    | Product _ ->
+      if Addressability.sort_is_always_addressable s then Marked else Requires
+    | Var _ | Univar _ -> Requires
+
   let rec mark : Sort.t t -> Addressability.Mark.t = function
     | Any (_, a) -> Addressability.Mark.of_action_on_undetermined a
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Exact Addressable -> Addressability.Mark.Marked
+      | Requires_addressable -> requirement_mark s
       | Exact Id | Join ->
         if Addressability.sort_is_always_addressable s
         then Marked
@@ -394,6 +411,9 @@ module Layout = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Exact Addressable -> Known_addressable
+      | Requires_addressable ->
+        (* Whatever the bound resolves to satisfies the requirement. *)
+        Known_addressable
       | Exact Id ->
         (* Unmarked: the verdict on the plain kind of the sort. *)
         Addressability.of_sort s
@@ -423,6 +443,7 @@ module Layout = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Exact Addressable | Join -> Addressability.Mark.of_slot a
+      | Requires_addressable -> requirement_mark s
       | Exact Id ->
         if Addressability.sort_is_always_addressable s
         then Marked
@@ -537,10 +558,11 @@ module Layout = struct
      root addressability, for intersections; [None] means the kinds are
      disjoint. Unlike [meet_root_scannable_axes] this handles [Product]s,
      whose root slots are meaningful. The meet is against the collapsed
-     [mark]: requiring addressability of an exactly-plain kind (a
-     stored [Id] slot on an unaddressable base, or a product of such kinds)
-     fails, while an undetermined kind (a join, or a product with
-     undetermined components) accepts the mark - even once its sort has
+     [mark]: requiring addressability of an exactly-plain kind (a stored
+     [Id] slot on an unaddressable base, or a product of such kinds) fails;
+     a flexible bound is narrowed to the requirement ([Requires] - NOT
+     committed to the whole-marked form: at a product sort the requirement
+     also admits the component-marked satisfiers), even once its sort has
      resolved, since sorts don't pin addressability. *)
   let meet_root_addressability t (a : Addressability.Action.t) =
     match a with
@@ -556,17 +578,19 @@ module Layout = struct
       | Sort (s, sa, _) ->
         Option.map
           (fun m -> Sort (s, sa, Addressability.Mark.to_slot m))
-          (Addressability.Mark.meet Marked (mark t))
+          (Addressability.Mark.meet Requires (mark t))
       | Product (ts, _) -> (
         match mark t with
-        | Marked ->
-          (* Already addressable (marked, or derived from the components);
-             in particular, don't turn a derived addressability into a
-             mark. *)
+        | Marked | Requires ->
+          (* Already (or required to be) addressable; in particular, don't
+             turn a derived addressability into a mark. *)
           Some t
         | Unmarked -> None
         | Flexible ->
-          (* Not yet determined: record the constraint as a mark. *)
+          (* Flexible components, and [Product] roots carry only an action:
+             record the constraint as a whole-product mark. CR rtjoa: this
+             residual commitment at [Product] nodes could be lifted by
+             giving their roots a third state, as for [flatten_slot]. *)
           Some (Product (ts, Addressability.Action.Addressable))))
 
   let sub t1 t2 =
@@ -703,12 +727,14 @@ module Layout = struct
       match decompose_sort sort ~arity:(List.length ts) ~slot:sslot with
       | None -> None
       | Some components -> (
-        (* Components before roots, as in [sub]. *)
+        (* Components before roots, as in [sub]. The sort side's root
+           flattens into the result's root action ([flatten_slot]; for a
+           requirement this commits, which only narrows the result). *)
         match
           intersect_products
             ~root_action:
               (Addressability.Action.compose pa
-                 (Addressability.forget_join sslot))
+                 (fst (Addressability.flatten_slot sslot)))
             ts components
         with
         | None -> None
@@ -773,8 +799,11 @@ module Layout = struct
        anyway. *)
     let addressable_words (a : Addressability.t) ~implied =
       match a with
-      | Exact Addressable when not implied -> [Addressability.to_string a]
-      | Exact _ | Join -> []
+      | (Exact Addressable | Requires_addressable) when not implied ->
+        (* Both print as the word [addressable]: the requirement is written
+           [any addressable]. *)
+        [Addressability.Action.to_string Addressable]
+      | Exact _ | Requires_addressable | Join -> []
     in
     let action_words (a : Addressability.Action.t) ~implied =
       addressable_words (Addressability.of_action_on_undetermined a) ~implied
@@ -2526,9 +2555,11 @@ module Const = struct
   let apply_addressable ?prior_annot ~warn env ~loc t =
     let t = Base_and_axes.fully_expand_aliases_const env t in
     let already_addressable =
-      Addressability.Mark.equal
-        (get_mark_of_fully_expanded t)
-        Addressability.Mark.Marked
+      (* [Requires] arises here from [any addressable]: marking it again is
+         as redundant as marking a marked kind. *)
+      match get_mark_of_fully_expanded t with
+      | Marked | Requires -> true
+      | Unmarked | Flexible -> false
     in
     if already_addressable
     then (
@@ -2817,6 +2848,11 @@ module Desc = struct
     | Sort (s, _, a) -> (
       match (a : Addressability.t) with
       | Exact Addressable -> Addressability.Mark.Marked
+      | Requires_addressable -> (
+        (* As [Layout.requirement_mark]: unique at any resolved base. *)
+        match s with
+        | Base _ -> Addressability.Mark.Marked
+        | Var _ | Genvar _ | Univar _ -> Addressability.Mark.Requires)
       | Exact Id | Join ->
         if flat_sort_is_always_addressable s
         then Addressability.Mark.Marked
@@ -2833,7 +2869,8 @@ module Desc = struct
         let sort_var_str = Fmt.asprintf "'s%d" (Sort.Var.get_print_number n) in
         let addressable_words =
           match (a : Addressability.t) with
-          | Exact Addressable -> [Addressability.to_string a]
+          | Exact Addressable | Requires_addressable ->
+            [Addressability.Action.to_string Addressable]
           | Exact Id | Join -> []
         in
         (Fmt.pp_print_list

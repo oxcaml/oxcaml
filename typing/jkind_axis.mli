@@ -74,10 +74,14 @@ end
       whole-product mark does not distribute); see [decomposed_component].
       [Join] denotes the *join* of the two exact forms - and, over a product
       sort, the top of the whole fiber of kinds at that sort: the marks are
-      unknown deeply through the components. [Join] arises only for flexible
-      bounds: a fresh sort variable's bound must admit every kind with whatever
-      sort the variable resolves to, and it persists after the variable
-      resolves, since resolving a sort determines none of the marks.
+      unknown deeply through the components. The remaining two slots occur only
+      on flexible BOUNDS, where they persist after the sort variable resolves
+      (resolving a sort determines none of the marks): [Join] is a fresh
+      variable's bound, admitting every kind at whatever sort the variable
+      resolves to, and [Requires_addressable] is such a bound constrained by
+      [any addressable], admitting every *addressable* kind at the sort - at a
+      base sort a single kind (the marked form), at a product sort several (the
+      whole-marked product and every all-components-addressable one).
 
     Readings of a kind are separate types, so that a raw stored slot cannot be
     compared without going through a reading: [Mark.t] answers how the kind
@@ -109,6 +113,7 @@ module Addressability : sig
 
   type t =
     | Exact of Action.t
+    | Requires_addressable
     | Join
 
   (** An alias for [t], for referring to the slot type from within [Mark]. *)
@@ -120,54 +125,67 @@ module Addressability : sig
   val equal : t -> t -> bool
 
   (** The slot a *flexible* sort-variable bound gets when an [any] bound's
-      action is transferred onto it: applying no action leaves the whole fiber
-      admitted ([Join]) - in contrast with a *rigid* bound (an lpoly layout
-      variable, which stands for one specific unknown layout), which transfers a
-      pending action exactly ([Exact]). *)
+      action is transferred onto it: no action leaves the whole fiber admitted
+      ([Join]); the [addressable] action becomes the requirement
+      ([Requires_addressable]) - in contrast with a *rigid* bound (an lpoly
+      layout variable, which stands for one specific unknown layout), which
+      transfers a pending action exactly ([Exact]). *)
   val of_action_on_undetermined : Action.t -> t
 
-  (** The action recorded in a [Sort] node's slot, forgetting the join. Used
-      when flattening a product sort into a [Product] node, whose root carries
-      only an action: the join, if any, moves onto the fabricated components
-      instead ([decomposed_component]). *)
-  val forget_join : t -> Action.t
+  (** The root action and component slot a [Sort] node's slot flattens to when
+      its resolved product sort becomes a [Product] node (whose root carries
+      only an action). Exact slots flatten exactly (exactly-plain components:
+      the whole-product mark does not distribute); a [Join] becomes an unmarked
+      root with join components, which reads the same; [Requires_addressable]
+      has no exact flattening and COMMITS to the whole-marked form at this
+      boundary (sound but incomplete; see the implementation's CR). *)
+  val flatten_slot : t -> Action.t * t
 
   (** The slot fabricated for the components of a decomposed sort-backed product
-      whose root slot is the argument: exact roots have exactly-plain
-      components, whether the whole is plain or whole-marked (the whole-product
-      mark does not distribute). Only the flexible [Join] leaves the components
+      whose root slot is the argument (the root itself stays on the [Sort] node,
+      unlike [flatten_slot]): exact roots have exactly-plain components, whether
+      the whole is plain or whole-marked (the whole-product mark does not
+      distribute); [Requires_addressable] and [Join] leave the components
       unconstrained. *)
   val decomposed_component : t -> t
 
-  (** Only [Addressable] is ever printed in user-facing output. *)
+  (** Only [Addressable] and [Requires_addressable]'s word are ever printed in
+      user-facing output; this [to_string] is for debugging. *)
   val to_string : t -> string
 
   val print : Format_doc.formatter -> t -> unit
 
   (** The result type of *mark* readings of a kind ([Jkind.Layout.mark]), which
       answer how the kind stands to whole-marking: [Marked] means the kind
-      equals its whole-marked form (marked outright, committed, or over a sort
-      where every form coincides), so marking it is a no-op; [Unmarked] means
-      its root is exactly unmarked and the kind is not known addressable, so it
-      is distinct from its whole-marked form and fails an [addressable]
-      requirement; [Flexible] means the root mark is flexible (a [Join] slot,
-      which may yet be committed). On a [Sort] node this is exactly which form
-      over the sort the kind is (any slot collapses to [Marked] once the sort
-      resolves intrinsically addressable); on an unmarked [Product] it is
-      derived from the components ([combine_product]). A mark reading of
-      [Unmarked] says nothing about whether the kind is addressable: the plain
-      form of a rigid layout variable [x] reads [Unmarked] - it is distinct from
-      [x addressable] *as polymorphic kinds* - while the addressability of [x]
-      itself stays open (that question is [Verdict.t], whose [Undetermined] is
-      epistemic where [Flexible] is constrainable).
+      equals its whole-marked form (marked outright, or over a sort where every
+      form coincides), so marking it is a no-op; [Unmarked] means its root is
+      exactly unmarked and the kind is not known addressable, so it is distinct
+      from its whole-marked form and fails an [addressable] requirement;
+      [Requires] means the kind is bounded by "some addressable kind at this
+      sort" (a [Requires_addressable] slot not collapsed by its sort);
+      [Flexible] means the root mark is flexible (a [Join] slot, which may yet
+      be constrained). On a [Sort] node this is exactly which position over the
+      sort the kind occupies (a slot collapses to [Marked] once the sort
+      resolves intrinsically addressable, and [Requires_addressable] collapses
+      to [Marked] at any resolved base sort, where the addressable kind is
+      unique); on an unmarked [Product] it is derived from the components
+      ([combine_product]). A mark reading of [Unmarked] says nothing about
+      whether the kind is addressable: the plain form of a rigid layout variable
+      [x] reads [Unmarked] - it is distinct from [x addressable] *as polymorphic
+      kinds* - while the addressability of [x] itself stays open (that question
+      is [Verdict.t], whose [Undetermined] is epistemic where [Flexible] is
+      constrainable).
 
-      As an order on marks this is flat and partial: [Marked] and [Unmarked] are
-      incomparable (the operator is a modifier, not a narrowing), and both are
-      below [Flexible]. Accordingly, [meet] is partial. *)
+      The order is [Marked <= Requires <= Flexible] and [Unmarked <= Flexible],
+      with [Unmarked] incomparable to [Marked] (the operator is a modifier, not
+      a narrowing) and to [Requires] (a not-known-addressable kind does not
+      satisfy the requirement). Accordingly, [meet] is the partial greatest
+      lower bound. *)
   module Mark : sig
     type t =
       | Marked
       | Unmarked
+      | Requires
       | Flexible
 
     (** The raw embedding: the mark a slot denotes verbatim. Readers apply the
@@ -176,7 +194,7 @@ module Addressability : sig
 
     (** Store a computed mark back as a slot, for the meets' write-back. Sound
         only because meets return marks that describe the written node exactly
-        (a meet of exact marks, or the flexible join). *)
+        (a meet of exact marks, the requirement, or the flexible join). *)
     val to_slot : t -> slot
 
     val equal : t -> t -> bool
@@ -185,16 +203,17 @@ module Addressability : sig
 
     val le : t -> t -> bool
 
-    (** The meet of [Marked] and [Unmarked] is nothing; [Flexible] is the
-        identity. *)
+    (** The partial greatest lower bound: [Marked]-vs-[Unmarked] and
+        [Requires]-vs-[Unmarked] have none; [Flexible] is the identity. *)
     val meet : t -> t -> t option
 
     (** The mark reading of an unmarked product from its components' readings:
-        [Marked] when every component reads [Marked] (whole-marking the product
-        is then a no-op), [Unmarked] when any component reads [Unmarked] (even
-        if others are marked: the product is then distinct from its whole-marked
-        form and not known addressable), and otherwise [Flexible]. This is not
-        the [meet] of the components. *)
+        [Marked] when every component reads [Marked] or [Requires]
+        (whole-marking the product is then a no-op at every resolution),
+        [Unmarked] when any component reads [Unmarked] (even if others are
+        marked: the product is then distinct from its whole-marked form and not
+        known addressable), and otherwise [Flexible]. This is not the [meet] of
+        the components. *)
     val combine_product : t list -> t
 
     (** Whether kinds with these marks are all addressable (equivalently,
@@ -203,12 +222,13 @@ module Addressability : sig
     val all_marked : t list -> bool
 
     (** The mark reading of an action stored on a node whose carrier's intrinsic
-        addressability is undetermined ([any] or an abstract kind): applying no
-        action leaves the mark undetermined. *)
+        addressability is undetermined ([any] or an abstract kind): the
+        [addressable] action bounds the kinds below by the requirement; applying
+        no action leaves the mark undetermined. *)
     val of_action_on_undetermined : Action.t -> t
 
-    (** Only [Marked] is ever printed in user-facing output (as
-        ["addressable"]). *)
+    (** Only [Marked] and [Requires] are ever printed in user-facing output
+        (both as the word ["addressable"]). *)
     val to_string : t -> string
   end
 

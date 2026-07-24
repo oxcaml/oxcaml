@@ -112,6 +112,7 @@ module Addressability : sig
 
   type t = Jkind_types.Addressability.t =
     | Exact of Action.t
+    | Requires_addressable
     | Join
 
   val of_action_on_undetermined : Action.t -> t
@@ -120,6 +121,7 @@ module Addressability : sig
     type t = Jkind_types.Addressability.Mark.t =
       | Marked
       | Unmarked
+      | Requires
       | Flexible
 
     val all_marked : t list -> bool

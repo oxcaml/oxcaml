@@ -1079,12 +1079,15 @@ module Layout = struct
      forms - over a product sort, the top of the whole fiber of kinds at
      that sort, the marks being unknown deeply through the components
      ([Addressability.decomposed_component] regenerates the join on each
-     fabricated component). The join persists after its variable resolves:
+     fabricated component). [Requires_addressable] is the BOUND admitting
+     every addressable kind at the sort ([any addressable]'s constraint on
+     a variable). Both bound slots persist after their variable resolves:
      sorts do not carry addressability, so filling the variable with [bits8]
-     leaves the kind the join of [bits8] and [bits8 addressable]. Readers
-     collapse any slot to [Mark.Marked] only when the resolved sort is
-     intrinsically addressable, where all forms denote the same kind (see
-     [Jkind.Layout.mark]).
+     leaves the join the join of [bits8] and [bits8 addressable]. Readers
+     collapse any slot to [Mark.Marked] when the resolved sort is
+     intrinsically addressable, where all forms denote the same kind, and
+     additionally collapse the requirement at any resolved base sort, where
+     the addressable kind is unique (see [Jkind.Layout.mark]).
 
      Construction discipline:
      - A fresh flexible BOUND - something that must admit every kind at
@@ -1108,20 +1111,22 @@ module Layout = struct
        [Exact Addressable] (e.g. [bits64 addressable] IS [bits64]); see
        [Const.Static.of_base].
      - A flexible variable constrained by [any addressable] gets
-       [Exact Addressable]. This is a COMMITMENT, in the same family as sort
-       defaulting: the variable's kind becomes exactly the marked kind of
-       whatever sort it resolves to. At a base sort this loses nothing
-       (there is exactly one addressable kind per unaddressable base), so
-       the commitment is complete there. At a product sort it is
-       deliberately incomplete: only the whole-marked product satisfies it,
-       and a component-marked product - a different, incomparable
-       addressable kind - is rejected (see
-       [Addressability.decomposed_component] and
-       testsuite/tests/typing-layouts-addressable/instantiate.ml). This
-       keeps every question the checker asks about an EXACT kind; asking
-       "is this some addressable kind at this sort?" would require a third
-       slot shape distinguishing the constraint from the mark, which can
-       recover the completeness at products if it is ever needed. *)
+       [Requires_addressable]: the bound admitting every ADDRESSABLE kind
+       at whatever sort the variable resolves to. At a base sort that is a
+       single kind - the marked form - and readers collapse the requirement
+       to [Exact Addressable] there ([Static.of_base] normalizes it away on
+       constants). At a product sort it genuinely admits several kinds (the
+       whole-marked product and every all-components-addressable one), so
+       e.g. a component-marked product satisfies [any addressable] (see
+       testsuite/tests/typing-layouts-addressable/regressions.ml). The
+       requirement is the one slot that is a BOUND rather than a position
+       in the fiber; it cannot be decomposed componentwise
+       ([Addressability.decomposed_component] gives its components the
+       join) and has no exact flattening
+       ([Addressability.flatten_slot] commits it to the whole-marked form
+       at the flatten/cmi boundary - the old commitment, now confined
+       there). Rigid [('b : x addressable)] bounds are unaffected: they
+       remain [Exact Addressable], exactly the whole-marked form of [x]. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t * Addressability.t
     | Product of 'sort t list * Addressability.Action.t
@@ -1408,6 +1413,12 @@ module Layout = struct
             | Bits32 ),
             ((Exact Addressable | Join) as a) ) ->
           Base (b, Scannable_axes.max, a)
+        | ( ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+            | Bits32 ),
+            Requires_addressable ) ->
+          (* At a base sort the addressable kind is unique - the marked
+             form - so the requirement collapses to it. *)
+          Base (b, Scannable_axes.max, Exact Addressable)
     end
 
     let of_sort s sa a =
@@ -1417,18 +1428,16 @@ module Layout = struct
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa a)
         | Product sorts ->
-          let component_slot = Addressability.decomposed_component a in
+          let root_action, component_slot = Addressability.flatten_slot a in
           Option.map
-            (fun x -> Product (x, Addressability.forget_join a))
+            (fun x -> Product (x, root_action))
             (* [Sort.get] is deep, so no need to repeat it here *)
             (* The sort product doesn't constrain the components' scannable
                axes, so they get [Scannable_axes.max]. The addressability
-               slot stays on the product root as an action: it marks the
-               product as a whole, not its components. A join slot (a
-               flexible variable's bound later filled with a product sort)
-               becomes an unmarked root deriving from join components, which
-               reads the same; an exact slot has exactly-plain components
-               ([Addressability.decomposed_component]). *)
+               slot flattens per [Addressability.flatten_slot]: exact slots
+               exactly, a join to an unmarked root with join components
+               (which reads the same), and a requirement by committing to
+               the whole-marked form (see the CR on [flatten_slot]). *)
             (Misc.Stdlib.List.map_option
                (fun s -> of_sort s Scannable_axes.max component_slot)
                sorts)

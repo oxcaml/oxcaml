@@ -151,6 +151,7 @@ module Addressability = struct
 
   type t =
     | Exact of Action.t
+    | Requires_addressable
     | Join
 
   type slot = t
@@ -158,20 +159,47 @@ module Addressability = struct
   let equal a1 a2 =
     match a1, a2 with
     | Exact a1, Exact a2 -> Action.equal a1 a2
+    | Requires_addressable, Requires_addressable -> true
     | Join, Join -> true
-    | (Exact _ | Join), _ -> false
+    | (Exact _ | Requires_addressable | Join), _ -> false
 
   let of_action_on_undetermined : Action.t -> t = function
     | Id -> Join
-    | Addressable -> Exact Addressable
+    | Addressable -> Requires_addressable
 
-  let forget_join : t -> Action.t = function Exact a -> a | Join -> Id
+  (* The root action and component slot a [Sort] node's slot flattens to
+     when its (resolved) product sort becomes a [Product] node, whose root
+     carries only an action. Exact slots flatten exactly: the whole-kind
+     form becomes the root action with exactly-plain components (the
+     whole-product mark does not distribute). A [Join] becomes an unmarked
+     root with join components, which reads the same.
+     [Requires_addressable] has no exact flattening (neither the
+     whole-marked nor the component-marked satisfier determines the
+     components), so it COMMITS to the whole-marked form at this boundary -
+     sound (the bound only shrinks) but incomplete, exactly as the
+     pre-[Requires_addressable] design was everywhere. CR rtjoa: give
+     [Product] roots a third state to preserve the requirement across
+     flattening and cmi round trips. *)
+  let flatten_slot : t -> Action.t * t = function
+    | Exact a -> a, Exact Id
+    | Requires_addressable -> Addressable, Exact Id
+    | Join -> Id, Join
 
+  (* The slot fabricated for the components of a decomposed sort-backed
+     product whose root slot is the argument (the root itself stays on the
+     [Sort] node, unlike [flatten_slot]): exact roots have exactly-plain
+     components; a required-addressable root does not constrain the
+     components (the whole-marked satisfier has plain components, the
+     component-marked one has marked components); a join leaves them
+     unconstrained too. *)
   let decomposed_component : t -> t = function
     | Exact _ -> Exact Id
-    | Join -> Join
+    | Requires_addressable | Join -> Join
 
-  let to_string = function Exact a -> Action.to_string a | Join -> "join"
+  let to_string = function
+    | Exact a -> Action.to_string a
+    | Requires_addressable -> "requires_addressable"
+    | Join -> "join"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 
@@ -179,6 +207,7 @@ module Addressability = struct
     type t =
       | Marked
       | Unmarked
+      | Requires
       | Flexible
 
     (* The raw embedding: the mark a slot denotes verbatim. Readers apply
@@ -186,48 +215,73 @@ module Addressability = struct
     let of_slot : slot -> t = function
       | Exact Addressable -> Marked
       | Exact Id -> Unmarked
+      | Requires_addressable -> Requires
       | Join -> Flexible
 
     (* Store a computed mark back as a slot, for the meets' write-back.
        Sound only because meets return marks that describe the written
-       node exactly (a meet of exact marks, or the join). *)
+       node exactly (a meet of exact marks, the requirement, or the
+       join). *)
     let to_slot : t -> slot = function
       | Marked -> Exact Addressable
       | Unmarked -> Exact Id
+      | Requires -> Requires_addressable
       | Flexible -> Join
 
     let equal m1 m2 =
       match m1, m2 with
-      | Marked, Marked | Unmarked, Unmarked | Flexible, Flexible -> true
-      | (Marked | Unmarked | Flexible), _ -> false
+      | Marked, Marked
+      | Unmarked, Unmarked
+      | Requires, Requires
+      | Flexible, Flexible ->
+        true
+      | (Marked | Unmarked | Requires | Flexible), _ -> false
 
+    (* The order: [Marked <= Requires <= Flexible] and
+       [Unmarked <= Flexible], with [Unmarked] incomparable to the other
+       two ([Marked] because the operator is a modifier, not a narrowing;
+       [Requires] because a not-known-addressable kind does not satisfy the
+       requirement). *)
     let less_or_equal m1 m2 : Misc.Le_result.t =
       match m1, m2 with
-      | Marked, Marked | Unmarked, Unmarked | Flexible, Flexible -> Equal
-      | (Marked | Unmarked), Flexible -> Less
-      | Flexible, (Marked | Unmarked) | Marked, Unmarked | Unmarked, Marked ->
+      | Marked, Marked
+      | Unmarked, Unmarked
+      | Requires, Requires
+      | Flexible, Flexible ->
+        Equal
+      | Marked, Requires | (Marked | Unmarked | Requires), Flexible -> Less
+      | Marked, Unmarked
+      | Unmarked, (Marked | Requires)
+      | Requires, (Marked | Unmarked)
+      | Flexible, (Marked | Unmarked | Requires) ->
         Not_le
 
     let le m1 m2 = Misc.Le_result.is_le (less_or_equal m1 m2)
 
+    (* The greatest lower bound where one exists ([Marked] and [Unmarked],
+       and [Requires] and [Unmarked], have none). *)
     let meet m1 m2 =
       match m1, m2 with
       | Flexible, m | m, Flexible -> Some m
-      | Marked, Marked -> Some Marked
+      | Marked, (Marked | Requires) | Requires, Marked -> Some Marked
+      | Requires, Requires -> Some Requires
       | Unmarked, Unmarked -> Some Unmarked
-      | Marked, Unmarked | Unmarked, Marked -> None
+      | (Marked | Requires), Unmarked | Unmarked, (Marked | Requires) -> None
 
     let combine_product ts =
       (* Combines component mark readings into an unmarked product's mark
          reading; see the .mli. Note that the implicit order here ([Marked]
          absorbed by [Flexible] absorbed by [Unmarked]) is not the subkind
-         order, under which [Marked] and [Unmarked] are incomparable. *)
+         order, under which [Marked] and [Unmarked] are incomparable. A
+         [Requires] component counts as [Marked]: whatever it resolves to
+         is addressable, so whole-marking the product is a no-op either
+         way. *)
       List.fold_left
         (fun acc t ->
           match acc, t with
           | Unmarked, _ | _, Unmarked -> Unmarked
           | Flexible, _ | _, Flexible -> Flexible
-          | Marked, Marked -> Marked)
+          | (Marked | Requires), (Marked | Requires) -> Marked)
         Marked ts
 
     (* Whether kinds with these marks are all addressable - equivalently,
@@ -235,17 +289,22 @@ module Addressability = struct
        them would be a no-op. *)
     let all_marked ts =
       List.for_all
-        (fun t -> match t with Marked -> true | Unmarked | Flexible -> false)
+        (fun t ->
+          match t with
+          | Marked | Requires -> true
+          | Unmarked | Flexible -> false)
         ts
 
     let of_action_on_undetermined : Action.t -> t = function
       | Id -> Flexible
-      | Addressable -> Marked
+      | Addressable -> Requires
 
-    (* Only [Marked] is ever printed in user-facing output. *)
+    (* Only [Marked] and [Requires] are ever printed in user-facing output
+       (both as the word [addressable]). *)
     let to_string = function
       | Marked -> "addressable"
       | Unmarked -> "unmarked"
+      | Requires -> "addressable"
       | Flexible -> "flexible"
   end
 

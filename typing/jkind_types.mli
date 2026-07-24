@@ -151,6 +151,7 @@ module Addressability : sig
 
   type t = Jkind_axis.Addressability.t =
     | Exact of Action.t
+    | Requires_addressable
     | Join
 
   type slot = t
@@ -159,7 +160,7 @@ module Addressability : sig
 
   val of_action_on_undetermined : Action.t -> t
 
-  val forget_join : t -> Action.t
+  val flatten_slot : t -> Action.t * t
 
   val decomposed_component : t -> t
 
@@ -171,6 +172,7 @@ module Addressability : sig
     type t = Jkind_axis.Addressability.Mark.t =
       | Marked
       | Unmarked
+      | Requires
       | Flexible
 
     val of_slot : slot -> t
