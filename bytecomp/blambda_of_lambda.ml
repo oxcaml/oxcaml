@@ -954,7 +954,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
     | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
     | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")

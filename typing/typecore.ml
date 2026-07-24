@@ -259,7 +259,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_access of Longident.t
   | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -1323,43 +1322,22 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-(* Does this record representation permit atomic field usage? *)
-let allows_atomic_field_usage = function
-  | Record_boxed -> true
-  | Record_inlined (_tag, ctor_repres, _variant_repres) -> (
-      match ctor_repres with
-      | Constructor_uniform_value -> true
-      | Constructor_mixed _ -> false
-      (* At this point, we should know the constructor representation. *)
-      | Constructor_variable -> false)
-  (* Reads/writes of atomic record fields are currently only supported for
-     labels whose logical offset matches the physical field position. To support
-     mixed records, we will add atomic primitives to lambda that consider mixed
-     block field reordering. *)
-  | Record_mixed _ -> false
-  (* The remaining cases should be unreachable. *)
-  (* [@@unboxed] already prohibits mutable (and therefore atomic) fields. *)
+let check_atomic_loc ~loc ~env record_repres mutability lid =
+  if not (Types.is_atomic mutability) then
+    raise (Error (loc, env, Label_not_atomic lid));
+  match record_repres with
+  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
+  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
+      raise (Error (loc, env, Mixed_record_atomic_loc lid))
+  (* We should know constructor representation at this point. *)
+  | Record_inlined (_, Constructor_variable, _)
+  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
-  (* [@atomic] fields disable the float record optimization. *)
+  (* [@atomic] fields disable float record optimization. *)
   | Record_float | Record_ufloat
-  (* At this point, we should know the record representation. *)
+  (* We should know record representation at this point. *)
   | Record_dummy _ | Record_variable ->
-      false
-
-(* CR-soon jkerrigan: simplify after we allow access of atomic fields in mixed
-   records. *)
-type atomic_field_use = Access | Loc
-
-(* Raises if we try to use an atomic field from a mixed record. *)
-let check_atomic_field_usage ~usage ~loc ~env record_repres mutability lid =
-  if Types.is_atomic mutability && not (allows_atomic_field_usage record_repres)
-  then
-    let err =
-      match usage with
-      | Access -> Mixed_record_atomic_access lid
-      | Loc -> Mixed_record_atomic_loc lid
-    in
-    raise (Error (loc, env, err))
+      Misc.fatal_error "check_atomic_loc: unexpected record representation"
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -7511,8 +7489,6 @@ and type_expect_
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
-      check_atomic_field_usage ~usage:Access ~loc:record.exp_loc ~env
-        record_repres label.lbl_mut lid.txt;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
@@ -7642,8 +7618,6 @@ and type_expect_
           ~why:Field_assignment
           ~containing_type:ty_record
       in
-      check_atomic_field_usage ~usage:Access ~loc ~env record_repres
-        label.lbl_mut lid.txt;
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8547,11 +8521,8 @@ and type_expect_
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
-          check_atomic_field_usage ~usage:Loc ~loc:record.exp_loc ~env
-            record_repres label.lbl_mut lid.txt;
           Env.mark_label_used Env.Projection label.lbl_uid;
-          if (not (Types.is_atomic label.lbl_mut))
-          then raise (Error (loc, env, Label_not_atomic lid.txt));
+          check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -13029,11 +13000,6 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
-  | Mixed_record_atomic_access lid ->
-      Location.errorf ~loc
-        "Accessing atomic fields (here %a) of mixed records is not yet@ \
-         supported."
-        quoted_longident lid
   | Mixed_record_atomic_loc lid ->
       Location.errorf ~loc
         "Use of %a with mixed record fields (here %a) is forbidden."

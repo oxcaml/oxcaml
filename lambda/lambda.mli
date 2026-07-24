@@ -365,7 +365,17 @@ type primitive =
   (* Atomic operations. Note that these operations must not be used on fields of
      all-float blocks. *)
   | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_load_mixed_field of {
+    index : int;
+    (** The field being accessed. Like [Pmixedfield]'s path, this is an index
+        into [shape] -- not a field index. *)
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_compare_exchange_field of
     { immediate_or_pointer : immediate_or_pointer }
@@ -683,6 +693,9 @@ val layout_of_extern_repr : extern_repr -> layout
 val element_layout_of_array_kind : array_kind -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
+
+val strip_locality_mode :
+  mixed_block_shape_with_locality_mode -> mixed_block_shape
 
 type structured_constant =
     Const_base of constant

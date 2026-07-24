@@ -853,7 +853,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                           \ present for float field read")
               shape
           in
-          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
+          if Types.is_atomic lbl.lbl_mut then
+            (* Patomic_load_mixed_field doesn't care about locality mode;
+               [@@flatten_floats] doesn't accept records with atomic fields. *)
+            let shape = strip_locality_mode shape in
+            Some
+              (Patomic_load_mixed_field { index = lbl.lbl_pos; shape }, [targ])
+          else
+            Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
@@ -967,8 +974,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let shape = Lambda.transl_mixed_product_shape shape in
           (* Update the shape with details for the modified field. *)
           shape.(lbl.lbl_pos) <- field_shape;
-          Psetmixedfield([lbl.lbl_pos], shape, mode),
-          [arg_lambda; newval_lambda]
+          if Types.is_atomic lbl.lbl_mut then
+            (Patomic_set_mixed_field { index = lbl.lbl_pos; shape },
+            [arg_lambda; newval_lambda])
+          else
+            (Psetmixedfield([lbl.lbl_pos], shape, mode),
+            [arg_lambda; newval_lambda])
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"

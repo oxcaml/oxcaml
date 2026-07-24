@@ -554,7 +554,8 @@ and fracture_prim lambda prim args loc =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
+  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
