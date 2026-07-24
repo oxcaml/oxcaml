@@ -45,6 +45,7 @@ let mk_no_ocamlcfg f =
   ("-no-ocamlcfg", Arg.Unit f, " Do not use ocamlcfg (deprecated, does nothing)")
 
 let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
+let mk_dssa f = ("-dssa", Arg.Unit f, " (undocumented)")
 
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
@@ -404,6 +405,59 @@ let mk_caml_apply_inline_fast_path f =
     Arg.Unit f,
     " Inline the fast path of caml_applyN" )
 
+let mk_use_ssa f =
+  ("-use-ssa", Arg.Unit f, " Use SSA intermediate representation (EXPERIMENTAL)")
+
+let mk_no_use_ssa f =
+  ("-no-use-ssa", Arg.Unit f, " Disable SSA intermediate representation")
+
+let mk_ssa_simplify f =
+  ( "-ssa-simplify",
+    Arg.Unit f,
+    " Run the SSA simplification pass (EXPERIMENTAL)" )
+
+let mk_no_ssa_simplify f =
+  ("-no-ssa-simplify", Arg.Unit f, " Disable the SSA simplification pass")
+
+let mk_ssa_bounds_check_elim f =
+  ( "-ssa-bounds-check-elim",
+    Arg.Unit f,
+    " Eliminate provably-redundant array bounds checks in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
+let mk_ssa_strength_reduce f =
+  ( "-ssa-strength-reduce",
+    Arg.Unit f,
+    " Strength-reduce derived induction variables in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
+let mk_ssa_lftr f =
+  ( "-ssa-lftr",
+    Arg.Unit f,
+    " Linear-function test replacement: retire loop counters in favour of \
+     derived induction variables, where non-overflow is provable from \
+     dominating guards (EXPERIMENTAL)" )
+
+let mk_ssa_delete_empty_loops f =
+  ( "-ssa-delete-empty-loops",
+    Arg.Unit f,
+    " Delete terminating loops whose body does no observable work in the SSA \
+     pipeline (EXPERIMENTAL)" )
+
+let mk_ssa_fuse_loops f =
+  ( "-ssa-fuse-loops",
+    Arg.Unit f,
+    " Fuse chains of adjacent reversing list-map loops in the SSA pipeline \
+     (EXPERIMENTAL)" )
+
+let mk_ssa_validate f =
+  ( "-ssa-validate",
+    Arg.Unit f,
+    " Validate the SSA pipeline by comparing against the legacy CFG" )
+
+let mk_no_ssa_validate f =
+  ("-no-ssa-validate", Arg.Unit f, " Disable SSA pipeline validation")
+
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
     Arg.Unit f,
@@ -634,6 +688,22 @@ let mk_no_flambda2_backend_cse_at_toplevel f =
       " Do not apply the backend CSE pass to\n\
       \     module initializers%s (Flambda 2 only)"
       (format_not_default Flambda2.Default.backend_cse_at_toplevel) )
+
+let mk_flambda2_peel_loopified f =
+  ( "-flambda2-peel-loopified",
+    Arg.Unit f,
+    Printf.sprintf
+      " Peel the first iteration of loops arising from\n\
+      \     loopified tail-recursive functions%s (Flambda 2 only)"
+      (format_default Flambda2.Default.peel_loopified) )
+
+let mk_no_flambda2_peel_loopified f =
+  ( "-no-flambda2-peel-loopified",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not peel the first iteration of loops arising\n\
+      \     from loopified tail-recursive functions%s (Flambda 2 only)"
+      (format_not_default Flambda2.Default.peel_loopified) )
 
 let mk_flambda2_cse_depth f =
   ( "-flambda2-cse-depth",
@@ -1283,6 +1353,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
+  val dssa : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -1348,6 +1419,17 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_bounds_check_elim : unit -> unit
+  val ssa_strength_reduce : unit -> unit
+  val ssa_lftr : unit -> unit
+  val ssa_delete_empty_loops : unit -> unit
+  val ssa_fuse_loops : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1382,6 +1464,8 @@ module type Oxcaml_options = sig
   val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
   val flambda2_backend_cse_at_toplevel : unit -> unit
   val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_peel_loopified : unit -> unit
+  val no_flambda2_peel_loopified : unit -> unit
   val flambda2_cse_depth : int -> unit
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit
@@ -1468,6 +1552,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
+      mk_dssa F.dssa;
       mk_dcfg_invariants F.dcfg_invariants;
       mk_regalloc F.regalloc;
       mk_regalloc_linscan_threshold F.regalloc_linscan_threshold;
@@ -1538,6 +1623,17 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dbranch_relaxation_max_displacement
         F.dbranch_relaxation_max_displacement;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
+      mk_use_ssa F.use_ssa;
+      mk_no_use_ssa F.no_use_ssa;
+      mk_ssa_simplify F.ssa_simplify;
+      mk_no_ssa_simplify F.no_ssa_simplify;
+      mk_ssa_bounds_check_elim F.ssa_bounds_check_elim;
+      mk_ssa_strength_reduce F.ssa_strength_reduce;
+      mk_ssa_lftr F.ssa_lftr;
+      mk_ssa_delete_empty_loops F.ssa_delete_empty_loops;
+      mk_ssa_fuse_loops F.ssa_fuse_loops;
+      mk_ssa_validate F.ssa_validate;
+      mk_no_ssa_validate F.no_ssa_validate;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -1579,6 +1675,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_backend_cse_at_toplevel F.flambda2_backend_cse_at_toplevel;
       mk_no_flambda2_backend_cse_at_toplevel
         F.no_flambda2_backend_cse_at_toplevel;
+      mk_flambda2_peel_loopified F.flambda2_peel_loopified;
+      mk_no_flambda2_peel_loopified F.no_flambda2_peel_loopified;
       mk_flambda2_cse_depth F.flambda2_cse_depth;
       mk_flambda2_join_depth F.flambda2_join_depth;
       mk_flambda2_reaper F.flambda2_reaper;
@@ -1785,6 +1883,7 @@ module Oxcaml_options_impl = struct
   let ocamlcfg () = ()
   let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
+  let dssa = set' Oxcaml_flags.dump_ssa
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
 
@@ -1958,6 +2057,17 @@ module Oxcaml_options_impl = struct
   let caml_apply_inline_fast_path =
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
+  let use_ssa = set' Oxcaml_flags.use_ssa
+  let no_use_ssa () = Oxcaml_flags.use_ssa := false
+  let ssa_simplify = set' Oxcaml_flags.ssa_simplify
+  let no_ssa_simplify () = Oxcaml_flags.ssa_simplify := false
+  let ssa_bounds_check_elim = set' Oxcaml_flags.ssa_bounds_check_elim
+  let ssa_strength_reduce = set' Oxcaml_flags.ssa_strength_reduce
+  let ssa_lftr = set' Oxcaml_flags.ssa_lftr
+  let ssa_delete_empty_loops = set' Oxcaml_flags.ssa_delete_empty_loops
+  let ssa_fuse_loops = set' Oxcaml_flags.ssa_fuse_loops
+  let ssa_validate = set' Oxcaml_flags.ssa_validate
+  let no_ssa_validate () = Oxcaml_flags.ssa_validate := false
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
@@ -2027,6 +2137,8 @@ module Oxcaml_options_impl = struct
   let no_flambda2_backend_cse_at_toplevel =
     clear Flambda2.backend_cse_at_toplevel
 
+  let flambda2_peel_loopified = set Flambda2.peel_loopified
+  let no_flambda2_peel_loopified = clear Flambda2.peel_loopified
   let flambda2_cse_depth n = Flambda2.cse_depth := Oxcaml_flags.Set n
   let flambda2_join_depth n = Flambda2.join_depth := Oxcaml_flags.Set n
   let flambda2_reaper = set Flambda2.enable_reaper
@@ -2374,6 +2486,14 @@ module Extra_params = struct
       true
     in
     match name with
+    | "use-ssa" -> set' Oxcaml_flags.use_ssa
+    | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
+    | "ssa-bounds-check-elim" -> set' Oxcaml_flags.ssa_bounds_check_elim
+    | "ssa-strength-reduce" -> set' Oxcaml_flags.ssa_strength_reduce
+    | "ssa-lftr" -> set' Oxcaml_flags.ssa_lftr
+    | "ssa-delete-empty-loops" -> set' Oxcaml_flags.ssa_delete_empty_loops
+    | "ssa-fuse-loops" -> set' Oxcaml_flags.ssa_fuse_loops
+    | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
@@ -2576,6 +2696,7 @@ module Extra_params = struct
     | "flambda2-unbox-along-intra-function-control-flow" ->
         set Flambda2.unbox_along_intra_function_control_flow
     | "flambda2-backend-cse-at-toplevel" -> set Flambda2.backend_cse_at_toplevel
+    | "flambda2-peel-loopified" -> set Flambda2.peel_loopified
     | "flambda2-cse-depth" -> set_int Flambda2.cse_depth
     | "flambda2-join-depth" -> set_int Flambda2.join_depth
     | "flambda2-expert-inline-effects-in-cmm" ->

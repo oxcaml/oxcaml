@@ -65,6 +65,10 @@
 
 (copy_files# backend/cfg/*.ml{,i})
 
+(copy_files# backend/ssa/*.ml{,i})
+
+(copy_files# backend/ssa/loop/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -125,7 +129,8 @@
    ; -47 needed because [@inline available] is not recognized by the system compiler
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
    ((action
@@ -188,6 +193,7 @@
   zero_alloc_annotations
   doubly_linked_list
   file_sections
+  id_counter
   lru
   ;; PARSING
   location
@@ -208,7 +214,7 @@
   ast_invariants
   depend
   parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+               ;; TYPING
   ident
   path
   current_unit
@@ -374,7 +380,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon)
  (modules
   ;; bytecomp/
@@ -416,7 +423,8 @@
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlcommon flambda2)
  (modules jsmaindriver jscompile jslibrarian))
 
@@ -518,10 +526,7 @@
  (package ocaml))
 
 (install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
+ (files Makefile.build_config Makefile.config_if_required Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -534,7 +539,8 @@
  (flags
   (:standard -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (modules_without_implementation
@@ -645,6 +651,7 @@
   cfg
   cfg_available_regs
   cfg_colours
+  cfg_compare
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -702,6 +709,32 @@
   ;; file_formats/
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa_intf
+  ssa
+  ssa_print
+  ssa_validate
+  ssa_reducer
+  ssa_simplify
+  ssa_tail_call
+  ssa_dominators
+  ssa_of_cmm
+  cfg_of_ssa
+  ;; backend/ssa/loop/
+  fourier_motzkin
+  affine_expr
+  loop_comparisons
+  loop_chains
+  natural_loop
+  induction_var
+  affine_ssa
+  termination
+  dead_induction_var
+  delete_empty_loops
+  bounds_check_elim
+  strength_reduction
+  lftr
+  loop_fusion
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
@@ -770,7 +803,8 @@
    ; remove -w -67 by adding the camlinternalMenhirLib hack like the Makefile
    ))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
   (backend bisect_ppx))
  (libraries
@@ -829,14 +863,11 @@
   (backend bisect_ppx))
  ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
  ; to be built against the system compiler, which won't work.
- (ocamlc_flags (:standard -I +unix unix.cma))
- (ocamlopt_flags (:standard -I +unix unix.cmxa))
- (libraries
-  flambda2
-  flambda2_ui
-  flambda2_to_cmm
-  ocamloptcomp
-  ocamlcommon)
+ (ocamlc_flags
+  (:standard -I +unix unix.cma))
+ (ocamlopt_flags
+  (:standard -I +unix unix.cmxa))
+ (libraries flambda2 flambda2_ui flambda2_to_cmm ocamloptcomp ocamlcommon)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
@@ -1026,8 +1057,7 @@
    backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files
    backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
   (glob_files
    backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti})

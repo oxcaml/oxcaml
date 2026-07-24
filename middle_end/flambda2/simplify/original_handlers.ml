@@ -18,7 +18,8 @@ type t =
       { invariant_params : Bound_parameters.t;
         lifted_params : Lifted_cont_params.t;
         continuation_handlers : One_recursive_handler.t Continuation.Lmap.t;
-        can_be_lifted : bool
+        can_be_lifted : bool;
+        first_iteration_peeled : bool
       }
   | Non_recursive of Non_recursive_handler.t
 
@@ -26,7 +27,7 @@ let[@ocamlformat "disable"] print ppf t =
   match t with
   | Non_recursive non_rec_handler ->
     Non_recursive_handler.print ppf non_rec_handler
-  | Recursive { invariant_params; lifted_params; continuation_handlers; can_be_lifted; } ->
+  | Recursive { invariant_params; lifted_params; continuation_handlers; can_be_lifted; first_iteration_peeled = _; } ->
     Format.fprintf ppf "@[<hov 1>(
         @[<hv 1>(can_be_lifted@ %b)@]@ \
         @[<hv 1>(invariant params@ %a)@]@ \
@@ -40,9 +41,14 @@ let[@ocamlformat "disable"] print ppf t =
       continuation_handlers
 
 let create_recursive ~invariant_params ~lifted_params ~continuation_handlers
-    ~can_be_lifted =
+    ~can_be_lifted ~first_iteration_peeled =
   Recursive
-    { invariant_params; lifted_params; continuation_handlers; can_be_lifted }
+    { invariant_params;
+      lifted_params;
+      continuation_handlers;
+      can_be_lifted;
+      first_iteration_peeled
+    }
 
 let create_non_recursive non_rec_handler = Non_recursive non_rec_handler
 

@@ -101,7 +101,13 @@ and non_recursive_let_cont_handler =
 
 and recursive_let_cont_handlers_t0 =
   { handlers : continuation_handlers_t0;
-    body : expr
+    body : expr;
+    first_iteration_peeled : bool
+        (** [true] once loop peeling (see [Simplify_let_cont]) has spliced a
+            copy of the first iteration ahead of this recursive continuation
+            group, so that the peeling transformation fires at most once per
+            loop and does not unroll it without bound across simplifier rounds.
+        *)
   }
 
 and recursive_let_cont_handlers =
@@ -249,10 +255,11 @@ and apply_renaming_non_recursive_let_cont_handler
   let handler' = apply_renaming_continuation_handler handler renaming in
   { handler = handler'; continuation_and_body = continuation_and_body' }
 
-and apply_renaming_recursive_let_cont_handlers_t0 { handlers; body } renaming =
+and apply_renaming_recursive_let_cont_handlers_t0
+    { handlers; body; first_iteration_peeled } renaming =
   let handlers' = apply_renaming_continuation_handlers handlers renaming in
   let body' = apply_renaming body renaming in
-  { handlers = handlers'; body = body' }
+  { handlers = handlers'; body = body'; first_iteration_peeled }
 
 and apply_renaming_recursive_let_cont_handlers t renaming =
   Name_abstraction.apply_renaming
@@ -424,7 +431,8 @@ and ids_for_export_non_recursive_let_cont_handler
   in
   Ids_for_export.union handler_ids continuation_and_body_ids
 
-and ids_for_export_recursive_let_cont_handlers_t0 { handlers; body } =
+and ids_for_export_recursive_let_cont_handlers_t0
+    { handlers; body; first_iteration_peeled = _ } =
   let body_ids = ids_for_export body in
   let handlers_ids = ids_for_export_continuation_handlers handlers in
   Ids_for_export.union body_ids handlers_ids
@@ -688,7 +696,7 @@ and print_let_cont_expr ppf t =
         (module Bound_continuations)
         handlers
         ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
-        ~f:(fun _ { body; handlers } ->
+        ~f:(fun _ { body; handlers; first_iteration_peeled = _ } ->
           Name_abstraction.pattern_match_for_printing
             (module Bound_parameters)
             handlers
@@ -1241,7 +1249,8 @@ module Recursive_let_cont_handlers = struct
   module T1 = struct
     type t = recursive_let_cont_handlers_t0
 
-    let create ~body handlers = { handlers; body }
+    let create ~body ~first_iteration_peeled handlers =
+      { handlers; body; first_iteration_peeled }
 
     let apply_renaming = apply_renaming_recursive_let_cont_handlers_t0
 
@@ -1253,18 +1262,28 @@ module Recursive_let_cont_handlers = struct
 
   type t = recursive_let_cont_handlers
 
-  let create ~body ~invariant_params handlers =
+  let create ~body ~invariant_params ~first_iteration_peeled handlers =
     let bound = Continuation_handlers.domain handlers in
-    let handlers0 = T1.create ~body (A0.create invariant_params handlers) in
+    let handlers0 =
+      T1.create ~body ~first_iteration_peeled
+        (A0.create invariant_params handlers)
+    in
     let conts = Bound_continuations.create bound in
     A1.create conts handlers0
 
   let pattern_match t ~f =
     let open A1 in
-    let<> _, { body; handlers } = t in
+    let<> _, { body; handlers; first_iteration_peeled = _ } = t in
     let open! A0 in
     let<> invariant_params, handlers = handlers in
     f ~invariant_params ~body handlers
+
+  (* [first_iteration_peeled] does not depend on the bound continuations, so it
+     can be read out from under the abstraction without freshening. *)
+  let first_iteration_peeled t =
+    let open A1 in
+    let<> _, { body = _; handlers = _; first_iteration_peeled } = t in
+    first_iteration_peeled
 
   let pattern_match_pair t1 t2 ~f =
     A1.pattern_match_pair t1 t2
@@ -1668,12 +1687,14 @@ module Let_cont_expr = struct
 
   let create_non_liftable = create_non_recursive0 ~can_be_lifted:false
 
-  let create_recursive ~invariant_params handlers ~body =
+  let create_recursive ?(first_iteration_peeled = false) ~invariant_params
+      handlers ~body =
     if Continuation_handlers.contains_exn_handler handlers
     then Misc.fatal_error "Exception-handling continuations cannot be recursive";
     Expr.create_let_cont
       (Recursive
-         (Recursive_let_cont_handlers.create ~invariant_params handlers ~body))
+         (Recursive_let_cont_handlers.create ~invariant_params handlers ~body
+            ~first_iteration_peeled))
 
   let apply_renaming = apply_renaming_let_cont_expr
 end

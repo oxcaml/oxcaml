@@ -31,6 +31,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics : unit -> unit
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
+  val dssa : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -96,6 +97,17 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_bounds_check_elim : unit -> unit
+  val ssa_strength_reduce : unit -> unit
+  val ssa_lftr : unit -> unit
+  val ssa_delete_empty_loops : unit -> unit
+  val ssa_fuse_loops : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -130,6 +142,8 @@ module type Oxcaml_options = sig
   val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
   val flambda2_backend_cse_at_toplevel : unit -> unit
   val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_peel_loopified : unit -> unit
+  val no_flambda2_peel_loopified : unit -> unit
   val flambda2_cse_depth : int -> unit
   val flambda2_join_depth : int -> unit
   val flambda2_reaper : unit -> unit

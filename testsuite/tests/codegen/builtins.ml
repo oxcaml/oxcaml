@@ -580,8 +580,8 @@ do_prefetch_write_low:
 let do_pause () = Builtins.pause_hint ()
 [%%expect_asm X86_64{|
 do_pause:
-  movl  $1, %eax
   pause
+  movl  $1, %eax
   ret
 |}]
 
@@ -769,8 +769,8 @@ let ptr_cas_int (p : nativeint#) old_v new_v =
 [%%expect_asm X86_64{|
 ptr_cas_int:
   movq  %rax, %rsi
-  movq  %rbx, %rax
   sarq  $1, %rdi
+  movq  %rbx, %rax
   sarq  $1, %rax
   lock cmpxchgq %rdi, (%rsi)
   sete  %al
@@ -788,9 +788,8 @@ let ptr_fetch_add_int64 (p : nativeint#) (v : int64#) =
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 ptr_fetch_add_int64:
-  movq  %rax, %rdi
+  lock xaddq %rbx, (%rax)
   movq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -800,10 +799,10 @@ let ptr_fetch_sub_int64 (p : nativeint#) (v : int64#) =
        (Nativeint_u.to_nativeint p) (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int64:
-  movq  %rax, %rdi
-  xorl  %eax, %eax
-  subq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
+  xorl  %edi, %edi
+  subq  %rbx, %rdi
+  lock xaddq %rdi, (%rax)
+  movq  %rdi, %rax
   ret
 |}]
 
@@ -876,9 +875,8 @@ let ptr_fetch_add_nativeint (p : nativeint#) (v : nativeint#) =
        (Nativeint_u.to_nativeint v))
 [%%expect_asm X86_64{|
 ptr_fetch_add_nativeint:
-  movq  %rax, %rdi
+  lock xaddq %rbx, (%rax)
   movq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -889,10 +887,10 @@ let ptr_fetch_sub_nativeint (p : nativeint#) (v : nativeint#) =
        (Nativeint_u.to_nativeint v))
 [%%expect_asm X86_64{|
 ptr_fetch_sub_nativeint:
-  movq  %rax, %rdi
-  xorl  %eax, %eax
-  subq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
+  xorl  %edi, %edi
+  subq  %rbx, %rdi
+  lock xaddq %rdi, (%rax)
+  movq  %rdi, %rax
   ret
 |}]
 
@@ -1063,12 +1061,11 @@ let ext_cas_int (p : Builtins.ext_pointer) old_v new_v =
   Builtins.ext_pointer_cas_int p old_v new_v
 [%%expect_asm X86_64{|
 ext_cas_int:
-  movq  %rax, %rsi
-  movq  %rbx, %rax
   sarq  $1, %rdi
-  sarq  $1, %rax
-  leaq  -1(%rsi), %rbx
-  lock cmpxchgq %rdi, (%rbx)
+  sarq  $1, %rbx
+  leaq  -1(%rax), %rsi
+  movq  %rbx, %rax
+  lock cmpxchgq %rdi, (%rsi)
   sete  %al
   movzbq %al, %rax
   salq  $1, %rax
@@ -1083,10 +1080,9 @@ let ext_fetch_add_int64
        p (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 ext_fetch_add_int64:
-  movq  %rax, %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
-  leaq  -1(%rdi), %rbx
-  lock xaddq %rax, (%rbx)
+  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -1110,10 +1106,9 @@ let ext_fetch_add_nativeint
        p (Nativeint_u.to_nativeint v))
 [%%expect_asm X86_64{|
 ext_fetch_add_nativeint:
-  movq  %rax, %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
-  leaq  -1(%rdi), %rbx
-  lock xaddq %rax, (%rbx)
+  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -1140,11 +1135,10 @@ let bs_fetch_add_int64
        bs pos (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 bs_fetch_add_int64:
-  movq  %rax, %rsi
-  movq  %rdi, %rax
   sarq  $1, %rbx
-  movq  8(%rsi), %rdi
-  addq  %rdi, %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  movq  %rdi, %rax
   lock xaddq %rax, (%rbx)
   ret
 |}]
@@ -1169,13 +1163,12 @@ let bs_cas_int
   Builtins.bigstring_cas_int bs pos old_v new_v
 [%%expect_asm X86_64{|
 bs_cas_int:
-  movq  %rax, %rdx
-  movq  %rdi, %rax
   sarq  $1, %rsi
-  sarq  $1, %rax
+  sarq  $1, %rdi
   sarq  $1, %rbx
-  movq  8(%rdx), %rdi
-  addq  %rdi, %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  movq  %rdi, %rax
   lock cmpxchgq %rsi, (%rbx)
   sete  %al
   movzbq %al, %rax
@@ -1192,11 +1185,10 @@ let bs_cas_int64
     (Int64_u.to_int64 new_v)
 [%%expect_asm X86_64{|
 bs_cas_int64:
-  movq  %rax, %rdx
-  movq  %rdi, %rax
   sarq  $1, %rbx
-  movq  8(%rdx), %rdi
-  addq  %rdi, %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  movq  %rdi, %rax
   lock cmpxchgq %rsi, (%rbx)
   sete  %al
   movzbq %al, %rax

@@ -1,5 +1,5 @@
 let code f_0 deleted in
-let code loopify(never) size(31) newer_version_of(f_0)
+let code loopify(never) size(42) newer_version_of(f_0)
       f_0_1 (x : imm tagged, init : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -11,7 +11,10 @@ let code loopify(never) size(31) newer_version_of(f_0)
     where k2 =
       let prim_1 = %untag_imm (x) in
       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
-      (cont k2 (0L, init)
+      ((let prim_2 = %int_comp.`int64`.le (1L, for_stop_naked) in
+        switch prim_2
+          | 0 -> k (init)
+          | 1 -> k2 (1L, init))
          where rec k2 (for_counter_naked : int64, m_unboxed0 : imm tagged) =
            let prim_2 = %num_conv.[`int64`].[`imm`] (for_counter_naked) in
            let i = %tag_imm (prim_2) in

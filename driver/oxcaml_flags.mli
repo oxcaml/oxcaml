@@ -17,6 +17,7 @@
 (** OxCaml specific command line flags *)
 
 val dump_cfg : bool ref
+val dump_ssa : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
@@ -106,6 +107,22 @@ val long_frames_threshold : int ref
 val branch_relaxation_max_displacement : int ref
 val caml_apply_inline_fast_path : bool ref
 
+val use_ssa : bool ref
+
+val ssa_simplify : bool ref
+
+val ssa_bounds_check_elim : bool ref
+
+val ssa_strength_reduce : bool ref
+
+val ssa_lftr : bool ref
+
+val ssa_delete_empty_loops : bool ref
+
+val ssa_fuse_loops : bool ref
+
+val ssa_validate : bool ref
+
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
@@ -145,6 +162,7 @@ module Flambda2 : sig
     val join_points : bool
     val unbox_along_intra_function_control_flow : bool
     val backend_cse_at_toplevel : bool
+    val peel_loopified : bool
     val cse_depth : int
     val join_depth : int
     val join_algorithm : join_algorithm
@@ -168,6 +186,7 @@ module Flambda2 : sig
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
     backend_cse_at_toplevel : bool;
+    peel_loopified : bool;
     cse_depth : int;
     join_depth : int;
     join_algorithm : join_algorithm;
@@ -191,6 +210,7 @@ module Flambda2 : sig
   val join_points : bool or_default ref
   val unbox_along_intra_function_control_flow : bool or_default ref
   val backend_cse_at_toplevel : bool or_default ref
+  val peel_loopified : bool or_default ref
   val cse_depth : int or_default ref
   val join_depth : int or_default ref
   val join_algorithm : join_algorithm or_default ref

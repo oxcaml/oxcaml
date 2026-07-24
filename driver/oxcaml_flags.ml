@@ -14,6 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
+let dump_ssa = ref false                (* -dssa *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -134,6 +135,22 @@ let branch_relaxation_max_displacement =
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
+let use_ssa = ref true                       (* -use-ssa *)
+
+let ssa_simplify = ref true                 (* -ssa-simplify *)
+
+let ssa_validate = ref true                 (* -ssa-validate *)
+
+let ssa_bounds_check_elim = ref false       (* -ssa-bounds-check-elim *)
+
+let ssa_strength_reduce = ref false         (* -ssa-strength-reduce *)
+
+let ssa_lftr = ref false                    (* -ssa-lftr *)
+
+let ssa_delete_empty_loops = ref false      (* -ssa-delete-empty-loops *)
+
+let ssa_fuse_loops = ref false              (* -ssa-fuse-loops *)
+
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
@@ -182,6 +199,7 @@ module Flambda2 = struct
     let join_points = false
     let unbox_along_intra_function_control_flow = true
     let backend_cse_at_toplevel = false
+    let peel_loopified = false
     let cse_depth = 2
     let join_depth = 5
     let join_algorithm = Binary
@@ -202,6 +220,7 @@ module Flambda2 = struct
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
     backend_cse_at_toplevel : bool;
+    peel_loopified : bool;
     cse_depth : int;
     join_depth : int;
     join_algorithm : join_algorithm;
@@ -222,6 +241,7 @@ module Flambda2 = struct
     join_points = Default.join_points;
     unbox_along_intra_function_control_flow = Default.unbox_along_intra_function_control_flow;
     backend_cse_at_toplevel = Default.backend_cse_at_toplevel;
+    peel_loopified = Default.peel_loopified;
     cse_depth = Default.cse_depth;
     join_depth = Default.join_depth;
     join_algorithm = Default.join_algorithm;
@@ -270,6 +290,7 @@ module Flambda2 = struct
   let join_points = ref Default
   let unbox_along_intra_function_control_flow = ref Default
   let backend_cse_at_toplevel = ref Default
+  let peel_loopified = ref Default
   let cse_depth = ref Default
   let join_depth = ref Default
   let join_algorithm = ref Default

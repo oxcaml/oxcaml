@@ -116,6 +116,19 @@ and float_operation =
 
 val equal_specific_operation : specific_operation -> specific_operation -> bool
 
+(** If [op] computes [disp + sum_i coeff.(i) * arg.(i)] exactly from its
+    integer register arguments, return [Some (coeff, disp)] with one
+    coefficient per argument; otherwise [None]. *)
+val specific_operation_as_affine :
+  specific_operation -> (int array * int) option
+
+(** If [op] is a fused integer multiply-add/sub of its register arguments,
+    return [Some (m0, m1, a, negate)] meaning it computes
+    [(if negate then - else +) (arg.(m0) * arg.(m1)) + arg.(a)]; otherwise
+    [None]. (amd64 has no such operation, so this is always [None].) *)
+val specific_operation_as_muladd :
+  specific_operation -> (int * int * int * bool) option
+
 val big_endian : bool
 
 val size_addr : int
