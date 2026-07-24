@@ -240,7 +240,7 @@ module Flambda2 = struct
 
   let oclassic = {
     default with
-    classic_mode = true;
+
     backend_cse_at_toplevel = false;
   }
 
@@ -345,6 +345,8 @@ module Flambda2 = struct
 
     let oclassic = {
       default with
+      max_unboxing_depth = 0;
+      max_function_simplify_run = 1;
       fallback_inlining_heuristic = true;
       shorten_symbol_names = true;
     }
