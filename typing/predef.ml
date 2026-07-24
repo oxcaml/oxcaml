@@ -574,6 +574,18 @@ and ident_some = ident_create "Some"
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
 
+let all_predef_constrs = [
+  ident_false;
+  ident_true;
+  ident_void;
+  ident_nil;
+  ident_cons;
+  ident_none;
+  ident_some;
+  ident_null;
+  ident_this;
+]
+
 let option_argument_sort = Jkind_types.Sort.Const.scannable
 let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
@@ -1240,8 +1252,13 @@ let add_runtime_metaprogramming_types add_type env =
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) env metaprogramming_extension_type_constrs
 
-let builtin_values =
+let builtin_exns =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns
+
+let builtin_constrs =
+  List.map (fun id -> (Ident.name id, id)) all_predef_constrs
+
+let builtin_values = builtin_exns
 
 let builtin_idents = List.rev !builtin_idents
 

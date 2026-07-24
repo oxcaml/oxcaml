@@ -1037,45 +1037,7 @@ module Identifier = struct
       let+ t = t in
       CDot (t, s)
 
-    let false_ = CBuiltin "false" |> mk
-
-    let true_ = CBuiltin "true" |> mk
-
-    let void = CBuiltin "()" |> mk
-
-    let nil = CBuiltin "[]" |> mk
-
-    let cons = CBuiltin "::" |> mk
-
-    let none = CBuiltin "None" |> mk
-
-    let some = CBuiltin "Some" |> mk
-
-    let match_failure = CBuiltin "Match_failure" |> mk
-
-    let out_of_memory = CBuiltin "Out_of_memory" |> mk
-
-    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
-
-    let invalid_argument = CBuiltin "Invalid_argument" |> mk
-
-    let failure = CBuiltin "Failure" |> mk
-
-    let not_found = CBuiltin "Not_found" |> mk
-
-    let sys_error = CBuiltin "Sys_error" |> mk
-
-    let end_of_file = CBuiltin "End_of_file" |> mk
-
-    let division_by_zero = CBuiltin "Division_by_zero" |> mk
-
-    let stack_overflow = CBuiltin "Stack_overflow" |> mk
-
-    let sys_blocked_io = CBuiltin "Sys_blocked_io" |> mk
-
-    let assert_failure = CBuiltin "Assert_failure" |> mk
-
-    let undefined_recursive_module = CBuiltin "Undefined_recursive_module" |> mk
+    let builtin name = CBuiltin name |> mk
   end
 
   module Field = struct

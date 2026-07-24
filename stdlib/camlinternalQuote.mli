@@ -150,45 +150,7 @@ module Identifier : sig
 
     val dot : Module.t -> string -> t
 
-    val false_ : t
-
-    val true_ : t
-
-    val void : t
-
-    val nil : t
-
-    val cons : t
-
-    val none : t
-
-    val some : t
-
-    val match_failure : t
-
-    val out_of_memory : t
-
-    val out_of_fibers : t
-
-    val invalid_argument : t
-
-    val failure : t
-
-    val not_found : t
-
-    val sys_error : t
-
-    val end_of_file : t
-
-    val division_by_zero : t
-
-    val stack_overflow : t
-
-    val sys_blocked_io : t
-
-    val assert_failure : t
-
-    val undefined_recursive_module : t
+    val builtin : string -> t
   end
 
   module Field : sig

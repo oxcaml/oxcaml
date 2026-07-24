@@ -369,6 +369,8 @@ val or_null_jkind : Types.type_expr -> Types.jkind_l
 
 val builtin_values: (string * Ident.t) list
 val builtin_idents: (string * Ident.t) list
+val builtin_exns: (string * Ident.t) list
+val builtin_constrs: (string * Ident.t) list
 val builtin_type_constrs: (string * Ident.t) list
 
 (** All predefined exceptions, exposed as [Ident.t] for flambda (for
