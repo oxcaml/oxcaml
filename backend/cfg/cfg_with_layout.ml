@@ -43,6 +43,8 @@ let create cfg ~layout = { cfg; layout; sections = Hashtbl.create 3 }
 
 let cfg t = t.cfg
 
+let with_cfg t cfg = { t with cfg }
+
 let layout t = t.layout
 
 let label_set_of_layout : layout -> Label.Set.t =
@@ -72,7 +74,7 @@ let assign_blocks_to_section t labels name =
       | Some new_name ->
         Misc.fatal_errorf
           "Cannot add %a->%s section mapping, already have %a->%s" Label.format
-          label name Label.format label new_name ()
+          label name Label.format label new_name
       | None -> Hashtbl.replace t.sections label name)
     labels
 
@@ -88,24 +90,39 @@ let remove_blocks t labels_to_remove =
     Cfg.remove_blocks t.cfg labels_to_remove;
     (* remove from layout *)
     let num_removed = ref 0 in
-    try
-      DLL.iter_cell t.layout ~f:(fun cell ->
-          if !num_removed = num_to_remove then raise Found_all;
-          let l = DLL.value cell in
-          if Label.Set.mem l labels_to_remove
-          then (
-            DLL.delete_curr cell;
-            incr num_removed))
-    with Found_all -> ())
+    (try
+       DLL.iter_cell t.layout ~f:(fun cell ->
+           if !num_removed = num_to_remove then raise Found_all;
+           let l = DLL.value cell in
+           if Label.Set.mem l labels_to_remove
+           then (
+             DLL.delete_curr cell;
+             incr num_removed))
+     with Found_all -> ());
+    if !num_removed <> num_to_remove
+    then
+      Misc.fatal_errorf
+        "Cfg_with_layout.remove_blocks: %d block(s) to remove were not found \
+         in the layout"
+        (num_to_remove - !num_removed);
+    (* remove from the section table, which is also keyed by label *)
+    Label.Set.iter
+      (fun label -> Hashtbl.remove t.sections label)
+      labels_to_remove)
 
 let add_block t (block : Cfg.basic_block) ~after =
   match
     DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
   with
   | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell ->
+  | Some cell -> (
     DLL.insert_after cell block.start;
-    Cfg.add_block_exn t.cfg block
+    Cfg.add_block_exn t.cfg block;
+    (* The new block inherits the section of the [after] block, so that the
+       section table remains total on blocks when sections are in use. *)
+    match Hashtbl.find_opt t.sections after with
+    | None -> ()
+    | Some section_name -> Hashtbl.replace t.sections block.start section_name)
 
 let is_trap_handler t label =
   let block = Cfg.get_block_exn t.cfg label in
@@ -405,27 +422,40 @@ let insert_block :
   let successors =
     match only_successor with
     | None -> Cfg.successor_labels ~normal:true ~exn:false predecessor_block
-    | Some only_successor -> Label.Set.singleton only_successor.start
+    | Some only_successor ->
+      if
+        not
+          (Label.Set.mem only_successor.start
+             (Cfg.successor_labels ~normal:true ~exn:false predecessor_block))
+      then
+        Misc.fatal_errorf
+          "Cannot insert a block between block %a and block %a: the latter is \
+           not a normal successor of the former"
+          Label.print predecessor_block.start Label.print only_successor.start;
+      Label.Set.singleton only_successor.start
   in
   if Label.Set.cardinal successors = 0
   then
     Misc.fatal_errorf
       "Cannot insert a block after block %a: it has no successors" Label.print
       predecessor_block.start;
-  let dbg, fdo, live, stack_offset, available_before, available_across =
+  let dbg, fdo, live, available_before, available_across =
     match DLL.last body with
     | None ->
       ( Debuginfo.none,
         Fdo_info.none,
         Reg.Set.empty,
-        predecessor_block.terminator.stack_offset,
         Reg_availability_set.Unreachable,
         Reg_availability_set.Unreachable )
-    | Some
-        { dbg; fdo; live; stack_offset; available_before; available_across; _ }
-      ->
-      dbg, fdo, live, stack_offset, available_before, available_across
+    | Some { dbg; fdo; live; available_before; available_across; _ } ->
+      dbg, fdo, live, available_before, available_across
   in
+  (* The inserted blocks sit on edges out of [predecessor_block], so the offset
+     after their body must be the offset at the edge, i.e. at the predecessor's
+     terminator. (An instruction's [stack_offset] field is the offset before the
+     instruction executes, so the last body instruction's field would be wrong
+     whenever that instruction changes the offset.) *)
+  let stack_offset = predecessor_block.terminator.stack_offset in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
     { i with id = InstructionId.get_and_incr cfg.next_instruction_id }
   in
@@ -463,7 +493,7 @@ let insert_block :
             };
           (* The [predecessor_block] is the only predecessor. *)
           predecessors = Label.Set.singleton predecessor_block.start;
-          stack_offset = predecessor_block.terminator.stack_offset;
+          stack_offset;
           exn = None;
           can_raise = false;
           is_trap_handler = false;
