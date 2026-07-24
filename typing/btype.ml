@@ -1052,34 +1052,6 @@ module Jkind0 = struct
 
     let[@inline] is_max m = m = max
 
-    let get_max_axes t =
-      let[@inline] add_if b ax axis_set =
-        if b then Jkind_axis.Axis_set.add axis_set ax else axis_set
-      in
-      let[@inline] add_crossing_if ax axis_set =
-        if
-          Crossing.Per_axis.(
-            (le [@inlined hint]) ax ((max [@inlined hint]) ax)
-              ((Crossing.proj [@inlined hint]) ax (crossing t)))
-        then Jkind_axis.Axis_set.add axis_set (Jkind_axis.Axis.Modal ax)
-        else axis_set
-      in
-      let open Crossing.Axis in
-      Jkind_axis.Axis_set.empty
-      |> add_crossing_if (Comonadic Areality)
-      |> add_crossing_if (Comonadic Linearity)
-      |> add_crossing_if (Monadic Uniqueness)
-      |> add_crossing_if (Comonadic Portability)
-      |> add_crossing_if (Monadic Contention)
-      |> add_crossing_if (Comonadic Forkable)
-      |> add_crossing_if (Comonadic Yielding)
-      |> add_crossing_if (Comonadic Statefulness)
-      |> add_crossing_if (Monadic Visibility)
-      |> add_crossing_if (Monadic Staticity)
-      |> add_if
-           (Externality.le Externality.max (externality t))
-           (Jkind_axis.Axis.Nonmodal Jkind_axis.Axis.Nonmodal.Externality)
-
     let for_arrow =
       let crossing =
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true

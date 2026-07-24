@@ -522,6 +522,34 @@ module Mod_bounds = struct
     | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
     | Nonmodal Externality -> externality t
 
+  (** Get all axes that are set to max *)
+  let get_max_axes t =
+    let[@inline] add_if b ax axis_set =
+      if b then Axis_set.add axis_set ax else axis_set
+    in
+    let[@inline] add_crossing_if ax axis_set =
+      if
+        Crossing.Per_axis.(
+          (le [@inlined hint]) ax ((max [@inlined hint]) ax)
+            ((Crossing.proj [@inlined hint]) ax (crossing t)))
+      then Axis_set.add axis_set (Modal ax)
+      else axis_set
+    in
+    Axis_set.empty
+    |> add_crossing_if (Comonadic Areality)
+    |> add_crossing_if (Comonadic Linearity)
+    |> add_crossing_if (Monadic Uniqueness)
+    |> add_crossing_if (Comonadic Portability)
+    |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Comonadic Forkable)
+    |> add_crossing_if (Comonadic Yielding)
+    |> add_crossing_if (Comonadic Statefulness)
+    |> add_crossing_if (Monadic Visibility)
+    |> add_crossing_if (Monadic Staticity)
+    |> add_if
+         (Externality.le Externality.max (externality t))
+         (Nonmodal Externality)
+
   let to_mode_crossing t = crossing t
 end
 
@@ -1168,36 +1196,6 @@ module Base_and_axes = struct
             No_with_bounds,
             { ctl with fuel_status = Sufficient_fuel } )
         | (ty, ti) :: bs -> (
-          let join_bounds b1 b2 ~relevant_axes =
-            let value_for_axis (type a) ~(axis : a Axis.t) : a =
-              if Axis_set.mem relevant_axes axis
-              then
-                (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
-                  (Mod_bounds.get ~axis b2)
-              else Mod_bounds.get ~axis b1
-            in
-            let monadic =
-              Mod_bounds.Crossing.Monadic.create
-                ~uniqueness:(value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-                ~contention:(value_for_axis ~axis:(Modal (Monadic Contention)))
-                ~visibility:(value_for_axis ~axis:(Modal (Monadic Visibility)))
-                ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
-            in
-            let comonadic =
-              Mod_bounds.Crossing.Comonadic.create
-                ~regionality:(value_for_axis ~axis:(Modal (Comonadic Areality)))
-                ~linearity:(value_for_axis ~axis:(Modal (Comonadic Linearity)))
-                ~portability:
-                  (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
-                ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-                ~statefulness:
-                  (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
-            in
-            let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
-            Mod_bounds.create crossing
-              ~externality:(value_for_axis ~axis:(Nonmodal Externality))
-          in
           (* Map the type's info before expanding the type *)
           let ti =
             match map_type_info with
@@ -1225,6 +1223,41 @@ module Base_and_axes = struct
                thereby avoid doing the work of expanding it. *)
             loop ctl bounds_so_far relevant_axes bs
           | false -> (
+            let join_bounds b1 b2 ~relevant_axes =
+              let value_for_axis (type a) ~(axis : a Axis.t) : a =
+                if Axis_set.mem relevant_axes axis
+                then
+                  (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
+                    (Mod_bounds.get ~axis b2)
+                else Mod_bounds.get ~axis b1
+              in
+              let monadic =
+                Mod_bounds.Crossing.Monadic.create
+                  ~uniqueness:
+                    (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
+                  ~contention:
+                    (value_for_axis ~axis:(Modal (Monadic Contention)))
+                  ~visibility:
+                    (value_for_axis ~axis:(Modal (Monadic Visibility)))
+                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
+              in
+              let comonadic =
+                Mod_bounds.Crossing.Comonadic.create
+                  ~regionality:
+                    (value_for_axis ~axis:(Modal (Comonadic Areality)))
+                  ~linearity:
+                    (value_for_axis ~axis:(Modal (Comonadic Linearity)))
+                  ~portability:
+                    (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
+                  ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
+                  ~statefulness:
+                    (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+              in
+              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
+              Mod_bounds.create crossing
+                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
+            in
             match get_desc ty with
             | Tmod (ty, mod_bounds) ->
               let axes_not_constrained_by_mod =

@@ -1041,9 +1041,8 @@ let rec copy_spine copy_scope ty =
   | Tquote_eval _
   | Tof_kind _
   | Tbox _ -> ty
-  | Tmod _
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
-    | Tconstr _ ) as desc ->
+    | Tconstr _ | Tmod _ ) as desc ->
       let level = get_level ty in
       if level < !current_level || level = generic_level then ty else
       let t =
@@ -2808,8 +2807,7 @@ let unbox_once env ty =
       { ty = instance_poly_for_jkind univars ty
       ; modality = Mode.Modality.Const.id
       ; or_null = None }
-  | Tmod (ty, _) ->
-    Stepped { ty; modality = Mode.Modality.Const.id; or_null = None }
+  | Tmod _ -> Misc.fatal_error "Ctype.unbox_once: Tmod"
   | _ -> Final_result
 
 let contained_without_boxing env ty =

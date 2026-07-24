@@ -190,6 +190,10 @@ and type_desc =
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
 
   | Tmod of type_expr * mod_bounds
+  (** [Tmod (t, bounds)] ==> [t @@ bounds]
+      The type [t] with its mode crossing bounded by [bounds]. This only
+      appears inside the with-bounds of a jkind; every other context fails
+      loudly on it. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
