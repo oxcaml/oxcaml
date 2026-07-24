@@ -201,7 +201,7 @@ let rec eval_slam ctx env slam : value Or_missing.t =
     let slv_comptime = eval_slam ctx env sval_comptime in
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
-  | SLlayout layout -> Present (SLVlayout layout)
+  | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
   | SLglobal cu ->
     begin match ctx.cu_static_data cu with Some v -> v | None -> Missing
     end
@@ -224,12 +224,12 @@ let rec eval_slam ctx env slam : value Or_missing.t =
     Present
       (SLVclosure
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
+  | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
       eval_slam ctx env sapp_func |> expect_not_missing |> expect Tclosure
     in
     let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
+    let args = Array.map eval_arg sapp_args in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
       Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
@@ -344,6 +344,10 @@ and eval_lam_shallow ctx env lam =
       eval_slam ctx env slam |> expect_not_missing |> expect Thalves
     in
     halves.slv_runtime
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -399,8 +403,8 @@ and eval_mixed_block_element :
  fun env element ->
   match element with
   | Splice_variable id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
+    eval_var env id |> expect_not_missing |> expect Tlayout
+    |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -412,9 +416,7 @@ and eval_mixed_block_element :
 
 and eval_layout env layout =
   match layout with
-  | Psplicevar id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout
+  | Psplicevar id -> eval_var env id |> expect_not_missing |> expect Tlayout
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -639,7 +641,9 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval ctx slam =

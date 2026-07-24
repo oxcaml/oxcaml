@@ -182,7 +182,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
-  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -246,7 +246,7 @@ let rec layout ppf lay_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
-  | Psplicevar id -> fprintf ppf "$%a" Ident.print id
+  | Psplicevar id -> fprintf ppf "$%a" Slambdaident.print id
 
 let layout_annotation ppf lay_ =
   match lay_ with
@@ -286,7 +286,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
-  | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
+  | Psplicevar id -> fprintf ppf ": $%a@ " Slambdaident.print id
 
 let locality_kind = function
   | Alloc_heap -> ""
@@ -345,7 +345,7 @@ let rec mixed_block_element
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
-  | Splice_variable id -> fprintf ppf "$%a" Ident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -1443,10 +1443,40 @@ let rec lam ppf = function
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->
-      fprintf ppf "$(%a)" slam slambda
+      fprintf ppf "$%a" slam slambda
+  | Lkindtemplate {ktmpl_params; ktmpl_return; ktmpl_body; ktmpl_mode;
+                   ktmpl_env; ktmpl_loc = _} ->
+      let pr_env ppf env =
+        fprintf ppf "{@[";
+        Ident.Map.iter
+          (fun id (l, layout) ->
+            match l with
+            | Lvar id2 when Ident.same id id2 ->
+              fprintf ppf "@,%a%a;" Ident.print id layout_annotation layout
+            | _ ->
+              fprintf ppf "@,%a=%a%a;"
+                Ident.print id layout_annotation layout lam l)
+          env;
+        fprintf ppf "@]}"
+      in
+      let pr_params ppf params =
+        List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
+      in
+      fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a%a)@]"
+        (locality_kind ktmpl_mode)
+        pr_env ktmpl_env
+        pr_params ktmpl_params
+        return_kind (ktmpl_mode, ktmpl_return)
+        lam ktmpl_body
+  | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
+                      kinst_mode = _; kinst_loc = _} ->
+      let lams ppf largs =
+        List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
+      fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
+        lam kinst_func lams kinst_args
 
 and slam ppf = function
-  | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
+  | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
   | SLglobal cu ->
     fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
   | SLvar id -> Slambdaident.print ppf id
@@ -1459,12 +1489,12 @@ and slam ppf = function
   | SLfield (container, field) ->
     fprintf ppf "%a.%i" slam container field
   | SLhalves { sval_comptime; sval_runtime } ->
-    fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
+    fprintf ppf "@[<hv>@[<2>{ c =@ %a@]@,@[<2>; r =@ ⟪%a⟫@] }@]"
       slam sval_comptime lam sval_runtime
   | SLproj_comptime value -> fprintf ppf "%a.c" slam value
-  | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
+  | SLtemplate func -> slambda_function ppf func
   | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
-  | SLlet _ as slet ->
+  | SLlet { slet_body = SLlet _ } as slet ->
     let rec letbody ~sp = function
     | SLlet { slet_name; slet_value; slet_body} ->
         if sp then fprintf ppf "@ ";
@@ -1475,16 +1505,19 @@ and slam ppf = function
     fprintf ppf "@[<2>(let@ @[<hv 1>(";
     let expr = letbody ~sp:false slet in
     fprintf ppf ")@]@ %a)@]" slam expr
+  | SLlet { slet_name; slet_value; slet_body } ->
+    fprintf ppf "@[<2>(@[<2>let (%a =@ %a)@]@ %a)@]"
+      Slambdaident.print slet_name slam slet_value slam slet_body
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
     Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) sfun_params
   in
-  fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
+  fprintf ppf "@[<2>(template @[<2>%t->@]@ %a)@]" print_params slam sfun_body
 
-and slambda_apply ppf { sapp_func; sapp_arguments } =
+and slambda_apply ppf { sapp_func; sapp_args } =
   let print_args ppf =
-    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_arguments
+    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_args
   in
   fprintf ppf "@[<2>%a%t@]" slam sapp_func print_args
 
@@ -1524,7 +1557,6 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
   fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
     (locality_kind mode) pr_params params
     function_attribute attr return_kind (ret_mode, return) lam body
-
 
 let structured_constant = struct_const
 

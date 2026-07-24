@@ -55,42 +55,98 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Library of string * library_infos
 
   (* CR mshinwell: This should not be raising errors from [Linkenv] *)
-  let read_file obj_name =
-    let file_name =
-      try Load_path.find obj_name
-      with Not_found -> raise (Linkenv.Error (File_not_found obj_name))
+  let read_file requested_filename =
+    let resolved_pathname =
+      try Load_path.find requested_filename
+      with Not_found ->
+        raise (Linkenv.Error (File_not_found requested_filename))
     in
-    if Filename.check_suffix file_name Backend.ext_flambda_obj
+    (* The kind of a link input is normally determined by the extension of
+       [resolved_pathname]. However, when [requested_filename] is resolved
+       through a manifest entry (see [-I-manifest]), the resolved path need not
+       retain the extension (manifests may map filenames to e.g.
+       content-addressed paths), so we also consult the extension of
+       [requested_filename]. *)
+    let has_suffix ext =
+      Filename.check_suffix resolved_pathname ext
+      || Filename.check_suffix requested_filename ext
+    in
+    if has_suffix Backend.ext_flambda_obj
     then
       (* This is a cmx file. It must be linked in any case. Read the infos to
          see which modules it requires. *)
       let info, crc =
         Profile.record_call ~accumulate:true "link/scan/read_cmx" (fun () ->
-            read_unit_info file_name)
+            read_unit_info resolved_pathname)
       in
-      Unit (file_name, info, crc)
-    else if Filename.check_suffix file_name Backend.ext_flambda_lib
+      Unit (resolved_pathname, info, crc)
+    else if has_suffix Backend.ext_flambda_lib
     then
       let infos =
         try
           Profile.record_call ~accumulate:true "link/scan/read_cmxa" (fun () ->
-              read_library_info file_name)
+              read_library_info resolved_pathname)
         with Compilenv.Error (Not_a_unit_info filename) ->
           raise (Linkenv.Error (Not_an_object_file filename))
       in
-      Library (file_name, infos)
-    else raise (Linkenv.Error (Not_an_object_file file_name))
+      Library (resolved_pathname, infos)
+    else raise (Linkenv.Error (Not_an_object_file resolved_pathname))
 
-  let scan_file linkenv ~shared genfns file
-      (full_paths, objfiles, tolink, cached_genfns_imports) =
-    match read_file file with
-    | Unit (file_name, info, crc) ->
+  (* The result of [find_companion_object_file], below. [Adjacent] carries the
+     object file's path, obtained by replacing the artifact extension in the
+     artifact's resolved path. The [Resolved_via_manifest_*] cases arise when
+     the artifact's resolved path does not retain the artifact extension, which
+     only happens when the artifact was resolved through a manifest entry (see
+     [-I-manifest]); the object file is then resolved through the load path
+     itself, yielding its path if found, or the searched-for filename if not. *)
+  type companion_object_file =
+    | Adjacent of Misc.filepath
+    | Resolved_via_manifest_and_found_in_load_path of Misc.filepath
+    | Resolved_via_manifest_but_not_found_in_load_path of Misc.filepath
+
+  (* Locate the object file ([.o] or [.a]/[.lib]) that accompanies a compilation
+     artifact ([.cmx] or [.cmxa]).
+
+     Normally the object file sits next to the artifact, and we obtain its path
+     by replacing the artifact extension in the artifact's resolved path
+     [resolved_pathname].
+
+     However, when the artifact was resolved through a manifest entry (see
+     [-I-manifest]), its resolved path need not retain the extension, and the
+     object file need not sit next to it. In that case we form the object file's
+     name from the name the artifact was requested under ([requested_filename],
+     which must then carry the artifact extension, since [read_file] dispatched
+     on it) and resolve that name through the load path. In other words,
+     manifests must list the object files as separate entries. *)
+  let find_companion_object_file ~requested_filename ~resolved_pathname
+      ~artifact_ext ~object_ext =
+    if Filename.check_suffix resolved_pathname artifact_ext
+    then
+      let object_pathname =
+        Filename.chop_suffix resolved_pathname artifact_ext ^ object_ext
+      in
+      Adjacent object_pathname
+    else
+      let object_filename =
+        Filename.chop_suffix requested_filename artifact_ext ^ object_ext
+      in
+      match Load_path.find object_filename with
+      | object_pathname ->
+        Resolved_via_manifest_and_found_in_load_path object_pathname
+      | exception Not_found ->
+        Resolved_via_manifest_but_not_found_in_load_path object_filename
+
+  let scan_file linkenv ~shared genfns requested_filename
+      (full_paths, object_pathnames, tolink, cached_genfns_imports) =
+    match read_file requested_filename with
+    | Unit (resolved_pathname, info, crc) ->
       (* This is a cmx file. It must be linked in any case. *)
       Linkenv.remove_required linkenv info.ui_unit;
       Linkenv.add_quoted_cmi linkenv info.ui_quoted_cmi;
       Linkenv.add_quoted_cmx linkenv info.ui_quoted_cmx;
       List.iter
-        (fun import -> Linkenv.add_required linkenv (file_name, None) import)
+        (fun import ->
+          Linkenv.add_required linkenv (resolved_pathname, None) import)
         info.ui_imports_cmx;
       let dynunit : Cmxs_format.dynunit option =
         if not shared
@@ -110,13 +166,24 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         { name = info.ui_unit;
           crc;
           defines = info.ui_defines;
-          file_name;
+          file_name = resolved_pathname;
           imports_cmx = info.ui_imports_cmx;
           dynunit
         }
       in
-      let object_file_name =
-        Filename.chop_suffix file_name Backend.ext_flambda_obj ^ Backend.ext_obj
+      let object_pathname =
+        match
+          find_companion_object_file ~requested_filename ~resolved_pathname
+            ~artifact_ext:Backend.ext_flambda_obj ~object_ext:Backend.ext_obj
+        with
+        | Adjacent object_pathname
+        | Resolved_via_manifest_and_found_in_load_path object_pathname ->
+          object_pathname
+        | Resolved_via_manifest_but_not_found_in_load_path object_filename ->
+          raise
+            (Linkenv.Error
+               (Companion_object_file_not_found_via_manifest
+                  { object_filename; requested_filename }))
       in
       Profile.record_call ~accumulate:true "link/scan/check_consistency"
         (fun () ->
@@ -131,44 +198,68 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         (not shared) && info.ui_requires_metaprogramming
         && not !Clflags.uses_metaprogramming
       then
-        raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
-      ( file_name :: full_paths,
-        object_file_name :: objfiles,
+        raise
+          (Linkenv.Error
+             (Requires_metaprogramming_without_flag resolved_pathname));
+      ( resolved_pathname :: full_paths,
+        object_pathname :: object_pathnames,
         unit :: tolink,
         cached_genfns_imports )
-    | Library (file_name, infos) ->
+    | Library (resolved_pathname, infos) ->
       (* This is an archive file. Each unit contained in it will be linked in
          only if needed. *)
-      Linkenv.add_ccobjs linkenv (Filename.dirname file_name) infos;
+      Linkenv.add_ccobjs linkenv (Filename.dirname resolved_pathname) infos;
       let cached_genfns_imports =
         Generic_fns.Tbl.add ~imports:cached_genfns_imports genfns
           infos.lib_generic_fns
       in
-      Linkenv.check_cmi_consistency linkenv file_name infos.lib_imports_cmi;
-      Linkenv.check_cmx_consistency linkenv file_name infos.lib_imports_cmx;
+      Linkenv.check_cmi_consistency linkenv resolved_pathname
+        infos.lib_imports_cmi;
+      Linkenv.check_cmx_consistency linkenv resolved_pathname
+        infos.lib_imports_cmx;
       if
         (not shared) && infos.lib_requires_metaprogramming
         && not !Clflags.uses_metaprogramming
       then
-        raise (Linkenv.Error (Requires_metaprogramming_without_flag file_name));
-      let objfiles =
-        let obj_file =
-          Filename.chop_suffix file_name Backend.ext_flambda_lib
-          ^ Backend.ext_lib
-        in
-        (* MSVC doesn't support empty .lib files, and macOS struggles to make
-           them (#6550), so there shouldn't be one if the cmxa contains no
-           units. The file_exists check is added to be ultra-defensive for the
-           case where a user has manually added things to the .a/.lib file *)
-        if infos.lib_units = [] && not (Sys.file_exists obj_file)
-        then objfiles
-        else obj_file :: objfiles
+        raise
+          (Linkenv.Error
+             (Requires_metaprogramming_without_flag resolved_pathname));
+      let object_pathnames =
+        match
+          find_companion_object_file ~requested_filename ~resolved_pathname
+            ~artifact_ext:Backend.ext_flambda_lib ~object_ext:Backend.ext_lib
+        with
+        | Adjacent object_pathname ->
+          (* MSVC doesn't support empty .lib files, and macOS struggles to make
+             them (#6550), so there shouldn't be one if the cmxa contains no
+             units. The file_exists check is added to be ultra-defensive for the
+             case where a user has manually added things to the .a/.lib file *)
+          if
+            List.is_empty infos.lib_units
+            && not (Sys.file_exists object_pathname)
+          then object_pathnames
+          else object_pathname :: object_pathnames
+        | Resolved_via_manifest_and_found_in_load_path object_pathname ->
+          object_pathname :: object_pathnames
+        | Resolved_via_manifest_but_not_found_in_load_path object_filename ->
+          (* The archive was resolved through a manifest with no entry for the
+             corresponding [.a]/[.lib] file. This is only legitimate when the
+             archive contains no units (see the comment above about empty .lib
+             files). *)
+          if List.is_empty infos.lib_units
+          then object_pathnames
+          else
+            raise
+              (Linkenv.Error
+                 (Companion_object_file_not_found_via_manifest
+                    { object_filename; requested_filename }))
       in
-      (* [file_name] is always returned irrespective of the [objfiles]
-         calculation above and the units calculation below: the aim is to know
-         the full set of files which were provided on the command line. *)
-      ( file_name :: full_paths,
-        objfiles,
+      (* [resolved_pathname] is always returned irrespective of the
+         [object_pathnames] calculation above and the units calculation below:
+         the aim is to know the full set of files which were provided on the
+         command line. *)
+      ( resolved_pathname :: full_paths,
+        object_pathnames,
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
@@ -177,7 +268,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               || Linkenv.is_required linkenv info.li_name
             then (
               Linkenv.remove_required linkenv info.li_name;
-              let req_by = file_name, Some li_name in
+              let req_by = resolved_pathname, Some li_name in
               info.li_imports_cmx
               |> Misc.Bitmap.iter (fun i ->
                   let import = infos.lib_imports_cmx.(i) in
@@ -220,7 +311,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                 { name = info.li_name;
                   crc = info.li_crc;
                   defines = info.li_defines;
-                  file_name;
+                  file_name = resolved_pathname;
                   imports_cmx;
                   dynunit
                 }

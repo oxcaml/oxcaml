@@ -177,7 +177,7 @@ type record_sorts =
   (** The sorts of this record's fields were determined when the type was
       declared. Invariant: Every description in [lbl_all] for any field has a
       [lbl_sort] that's [Some]. *)
-  | Variable of Jkind.Sort.Const.t array
+  | Variable of Jkind.sort array
   (** This value has the specified sorts for its fields. *)
 
 type pattern = value general_pattern
@@ -1617,13 +1617,13 @@ val map_apply_arg:
 val label_sort:
   'rep Data_types.record_form -> 'rep Data_types.gen_label_description
   -> record_sorts
-  -> [ `Sort of Jkind.Sort.Const.t | `Same_as_record_sort ]
+  -> [ `Sort of Jkind.sort | `Same_as_record_sort ]
 
 (** Computes the sort of a label. Becuase the sepcial case above doesn't apply
     to unboxed records, this doesn't return an option. *)
 val unboxed_label_sort :
-  Data_types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t
+  Data_types.unboxed_label_description -> record_sorts -> Jkind.sort
 
 val unboxed_label_all_sorts:
   Data_types.unboxed_label_description -> record_sorts
-  -> Jkind.Sort.Const.t array
+  -> Jkind.sort array

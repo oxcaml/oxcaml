@@ -116,23 +116,41 @@ let join_parallel r1 r2 =
   | Pass, _ | _, Pass -> Pass
   | Skip, Skip -> Skip
 
+let join_list_parallel results = List.fold_left join_parallel Skip results
+
 let string_of_summary = function
   | Pass -> "passed"
   | Fail -> "failed"
   | Skip -> "skipped"
 
+let string_of_test_location ~branches line =
+  String.concat ""
+    (List.rev_map (fun branch -> Printf.sprintf "branch %d: " branch)
+       branches)
+  ^ Printf.sprintf "line %d" line
+
 let run_test_tree log add_msg behavior env summ ast =
-  let run_statement (behavior, env, summ, must_do_something) = function
-    | Environment_statement s ->
+  (* Interpret the statements contained in [stmts] and [segments] (effectively,
+     run [stmts @ List.concat segments]), then go into each of the subtrees in
+     [subs]. [branches] is a list of indices of [split] arms that we've
+     descended into. *)
+  let rec run_statements behavior env summ stmts segments subs ~branches
+      ~must_do_something =
+    match stmts with
+    | Environment_statement s :: rest ->
       begin match interpret_environment_statement env s with
-      | env -> Ok (behavior, env, summ, must_do_something)
+      | env ->
+        run_statements behavior env summ rest segments subs ~branches
+          ~must_do_something
       | exception e ->
         let bt = Printexc.get_backtrace () in
         let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-        Printf.ksprintf add_msg "line %d %s" line (report_error s.loc e bt);
-        Error Fail
+        Printf.ksprintf add_msg "%s %s"
+          (string_of_test_location ~branches line)
+          (report_error s.loc e bt);
+        Fail
       end
-    | Test (_, name, mods) ->
+    | Test (_, name, mods) :: rest ->
       let skip_all =
         match behavior with
         | Skip_all -> true
@@ -142,7 +160,8 @@ let run_test_tree log add_msg behavior env summ ast =
         if name.loc = Location.none then
           "default"
         else
-          Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
+          string_of_test_location ~branches
+            name.loc.Location.loc_start.Lexing.pos_lnum
       in
       let test = lookup_test name in
       let (msg, behavior, env, result) =
@@ -167,15 +186,25 @@ let run_test_tree log add_msg behavior env summ ast =
       let must_do_something =
         must_do_something && not (Tests.does_something test)
       in
-      Ok (behavior, env, summ, must_do_something)
-  in
-  let rec run_tree behavior env summ (Ast (stmts, subs)) ~must_do_something =
-    match
-      List.fold_left_result run_statement
-        (behavior, env, summ, must_do_something) stmts
-    with
-    | Error e -> e
-    | Ok (behavior, env, summ, must_do_something) ->
+      run_statements behavior env summ rest segments subs ~branches
+        ~must_do_something
+    | Split alternatives :: rest ->
+      let count = List.length alternatives in
+      let run_alternative i alternative =
+        Printf.fprintf log "Running split branch %d of %d\n%!" (i + 1) count;
+        run_statements behavior env summ alternative (rest :: segments)
+          subs ~branches:(i + 1 :: branches) ~must_do_something
+      in
+      join_list_parallel (List.mapi run_alternative alternatives)
+    | [] ->
+      run_segments behavior env summ segments subs ~branches ~must_do_something
+  and run_segments behavior env summ segments subs ~branches
+      ~must_do_something =
+    match segments with
+    | segment :: segments ->
+        run_statements behavior env summ segment segments subs ~branches
+          ~must_do_something
+    | [] ->
         (* If [subs] is empty, there are no further test actions to
            perform: we are at the end of a test path and can report
            our current summary. Otherwise we continue with each
@@ -194,10 +223,15 @@ let run_test_tree log add_msg behavior env summ ast =
         (* CR mshinwell/xclerc: maybe sequences of actions that "do something"
            and then have further actions that do not "do something" should be
            flagged *)
-            List.fold_left join_parallel Skip
-              (List.map (run_tree behavior env summ ~must_do_something) subs)
+            join_list_parallel
+              (List.map
+                (run_tree behavior env summ ~branches ~must_do_something)
+                subs)
         end
-  in run_tree behavior env summ ast ~must_do_something:true
+  and run_tree behavior env summ (Ast (stmts, subs)) ~branches
+      ~must_do_something =
+    run_statements behavior env summ stmts [] subs ~branches ~must_do_something
+  in run_tree behavior env summ ast ~branches:[] ~must_do_something:true
 
 let get_test_source_directory test_dirname =
   if (Filename.is_relative test_dirname) then
