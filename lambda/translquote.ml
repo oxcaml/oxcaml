@@ -231,6 +231,45 @@ end = struct
 
   let inject x = x
 
+  (* Note [Generating functions when translating quotes]
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     jbachurski, jrickard:
+
+     Why is [nlocal = 1] and [mode = alloc_local] for [func_]?
+     These [Lfunction]s are generated as part of quote translation.
+     Inside of quotes we might enter splices, causing these functions to
+     inadvertently capture any values that appear there.
+     These values might be local, and hence stack allocated, which is not
+     reflected in mode checking (as we assume values in splices are not
+     captured by the surrounding quote).
+     Hence, if we heap-allocate these functions, they would feature pointers
+     to stack-allocated values, which would be wrong. These functions must thus
+     be stack-allocated and treated as such.
+     [CamlinternalQuote]'s interface does not allow functions passed as
+     arguments to be local, and this is difficult to change due to difficulties
+     with bootstrapping. We believe this should be fine, as applying
+     stack-allocated functions as heap-allocated ones should be safe.
+
+     Why is [ret_mode = alloc_local] and there is no [Lregion]?
+     There is an awkward case in [Translquote] where a [func_] is defined that
+     returns a [func_], and since that one is stack-allocated, this function
+     has to say it might be local-returning. It also cannot have its own region
+     to return this stack-allocated function, i.e. it exclaves.
+     This seems at odds with assumptions elsewhere that we consume quotes that
+     are in fact global. We could make this more fine-grained and only mark
+     functions as local-returning sometimes, but it's fine as is:
+     quotes are always heap-allocated, effectively crossing [mod heap_local]
+     (under [heap_global < heap_local < stack_local]).
+     It is already possible to generate [Lambda] that will return the result
+     of a local-returning function in a heap-returning one, as [immediate]s
+     already cross locality in a similar manner.
+
+     What about [Lregion]s for these allocations?
+     These closures must appear directly within quotes (<[/]>) and no other
+     translated code in between, and we insert [Lregion]s around quotes.
+     We also insert [Lregion]s around splices in case they appear inside
+     the closures to make sure these functions remain exclaving. *)
+
   let func_ ~loc _ id body =
     let param_from_name name =
       { name;
@@ -241,11 +280,11 @@ end = struct
       }
     in
     lfunction
-      ~kind:(Curried { nlocal = 0 })
+      ~kind:(Curried { nlocal = 1 })
       ~params:[param_from_name id]
       ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
-      ~attr:default_function_attribute ~body ~loc ~mode:alloc_heap
-      ~ret_mode:alloc_heap
+      ~attr:default_function_attribute ~body ~loc ~mode:alloc_local
+      ~ret_mode:alloc_local
 
   let func ~loc arg_sort body_lam id body =
     func_ ~loc arg_sort id (body_lam body)
@@ -365,7 +404,7 @@ let apply modname field loc args =
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
          ap_region_close = Rc_normal;
-         ap_mode = alloc_heap;
+         ap_mode = alloc_local;
          ap_tailcall = Default_tailcall;
          ap_inlined = Default_inlined;
          ap_specialised = Default_specialise
@@ -3945,9 +3984,10 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
         Exp_desc.antiquote loc exp
       else
         let exp =
-          (* Local allocations are not expected to escape from this expression.
-             If they did, the [ret_mode] on the corresponding [lfunction] would
-             need to indicate local mode. *)
+          (* See Note [Generating functions when translating quotes].
+             The code within splices might contain stack-allocations,
+             which we can free since we only return an always-heap-allocated
+             quote to the parent. *)
           Lregion (transl exp, layout_any_value)
         in
         Exp_desc.splice loc (Code.inject exp)
@@ -4080,4 +4120,8 @@ let transl_quote ~scopes ~loc ~transl exp =
       in
       Code.of_exp_with_type_vars loc (quote_loc loc) type_names quote_fun
   in
-  extract (Code.wrap code)
+  (* See Note [Generating functions when translating quotes].
+     Quote translation needs to stack-allocate closures.
+     We can free these before we leave the quote, as they are applied within
+     this scope and never returned to the parent. *)
+  Lregion (extract (Code.wrap code), layout_any_value)
