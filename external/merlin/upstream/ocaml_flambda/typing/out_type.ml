@@ -1242,10 +1242,10 @@ let add_type_to_preparation = prepare_type
 let print_labels = ref true
 let with_labels b f = Misc.protect_refs [R (print_labels,b)] f
 
-(* Whether to expand [eval] in types for reductions before printing.
+(* Whether to expand [eval] and [box] in types for reductions before printing.
    Disabled when printing errors, as they usually contain an expansion trace. *)
-let print_reduced_evals = ref true
-let with_reduced_evals b f = Misc.protect_refs [R (print_reduced_evals,b)] f
+let print_reduced_abbrevs = ref true
+let with_reduced_abbrevs b f = Misc.protect_refs [R (print_reduced_abbrevs,b)] f
 
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
@@ -1411,7 +1411,8 @@ let rec tree_of_modal_typexp mode modal ty =
     | Other _ -> tree
   in
   let ty =
-    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
+    Ctype.reduce_head ~expand_reducible_abbrevs:!print_reduced_abbrevs
+      !printing_env ty
   in
   let px = proxy ty in
   if Aliases.is_printed_proxy px && not (Aliases.is_delayed px) then
@@ -1583,6 +1584,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_module pack
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
+    | Tbox ty ->
+      (* Render as if a regular Tconstr application of Predef.path_box,
+         so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
+      let p', s = best_type_path Predef.path_box in
+      let tyl' = apply_subst s [ty] in
+      Internal_names.add p';
+      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
@@ -2821,8 +2829,8 @@ let trees_of_type_expansion'
     (* beware order matter due to side effect,
        e.g. when printing object types *)
     let first =
-      (* preserve unreduced eval in types *)
-      with_reduced_evals false (fun () -> tree_of_typexp' t)
+      (* preserve unreduced abbrevs in types *)
+      with_reduced_abbrevs false (fun () -> tree_of_typexp' t)
     in
     let second = tree_of_typexp' t' in
     if first = second then Same first

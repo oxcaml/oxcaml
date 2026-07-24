@@ -38,6 +38,10 @@ module Float_arg_helper = Arg_helper.Make (struct
   end
 end)
 
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
 and dllibs = ref ([] : string list)     (* .so and -dllib -lxxx *)
@@ -150,7 +154,7 @@ and noprompt = ref false                (* -noprompt *)
 and nopromptcont = ref false            (* -nopromptcont *)
 and init_file = ref (None : string option)   (* -init *)
 and noinit = ref false                  (* -noinit *)
-and open_modules = ref []               (* -open *)
+and open_args = ref ([] : open_arg list) (* -open / -open-cmi *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
 and plugin = ref false                  (* -plugin ... *)
@@ -160,6 +164,7 @@ and recursive_types = ref false         (* -rectypes *)
 and strict_sequence = ref false         (* -strict-sequence *)
 and strict_formats = ref true           (* -strict-formats *)
 and applicative_functors = ref true     (* -no-app-funct *)
+and typing_recovery = ref false         (* -typing-recovery *)
 and make_runtime = ref false            (* -make-runtime *)
 and c_compiler = ref (None: string option) (* -cc *)
 and no_auto_link = ref false            (* -noautolink *)

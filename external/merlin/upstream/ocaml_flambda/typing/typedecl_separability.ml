@@ -53,7 +53,11 @@ let structure : type_definition -> type_structure = fun def ->
   | Type_abstract _, _ ->
       begin match def.type_manifest with
       | None -> Abstract
-      | Some type_expr -> Synonym type_expr
+      | Some type_expr ->
+          if !Clflags.typing_recovery
+          && Typing_recovery.erroneous_type_check type_expr
+          then Abstract
+          else Synonym type_expr
       end
   | (Type_record _ | Type_variant _), None -> Algebraic
   | Type_record_unboxed_product _, None -> Algebraic
@@ -147,7 +151,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       (* these should only occur under Tobject and not at the toplevel,
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
-  | Tquote ty | Tsplice ty | Tquote_eval ty -> [ty]
+  | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
@@ -427,6 +431,7 @@ let check_type
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
     | (Tquote_eval(_)     , Sep    )
+    | (Tbox(_)            , Sep    )
     | (Tpackage _         , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
     (* "Deeply separable" case for these same constructors. *)
@@ -439,6 +444,7 @@ let check_type
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
     | (Tquote_eval(_)     , Deepsep)
+    | (Tbox(_)            , Deepsep)
     | (Tpackage _         , Deepsep) ->
         let tys = immediate_subtypes ty in
         let on_subtype context ty =

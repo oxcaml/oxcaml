@@ -124,8 +124,6 @@ module type Sort = sig
 
     val for_block_element : t
 
-    val for_array_get_result : t
-
     val for_array_comprehension_element : t
 
     val for_list_element : t
@@ -135,15 +133,7 @@ module type Sort = sig
         make the code clearer. *)
     val for_function : t
 
-    val for_probe_body : t
-
-    val for_poly_variant : t
-
     val for_object : t
-
-    val for_initializer : t
-
-    val for_method : t
 
     val for_module : t
 
@@ -151,8 +141,6 @@ module type Sort = sig
     val for_predef_scannable : t
 
     val for_tuple : t
-
-    val for_idx : t
 
     val for_loop_index : t
 
@@ -400,6 +388,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Or_null_payload of Path.t
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
@@ -413,6 +402,7 @@ module History = struct
     | Class_field
     | Boxed_record
     | Boxed_variant
+    | Boxed
     | Extensible_variant
     | Primitive of Ident.t
     | Type_argument of
@@ -421,6 +411,7 @@ module History = struct
           arity : int
         }
     (* [position] is 1-indexed *)
+    | Or_null_payload of Path.t
     | Tuple
     | Row_variable
     | Polymorphic_variant

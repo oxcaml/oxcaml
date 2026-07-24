@@ -62,8 +62,13 @@ type error =
         value: Global_module.Name.t;
       }
 
-exception Error of error
-let error err = raise (Error err)
+include (struct
+  exception Error of error
+  let error e = Typing_recovery.log_and_raise (Error e)
+end : sig
+  type exn += private Error of error
+  val error : error -> 'a
+end)
 
 module Persistent_signature = struct
   type t =
@@ -254,8 +259,8 @@ let register_parameter ({param_imports; _} as penv) modname =
       ()
   | Some imp ->
       if not imp.imp_is_param then
-        raise (Error (Not_compiled_as_parameter
-                        (Global_module.Name.of_parameter_name modname)))
+        error (Not_compiled_as_parameter
+                 (Global_module.Name.of_parameter_name modname))
   end;
   param_imports := Param_set.add modname !param_imports
 
@@ -589,13 +594,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
         (fun (param, value) ->
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
-              raise
-                (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
-                          valid_parameters = params;
-                          parameter = param;
-                          value = value |> Global_module.to_name;
-                        })))
+              error (Imported_module_has_no_such_parameter {
+                  imported = CU.Name.of_head_of_global_name modname;
+                  valid_parameters = params;
+                  parameter = param;
+                  value = value |> Global_module.to_name;
+                }))
       ~both:
         (fun expected_type (_arg_name, arg_value_global) ->
             let arg_value = arg_value_global |> Global_module.to_name in
@@ -613,12 +617,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
-              raise (Error (Argument_type_mismatch {
+              error (Argument_type_mismatch {
                   value = arg_value;
                   filename = pn.pn_import.imp_filename;
                   expected = expected_type;
                   actual = actual_type;
-                }))
+                })
             end)
   end;
   (* Form the name without any arguments at all, then substitute in all the
@@ -958,6 +962,22 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 
 let read penv modname a =
   read_pers_struct penv true modname a
+
+let read_cmi_file penv filename =
+  let cmi = read_cmi_lazy filename in
+  let unit_name = cmi.cmi_name in
+  let modname = CU.Name.to_global_name unit_name in
+  add_import penv unit_name;
+  (* Register as hidden so that direct user-code references to the module
+     are still reported as unbound; only transitive lookups can reach it. *)
+  let pers_sig =
+    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+  in
+  let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  let pers_name =
+    acknowledge_pers_name penv true modname import ~allow_excess_args:false
+  in
+  modname, pers_name.pn_sign
 
 let find ~allow_hidden penv f name ~allow_excess_args =
   (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true

@@ -122,7 +122,11 @@ val classic : bool ref
 val nopervasives : bool ref
 val match_context_rows : int ref
 val safer_matching : bool ref
-val open_modules : string list ref
+type open_arg =
+  | Open of string
+  | Open_cmi of string
+
+val open_args : open_arg list ref
 val preprocessor : string option ref
 val all_ppx : string list ref
 val absname : bool ref
@@ -152,6 +156,7 @@ val recursive_types : bool ref
 val strict_sequence : bool ref
 val strict_formats : bool ref
 val applicative_functors : bool ref
+val typing_recovery : bool ref
 val make_runtime : bool ref
 val c_compiler : string option ref
 val no_auto_link : bool ref

@@ -1125,6 +1125,11 @@ module PpxContext = struct
     | Some x -> Exp.construct (lid "Some") (Some (f x))
     | None   -> Exp.construct (lid "None") None
 
+  let make_open_arg (arg : Clflags.open_arg) =
+    match arg with
+    | Open s -> Exp.construct (lid "Open") (Some (make_string s))
+    | Open_cmi s -> Exp.construct (lid "Open_cmi") (Some (make_string s))
+
   let get_cookies () =
     lid "cookies",
     make_list (make_pair make_string (fun x -> x))
@@ -1159,7 +1164,8 @@ module PpxContext = struct
             (make_list (make_pair make_string make_bool))
             (make_list make_string)
             (visible_load_dir_pairs visible, hidden);
-        lid "open_modules", make_list make_string !Clflags.open_modules;
+        lid "open_args",
+          make_list make_open_arg !Clflags.open_args;
         lid "for_package",  make_option make_string !Clflags.for_package;
         lid "debug",        make_bool !Clflags.debug;
         lid "use_threads",  make_bool !Clflags.use_threads;
@@ -1225,6 +1231,16 @@ module PpxContext = struct
             None
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] option syntax" name
+      and get_open_arg = function
+        | { pexp_desc =
+              Pexp_construct ({ txt = Longident.Lident "Open" }, Some exp) } ->
+            Clflags.Open (get_string exp)
+        | { pexp_desc =
+              Pexp_construct
+                ({ txt = Longident.Lident "Open_cmi" }, Some exp) } ->
+            Clflags.Open_cmi (get_string exp)
+        | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
+                             { %s }] open_arg syntax" name
       in
       match name with
       | "tool_name" ->
@@ -1259,8 +1275,8 @@ module PpxContext = struct
               visible
           in
           Load_path.init ~auto_include ~visible ~hidden
-      | "open_modules" ->
-          Clflags.open_modules := get_list get_string payload
+      | "open_args" ->
+          Clflags.open_args := get_list get_open_arg payload
       | "for_package" ->
           Clflags.for_package := get_option get_string payload
       | "debug" ->
