@@ -1487,15 +1487,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
-  | Texp_quotation exp ->
+  | Texp_quote exp ->
       Translquote.transl_quote
         ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes layout) exp
-  (* TODO: update scopes *)
-  | Texp_antiquotation exp ->
-      fatal_errorf
-        "@[Cannot unquote expression outside of a quotation context:@ \
-         %a@]"
-        Pprintast.expression (Untypeast.untype_expression exp)
+  | Texp_splice _ ->
+      fatal_errorf_doc
+        "transl_exp: unexpected initial-stage splice at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        e.exp_loc
 
 and pure_module m =
   match m.mod_desc with

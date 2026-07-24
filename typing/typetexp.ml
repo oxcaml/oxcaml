@@ -1330,7 +1330,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_quote t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
-      let new_env = Env.enter_quotation env in
+      let new_env = Env.enter_quote env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->

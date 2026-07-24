@@ -363,7 +363,7 @@ val parameterised_modules : bool
 (** Whether parameterised modules are supported *)
 
 val syntax_quotations : bool
-(** Whether runtime quotations syntax is enabled. *)
+(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
 (** Access to configuration values *)
 val print_config : out_channel -> unit

@@ -90,11 +90,11 @@ let compute_variance env visited vari ty =
     | Tobject (ty, _) ->
         compute_same ty
     | Tquote ty ->
-        compute_variance_rec (Env.enter_quotation env) vari ty
+        compute_variance_rec (Env.enter_quote env) vari ty
     | Tsplice ty ->
         compute_variance_rec (Env.enter_splice ~loc:Location.none env) vari ty
     | Tquote_eval ty ->
-        compute_variance_rec (Env.enter_quotation env) vari ty
+        compute_variance_rec (Env.enter_quote env) vari ty
     | Tbox ty ->
         compute_same ty
     | Tfield (_, _, ty1, ty2) ->

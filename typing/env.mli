@@ -586,7 +586,7 @@ val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
-val enter_quotation : t -> t
+val enter_quote : t -> t
 val enter_splice : loc:Location.t -> t -> t
 
 (** Set the environment's stage to a fixed one in the far future.
