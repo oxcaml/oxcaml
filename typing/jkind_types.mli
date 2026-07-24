@@ -132,7 +132,9 @@ end
 
 (** See [Jkind_axis.Addressability] for an overview of actions ([Action.t], on
     [Any]/[Product]/[Kconstr] nodes) vs the full [t] with the join
-    [Id_or_addressable] (on [Sort] nodes, also the type of readings). *)
+    [Id_or_addressable] (on [Sort] nodes, also the type of normalized-mark
+    readings) vs verdicts ([Verdict.t], the type of "is this kind addressable?"
+    answers). *)
 module Addressability : sig
   module Action : sig
     type t = Jkind_axis.Addressability.Action.t =
@@ -175,18 +177,32 @@ module Addressability : sig
 
   val print : Format_doc.formatter -> t -> unit
 
-  (** The intrinsic addressability of a base sort, as a reading; either
-      [Addressable] or [Id] (not addressable). [Scannable], [Word], [Bits64],
-      and the vector bases are boxed as blocks with all data in the body; the
-      others are boxed as tagged immediates or float blocks. *)
-  val of_base : Sort.base -> t
+  module Verdict : sig
+    type t = Jkind_axis.Addressability.Verdict.t =
+      | Id
+      | Addressable
+      | Undetermined
 
-  (** The intrinsic addressability of a sort, insofar as it is determined: the
-      addressability of an unfilled sort variable is not yet known
-      ([Id_or_addressable]). This is a mark-free question - the addressability
-      of the *plain* kind of the sort - so it can be definite ([Id]) even while
-      the marks over the sort are undetermined. *)
-  val of_sort : Sort.t -> t
+    val consistent : t -> t -> bool
+
+    val combine_product : t list -> t
+
+    val of_action_on_undetermined : Action.t -> t
+  end
+
+  (** Whether every kind at this base sort is addressable, whatever its marks:
+      the plain kind is intrinsically addressable, so marking is a no-op and all
+      forms coincide. [Scannable], [Word], [Bits64], and the vector bases are
+      boxed as blocks with all data in the body; the others are boxed as tagged
+      immediates or float blocks. *)
+  val base_is_always_addressable : Sort.base -> bool
+
+  (** The intrinsic addressability of a sort, as a verdict about its *plain*
+      kind, insofar as it is determined: the addressability of an unfilled sort
+      variable is not yet known ([Undetermined]). This is a mark-free question,
+      so it can be definite ([Id], not addressable) even while the marks over
+      the sort are undetermined. *)
+  val of_sort : Sort.t -> Verdict.t
 
   (** Whether every kind with this sort is addressable, whatever its marks: the
       plain kind is intrinsically addressable, so the plain, marked, and join
@@ -254,14 +270,16 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    (** The addressability reading of a constant layout. A join
-        ([Id_or_addressable]) slot on a base collapses only when the base is
-        intrinsically addressable, where its branches coincide, and is otherwise
-        preserved - the join is information (a flexible [bits8] bound still
-        admits [bits8 addressable]) and must survive [equal]; only printing
-        elides it. An unmarked product derives its reading from its components;
-        [Univar]/[Genvar] layouts read their stored slot. *)
-    val addressability : t -> Addressability.t
+    (** The normalized mark of a constant layout: which of the forms over its
+        sort the kind is. A join ([Id_or_addressable]) slot on a base collapses
+        only when the base is intrinsically addressable, where its branches
+        coincide, and is otherwise preserved - the join is information (a
+        flexible [bits8] bound still admits [bits8 addressable]) and must
+        survive [equal]; only printing elides it. An unmarked product derives
+        its mark from its components; [Univar]/[Genvar] layouts read their
+        stored slot ([Id] on a rigid variable is exactly the plain form, with no
+        claim about its addressability). *)
+    val normalized_mark : t -> Addressability.t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

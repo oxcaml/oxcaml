@@ -1012,25 +1012,27 @@ end
 module Addressability0 = struct
   include Jkind_axis.Addressability
 
-  (* The intrinsic addressability of each base sort, as a reading: whether
-     its types store all of their information in the data portion of a block
-     when boxed. Kinds boxed as tagged immediates or as float blocks are not
-     addressable ([Id]: only the identity action keeps them so). *)
-  let of_base : Sort.base -> t = function
-    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 -> Addressable
+  (* Whether every kind at this base sort is addressable, whatever its marks:
+     the plain kind is intrinsically addressable (its types store all of
+     their information in the data portion of a block when boxed), so
+     marking is a no-op and all forms coincide. Kinds boxed as tagged
+     immediates or as float blocks are not addressable. *)
+  let base_is_always_addressable : Sort.base -> bool = function
+    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 -> true
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
-      Id
+      false
 
-  (* The intrinsic addressability of a sort, insofar as it is determined: the
-     addressability of an unfilled sort variable is not yet known. This is a
-     mark-free question - the addressability of the *plain* kind of the sort
-     - so it can be definite ([Id]) even while the marks over the sort are
-     undetermined. *)
+  (* The intrinsic addressability of a sort, as a verdict about its *plain*
+     kind, insofar as it is determined: the addressability of an unfilled
+     sort variable is not yet known ([Undetermined]). This is a mark-free
+     question, so it can be definite ([Id], not addressable) even while the
+     marks over the sort are undetermined. *)
   let of_sort s =
-    let rec go : Sort.t -> t = function
-      | Base b -> of_base b
-      | Product sorts -> combine_product (List.map go sorts)
-      | Var _ | Univar _ -> Id_or_addressable
+    let rec go : Sort.t -> Verdict.t = function
+      | Base b ->
+        if base_is_always_addressable b then Verdict.Addressable else Verdict.Id
+      | Product sorts -> Verdict.combine_product (List.map go sorts)
+      | Var _ | Univar _ -> Verdict.Undetermined
     in
     (* [Sort.get] is deep, so a returned [Var] is guaranteed unfilled. *)
     go (Sort.get s)
@@ -1042,7 +1044,9 @@ module Addressability0 = struct
      forms either differ or are not yet known to coincide (an unfilled
      variable in the sort). *)
   let sort_is_always_addressable s =
-    match of_sort s with Addressable -> true | Id | Id_or_addressable -> false
+    match of_sort s with
+    | Verdict.Addressable -> true
+    | Verdict.Id | Verdict.Undetermined -> false
 end
 
 module Addressability = Addressability0
@@ -1081,11 +1085,12 @@ module Layout = struct
      variable with [bits8] leaves the kind the join of [bits8] and
      [bits8 addressable]. Readers collapse the join only when the resolved
      sort is intrinsically addressable, where the two branches denote the
-     same kind (see [Jkind.Layout.addressability]).
+     same kind (see [Jkind.Layout.normalized_mark]).
 
      Construction invariants:
      - A [Sort]/[Const.Base] node of an intrinsically addressable base
-       ([Addressability.of_base]) normalizes its slot to [Addressable]
+       ([Addressability.base_is_always_addressable]) normalizes its slot to
+       [Addressable]
        (e.g. [bits64 addressable] IS [bits64]); see [Const.Static.of_base].
      - On an unaddressable base, [Id] and [Addressable] mean exactly the
        plain and the marked kind.
@@ -1133,30 +1138,32 @@ module Layout = struct
 
     let max = Any (Scannable_axes.max, Addressability.Action.Id)
 
-    (* The addressability reading of a constant layout. A join slot on a base
-       collapses only when the base is intrinsically addressable, where its
-       branches coincide; it is otherwise PRESERVED - the join is
-       information (e.g. a flexible [bits8] bound still admits
-       [bits8 addressable]), and must survive [equal] (in particular through
-       the builtin memoization used when saving cmis). Only printing elides
-       the join ([Jkind.Addressability.to_string_list_diff]). An unmarked
-       product derives its reading from its components. *)
-    let rec addressability : t -> Addressability.t = function
+    (* The normalized mark of a constant layout: which of the forms over its
+       sort the kind is. A join slot on a base collapses only when the base
+       is intrinsically addressable, where its branches coincide; it is
+       otherwise PRESERVED - the join is information (e.g. a flexible
+       [bits8] bound still admits [bits8 addressable]), and must survive
+       [equal] (in particular through the builtin memoization used when
+       saving cmis). Only printing elides the join
+       ([Jkind.Addressability.to_string_list_diff]). An unmarked product
+       derives its mark from its components. *)
+    let rec normalized_mark : t -> Addressability.t = function
       | Base (b, _, a) -> (
         match a with
-        | Id_or_addressable -> (
-          match Addressability.of_base b with
-          | Addressable -> Addressable
-          | Id | Id_or_addressable -> Id_or_addressable)
+        | Id_or_addressable ->
+          if Addressability.base_is_always_addressable b
+          then Addressable
+          else Id_or_addressable
         | Addressable | Id -> a)
       | Any (_, a) -> Addressability.of_action_on_undetermined a
       | Product (ts, a) -> (
         match (a : Addressability.Action.t) with
         | Addressable -> Addressability.Addressable
-        | Id -> Addressability.combine_product (List.map addressability ts))
+        | Id -> Addressability.combine_product (List.map normalized_mark ts))
       | Univar (_, _, a) | Genvar (_, _, a) ->
-        (* The carrier is never resolved, so the slot is the reading:
-           [Id] on a rigid variable means exactly the plain kind. *)
+        (* The carrier is never resolved, so the slot is the mark: [Id] on a
+           rigid variable is exactly the plain form (whose addressability is
+           open until instantiation - a question for verdicts, not marks). *)
         a
 
     let rec equal c1 c2 =
@@ -1167,7 +1174,7 @@ module Layout = struct
         Scannable_axes.equal sa1 sa2
       | (Base (b1, _, _) as c1), (Base (b2, _, _) as c2) ->
         Sort.equal_base b1 b2
-        && Addressability.equal (addressability c1) (addressability c2)
+        && Addressability.equal (normalized_mark c1) (normalized_mark c2)
       | Any (sa1, a1), Any (sa2, a2) ->
         Scannable_axes.equal sa1 sa2 && Addressability.Action.equal a1 a2
       | (Product (cs1, _) as c1), (Product (cs2, _) as c2) ->
@@ -1175,7 +1182,7 @@ module Layout = struct
         (* Comparing the roots distinguishes a marked product of
            unaddressable kinds from the unmarked product; marking a product
            of addressable kinds does nothing. *)
-        && Addressability.equal (addressability c1) (addressability c2)
+        && Addressability.equal (normalized_mark c1) (normalized_mark c2)
       | Univar (uv1, sa1, a1), Univar (uv2, sa2, a2) ->
         Sort.equal_univar_univar uv1 uv2
         && Scannable_axes.equal sa1 sa2
@@ -1305,7 +1312,8 @@ module Layout = struct
          have to pick something, though, so we pick [Scannable_axes.max].
          The addressability slot of these constants is [Id] on intrinsically
          unaddressable bases (the plain, unmarked kind) and [Addressable] on
-         intrinsically addressable ones ([Addressability.of_base]). *)
+         intrinsically addressable ones
+         ([Addressability.base_is_always_addressable]). *)
 
       let void = Base (Sort.Void, Scannable_axes.max, Id)
 

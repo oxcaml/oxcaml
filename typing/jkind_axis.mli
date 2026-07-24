@@ -74,13 +74,18 @@ end
     variables ([Const.Base], [Const.Univar], [Const.Genvar]), where it arises
     for flexible bounds: a fresh sort variable's bound must admit every kind
     with whatever sort the variable resolves to, and it persists after the
-    variable resolves, since resolving a sort determines none of the marks. [t]
-    is also the result type of addressability *readings* of a kind: there
-    [Addressable] means definitely addressable, [Id] definitely not (the
-    identity action on an intrinsically unaddressable carrier), and
-    [Id_or_addressable] not (yet) determined.
+    variable resolves, since resolving a sort determines none of the marks.
 
-    As an order on readings this is flat and partial: [Addressable] and [Id] are
+    [t] is also the result type of *normalized-mark* readings of a kind: which
+    of the forms over its sort the kind is. There [Addressable] is the marked
+    form - or any form over a sort whose forms all coincide - [Id] is exactly
+    the plain form, and [Id_or_addressable] is the flexible join. A mark reading
+    of [Id] says nothing about whether the kind is addressable: the plain form
+    of a rigid layout variable [x] reads [Id] while the addressability of [x] is
+    still open. The question "is this kind addressable?" has a different answer
+    type, [Verdict.t], whose third case is an honest [Undetermined].
+
+    As an order on marks this is flat and partial: [Addressable] and [Id] are
     incomparable (the operator is a modifier, not a narrowing), and both are
     below [Id_or_addressable]. Accordingly, [meet] is partial. This is also not
     an [Axis.t]: it is not part of the mod- or with-bounds, but rather a
@@ -157,6 +162,38 @@ module Addressability : sig
   val to_string : t -> string
 
   val print : Format_doc.formatter -> t -> unit
+
+  (** The result of an addressability *verdict* - "is this kind addressable?" -
+      as opposed to a mark reading ([t]), which answers which form over its sort
+      a kind is. The two differ exactly where honesty requires it: the plain
+      form of an unresolved layout reads mark [Id] but verdict [Undetermined].
+  *)
+  module Verdict : sig
+    type t =
+      | Id
+          (** Definitely not addressable: an unmarked (identity) form over a
+              carrier resolved intrinsically unaddressable. *)
+      | Addressable  (** Definitely addressable. *)
+      | Undetermined
+          (** Not determined: a flexible join, an unmarked form over an
+              unresolved sort (rigid or flexible), [any], or an abstract kind.
+          *)
+
+    (** Whether kinds with these verdicts can possibly meet: [false] exactly
+        when one is definitely addressable and the other definitely not.
+        [Undetermined] is consistent with everything. *)
+    val consistent : t -> t -> bool
+
+    (** The verdict on a product of kinds from its components' verdicts:
+        definitely not if any component is, otherwise undetermined if any
+        component is, otherwise definitely addressable. *)
+    val combine_product : t list -> t
+
+    (** The verdict on a node whose carrier's intrinsic addressability is
+        undetermined ([any] or an abstract kind): marked means definitely
+        addressable; unmarked leaves the verdict undetermined. *)
+    val of_action_on_undetermined : Action.t -> t
+  end
 end
 
 module Axis : sig

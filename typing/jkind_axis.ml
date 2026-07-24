@@ -215,6 +215,32 @@ module Addressability = struct
     | Id_or_addressable -> "id_or_addressable"
 
   let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+
+  module Verdict = struct
+    type t =
+      | Id
+      | Addressable
+      | Undetermined
+
+    let consistent v1 v2 =
+      match v1, v2 with
+      | Id, Addressable | Addressable, Id -> false
+      | (Id | Addressable | Undetermined), (Id | Addressable | Undetermined) ->
+        true
+
+    let combine_product ts =
+      List.fold_left
+        (fun acc t ->
+          match acc, t with
+          | Id, _ | _, Id -> Id
+          | Undetermined, _ | _, Undetermined -> Undetermined
+          | Addressable, Addressable -> Addressable)
+        Addressable ts
+
+    let of_action_on_undetermined : Action.t -> t = function
+      | Id -> Undetermined
+      | Addressable -> Addressable
+  end
 end
 
 module Axis = struct

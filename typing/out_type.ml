@@ -1282,7 +1282,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
       | Addressable ->
         List.exists
           (fun l ->
-            match Jkind.Desc.layout_addressability l with
+            match Jkind.Desc.layout_normalized_mark l with
             | Jkind.Addressability.Addressable -> false
             | Id | Id_or_addressable -> true)
           lays
