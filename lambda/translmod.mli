@@ -61,6 +61,19 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
+(** Translate a bundle as a generative functor over [params] whose body
+    exposes [modules] (after [coercion]).  Transitive deps are looked up
+    on the load path via [base_filename ^ ext] and read by [read_format]. *)
+val transl_functorization:
+      Compilation_unit.t
+        -> Global_module.Parameter_name.t list
+        -> Global_module.t list
+        -> ext:string
+        -> read_format:(Misc.filepath ->
+                          main_module_block_format * arg_descr option)
+        -> coercion:module_coercion
+        -> program
+
 val toplevel_name: Ident.t -> string
 
 val primitive_declarations: Primitive.description list ref

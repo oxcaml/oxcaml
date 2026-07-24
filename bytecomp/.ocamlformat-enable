@@ -1,8 +1,12 @@
 blambda.ml
 blambda.mli
+cmo_io.ml
+cmo_io.mli
 blambda_of_lambda.ml
 blambda_of_lambda.mli
 bytegen.ml
 bytegen.mli
 printblambda.ml
 printblambda.mli
+bytefunctorizer.ml
+bytefunctorizer.mli
