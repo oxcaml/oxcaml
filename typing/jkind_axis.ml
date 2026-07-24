@@ -174,10 +174,11 @@ module Addressability = struct
     | Exact a1, (Exact a2 as e) -> if Action.equal a1 a2 then Some e else None
 
   let combine_product ts =
-    (* Combines component *readings* into a product's reading. Note that the
-       implicit order here ([Exact Addressable] absorbed by [Join] absorbed
-       by [Exact Id]) is not the subkind order, under which the two exact
-       forms are incomparable. *)
+    (* Combines component mark readings into an unmarked product's mark
+       reading; see the .mli. Note that the implicit order here
+       ([Exact Addressable] absorbed by [Join] absorbed by [Exact Id]) is
+       not the subkind order, under which the two exact forms are
+       incomparable. *)
     List.fold_left
       (fun acc t ->
         match acc, t with

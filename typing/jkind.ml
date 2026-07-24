@@ -362,21 +362,27 @@ module Layout = struct
     | Equal_mutated_both ->
       true
 
-  (* The normalized mark of the kind a layout describes: which of the forms
-     over its sort the kind is. Any slot collapses to [Exact Addressable]
-     once the sort resolves intrinsically addressable, where all forms
-     coincide - which matters when a sort variable was filled after the slot
-     was created, e.g. [Sort (v, _, Join)] with [v] filled by [bits64] IS
-     [bits64]. [Exact Id] is exactly the plain form; for a rigid layout
-     variable [x] that is the plain [x], whose addressability is simply not
-     yet determined - this function answers which form the kind is, not
-     whether it is addressable (that question is [addressability_verdict]).
-     [Join] is the flexible join. The collapse must NOT go the other way:
-     sorts do not carry addressability, so resolving a sort to [bits8] pins
-     nothing - a join is still the join of [bits8] and [bits8 addressable],
-     and only the stored slot records which. Normalization makes equal kinds
-     read equal marks: use this for the left of a subkind check and for
-     equality. *)
+  (* The normalized mark of the kind a layout describes: how the kind
+     stands to whole-marking (see [Jkind_axis.Addressability]).
+     [Exact Addressable] means addressable, so marking is a no-op: any
+     [Sort] slot collapses to it once the sort resolves intrinsically
+     addressable, where all forms coincide - which matters when a sort
+     variable was filled after the slot was created, e.g.
+     [Sort (v, _, Join)] with [v] filled by [bits64] IS [bits64].
+     [Exact Id] means the root is exactly unmarked and the kind is not
+     known addressable: exactly the plain form on a [Sort] node - for a
+     rigid layout variable [x], the plain [x], whose own addressability is
+     simply not yet determined; this function answers how the kind compares,
+     not whether it is addressable (that question is
+     [addressability_verdict]) - and on an unmarked [Product], that some
+     component reads [Exact Id] ([Addressability.combine_product]; a mixed
+     product also reads [Exact Id], being likewise distinct from its
+     whole-marked form). [Join] is the flexible join. The collapse must NOT
+     go the other way: sorts do not carry addressability, so resolving a
+     sort to [bits8] pins nothing - a join is still the join of [bits8] and
+     [bits8 addressable], and only the stored slot records which.
+     Normalization makes equal kinds read equal marks: use this for the
+     left of a subkind check and for equality. *)
   let rec normalized_mark : Sort.t t -> Addressability.t = function
     | Any (_, a) -> Addressability.of_action_on_undetermined a
     | Sort (s, _, a) -> (

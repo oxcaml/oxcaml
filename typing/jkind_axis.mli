@@ -79,14 +79,21 @@ end
       sort the variable resolves to, and it persists after the variable
       resolves, since resolving a sort determines none of the marks.
 
-    [t] is also the result type of *normalized-mark* readings of a kind: which
-    of the forms over its sort the kind is, where an [Exact] or [Join] slot
-    collapses to [Exact Addressable] once every form over the sort coincides. A
-    mark reading of [Exact Id] says nothing about whether the kind is
-    addressable: the plain form of a rigid layout variable [x] reads [Exact Id]
-    while the addressability of [x] is still open. The question "is this kind
-    addressable?" has a different answer type, [Verdict.t], whose third case is
-    an honest [Undetermined].
+    [t] is also the result type of *normalized-mark* readings of a kind
+    ([Jkind.Layout.normalized_mark]), which answer how the kind stands to
+    whole-marking: [Exact Addressable] means the kind is addressable, so marking
+    it is a no-op; [Exact Id] means its root is exactly unmarked and the kind is
+    not known addressable, so it is distinct from its whole-marked form and
+    fails an [addressable] requirement; [Join] means the root mark is flexible.
+    On a [Sort] node this is exactly which form over the sort the kind is (any
+    slot collapses to [Exact Addressable] once the sort resolves intrinsically
+    addressable, where all forms coincide); on an unmarked [Product] it is
+    derived from the components ([combine_product]). A mark reading of
+    [Exact Id] says nothing about whether the kind is addressable: the plain
+    form of a rigid layout variable [x] reads [Exact Id] - it is distinct from
+    [x addressable] *as polymorphic kinds* - while the addressability of [x]
+    itself stays open. The question "is this kind addressable?" has a different
+    answer type, [Verdict.t], whose third case is an honest [Undetermined].
 
     As an order on marks this is flat and partial: the two exact forms are
     incomparable (the operator is a modifier, not a narrowing), and both are
@@ -129,10 +136,12 @@ module Addressability : sig
       identity. *)
   val meet : t -> t -> t option
 
-  (** The reading of a product of kinds from its components' readings:
-      [Exact Id] (not addressable) if any component is, otherwise [Join] if any
-      component is undetermined, otherwise [Exact Addressable]. This is not the
-      [meet] of the components. *)
+  (** The mark reading of an unmarked product from its components' readings:
+      [Exact Addressable] when every component reads addressable (whole-marking
+      the product is then a no-op), [Exact Id] when any component reads
+      [Exact Id] (even if others are marked: the product is then distinct from
+      its whole-marked form and not known addressable), and otherwise [Join].
+      This is not the [meet] of the components. *)
   val combine_product : t list -> t
 
   (** The reading of an action stored on a node whose carrier's intrinsic
