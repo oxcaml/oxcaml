@@ -2241,20 +2241,44 @@ let emit_instr ~first ~last ~fallthrough i =
          }
          :: !local_realloc_sites
   | Lop Poll ->
-    I.cmp (domain_field Domainstate.Domain_young_limit) r15;
-    let gc_call_label = L.create Text in
-    let lbl_after_poll = L.create Text in
-    let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
-    I.jbe (emit_asm_label_arg gc_call_label);
-    call_gc_sites
-      := { gc_lbl = gc_call_label;
-           gc_return_lbl = lbl_after_poll;
-           gc_dbg = i.dbg;
-           gc_frame = lbl_frame;
-           gc_save_simd = must_save_simd_regs i.live
-         }
-         :: !call_gc_sites;
-    D.define_label lbl_after_poll
+    if Config.faulting_safepoints
+    then (
+      (* A poll is a load through [Caml_state->safepoint_trigger], which faults
+         iff the runtime has armed the trigger by pointing it at an unmapped
+         page. The SEGV handler in the runtime makes the fault behave as a call
+         to a caml_call_gc* stub, so the frame descriptor is recorded after the
+         load. The handler relies on the exact encodings of the faulting load (2
+         or 3 bytes). The load's displacement tells the handler how much SIMD
+         state is live, and so which GC entry stub to enter. Displacements are
+         nonzero (to avoid assembler optimisation to a non-displaced load),
+         positive (to hit the trigger page), and multiples of 4 (so the same
+         values could be used on ARM64 in future). The SIMD versions cost one
+         byte, only at SIMD-live polls. *)
+      let disp =
+        match must_save_simd_regs i.live with
+        | Save_none -> 0
+        | Save_xmm -> 4
+        | Save_ymm -> 8
+        | Save_zmm -> 12
+      in
+      I.mov (domain_field Domainstate.Domain_safepoint_trigger) rcx;
+      I.mov (mem64 DWORD disp (Scalar RCX)) ecx;
+      record_frame i.live (Dbg_alloc []))
+    else (
+      I.cmp (domain_field Domainstate.Domain_young_limit) r15;
+      let gc_call_label = L.create Text in
+      let lbl_after_poll = L.create Text in
+      let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
+      I.jbe (emit_asm_label_arg gc_call_label);
+      call_gc_sites
+        := { gc_lbl = gc_call_label;
+             gc_return_lbl = lbl_after_poll;
+             gc_dbg = i.dbg;
+             gc_frame = lbl_frame;
+             gc_save_simd = must_save_simd_regs i.live
+           }
+           :: !call_gc_sites;
+      D.define_label lbl_after_poll)
   | Lop Pause -> I.pause ()
   | Lop (Intop (Icomp cmp)) ->
     if

@@ -459,6 +459,7 @@ AC_SUBST([compute_deps])
 AC_SUBST([intel_jcc_bug_cflags])
 AC_SUBST([stack_allocation])
 AC_SUBST([poll_insertion])
+AC_SUBST([faulting_safepoints])
 AC_SUBST([enable_multidomain])
 AC_SUBST([dune])
 AC_SUBST([opam])
@@ -856,6 +857,11 @@ AC_ARG_ENABLE([stack-allocation],
 AC_ARG_ENABLE([poll-insertion],
   [AS_HELP_STRING([--enable-poll-insertion],
     [enable insertion of poll points])])
+
+AC_ARG_ENABLE([faulting-safepoints],
+  [AS_HELP_STRING([--disable-faulting-safepoints],
+    [use the upstream compare-and-branch poll sequence even where
+     faulting safepoints are supported])])
 
 AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
   [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
@@ -3292,6 +3298,19 @@ AS_IF([test x"$enable_poll_insertion" = "xyes"],
   [AC_DEFINE([POLL_INSERTION])
    poll_insertion=true],
   [poll_insertion=false])
+
+# On amd64 and arm64, on Linux and macOS, poll insertion uses faulting
+# safepoints by default: a poll point compiles to a load through the
+# domain's safepoint_trigger pointer, and the runtime interrupts it by
+# pointing that at an unmapped page and fielding the SEGV, rather than
+# by a young_limit comparison at every poll.
+faulting_safepoints=false
+AS_IF([test x"$poll_insertion" = "xtrue"],
+  [AS_IF([test x"$enable_faulting_safepoints" != "xno"],
+    [AS_CASE(["$arch,$system"],
+      [amd64,linux|arm64,linux|amd64,macosx|arm64,macosx],
+        [faulting_safepoints=true
+         AC_DEFINE([FAULTING_SAFEPOINTS])])])])
 
 # Multidomain is permitted without stack checks, you'll just get large
 # non-resizeable fiber stacks.
