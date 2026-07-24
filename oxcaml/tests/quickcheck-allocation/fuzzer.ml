@@ -63,19 +63,19 @@ let cleanup mlfile =
     (fun ext -> try Sys.remove (base ^ ext) with _ -> ())
     [".ml"; ".cmi"; ".cmo"; ".cmx"; ".cmt"; ".cmti"; ".o"]
 
-let run_one stats ~compiler ~seed ~mode =
-  let sample = Gen.generate ~mode ~seed in
+let run_one stats ~compiler ~seed ~mode ~max_decls =
+  let sample = Gen.generate ~max_decls ~mode ~seed in
   let file = Filename.temp_file "qc_alloc" ".ml" in
   write_source file sample.Gen.Sample.source;
   let outcome = Oracle.check ~compiler ~file in
   Stats.record stats ~seed ~sample ~outcome;
   cleanup file
 
-let run ~compiler ~count ~seed0 ~mode =
+let run ~compiler ~count ~seed0 ~mode ~max_decls =
   let stats = Stats.create () in
   for k = 0 to count - 1 do
     let seed = seed0 + k in
-    run_one stats ~compiler ~seed ~mode
+    run_one stats ~compiler ~seed ~mode ~max_decls
   done;
   stats
 

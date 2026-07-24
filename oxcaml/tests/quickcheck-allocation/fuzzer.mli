@@ -1,9 +1,4 @@
-(* The fuzz loop: generate programs, run the oracle pipeline, and aggregate the
-   results. *)
-
 module Suspect : sig
-  (* A soundness suspect (FE-accept & BE-reject): ambiguous, needs manual
-     triage. *)
   type t =
     { seed : int;
       sample : Gen.Sample.t;
@@ -14,12 +9,9 @@ module Suspect : sig
 end
 
 module Gap : sig
-  (* A frontend rejection: a completeness (precision-gap) candidate, bucketed by
-     cause. The backend cannot confirm it, since the rejected program does not
-     compile. *)
   type t =
     { seed : int;
-      cause : string; (* canonical frontend rejection cause, for bucketing *)
+      cause : string;
       sample : Gen.Sample.t
     }
 end
@@ -37,17 +29,14 @@ module Stats : sig
   val gaps : t -> Gap.t list
 end
 
-(* Run [count] rounds starting from PRNG seed [seed0] (round [k] uses seed
-   [seed0 + k]), all in generation mode [mode]. [compiler] is the path to the
-   built [ocamlopt.opt]. *)
 val run :
-  compiler:string -> count:int -> seed0:int -> mode:Gen.Mode.t -> Stats.t
+  compiler:string ->
+  count:int ->
+  seed0:int ->
+  mode:Gen.Mode.t ->
+  max_decls:int ->
+  Stats.t
 
 val report : Stats.t -> unit
 
-(* Save witness .ml files to [dir] (created if missing): every soundness
-   suspect, and the first-seen witness of each distinct frontend-rejection
-   cause. File names embed the seed (e.g. suspect_seed0042.ml,
-   fe_reject_seed0007.ml), so any witness can be re-run with [-count 1 -seed
-   N]. *)
 val save : Stats.t -> dir:string -> unit

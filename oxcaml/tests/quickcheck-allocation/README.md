@@ -31,6 +31,8 @@ Flags:
   (`suspect_seed0042.ml`, `fe_reject_seed0007.ml`). Without this flag,
   nothing is saved: programs live in temp files only for the duration of
   their compiles, and results exist only on stdout
+- `-max-decls N` -- max type declarations generated per program; the count is
+  drawn uniformly from min(2, N) to N (default 4)
 
 Pass the compiler as an absolute path (it is invoked via the shell). The fuzz
 loop can also be run via its alias, which uses the just-built `ocamlopt.opt`

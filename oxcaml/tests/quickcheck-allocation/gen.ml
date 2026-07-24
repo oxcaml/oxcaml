@@ -71,8 +71,6 @@ module Arg_label = struct
     | Labelled of string
     | Optional of string
 
-  (* CR shsong: Can this be replaced by some existing function in the
-     compiler? *)
   let equal a b =
     match a, b with
     | Nolabel, Nolabel -> true
@@ -85,15 +83,16 @@ module Ty = struct
     type t =
       | Int
       | Float
+      | Bool
     (* CR-soon shsong: extend to support Char, Int64, and unboxed layouts
        (float#, int64#) *)
 
     let equal a b =
       match a, b with
-      | Int, Int | Float, Float -> true
-      | (Int | Float), _ -> false
+      | Int, Int | Float, Float | Bool, Bool -> true
+      | (Int | Float | Bool), _ -> false
 
-    let name = function Int -> "int" | Float -> "float"
+    let name = function Int -> "int" | Float -> "float" | Bool -> "bool"
   end
 
   (* Identifier (also the source name) of a user-declared nominal type. *)
@@ -223,10 +222,6 @@ module Ty = struct
   end
 end
 
-(* Expression builders over the compiler's own untyped AST: every builder
-   returns a [Parsetree.expression], constructed with [Ast_helper] and printed
-   with [Pprintast]. Well-typedness is still the generator's job ([gen_expr]);
-   this module only knows how to build each node. *)
 module Expr = struct
   let mknoloc = Location.mknoloc
 
@@ -239,18 +234,68 @@ module Expr = struct
   let float_lit f =
     Ast_helper.Exp.constant (Ast_helper.Const.float (Printf.sprintf "%F" f))
 
-  (* CR shsong: Consider to make it more comprehensive for completeness test. *)
+  let bool_lit b = Ast_helper.Exp.construct (lid (string_of_bool b)) None
+
   type binop =
     | Add
+    | Sub
+    | Mul
+    | Land
+    | Lor
+    | Lxor
+    | Lsl
+    | Lsr
+    | Asr
+    | Min
+    | Max
     | Fadd
+    | Fsub
+    | Fmul
+    | Fdiv
     | Leq
+    | Lt
+    | Geq
+    | Gt
+    | Eq
+    | Neq
+    | Phys_eq
+    | Phys_neq
+    | And
+    | Or
 
-  let binop_name = function Add -> "+" | Fadd -> "+." | Leq -> "<="
+  let binop_name = function
+    | Add -> "+"
+    | Sub -> "-"
+    | Mul -> "*"
+    | Land -> "land"
+    | Lor -> "lor"
+    | Lxor -> "lxor"
+    | Lsl -> "lsl"
+    | Lsr -> "lsr"
+    | Asr -> "asr"
+    | Min -> "min"
+    | Max -> "max"
+    | Fadd -> "+."
+    | Fsub -> "-."
+    | Fmul -> "*."
+    | Fdiv -> "/."
+    | Leq -> "<="
+    | Lt -> "<"
+    | Geq -> ">="
+    | Gt -> ">"
+    | Eq -> "="
+    | Neq -> "<>"
+    | Phys_eq -> "=="
+    | Phys_neq -> "!="
+    | And -> "&&"
+    | Or -> "||"
 
   let binop op a b =
     Ast_helper.Exp.apply
       (var (binop_name op))
       [Arg_label.Nolabel, a; Arg_label.Nolabel, b]
+
+  let unop name e = Ast_helper.Exp.apply (var name) [Arg_label.Nolabel, e]
 
   let if_ c t e = Ast_helper.Exp.ifthenelse c t (Some e)
 
@@ -392,39 +437,24 @@ let choose ctx options =
   in
   pick (Random.State.int ctx.rng total) options
 
-(* CR shsong: Is it ok to pick decl without deciding which type is desired? *)
 let pick_decl ctx =
   let decls = Ty.Tenv.decls ctx.tenv in
   List.nth decls (Random.State.int ctx.rng (List.length decls))
 
-(* Component types usable inside a type declaration: constants, strictly earlier
-   declarations (those already in [ctx.tenv] while [gen_decls] is running), and
-   -- for variant constructor arguments -- the declaring type itself, which is
-   what makes recursive variants (lists, trees) possible. *)
-let decl_component_ty ctx ~self =
-  let earlier = Ty.Tenv.decls ctx.tenv in
+let component_ty ctx ~self =
   choose ctx
     ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
-       (2, fun () -> Ty.Constant Ty.Constant.Float) ]
-    (* CR shsong: Why don't put the entire list of decl here? I feel each of
-       them should be placed at an equivalent place to Int and Float. It is ok
-       to adjust the probability of selecting of them, but I feel it is super
-       wierd to pre-select one and then select among the selected one and Int
-       and Float (and maybe self). *)
-    @ (if earlier = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
+       (2, fun () -> Ty.Constant Ty.Constant.Float);
+       (1, fun () -> Ty.Constant Ty.Constant.Bool) ]
+    @ List.map
+        (fun (d : Ty.Decl.decl) -> 1, fun () -> Ty.Constr d.id)
+        (Ty.Tenv.decls ctx.tenv)
     @ match self with None -> [] | Some id -> [(2, fun () -> Ty.Constr id)])
 
 let gen_record ctx =
-  (* CR shsong: Remove the logic to pick favored mode based on ctx.mode.
-     Also increase the favor over Mixed mode. *)
-  (* All-float (flat float layout) and all-int (all-immediate fields) records
-     are the mode-crossing-adjacent layouts; soundness mode favors them. *)
   let flavor =
     choose ctx
-      [ (3, fun () -> `Mixed);
-        ( (match ctx.mode with Mode.Soundness -> 2 | Mode.Completeness -> 1),
-          fun () -> `All_float );
-        (1, fun () -> `All_int) ]
+      [(6, fun () -> `Mixed); (1, fun () -> `All_float); (1, fun () -> `All_int)]
   in
   let n_fields = 1 + Random.State.int ctx.rng 3 in
   Ty.Decl.Record
@@ -434,7 +464,7 @@ let gen_record ctx =
              (match flavor with
              | `All_float -> Ty.Constant Ty.Constant.Float
              | `All_int -> Ty.Constant Ty.Constant.Int
-             | `Mixed -> decl_component_ty ctx ~self:None);
+             | `Mixed -> component_ty ctx ~self:None);
            f_mutable = Random.State.int ctx.rng 4 = 0
          }))
 
@@ -444,8 +474,7 @@ let gen_variant ctx ~id =
     List.init n_constrs (fun _ ->
         let n_args = Random.State.int ctx.rng 3 in
         { Ty.Decl.c_name = fresh_constr ctx;
-          c_args =
-            List.init n_args (fun _ -> decl_component_ty ctx ~self:(Some id))
+          c_args = List.init n_args (fun _ -> component_ty ctx ~self:(Some id))
         })
   in
   (* Constructibility invariant: guarantee a nullary base constructor, so
@@ -464,14 +493,9 @@ let gen_variant ctx ~id =
   in
   Ty.Decl.Variant constrs
 
-(* CR shsong: Make the max possible number of declarations as a parameter,
-   and expose it to the top level. *)
-(* Generate this program's type declarations. Each may reference strictly
-   earlier ones (and variants may reference themselves), so every declared type
-   is constructible by induction on declaration order, with recursive variants
-   bottoming out at their nullary constructor. *)
-let gen_decls ctx =
-  let n = 2 + Random.State.int ctx.rng 3 in
+let gen_decls ctx ~max_decls =
+  let lo = min 2 max_decls in
+  let n = lo + Random.State.int ctx.rng (max_decls - lo + 1) in
   for _ = 1 to n do
     let id = fresh_ty_name ctx in
     let kind =
@@ -480,21 +504,6 @@ let gen_decls ctx =
     in
     ctx.tenv <- ctx.tenv @ [{ Ty.Decl.id; kind }]
   done
-
-(* CR shsong: This function seems to be very similar to decl_component_ty, where both pick some types.
-The only difference is that small_ty do not have self. Consider to merge them. *)
-(* Component types for tuples / lists / arrays / function payloads: constants
-   and declared types. Declared types are constructible in finitely many steps
-   (see [gen_decls]), which preserves the termination argument: composite
-   children generated at exhausted fuel still bottom out. *)
-let small_ty ctx =
-  let decls = Ty.Tenv.decls ctx.tenv in
-  choose ctx
-    ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
-       (2, fun () -> Ty.Constant Ty.Constant.Float) ]
-    (* CR shsong: Similar issue: should just append the list of all decl here
-       with some favor number. *)
-    @ if decls = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
 
 let fun_ty ctx =
   let shape =
@@ -527,13 +536,15 @@ let fun_ty ctx =
   (* CR-soon shsong: It seems that currently a function type can only be an 1 or
      2-ary function returns small_ty. *)
   List.fold_right
-    (fun label ret -> Ty.Arrow { label; arg = small_ty ctx; ret })
-    labels (small_ty ctx)
+    (fun label ret ->
+      Ty.Arrow { label; arg = component_ty ctx ~self:None; ret })
+    labels
+    (component_ty ctx ~self:None)
 
 let goal_ty ctx =
   let tuple () =
     let n = 2 + Random.State.int ctx.rng 2 in
-    Ty.Tuple (List.init n (fun _ -> small_ty ctx))
+    Ty.Tuple (List.init n (fun _ -> component_ty ctx ~self:None))
   in
   let constr () = Ty.Constr (pick_decl ctx).id in
   match ctx.mode with
@@ -541,10 +552,11 @@ let goal_ty ctx =
     choose ctx
       [ (3, fun () -> Ty.Constant Ty.Constant.Int);
         (2, fun () -> Ty.Constant Ty.Constant.Float);
+        (1, fun () -> Ty.Constant Ty.Constant.Bool);
         4, constr;
         2, tuple;
-        (1, fun () -> Ty.List (small_ty ctx));
-        (1, fun () -> Ty.Array (small_ty ctx));
+        (1, fun () -> Ty.List (component_ty ctx ~self:None));
+        (1, fun () -> Ty.Array (component_ty ctx ~self:None));
         (* returning a closure is prime soundness bait: the closure (and its
            captures) must be allocated *)
         (2, fun () -> fun_ty ctx) ]
@@ -552,9 +564,10 @@ let goal_ty ctx =
     choose ctx
       [ (6, fun () -> Ty.Constant Ty.Constant.Int);
         (2, fun () -> Ty.Constant Ty.Constant.Float);
+        (3, fun () -> Ty.Constant Ty.Constant.Bool);
         2, constr;
         1, tuple;
-        (1, fun () -> Ty.List (small_ty ctx));
+        (1, fun () -> Ty.List (component_ty ctx ~self:None));
         (1, fun () -> fun_ty ctx) ]
 
 let int_lit ctx = Expr.int_lit (Random.State.int ctx.rng 13 - 3)
@@ -562,292 +575,291 @@ let int_lit ctx = Expr.int_lit (Random.State.int ctx.rng 13 - 3)
 let float_lit ctx =
   Expr.float_lit (float_of_int (Random.State.int ctx.rng 13 - 3) *. 0.5)
 
-(* CR shsong: Try to split this very long function into multiple functions.
-   Specifically, many functions defined in its function should be able to
-   moved out. *)
-(* Generate a well-typed expression of type [ty] in environment [env]. Every
-   recursive call decreases [fuel]; once fuel is exhausted only non-recursive
-   productions (and construction whose children bottom out -- literals, nullary
-   constructors, strictly-earlier declarations) remain, so generation
-   terminates. *)
+let bool_lit ctx = Expr.bool_lit (Random.State.int ctx.rng 2 = 0)
+
+let is_completeness ctx =
+  match ctx.mode with Mode.Completeness -> true | Mode.Soundness -> false
+
+let app_candidates env ty =
+  List.concat_map
+    (fun (x, ty') ->
+      match Ty.arrows ty' with
+      | [], _ -> []
+      | params, result ->
+        let n = List.length params in
+        let indices = List.init n (fun i -> i) in
+        let nth i = List.nth params i in
+        let is_positional i =
+          match fst (nth i) with
+          | Arg_label.Nolabel -> true
+          | Arg_label.Labelled _ | Arg_label.Optional _ -> false
+        in
+        List.filter_map
+          (fun mask ->
+            let in_set i = mask land (1 lsl i) <> 0 in
+            (* no positional parameter may be supplied after a skipped one *)
+            let positionals_form_prefix =
+              let rec ok seen_skipped = function
+                | [] -> true
+                | i :: rest ->
+                  if in_set i
+                  then (not seen_skipped) && ok false rest
+                  else ok true rest
+              in
+              ok false (List.filter is_positional indices)
+            in
+            if not positionals_form_prefix
+            then None
+            else begin
+              let erased i =
+                (match fst (nth i) with
+                  | Arg_label.Optional _ -> not (in_set i)
+                  | Arg_label.Nolabel | Arg_label.Labelled _ -> false)
+                && List.exists
+                     (fun j -> j > i && in_set j && is_positional j)
+                     indices
+              in
+              let remaining =
+                List.fold_right
+                  (fun i acc ->
+                    if in_set i || erased i
+                    then acc
+                    else
+                      let label, arg = nth i in
+                      Ty.Arrow { label; arg; ret = acc })
+                  indices result
+              in
+              if Ty.equal remaining ty
+              then
+                Some
+                  ( x,
+                    List.filter_map
+                      (fun i -> if in_set i then Some (nth i) else None)
+                      indices )
+              else None
+            end)
+          (List.init ((1 lsl n) - 1) (fun m -> m + 1)))
+    env
+
 let rec gen_expr ctx env ty fuel =
-  let completeness =
-    match ctx.mode with Mode.Completeness -> true | Mode.Soundness -> false
-  in
+  let completeness = is_completeness ctx in
   let deep w = if fuel > 0 then w else 0 in
   (* Productions available at every type. *)
-  let vars = List.filter (fun (_, ty') -> Ty.equal ty' ty) env in
-  let use_var () =
-    let x, _ = List.nth vars (Random.State.int ctx.rng (List.length vars)) in
-    Expr.var x
-  in
-  let let_in () =
-    (* XCR shsong: bound_ty cannot be user-defined type here like a record or a
-       variant.
-
-       aide on behalf of shsong: [small_ty] now includes declared record /
-       variant types, so [let]-bound values cover them too. *)
-    let bound_ty =
-      choose ctx
-        [ (4, fun () -> small_ty ctx);
-          ((if completeness then 1 else 2), fun () -> fun_ty ctx) ]
-    in
-    let x = fresh ctx in
-    let e1 = gen_expr ctx env bound_ty (fuel - 1) in
-    let e2 = gen_expr ctx ((x, bound_ty) :: env) ty (fuel - 1) in
-    Expr.let_ x e1 e2
-  in
-  let if_ () =
-    let int_ty = Ty.Constant Ty.Constant.Int in
-    let c =
-      Expr.binop Expr.Leq
-        (gen_expr ctx env int_ty (fuel - 1))
-        (gen_expr ctx env int_ty (fuel - 1))
-    in
-    Expr.if_ c (gen_expr ctx env ty (fuel - 1)) (gen_expr ctx env ty (fuel - 1))
-  in
-  (* Tier C: apply an in-scope function. Argument matching follows OCaml's
-     rules, so an application may skip parameters and supply them later: -
-     labeled / optional parameters commute: any subset of them may be supplied,
-     in any order relative to the rest; - positional parameters cannot be
-     reordered: the supplied ones must form a prefix of the function's
-     positional parameters; - a skipped [Optional] parameter is erased
-     (defaulted) if a positional argument matching a later parameter is
-     supplied, and otherwise remains in the result type. A candidate is a
-     function variable plus a nonempty parameter subset such that the type
-     remaining after the application equals the goal type; supplying fewer than
-     all parameters is partial application. Subsets are enumerated by bitmask,
-     which is fine while [fun_ty] chains stay short. *)
-  let app_candidates =
-    List.concat_map
-      (fun (x, ty') ->
-        match Ty.arrows ty' with
-        | [], _ -> []
-        | params, result ->
-          let n = List.length params in
-          let indices = List.init n (fun i -> i) in
-          let nth i = List.nth params i in
-          let is_positional i =
-            match fst (nth i) with
-            | Arg_label.Nolabel -> true
-            | Arg_label.Labelled _ | Arg_label.Optional _ -> false
-          in
-          List.filter_map
-            (fun mask ->
-              let in_set i = mask land (1 lsl i) <> 0 in
-              (* no positional parameter may be supplied after a skipped one *)
-              let positionals_form_prefix =
-                let rec ok seen_skipped = function
-                  | [] -> true
-                  | i :: rest ->
-                    if in_set i
-                    then (not seen_skipped) && ok false rest
-                    else ok true rest
-                in
-                ok false (List.filter is_positional indices)
-              in
-              if not positionals_form_prefix
-              then None
-              else begin
-                let erased i =
-                  (match fst (nth i) with
-                    | Arg_label.Optional _ -> not (in_set i)
-                    | Arg_label.Nolabel | Arg_label.Labelled _ -> false)
-                  && List.exists
-                       (fun j -> j > i && in_set j && is_positional j)
-                       indices
-                in
-                let remaining =
-                  List.fold_right
-                    (fun i acc ->
-                      if in_set i || erased i
-                      then acc
-                      else
-                        let label, arg = nth i in
-                        Ty.Arrow { label; arg; ret = acc })
-                    indices result
-                in
-                if Ty.equal remaining ty
-                then
-                  Some
-                    ( x,
-                      List.filter_map
-                        (fun i -> if in_set i then Some (nth i) else None)
-                        indices )
-                else None
-              end)
-            (List.init ((1 lsl n) - 1) (fun m -> m + 1)))
-      env
-  in
-  let apply () =
-    let f, supplied =
-      List.nth app_candidates
-        (Random.State.int ctx.rng (List.length app_candidates))
-    in
-    let args =
-      List.map
-        (fun ((label : Arg_label.t), arg_ty) ->
-          label, gen_expr ctx env arg_ty (fuel - 1))
-        supplied
-    in
-    (* Labeled arguments also commute syntactically: sometimes emit them ahead
-       of the positional ones (the relative order of positional arguments is
-       preserved either way). *)
-    let args =
-      if List.length args > 1 && Random.State.int ctx.rng 2 = 0
-      then begin
-        let labeled, positional =
-          List.partition
-            (fun ((l : Arg_label.t), _) ->
-              match l with Labelled _ | Optional _ -> true | Nolabel -> false)
-            args
-        in
-        labeled @ positional
-      end
-      else args
-    in
-    Expr.app (Expr.var f) args
-  in
+  let matching_vars = List.filter (fun (_, ty') -> Ty.equal ty' ty) env in
+  let candidates = app_candidates env ty in
   let generic =
-    [ (if vars = [] then 0 else 3), use_var;
-      deep 1, let_in;
-      deep (if completeness then 3 else 1), if_;
-      ( (if app_candidates = [] then 0 else deep (if completeness then 2 else 3)),
-        apply ) ]
+    [ ( (if matching_vars = [] then 0 else 3),
+        fun () ->
+          (* pick one of the in-scope variables of the goal type *)
+          let x, _ =
+            List.nth matching_vars
+              (Random.State.int ctx.rng (List.length matching_vars))
+          in
+          Expr.var x );
+      (deep 1, fun () -> gen_let_in ctx env ty fuel);
+      (deep (if completeness then 3 else 1), fun () -> gen_if ctx env ty fuel);
+      ( (if candidates = [] then 0 else deep (if completeness then 2 else 3)),
+        fun () -> gen_apply ctx env fuel candidates ) ]
   in
-  (* Productions specific to the goal type. *)
-  let structural =
-    match ty with
-    | Ty.Constant Ty.Constant.Int ->
-      [ (2, fun () -> int_lit ctx);
-        ( deep (if completeness then 4 else 2),
-          fun () ->
-            Expr.binop Expr.Add
-              (gen_expr ctx env ty (fuel - 1))
-              (gen_expr ctx env ty (fuel - 1)) ) ]
-    | Ty.Constant Ty.Constant.Float ->
-      [ (2, fun () -> float_lit ctx);
-        ( deep 2,
-          fun () ->
-            Expr.binop Expr.Fadd
-              (gen_expr ctx env ty (fuel - 1))
-              (gen_expr ctx env ty (fuel - 1)) ) ]
-    | Ty.Tuple ts ->
-      [ ( 4,
-          fun () ->
-            Expr.tuple (List.map (fun t -> gen_expr ctx env t (fuel - 1)) ts) )
-      ]
-    | Ty.List t ->
-      [ (2, fun () -> Expr.nil);
-        ( deep 3,
-          fun () ->
-            Expr.cons
-              (gen_expr ctx env t (fuel - 1))
-              (gen_expr ctx env ty (fuel - 1)) ) ]
-    | Ty.Array t ->
-      [ ( 3,
-          fun () ->
-            let n = Random.State.int ctx.rng 4 in
-            Expr.array_lit
-              (List.init n (fun _ -> gen_expr ctx env t (fuel - 1))) ) ]
-    | Ty.Constr id -> (
-      match Ty.Tenv.lookup ctx.tenv id with
-      | Ty.Decl.Record fields ->
-        [ ( 4,
-            fun () ->
-              Expr.record
-                (List.map
-                   (fun (f : Ty.Decl.field) ->
-                     f.f_name, gen_expr ctx env f.f_ty (fuel - 1))
-                   fields) ) ]
-      | Ty.Decl.Variant constrs ->
-        (* One production per constructor. Soundness mode favors nullary
-           (immediate, mode-crossing) constructors; non-nullary ones recurse and
-           are fuel-gated, bottoming out at the guaranteed nullary base
-           constructor. *)
-        List.map
-          (fun (c : Ty.Decl.constructor) ->
-            match c.c_args with
-            | [] ->
-              ( (if completeness then 2 else 4),
-                fun () -> Expr.construct c.c_name [] )
-            | args ->
-              ( deep 2,
-                fun () ->
-                  Expr.construct c.c_name
-                    (List.map (fun t -> gen_expr ctx env t (fuel - 1)) args) ))
-          constrs)
-    (* Tier B: lambdas. Bind a prefix of [k] parameters in this [Lam]; k < chain
-       length leaves a function-typed body, i.e. nested closures, while k =
-       chain length is the n-ary single-closure form -- same type, different
-       allocation behavior, so both are generated. Split points where a bound
-       [Optional] parameter is not followed by a bound positional one are
-       excluded (the optional would be unerasable within this syntactic
-       function: warning 16). Parameter binders are fresh and independent of the
-       type-side labels; a default expression may refer to earlier parameters of
-       the same lambda. Not [deep]-gated: like construction, a lambda must be
-       available at exhausted fuel (its body then bottoms out in leaves, since
-       [fun_ty] components are [small_ty]). *)
-    | Ty.Arrow _ ->
-      [ ( 4,
-          fun () ->
-            let all, _result = Ty.arrows ty in
-            let total = List.length all in
-            let valid k =
-              let prefix = List.filteri (fun i _ -> i < k) all in
-              let rec ok = function
-                | [] -> true
-                | ((l : Arg_label.t), _) :: rest -> (
-                  match l with
-                  | Optional _ ->
-                    List.exists
-                      (fun ((l', _) : Arg_label.t * _) ->
-                        match l' with
-                        | Nolabel -> true
-                        | Labelled _ | Optional _ -> false)
-                      rest
-                    && ok rest
-                  | Nolabel | Labelled _ -> ok rest)
-              in
-              ok prefix
-            in
-            (* k = total is always valid thanks to [fun_ty]'s erasability
-               invariant, so [ks] is never empty. *)
-            let ks = List.filter valid (List.init total (fun i -> i + 1)) in
-            let k = List.nth ks (Random.State.int ctx.rng (List.length ks)) in
-            let prefix = List.filteri (fun i _ -> i < k) all in
-            let rec ret_after k chain =
-              if k = 0
-              then chain
-              else
-                match chain with
-                | Ty.Arrow { ret; _ } -> ret_after (k - 1) ret
-                | _ -> assert false
-            in
-            let rev_params, env' =
-              List.fold_left
-                (fun (params, env) ((label : Arg_label.t), arg_ty) ->
-                  let x = fresh ctx in
-                  let param =
-                    match label with
-                    | Nolabel -> Expr.param_positional x arg_ty
-                    | Labelled l -> Expr.param_labelled l x arg_ty
-                    | Optional l ->
-                      (* always with a default for now; see
-                         [Expr.param_optional] *)
-                      Expr.param_optional l x arg_ty
-                        ~default:(gen_expr ctx env arg_ty (fuel - 1))
-                  in
-                  param :: params, (x, arg_ty) :: env)
-                ([], env) prefix
-            in
-            Expr.lam (List.rev rev_params)
-              (gen_expr ctx env' (ret_after k ty) (fuel - 1)) ) ]
-  in
-  choose ctx (generic @ structural)
+  choose ctx (generic @ structural_productions ctx env ty fuel)
 
-(* CR: [exclave_] is only placed at the very top of the body (a tail position by
-   construction). Extend to tail positions of [if]/[let] when Tier B lands. *)
+and gen_let_in ctx env ty fuel =
+  let bound_ty =
+    choose ctx
+      [ (4, fun () -> component_ty ctx ~self:None);
+        ((if is_completeness ctx then 1 else 2), fun () -> fun_ty ctx) ]
+  in
+  let x = fresh ctx in
+  let e1 = gen_expr ctx env bound_ty (fuel - 1) in
+  let e2 = gen_expr ctx ((x, bound_ty) :: env) ty (fuel - 1) in
+  Expr.let_ x e1 e2
+
+and gen_if ctx env ty fuel =
+  let c = gen_expr ctx env (Ty.Constant Ty.Constant.Bool) (fuel - 1) in
+  Expr.if_ c (gen_expr ctx env ty (fuel - 1)) (gen_expr ctx env ty (fuel - 1))
+
+and gen_apply ctx env fuel candidates =
+  let f, supplied =
+    List.nth candidates (Random.State.int ctx.rng (List.length candidates))
+  in
+  let args =
+    List.map
+      (fun ((label : Arg_label.t), arg_ty) ->
+        label, gen_expr ctx env arg_ty (fuel - 1))
+      supplied
+  in
+  (* Labeled arguments also commute syntactically: sometimes emit them ahead of
+     the positional ones (the relative order of positional arguments is
+     preserved either way). *)
+  let args =
+    if List.length args > 1 && Random.State.int ctx.rng 2 = 0
+    then begin
+      let labeled, positional =
+        List.partition
+          (fun ((l : Arg_label.t), _) ->
+            match l with Labelled _ | Optional _ -> true | Nolabel -> false)
+          args
+      in
+      labeled @ positional
+    end
+    else args
+  in
+  Expr.app (Expr.var f) args
+
+and gen_lambda ctx env ty fuel =
+  let all, _result = Ty.arrows ty in
+  let total = List.length all in
+  let valid k =
+    let prefix = List.filteri (fun i _ -> i < k) all in
+    let rec ok = function
+      | [] -> true
+      | ((l : Arg_label.t), _) :: rest -> (
+        match l with
+        | Optional _ ->
+          List.exists
+            (fun ((l', _) : Arg_label.t * _) ->
+              match l' with Nolabel -> true | Labelled _ | Optional _ -> false)
+            rest
+          && ok rest
+        | Nolabel | Labelled _ -> ok rest)
+    in
+    ok prefix
+  in
+  (* k = total is always valid thanks to [fun_ty]'s erasability invariant, so
+     [ks] is never empty. *)
+  let ks = List.filter valid (List.init total (fun i -> i + 1)) in
+  let k = List.nth ks (Random.State.int ctx.rng (List.length ks)) in
+  let prefix = List.filteri (fun i _ -> i < k) all in
+  let rec ret_after k chain =
+    if k = 0
+    then chain
+    else
+      match chain with
+      | Ty.Arrow { ret; _ } -> ret_after (k - 1) ret
+      | _ -> assert false
+  in
+  let rev_params, env' =
+    List.fold_left
+      (fun (params, env) ((label : Arg_label.t), arg_ty) ->
+        let x = fresh ctx in
+        let param =
+          match label with
+          | Nolabel -> Expr.param_positional x arg_ty
+          | Labelled l -> Expr.param_labelled l x arg_ty
+          | Optional l ->
+            (* always with a default for now; see [Expr.param_optional] *)
+            Expr.param_optional l x arg_ty
+              ~default:(gen_expr ctx env arg_ty (fuel - 1))
+        in
+        param :: params, (x, arg_ty) :: env)
+      ([], env) prefix
+  in
+  Expr.lam (List.rev rev_params) (gen_expr ctx env' (ret_after k ty) (fuel - 1))
+
+(* Productions specific to the goal type. *)
+and structural_productions ctx env ty fuel =
+  let completeness = is_completeness ctx in
+  let deep w = if fuel > 0 then w else 0 in
+  match ty with
+  | Ty.Constant Ty.Constant.Int ->
+    (* One arithmetic production; the operator is picked uniformly inside so
+       adding operators does not inflate the arithmetic-vs-other balance. *)
+    let ops = Expr.[Add; Sub; Mul; Land; Lor; Lxor; Lsl; Lsr; Asr; Min; Max] in
+    [ (2, fun () -> int_lit ctx);
+      ( deep (if completeness then 4 else 2),
+        fun () ->
+          let op = List.nth ops (Random.State.int ctx.rng (List.length ops)) in
+          Expr.binop op
+            (gen_expr ctx env ty (fuel - 1))
+            (gen_expr ctx env ty (fuel - 1)) );
+      (deep 1, fun () -> Expr.unop "~-" (gen_expr ctx env ty (fuel - 1))) ]
+  | Ty.Constant Ty.Constant.Float ->
+    let ops = Expr.[Fadd; Fsub; Fmul; Fdiv] in
+    [ (2, fun () -> float_lit ctx);
+      ( deep 2,
+        fun () ->
+          let op = List.nth ops (Random.State.int ctx.rng (List.length ops)) in
+          Expr.binop op
+            (gen_expr ctx env ty (fuel - 1))
+            (gen_expr ctx env ty (fuel - 1)) );
+      (deep 1, fun () -> Expr.unop "~-." (gen_expr ctx env ty (fuel - 1))) ]
+  | Ty.Constant Ty.Constant.Bool ->
+    let cmp_ops = Expr.[Leq; Lt; Geq; Gt; Eq; Neq; Phys_eq; Phys_neq] in
+    let bool_ops = Expr.[And; Or] in
+    [ (2, fun () -> bool_lit ctx);
+      ( deep (if completeness then 4 else 2),
+        fun () ->
+          let op =
+            List.nth cmp_ops (Random.State.int ctx.rng (List.length cmp_ops))
+          in
+          let arg_ty =
+            if Random.State.int ctx.rng 2 = 0
+            then Ty.Constant Ty.Constant.Int
+            else Ty.Constant Ty.Constant.Float
+          in
+          Expr.binop op
+            (gen_expr ctx env arg_ty (fuel - 1))
+            (gen_expr ctx env arg_ty (fuel - 1)) );
+      ( deep 2,
+        fun () ->
+          let op =
+            List.nth bool_ops (Random.State.int ctx.rng (List.length bool_ops))
+          in
+          Expr.binop op
+            (gen_expr ctx env ty (fuel - 1))
+            (gen_expr ctx env ty (fuel - 1)) );
+      (deep 1, fun () -> Expr.unop "not" (gen_expr ctx env ty (fuel - 1))) ]
+  | Ty.Tuple ts ->
+    [ ( 4,
+        fun () ->
+          Expr.tuple (List.map (fun t -> gen_expr ctx env t (fuel - 1)) ts) ) ]
+  | Ty.List t ->
+    [ (2, fun () -> Expr.nil);
+      ( deep 3,
+        fun () ->
+          Expr.cons
+            (gen_expr ctx env t (fuel - 1))
+            (gen_expr ctx env ty (fuel - 1)) ) ]
+  | Ty.Array t ->
+    [ ( 3,
+        fun () ->
+          let n = Random.State.int ctx.rng 4 in
+          Expr.array_lit (List.init n (fun _ -> gen_expr ctx env t (fuel - 1)))
+      ) ]
+  | Ty.Constr id -> (
+    match Ty.Tenv.lookup ctx.tenv id with
+    | Ty.Decl.Record fields ->
+      [ ( 4,
+          fun () ->
+            Expr.record
+              (List.map
+                 (fun (f : Ty.Decl.field) ->
+                   f.f_name, gen_expr ctx env f.f_ty (fuel - 1))
+                 fields) ) ]
+    | Ty.Decl.Variant constrs ->
+      (* One production per constructor. Soundness mode favors nullary
+         (immediate, mode-crossing) constructors; non-nullary ones recurse and
+         are fuel-gated, bottoming out at the guaranteed nullary base
+         constructor. *)
+      List.map
+        (fun (c : Ty.Decl.constructor) ->
+          match c.c_args with
+          | [] ->
+            ( (if completeness then 2 else 4),
+              fun () -> Expr.construct c.c_name [] )
+          | args ->
+            ( deep 2,
+              fun () ->
+                Expr.construct c.c_name
+                  (List.map (fun t -> gen_expr ctx env t (fuel - 1)) args) ))
+        constrs)
+  (* Not [deep]-gated: like construction, a lambda must be available at
+     exhausted fuel (its body then bottoms out in leaves, since [fun_ty]
+     components are [component_ty]). *)
+  | Ty.Arrow _ -> [(4, fun () -> gen_lambda ctx env ty fuel)]
+
+(* CR-soon shsong: [exclave_] is only placed at the very top of the body (a tail
+   position by construction). Extend to tail positions of [if]/[let]. *)
 let maybe_exclave ctx ty body =
   match ctx.mode with
   | Mode.Soundness
@@ -857,7 +869,7 @@ let maybe_exclave ctx ty body =
 
 let initial_fuel = 5
 
-let generate ~mode ~seed =
+let generate ~max_decls ~mode ~seed =
   let ctx =
     { rng = Random.State.make [| seed |];
       next_var = 0;
@@ -868,7 +880,7 @@ let generate ~mode ~seed =
       mode
     }
   in
-  gen_decls ctx;
+  gen_decls ctx ~max_decls;
   let int_ty = Ty.Constant Ty.Constant.Int in
   let float_ty = Ty.Constant Ty.Constant.Float in
   let env = ["x0", int_ty; "x1", float_ty] in
