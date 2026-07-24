@@ -85,8 +85,8 @@ module Ty = struct
     type t =
       | Int
       | Float
-    (* CR shsong: extend to support Char, Int64, and unboxed layouts (float#,
-       int64#) *)
+    (* CR-soon shsong: extend to support Char, Int64, and unboxed layouts
+       (float#, int64#) *)
 
     let equal a b =
       match a, b with
@@ -158,7 +158,7 @@ module Ty = struct
       { f_name : string;
         f_ty : t;
         f_mutable : bool
-            (* CR shsong: declared but assignments are not generated yet
+            (* CR-soon shsong: declared but assignments are not generated yet
                (mutation wants a unit type and sequencing) *)
       }
 
@@ -239,7 +239,7 @@ module Expr = struct
   let float_lit f =
     Ast_helper.Exp.constant (Ast_helper.Const.float (Printf.sprintf "%F" f))
 
-  (* CR shong: Consider to make it more comprehensive for completeness test. *)
+  (* CR shsong: Consider to make it more comprehensive for completeness test. *)
   type binop =
     | Add
     | Fadd
@@ -308,7 +308,7 @@ module Expr = struct
   (* The default is mandatory here, so the binder has type [ty] in the body. A
      default-free optional parameter would bind [ty option] instead.
 
-     CR shsong: default-free optional parameters are NOT generated yet: the
+     CR-soon shsong: default-free optional parameters are NOT generated yet: the
      binder would have type [t option], which needs option types in [Ty]. *)
   let param_optional l x ty ~default =
     let default =
@@ -392,6 +392,7 @@ let choose ctx options =
   in
   pick (Random.State.int ctx.rng total) options
 
+(* CR shsong: Is it ok to pick decl without deciding which type is desired? *)
 let pick_decl ctx =
   let decls = Ty.Tenv.decls ctx.tenv in
   List.nth decls (Random.State.int ctx.rng (List.length decls))
@@ -405,10 +406,17 @@ let decl_component_ty ctx ~self =
   choose ctx
     ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
        (2, fun () -> Ty.Constant Ty.Constant.Float) ]
+    (* CR shsong: Why don't put the entire list of decl here? I feel each of
+       them should be placed at an equivalent place to Int and Float. It is ok
+       to adjust the probability of selecting of them, but I feel it is super
+       wierd to pre-select one and then select among the selected one and Int
+       and Float (and maybe self). *)
     @ (if earlier = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
     @ match self with None -> [] | Some id -> [(2, fun () -> Ty.Constr id)])
 
 let gen_record ctx =
+  (* CR shsong: Remove the logic to pick favored mode based on ctx.mode.
+     Also increase the favor over Mixed mode. *)
   (* All-float (flat float layout) and all-int (all-immediate fields) records
      are the mode-crossing-adjacent layouts; soundness mode favors them. *)
   let flavor =
@@ -456,6 +464,8 @@ let gen_variant ctx ~id =
   in
   Ty.Decl.Variant constrs
 
+(* CR shsong: Make the max possible number of declarations as a parameter,
+   and expose it to the top level. *)
 (* Generate this program's type declarations. Each may reference strictly
    earlier ones (and variants may reference themselves), so every declared type
    is constructible by induction on declaration order, with recursive variants
@@ -471,6 +481,8 @@ let gen_decls ctx =
     ctx.tenv <- ctx.tenv @ [{ Ty.Decl.id; kind }]
   done
 
+(* CR shsong: This function seems to be very similar to decl_component_ty, where both pick some types.
+The only difference is that small_ty do not have self. Consider to merge them. *)
 (* Component types for tuples / lists / arrays / function payloads: constants
    and declared types. Declared types are constructible in finitely many steps
    (see [gen_decls]), which preserves the termination argument: composite
@@ -480,20 +492,10 @@ let small_ty ctx =
   choose ctx
     ([ (3, fun () -> Ty.Constant Ty.Constant.Int);
        (2, fun () -> Ty.Constant Ty.Constant.Float) ]
+    (* CR shsong: Similar issue: should just append the list of all decl here
+       with some favor number. *)
     @ if decls = [] then [] else [(2, fun () -> Ty.Constr (pick_decl ctx).id)])
 
-(* Function types, for [let]-bound and returned closures (Tiers B and C).
-   Components are [small_ty], mirroring its termination argument. Parameter
-   shapes come from a fixed list that respects the erasability invariant: every
-   [Optional] parameter is followed by a positional one (otherwise it could
-   never be omitted at a call site, and the definition trips warning 16).
-
-   Labels come from a tiny fixed pool, distinct within a chain (duplicate labels
-   in one type would break argument matching) but deliberately shared across
-   function types: a partially-applied remainder with leftover labeled
-   parameters can then equal an independently generated goal type, which is what
-   makes label-skipping candidates reachable at all. Binders are separate from
-   labels, so this reuse cannot cause shadowing. *)
 let fun_ty ctx =
   let shape =
     choose ctx
@@ -522,20 +524,12 @@ let fun_ty ctx =
           Arg_label.Optional l)
       shape
   in
-  (* CR shsong: It seems that currently a function type can only be an 1 or
+  (* CR-soon shsong: It seems that currently a function type can only be an 1 or
      2-ary function returns small_ty. *)
   List.fold_right
     (fun label ret -> Ty.Arrow { label; arg = small_ty ctx; ret })
     labels (small_ty ctx)
 
-(* XCR shsong: We should allow more flexibility of generated type here: 1. Avoid
-   having small_ty, i.e., allow other types in pair, list, array, and function
-   return type; 2. Allow more kinds of variant and record types.
-
-   aide on behalf of shsong: part 2 is done -- records and variants are now
-   arbitrary generated declarations, picked here via [Ty.Constr]. Part 1 remains
-   open: [small_ty] still gates component types (it is also the current
-   termination argument, so lifting it needs a replacement bound). *)
 let goal_ty ctx =
   let tuple () =
     let n = 2 + Random.State.int ctx.rng 2 in
@@ -568,6 +562,9 @@ let int_lit ctx = Expr.int_lit (Random.State.int ctx.rng 13 - 3)
 let float_lit ctx =
   Expr.float_lit (float_of_int (Random.State.int ctx.rng 13 - 3) *. 0.5)
 
+(* CR shsong: Try to split this very long function into multiple functions.
+   Specifically, many functions defined in its function should be able to
+   moved out. *)
 (* Generate a well-typed expression of type [ty] in environment [env]. Every
    recursive call decreases [fuel]; once fuel is exhausted only non-recursive
    productions (and construction whose children bottom out -- literals, nullary
