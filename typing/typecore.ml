@@ -585,6 +585,9 @@ let as_single_mode {mode; tuple_modes; _} =
       Value.meet (mode :: l)
   | None -> mode
 
+let proj_staticity mode =
+  Staticity.disallow_left (Value.proj_monadic Staticity mode)
+
 let mode_morph f expected_mode =
   let mode = as_single_mode expected_mode in
   let mode = f mode |> Mode.Value.disallow_left in
@@ -6966,11 +6969,15 @@ and type_expect_
             in
             Texp_ident { path; lid; desc; kind;
               unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+                (as_single_mode expected_mode);
+              staticity = proj_staticity (as_single_mode expected_mode);
+              mode = actual_mode }
         | _ ->
             Texp_ident { path; lid; desc; kind;
               unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+                (as_single_mode expected_mode);
+              staticity = proj_staticity (as_single_mode expected_mode);
+              mode = actual_mode }
       in
       let exp = rue {
         exp_desc; exp_loc = loc; exp_extra = [];
@@ -10137,6 +10144,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
          Texp_ident { path = Path.Pident id;
                       lid = mknoloc (Longident.Lident name);
                       desc; kind = Id_value; unique_use = uu;
+                      staticity = proj_staticity mode;
                       mode = Value.disallow_right mode }}
       in
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in

@@ -283,6 +283,7 @@ and expression_desc =
         desc : Types.value_description;
         kind : ident_kind;
         unique_use : unique_use;
+        staticity : Mode.Staticity.r;
         mode : Mode.Value.l }
   | Texp_apply_layout of expression * Jkind_types.Sort.var list
   | Texp_constant of constant
