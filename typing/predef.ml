@@ -66,6 +66,7 @@ type abstract_non_value_type_constr = [
   | `Uint16_u
   | `Uint32_u
   | `Uint64_u
+  | `Unativeint_u
   | `Idx_imm
   | `Idx_mut
   | `Int8x16
@@ -132,10 +133,6 @@ let base_type_constrs : type_constr list = [
   `Nativeint_u;
   `Int32_u;
   `Int64_u;
-  `Uint8_u;
-  `Uint16_u;
-  `Uint32_u;
-  `Uint64_u;
   `Idx_imm;
   `Idx_mut;
 ]
@@ -178,6 +175,11 @@ let small_number_extension_type_constrs : type_constr list = [
   `Float32_u;
   `Int8;
   `Int16;
+  `Uint8_u;
+  `Uint16_u;
+  `Uint32_u;
+  `Uint64_u;
+  `Unativeint_u;
 ]
 
 let metaprogramming_extension_type_constrs : type_constr list = [
@@ -234,6 +236,7 @@ and ident_uint8_u = ident_create "uint8_u"
 and ident_uint16_u = ident_create "uint16_u"
 and ident_uint32_u = ident_create "uint32_u"
 and ident_uint64_u = ident_create "uint64_u"
+and ident_unativeint_u = ident_create "unativeint_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
@@ -297,6 +300,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Uint16_u -> ident_uint16_u
   | `Uint32_u -> ident_uint32_u
   | `Uint64_u -> ident_uint64_u
+  | `Unativeint_u -> ident_unativeint_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
   | `Int8x16 -> ident_int8x16
@@ -355,6 +359,7 @@ and path_uint8_u = Pident ident_uint8_u
 and path_uint16_u = Pident ident_uint16_u
 and path_uint32_u = Pident ident_uint32_u
 and path_uint64_u = Pident ident_uint64_u
+and path_unativeint_u = Pident ident_unativeint_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
 and path_code = Pident ident_code
@@ -469,6 +474,7 @@ and type_uint8_u = tconstr path_uint8_u []
 and type_uint16_u = tconstr path_uint16_u []
 and type_uint32_u = tconstr path_uint32_u []
 and type_uint64_u = tconstr path_uint64_u []
+and type_unativeint_u = tconstr path_unativeint_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
@@ -934,6 +940,8 @@ let decl_of_type_constr type_constr =
     decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int32) ()
   | `Uint64_u ->
     decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_int64) ()
+  | `Unativeint_u ->
+    decl0 ~jkind:(builtin Jkind.Const.Builtin.kind_of_unboxed_nativeint) ()
   | `Idx_imm ->
     decl2 ~variance:(Variance.full, Variance.covariant)
        ~param_jkinds:(

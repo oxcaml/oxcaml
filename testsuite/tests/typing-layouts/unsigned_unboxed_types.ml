@@ -10,11 +10,13 @@ type t8 : bits8 mod everything = uint8_u
 type t16 : bits16 mod everything = uint16_u
 type t32 : bits32 mod everything = uint32_u
 type t64 : bits64 mod everything = uint64_u
+type tw : word mod everything = unativeint_u
 [%%expect{|
 type t8 = uint8_u
 type t16 = uint16_u
 type t32 = uint32_u
 type t64 = uint64_u
+type tw = unativeint_u
 |}]
 
 (* They are distinct from the signed types. *)
@@ -55,6 +57,15 @@ Error: The value "x" has type "int64#" but an expression was expected of type
          "uint64_u"
 |}]
 
+let f (x : nativeint#) : unativeint_u = x
+[%%expect{|
+Line 1, characters 40-41:
+1 | let f (x : nativeint#) : unativeint_u = x
+                                            ^
+Error: The value "x" has type "nativeint#" but an expression was expected of type
+         "unativeint_u"
+|}]
+
 (* They can be used as GADT indices and distinguished from the signed
    types. *)
 
@@ -67,6 +78,8 @@ type ('a : any) width =
   | U32 : uint32_u width
   | I64 : int64# width
   | U64 : uint64_u width
+  | IW : nativeint# width
+  | UW : unativeint_u width
 [%%expect{|
 type ('a : any) width =
     I8 : int8# width
@@ -77,6 +90,8 @@ type ('a : any) width =
   | U32 : uint32_u width
   | I64 : int64# width
   | U64 : uint64_u width
+  | IW : nativeint# width
+  | UW : unativeint_u width
 |}]
 
 (* Specifying the index selects between the signed and unsigned
@@ -98,6 +113,12 @@ let unsigned64 (x : uint64_u width) = match x with
   | U64 -> ()
 [%%expect{|
 val unsigned64 : uint64_u width -> unit = <fun>
+|}]
+
+let unsignedw (x : unativeint_u width) = match x with
+  | UW -> ()
+[%%expect{|
+val unsignedw : unativeint_u width -> unit = <fun>
 |}]
 
 (* A constructor of the wrong signedness cannot match at a specified
@@ -123,4 +144,16 @@ Line 2, characters 4-7:
 Error: This pattern matches values of type "uint16_u width"
        but a pattern was expected which matches values of type "int16# width"
        Type "uint16_u" is not compatible with type "int16#"
+|}]
+
+let bad (x : unativeint_u width) = match x with
+  | IW -> ()
+[%%expect{|
+Line 2, characters 4-6:
+2 |   | IW -> ()
+        ^^
+Error: This pattern matches values of type "nativeint# width"
+       but a pattern was expected which matches values of type
+         "unativeint_u width"
+       Type "nativeint#" is not compatible with type "unativeint_u"
 |}]

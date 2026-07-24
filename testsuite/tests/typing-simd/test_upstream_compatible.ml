@@ -17,7 +17,7 @@ Line 1, characters 9-16:
 1 | type t = int16x8;;
              ^^^^^^^
 Error: Unbound type constructor "int16x8"
-Hint:              Did you mean "int64" or "uint16_u"?
+Hint:              Did you mean "int64"?
 |}];;
 
 type t = int32x4;;
