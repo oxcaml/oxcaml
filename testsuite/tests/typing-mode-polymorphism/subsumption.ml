@@ -272,32 +272,84 @@ module Fail_less_polymorphic_local : module type of Base = struct
   let f (x @ local) = x
 end
 [%%expect{|
-module Fail_less_polymorphic_local :
-  sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+Lines 1-3, characters 59-3:
+1 | ...........................................................struct
+2 |   let f (x @ local) = x
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local] end
+       is not included in
+         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+       Values do not match:
+         val f : 'a @ [< 'm > local] -> 'a @ [> 'm | local]
+       is not included in
+         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
+       is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
 |}]
 
 module Fail_less_polymorphic_unique : module type of Base = struct
   let f (x @ unique) = x
 end
 [%%expect{|
-module Fail_less_polymorphic_unique :
-  sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+Lines 1-3, characters 60-3:
+1 | ............................................................struct
+2 |   let f (x @ unique) = x
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ [< 'm & unique] -> 'a @ [> 'm] end
+       is not included in
+         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+       Values do not match:
+         val f : 'a @ [< 'm & unique] -> 'a @ [> 'm]
+       is not included in
+         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The type "'a @ [< 'm & unique] -> 'a @ [> 'm]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
 |}]
 
 module Fail_less_polymorphic_global : module type of Base = struct
   let f (x @ global) = x
 end
 [%%expect{|
-module Fail_less_polymorphic_global :
-  sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+Lines 1-3, characters 60-3:
+1 | ............................................................struct
+2 |   let f (x @ global) = x
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ [< 'm & global] -> 'a @ [> 'm] end
+       is not included in
+         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+       Values do not match:
+         val f : 'a @ [< 'm & global] -> 'a @ [> 'm]
+       is not included in
+         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The type "'a @ [< 'm & global] -> 'a @ [> 'm]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
 |}]
 
 module Fail_less_polymorphic_portable : module type of Base = struct
   let f (x @ portable) = x
 end
 [%%expect{|
-module Fail_less_polymorphic_portable :
-  sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+Lines 1-3, characters 62-3:
+1 | ..............................................................struct
+2 |   let f (x @ portable) = x
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ [< 'm & portable] -> 'a @ [> 'm] end
+       is not included in
+         sig val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless end
+       Values do not match:
+         val f : 'a @ [< 'm & portable] -> 'a @ [> 'm]
+       is not included in
+         val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
+       The type "'a @ [< 'm & portable] -> 'a @ [> 'm]"
+       is not compatible with the type "'a @ [< 'n] -> 'a @ [> 'n]"
 |}]
 
 module Producer = struct
@@ -326,8 +378,25 @@ module Bad_client : module type of Producer = struct
   let f (x @ local) y = y
 end
 [%%expect{|
-module Bad_client :
-  sig val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless end
+Lines 1-3, characters 46-3:
+1 | ..............................................struct
+2 |   let f (x @ local) y = y
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm] end
+       is not included in
+         sig
+           val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
+         end
+       Values do not match:
+         val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
+       is not included in
+         val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
+       The type
+         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+       is not compatible with the type
+         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
 |}]
 
 module Fail_local_escapes : sig
