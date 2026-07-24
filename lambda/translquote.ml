@@ -2352,6 +2352,10 @@ let quote_constructor loc env (constr : Data_types.constructor_description) =
   let persistent id =
     id |> Identifier.Constructor.wrap |> Constructor.ident loc
   in
+  (* CR-someday jbachurski: Similarly to [type_for_path], I'm fairly sure
+     checking for builtin names is redundant. Secondly, I'm not sure
+     why these code paths are split between [Extension] and the rest,
+     nor certain that the [type_path] check is helpful. *)
   (match constr.cstr_tag with
     | Extension (Path.Pdot (p, name)) ->
       Identifier.Constructor.dot loc (module_for_path loc env p) name
