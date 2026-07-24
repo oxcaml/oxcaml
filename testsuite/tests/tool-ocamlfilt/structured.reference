@@ -6,8 +6,8 @@ Foo.>>=
 Foo.let*
 Foo.func'sub'
 Stdlib.fn(stdlib.ml:334:0)
-Foo.mod(:42:7)
-Foo.partial(:10:5)
+Foo.mod(<unknown>:42:7)
+Foo.partial(<unknown>:10:5)
 Foo.Bar.Baz.my_fun
 Foo.0foo
 Main.say_hello_0
@@ -22,3 +22,6 @@ Foo.mod(foo.ml:2:10).init.fn_5_6
 Foo.bar.partial(foo.ml:9:15)
 Foo.Bar.<specialization_of>.Baz.qux
 Foo.Bar.Shape.area
+Foo.fn(<unknown>:??:??)
+Foo.fn(foo.ml:??:512)
+Foo.mod(<unknown>:??:7)

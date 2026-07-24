@@ -39,16 +39,26 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
-  let format_anonymous_location prefix line col file_opt =
-    let file = Option.value ~default:"" file_opt in
-    Printf.sprintf "%s(%s:%d:%d)" prefix file line col
+  (* Locations from [Location.none] or ppx-generated code can be missing
+     components (see the note on [Lexing.position] in [Location]). Render the
+     unavailable ones as placeholders rather than nonsensical numbers. *)
+  let format_anonymous_location prefix file_opt
+      (position : Structured_mangling.position) =
+    let file = Option.value ~default:"<unknown>" file_opt in
+    let line, col =
+      match position with
+      | Unknown -> "??", "??"
+      | Offset n -> "??", string_of_int n
+      | Line_col (line, col) -> string_of_int line, string_of_int col
+    in
+    Printf.sprintf "%s(%s:%s:%s)" prefix file line col
 
   let render_path_item (item : string Structured_mangling.path_item) =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> s
-    | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
-    | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
-    | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    | Anonymous_function (f, p) -> format_anonymous_location "fn" f p
+    | Anonymous_module (f, p) -> format_anonymous_location "mod" f p
+    | Partial_function (f, p) -> format_anonymous_location "partial" f p
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)

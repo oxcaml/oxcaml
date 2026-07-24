@@ -80,22 +80,38 @@ module Scoped_location = struct
     | Empty -> s
     | Cons {str; _} -> str ^ sep ^ s
 
+  (* Normalise a location for mangling. A missing filename ([_none_], [""] or
+     ["."]) becomes [None]. A bogus line ([<= 0], from [Location.none] or from
+     ppx code using the [pos_lnum = -1] convention) is dropped, keeping the
+     character offset when it is still valid. *)
+  let mangling_loc loc : string option * Structured_mangling.position =
+    let (file, line, col) = Location.get_pos_info loc.loc_start in
+    let file =
+      match Filename.basename file with
+      | "" | "." | "_none_" -> None
+      | file -> Some file
+    in
+    let position : Structured_mangling.position =
+      if line >= 1 then Line_col (line, col)
+      else if col >= 0 then Offset col
+      else Unknown
+    in
+    (file, position)
+
   let enter_anonymous_function ~scopes ~assume_zero_alloc ~loc =
     let str = str_fun scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
+    let file, position = mangling_loc loc in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_function (line, col, Some file))
+      Some (Anonymous_function (file, position))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
           assume_zero_alloc; mangling_item }
 
   let enter_anonymous_module ~scopes ~loc =
     let str = str scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
+    let file, position = mangling_loc loc in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_module (line, col, Some file))
+      Some (Anonymous_module (file, position))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
           prev = scopes; assume_zero_alloc = ZA.Assume_info.none;
@@ -135,11 +151,10 @@ module Scoped_location = struct
                              ~assume_zero_alloc:ZA.Assume_info.none None
 
   let enter_partial_or_eta_wrapper ~scopes ~loc =
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
+    let file, position = mangling_loc loc in
     cons scopes Sc_partial_or_eta_wrapper (dot ~no_parens:() scopes "(partial)")
       "" ~assume_zero_alloc:ZA.Assume_info.none
-      (Some (Partial_function (line, col, Some file)))
+      (Some (Partial_function (file, position)))
 
   let update_assume_zero_alloc ~scopes ~assume_zero_alloc =
     match scopes with
