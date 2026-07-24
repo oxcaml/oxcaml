@@ -3,6 +3,11 @@
     expect;
 *)
 
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 module M : sig
   type ('a, 'b) t : immutable_data with 'a
 end = struct
@@ -119,7 +124,7 @@ module M : sig type 'a t : value mod aliased end
 |}]
 
 module M : sig
-  type 'a t : value mod global aliased many portable contended
+  type 'a t : value mod global many portable contended
 end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end

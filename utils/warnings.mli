@@ -54,6 +54,10 @@ type type_declaration_usage_warning =
   | Declaration
   | Alias
 
+type redundant_modifier_reason =
+  | Default_bound
+  | Implied_by of string
+
 type t =
   | Comment_start                           (*  1 *)
   | Comment_not_end                         (*  2 *)
@@ -157,7 +161,9 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier of
+      { modifier : string;
+        reason : redundant_modifier_reason }  (* 211 *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)

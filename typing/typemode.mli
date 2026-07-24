@@ -75,6 +75,7 @@ val transl_with_bound_modifiers :
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds :
+  ?warn:bool ->
   Parsetree.modes ->
   Jkind.Mod_bounds.t
   * (Jkind_axis.Nullability.t Location.loc option

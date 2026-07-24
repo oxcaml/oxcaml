@@ -463,7 +463,10 @@ val of_annotation_option_default :
     Raises if a disallowed or unknown jkind is present.
 
     [use_abstract_jkinds] controls whether references to other kinds here count
-    as uses of them for unused abstract kind warnings. *)
+    as uses of them for unused abstract kind warnings.
+
+    [warn] controls whether redundant-modifier and redundant-kind-modifier
+    warnings are emitted while parsing the annotation. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
   ?warn:bool ->
