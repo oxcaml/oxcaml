@@ -232,6 +232,9 @@ val path_uint8_u: Path.t
 val path_uint16_u: Path.t
 val path_uint32_u: Path.t
 val path_uint64_u: Path.t
+
+val path_of_scalar: 'a Scalar.t -> Path.t
+
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t

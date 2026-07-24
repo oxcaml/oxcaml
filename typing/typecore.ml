@@ -267,7 +267,7 @@ type error =
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
   | Modalities_on_atomic_field of Longident.t
-  | Literal_overflow of string
+  | Literal_overflow of Scalar.any_locality_mode Scalar.Integral.t
   | Unknown_literal of string * char
   | Float32_literal of string
   | Int8_literal of string
@@ -936,86 +936,69 @@ let type_constant: Typedtree.constant -> type_expr = function
   | Const_unboxed_int64 _ -> instance Predef.type_unboxed_int64
   | Const_unboxed_nativeint _ -> instance Predef.type_unboxed_nativeint
 
-type constant_integer_result =
-  | Int8 of int
-  | Int16 of int
-  | Int32 of int32
-  | Int64 of int64
-  | Nativeint of nativeint
-  | Int of int
+let parse_integer (scalar : 'a Scalar.Integral.t) i : _ result =
+  let module I = Misc.Int_literal_converter in
+  let literal () =
+    match scalar with
+    | Value _ -> i
+    | Naked _ -> Misc.format_as_unboxed_literal i
+  in
+  try
+    match scalar with
+    | Value (Taggable Int8) | Naked (Taggable Int8)
+      when not (Language_extension.is_enabled Small_numbers) ->
+      Error (Int8_literal (literal ()))
+    | Value (Taggable Int16) | Naked (Taggable Int16)
+      when not (Language_extension.is_enabled Small_numbers) ->
+      Error (Int16_literal (literal ()))
+    | Value (Taggable Int8) -> Ok (Const_int8 (I.int8 i))
+    | Naked (Taggable Int8) -> Ok (Const_untagged_int8 (I.int8 i))
+    | Value (Taggable Int16) -> Ok (Const_int16 (I.int16 i))
+    | Naked (Taggable Int16) -> Ok (Const_untagged_int16 (I.int16 i))
+    | Value (Taggable Int) -> Ok (Const_int (I.int i))
+    | Naked (Taggable Int) -> Ok (Const_untagged_int (I.int i))
+    | Value (Boxable (Int32 _)) -> Ok (Const_int32 (I.int32 i))
+    | Naked (Boxable (Int32 _)) -> Ok (Const_unboxed_int32 (I.int32 i))
+    | Value (Boxable (Int64 _)) -> Ok (Const_int64 (I.int64 i))
+    | Naked (Boxable (Int64 _)) -> Ok (Const_unboxed_int64 (I.int64 i))
+    | Value (Boxable (Nativeint _)) -> Ok (Const_nativeint (I.nativeint i))
+    | Naked (Boxable (Nativeint _)) ->
+      Ok (Const_unboxed_nativeint (I.nativeint i))
+  with
+  | Failure _ -> Error (Literal_overflow scalar)
 
-type constant_integer_error =
-  | Int8_literal_not_enabled
-  | Int16_literal_not_enabled
-  | Int8_literal_overflow
-  | Int16_literal_overflow
-  | Int32_literal_overflow
-  | Int64_literal_overflow
-  | Nativeint_literal_overflow
-  | Int_literal_overflow
-  | Unknown_constant_literal of char
+type naked_flag =
+  | Naked
+  | Value
 
-let constant_integer i ~suffix :
-    (constant_integer_result, constant_integer_error) result =
+let parse_integer_with_suffix naked i ~suffix : _ result =
+  let parse_as width =
+    let scalar : _ Scalar.Maybe_naked.t =
+      match naked with
+      | Naked -> Naked width
+      | Value -> Value width
+    in
+    parse_integer scalar i
+  in
   match suffix with
-  | Some 's' ->
-    if Language_extension.is_enabled Small_numbers then
-    begin
-      try Ok (Int8 (Misc.Int_literal_converter.int8 i))
-      with Failure _ -> Error Int8_literal_overflow
-    end
-    else Error (Int8_literal_not_enabled)
-  | Some 'S' ->
-    if Language_extension.is_enabled Small_numbers then
-    begin
-      try Ok (Int16 (Misc.Int_literal_converter.int16 i))
-      with Failure _ -> Error Int16_literal_overflow
-    end
-    else Error (Int16_literal_not_enabled)
-  | Some 'l' ->
-    begin
-      try Ok (Int32 (Misc.Int_literal_converter.int32 i))
-      with Failure _ -> Error Int32_literal_overflow
-    end
-  | Some 'L' ->
-    begin
-      try Ok (Int64 (Misc.Int_literal_converter.int64 i))
-      with Failure _ -> Error Int64_literal_overflow
-    end
-  | Some 'n' ->
-    begin
-      try Ok (Nativeint (Misc.Int_literal_converter.nativeint i))
-      with Failure _ -> Error Nativeint_literal_overflow
-    end
-  | Some 'm' | None ->
-    begin
-      try Ok (Int (Misc.Int_literal_converter.int i))
-      with Failure _ -> Error Int_literal_overflow
-    end
-  | Some suffix -> Error (Unknown_constant_literal suffix)
+  | Some 's' -> parse_as (Taggable Int8)
+  | Some 'S' -> parse_as (Taggable Int16)
+  | Some 'm' | None -> parse_as (Taggable Int)
+  | Some 'l' -> parse_as (Boxable (Int32 Any_locality_mode))
+  | Some 'L' -> parse_as (Boxable (Int64 Any_locality_mode))
+  | Some 'n' -> parse_as (Boxable (Nativeint Any_locality_mode))
+  | Some suffix ->
+    let literal =
+      match naked with
+      | Value -> i
+      | Naked -> Misc.format_as_unboxed_literal i
+    in
+    Error (Unknown_literal (literal, suffix))
 
 let constant_desc
   : Parsetree.constant_desc -> (Typedtree.constant, error) result =
   function
-  | Pconst_integer (i, suffix) ->
-    begin match constant_integer i ~suffix with
-      | Ok (Int8 v) -> Ok (Const_int8 v)
-      | Ok (Int16 v) -> Ok (Const_int16 v)
-      | Ok (Int32 v) -> Ok (Const_int32 v)
-      | Ok (Int64 v) -> Ok (Const_int64 v)
-      | Ok (Nativeint v) -> Ok (Const_nativeint v)
-      | Ok (Int v) -> Ok (Const_int v)
-      | Error Int8_literal_not_enabled -> Error (Int8_literal i)
-      | Error Int16_literal_not_enabled -> Error (Int16_literal i)
-      | Error Int8_literal_overflow -> Error (Literal_overflow "int8")
-      | Error Int16_literal_overflow -> Error (Literal_overflow "int16")
-      | Error Int32_literal_overflow -> Error (Literal_overflow "int32")
-      | Error Int64_literal_overflow -> Error (Literal_overflow "int64")
-      | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint")
-      | Error Int_literal_overflow -> Error (Literal_overflow "int")
-      | Error Unknown_constant_literal suffix ->
-        Error (Unknown_literal (i, suffix))
-    end
+  | Pconst_integer (i, suffix) -> parse_integer_with_suffix Value i ~suffix
   | Pconst_char c -> Ok (Const_char c)
   | Pconst_untagged_char c ->
       if Language_extension.is_enabled Small_numbers
@@ -1035,31 +1018,12 @@ let constant_desc
   | Pconst_unboxed_float (x, Some c) ->
       Error (Unknown_literal (Misc.format_as_unboxed_literal x, c))
   | Pconst_unboxed_integer (i, suffix) ->
-      begin match constant_integer i ~suffix:(Some suffix) with
-      | Ok (Int8 v) -> Ok (Const_untagged_int8 v)
-      | Ok (Int16 v) -> Ok (Const_untagged_int16 v)
-      | Ok (Int32 v) -> Ok (Const_unboxed_int32 v)
-      | Ok (Int64 v) -> Ok (Const_unboxed_int64 v)
-      | Ok (Nativeint v) -> Ok (Const_unboxed_nativeint v)
-      | Ok (Int v) -> Ok (Const_untagged_int v)
-      | Error Int8_literal_not_enabled ->
-        Error (Int8_literal (Misc.format_as_unboxed_literal i))
-      | Error Int16_literal_not_enabled ->
-        Error (Int16_literal (Misc.format_as_unboxed_literal i))
-      | Error Int8_literal_overflow -> Error (Literal_overflow "int8#")
-      | Error Int16_literal_overflow -> Error (Literal_overflow "int16#")
-      | Error Int32_literal_overflow -> Error (Literal_overflow "int32#")
-      | Error Int64_literal_overflow -> Error (Literal_overflow "int64#")
-      | Error Nativeint_literal_overflow -> Error (Literal_overflow "nativeint#")
-      | Error Int_literal_overflow -> Error (Literal_overflow "int#")
-      | Error Unknown_constant_literal suffix ->
-          Error (Unknown_literal (Misc.format_as_unboxed_literal i, suffix))
-      end
+    parse_integer_with_suffix Naked i ~suffix:(Some suffix)
 
 let constant const = constant_desc const.pconst_desc
 
-let constant_or_raise env loc cst =
-  match constant cst with
+let constant_result_or_raise env loc (result : _ result) =
+  match result with
   | Ok c ->
       (match c with
        | Const_untagged_char _
@@ -1079,6 +1043,9 @@ let constant_or_raise env loc cst =
            ());
       c
   | Error err -> raise (Error (loc, env, err))
+
+let constant_or_raise env loc cst =
+  constant_result_or_raise env loc (constant cst)
 
 (* Specific version of type_option, using newty rather than newgenty *)
 
@@ -1380,6 +1347,38 @@ let disambiguate_array_literal ~loc env expected_ty =
     return None Immutable
   else
     { ty_elt = None; mut = Mutable }
+
+let disambiguate_integer_literal ~loc env ty_expected i =
+  if not (Language_extension.is_enabled Type_directed_disambiguation)
+  then None
+  else
+    let ty_expected = expand_head env (protect_expansion env ty_expected) in
+    match get_desc ty_expected with
+    | Tconstr (ty_expected_path, _, _)
+      when not (Path.same ty_expected_path Predef.path_int) ->
+      List.find_map
+        (fun (scalar : _ Scalar.Integral.t) ->
+          let candidate = Predef.path_of_scalar (Scalar.integral scalar) in
+          if Path.same ty_expected_path candidate then (
+            if not (is_principal ty_expected)
+            then
+              Location.prerr_warning loc
+                (not_principal "this coercion to %s" (Path.name candidate));
+            Some (constant_result_or_raise env loc (parse_integer scalar i)))
+          else None)
+        Scalar.Integral.all
+    | _ -> None
+
+let disambiguated_constant_or_raise env loc cst ~ty_expected =
+  let disambiguated =
+    match cst.pconst_desc with
+    | Pconst_integer (i, None) ->
+      disambiguate_integer_literal ~loc env ty_expected i
+    | _ -> None
+  in
+  match disambiguated with
+  | Some constant -> constant
+  | None -> constant_or_raise env loc cst
 
 (* Typing of patterns *)
 
@@ -3634,7 +3633,9 @@ and type_pat_aux
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constant cst ->
-      let cst = constant_or_raise !!penv loc cst in
+      let cst =
+        disambiguated_constant_or_raise !!penv loc cst ~ty_expected:expected_ty
+      in
       rvp @@ solve_expected {
         pat_desc = Tpat_constant cst;
         pat_loc = loc; pat_extra=[];
@@ -7027,7 +7028,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_constant cst ->
-      let cst = constant_or_raise env loc cst in
+      let cst = disambiguated_constant_or_raise env loc cst ~ty_expected in
       rue {
         exp_desc = Texp_constant cst;
         exp_loc = loc; exp_extra = [];
@@ -13042,7 +13043,7 @@ let report_error ~loc env =
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
-        Style.inline_code ty
+        (Style.as_inline_code Scalar.Integral.pp) ty
   | Unknown_literal (n, m) ->
       let pp_lit ppf (n,m) = fprintf ppf "%s%c" n m in
       Location.errorf ~loc "Unknown modifier %a for literal %a"
