@@ -2659,7 +2659,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-  | Tmod (ty, _) -> extract_concrete_typedecl env ty
+  | Tmod _ -> Misc.fatal_error "Ctype.extract_concrete_typedecl: unexpected Tmod"
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
@@ -2823,7 +2823,7 @@ let contained_without_boxing env ty =
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
   | Tpoly (ty, _) -> [ty]
-  | Tmod (ty, _) -> [ty]
+  | Tmod _ -> Misc.fatal_error "Ctype.contained_without_boxing: Tmod"
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
