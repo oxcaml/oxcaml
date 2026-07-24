@@ -44,6 +44,8 @@ void caml_init_codefrag(void) {
   caml_lf_skiplist_init(&code_fragments_by_num);
 }
 
+extern uintnat caml_measure_frametables;
+
 int caml_register_code_fragment(char *start, char *end,
                                 enum digest_status digest_kind,
                                 unsigned char *opt_digest) {
@@ -72,6 +74,9 @@ int caml_register_code_fragment(char *start, char *end,
   caml_lf_skiplist_insert(&code_fragments_by_pc, (uintnat)start, (uintnat)cf);
   caml_lf_skiplist_insert(&code_fragments_by_num, (uintnat)cf->fragnum,
                           (uintnat)cf);
+  if (caml_measure_frametables) {
+    printf("Code fragment %p-%p\n", start, end);
+  }
   return cf->fragnum;
 }
 
