@@ -232,9 +232,6 @@ let block_like ~env ~res symbol (const : Static_const.t) =
        maybe it's still worth fixing in the future just for uniformity. *)
     bind_expr_to_symbol ~env ~res symbol
       (Prim (Extern "caml_array_make", [Pc (Int Targetint.zero); Pc Null]))
-  | Mutable_string { initial_value } ->
-    ignore initial_value;
-    static_const_not_supported const
   | Immutable_string value ->
     bind_expr_to_symbol ~env ~res symbol (Constant (String value))
 

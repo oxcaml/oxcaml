@@ -470,8 +470,6 @@ let static_data ppf : static_data -> unit = function
       elements
   | Empty_array kind ->
     Format.fprintf ppf "Empty_array%a" (empty_array_kind ~space:Before) kind
-  | Mutable_string { initial_value = s } ->
-    Format.fprintf ppf "mutable \"%s\"" (s |> String.escaped)
   | Immutable_string s -> Format.fprintf ppf "\"%s\"" (s |> String.escaped)
 
 let static_data_binding ppf { symbol = s; defining_expr = sp } =
