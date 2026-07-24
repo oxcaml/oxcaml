@@ -4287,8 +4287,11 @@ let tagged_immediate_alias_to ~naked_immediate : t =
 let is_int_for_scrutinee ~machine_width ~scrutinee : t =
   let descr =
     Simple.pattern_match scrutinee
-      ~const:(fun _ ->
-        TD.create_equals (Simple.untagged_const_true machine_width))
+      ~const:(fun const ->
+        (* A constant is never a block, so [%is_int] is [true] unless the
+           constant is null (mirroring [Relation.of_const]). *)
+        TD.create_equals
+          (Simple.untagged_const_bool machine_width (not (RWC.is_null const))))
       ~name:(fun name ~coercion:_ ->
         let head =
           create_head_of_kind_naked_immediate
