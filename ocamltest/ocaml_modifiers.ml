@@ -125,8 +125,8 @@ let compilerlibs_subdirs =
 let add_compiler_subdir subdir =
   append Ocaml_variables.directories [compiler_subdir [subdir]]
 
-let compilerlibs_archive archive =
-  append Ocaml_variables.libraries [archive] ::
+let compilerlibs_archives archives =
+  append Ocaml_variables.libraries archives ::
   List.map add_compiler_subdir compilerlibs_subdirs
 
 let debugger = [add_compiler_subdir "debugger"]
@@ -161,13 +161,20 @@ let init () =
       "stdlib_alpha";
     ];
   List.iter
-    (fun archive -> register_modifiers archive (compilerlibs_archive archive))
+    (fun (name, archives) ->
+      register_modifiers name (compilerlibs_archives archives))
     [
-      "ocamlcommon";
-      "ocamlbytecomp";
-      "ocamlmiddleend";
-      "ocamloptcomp";
-      "ocamltoplevel";
+      (* The compilerlibs split of ocamlcommon into ocamlcommon and
+         ocamlfrontend is specific to this repo.  To avoid updating every
+         test, the "ocamlcommon" modifier links both archives (there is
+         deliberately no "ocamlfrontend" modifier).  If the split is ever
+         upstreamed, this hack should go, with the tests then updated to
+         use the appropriate archives. *)
+      "ocamlcommon", ["ocamlcommon"; "ocamlfrontend"];
+      "ocamlbytecomp", ["ocamlbytecomp"];
+      "ocamlmiddleend", ["ocamlmiddleend"];
+      "ocamloptcomp", ["ocamloptcomp"];
+      "ocamltoplevel", ["ocamltoplevel"];
     ];
   register_modifiers "runtime_events" runtime_events;
   register_modifiers "systhreads" systhreads;

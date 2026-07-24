@@ -358,6 +358,7 @@ install_for_test: install
 	# various things.
 	mkdir _runtest/utils
 	cp _install/lib/ocaml/compiler-libs/*.{cmi,cmx} _runtest/utils
+	cp $(main_build)/$(ocamldir)/.ocamlfrontend.objs/byte/*.cmo _runtest/utils
 	cp $(main_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
