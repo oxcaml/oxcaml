@@ -3879,9 +3879,7 @@ let walk_locks_for_legacy_construct ~env pp =
    use site outwards; a [Zero_alloc_lock] means the current context is
    itself inside a [zero_alloc_] region (whose own exit performs this
    check), so there is no obligation here. *)
-let enclosing_noalloc_ceiling env =
-  let locks = IdTbl.get_all_locks env.values in
-  let _stage_locks, locks = partition_locks locks in
+let noalloc_ceiling_of_locks locks =
   let rec go = function
     | [] -> Mode.Allocation.alloc
     | Zero_alloc_lock :: _ -> Mode.Allocation.alloc
@@ -3889,6 +3887,11 @@ let enclosing_noalloc_ceiling env =
     | _ :: rest -> go rest
   in
   Mode.Allocation.disallow_left (go (List.rev locks))
+
+let enclosing_noalloc_ceiling env =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  noalloc_ceiling_of_locks locks
 
 (** Registers a use of an allocation, constraining every enclosing closure lock.
     Used for constructs with allocations that force enclosing functions to be
@@ -3916,6 +3919,14 @@ let walk_locks_for_allocation ~env pp =
   a write).
 *)
 let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
+  let declaration_ceiling =
+    lazy
+      (let all = IdTbl.get_all_locks env.values in
+       let _stage_locks, all = partition_locks all in
+       let outer_len = List.length all - List.length locks in
+       noalloc_ceiling_of_locks
+         (List.filteri (fun i _ -> i < outer_len) all))
+  in
   let mode =
     m0
     |> mutable_mode |> Mode.Value.disallow_left
@@ -3937,9 +3948,13 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) | Closure_noalloc_lock
-      | Zero_alloc_lock ->
+      | Const_closure_lock (true, _, _) | Closure_noalloc_lock ->
           mode
+      | Zero_alloc_lock ->
+          Mode.Value.meet
+            [mode;
+             Mode.Value.max_with_comonadic Allocation
+               (Lazy.force declaration_ceiling)]
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)

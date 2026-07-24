@@ -2205,13 +2205,13 @@ let (za_smuggle_ref @ noalloc_strict) () =
   | Some f -> f ());
   ()
 [%%expect{|
-Lines 4-6, characters 2-19:
-4 | ..(match r with
-5 |   | None -> assert false
-6 |   | Some f -> f ()).
-Warning 10 [non-unit-statement]: this expression should have type unit.
-
-val za_smuggle_ref : unit -> unit = <fun>
+Line 3, characters 25-34:
+3 |   zero_alloc_ (r <- Some alloc_fun);
+                             ^^^^^^^^^
+Error: This value is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is contained (via constructor "Some") in the value at line 3, characters 20-34
+         which is expected to be "noalloc_strict".
 |}]
 
 (* Nor wrapped in a closure built inside the region. *)
