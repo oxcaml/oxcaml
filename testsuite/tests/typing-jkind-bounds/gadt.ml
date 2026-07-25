@@ -1037,3 +1037,19 @@ type 'a unboxed_alias_z
 [%%expect {|
 type 'a unboxed_alias_z = 'a unboxed_alias_x list
 |}]
+
+type 'a unboxed_local_bound_v : immutable_data =
+  | V : ('a : immutable_data). 'a -> 'a unboxed_local_bound_v
+[@@unboxed]
+[%%expect {|
+type 'a unboxed_local_bound_v =
+    V : ('a : immutable_data). 'a -> 'a unboxed_local_bound_v [@@unboxed]
+|}]
+
+type 'a unboxed_local_bound_r : value mod portable =
+  | R : ('a : value mod portable). { foo : 'a } -> 'a unboxed_local_bound_r
+[@@unboxed]
+[%%expect {|
+type 'a unboxed_local_bound_r =
+    R : ('a : value mod portable). { foo : 'a; } -> 'a unboxed_local_bound_r [@@unboxed]
+|}]
