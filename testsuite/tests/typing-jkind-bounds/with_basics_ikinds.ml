@@ -680,6 +680,24 @@ Error: This type definition does not satisfy its kind annotation value mod conte
        because ref is not mod contended.
 |}]
 
+type t : value mod portable = Pack : 'a -> t
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod portable = Pack : 'a -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because 'a is not mod portable.
+|}]
+
+type 'a t : value mod portable = A : 'b -> 'b t
+[%%expect {|
+Line 1, characters 0-47:
+1 | type 'a t : value mod portable = A : 'b -> 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation value mod portable,
+       because 'b is not mod portable.
+|}]
+
 (***************)
 (* TEST: Loops *)
 
