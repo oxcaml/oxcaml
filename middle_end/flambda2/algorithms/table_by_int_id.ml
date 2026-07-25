@@ -50,16 +50,13 @@ struct
   module HT = Hashtbl.Make (struct
     type t = int
 
-    (* These ids are structured small integers. [Hashtbl] selects a bucket using
-       the low bits of the hash, so ids whose hashes share low bits but differ
-       in higher bits could otherwise cluster in the same buckets. The current
-       [E.hash] implementations have suitable low-bit distributions, and
-       identity hashing performs similarly on current workloads. However, the
-       [E] interface does not guarantee this property. This defensive
-       xorshift-multiply finalizer mixes higher bits into the low bits and uses
-       the multiplier from xxHash. *)
+    (* As of writing, every [E.hash] reaching this table is already well
+       distributed in the low bits and the identity function would do; we mix
+       defensively against future ones that aren't. The mixer is a bijection, so
+       it never merges distinct ids. Multiplier from xxHash. *)
     let hash (t : t) =
-      let h = t lxor (t lsr 31) * 0x27d4eb2f in
+      let mixed = t lxor (t lsr 31) in
+      let h = mixed * 0x27d4eb2f in
       h lxor (h lsr 29)
 
     let equal t1 t2 = t1 == t2
