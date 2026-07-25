@@ -608,17 +608,17 @@ module F (X : sig val n : int end) = struct let m = X.n + 1 end
 module N = struct let n = 41 end
 module R = F(N)
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "F/693"
+(apply (field_imm 1 (global Toploop!)) "F/689"
   (function {nlocal = 0} X is_a_functor never_loop
     (let (m =[value<int>] (%int_add (field_imm 0 X) 1)) (makeblock 0 m))))
 module F : functor (X : sig val n : int end) -> sig val m : int end
-(apply (field_imm 1 (global Toploop!)) "N/698"
+(apply (field_imm 1 (global Toploop!)) "N/694"
   (let (n =[value<int>] 41) (makeblock 0 n)))
 module N : sig val n : int end
 (let
-  (N =? (apply (field_imm 0 (global Toploop!)) "N/698")
-   F =? (apply (field_imm 0 (global Toploop!)) "F/693"))
-  (apply (field_imm 1 (global Toploop!)) "R/700" (apply F N)))
+  (N =? (apply (field_imm 0 (global Toploop!)) "N/694")
+   F =? (apply (field_imm 0 (global Toploop!)) "F/689"))
+  (apply (field_imm 1 (global Toploop!)) "R/696" (apply F N)))
 module R : sig val m : int end
 |}]
 
@@ -629,7 +629,7 @@ module Yf (X : sig val f : unit -> unit end @ yielding) = struct
   let g () = X.f ()
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Yf/706"
+(apply (field_imm 1 (global Toploop!)) "Yf/702"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -647,7 +647,7 @@ let () =
 [%%expect{|
 (let
   (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/706")
+   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/702")
    Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
@@ -674,13 +674,13 @@ let h () =
   let module R = Yf (M) in
   R.g ()
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "M/719"
+(apply (field_imm 1 (global Toploop!)) "M/715"
   (let (f = (function {nlocal = 0} param[value<int>] : int 0))
     (makeblock 0 f)))
 module M : sig val f : unit -> unit end
 (let
-  (M =? (apply (field_imm 0 (global Toploop!)) "M/719")
-   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/706")
+  (M =? (apply (field_imm 0 (global Toploop!)) "M/715")
+   Yf =? (apply (field_imm 0 (global Toploop!)) "Yf/702")
    h =
      (function {nlocal = 0} param[value<int>] : int
        (let (R = (apply Yf M)) (apply[yielding] (field_imm 0 R) 0))))
@@ -697,7 +697,7 @@ let () =
     let module R = Uf (struct let f () = yield y end) in
     R.g ())
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Uf/730"
+(apply (field_imm 1 (global Toploop!)) "Uf/726"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -736,7 +736,7 @@ let () =
 [%%expect{|
 (let
   (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   M =? (apply (field_imm 0 (global Toploop!)) "M/719")
+   M =? (apply (field_imm 0 (global Toploop!)) "M/715")
    Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
@@ -877,15 +877,15 @@ class d = object inherit c as super method n = super#m end
        (opaque
          (apply (field_imm 18 (global CamlinternalOO!)) (opaque [0: #"m"])
            c_init))))
-  (apply (field_imm 1 (global Toploop!)) "c/792" c))
+  (apply (field_imm 1 (global Toploop!)) "c/788" c))
 class c : object method m : int end
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/792")
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/788")
    mk = (function {nlocal = 0} param[value<int>] (apply (field_mut 0 c) 0)))
   (apply (field_imm 1 (global Toploop!)) "mk" mk))
 val mk : unit -> c = <fun>
 (let
-  (c =? (apply (field_imm 0 (global Toploop!)) "c/792")
+  (c =? (apply (field_imm 0 (global Toploop!)) "c/788")
    shared =a (opaque [0: #"m"])
    shared =a (opaque [0: #"n" #"m"])
    d =?
@@ -921,7 +921,7 @@ val mk : unit -> c = <fun>
        (opaque
          (apply (field_imm 18 (global CamlinternalOO!))
            (opaque [0: #"m" #"n"]) d_init))))
-  (apply (field_imm 1 (global Toploop!)) "d/820" d))
+  (apply (field_imm 1 (global Toploop!)) "d/816" d))
 class d : object method m : int method n : int end
 |}]
 
@@ -975,12 +975,12 @@ end
 [%%expect{|
 0
 module type S = sig type t val x : t end
-(apply (field_imm 1 (global Toploop!)) "F/868"
+(apply (field_imm 1 (global Toploop!)) "F/864"
   (function {nlocal = 0} M is_a_functor never_loop
     (let (y = (field_imm 0 M)) (makeblock 0 y))))
 module F : functor (M : S) -> sig val y : M.t end
-(let (F =? (apply (field_imm 0 (global Toploop!)) "F/868"))
-  (apply (field_imm 1 (global Toploop!)) "M/876"
+(let (F =? (apply (field_imm 0 (global Toploop!)) "F/864"))
+  (apply (field_imm 1 (global Toploop!)) "M/872"
     (let (x =[value<int>] 42 include = (apply F (makeblock 0 x)))
       (makeblock 0 x (field_imm 0 include)))))
 module M : sig type t = int val x : int val y : int end
@@ -1000,7 +1000,7 @@ let () =
     end in
     M.g ())
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Gf/883"
+(apply (field_imm 1 (global Toploop!)) "Gf/879"
   (function {nlocal = 0} X is_a_functor never_loop
     (let
       (g =
@@ -1012,7 +1012,7 @@ module Gf :
     sig val g : unit -> unit end @ yielding
 (let
   (yield =? (apply (field_imm 0 (global Toploop!)) "yield")
-   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/883")
+   Gf =? (apply (field_imm 0 (global Toploop!)) "Gf/879")
    Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296")
    *match* =[value<int>]
      (apply (field_imm 0 Yielding)
