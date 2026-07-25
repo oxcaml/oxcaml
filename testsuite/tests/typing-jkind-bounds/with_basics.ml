@@ -700,6 +700,28 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
          contention: mod uncontended ≰ mod contended
 |}]
 
+type t : value mod portable = Pack : 'a -> t
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod portable = Pack : 'a -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+type 'a t : value mod portable = A : 'b -> 'b t
+[%%expect {|
+Line 1, characters 0-47:
+1 | type 'a t : value mod portable = A : 'b -> 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
 (***************)
 (* TEST: Loops *)
 
