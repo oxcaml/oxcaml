@@ -1471,6 +1471,33 @@ Error: Annotating types with kinds
 - : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
 |}];;
 
+<[ let rec f (x : _ @ local unique) = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let rec f = (fun ((x : _ @ local unique) : _ @ local unique) -> x) in f]>
+|}];;
+
+<[ let rec f (x : string @ local unique) = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[
+  let rec f = (fun ((x : string @ local unique) : _ @ local unique) -> x) in
+  f
+]>
+|}];;
+
+<[ fun (x : _ @ local unique) -> x ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[fun ((x : _ @ local unique) : _ @ local unique) -> x]>
+|}];;
+
+<[ fun (x : string @ local unique) -> x ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[fun ((x : string @ local unique) : _ @ local unique) -> x]>
+|}];;
+
 (* Function types *)
 <[ fun (f : _ @ local unique -> _ @ local unique) -> f]>
 [%%expect {|
