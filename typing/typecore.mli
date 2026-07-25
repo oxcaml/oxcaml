@@ -312,7 +312,7 @@ type error =
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
   | Modalities_on_atomic_field of Longident.t
-  | Literal_overflow of string
+  | Literal_overflow of Scalar.any_locality_mode Scalar.Integral.t
   | Unknown_literal of string * char
   | Float32_literal of string
   | Int8_literal of string

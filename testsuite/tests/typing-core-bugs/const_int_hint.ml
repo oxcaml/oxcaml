@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-extension type_directed_disambiguation";
  expect;
 *)
 
