@@ -193,9 +193,10 @@ and type_desc =
   (** [Tmod (t, bounds)] ==> [t @@ bounds]
       The type [t] with its mode crossing bounded by [bounds]. This is a
       transparent wrapper: it constrains mode crossing only, and erases at
-      runtime. The unboxing and kind-computation paths therefore look through
-      it to [t], as they already do for [Tpoly]; other traversals raise, since
-      a [Tmod] is not expected to reach them. *)
+      runtime. The unboxing and kind-computation paths look through it to [t],
+      as they do for [Tpoly]; generic structural traversals rebuild it; the
+      leaf consumers that classify a type's runtime representation raise,
+      since a [Tmod] is not expected to reach them. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
