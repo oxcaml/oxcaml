@@ -813,8 +813,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (* The declared shape's separability can be more precise than what
          [value_kind] computes here (e.g. for existential type variables), so
          take the better of the two. *)
-      (* CR-someday rtjoa: The most precise thing would be a real meet of value
-         kinds (e.g. a pointerness of [Immediate] could remove the non-constant
+      (* CR layouts: The most precise thing would be a real meet of value kinds
+         (e.g. a pointerness of [Immediate] could remove the non-constant
          constructors from [Pvariant _]) *)
       let kind =
         match pointerness, kind.raw_kind with
