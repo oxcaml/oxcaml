@@ -21,6 +21,12 @@ val type_declaration_ikind_of_jkind :
   Types.jkind_l ->
   Types.type_ikind
 
+val type_declaration_ikind_of_manifest :
+  env:Env.t option ->
+  params:Types.type_expr list ->
+  Types.type_expr ->
+  Types.type_ikind
+
 val sub_jkind_l :
   ?allow_any_crossing:bool ->
   ?origin:string ->
@@ -66,5 +72,6 @@ val sub_or_error :
 val substitute_decl_ikind_with_lookup :
   lookup_type:(Path.t -> Subst.Ikind_substitution.type_lookup_result) ->
   lookup_jkind:(Path.t -> Subst.Ikind_substitution.jkind_lookup_result) ->
+  for_saving:bool ->
   Types.type_ikind ->
   Types.type_ikind

@@ -6247,25 +6247,20 @@ let crossing_of_ty env ?modalities ty =
         let jkind = type_jkind_purely env ty in
         crossing_of_jkind env jkind
       in
-      if !Clflags.ikinds
-      then (
-        let ikind_crossing = Ikind.crossing_of_type env ty in
-        if debug_ikind_crossing_mismatch then (
-          let old_jkind_crossing = jkind_crossing () in
-          if not (Crossing.equal ikind_crossing old_jkind_crossing)
-          then
-            Format.eprintf
-              "@[<v>[ikind-crossing-mismatch]@ \
-               type=%a@ \
-               ikind=%a@ \
-               jkind=%a@]@."
-              !Btype.print_raw ty
-              (Format_doc.compat Crossing.print) ikind_crossing
-              (Format_doc.compat Crossing.print) old_jkind_crossing
-        );
-        ikind_crossing)
-      else
-        jkind_crossing ()
+      let ikind_crossing = Ikind.crossing_of_type env ty in
+      if debug_ikind_crossing_mismatch then (
+        let old_jkind_crossing = jkind_crossing () in
+        if not (Crossing.equal ikind_crossing old_jkind_crossing)
+        then
+          Format.eprintf
+            "@[<v>[ikind-crossing-mismatch]@ \
+             type=%a@ \
+             ikind=%a@ \
+             jkind=%a@]@."
+            !Btype.print_raw ty
+            (Format_doc.compat Crossing.print) ikind_crossing
+            (Format_doc.compat Crossing.print) old_jkind_crossing);
+      ikind_crossing
   in
   match modalities with
   | None -> crossing
@@ -8734,8 +8729,7 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      (* Use Ikind when enabled so axis constraints are checked; it falls
-         back to [Jkind.sub_or_error] when ikinds are disabled. *)
+      (* Use Ikind so axis constraints are checked. *)
       Ikind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with

@@ -1217,11 +1217,15 @@ module Merge = struct
                Internal ticket 5095. *)
             (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
-          let reason = "package constraint removal" in
           let tdecl =
             { tdecl with
               type_manifest = None;
-              type_ikind = Types.ikinds_todo reason
+              (* Now abstract with no manifest, so the ikind is derived from
+                 the (constrained) declaration jkind -- exactly what the
+                 env-recompute fallback would produce for an abstract type. *)
+              type_ikind =
+                Ikind.type_declaration_ikind_of_jkind ~env:(Some sig_env)
+                  ~params:tdecl.type_params tdecl.type_jkind
             }
           in
           let path = Pident id in

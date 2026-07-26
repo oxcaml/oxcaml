@@ -116,6 +116,17 @@ module Rigid_name : sig
             ikinds. This is used when we couldn't compute a precise ikind,
             e.g. for a polymorphic variant with conjunctive type --
             `Constr of (a & b & ...) *)
+    | Residue of
+        { defining_unit : string;
+          id : int
+        }
+        (** A recursive-module fixpoint residue, produced on the cmi SAVE path
+            (stage 5b) by neutralizing a foreign [Param]. Unit-qualified
+            ([defining_unit] = the saving unit's [full_path_as_string], [id] the
+            original stale [type_expr] id) so residues from distinct units are
+            distinct atoms and a residue can never alias an importer's live
+            [Param] -- collision-free by construction -- while a distinct
+            constructor keeps residues recognizable for CLASS-B. *)
 
   (** Ordering on rigid names used in the LDD to order the nodes. *)
   val compare : t -> t -> int
@@ -129,6 +140,8 @@ module Rigid_name : sig
   val param : int -> t
 
   val unknown : Shape.Uid.t -> t
+
+  val residue : string -> int -> t
 
 end
 
@@ -148,9 +161,24 @@ type constructor_ikind =
   }
 
 
+(* A single ZDD term of a decl ikind polynomial (stage-5 named-terms cmi form):
+   a coefficient meet the canonically-sorted rigid atoms of the term. *)
+type ikind_term = Axis_lattice.t * Rigid_name.t list
+
+(* The named-terms cmi payload for a decl ikind: [base]/[coeffs.(i)] decomposed
+   by [Ldd.to_terms].  This is the sole cmi wire form; the raw-DAG coexistence
+   window (STAGE5-DESIGN.md C.1) was validated and then removed. *)
+type saved_constructor_ikind =
+  { saved_base : ikind_term list;
+    saved_coeffs : ikind_term list array;
+  }
+
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
   | No_constructor_ikind of string
+  | Saved_ikind of saved_constructor_ikind
+      (** On-disk only: exists transiently at the cmi serialize/deserialize
+          boundary; live code always observes [Constructor_ikind]. *)
 
 type type_ikind = constructor_ikind_entry
 
@@ -410,8 +438,9 @@ and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_pac
 (** The "quality" of a jkind indicates whether we are able to learn more about the jkind
     later.
 
-    We can never learn more about a [Best] jkind to make it "lower" (according to
-    [Jkind.sub] / [Jkind.sub_jkind_l]). A [Not_best], jkind, however, might have more
+    We can never learn more about a [Best] jkind to make it "lower" (according
+    to the ikind subkind order, [Ikind.sub_jkind_l]). A [Not_best] jkind,
+    however, might have more
     information provided about it later that makes it lower.
 
     Note that only left jkinds can be [Best] (meaning we can never compare less than or
@@ -445,6 +474,10 @@ and jkind_declaration =
   }
 
 val ikinds_todo : string -> type_ikind
+
+(* Explicit named-terms cmi encode/decode (stage-5 format lock-in). *)
+val constructor_ikind_to_saved : constructor_ikind -> saved_constructor_ikind
+val constructor_ikind_of_saved : saved_constructor_ikind -> constructor_ikind
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.

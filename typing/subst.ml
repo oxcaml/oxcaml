@@ -97,8 +97,10 @@ module Ikind_substitution = struct
   let substitute_decl_ikind_with_lookup :
       (lookup_type:(Path.t -> type_lookup_result) ->
        lookup_jkind:(Path.t -> jkind_lookup_result) ->
+       for_saving:bool ->
        type_ikind -> type_ikind) ref =
-    ref (fun ~lookup_type:_ ~lookup_jkind:_ ikind_entry -> ikind_entry)
+    ref (fun ~lookup_type:_ ~lookup_jkind:_ ~for_saving:_ ikind_entry ->
+      ikind_entry)
 end
 
 let identity =
@@ -580,7 +582,7 @@ let jkind_desc s jkind =
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
@@ -594,7 +596,7 @@ let jkind_desc s jkind =
     else { jkind with base = Layout l' }
 
 let jkind_const_desc s
-      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
+      ({ with_bounds = No_with_bounds; _ } as jkind : jkind_const_desc_lr) =
   match jkind.base with
   | Kconstr (p, sa) ->
     begin match Path.Map.find p s.jkinds with
@@ -603,7 +605,7 @@ let jkind_const_desc s
       if Path.compare p' p = 0 then jkind else
         { jkind with base = Kconstr (p', sa) }
     | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
-    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+    | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds; _ } ->
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
@@ -904,8 +906,16 @@ let rec type_declaration' copy_scope s decl =
           then Lookup_jkind_identity
           else Lookup_jkind_path path'
       in
+      (* Stage-4d: [for_saving] scopes the cmi-save-only behaviors (the seeded
+         fault; and, deferred to stage 5, foreign-Param neutralization) to the
+         [Prepare_for_saving] path. *)
+      let for_saving =
+        match s.additional_action with
+        | Prepare_for_saving _ -> true
+        | Duplicate_variables | No_action -> false
+      in
       !Ikind_substitution.substitute_decl_ikind_with_lookup
-        ~lookup_type ~lookup_jkind decl.type_ikind
+        ~lookup_type ~lookup_jkind ~for_saving decl.type_ikind
     );
     type_private = decl.type_private;
     type_variance = decl.type_variance;

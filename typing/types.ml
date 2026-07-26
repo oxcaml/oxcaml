@@ -29,6 +29,18 @@ module Rigid_name = struct
     | KAtom of Path.t
     | Param of int
     | Unknown of unknown_id
+    | Residue of
+        { defining_unit : string;
+          id : int
+        }
+      (* A recursive-module fixpoint residue, produced on the cmi SAVE path by
+         neutralizing a foreign [Param] (stage 5b): [defining_unit] is the
+         saving unit's [full_path_as_string] and [id] the original stale
+         [type_expr] id. Unit-qualified so two units' residues are distinct
+         atoms and a residue can never alias an importer's live [Param]
+         (collision-free BY CONSTRUCTION); a
+         distinct constructor so CLASS-B residue recognition survives (the D1
+         marker-erasure lesson). *)
 
   let compare a b =
     if a == b
@@ -40,13 +52,18 @@ module Rigid_name = struct
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Residue r1, Residue r2 ->
+        let h = String.compare r1.defining_unit r2.defining_unit in
+        if h != 0 then h else Int.compare r1.id r2.id
       | Atom _, _ -> -1
       | _, Atom _ -> 1
       | KAtom _, _ -> -1
       | _, KAtom _ -> 1
-      | Unknown x, Unknown y -> Shape.Uid.compare x y
-      | Unknown _, _ -> 1
-      | _, Unknown _ -> -1
+      | Param _, _ -> -1
+      | _, Param _ -> 1
+      | Unknown _, _ -> -1
+      | _, Unknown _ -> 1
 
   let to_string = function
     | Atom { constr; arg_index } ->
@@ -58,6 +75,8 @@ module Rigid_name = struct
     | Param i -> Printf.sprintf "param[%d]" i
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
+    | Residue { defining_unit; id } ->
+      Printf.sprintf "residue[%s.%d]" defining_unit id
 
   let atomic constr arg_index = Atom { constr; arg_index }
 
@@ -66,6 +85,8 @@ module Rigid_name = struct
   let param i = Param i
 
   let unknown uid = Unknown uid
+
+  let residue defining_unit id = Residue { defining_unit; id }
 end
 
 module Ldd = struct
@@ -80,9 +101,29 @@ type constructor_ikind =
     coeffs : Ldd.node array;
   }
 
+(* A single ZDD term of a decl ikind polynomial: a coefficient meet the
+   canonically-sorted rigid atoms of the term.  This is [Ldd.to_terms]'s
+   element type -- the explicit, node-layout-independent wire form of a
+   [constructor_ikind] on the cmi (stage-5 format lock-in). *)
+type ikind_term = Axis_lattice.t * Rigid_name.t list
+
+(* The named-terms cmi payload for a decl ikind (stage-5 format lock-in): each
+   of [base]/[coeffs.(i)] is decomposed by [Ldd.to_terms] into a term list.
+   Decouples the cmi from the [Ldd] node block / [Axis_lattice] internal layout
+   and gives an explicit place to remap atoms on import. *)
+type saved_constructor_ikind =
+  { saved_base : ikind_term list;
+    saved_coeffs : ikind_term list array;
+  }
+
 type constructor_ikind_entry =
   | Constructor_ikind of constructor_ikind
   | No_constructor_ikind of string
+  | Saved_ikind of saved_constructor_ikind
+      (* On-disk only: exists transiently between the cmi serialize/deserialize
+         boundary (file_formats/cmi_format.ml).  Live code never observes it --
+         serialize maps Constructor_ikind -> Saved_ikind, deserialize maps back
+         -- so every in-memory consumer sees Constructor_ikind. *)
 
 type type_ikind = constructor_ikind_entry
 
@@ -90,6 +131,21 @@ let ikinds_todo (message : string) : type_ikind =
   if !Clflags.ikinds_debug then
     Format.eprintf "[ikinds-todo] %s@." message;
   No_constructor_ikind message
+
+(* Explicit named-terms cmi encode/decode (stage-5 format lock-in).  Pure: the
+   validate-gated faithfulness cross-check lives at the cmi boundary
+   (file_formats/cmi_format.ml), which holds the [Clflags] gate. *)
+let constructor_ikind_to_saved (ci : constructor_ikind) :
+    saved_constructor_ikind =
+  { saved_base = Ldd.to_terms ci.base;
+    saved_coeffs = Array.map Ldd.to_terms ci.coeffs;
+  }
+
+let constructor_ikind_of_saved (s : saved_constructor_ikind) :
+    constructor_ikind =
+  { base = Ldd.of_terms s.saved_base;
+    coeffs = Array.map Ldd.of_terms s.saved_coeffs;
+  }
 
 type atomic =
   | Nonatomic

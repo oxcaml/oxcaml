@@ -133,6 +133,7 @@ module Ikind_substitution : sig
   val substitute_decl_ikind_with_lookup :
     (lookup_type:(Path.t -> type_lookup_result) ->
      lookup_jkind:(Path.t -> jkind_lookup_result) ->
+     for_saving:bool ->
      type_ikind -> type_ikind) ref
 end
 

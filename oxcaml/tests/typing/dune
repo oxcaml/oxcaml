@@ -1,3 +1,4 @@
 (tests
- (names global_module_test axis_lattice_roundtrip_test)
+ (names global_module_test axis_lattice_roundtrip_test
+        ldd_terms_roundtrip_test)
  (libraries ocamlcommon))

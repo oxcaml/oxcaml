@@ -483,9 +483,10 @@ let type_iterators_without_type_expr =
     match jkd.jkind_manifest with
     | None -> ()
     | Some { base = Kconstr (p, _); mod_bounds = _;
-             with_bounds = No_with_bounds } ->
+             with_bounds = No_with_bounds; _ } ->
       it.it_path p
-    | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
+    | Some { base = Layout _; mod_bounds = _;
+             with_bounds = No_with_bounds; _ } ->
       ()
   and it_functor_param it = function
     | Unit -> ()
