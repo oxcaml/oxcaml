@@ -957,11 +957,12 @@ let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
 let label_mutability_contribution (lbl : Types.label_declaration) =
-  Ldd.const
-    (match lbl.ld_mutable with
-    | Immutable -> Axis_lattice.immediate
-    | Mutable { atomic = Atomic; _ } -> Axis_lattice.sync_data
-    | Mutable { atomic = Nonatomic; _ } -> Axis_lattice.mutable_data)
+  match lbl.ld_mutable with
+  (* [immediate] is below every base this is summed into, so omitting it keeps
+     immutable fields out of the untracked part of a provenance residual. *)
+  | Immutable -> Ldd.bot
+  | Mutable { atomic = Atomic; _ } -> Ldd.const Axis_lattice.sync_data
+  | Mutable { atomic = Nonatomic; _ } -> Ldd.const Axis_lattice.mutable_data
 
 let sum_record_label_contributions ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
@@ -1140,13 +1141,14 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
     | Types.Type_abstract _ | Types.Type_open -> use_decl_jkind ()
     | Types.Type_record (lbls, rep, _umc_opt) ->
       let base =
-        Ldd.const
-          (match rep with
-          | Types.Record_unboxed -> Axis_lattice.immediate
+        let base_lat, source =
+          match rep with
+          | Types.Record_unboxed -> Axis_lattice.immediate, "unboxed records"
           (* CR box: This will no longer be [non_float] once we update the
              representation of singleton float64 records *)
-          | _ -> Axis_lattice.immutable_data)
-        |> decl_base_provenance ctx "boxed records"
+          | _ -> Axis_lattice.immutable_data, "boxed records"
+        in
+        Ldd.const base_lat |> decl_base_provenance ctx source
       in
       sum_record_label_contributions ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
@@ -1192,15 +1194,15 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
           cstrs
       in
       let base =
-        let base_lat =
+        let base_lat, source =
           match rep with
-          | Types.Variant_unboxed -> Axis_lattice.immediate
+          | Types.Variant_unboxed -> Axis_lattice.immediate, "unboxed variants"
           | _ ->
             if all_args_void
-            then Axis_lattice.immediate
-            else Axis_lattice.immutable_data
+            then Axis_lattice.immediate, "enumeration variants"
+            else Axis_lattice.immutable_data, "boxed variants"
         in
-        Ldd.const base_lat |> decl_base_provenance ctx "boxed variants"
+        Ldd.const base_lat |> decl_base_provenance ctx source
       in
       let payload_kind_of_constructor =
         make_gadt_payload_projector ~decl_params:decl.type_params ctx
