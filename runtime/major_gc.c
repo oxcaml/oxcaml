@@ -773,10 +773,8 @@ static void adopt_orphaned_work (int expected_status)
 /* Default speed setting for the major GC */
 atomic_uintnat caml_percent_free = Percent_free_def;
 
-/* Idle-phase floor (upstream #14365): after sweeping, marking is
-   deferred until this much (in sweep-work words) has been allocated
-   this cycle.  Plain like the other gc tweaks; upstream makes it
-   _Atomic together with its whole tweak table. */
+/* Idle-phase floor, in sweep-work words: after sweeping, marking waits
+   until this much has been allocated this cycle. */
 uintnat caml_small_heap_limit = Small_heap_limit_def;
 atomic_uintnat caml_max_percent_free = Max_percent_free_def;
 
@@ -821,16 +819,13 @@ static intnat Sweepwork_markwork(intnat mark_work)
 static atomic_uintnat total_work_incurred;
 static atomic_uintnat total_work_completed;
 
-/* Value of total_work_completed at the latest color rotation (start of
-   sweep) and amount of work incurred during the latest sweep phase
-   (upstream #14365: alloc during sweep = the "virtual sweep work").
-   Only written under stw. */
+/* total_work_completed at the latest color rotation, and the work
+   incurred during the latest sweep phase. Only written under stw. */
 static uintnat work_counter_at_sweep_start;
 static uintnat latest_sweep_allocs;
 
-/* Small-memory mode: at the end of sweeping, we will not switch to
-   Phase_sweep_and_mark_main (and thus will stay in idle mode) until
-   total_work_completed has reached this value. */
+/* Sweeping will not give way to Phase_sweep_and_mark_main until
+   total_work_completed reaches this. */
 static atomic_uintnat work_counter_min_before_mark;
 
 static inline intnat max2 (intnat a, intnat b)
@@ -870,19 +865,18 @@ static inline intnat diffmod (uintnat x1, uintnat x2)
  * collection.
  */
 
-/* Initialize the counters for GC pacing.
-   For use in caml_init_gc, when everything is still single-threaded.
-   caml_small_heap_limit must be initialized (gc tweaks parsed) before
-   calling this function. */
+/* For caml_init_gc, while still single-threaded. Requires the gc tweaks
+   to have been parsed, so that caml_small_heap_limit is set. */
 void caml_init_major_pacing (void)
 {
-  work_counter_min_before_mark =
-    atomic_load (&total_work_completed) + caml_small_heap_limit;
+  total_work_incurred = 0;
+  total_work_completed = 0;
+  CAML_GC_MESSAGE (POLICY, "work_counter: initialize to 0\n");
+  work_counter_min_before_mark = caml_small_heap_limit;
 }
 
-/* add_overhead is true if the latest collection was synchronous (with
-   caml_gc_full_major) and thus the sweep phase counted only the live
-   data (with no floating garbage). */
+/* add_overhead: the latest collection was synchronous, so the sweep
+   phase counted only live data, with no floating garbage. */
 void caml_reset_major_pacing(bool add_overhead)
 {
   bool res;
@@ -2233,25 +2227,19 @@ static void major_collection_slice(intnat howmuch,
     if (log_events) CAML_EV_END(EV_MAJOR_SWEEP);
   }
 
-  if (domain_state->sweeping_done) {
-    /* Idle phase (upstream #14365): after sweeping, delay the switch to
-       marking until the work counter has advanced past the floor armed
-       at the start of this sweep phase. Until then the GC does nothing
-       but commit the incurred work, so small heaps never pay for a
-       mark phase. */
+  if (domain_state->sweeping_done && !caml_marking_started()) {
+    /* Idle phase: defer marking until the work counter passes the floor
+       armed at the start of this sweep phase. */
     uintnat wkcnt = atomic_load (&total_work_completed);
     intnat idle = diffmod (work_counter_min_before_mark, wkcnt);
     bool want_mark;
     if (idle <= 0){
-      /* Idle phase is finished (or never existed): start marking. */
       want_mark = true;
     }else{
-      /* Idle phase: do nothing but commit to the work counter. */
       intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
-      todo = min2 (max2 (todo, 0), idle);
-      /* Commit even when todo == 0: the commit also clears
-         [requested_global_major_slice] (as the opportunistic early-out
-         above does). */
+      todo = min2 (todo, idle);
+      /* Commit even when todo == 0: this also clears
+         [requested_global_major_slice]. */
       commit_major_slice_sweepwork (todo);
       want_mark = (todo == idle);
       CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
