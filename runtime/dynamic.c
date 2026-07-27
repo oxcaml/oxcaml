@@ -459,6 +459,65 @@ CAMLprim value caml_dynamic_make(value unit)
   CAMLreturn(hash);
 }
 
+static bool dynamic_fiber_find(struct stack_info *stack, value dyn, value *val)
+{
+  dynamic_stack_t bindings;
+  if(dynamic_table_find(&stack->dyn, dyn, &bindings) && bindings->count > 0) {
+    *val = bindings->vals[bindings->count - 1];
+    return true;
+  }
+  return false;
+}
+
+/* Fibers have up to two out-edges: [lexical_parent] (usually NULL; see
+   fiber.h) and [Stack_parent]. Lookup walks the current fiber's chain (the
+   spine) and, at each fiber pinned to a fork point, takes a detour through
+   the lexically enclosing scope: the fork point's fibers up to the base of
+   its task, jumping through nested fork edges. Bindings visible at a fork
+   point thus win over bindings inherited from the fiber's current (possibly
+   reparented) dynamic chain, while dynamics unbound at the fork point still
+   resolve against that chain via the spine.
+
+   A detour stops at a task base (a [lexical_root] fiber, or a parent link
+   cut by continuation capture); in particular it never reads a task base's
+   [Stack_parent], which changes whenever a scheduler moves the task. The
+   spine deliberately ignores [lexical_root]: a fiber's own lookups fall
+   through its task base into the chain of the worker executing it.
+
+   Both walks are linear. Within a detour each fiber has a single successor
+   (fork edge, stop, or enclosing fiber), so detours never branch and no
+   recursion is needed. */
+static value dynamic_lookup(struct stack_info *stack, value dyn)
+{
+  value val;
+
+  for(; stack != NULL; stack = Stack_parent(stack)) { /* spine */
+    if(dynamic_fiber_find(stack, dyn, &val)) {
+      return val;
+    }
+    /* Skip the detour when the fork point is also the dynamic parent (a
+       child running directly on its forker): the spine visits the same
+       fibers, and correctly continues past the task base. */
+    if(stack->lexical_parent != NULL
+       && stack->lexical_parent != Stack_parent(stack)) {
+      struct stack_info *p = stack->lexical_parent;
+      while(p != NULL) { /* lexical detour */
+        if(dynamic_fiber_find(p, dyn, &val)) {
+          return val;
+        }
+        if(p->lexical_parent != NULL) {
+          p = p->lexical_parent; /* nested fork ancestry */
+        } else if(p->lexical_root) {
+          break; /* task base */
+        } else {
+          p = Stack_parent(p); /* enclosing fiber of the same task */
+        }
+      }
+    }
+  }
+  return Val_null;
+}
+
 CAMLprim value caml_dynamic_get(value dyn)
 {
   CAMLnoalloc;
@@ -472,17 +531,7 @@ CAMLprim value caml_dynamic_get(value dyn)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  value val = Val_null;
-  while(stack) {
-    dynamic_stack_t bindings;
-    if(dynamic_table_find(&stack->dyn, dyn, &bindings)) {
-      if(bindings->count > 0) {
-        val = bindings->vals[bindings->count - 1];
-        break;
-      }
-    }
-    stack = Stack_parent(stack);
-  }
+  value val = dynamic_lookup(stack, dyn);
 
   entry->dyn = dyn;
   entry->val = val;
@@ -492,6 +541,9 @@ CAMLprim value caml_dynamic_get(value dyn)
 CAMLprim value caml_dynamic_push(value dyn, value val)
 {
   CAMLparam2(dyn, val);
+
+  /* Val_null is reserved as the "unbound" sentinel */
+  CAMLassert(Is_this(val));
 
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
@@ -520,6 +572,40 @@ CAMLprim value caml_dynamic_pop(value dyn)
   if(entry->dyn == dyn) {
     entry->dyn = Val_null;
   }
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_current_fiber(value unit)
+{
+  CAMLnoalloc;
+  return Val_ptr(Caml_state->current_stack);
+}
+
+CAMLprim value caml_dynamic_set_lexical_parent(value fiber)
+{
+  CAMLnoalloc;
+
+  /* Val_ptr(NULL) == Val_unit, so passing () clears the edge */
+  struct stack_info *parent = Ptr_val(fiber);
+  CAMLassert(parent == NULL || parent->magic == 42);
+
+  Caml_state->current_stack->lexical_parent = parent;
+
+  /* Cached lookups may now resolve differently */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_set_lexical_root(value unit)
+{
+  CAMLnoalloc;
+
+  Caml_state->current_stack->lexical_root = true;
+
+  /* Cached lookups may now resolve differently */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   return Val_unit;
 }

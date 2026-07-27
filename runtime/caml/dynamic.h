@@ -34,6 +34,50 @@ CAMLprim value caml_dynamic_push(value dyn, value val);
    Must be paired with [caml_dynamic_push] on the same fiber. */
 CAMLprim value caml_dynamic_pop(value dyn);
 
+/* Return a handle (tagged pointer) to the current fiber, for use with
+   [caml_dynamic_set_lexical_parent]. Unsafe: the handle is invalidated if
+   the fiber's stack grows (reallocation frees the old block) or the fiber
+   terminates. Callers must obtain it immediately before suspending (e.g.
+   right before performing a fork effect), with no intervening OCaml calls
+   that could trigger a stack check, and must not use it after the fiber
+   resumes. */
+CAMLprim value caml_dynamic_current_fiber(value unit);
+
+/* Set (or, given Val_unit, clear) the lexical parent of the current fiber,
+   making dynamic lookups see the bindings visible at [fiber] (its task's
+   chain, up to the enclosing task base) before those of this fiber's own
+   dynamic parent chain (see [dynamic_lookup] in dynamic.c).
+
+   Intended for fork/join-style libraries pinning the scope of the fork
+   point. The caller must guarantee:
+   - This runs as the first action of a dedicated per-child fiber, never on
+     a long-lived (e.g. scheduler worker) fiber, where the edge would
+     outlive the task. The edge dies with the fiber.
+   - The fork point's task span (fork point up to its task base) stays
+     alive, with bindings and parent links unchanged, for as long as this
+     fiber can run. Joining all children before the forking task unwinds
+     provides liveness; children making their bindings in their own fibers,
+     and effects from a child never being handled between the fork point
+     and the task base, provide immutability. Handoff to and joining from
+     another domain must synchronize (any scheduler queue does), making
+     cross-domain reads of the span's tables safe.
+   - This fiber must never escape into a continuation that outlives the
+     join, or its edge dangles. Fibers created *within* it may escape
+     freely: they carry no edge, so once their chain no longer passes
+     through this fiber they resolve purely against their new parent chain.
+   - Every chain reachable through a lexical edge ends at a fiber marked by
+     [caml_dynamic_set_lexical_root] or at a parent link cut by
+     continuation capture; an unmarked task base would let detours run into
+     (and race with) the mounting worker's live chain. */
+CAMLprim value caml_dynamic_set_lexical_parent(value fiber);
+
+/* Mark the current fiber as the base of a scheduler task: lexical detours
+   stop here instead of continuing into the scheduler's own chain (see
+   [dynamic_lookup] in dynamic.c). The fiber's own lookups are unaffected.
+   Schedulers must mark every task fiber they mount that is not itself a
+   fork/join child, before running the task body. */
+CAMLprim value caml_dynamic_set_lexical_root(value unit);
+
 
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */

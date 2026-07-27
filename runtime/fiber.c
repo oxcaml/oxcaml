@@ -354,6 +354,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_top = NULL;
   stack->local_limit = 0;
   caml_dynamic_table_init(&stack->dyn);
+  stack->lexical_parent = NULL;
+  stack->lexical_root = false;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -952,6 +954,8 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dyn = old_stack->dyn;
+  new_stack->lexical_parent = old_stack->lexical_parent;
+  new_stack->lexical_root = old_stack->lexical_root;
 
   // Detach locals stack and dynamic bindings from old_stack so they will not be freed
   old_stack->local_arenas = NULL;

@@ -74,6 +74,26 @@ struct stack_info {
 
   /* Temporary dynamic bindings, applying only in this fiber */
   struct dynamic_table_s dyn;
+
+  /* Fiber whose dynamic bindings lexically enclose this fiber's, or NULL.
+     Set on fork/join child tasks. Dynamic lookups detour through this edge
+     before falling back to [Stack_parent] (see [dynamic_lookup] in
+     dynamic.c), so children see the bindings visible at the fork point even
+     if a scheduler runs them under an unrelated parent.
+
+     Not scanned by the GC. Whoever sets it (see
+     [caml_dynamic_set_lexical_parent]) must guarantee that the target's
+     task span (fork point up to its task base) stays alive, with bindings
+     and parent links unchanged, for as long as this fiber can run. */
+  struct stack_info* lexical_parent;
+
+  /* Whether this fiber is the base fiber of a scheduler task. Lexical
+     detours (see [dynamic_lookup] in dynamic.c) stop here instead of
+     continuing into the scheduler's own chain; the fiber's own lookups
+     ignore the flag and fall through into the executing worker's chain.
+     Set by schedulers (see [caml_dynamic_set_lexical_root]) on every task
+     fiber they mount that is not a fork/join child. */
+  bool lexical_root;
 };
 
 #ifdef STACK_GUARD_PAGES
