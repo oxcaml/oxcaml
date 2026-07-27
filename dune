@@ -149,6 +149,7 @@
  (modules
   ;; UTILS
   arrayset
+  breadcrumbs
   config
   build_path_prefix_map
   misc
