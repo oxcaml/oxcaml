@@ -64,6 +64,8 @@
    cpu.c
    ../stdlib/prims/blake2.c
    misc.c
+   ../stdlib/prims/gc_ctrl_prims.c ../stdlib/prims/io_prims.c
+     ../stdlib/prims/obj_prims.c ../stdlib/prims/sys_prims.c
    build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
    ../Makefile.config
    (glob_files caml/*.h))

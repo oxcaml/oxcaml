@@ -1136,13 +1136,17 @@ stdlib_prims_C_SOURCES = \
   compare \
   float32 \
   floats \
+  gc_ctrl_prims \
   hash \
   ints \
+  io_prims \
   lexing \
   md5 \
+  obj_prims \
   parsing \
   prng \
-  str
+  str \
+  sys_prims
 
 runtime_BYTECODE_ONLY_C_SOURCES = \
   backtrace_byt \
