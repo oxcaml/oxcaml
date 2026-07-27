@@ -323,103 +323,6 @@ caml_stat_string caml_search_dll_in_path(struct ext_table * path,
   return res;
 }
 
-#ifdef WITH_DYNAMIC_LINKING
-#ifdef __CYGWIN__
-/* Use flexdll */
-
-void * caml_dlopen(char * libname, int global)
-{
-  int flags = (global ? FLEXDLL_RTLD_GLOBAL : 0);
-  return flexdll_dlopen(libname, flags);
-}
-
-void caml_dlclose(void * handle)
-{
-  flexdll_dlclose(handle);
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return flexdll_dlsym(handle, name);
-}
-
-void * caml_globalsym(const char * name)
-{
-  return flexdll_dlsym(flexdll_dlopen(NULL,0), name);
-}
-
-char * caml_dlerror(void)
-{
-  return flexdll_dlerror();
-}
-
-#else /* ! __CYGWIN__ */
-/* Use normal dlopen */
-
-#ifndef RTLD_GLOBAL
-#define RTLD_GLOBAL 0
-#endif
-#ifndef RTLD_LOCAL
-#define RTLD_LOCAL 0
-#endif
-
-void * caml_dlopen(char * libname, int global)
-{
-  return dlopen(libname, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
-}
-
-void caml_dlclose(void * handle)
-{
-  dlclose(handle);
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return dlsym(handle, name);
-}
-
-void * caml_globalsym(const char * name)
-{
-#ifdef RTLD_DEFAULT
-  return caml_dlsym(RTLD_DEFAULT, name);
-#else
-  return NULL;
-#endif
-}
-
-char * caml_dlerror(void)
-{
-  return (char*) dlerror();
-}
-
-#endif /* __CYGWIN__ */
-#else
-
-void * caml_dlopen(char * libname, int global)
-{
-  return NULL;
-}
-
-void caml_dlclose(void * handle)
-{
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return NULL;
-}
-
-void * caml_globalsym(const char * name)
-{
-  return NULL;
-}
-
-char * caml_dlerror(void)
-{
-  return "dynamic loading not supported on this platform";
-}
-
-#endif /* WITH_DYNAMIC_LINKING */
 
 /* Add to [contents] the (short) names of the files contained in
    the directory named [dirname].  No entries are added for [.] and [..].
@@ -778,3 +681,101 @@ void caml_plat_mem_unmap(void* mem, uintnat size)
 }
 
 #endif /* CAML_BARE_METAL */
+
+#ifdef WITH_DYNAMIC_LINKING
+#ifdef __CYGWIN__
+/* Use flexdll */
+
+void * caml_dlopen(char * libname, int global)
+{
+  int flags = (global ? FLEXDLL_RTLD_GLOBAL : 0);
+  return flexdll_dlopen(libname, flags);
+}
+
+void caml_dlclose(void * handle)
+{
+  flexdll_dlclose(handle);
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return flexdll_dlsym(handle, name);
+}
+
+void * caml_globalsym(const char * name)
+{
+  return flexdll_dlsym(flexdll_dlopen(NULL,0), name);
+}
+
+char * caml_dlerror(void)
+{
+  return flexdll_dlerror();
+}
+
+#else /* ! __CYGWIN__ */
+/* Use normal dlopen */
+
+#ifndef RTLD_GLOBAL
+#define RTLD_GLOBAL 0
+#endif
+#ifndef RTLD_LOCAL
+#define RTLD_LOCAL 0
+#endif
+
+void * caml_dlopen(char * libname, int global)
+{
+  return dlopen(libname, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
+}
+
+void caml_dlclose(void * handle)
+{
+  dlclose(handle);
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return dlsym(handle, name);
+}
+
+void * caml_globalsym(const char * name)
+{
+#ifdef RTLD_DEFAULT
+  return caml_dlsym(RTLD_DEFAULT, name);
+#else
+  return NULL;
+#endif
+}
+
+char * caml_dlerror(void)
+{
+  return (char*) dlerror();
+}
+
+#endif /* __CYGWIN__ */
+#else
+
+void * caml_dlopen(char * libname, int global)
+{
+  return NULL;
+}
+
+void caml_dlclose(void * handle)
+{
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return NULL;
+}
+
+void * caml_globalsym(const char * name)
+{
+  return NULL;
+}
+
+char * caml_dlerror(void)
+{
+  return "dynamic loading not supported on this platform";
+}
+
+#endif /* WITH_DYNAMIC_LINKING */

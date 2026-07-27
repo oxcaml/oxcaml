@@ -161,6 +161,7 @@ typedef uint64_t uintnat;
 #undef HAS_LOCALE_H
 #undef HAS_XLOCALE_H
 #undef HAS_LOCALE
+#undef SUPPORT_DYNAMIC_LINKING
 
 #undef OCAML_OS_TYPE
 #define OCAML_OS_TYPE "none"
