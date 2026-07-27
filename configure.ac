@@ -645,9 +645,11 @@ AC_ARG_ENABLE([vmthreads], [],
       It was deleted in OCaml 4.09.]))])],
   [])
 
-AC_ARG_ENABLE([systhreads],
-  [AS_HELP_STRING([--disable-systhreads],
-    [disable the Win32/POSIX threads library])])
+AC_ARG_ENABLE([systhreads], [],
+  [AS_IF([test "x$enableval" = 'xno'],
+    [AC_MSG_ERROR(m4_normalize([The systhreads library is part of the
+      runtime and can no longer be disabled.]))])],
+  [])
 
 AC_ARG_ENABLE([tsan],
   [AS_HELP_STRING([--enable-tsan],
@@ -3011,9 +3013,9 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
   [yes,no],
     [systhread_support=false
     AC_MSG_ERROR([the threads library requires the unix library])],
-  [no,*|*,no],
+  [*,no],
     [systhread_support=false
-    AC_MSG_NOTICE([the threads library is disabled])],
+    AC_MSG_NOTICE([the threads library is disabled (requires the unix library)])],
   [systhread_support=true
   AC_CONFIG_FILES([otherlibs/systhreads/META])
   otherlibraries="$otherlibraries systhreads"
