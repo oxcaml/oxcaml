@@ -904,25 +904,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       of [v.lower] and the lower bounds of all variables reachable through
       [vlower] edges. The traversal stops as soon as the accumulated bound is
       above [stop]. *)
-  let floor_reachable_var : type a. a C.obj -> stop:a -> a var -> a =
-   fun obj ~stop v ->
-    let rec search :
-        (a, left_only) morphvar ->
-        a * a lmorphvar VarMap.t ->
-        a * a lmorphvar VarMap.t =
-     fun (Amorphvar (u, f, f_hint) as mv) ((lower, mvs) as acc) ->
-      if C.le obj stop lower
+  let floor_reachable_morphvar : type b l r.
+      b C.obj -> stop:b -> (b, l * r) morphvar -> b =
+   fun dst ~stop (Amorphvar (v, m, _)) ->
+    let src = C.src dst m in
+    let rec search (Amorphvar (u, f, f_hint) as mv) ((lower, mvs) as acc) =
+      if C.le dst stop (C.apply dst m lower)
       then acc
       else
-        let key = get_key obj mv in
+        let key = get_key src mv in
         if VarMap.mem key mvs
         then acc
         else
-          let lower = C.join obj lower (mlower obj mv) in
+          let lower = C.join src lower (mlower src mv) in
           let mvs = VarMap.add key mv mvs in
           VarMap.fold
             (fun _ (Amorphvar (w, g, g_hint)) acc ->
-              let fg = C.compose obj f g in
+              let fg = C.compose src f g in
               let fg_hint = Comp_hint.Morph_hint.Compose (f_hint, g_hint) in
               search (Amorphvar (w, fg, fg_hint)) acc)
             u.vlower (lower, mvs)
@@ -932,38 +930,39 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv acc -> search mv acc)
         v.vlower (v.lower, VarMap.empty)
     in
-    lower
+    C.apply dst m lower
 
   let rigid_submode_cv : type a.
       a C.obj -> a -> a var -> (unit, a * (a, right_only) Comp_hint.t) Result.t
       =
    fun obj a v ->
-    let lower = floor_reachable_var obj ~stop:a v in
+    let lower =
+      floor_reachable_morphvar obj ~stop:a
+        (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id))
+    in
     if C.le obj a lower then Ok () else Error (lower, Comp_hint.Unknown lower)
 
   (** Returns the upper bound of [v] implied by the constraint graph: the meet
       of [v.upper] and the upper bounds of all variables reachable through
       [vupper] edges. The traversal stops as soon as the accumulated bound is
       below [stop]. *)
-  let ceil_reachable_var : type a. a C.obj -> stop:a -> a var -> a =
-   fun obj ~stop v ->
-    let rec search :
-        (a, right_only) morphvar ->
-        a * a rmorphvar VarMap.t ->
-        a * a rmorphvar VarMap.t =
-     fun (Amorphvar (u, f, f_hint) as mv) ((upper, mvs) as acc) ->
-      if C.le obj upper stop
+  let ceil_reachable_morphvar : type b l r.
+      b C.obj -> stop:b -> (b, l * r) morphvar -> b =
+   fun dst ~stop (Amorphvar (v, m, _)) ->
+    let src = C.src dst m in
+    let rec search (Amorphvar (u, f, f_hint) as mv) ((upper, mvs) as acc) =
+      if C.le dst (C.apply dst m upper) stop
       then acc
       else
-        let key = get_key obj mv in
+        let key = get_key src mv in
         if VarMap.mem key mvs
         then acc
         else
-          let upper = C.meet obj upper (mupper obj mv) in
+          let upper = C.meet src upper (mupper src mv) in
           let mvs = VarMap.add key mv mvs in
           VarMap.fold
             (fun _ (Amorphvar (w, g, g_hint)) acc ->
-              let fg = C.compose obj f g in
+              let fg = C.compose src f g in
               let fg_hint = Comp_hint.Morph_hint.Compose (f_hint, g_hint) in
               search (Amorphvar (w, fg, fg_hint)) acc)
             u.vupper (upper, mvs)
@@ -973,12 +972,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv acc -> search mv acc)
         v.vupper (v.upper, VarMap.empty)
     in
-    upper
+    C.apply dst m upper
 
   let rigid_submode_vc : type a.
       a C.obj -> a var -> a -> (unit, a * (a, left_only) Comp_hint.t) Result.t =
    fun obj v a ->
-    let upper = ceil_reachable_var obj ~stop:a v in
+    let upper =
+      ceil_reachable_morphvar obj ~stop:a
+        (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id))
+    in
     if C.le obj upper a then Ok () else Error (upper, Comp_hint.Unknown upper)
 
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
@@ -1219,21 +1221,22 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (c, b, l * allowed) C.morph ->
       (c, b, l * allowed) Comp_hint.Morph_hint.t ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log:_ _pp dst v f _f_hint u g _g_hint ->
+   fun ~log:_ _pp dst v f _f_hint u g g_hint ->
     let src_f = C.src dst f in
-    let src_g = C.src dst g in
-    let zap_log, _ =
+    let f' = C.right_adjoint dst f in
+    let zap_log, ceil =
       zap_to_ceil_morphvar_aux src_f
         (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id))
     in
-    let ceil = C.apply dst f (ceil_reachable_var src_f ~stop:(C.min src_f) v) in
     let floor =
-      C.apply dst g (floor_reachable_var src_g ~stop:(C.max src_g) u)
+      floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (u, g, g_hint))
     in
     undo_changes zap_log;
-    if C.le dst ceil floor
+    if C.le src_f ceil (C.apply src_f f' floor)
     then Ok ()
-    else Error (ceil, Comp_hint.Unknown ceil, floor, Comp_hint.Unknown floor)
+    else
+      let ceil = C.apply dst f ceil in
+      Error (ceil, Comp_hint.Unknown ceil, floor, Comp_hint.Unknown floor)
 
   (** Handles [f v <= g u] where [u] is rigid but [v] is not. We cannot add the
       arrow [g' (f v)] to [u.vlower]; instead we enforce the bound requirement
@@ -1250,9 +1253,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (c, b, l * allowed) C.morph ->
       (c, b, l * allowed) Comp_hint.Morph_hint.t ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log pp dst v f f_hint u g _g_hint ->
-    let src_g = C.src dst g in
-    let ceil = C.apply dst g (ceil_reachable_var src_g ~stop:(C.min src_g) u) in
+   fun ~log pp dst v f f_hint u g g_hint ->
+    let ceil =
+      ceil_reachable_morphvar dst ~stop:(C.min dst) (Amorphvar (u, g, g_hint))
+    in
     match
       submode_mvc ~allow_rigid:false ~log pp dst
         (Amorphvar (v, f, f_hint))
@@ -1276,10 +1280,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (c, b, l * allowed) C.morph ->
       (c, b, l * allowed) Comp_hint.Morph_hint.t ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log pp dst v f _f_hint u g g_hint ->
-    let src_f = C.src dst f in
+   fun ~log pp dst v f f_hint u g g_hint ->
     let floor =
-      C.apply dst f (floor_reachable_var src_f ~stop:(C.max src_f) v)
+      floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (v, f, f_hint))
     in
     match
       submode_cmv ~allow_rigid:false ~log pp dst floor (Comp_hint.Unknown floor)
