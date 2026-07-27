@@ -470,6 +470,7 @@ AC_SUBST([ocaml_libdir])
 AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
+AC_SUBST([ar_thin_archives_flags])
 AC_SUBST([target_bindir])
 
 ## Generated files
@@ -1093,6 +1094,25 @@ AS_CASE([$host],
 AS_CASE([$lt_cv_ar_at_file],
   [no], [ar_supports_response_files=false],
   [ar_supports_response_files=true])
+
+# Which ar flags to use to build thin archives.
+# llvm-ar and recent GNU ar accept --thin. Older GNU accepts only
+# the now-deprecated 'T' modifier, which is ambiguous with BSD ar.
+# (To avoid the ambiguity, check the magic number when using 'T')
+
+ar_thin_archives_flags=''
+AS_IF([test -n "$AR"],
+  [AC_MSG_CHECKING([for $AR flags to build thin archives])
+  echo 'conftest' > conftest_ar_member
+  rm -f conftest_ar.a
+  AS_IF([$AR --thin rc conftest_ar.a conftest_ar_member >/dev/null 2>&1],
+    [ar_thin_archives_flags='--thin rc'],
+    [rm -f conftest_ar.a
+    AS_IF([$AR rcT conftest_ar.a conftest_ar_member >/dev/null 2>&1 \
+           && grep '!<thin>' conftest_ar.a >/dev/null 2>&1],
+      [ar_thin_archives_flags='rcT'],
+      [ar_thin_archives_flags='rc'])])
+  rm -f conftest_ar.a conftest_ar_member])
 
 # Libraries to build depending on the target
 
