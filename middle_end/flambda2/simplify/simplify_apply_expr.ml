@@ -899,7 +899,7 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           ~arg_types:
             (T.unknown_types_from_arity (Apply.return_arity apply)
                ~alloc_mode:
-                 (Apply.alloc_mode apply |> Alloc_mode.For_applications.as_type)
+                 (Apply.return_mode apply |> Alloc_mode.For_applications.as_type)
                ~machine_width:(DE.machine_width denv))
       in
       dacc, Some use_id

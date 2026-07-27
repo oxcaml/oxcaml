@@ -1073,7 +1073,7 @@ and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_return: layout;
     ktmpl_body: lambda;
-    ktmpl_ret_mode: locality_mode;
+    ktmpl_ret_mode: return_mode;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1491,6 +1491,7 @@ val is_maybe_alloc_stack : return_mode -> bool
 val is_not_alloc_stack : return_mode -> bool
 val eq_return_mode : return_mode -> return_mode -> bool
 val locality_return_compat : locality_mode -> return_mode -> bool
+val return_mode_of_locality_mode : locality_mode -> return_mode
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.

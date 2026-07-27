@@ -4815,7 +4815,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     let return = Typeopt.layout pat.pat_env pat.pat_loc sort pat.pat_type in
     let mode = Mode.value_to_alloc_r2l mode in
     let locality = Mode.Alloc.proj_comonadic Areality mode in
-    let ret_mode = Translmode.transl_locality_mode_l locality in
+    let ret_mode = Translmode.transl_return_mode_l locality in
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in

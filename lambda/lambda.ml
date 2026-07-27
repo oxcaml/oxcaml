@@ -155,6 +155,10 @@ let locality_return_compat a b =
   | _, Maybe_alloc_stack -> true
   | Alloc_local, Not_alloc_stack -> false
 
+let return_mode_of_locality_mode = function
+  | Alloc_heap -> not_alloc_stack
+  | Alloc_local -> maybe_alloc_stack
+
 type staticity =
   | Static
   | Dynamic
@@ -1224,7 +1228,7 @@ and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_return: layout;
     ktmpl_body: lambda;
-    ktmpl_ret_mode: locality_mode;
+    ktmpl_ret_mode: return_mode;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
