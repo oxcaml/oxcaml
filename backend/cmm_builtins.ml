@@ -942,21 +942,20 @@ let transl_builtin name args dbg typ_res =
     Some (zero_extend ~bits:32 ~dbg (one_arg name args))
   | "caml_csel_value" | "caml_csel_int_untagged" | "caml_csel_int64_unboxed"
   | "caml_csel_int32_unboxed" | "caml_csel_int16_untagged"
-  | "caml_csel_int8_untagged" | "caml_csel_nativeint_unboxed" ->
+  | "caml_csel_int8_untagged" | "caml_csel_nativeint_unboxed" -> (
     (* Unboxed float variant of csel intrinsic is not currently supported. It
        can be emitted on arm64 using FCSEL, but there appears to be no
        corresponding instruction on amd64 for xmm registers. *)
     let op = Ccsel typ_res in
     let cond, ifso, ifnot = three_args name args in
-    if_operation_supported op ~f:(fun () ->
-        (* Here is an example to show how csel is compiled:
-         *   (csel val (!= cond/306 1) ifso/304 ifnot/305))
-         * [test_bool] goes from a tagged to an untagged bool. *)
-        let cond = test_bool dbg cond in
-        match cond with
-        | Cconst_int (0, _) -> ifnot
-        | Cconst_int (1, _) -> ifso
-        | Cconst_int _ | Cconst_natint _
+    match ifso, ifnot with
+    | Cconst_int (c1, _), Cconst_int (c2, _) when Int.equal c1 c2 ->
+      Some (Csequence (cond, ifso))
+    | Cconst_natint (c1, _), Cconst_natint (c2, _) when Nativeint.equal c1 c2 ->
+      Some (Csequence (cond, ifso))
+    | Cvar v1, Cvar v2 when Backend_var.same v1 v2 ->
+      Some (Csequence (cond, ifso))
+    | ( ( Cconst_int _ | Cconst_natint _
         | Cconst_float32 (_, _)
         | Cconst_float (_, _)
         | Cconst_vec128 (_, _)
@@ -973,8 +972,35 @@ let transl_builtin name args dbg typ_res =
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
         | Cexit (_, _, _)
-        | Cinvalid _ ->
-          Cop (op, [cond; ifso; ifnot], dbg))
+        | Cinvalid _ ),
+        _ ) ->
+      if_operation_supported op ~f:(fun () ->
+          (* Here is an example to show how csel is compiled:
+           *   (csel val (!= cond/306 1) ifso/304 ifnot/305))
+           * [test_bool] goes from a tagged to an untagged bool. *)
+          let cond = test_bool dbg cond in
+          match cond with
+          | Cconst_int (0, _) -> ifnot
+          | Cconst_int (1, _) -> ifso
+          | Cconst_int _ | Cconst_natint _
+          | Cconst_float32 (_, _)
+          | Cconst_float (_, _)
+          | Cconst_vec128 (_, _)
+          | Cconst_vec256 (_, _)
+          | Cconst_vec512 (_, _)
+          | Cconst_symbol (_, _)
+          | Cvar _
+          | Clet (_, _, _)
+          | Cphantom_let (_, _, _)
+          | Ctuple _
+          | Cop (_, _, _)
+          | Csequence (_, _)
+          | Cifthenelse (_, _, _, _, _, _)
+          | Cswitch (_, _, _, _)
+          | Ccatch (_, _, _)
+          | Cexit (_, _, _)
+          | Cinvalid _ ->
+            Cop (op, [cond; ifso; ifnot], dbg)))
   | "caml_int8_shift_left_by_int8_untagged" ->
     let arg, count = two_args name args in
     shift ~bits:8 lsl_int arg count dbg

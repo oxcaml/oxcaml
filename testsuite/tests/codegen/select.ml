@@ -68,23 +68,16 @@ select_constant:
   ret
 |}]
 
-(* CR ttebbi: We could constant-fold this. *)
 let select_constant b x = Builtins.select b 0 0
 [%%expect_asm X86_64{|
 select_constant:
-  movq  %rax, %rbx
   movl  $1, %eax
-  movl  $1, %edi
-  cmpq  $1, %rbx
-  cmovne %rdi, %rax
   ret
 |}]
 
-(* CR ttebbi: Extra mov %rax, %rdi *)
 let select_constant b x = Builtins.select b x x
 [%%expect_asm X86_64{|
 select_constant:
-  movq  %rax, %rdi
   movq  %rbx, %rax
   ret
 |}]
