@@ -673,7 +673,17 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, is_pun, poly) attrs =
+let doclang_observation_attribute ~loc name =
+  let name = mkloc ("ocaml.doclang." ^ name) loc in
+  mk_attr ~loc name (PStr [])
+
+let mklb first ~loc (p, e, typ, modes, is_pun, poly, observation) attrs =
+  let attrs =
+    match observation with
+    | None -> attrs
+    | Some loc ->
+      doclang_observation_attribute ~loc "observe_binding" :: attrs
+  in
   {
     lb_pattern = p;
     lb_expression = e;
@@ -2944,7 +2954,7 @@ fun_expr:
       { unclosed "do" $loc($1) "done" $loc($2) }
 ;
 %inline expr_:
-  | simple_expr nonempty_llist(labeled_simple_expr)
+  | simple_expr nonempty_llist(labeled_simple_expr) %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_apply($1, $2)) }
   | stack(simple_expr) %prec below_HASH { $1 }
   | BORROW simple_expr %prec below_HASH
@@ -2984,6 +2994,14 @@ spliceable_expr:
 ;
 
 simple_expr:
+  | AT LPAREN seq_expr RPAREN
+      {
+        let loc = make_loc $sloc in
+        let attribute =
+          doclang_observation_attribute ~loc "observe_expression"
+        in
+        { $3 with pexp_attributes = attribute :: $3.pexp_attributes }
+      }
   | LPAREN seq_expr RPAREN
       { reloc_exp ~loc:$sloc $2 }
   | LPAREN seq_expr error
@@ -3354,11 +3372,25 @@ let_binding_body_no_punning:
 ;
 let_binding_body:
   | poly_flag = poly_flag let_binding_body_no_punning
-      { let p,e,c,modes = $2 in (p,e,c,modes,false,poly_flag) }
+      {
+        let p,e,c,modes = $2 in
+        (p,e,c,modes,false,poly_flag,None)
+      }
+  | AT poly_flag = poly_flag let_binding_body_no_punning
+      {
+        let p,e,c,modes = $3 in
+        (p,e,c,modes,false,poly_flag,Some (make_loc $loc($1)))
+      }
 /* BEGIN AVOID */
   | poly_flag = poly_flag val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc($2) $2, ghexpvar ~loc:$loc($2) $2,
-         None, [], true, poly_flag) }
+      {
+        (mkpatvar ~loc:$loc($2) $2, ghexpvar ~loc:$loc($2) $2,
+         None, [], true, poly_flag, None)
+      }
+  | AT poly_flag val_ident %prec below_HASH
+      {
+        syntax_error ()
+      }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the

@@ -149,6 +149,127 @@ let prim_fresh_oo_id =
   Pccall
     (Lambda.simple_prim_on_values ~name:"caml_fresh_oo_id" ~arity:1 ~alloc:false)
 
+let prim_doclang_observe_enter =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_enter" ~arity:1 ~alloc:false)
+
+let prim_doclang_observe_return =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_return" ~arity:3 ~alloc:false)
+
+let prim_doclang_observe_raise =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_raise" ~arity:3 ~alloc:false)
+
+let prim_doclang_observe_parameter =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_parameter" ~arity:3 ~alloc:false)
+
+type doclang_observation = {
+  attribute : Parsetree.attribute;
+  kind : string;
+  label : string;
+  type_ : string;
+}
+
+let doclang_attribute name attributes =
+  match
+    Builtin_attributes.select_attributes
+      [name, Builtin_attributes.Return]
+      attributes
+  with
+  | attribute :: _ -> Some attribute
+  | [] -> None
+
+let doclang_type expression =
+  Printtyp.wrap_printing_env expression.exp_env ~error:true (fun () ->
+    Format.asprintf "%a" Printtyp.type_expr expression.exp_type)
+
+let doclang_metadata observation =
+  let location = observation.attribute.attr_loc in
+  let start = location.loc_start in
+  let finish = location.loc_end in
+  let path = start.pos_fname in
+  let line = start.pos_lnum in
+  let column = start.pos_cnum - start.pos_bol in
+  let end_line = finish.pos_lnum in
+  let end_column = finish.pos_cnum - finish.pos_bol in
+  let site =
+    Printf.sprintf "%s:%d:%d:%s" path line column observation.kind
+  in
+  String.concat "\x1f"
+    [ site; observation.kind; observation.label; path;
+      string_of_int line; string_of_int column; string_of_int end_line;
+      string_of_int end_column; observation.type_ ]
+
+let doclang_observe_lambda
+      ?(parameters = []) ~scopes observation layout lambda =
+  match layout with
+  | Pvalue _ ->
+    let location = observation.attribute.attr_loc in
+    let loc = of_location ~scopes location in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let occurrence = Ident.create_local "doclang_occurrence" in
+    let result = Ident.create_local "doclang_result" in
+    let exception_ = Ident.create_local "doclang_exception" in
+    let return =
+      Lsequence
+        (Lprim
+           ( prim_doclang_observe_return,
+             [metadata; Lvar occurrence; Lvar result],
+             loc ),
+         Lvar result)
+    in
+    let body =
+      Llet
+        (Strict, layout, result, Lambda.debug_uid_none, lambda, return)
+    in
+    let handler =
+      Lsequence
+        (Lprim
+           ( prim_doclang_observe_raise,
+             [metadata; Lvar occurrence; Lvar exception_],
+             loc ),
+         Lprim (Praise Raise_reraise, [Lvar exception_], loc))
+    in
+    let parameter_events =
+      List.fold_right
+        (fun (parameter, parameter_value) body ->
+          let parameter_metadata =
+            Lconst
+              (Const_base
+                 (Const_string
+                    (doclang_metadata parameter, location, None)))
+          in
+          Lsequence
+            (Lprim
+               ( prim_doclang_observe_parameter,
+                 [Lvar occurrence; parameter_metadata; parameter_value],
+                 loc ),
+             body))
+        parameters
+        (Ltrywith
+           (body, exception_, Lambda.debug_uid_none, handler, layout))
+    in
+    Llet
+      ( Strict,
+        Lambda.layout_int,
+        occurrence,
+        Lambda.debug_uid_none,
+        Lprim (prim_doclang_observe_enter, [metadata], loc),
+        parameter_events )
+  | _ ->
+    Location.raise_errorf ~loc:observation.attribute.attr_loc
+      "Observed execution currently supports boxed values only."
+
 let transl_extension_constructor ~scopes env path ext =
   let path =
     Printtyp.wrap_printing_env env ~error:true (fun () ->
@@ -435,17 +556,31 @@ let rec transl_exp ~scopes layout e =
    parsed as a let-bound Pexp_function node [let f = fun x -> ...].
    We give it f's scope.
 *)
-and transl_exp1 ~scopes ~in_new_scope layout e =
+and transl_exp1 ?binding_observation ~scopes ~in_new_scope layout e =
   let eval_once =
     (* Whether classes for immediate objects must be cached *)
     match e.exp_desc with
       Texp_function _ | Texp_for _ | Texp_while _ -> false
     | _ -> true
   in
-  if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
-  Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
+  let lambda =
+    if eval_once
+    then transl_exp0 ?binding_observation ~scopes ~in_new_scope layout e
+    else
+      Translobj.oo_wrap e.exp_env true
+        (transl_exp0 ?binding_observation ~scopes ~in_new_scope layout) e
+  in
+  match doclang_attribute "doclang.observe_expression" e.exp_attributes with
+  | None -> lambda
+  | Some attribute ->
+    let observation =
+      { attribute; kind = "expression"; label = "expression";
+        type_ = doclang_type e }
+    in
+    doclang_observe_lambda ~scopes observation layout lambda
 
-and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
+and transl_exp0 ?binding_observation ~in_new_scope ~scopes
+    (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
@@ -472,7 +607,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
-      transl_function ~in_new_scope ~scopes e params body
+      transl_function ?binding_observation ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
@@ -2143,9 +2278,10 @@ and transl_curried_function ~scopes loc repr params body
     in
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
-and transl_function ~in_new_scope ~scopes e params body
+and transl_function ?binding_observation ~in_new_scope ~scopes e params body
       ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
       ~zero_alloc =
+  let doclang_typed_parameters = params in
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2208,21 +2344,86 @@ and transl_function ~in_new_scope ~scopes e params body
     { function_attribute_disallowing_arity_fusion with zero_alloc }
   in
   let loc = of_location ~scopes e.exp_loc in
+  let body =
+    match binding_observation with
+    | None -> body
+    | Some observation ->
+      let rec parameter_observations index typed translated =
+        match typed, translated with
+        | typed_parameter :: typed, parameter :: translated ->
+          let pattern =
+            match typed_parameter.fp_kind with
+            | Tparam_pat pattern -> pattern
+            | Tparam_optional_default (pattern, _, _) -> pattern
+          in
+          let label =
+            match typed_parameter.fp_arg_label, pat_bound_idents pattern with
+            | (Labelled label | Optional label | Position label), _ -> label
+            | Nolabel, [identifier] -> Ident.name identifier
+            | Nolabel, _ -> Printf.sprintf "argument%d" index
+          in
+          let type_ =
+            Printtyp.wrap_printing_env pattern.pat_env ~error:true (fun () ->
+              Format.asprintf "%a" Printtyp.type_expr pattern.pat_type)
+          in
+          let rest =
+            parameter_observations (index + 1) typed translated
+          in
+          (match parameter.layout with
+           | Pvalue _ ->
+             let parameter_observation =
+               { observation with kind = "parameter"; label; type_ }
+             in
+             (parameter_observation, Lvar parameter.name) :: rest
+           | _ -> rest)
+        | _, _ -> []
+      in
+      let parameters =
+        parameter_observations 1 doclang_typed_parameters params
+      in
+      doclang_observe_lambda ~parameters ~scopes observation return body
+  in
   let body = if region then maybe_region_layout return body else body in
   let lam = lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
   Translattribute.add_function_attributes lam e.exp_loc attrs
 
 (* Like transl_exp, but used when a new scope was just introduced. *)
-and transl_scoped_exp ~scopes layout expr =
-  transl_exp1 ~scopes ~in_new_scope:true layout expr
+and transl_scoped_exp ?binding_observation ~scopes layout expr =
+  transl_exp1 ?binding_observation ~scopes ~in_new_scope:true layout expr
 
 (* Decides whether a pattern binding should introduce a new scope. *)
-and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
+and transl_bound_exp ~scopes ~in_structure ~recursive pat layout expr loc
+      attrs =
+  let binding_observation =
+    match doclang_attribute "doclang.observe_binding" attrs with
+    | None -> None
+    | Some attribute ->
+      let label =
+        match pat_bound_idents pat with
+        | identifier :: _ -> Ident.name identifier
+        | [] -> "binding"
+      in
+      Some
+        { attribute; kind = "binding"; label; type_ = doclang_type expr }
+  in
   let should_introduce_scope =
     match expr.exp_desc with
     | Texp_function _ -> true
     | _ when in_structure -> true
     | _ -> false in
+  let is_function =
+    match expr.exp_desc with
+    | Texp_function _ -> true
+    | _ -> false
+  in
+  let function_observation =
+    if is_function
+    then
+      Option.map
+        (fun observation -> { observation with kind = "function" })
+        binding_observation
+    else None
+  in
   let lam =
     match pat_bound_idents pat with
     | (id :: _) when should_introduce_scope ->
@@ -2230,8 +2431,19 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
       (* If this is a let-binding of a function, the scope will be updated
          with zero_alloc info in [transl_function]. *)
       let scopes = enter_value_definition ~scopes ~assume_zero_alloc id in
-      transl_scoped_exp ~scopes layout expr
+      transl_scoped_exp ?binding_observation:function_observation
+        ~scopes layout expr
     | _ -> transl_exp ~scopes layout expr
+  in
+  let lam =
+    match binding_observation, is_function with
+    | None, _ | Some _, true -> lam
+    | Some observation, false ->
+      if recursive
+      then
+        Location.raise_errorf ~loc:observation.attribute.attr_loc
+          "A recursive observed binding must be a function."
+      else doclang_observe_lambda ~scopes observation layout lam
   in
   Translattribute.add_function_attributes lam loc attrs
 
@@ -2254,7 +2466,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           let sort = Jkind.Sort.default_for_transl_and_get sort in
           let layout = layout_exp sort expr in
           let lam =
-            transl_bound_exp ~scopes ~in_structure pat layout expr vb_loc
+            transl_bound_exp ~scopes ~in_structure ~recursive:false
+              pat layout expr vb_loc
               vb_attributes
           in
           let lam =
@@ -2282,7 +2495,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
         let vb_layout = layout_exp vb_sort expr in
         let def =
-          transl_bound_exp ~scopes ~in_structure vb_pat vb_layout expr
+          transl_bound_exp ~scopes ~in_structure ~recursive:true
+            vb_pat vb_layout expr
             vb_loc vb_attributes
         in
         let def =
@@ -2297,7 +2511,8 @@ and transl_letmutable ~scopes ~return_layout
   let arg_sort = Jkind_types.Sort.default_to_scannable_and_get vb_sort in
   let arg_layout = layout_exp arg_sort expr in
   let lam =
-    transl_bound_exp ~scopes ~in_structure:false pat arg_layout expr vb_loc attr
+    transl_bound_exp ~scopes ~in_structure:false ~recursive:false
+      pat arg_layout expr vb_loc attr
   in
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
