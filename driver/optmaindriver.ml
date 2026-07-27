@@ -165,9 +165,11 @@ let main unix argv ppf ~flambda2 =
         List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
       with
         | [cmr_file], inputs -> cmr_file, inputs
-        | _ ->
-          Compenv.fatal
-            "Must specify exactly one .cmr file with -reaper-rebuild"
+        | cmr_files, _ ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify exactly one .cmr file with -reaper-rebuild (found \
+             %d: [%s])"
+            (List.length cmr_files) (String.concat ", " cmr_files)
       in
       (* CR mvellacott: implement this *)
       Printf.printf "rebuilding from cmr: %s\n" cmr_file;
