@@ -358,7 +358,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
         let modes = Typemode.untransl_mode modes in
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
-                         Some (sub.typ sub ct), modes)
+                         Option.map (sub.typ sub) ct, modes)
     | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
         Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
     | _ ->

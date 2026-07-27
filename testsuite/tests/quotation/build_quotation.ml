@@ -1173,7 +1173,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
 [%%expect{|
 - : <[unit]> expr =
-<[let y = (borrow_ "foo") in (fun (a : _ @ local) -> ()) y]>
+<[let y = (borrow_ "foo") in (fun ((a : _ @ local) : _ @ local) -> ()) y]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
@@ -1410,7 +1410,8 @@ Error: Annotating types with kinds
 (* Pattern constraints *)
 <[ let (x @ unique portable) = "abc" in x ]>
 [%%expect {|
-- : <[string]> expr = <[let x = ("abc" : _ @ unique portable) in x]>
+- : <[string]> expr =
+<[let x : _ @ unique portable = ("abc" : _ @ unique portable) in x]>
 |}];;
 
 (* Expression constraints *)
@@ -1425,20 +1426,20 @@ Error: Annotating types with kinds
 - : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
 |}];;
 
-(* Function definitions *)
+(* Function definitions -- without type annotation *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[fun (x : _ @ local unique) -> (x : _ @ local unique)]>
+<[fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique)]>
 |}];;
 
 <[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
 <[
-  let f =
-  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
-    _ @ unique portable)
+  let f : _ @ unique portable =
+  (fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique)
+    : _ @ unique portable)
   in f
 ]>
 |}];;
@@ -1446,43 +1447,65 @@ Error: Annotating types with kinds
 <[ let rec f (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[let rec f = (fun (x : _ @ local unique) -> (x : _ @ local unique)) in f]>
-|}];;
-
-<[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
-[%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[let rec f = (fun (x : _ @ local unique) -> x : _ @ unique portable) in f]>
-|}];;
-
-<[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
-[%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
 <[
   let rec f =
-  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
-    _ @ unique portable)
+  (fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique))
   in f
 ]>
 |}];;
 
+<[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
+<[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
+<[ let rec (f @ unique portable)
+              (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
 <[ let local_ f x = x in f "abc" ]>
 [%%expect {|
-- : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
+- : <[string]> expr =
+<[let f : _ @ local = (fun x -> x : _ @ local) in f "abc"]>
 |}];;
 
-<[ let rec f (x : _ @ local unique) = x in f ]>
+(* Function definitions -- with type annotations *)
+<[ let f (x : _ @ local unique) = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[let rec f = (fun ((x : _ @ local unique) : _ @ local unique) -> x) in f]>
+<[let f = (fun ((x : _ @ local unique) : _ @ local unique) -> x) in f]>
 |}];;
 
-<[ let rec f (x : string @ local unique) = x in f ]>
+<[ let f (x : string @ local unique) = x in f ]>
 [%%expect {|
 - : <[string @ local unique -> string @ local]> expr =
+<[let f = (fun ((x : string @ local unique) : _ @ local unique) -> x) in f]>
+|}];;
+
+<[ let f (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local unique]> expr =
 <[
-  let rec f = (fun ((x : string @ local unique) : _ @ local unique) -> x) in
-  f
+  let f =
+  (fun ((x : string @ local unique) : _ @ local unique) -> (((x : string) :
+     _ @ local unique) : _ @ local unique))
+  in f
 ]>
 |}];;
 
