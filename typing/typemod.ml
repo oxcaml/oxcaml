@@ -103,7 +103,6 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Cannot_be_local
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -116,12 +115,8 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation ~env ~loc : Alloc.lr * Value.lr =
-  let is_local =
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
-  in
-  if is_local then
-    raise (Error (loc, env, Cannot_be_local));
+let register_allocation ~env ~loc ~desc : Alloc.lr * Value.lr =
+  let min_mode = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -131,6 +126,7 @@ let register_allocation ~env ~loc : Alloc.lr * Value.lr =
   let closed_over_mode =
     alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
   in
+  Value.submode_err (loc, desc) min_mode closed_over_mode;
   alloc_mode, closed_over_mode
 
 open Typedtree
@@ -3190,7 +3186,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_allocation ~env ~loc:sbody.pmod_loc
+        register_allocation ~env ~loc:sbody.pmod_loc ~desc:Functor
       in
       let newenv =
         Env.add_closure_lock
@@ -3651,7 +3647,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
-  let _, md_mode = register_allocation ~env ~loc:loc_md in
+  let _, md_mode = register_allocation ~env ~loc:loc_md ~desc:Structure in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4317,7 +4313,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation ~env ~loc:modl.mod_loc in
+  let _, mode = register_allocation ~env ~loc:modl.mod_loc ~desc:Module in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
@@ -5153,8 +5149,6 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Cannot_be_local ->
-      Location.errorf ~loc "Module cannot be \"local\"."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
