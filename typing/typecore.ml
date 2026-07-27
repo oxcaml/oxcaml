@@ -808,21 +808,10 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 let reset_allocations () = allocations := []
 
 let register_allocation_mode ~env ~loc alloc_mode =
-  (* [stack_]-marked allocations are stack-allocated and so do not count
-     towards the allocation axis; only heap allocations walk the locks. *)
-  let is_local =
+  let min_mode =
     Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
   in
-  if is_local then
-    (match
-      Value.submode ~pp:(loc, Function)
-        (Value.min_with_comonadic Areality Regionality.local)
-        (alloc_as_value alloc_mode)
-    with
-    | Ok () -> ()
-    | Error failure_reason ->
-      let error = Submode_failed(failure_reason, Other) in
-      raise (Error (loc, env, error)));
+  Value.submode_err (loc, Allocation) min_mode (alloc_as_value alloc_mode);
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
@@ -6265,8 +6254,11 @@ let split_function_ty
     | true ->
         let env =
           match expected_mode.alloc_annot with
-          | Some (Noalloc | Noalloc_strict) ->
-            Env.add_closure_noalloc_lock env
+          | Some Noalloc ->
+            Env.add_closure_noalloc_lock Hint.Noalloc (loc, Function) env
+          | Some Noalloc_strict ->
+            Env.add_closure_noalloc_lock Hint.Noalloc_strict (loc, Function)
+              env
           | Some Alloc | None -> env
         in
         let env =
