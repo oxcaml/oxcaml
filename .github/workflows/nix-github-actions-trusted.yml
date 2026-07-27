@@ -1,15 +1,13 @@
 # CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
 # If you want this functionality, ask for help from a subset of:
 # @jvanburen @glittershark @mshinwell
-name: Nix Flake Actions
+name: Nix Flake Actions (trusted)
 
 on:
   push:
     branches:
-      - '*microbranch'
-    tags:
-      - '*'
-  pull_request:
+      - main
+  merge_group:
 
 permissions: {}
 
@@ -17,6 +15,8 @@ jobs:
   nix-matrix:
     # Keep this name equal to the job id: it is the GitHub status-check name,
     # and branch protection on `main` requires the check named `nix-matrix`.
+    # It matches the untrusted workflow's job name; exactly one of the two
+    # workflows runs per event, so the check is reported exactly once.
     name: nix-matrix
     runs-on: warp-ubuntu-latest-arm64-8x
     permissions:
@@ -39,28 +39,20 @@ jobs:
           echo -n 'matrix=' >> "$GITHUB_OUTPUT"
           nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
 
-  # The `oxcaml` cachix cache is a CI-only optimization, NOT a
-  # distribution channel: internal builds are always from source, and
-  # nothing outside GitHub CI should consume these binaries. Do not add
-  # the cache as a substituter in flake.nix or otherwise encourage
-  # non-CI use. The cache is disposable: if it is ever suspect, wipe it
-  # and CI falls back to building from source.
-  #
-  # This workflow builds untrusted refs only -- PRs (same-repo or fork)
-  # and non-main pushes such as microbranches and tags -- and must run
-  # without the cache write token in the job at all: `nix build`
-  # executes build scripts controlled by that code, and unreviewed code
-  # must never be able to populate a cache that later CI runs consume.
-  # Trusted refs (main and the merge queue) are built with the write
-  # token by nix-github-actions-trusted.yml instead; the trusted/
-  # untrusted split is done at the trigger level (rather than with
-  # job-level `if:` on twin jobs) so that neither workflow ever carries
-  # a skipped matrix job, whose display name would show up as a
-  # placeholder check with the unexpanded "matrix.name" template.
+  # Trusted counterpart of nix-build in nix-github-actions.yml: only
+  # main and the merge queue reach this workflow, and only those refs
+  # may hold the `oxcaml` cachix write token (see the cache policy
+  # comment in that file). The token lives in the `cachix` deployment
+  # environment, whose branch policy allows only those refs -- keep this
+  # workflow's triggers and the job's `if:` in sync with that policy,
+  # or gated runs fail instead of skipping. The job keeps the same
+  # display name template as the untrusted job so the resulting check
+  # names are identical in every context.
 
-  nix-build:
+  nix-build-trusted:
     name: ${{ matrix.name }} (${{ matrix.system }})
     needs: nix-matrix
+    if: github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -68,6 +60,9 @@ jobs:
 
     permissions:
       contents: read
+
+    # Scopes CACHIX_AUTH_TOKEN to main and merge-queue refs.
+    environment: cachix
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -79,11 +74,11 @@ jobs:
           # on darwin
           install_url: https://releases.nixos.org/nix/nix-2.33.0/install
 
-      - name: Set up cache (read-only)
+      - name: Set up cache (read/write)
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
-          # Public caches are readable without credentials.
           name: oxcaml
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - env:
           ATTR: ${{ matrix.attr }}
