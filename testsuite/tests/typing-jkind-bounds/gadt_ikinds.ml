@@ -287,10 +287,8 @@ type 'a u : immutable_data =
 Lines 1-2, characters 0-25:
 1 | type 'a u : immutable_data =
 2 | | P1 : ('b, 'a) t -> 'a u
-Error: The kind of type "u" is value non_float
-         because it's a boxed variant type.
-       But the kind of type "u" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type u.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 
 (* CR layouts v2.8: It'd also be OK to infer or accept [immutable_data with 'y] here. Internal ticket 4973. *)

@@ -58,16 +58,8 @@ module Ref : sig type 'a t = 'a ref end
 Line 4, characters 0-48:
 4 | type 'a t : immutable_data with 'a = 'a F(Ref).t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a F(Ref).t" is
-           mutable_data with 'a @@ forkable unyielding many
-         because of the definition of t at line 2, characters 2-40.
-       But the kind of type "'a F(Ref).t" must be a subkind of
-           immutable_data with 'a
-         because of the definition of t at line 4, characters 0-48.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended with 'a
-         visibility: mod read_write ≰ mod immutable with 'a
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because F(Ref).t is not mod immutable.
 |}]
 
 module Ref = struct

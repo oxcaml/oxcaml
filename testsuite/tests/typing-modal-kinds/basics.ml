@@ -845,10 +845,8 @@ type t : value mod contended = { x : int ref @@ shared }
 Line 1, characters 0-56:
 1 | type t : value mod contended = { x : int ref @@ shared }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation value mod contended,
+       because ref is not mod contended.
 |}]
 
 type ('a : value mod contended) require_contended

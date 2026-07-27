@@ -130,6 +130,14 @@ let co_sub_reference_impl (type t)
     (fun acc c -> if Axis.le a (Axis.join b c) then Axis.meet acc c else acc)
     Axis.max all_values
 
+let imply_reference_impl (type t)
+    (module Axis : Mode_intf.Lattice with type t = t) (all_values : t list)
+    (a : t) (b : t) =
+  (* imply(a, b) = join { c | meet(a, c) <= b } *)
+  List.fold_left
+    (fun acc c -> if Axis.le (Axis.meet a c) b then Axis.join acc c else acc)
+    Axis.min all_values
+
 let check_operations (type t) (module Axis : Mode_intf.Lattice with type t = t)
     label update extract (all_values : t list) =
   List.iter
@@ -158,6 +166,11 @@ let check_operations (type t) (module Axis : Mode_intf.Lattice with type t = t)
               expect_value "co_sub"
                 (extract (co_sub lhs rhs))
                 (co_sub_reference_impl
+                   (module Axis)
+                   all_values lhs_value rhs_value);
+              expect_value "imply"
+                (extract (imply lhs rhs))
+                (imply_reference_impl
                    (module Axis)
                    all_values lhs_value rhs_value);
               let expected_leq = Axis.le lhs_value rhs_value in

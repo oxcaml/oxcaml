@@ -416,7 +416,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -840,7 +840,7 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a fixed representation while the other varies"
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first
+      Ikind.report_subjkind_error_with_name ~name:first
         env ppf v
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"

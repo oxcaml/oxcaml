@@ -220,19 +220,18 @@ end
    [global] must imply [aliased] for soundness of borrowing. *)
 let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   match[@warning "-18"] ax, a with
-  | Comonadic Areality, Meet_const a ->
-    let f, y, u =
-      match a with
-      | Global ->
-        ( Forkable.Const.Forkable,
-          Yielding.Const.Unyielding,
-          [Uniqueness.Const.Aliased] )
-      | Local -> Forkable.Const.Unforkable, Yielding.Const.Yielding, []
-      | Regional -> assert false
-    in
-    [ Modality.Atom (Comonadic Forkable, Meet_const f);
-      Atom (Comonadic Yielding, Meet_const y) ]
-    @ List.map (fun x -> Modality.Atom (Monadic Uniqueness, Join_const x)) u
+  | Comonadic Areality, Meet_const a -> (
+    match a with
+    | Global ->
+      [ Modality.Atom (Comonadic Forkable, Meet_const Forkable.Const.Forkable);
+        Atom (Comonadic Yielding, Meet_const Yielding.Const.Unyielding);
+        Atom (Monadic Uniqueness, Join_const Uniqueness.Const.Aliased) ]
+    | Local ->
+      [ Modality.Atom (Comonadic Forkable, Meet_const Forkable.Const.Unforkable);
+        Atom (Comonadic Yielding, Meet_const Yielding.Const.Yielding) ]
+    (* [regional] cannot be written in an annotation, but bounds computed by
+       the ikind engine can reach here. It implies nothing. *)
+    | Regional -> [])
   | Monadic Visibility, Join_const a ->
     let b : Contention.Const.t =
       match a with
@@ -561,12 +560,46 @@ let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
     List.filter_map
       (fun (Modality.Atom (ax, m_implied)) ->
         let m_projected = Modality.Const.proj ax t in
-        if m_projected <> m_implied || include_implied
+        let already_listed =
+          List.exists
+            (fun (Modality.Atom (ax', _)) ->
+              Modality.Axis.P ax' = Modality.Axis.P ax)
+            exclude_implied
+        in
+        if (m_projected <> m_implied || include_implied) && not already_listed
         then Some (Modality.Atom (ax, m_projected))
         else None)
       implied
   in
   exclude_implied @ overridden
+
+let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
+    =
+  (* Bounds computed axis-by-axis (as in ikind provenance reporting) lack the
+     implied bounds that [transl_mod_bounds] inserts for user-written
+     annotations, e.g. [aliased forkable unyielding] for [global].
+     [untransl_mod_bounds] relies on those implications being present in order
+     to omit the implied modes when printing, so close the bounds first. *)
+  let crossing = Jkind.Mod_bounds.crossing bounds in
+  let annotated =
+    Modality.Const.diff Modality.Const.id (Crossing.to_modality crossing)
+  in
+  let modality = Crossing.to_modality crossing in
+  let implied = List.concat_map implied_modalities annotated in
+  let crossing =
+    List.fold_left
+      (fun crossing (Modality.Atom (ax, a)) ->
+        (* As in [transl_mod_bounds], an explicit bound on an axis wins over
+           a bound implied by another axis. *)
+        if
+          Modality.Const.proj ax modality
+          <> Modality.Const.proj ax Modality.Const.id
+        then crossing
+        else
+          Crossing.modality (Modality.Const.set ax a Modality.Const.id) crossing)
+      crossing implied
+  in
+  Jkind.Mod_bounds.set_crossing crossing bounds
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     Parsetree.modes =

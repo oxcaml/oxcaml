@@ -115,8 +115,8 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
-  | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
+  | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
+  | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
   | Jkind_mismatch_due_to_bad_inference of
       Env.t * type_expr * Jkind.Violation.t * bad_jkind_inference_location
   | Jkind_sort of
@@ -238,7 +238,10 @@ let constrain_or_null_payload ~env ~path payload_ty payload_loc =
   match Ctype.constrain_type_jkind env payload_ty required with
   | Ok () -> ()
   | Error err ->
-    raise (Error (payload_loc, Jkind_mismatch_of_type (env, payload_ty, err)))
+    raise
+      (Error
+         ( payload_loc,
+           Jkind_mismatch_of_type (env, payload_ty, Ikind.Jkind_error err) ))
 
 (* [make_params] creates sort variables - these can be defaulted away (as in
    transl_type_decl) or unified with existing sort-variable-free types (as in
@@ -1716,15 +1719,16 @@ let narrow_to_manifest_jkind env loc path decl =
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
-           Ikind.sub_jkind_l
+           Ikind.check_type_expr_bound
              ~origin:(Format.asprintf
                         "typedecl:manifest_vs_decl %a"
                         Location.print_loc decl.type_loc)
              ~type_equal
              ~context
              env
-             manifest_jkind
-             decl.type_jkind
+             ~ty
+             ~actual:manifest_jkind
+             ~bound:decl.type_jkind
          with
          | Ok () -> ()
          | Error v ->
@@ -1747,7 +1751,10 @@ let narrow_to_manifest_jkind env loc path decl =
                Format.eprintf
                  "[ikind-narrow] path=%a branch=constrain_type_jkind error@."
                  (Format_doc.compat Path.print) path;
-             raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
+             raise
+               (Error
+                  (loc,
+                   Jkind_mismatch_of_type (env, ty, Ikind.Jkind_error v))))
     end;
     let type_ikind =
       Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
@@ -2732,7 +2739,10 @@ let rec update_decl_jkind env dpath decl =
   with
   | Ok () -> new_decl
   | Error err ->
-    raise (Error (decl.type_loc, Jkind_mismatch_of_path (env, dpath, err)))
+    raise
+      (Error
+         (decl.type_loc,
+          Jkind_mismatch_of_path (env, dpath, Ikind.Jkind_error err)))
 
 let update_decls_jkind_reason decls =
   List.map
@@ -3539,7 +3549,7 @@ let normalize_decl_jkinds env decls =
       match
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
-        Ikind.sub_jkind_l
+        Ikind.check_type_decl_bound
           ~origin:(Format.asprintf
                      "typedecl:normalize %a (%a)"
                      (Format_doc.compat Path.print) path
@@ -3548,8 +3558,9 @@ let normalize_decl_jkinds env decls =
           ~context
           ~allow_any_crossing
           env
-          decl.type_jkind
-          original_decl.type_jkind
+          ~decl
+          ~actual:decl.type_jkind
+          ~bound:original_decl.type_jkind
       with
       | Ok _ ->
         if allow_any_crossing then
@@ -5714,13 +5725,13 @@ let report_error ~loc = function
       fprintf ppf "type %a" Style.inline_code path_end
     in
     Location.errorf ~loc "%t" (fun ppf ->
-      Jkind.Violation.report_with_offender ~offender
+      Ikind.report_subjkind_error_with_offender ~offender
         env ppf v)
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
     Location.errorf ~loc "%t" (fun ppf ->
-      Jkind.Violation.report_with_offender ~offender
+      Ikind.report_subjkind_error_with_offender ~offender
         env ppf v)
   | Jkind_sort {env; kloc; typ; err} ->
     let s =

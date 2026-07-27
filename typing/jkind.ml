@@ -25,6 +25,8 @@ let print_type_expr : type_expr Fmt.printer ref = ref (fun _ _ -> assert false)
 
 let set_print_type_expr p = print_type_expr := p
 
+let format_type_expr ppf ty = !print_type_expr ppf ty
+
 let raw_type_expr : (Format.formatter -> type_expr -> unit) ref =
   ref (fun _ _ -> assert false)
 

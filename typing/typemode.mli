@@ -80,6 +80,13 @@ val transl_mod_bounds :
   * (Jkind_axis.Nullability.t Location.loc option
     * Jkind_axis.Separability.t Location.loc option)
 
+(** Close mod-bounds under implied modalities, as [transl_mod_bounds] does for
+    user-written annotations (e.g. a [global] bound also bounds [aliased],
+    [forkable] and [unyielding]). Bounds computed axis-by-axis may lack these
+    implications, which [untransl_mod_bounds] relies on to omit implied modes
+    when printing. *)
+val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
+
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)
 val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes

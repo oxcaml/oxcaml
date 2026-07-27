@@ -839,6 +839,19 @@ Error: The kind of type "t" is immutable_data
          because of the annotation on the declaration of the type t.
 |}]
 
+(* Fields failing on different axes produce one bullet each, each carrying
+   only its own violating axes. *)
+type t : immutable_data = { mutable a : int; f : int -> int }
+[%%expect{|
+Line 1, characters 0-61:
+1 | type t : immutable_data = { mutable a : int; f : int -> int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
 type t : any mod external_ = { x : int }
 [%%expect {|
 Line 1, characters 0-40:
@@ -1964,6 +1977,103 @@ Error: The kind of type "c" is immutable_data with 'a a with 'b a
        But the kind of type "c" must be a subkind of
            value mod portable contended
          because of the annotation on the declaration of the type c.
+|}]
+
+type 'a r : immutable_data with 'a @@ portable
+type 'a t : immutable_data with 'a r = { x : 'a }
+[%%expect {|
+type 'a r : immutable_data with 'a @@ portable
+Line 2, characters 0-49:
+2 | type 'a t : immutable_data with 'a r = { x : 'a }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data with 'a r
+         because of the annotation on the declaration of the type t.
+|}]
+
+type 'a r : immutable_data with 'a @@ portable
+type 'a t : immutable_data with 'a r = { x : 'a @@ portable }
+[%%expect {|
+type 'a r : immutable_data with 'a @@ portable
+Line 2, characters 0-61:
+2 | type 'a t : immutable_data with 'a r = { x : 'a @@ portable }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a @@ portable
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data with 'a r
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a ≰ mod many with 'a r
+         contention: mod contended with 'a ≰ mod contended with 'a r
+         forkable: mod forkable with 'a ≰ mod forkable with 'a r
+         yielding: mod unyielding with 'a ≰ mod unyielding with 'a r
+         statefulness: mod stateless with 'a ≰ mod stateless with 'a r
+         visibility: mod immutable with 'a ≰ mod immutable with 'a r
+|}]
+
+type 'a portable = { portable : 'a @@ portable }
+type 'a contended = { contended : 'a @@ contended }
+type t : value
+type q = t
+type r : value mod portable contended =
+  | Foo of int * (t * (bool -> string)) portable
+  | Bar of string * (int ref * q) contended
+[%%expect {|
+type 'a portable = { portable : 'a @@ portable; }
+type 'a contended = { contended : 'a @@ contended; }
+type t
+type q = t
+Lines 5-7, characters 0-43:
+5 | type r : value mod portable contended =
+6 |   | Foo of int * (t * (bool -> string)) portable
+7 |   | Bar of string * (int ref * q) contended
+Error: The kind of type "r" is
+           value
+             non_float
+             mod portable contended
+             with q @@ contended
+             with t @@ portable
+         because it's a boxed variant type.
+       But the kind of type "r" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type r.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with t ≰ mod contended
+         portability: mod portable with q ≰ mod portable
+|}]
+
+type 'a portable = { portable : 'a @@ portable }
+type 'a contended = { contended : 'a @@ contended }
+type t : value
+type q = t
+type r : value mod portable shared =
+  | Foo of int * (t * (bool -> string)) portable
+  | Bar of string * (int ref * q) contended
+[%%expect {|
+type 'a portable = { portable : 'a @@ portable; }
+type 'a contended = { contended : 'a @@ contended; }
+type t
+type q = t
+Lines 5-7, characters 0-43:
+5 | type r : value mod portable shared =
+6 |   | Foo of int * (t * (bool -> string)) portable
+7 |   | Bar of string * (int ref * q) contended
+Error: The kind of type "r" is
+           value
+             non_float
+             mod portable contended
+             with q @@ contended
+             with t @@ portable
+         because it's a boxed variant type.
+       But the kind of type "r" must be a subkind of value mod portable shared
+         because of the annotation on the declaration of the type r.
+
+       The first mode-crosses less than the second along:
+         contention: mod contended with t ≰ mod shared
+         portability: mod portable with q ≰ mod portable
 |}]
 
 type t : value mod contended

@@ -24,10 +24,8 @@ type 'a t : immutable_data = A of 'a
 Line 1, characters 0-36:
 1 | type 'a t : immutable_data = A of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
@@ -35,10 +33,8 @@ type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
 Line 1, characters 0-61:
 1 | type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a with 'b
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+       because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 
 type 'a t : immutable_data = Foo of 'a @@ portable
@@ -46,18 +42,8 @@ type 'a t : immutable_data = Foo of 'a @@ portable
 Line 1, characters 0-50:
 1 | type 'a t : immutable_data = Foo of 'a @@ portable
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a @@ portable
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
-
-       The first mode-crosses less than the second along:
-         linearity: mod many with 'a ≰ mod many
-         contention: mod contended with 'a ≰ mod contended
-         forkable: mod forkable with 'a ≰ mod forkable
-         yielding: mod unyielding with 'a ≰ mod unyielding
-         statefulness: mod stateless with 'a ≰ mod stateless
-         visibility: mod immutable with 'a ≰ mod immutable
+Error: This type definition does not satisfy its kind annotation immutable_data,
+       because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
 module M : sig

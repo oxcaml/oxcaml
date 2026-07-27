@@ -213,8 +213,8 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
-  | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
+  | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
+  | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
   | Jkind_mismatch_due_to_bad_inference of
       Env.t * type_expr * Jkind.Violation.t * bad_jkind_inference_location
   | Jkind_sort of
