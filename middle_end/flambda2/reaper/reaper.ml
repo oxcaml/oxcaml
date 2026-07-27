@@ -16,7 +16,7 @@
 module Staged = struct
   let traverse = Traverse.run
 
-  let solve Traverse.{ deps; _ } =
+  let solve deps =
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps)
@@ -84,7 +84,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
   let traverse_result = Staged.traverse unit in
-  let solved_dep = Staged.solve traverse_result in
+  let solved_dep = Staged.solve traverse_result.deps in
   let unit_metadata = Flambda_unit.metadata unit in
   Staged.rebuild ~unit_metadata ~traverse_result ~solved_dep ~machine_width
     ~cmx_loader ~all_code ~final_typing_env

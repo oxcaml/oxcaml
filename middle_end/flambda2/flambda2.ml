@@ -216,7 +216,7 @@ let flambda_to_flambda0 : type m.
                     Flambda2_reaper.Reaper.Staged.traverse flambda
                   in
                   let solved_dep =
-                    Flambda2_reaper.Reaper.Staged.solve traverse_result
+                    Flambda2_reaper.Reaper.Staged.solve traverse_result.deps
                   in
                   let unit_metadata = Flambda_unit.metadata flambda in
                   Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
