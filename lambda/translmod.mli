@@ -62,15 +62,18 @@ val transl_instance:
         -> program
 
 (** Translate a bundle as a generative functor over [params] whose body
-    exposes [modules] (after [coercion]).  Transitive deps are looked up
-    on the load path via [base_filename ^ ext] and read by [read_format]. *)
+    exposes [modules] (after [coercion]).  [find_impl_by_name] looks up
+    a transitive dependency's format and arg descriptor by its
+    [Compilation_unit.t]; [chain] carries the "required by" trace for
+    error reporting. *)
 val transl_functorization:
       Compilation_unit.t
         -> Global_module.Parameter_name.t list
         -> Global_module.t list
-        -> ext:string
-        -> read_format:(Misc.filepath ->
-                          main_module_block_format * arg_descr option)
+        -> find_impl_by_name:(chain:Global_module.t list ->
+                                Compilation_unit.t ->
+                                main_module_block_format
+                                * arg_descr option)
         -> coercion:module_coercion
         -> program
 

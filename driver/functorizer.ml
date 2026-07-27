@@ -27,22 +27,29 @@
 module CU = Compilation_unit
 module GM = Global_module
 
+(** Status of a bundled module in [module_map]:
+    - [Exact id]: the module was referenced with [Exact] precision and is bound
+      locally to [id].
+    - [Approximate]: the module was only ever referenced with [Approximate]
+      precision; references to it get substituted to [Pruned_<head>]. An
+      [Approximate] entry can be upgraded to [Exact] by a later [Exact]
+      reference. *)
+type module_status = Exact of Ident.t | Approximate
+
 type state = {
   rev_modules : (GM.t * Ident.t * Subst.Lazy.signature) list;
-      (** Bundled modules with unsubstituted signatures; substituted in one pass
-          at the end of [compute]. *)
-  rev_params : (GM.Parameter_name.t * Ident.t) list;
+      (** Bundled modules with their signatures. Two substitutions apply:
+          [Signature_with_global_bindings.subst] (GM → GM) and
+          [Subst.add_module]/[Subst.Lazy.signature] (GM → local ident or
+          pruned). Signatures here have gone through the first but not the
+          second (which is applied in one pass at the end of [analyze]). *)
   param_map : Ident.t GM.Parameter_name.Map.t;
-  module_map : Ident.t option GM.Name.Map.t;
-      (** Bundled module → its local ident. [None] means the module was only
-          ever referenced [Approximate] and gets substituted to [Pruned_<head>];
-          can be upgraded to [Some] by a later [Exact] reference. *)
+  module_map : module_status GM.Name.Map.t;
 }
 
 let empty_state =
   {
     rev_modules = [];
-    rev_params = [];
     param_map = GM.Parameter_name.Map.empty;
     module_map = GM.Name.Map.empty;
   }
@@ -52,7 +59,6 @@ let register_parameter p_name state =
   ( id,
     {
       state with
-      rev_params = (p_name, id) :: state.rev_params;
       param_map = GM.Parameter_name.Map.add p_name id state.param_map;
     } )
 
@@ -81,31 +87,29 @@ let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
   let local_name =
     let base = GM.Name.to_string (GM.to_name gm) in
-    (* Transitive deps (non-empty [chain]) get a [DEP__] prefix to discourage
-       users from accessing them through the bundle.
-       CR-soon zqian: make these nonmentionable instead. *)
-    if List.is_empty chain then base else "DEP__" ^ base
+    (* Transitive deps (non-toplevel) get a [DEP__] prefix to discourage
+       users from accessing them through the bundle. *)
+    (* CR-soon zqian: make these nonmentionable instead. *)
+    let is_toplevel = List.is_empty chain in
+    if is_toplevel then base else "DEP__" ^ base
   in
   let new_id = Ident.create_local local_name in
   let state =
     {
       state with
       module_map =
-        GM.Name.Map.add (GM.to_name gm) (Some new_id) state.module_map;
+        GM.Name.Map.add (GM.to_name gm) (Exact new_id) state.module_map;
     }
   in
   let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
 
   let swg =
-    match gm.visible_args with
-    | [] -> swg
-    | _ :: _ ->
-        let args =
-          List.map
-            (fun (a : GM.t GM.Argument.t) -> (a.param, a.value))
-            gm.visible_args
-        in
-        Signature_with_global_bindings.subst swg args
+    let args =
+      List.map
+        (fun (a : GM.t GM.Argument.t) -> (a.param, a.value))
+        gm.visible_args
+    in
+    Signature_with_global_bindings.subst swg args
   in
   let state =
     Array.fold_left
@@ -134,8 +138,8 @@ let rec insert_module_exact ~chain (gm : GM.t)
 
 and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
   match GM.Name.Map.find_opt (GM.to_name gm) state.module_map with
-  | Some (Some _) -> state
-  | Some None | None -> insert_module_exact ~chain gm swg state
+  | Some (Exact _) -> state
+  | Some Approximate | None -> insert_module_exact ~chain gm swg state
 
 and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
   match prec with
@@ -144,8 +148,10 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
       match GM.Name.Map.find_opt name state.module_map with
       | Some _ -> state
       | None ->
-          { state with module_map = GM.Name.Map.add name None state.module_map }
-      )
+          {
+            state with
+            module_map = GM.Name.Map.add name Approximate state.module_map;
+          })
   | Exact ->
       let swg = validate_and_load ~chain gm in
       maybe_insert_module_exact ~chain gm swg state
@@ -160,8 +166,8 @@ let make_md md_type : Types.module_declaration =
   }
 
 type result = {
-  modules : (GM.t * Ident.t * Types.signature) list;  (** Topo-sorted. *)
-  params : (GM.Parameter_name.t * Ident.t) list;  (** Declaration order. *)
+  modules : (GM.t * Ident.t * Types.signature) list;
+  params : (GM.Parameter_name.t * Ident.t) list;
 }
 
 let validate_inputs (input_module_names : string list) : CU.Name.Set.t =
@@ -175,7 +181,7 @@ let validate_inputs (input_module_names : string list) : CU.Name.Set.t =
       CU.Name.Set.add cu_name set)
     CU.Name.Set.empty input_module_names
 
-let compute (src_names : CU.Name.Set.t) : result =
+let analyze (src_names : CU.Name.Set.t) : result =
   let chain = [] in
   let state =
     CU.Name.Set.fold
@@ -202,12 +208,12 @@ let compute (src_names : CU.Name.Set.t) : result =
   in
   let subst =
     GM.Name.Map.fold
-      (fun (name : GM.Name.t) id_opt subst ->
+      (fun (name : GM.Name.t) status subst ->
         let orig_ident = Ident.create_global name in
         let target =
-          match id_opt with
-          | Some id -> Path.Pident id
-          | None ->
+          match status with
+          | Exact id -> Path.Pident id
+          | Approximate ->
               let pruned =
                 GM.Name.create_exn ("Pruned_" ^ name.head) name.args
               in
@@ -216,12 +222,13 @@ let compute (src_names : CU.Name.Set.t) : result =
         Subst.add_module orig_ident target subst)
       state.module_map Subst.identity
   in
+  let params = GM.Parameter_name.Map.bindings state.param_map in
   let subst =
     List.fold_left
       (fun subst (p_name, p_id) ->
         let n = GM.Name.of_parameter_name p_name in
         Subst.add_module (Ident.create_global n) (Path.Pident p_id) subst)
-      subst state.rev_params
+      subst params
   in
   let modules =
     List.rev_map
@@ -234,7 +241,7 @@ let compute (src_names : CU.Name.Set.t) : result =
         (gm, id, sign))
       state.rev_modules
   in
-  { modules; params = List.rev state.rev_params }
+  { modules; params }
 
 let wrap_in_named_functor_layers (params : (GM.Parameter_name.t * Ident.t) list)
     (body : Types.module_type) : Types.module_type =
@@ -253,6 +260,21 @@ let wrap_in_named_functor_layers (params : (GM.Parameter_name.t * Ident.t) list)
           Mode.Alloc.legacy ))
     params body
 
+(** Build the signature exposed by the bundle. Roughly:
+
+    {[
+      module Intf : functor (P1) ... (Pn) -> sig
+        module type S = sig
+          module M1 : <sig of M1>
+          ...
+          module Mk : <sig of Mk>
+        end
+      end
+      module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
+    ]}
+
+    where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
+    modules (in topological order). *)
 let compute_signature (params : (GM.Parameter_name.t * Ident.t) list)
     (modules : (GM.t * Ident.t * Types.signature) list) : Types.signature =
   let body =
@@ -299,7 +321,7 @@ let compute_signature (params : (GM.Parameter_name.t * Ident.t) list)
 let interface input_module_names (info : Compile_common.info) =
   let unit_info = info.target in
   let compilation_unit = info.module_name in
-  let { modules; params } = compute input_module_names in
+  let { modules; params } = analyze input_module_names in
   let sg = compute_signature params modules in
   Ident.reinit ();
   Misc.try_finally
@@ -330,7 +352,7 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
     ~(compile_program : Compile_common.info -> Lambda.program -> unit)
     (info : Compile_common.info) : unit =
   let unit_info = info.target in
-  let { modules; params } = compute input_module_names in
+  let { modules; params } = analyze input_module_names in
   let sg = compute_signature params modules in
   let params = List.map fst params in
   let modules = List.map (fun (name, _id, _sign) -> name) modules in
@@ -401,9 +423,24 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
           Typedtree.Tcoerce_none
   in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
+    let find_impl_by_name ~chain cu =
+      let base = Compilation_unit.base_filename cu ^ ext in
+      match Load_path.find_normalized base with
+      | filename -> read_format filename
+      | exception Not_found ->
+          let required_by =
+            List.map
+              (fun gm ->
+                Printf.sprintf ", required by %s" (Global_module.to_string gm))
+              chain
+            |> String.concat ""
+          in
+          Location.raise_errorf "@[<hov>Cannot find %s on the load path%s.@]"
+            base required_by
+    in
     let program =
-      Translmod.transl_functorization modulename params modules ~ext
-        ~read_format ~coercion
+      Translmod.transl_functorization modulename params modules
+        ~find_impl_by_name ~coercion
     in
     compile_program info program
   end
