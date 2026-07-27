@@ -1173,7 +1173,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
 [%%expect{|
 - : <[unit]> expr =
-<[let y = (borrow_ "foo") in (fun ((a : _ @ local) : _ @ local) -> ()) y]>
+<[let y = (borrow_ "foo") in (fun (a : _ @ local) -> ()) y]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
@@ -1430,7 +1430,7 @@ Error: Annotating types with kinds
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique)]>
+<[fun (x : _ @ local unique) -> x]>
 |}];;
 
 <[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
@@ -1438,20 +1438,14 @@ Error: Annotating types with kinds
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
 <[
   let f : _ @ unique portable =
-  (fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique)
-    : _ @ unique portable)
-  in f
+  (fun (x : _ @ local unique) -> x : _ @ unique portable) in f
 ]>
 |}];;
 
 <[ let rec f (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[
-  let rec f =
-  (fun ((x : _ @ local unique) : _ @ local unique) -> (x : _ @ local unique))
-  in f
-]>
+<[let rec f = (fun (x : _ @ local unique) -> x) in f]>
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
@@ -1489,13 +1483,13 @@ Uncaught exception: Misc.Fatal_error
 <[ let f (x : _ @ local unique) = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[let f = (fun ((x : _ @ local unique) : _ @ local unique) -> x) in f]>
+<[let f = (fun (x : _ @ local unique) -> x) in f]>
 |}];;
 
 <[ let f (x : string @ local unique) = x in f ]>
 [%%expect {|
 - : <[string @ local unique -> string @ local]> expr =
-<[let f = (fun ((x : string @ local unique) : _ @ local unique) -> x) in f]>
+<[let f = (fun (x : string @ local unique) -> x) in f]>
 |}];;
 
 <[ let f (x : string @ local unique) : string @ local unique = x in f ]>
@@ -1503,22 +1497,26 @@ Uncaught exception: Misc.Fatal_error
 - : <[string @ local unique -> string @ local unique]> expr =
 <[
   let f =
-  (fun ((x : string @ local unique) : _ @ local unique) -> (((x : string) :
-     _ @ local unique) : _ @ local unique))
-  in f
+  (fun (x : string @ local unique) -> ((x : string) : _ @ local unique)) in
+  f
 ]>
 |}];;
 
 <[ fun (x : _ @ local unique) -> x ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[fun ((x : _ @ local unique) : _ @ local unique) -> x]>
+<[fun (x : _ @ local unique) -> x]>
 |}];;
 
 <[ fun (x : string @ local unique) -> x ]>
 [%%expect {|
 - : <[string @ local unique -> string @ local]> expr =
-<[fun ((x : string @ local unique) : _ @ local unique) -> x]>
+<[fun (x : string @ local unique) -> x]>
+|}];;
+
+<[ fun x @ local unique -> x ]>
+[%%expect {|
+- : <[$('a) @ unique -> $('a) @ local unique]> expr = <[fun x -> x]>
 |}];;
 
 (* Function types *)
