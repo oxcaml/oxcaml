@@ -707,7 +707,7 @@ let descriptions = [
     names = ["unused-alert-disable"];
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
-    since = since 5 2 };
+    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -821,34 +821,28 @@ let mk_lazy f =
    [Unused_alert_disable].  Table keys are the location of the disabling
    attribute together with the name of the disabled alert.
 
-   An entry is [Uncommitted] between its registration and the end of the
-   processing of the attributes of the surrounding item
-   ([commit_alert_disable_snapshots]).  It then becomes [Committed], with a
-   snapshot of the warning state that later decides the activity/error status
-   of warning 221 if the entry is reported (like
-   [Unchecked_zero_alloc_attribute]).  Deferring the snapshot lets a
-   [[@warning "-221"]] attribute scope over the alert-disabling attributes of
-   the same item regardless of the order in which the attributes appear.
+   An [Unfulfilled] entry carries a snapshot of the warning state at the
+   point where the attribute was processed; if the entry is still
+   unfulfilled at the end of compilation, the snapshot decides the
+   activity/error status of warning 221 when the entry is reported (like
+   [Unchecked_zero_alloc_attribute]).
 
-   An entry becomes [Fulfilled] when the disable suppresses an occurrence of
-   its alert; fulfilled entries are never reported.  They are kept in the
-   table because the same attribute may be processed several times (e.g. the
-   type-checker enters the warning scope of a value binding once to type the
-   expression and again to check pattern totality), and a later processing
-   must not register the attribute anew.
+   An entry becomes [Fulfilled] when the disable suppresses an occurrence
+   of its alert; fulfilled entries are never reported.  They are kept in
+   the table because the same attribute may be processed several times
+   (e.g. the type-checker enters the warning scope of a value binding once
+   to type the expression and again to check pattern totality), and a
+   later processing must not register the attribute anew.
 
    The table deliberately lives outside [state]: an entry's status must
    survive scope exits, so that leftovers can be reported at the end of
    compilation via [flush_unused_alert_disables]. *)
 type alert_disable_status =
-  | Uncommitted
-  | Committed of state
+  | Unfulfilled of state
   | Fulfilled
 
-let alert_disables : (loc * string, alert_disable_status ref) Hashtbl.t =
+let alert_disables : (loc * string, alert_disable_status) Hashtbl.t =
   Hashtbl.create 16
-
-let uncommitted_alert_disables = ref 0
 
 let register_alert_disable ~loc name =
   let watches =
@@ -857,48 +851,37 @@ let register_alert_disable ~loc name =
       (!current).alert_disable_watches
   in
   current := {(!current) with alert_disable_watches = watches};
-  if not (Hashtbl.mem alert_disables (loc, name)) then begin
-    Hashtbl.add alert_disables (loc, name) (ref Uncommitted);
-    incr uncommitted_alert_disables
-  end
-
-let commit_alert_disable_snapshots () =
-  if !uncommitted_alert_disables > 0 then begin
-    Hashtbl.iter
-      (fun _ status ->
-         match !status with
-         | Uncommitted -> status := Committed !current
-         | Committed _ | Fulfilled -> ())
-      alert_disables;
-    uncommitted_alert_disables := 0
-  end
+  if not (Hashtbl.mem alert_disables (loc, name)) then
+    Hashtbl.add alert_disables (loc, name) (Unfulfilled !current)
 
 let mark_alert_disables_used kind =
-  if not !disabled then
-    match
-      Misc.Stdlib.String.Map.find_opt kind (!current).alert_disable_watches
-    with
-    | None -> ()
-    | Some locs ->
-        List.iter
-          (fun loc ->
-             match Hashtbl.find_opt alert_disables (loc, kind) with
-             | Some status -> status := Fulfilled
-             | None -> ())
-          locs
+  if not !disabled then begin
+    let mark name =
+      match
+        Misc.Stdlib.String.Map.find_opt name (!current).alert_disable_watches
+      with
+      | None -> ()
+      | Some locs ->
+          List.iter
+            (fun loc -> Hashtbl.replace alert_disables (loc, name) Fulfilled)
+            locs
+    in
+    mark kind;
+    (* Disables of "all" act as wildcards: any suppressed alert fulfills
+       them.  ("all" is reserved, so [kind] is never literally "all".) *)
+    mark "all"
+  end
 
 let flush_unused_alert_disables () =
   let entries =
     Hashtbl.fold
       (fun (loc, name) status acc ->
-         match !status with
+         match status with
          | Fulfilled -> acc
-         | Committed state -> (loc, name, state) :: acc
-         | Uncommitted -> (loc, name, !current) :: acc)
+         | Unfulfilled state -> (loc, name, state) :: acc)
       alert_disables []
   in
   Hashtbl.clear alert_disables;
-  uncommitted_alert_disables := 0;
   entries
 
 let set_alert ~error ~enable s =
@@ -933,12 +916,9 @@ let parse_alert_option ?disable_loc s =
   in
   let disable name =
     set_alert ~error:false ~enable:false name;
-    (* Watch attribute-level disables of named alerts so that we can warn
-       about the ones that never suppress anything (warning 221). *)
-    match disable_loc with
-    | Some loc when not (String.equal name "all") ->
-        register_alert_disable ~loc name
-    | Some _ | None -> ()
+    (* Watch attribute-level disables so that we can warn about the ones
+       that never suppress anything (warning 221). *)
+    Option.iter (fun loc -> register_alert_disable ~loc name) disable_loc
   in
   let rec scan i =
     if i = n then ()
@@ -1659,8 +1639,6 @@ let report w =
 let report_alert (alert : alert) =
   match alert_is_active alert with
   | false ->
-      (* The alert was suppressed: any attribute-level disable of this alert
-         that is in force did its job (see warning 221). *)
       mark_alert_disables_used alert.kind;
       `Inactive
   | true ->

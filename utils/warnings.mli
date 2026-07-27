@@ -179,10 +179,11 @@ val parse_alert_option: ?disable_loc:loc -> string -> unit
 
       If [disable_loc] is provided (as done when the specification comes
       from an [[@alert ...]] attribute rather than the command line), each
-      plain disable of a named alert is additionally recorded so that
-      disables that never suppress an occurrence of their alert can be
-      reported at the end of compilation with warning 221
-      [Unused_alert_disable]; see [flush_unused_alert_disables].
+      plain disable is additionally recorded so that disables that never
+      suppress an occurrence of their alert can be reported at the end of
+      compilation with warning 221 [Unused_alert_disable]; see
+      [flush_unused_alert_disables].  A disable of ["all"] is fulfilled by
+      a suppressed occurrence of any alert.
   *)
 
 val without_warnings : (unit -> 'a) -> 'a
@@ -219,20 +220,11 @@ val mk_lazy: (unit -> 'a) -> 'a Lazy.t
     (** Like [Lazy.of_fun], but the function is applied with
         the warning/alert settings at the time [mk_lazy] is called. *)
 
-val commit_alert_disable_snapshots : unit -> unit
-    (** Associates the current warning state with the alert disables newly
-        registered by [parse_alert_option ~disable_loc]; that state decides
-        the activity/error status of warning 221 [Unused_alert_disable] if
-        the disable is later reported as unused.  Meant to be called after
-        processing all warning-related attributes of an item, so that a
-        [[@warning "-221"]] attribute takes effect regardless of its position
-        among the item's attributes. *)
-
 val flush_unused_alert_disables : unit -> (loc * string * state) list
     (** Returns (and forgets) the alert-disabling attributes registered via
         [parse_alert_option ~disable_loc] that never suppressed an occurrence
-        of their alert, together with the warning state recorded by
-        [commit_alert_disable_snapshots].  Used to report warning 221
+        of their alert, together with the warning state at the point where
+        the attribute was processed.  Used to report warning 221
         [Unused_alert_disable] at the end of compilation. *)
 
 type description =
