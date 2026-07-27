@@ -50,16 +50,19 @@
  (mode    fallback)
  (deps
    ; matches the line structure of files in gen_primitives.sh
-   alloc.c array.c compare.c extern.c floats.c gc_ctrl.c hash.c intern.c
-     interp.c ints.c io.c
-   lexing.c md5.c meta.c memprof.c obj.c parsing.c signals.c str.c sys.c
+   alloc.c ../stdlib/prims/array.c ../stdlib/prims/compare.c extern.c
+     ../stdlib/prims/floats.c gc_ctrl.c ../stdlib/prims/hash.c intern.c
+     interp.c ../stdlib/prims/ints.c io.c
+   ../stdlib/prims/lexing.c ../stdlib/prims/md5.c meta.c memprof.c obj.c
+     ../stdlib/prims/parsing.c signals.c ../stdlib/prims/str.c sys.c
      callback.c weak.c dynamic.c
    finalise.c domain.c platform.c fiber.c memory.c startup_aux.c
      runtime_events.c sync.c
-   dynlink.c backtrace_byt.c backtrace.c afl.c bigarray.c prng.c float32.c
+   dynlink.c backtrace_byt.c backtrace.c afl.c ../stdlib/prims/bigarray.c
+     ../stdlib/prims/prng.c ../stdlib/prims/float32.c
    simd.c
    cpu.c
-   blake2.c
+   ../stdlib/prims/blake2.c
    misc.c
    build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
    ../Makefile.config
@@ -93,6 +96,7 @@
    sak
    (glob_files *.S)
    (glob_files *.c)
+   (glob_files ../stdlib/prims/*.c)
  )
  (action
  (no-infer
