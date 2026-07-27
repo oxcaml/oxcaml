@@ -1,0 +1,9 @@
+File "unique_export_fail.ml", line 17, characters 0-20:
+17 | let exported = "foo"
+     ^^^^^^^^^^^^^^^^^^^^
+Error: This value is exported, and hence usable by other code here,
+       but it has already been used as unique at:
+File "unique_export_fail.ml", line 19, characters 19-27:
+19 | let () = unique_id exported
+                        ^^^^^^^^
+  

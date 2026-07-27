@@ -339,7 +339,9 @@ module Test_incl :
 
 let use_unique : 'a @ unique -> unit = fun _ -> ()
 
-(* Functors are [many], and can't close over unique values*)
+(* A functor that closes over a unique value is [once]: it can be applied a
+   single time (see testsuite/tests/typing-unique/unique_functors.ml for the
+   rejection of a second application). *)
 
 let foo (x @ unique) =
   let module Foo (_ : sig end) = struct
@@ -349,11 +351,7 @@ let foo (x @ unique) =
   ()
 [%%expect{|
 val use_unique : 'a @ unique -> unit = <fun>
-Line 7, characters 24-25:
-7 |     let () = use_unique x
-                            ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let foo (x @ unique) =
@@ -363,11 +361,7 @@ let foo (x @ unique) =
   let module _ = Foo() in
   ()
 [%%expect{|
-Line 3, characters 24-25:
-3 |     let () = use_unique x
-                            ^
-Error: This value is aliased but used as unique.
-Hint: This value comes from outside the current module or class.
+val foo : 'a @ unique -> unit = <fun>
 |}]
 
 let (foo @ nonportable) () = ()

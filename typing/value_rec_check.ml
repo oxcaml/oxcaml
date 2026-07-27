@@ -336,7 +336,7 @@ let classify_expression : Typedtree.expression -> sd =
         Dynamic
   and classify_module_expression env mexp : sd =
     match mexp.mod_desc with
-    | Tmod_ident (path, _) ->
+    | Tmod_ident (path, _, _) ->
         classify_path env path
     | Tmod_structure _ ->
         Static
@@ -1193,7 +1193,7 @@ and class_field_kind : Typedtree.class_field_kind -> term_judg =
 
 and modexp : Typedtree.module_expr -> term_judg =
   fun mexp -> match mexp.mod_desc with
-    | Tmod_ident (pth, _) ->
+    | Tmod_ident (pth, _, _) ->
       path pth
     | Tmod_structure s ->
       structure s
