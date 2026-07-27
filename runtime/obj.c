@@ -132,6 +132,26 @@ CAMLprim value caml_lazy_update_to_forcing (value v)
   }
 }
 
+/* Allocate OO ids in chunks, to avoid contention */
+#define Id_chunk 1024
+
+static atomic_uintnat oo_next_id;
+
+CAMLprim value caml_fresh_oo_id (value v) {
+  if (Caml_state->oo_next_id_local % Id_chunk == 0) {
+    Caml_state->oo_next_id_local =
+      atomic_fetch_add(&oo_next_id, Id_chunk);
+  }
+  v = Val_long(Caml_state->oo_next_id_local++);
+  return v;
+}
+
+CAMLprim value caml_set_oo_id (value obj) {
+  value v = Val_unit;
+  Field(obj, 1) = caml_fresh_oo_id(v);
+  return obj;
+}
+
 /* Compute how many words in the heap are occupied by blocks accessible
    from a given value */
 

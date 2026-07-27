@@ -259,26 +259,6 @@ CAMLprim value caml_get_public_method (value obj, value tag)
   return (tag == Field(meths,li) ? Field (meths, li-1) : 0);
 }
 
-/* Allocate OO ids in chunks, to avoid contention */
-#define Id_chunk 1024
-
-static atomic_uintnat oo_next_id;
-
-CAMLprim value caml_fresh_oo_id (value v) {
-  if (Caml_state->oo_next_id_local % Id_chunk == 0) {
-    Caml_state->oo_next_id_local =
-      atomic_fetch_add(&oo_next_id, Id_chunk);
-  }
-  v = Val_long(Caml_state->oo_next_id_local++);
-  return v;
-}
-
-CAMLprim value caml_set_oo_id (value obj) {
-  value v = Val_unit;
-  Field(obj, 1) = caml_fresh_oo_id(v);
-  return obj;
-}
-
 CAMLprim value caml_int_as_pointer (value n) {
   return n - 1;
 }

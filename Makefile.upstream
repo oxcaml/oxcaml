@@ -1083,7 +1083,9 @@ runtime_COMMON_C_SOURCES = \
   addrmap \
   afl \
   alloc \
+  array \
   backtrace \
+  bigarray \
   callback \
   codefrag \
   custom \
@@ -1095,14 +1097,19 @@ runtime_COMMON_C_SOURCES = \
   fiber \
   dynamic \
   finalise \
+  float32 \
+  floats \
   gc_ctrl \
   gc_stats \
   globroots \
+  hash \
   intern \
+  ints \
   io \
   lf_skiplist \
   main \
   major_gc \
+  md5 \
   memory \
   memprof \
   meta \
@@ -1119,6 +1126,7 @@ runtime_COMMON_C_SOURCES = \
   cpu \
   skiplist \
   startup_aux \
+  str \
   sync \
   sys \
   $(TSAN_NATIVE_RUNTIME_C_SOURCES) \
@@ -1130,22 +1138,22 @@ runtime_COMMON_C_SOURCES = \
 # (GC, domains, signals, ...).  It lives in stdlib/prims/ rather than
 # runtime/, but is still compiled into the runtime libraries.
 stdlib_prims_C_SOURCES = \
-  array \
-  bigarray \
+  array_prims \
+  bigarray_prims \
   blake2 \
   compare \
-  float32 \
-  floats \
+  float32_prims \
+  floats_prims \
   gc_ctrl_prims \
-  hash \
-  ints \
+  hash_prims \
+  ints_prims \
   io_prims \
   lexing \
-  md5 \
+  md5_prims \
   obj_prims \
   parsing \
   prng \
-  str \
+  str_prims \
   sys_prims
 
 runtime_BYTECODE_ONLY_C_SOURCES = \
@@ -1444,7 +1452,7 @@ runtime/major_gc.%.$(O): OC_CFLAGS += $(INTEL_JCC_BUG_CFLAGS)
 
 # Partial inlining on (at least) caml_string_compare seems to produce
 # worse code.
-stdlib/prims/str.%.$(O): OC_CFLAGS += $(NO_PARTIAL_INLINING_CFLAGS)
+stdlib/prims/str_prims.%.$(O): OC_CFLAGS += $(NO_PARTIAL_INLINING_CFLAGS)
 
 ## Compilation of runtime C files
 

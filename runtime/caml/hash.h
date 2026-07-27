@@ -36,4 +36,29 @@ CAMLextern uint32_t caml_hash_mix_string(uint32_t h, value s);
 #endif
 
 
+#ifdef CAML_INTERNALS
+
+/* The MurmurHash 3 mixing steps, used by the caml_hash_mix_*
+   functions in runtime/hash.c and by the generic hashing primitives
+   in stdlib/prims/hash_prims.c. */
+
+#define ROTL32(x,n) ((x) << n | (x) >> (32-n))
+
+#define MIX(h,d) \
+  d *= 0xcc9e2d51; \
+  d = ROTL32(d, 15); \
+  d *= 0x1b873593; \
+  h ^= d; \
+  h = ROTL32(h, 13); \
+  h = h * 5 + 0xe6546b64;
+
+#define FINAL_MIX(h) \
+  h ^= h >> 16; \
+  h *= 0x85ebca6b; \
+  h ^= h >> 13; \
+  h *= 0xc2b2ae35; \
+  h ^= h >> 16;
+
+#endif /* CAML_INTERNALS */
+
 #endif /* CAML_HASH_H */

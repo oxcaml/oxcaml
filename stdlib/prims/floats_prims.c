@@ -104,13 +104,8 @@ CAMLexport void caml_Store_double_val(value val, double dbl)
 
 #endif
 
-/*
- OCaml runtime itself doesn't call setlocale, i.e. it is using
- standard "C" locale by default, but it is possible that
- third-party code loaded into process does.
-*/
 #ifdef HAS_LOCALE
-locale_t caml_locale = (locale_t)0;
+extern locale_t caml_locale;    /* see runtime/floats.c */
 #endif
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
@@ -124,31 +119,6 @@ locale_t caml_locale = (locale_t)0;
 #define USE_LOCALE do {} while(0)
 #define RESTORE_LOCALE do {} while(0)
 #endif
-
-void caml_init_locale(void)
-{
-#if defined(_MSC_VER) || defined(__MINGW32__)
-  _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
-#endif
-#ifdef HAS_LOCALE
-  if ((locale_t)0 == caml_locale)
-  {
-#if defined(_MSC_VER)
-    caml_locale = _create_locale(LC_NUMERIC, "C");
-#else
-    caml_locale = newlocale(LC_NUMERIC_MASK,"C",(locale_t)0);
-#endif
-  }
-#endif
-}
-
-void caml_free_locale(void)
-{
-#ifdef HAS_LOCALE
-  if ((locale_t)0 != caml_locale) freelocale(caml_locale);
-  caml_locale = (locale_t)0;
-#endif
-}
 
 CAMLexport value caml_copy_double(double d)
 {
@@ -971,7 +941,7 @@ CAMLprim value caml_hypot_float(value f, value g)
   return caml_copy_double(caml_hypot(Double_val(f), Double_val(g)));
 }
 
-/* These emulations of expm1() and log1p() are due to William Kahan.
+/* This emulation of expm1() is due to William Kahan.
    See http://www.plunk.org/~hatch/rightway.php */
 CAMLexport double caml_expm1(double x)
 {
@@ -984,19 +954,6 @@ CAMLexport double caml_expm1(double x)
   if (u - 1. == -1.)
     return -1.;
   return (u - 1.) * x / log(u);
-#endif
-}
-
-CAMLexport double caml_log1p(double x)
-{
-#ifdef HAS_C99_FLOAT_OPS
-  return log1p(x);
-#else
-  double u = 1. + x;
-  if (u == 1.)
-    return x;
-  else
-    return log(u) * x / (u - 1.);
 #endif
 }
 

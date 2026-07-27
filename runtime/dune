@@ -50,23 +50,24 @@
  (mode    fallback)
  (deps
    ; matches the line structure of files in gen_primitives.sh
-   alloc.c ../stdlib/prims/array.c ../stdlib/prims/compare.c extern.c
-     ../stdlib/prims/floats.c gc_ctrl.c ../stdlib/prims/hash.c intern.c
-     interp.c ../stdlib/prims/ints.c io.c
-   ../stdlib/prims/lexing.c ../stdlib/prims/md5.c meta.c memprof.c obj.c
-     ../stdlib/prims/parsing.c signals.c ../stdlib/prims/str.c sys.c
+   alloc.c ../stdlib/prims/array_prims.c ../stdlib/prims/compare.c extern.c
+     ../stdlib/prims/floats_prims.c gc_ctrl.c ../stdlib/prims/hash_prims.c intern.c
+     interp.c ../stdlib/prims/ints_prims.c io.c
+   ../stdlib/prims/lexing.c ../stdlib/prims/md5_prims.c meta.c memprof.c obj.c
+     ../stdlib/prims/parsing.c signals.c ../stdlib/prims/str_prims.c sys.c
      callback.c weak.c dynamic.c
    finalise.c domain.c platform.c fiber.c memory.c startup_aux.c
      runtime_events.c sync.c
-   dynlink.c backtrace_byt.c backtrace.c afl.c ../stdlib/prims/bigarray.c
-     ../stdlib/prims/prng.c ../stdlib/prims/float32.c
+   dynlink.c backtrace_byt.c backtrace.c afl.c ../stdlib/prims/bigarray_prims.c
+     ../stdlib/prims/prng.c ../stdlib/prims/float32_prims.c
    simd.c
    cpu.c
    ../stdlib/prims/blake2.c
    misc.c
    ../stdlib/prims/gc_ctrl_prims.c ../stdlib/prims/io_prims.c
      ../stdlib/prims/obj_prims.c ../stdlib/prims/sys_prims.c
-   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
+   build_config.h sync_posix.h float16.h caml/jumptbl.h
+     caml/domain_state.tbl
    ../Makefile.config
    (glob_files caml/*.h))
  (action
