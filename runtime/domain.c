@@ -786,7 +786,10 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   /* This call may fail, but fatally so we don't need an error path */
   domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
-  domain_root_register(&domain_state->tls_state, Atom(0) /* Empty array */);
+  /* [tls_state] is not a generational global root because it is updated by
+     plain stores from assembly code at stack switches; it is scanned
+     directly in [caml_do_roots] and by the minor GC. */
+  domain_state->tls_state = Atom(0) /* Empty array */;
 
   // Must happen after taking the domain lock
   caml_enable_stack_caches(domain_state->stack_caches);
@@ -867,7 +870,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
 fail_main_stack:
   domain_root_remove(&domain_state->dls_state);
-  domain_root_remove(&domain_state->tls_state);
+  domain_state->tls_state = Val_unit;
   free_minor_heap();
 fail_minor_heap:
   caml_teardown_major_gc();
@@ -2734,7 +2737,7 @@ void caml_domain_terminate(bool last)
 
   /* We can not touch domain_self after here because it may be reused */
   domain_root_remove(&domain_state->dls_state);
-  domain_root_remove(&domain_state->tls_state);
+  domain_state->tls_state = Val_unit;
   domain_root_remove(&domain_state->backtrace_last_exn);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
@@ -2938,17 +2941,30 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
   }
 }
 
-/* Thread-local state */
+/* TLS state (see fiber.h) */
 
 CAMLprim value caml_domain_tls_set(value t)
 {
-  domain_root_set(&Caml_state->tls_state, t);
+  CAMLnoalloc;
+  /* [tls_state] is not a generational global root; it is scanned directly
+     as a domain root, so a plain store suffices. The store must also reach
+     the owning stack, from which [Caml_state->tls_state] is recomputed at
+     stack switches. Callback adoption (see callback.c) guarantees the owner
+     exists. The owner's field is a plain store too: the owner is on a
+     scanned stack chain, like the handler values (see fiber.h). */
+  struct stack_info* owner = caml_tls_find_owner(Caml_state->current_stack);
+  Caml_state->tls_state = t;
+  /* [owner] can only be NULL when running on a detached fiber chain
+     (delivery of Effect.Unhandled); the update is then kept only in the
+     cache, consistent with how stack switches treat such chains. */
+  if (owner != NULL)
+    owner->tls_state = t;
   return Val_unit;
 }
 
 CAMLprim value caml_domain_tls_get(value unused)
 {
-  return domain_root_get(&Caml_state->tls_state);
+  return Caml_state->tls_state;
 }
 
 CAMLprim value caml_recommended_domain_count(value unused)

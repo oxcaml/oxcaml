@@ -53,28 +53,56 @@
  *  - we register the stack parent as a local root while the callback
  * is executing to ensure that the garbage collector follows the
  * stack parent
+ *
+ * Cutting the parent link also cuts a non-owner stack off from its TLS
+ * owner (see fiber.h). To keep every running chain owner-terminated, the
+ * callback stack temporarily adopts the current TLS state; on exit, the
+ * (possibly grown) state is written back to the real owner. [tls_adopted]
+ * records whether adoption happened for this callback invocation (the
+ * stack may already be an owner, e.g. a preemptible fiber or a nested
+ * callback on the same stack).
  */
-Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
+Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state,
+                                               int* tls_adopted)
 {
   struct stack_info* parent_stack = Stack_parent(domain_state->current_stack);
+  *tls_adopted = 0;
   if (parent_stack == NULL) {
     return Val_unit;
   } else {
     value cont = caml_alloc_2(Cont_tag, Val_ptr(parent_stack), Val_long(0));
-    Stack_parent(domain_state->current_stack) = NULL;
+    struct stack_info* stk = domain_state->current_stack;
+    Stack_parent(stk) = NULL;
     caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+    if (stk->tls_state == Val_null) {
+      stk->tls_state = domain_state->tls_state;
+      *tls_adopted = 1;
+    }
     return cont;
   }
 }
 
 Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
-                                      value cont)
+                                      value cont, int tls_adopted)
 {
   CAMLassert(Stack_parent(domain_state->current_stack) == NULL);
   if (Is_block(cont)) {
+    struct stack_info* stk = domain_state->current_stack;
     struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
-    Stack_parent(domain_state->current_stack) = parent_stack;
+    Stack_parent(stk) = parent_stack;
     caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+    if (tls_adopted) {
+      /* Hand the TLS state back to the real owner. The cached
+         [domain_state->tls_state] is unchanged: it is the same array,
+         possibly grown during the callback. If there is no owner (callback
+         made while unwinding a detached fiber chain), the stack keeps the
+         adopted state. */
+      struct stack_info* owner = caml_tls_find_owner(parent_stack);
+      if (owner != NULL) {
+        owner->tls_state = stk->tls_state;
+        stk->tls_state = Val_null;
+      }
+    }
   }
 }
 
@@ -120,6 +148,7 @@ static value caml_callbackN_exn0(value closure, int narg, value args[])
   CAMLparam1(closure); /* no need to register args as roots, see below */
   CAMLlocal1(cont);
   value res;
+  int tls_adopted;
   caml_domain_state* domain_state = Caml_state;
 
   /* Ensure there's enough stack space */
@@ -140,7 +169,7 @@ static value caml_callbackN_exn0(value closure, int narg, value args[])
   domain_state->current_stack->sp[narg + 1] = Val_unit;    /* environment */
   domain_state->current_stack->sp[narg + 2] = Val_long(0); /* extra args */
 
-  cont = alloc_and_clear_stack_parent(domain_state);
+  cont = alloc_and_clear_stack_parent(domain_state, &tls_adopted);
   /* This can call the GC and invalidate the values [args].
      However, they are never used afterwards,
      as they were copied into the root [domain_state->current_stack]. */
@@ -152,7 +181,7 @@ static value caml_callbackN_exn0(value closure, int narg, value args[])
   if (Is_exception_result(res))
     domain_state->current_stack->sp += narg + 3; /* PR#3419 */
 
-  restore_stack_parent(domain_state, cont);
+  restore_stack_parent(domain_state, cont, tls_adopted);
 
   CAMLreturn (res);
 }
@@ -251,12 +280,13 @@ static value callback(value closure, value arg)
 
   if (Stack_parent(domain_state->current_stack)) {
     value cont, res;
+    int tls_adopted;
 
     /* [closure] and [arg] need to be preserved across the allocation
        of the stack parent, but need not and should not be registered
        as roots past this allocation. */
     Begin_roots2(closure, arg);
-    cont = alloc_and_clear_stack_parent(domain_state);
+    cont = alloc_and_clear_stack_parent(domain_state, &tls_adopted);
     End_roots();
 
     Begin_roots1(cont);
@@ -264,7 +294,7 @@ static value callback(value closure, value arg)
     res = caml_callback_asm(domain_state, closure, &arg);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_parent(domain_state, cont, tls_adopted);
 
     return res;
   } else {
@@ -283,10 +313,11 @@ static value callback2(value closure, value arg1, value arg2)
 
   if (Stack_parent(domain_state->current_stack)) {
     value cont, res;
+    int tls_adopted;
 
     /* Root registration policy: see caml_callback_exn. */
     Begin_roots3(closure, arg1, arg2);
-    cont = alloc_and_clear_stack_parent(domain_state);
+    cont = alloc_and_clear_stack_parent(domain_state, &tls_adopted);
     End_roots();
 
     Begin_roots1(cont);
@@ -295,7 +326,7 @@ static value callback2(value closure, value arg1, value arg2)
     res = caml_callback2_asm(domain_state, closure, args);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_parent(domain_state, cont, tls_adopted);
 
     return res;
   } else {
@@ -313,10 +344,11 @@ static value callback3(value closure, value arg1, value arg2, value arg3)
 
   if (Stack_parent(domain_state->current_stack))  {
     value cont, res;
+    int tls_adopted;
 
     /* Root registration policy: see caml_callback_exn. */
     Begin_roots4(closure, arg1, arg2, arg3);
-    cont = alloc_and_clear_stack_parent(domain_state);
+    cont = alloc_and_clear_stack_parent(domain_state, &tls_adopted);
     End_roots();
 
     Begin_root(cont);
@@ -325,7 +357,7 @@ static value callback3(value closure, value arg1, value arg2, value arg3)
     res = caml_callback3_asm(domain_state, closure, args);
     End_roots();
 
-    restore_stack_parent(domain_state, cont);
+    restore_stack_parent(domain_state, cont, tls_adopted);
 
     return res;
   } else {

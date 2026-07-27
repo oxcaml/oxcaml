@@ -132,6 +132,7 @@ G(name):
 #define Stack_local_sp           64
 #define Stack_local_top          72
 #define Stack_local_limit        80
+#define Stack_tls_state          112
 
 /* struct stack_handler */
 #define Handler_value(REG)       0(REG)
@@ -315,6 +316,24 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
         movq    $0, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
         movq    $0, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
         movq    $0, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)(reg)
+
+/* Update the cached TLS state (Caml_state->tls_state) from the nearest
+   TLS-owning stack (Stack_tls_state != Val_null (0)), starting at reg_stk
+   and walking parent links (see fiber.h). If the chain is detached (NULL
+   parent reached before an owner), the cached state is left unchanged.
+   Clobbers reg_stk and reg_tmp. */
+
+#define UPDATE_TLS_MIRROR(reg_stk, reg_tmp)          \
+9:      movq    Stack_tls_state(reg_stk), reg_tmp;   \
+        testq   reg_tmp, reg_tmp;                    \
+        jnz     8f;                                  \
+        movq    Stack_handler(reg_stk), reg_stk;     \
+        movq    Handler_parent(reg_stk), reg_stk;    \
+        testq   reg_stk, reg_stk;                    \
+        jnz     9b;                                  \
+        jmp     7f;                                  \
+8:      movq    reg_tmp, Caml_state(tls_state);      \
+7:
 
 /* When ThreadSanitizer instrumentation is enabled, the code must call
    the C functions __tsan_func_entry and __tsan_func_exit to signal
@@ -1373,6 +1392,15 @@ LBL(do_perform):
      /* We have to null the Handler_parent after the switch because the
         Handler_parent is needed to unwind the stack for backtraces */
         movq    $0, Handler_parent(%r11) /* Set parent of performer to NULL */
+     /* If the departing stack owned the TLS state (it was captured into
+        the continuation), recompute the cached state from the new chain.
+        Perform and reperform capture one fiber per switch, so only %rsi
+        ever leaves the running chain here. */
+        cmpq    $0, Stack_tls_state(%rsi)
+        je      6f
+        movq    %r10, %rcx
+        UPDATE_TLS_MIRROR(%rcx, %rdx)
+6:
         movq    Handler_effect(%r11), %rsi  /* %rsi := effect handler */
         FLUSH_DYNAMIC_CACHE(%r11)
 LBL(caml_perform_enter):
@@ -1397,6 +1425,11 @@ LBL(112):
         jz      LBL(113)
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
+    /* Recompute the cached TLS state on the (detached) resumed chain,
+       leaving it unchanged if the chain contains no owner. Preserves %r10
+       (the performer stack), which the TSan block below needs. */
+        movq    %r10, %rcx
+        UPDATE_TLS_MIRROR(%rcx, %rdx)
     /* No parent stack. If this is a preemption effect (wosize of the
        continuation is 3, meaning we have a gc_regs present) then just continue
        execution. Otherwise, raise Effect.Unhandled. */
@@ -1574,6 +1607,12 @@ END_FUNCTION(caml_preempt)
         UPDATE_BASE_POINTER(%rdi) ; \
         SWITCH_OCAML_STACKS ; \
         FLUSH_DYNAMIC_CACHE(%r13) ; \
+    /* Recompute the cached TLS state from the resumed stack: the resumed \
+       chain's owner takes over, or, as the chain was re-parented above, \
+       the walk falls through into the old chain and finds the old owner. \
+       Preserves %rdx (gc_regs flag) and %rbx (payload). */ \
+        movq    %r10, %r13 ; \
+        UPDATE_TLS_MIRROR(%r13, %rcx) ; \
         testq   %rdx, %rdx ;               /* Do we have a gc_regs? */ \
         jnz     LBL(resume_preemption)
 
@@ -1699,6 +1738,14 @@ CFI_STARTPROC
     /* Switch to the new stack */
         movq    %r11, %rsp
         FLUSH_DYNAMIC_CACHE(%r11)
+    /* If the new fiber owns TLS state (it is preemptible), cache its
+       state; otherwise it inherits the current cached state, since its
+       parent is the old current stack. */
+        movq    Stack_tls_state(%rax), %r10
+        testq   %r10, %r10
+        jz      6f
+        movq    %r10, Caml_state(tls_state)
+6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2, \
@@ -1739,6 +1786,13 @@ LBL(frame_runstack):
         movq    Stack_local_limit(%r10), %r11
         movq    %r11, Caml_state(local_limit)
         FLUSH_DYNAMIC_CACHE(%r11)
+    /* If the dying fiber owned the TLS state, recompute the cached state
+       from the parent chain. Preserves %rax (result) and %rbx (handler). */
+        cmpq    $0, Stack_tls_state(C_ARG_1)
+        je      6f
+        movq    %r10, %r11
+        UPDATE_TLS_MIRROR(%r11, %rcx)
+6:
     /* free old stack by switching directly to c_stack; is a no-alloc call */
         movq    Stack_sp(%r10), %r13 /* saved across C call */
         CFI_RESTORE_STATE

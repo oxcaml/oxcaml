@@ -339,6 +339,10 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other
     | Begin_region | End_region -> Op_other
+    (* [Tls_get] reads a cache that changes at fiber switches; this remains a
+       CSE-able mutable load because every point where it can change is a call,
+       poll or allocation, all of which kill mutable-load equations (see
+       [cse_instruction]). The same argument covers [Dls_get]. *)
     | Dls_get | Tls_get | Domain_index -> Op_load Mutable
 
   let class_of_operation op =

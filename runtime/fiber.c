@@ -354,6 +354,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_top = NULL;
   stack->local_limit = 0;
   caml_dynamic_table_init(&stack->dyn);
+  /* Preemptible fibers own TLS state; see fiber.h. */
+  stack->tls_state = (htick == Val_null) ? Val_null : Atom(0);
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -667,6 +669,7 @@ void caml_scan_stack(
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    f(fdata, stack->tls_state, &stack->tls_state);
 
     scan_local_allocations(f, fdata, locals, stack->local_sp);
 
@@ -813,6 +816,8 @@ void caml_scan_stack(
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     if (is_scannable(fflags, Stack_handle_tick(stack)))
       f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    if (is_scannable(fflags, stack->tls_state))
+      f(fdata, stack->tls_state, &stack->tls_state);
 
     stack = Stack_parent(stack);
   }
@@ -952,13 +957,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dyn = old_stack->dyn;
+  new_stack->tls_state = old_stack->tls_state;
 
-  // Detach locals stack and dynamic bindings from old_stack so they will not be freed
+  // Detach locals stack, dynamic bindings and TLS state from old_stack so
+  // they will not be freed
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   caml_dynamic_table_init(&old_stack->dyn);
+  old_stack->tls_state = Val_null;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1030,6 +1038,9 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
   const int64_t id = atomic_fetch_add(&fiber_id, 1);
   struct stack_info* stk =
     caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
+  /* Main stacks own TLS state even though they are not preemptible;
+     see fiber.h. */
+  if (stk != NULL) stk->tls_state = Atom(0);
   return stk;
 }
 
@@ -1154,6 +1165,8 @@ void caml_free_stack (struct stack_info* stack)
 
   caml_dynamic_table_free(&stack->dyn);
 
+  stack->tls_state = Val_null;
+
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
     memset(Stack_base(stack), 0x42,
@@ -1178,6 +1191,20 @@ void caml_free_stack (struct stack_info* stack)
   } else {
     free_stack_memory(stack);
   }
+}
+
+struct stack_info* caml_tls_find_owner(struct stack_info* stack)
+{
+  while (stack != NULL && stack->tls_state == Val_null)
+    stack = Stack_parent(stack);
+  return stack;
+}
+
+void caml_tls_recompute_mirror(void)
+{
+  struct stack_info* owner = caml_tls_find_owner(Caml_state->current_stack);
+  if (owner != NULL)
+    Caml_state->tls_state = owner->tls_state;
 }
 
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
@@ -1254,7 +1281,7 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
 }
 
 CAMLprim value caml_continuation_update_handler_noexc
-  (value cont, value hval, value hexn, value heff, value htick)
+  (value cont, value hval, value hexn, value heff, value htick, value tls)
 {
   /* Note: this can be noalloc because, despite participating in marking (by
      potentially calling [caml_darken_cont], through
@@ -1274,9 +1301,46 @@ CAMLprim value caml_continuation_update_handler_noexc
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
   Stack_handle_tick(stk) = htick;
+  /* If the fiber is becoming preemptible and does not own TLS state yet,
+     attach the provided initial state, or a fresh empty one. Fibers that
+     already own state keep it: once an owner, always an owner (see
+     fiber.h). */
+  if (stk->tls_state == Val_null && (htick != Val_null || tls != Val_null))
+    stk->tls_state = (tls == Val_null) ? Atom(0) : tls;
   caml_continuation_replace(cont, Ptr_val(stack));
 
   return cont;
+}
+
+CAMLprim value caml_continuation_update_handler_noexc_byte
+  (value* argv, int argn)
+{
+  return caml_continuation_update_handler_noexc
+    (argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+}
+
+/* Whether resuming [cont] with a tick handler would attach fresh TLS state
+   to its outermost fiber (i.e. the fiber does not own TLS state yet). Used
+   to build the initial state only when it will be consumed. */
+CAMLprim value caml_continuation_tls_needs_init(value cont)
+{
+  /* noalloc for the same reason as
+     [caml_continuation_update_handler_noexc] */
+  CAMLnoalloc;
+  value stack;
+  struct stack_info* stk;
+  value res;
+
+  stack = caml_continuation_use_noexc (cont);
+  if (Ptr_val(stack) == NULL) {
+    /* The continuation has already been taken; the resumption that follows
+       will raise. */
+    return Val_false;
+  }
+  stk = Ptr_val(Field(cont, 1));
+  res = Val_bool(stk->tls_state == Val_null);
+  caml_continuation_replace(cont, Ptr_val(stack));
+  return res;
 }
 
 /* Update only the tick handler of a continuation, leaving all other handlers
@@ -1299,6 +1363,9 @@ CAMLprim value caml_continuation_update_tick_handler_noexc
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
   Stack_handle_tick(stk) = htick;
+  /* A fiber becoming preemptible must own TLS state (see fiber.h). */
+  if (stk->tls_state == Val_null && htick != Val_null)
+    stk->tls_state = Atom(0);
   caml_continuation_replace(cont, Ptr_val(stack));
 
   return cont;

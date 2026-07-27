@@ -105,7 +105,15 @@ module Prim = struct
     (exn -> 'b) ->
     ('a2 . ('a2, 'x, 'b) effc) ->
     (unit -> tick_outcome) or_null ->
-    ('a, 'x, 'b) cont = "caml_continuation_update_handler_noexc"
+    Domain.TLS.Private.state or_null ->
+    ('a, 'x, 'b) cont
+    = "caml_continuation_update_handler_noexc_byte"
+      "caml_continuation_update_handler_noexc"
+
+  (* Whether resuming this continuation with a tick handler would attach
+     fresh TLS state to its outermost fiber. *)
+  external cont_tls_needs_init :
+    _ cont -> bool = "caml_continuation_tls_needs_init"
 end
 
 type _ t += Preemption : unit t
@@ -133,20 +141,30 @@ let[@inline] discontinue_with_backtrace (_h : Handler.t @ yielding) cont e bt =
    they could be interleaved, causing a segfault rather than an exception. *)
 
 let continue_with_handler (h : Handler.t @ yielding) cont valuec exnc
-    (effc : 'a. ('a, _, _) effc) tickc v =
-  continue h (Prim.update_cont_handler_noexc cont valuec exnc effc tickc) v
+    (effc : 'a. ('a, _, _) effc) tickc tls v =
+  continue h
+    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc tls) v
 
 let discontinue_with_handler (h : Handler.t @ yielding) cont valuec exnc
-    (effc : 'a. ('a, _, _) effc) tickc e =
+    (effc : 'a. ('a, _, _) effc) tickc tls e =
   discontinue h
-    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
+    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc tls)
     e
 
 let discontinue_with_handler_with_backtrace (h : Handler.t @ yielding) cont
-    valuec exnc (effc : 'a. ('a, _, _) effc) tickc e bt =
+    valuec exnc (effc : 'a. ('a, _, _) effc) tickc tls e bt =
   discontinue_with_backtrace h
-    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
+    (Prim.update_cont_handler_noexc cont valuec exnc effc tickc tls)
     e bt
+
+(* The initial TLS state for a fiber becoming preemptible: keys registered
+   with [split_from_parent] are split from the current context (parity with
+   [Thread.create]). Built only when the fiber does not own TLS state yet
+   (a fiber that was already resumed preemptibly keeps its state). *)
+let[@inline] initial_tls_for cont : Domain.TLS.Private.state or_null =
+  if Prim.cont_tls_needs_init cont
+  then This (Domain.TLS.Private.make_initial_state ())
+  else Null
 
 module Deep = struct
 
@@ -267,6 +285,15 @@ module Deep = struct
           to_continuation f (Cont k) [@nontail]
         | None -> Prim.reperform eff k last_fiber
       in
+      (* The new preemptible fiber owns fresh TLS state; populate it with
+         the keys registered with [split_from_parent] (parity with
+         [Thread.create]). *)
+      let comp =
+        if Domain.TLS.Private.has_initial_keys () then begin
+          let keys = Domain.TLS.Private.get_initial_keys () in
+          fun arg -> Domain.TLS.Private.set_initial_keys keys; comp arg
+        end else comp
+      in
       Prim.with_stack_preemptible
         handler.retc handler.exnc effc handler.tickc
         comp arg
@@ -307,11 +334,20 @@ module Deep = struct
               to_continuation f (Cont k) [@nontail]
             | None -> Prim.reperform eff k last_fiber
           in
+          (* See [Deep.Preemptible.match_with]. *)
+          let comp' =
+            if Domain.TLS.Private.has_initial_keys () then begin
+              let keys = Domain.TLS.Private.get_initial_keys () in
+              fun arg ->
+                Domain.TLS.Private.set_initial_keys keys;
+                comp (Handler.unsafe_make ()) arg
+            end else (fun arg -> comp (Handler.unsafe_make ()) arg)
+          in
           Prim.with_stack_preemptible
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
             effc handler.tickc
-            (fun arg -> comp (Handler.unsafe_make ()) arg)
+            comp'
             arg
 
         let try_with (h @ local) ~on_tick comp arg
@@ -366,7 +402,7 @@ module Shallow = struct
       | None -> Prim.reperform eff k last_fiber
     in
     continue_with_handler (Handler.unsafe_make ())
-      k handler.retc handler.exnc effc Null v
+      k handler.retc handler.exnc effc Null Null v
 
   let discontinue_with (Cont k) e handler =
     let effc eff k last_fiber =
@@ -375,7 +411,7 @@ module Shallow = struct
       | None -> Prim.reperform eff k last_fiber
     in
     discontinue_with_handler (Handler.unsafe_make ())
-      k handler.retc handler.exnc effc Null e
+      k handler.retc handler.exnc effc Null Null e
 
   let discontinue_with_backtrace (Cont k) e bt handler =
     let effc eff k last_fiber =
@@ -384,7 +420,7 @@ module Shallow = struct
       | None -> Prim.reperform eff k last_fiber
     in
     discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
-      k handler.retc handler.exnc effc Null e bt
+      k handler.retc handler.exnc effc Null Null e bt
 
   module Safe = struct
     let fiber f =
@@ -407,7 +443,7 @@ module Shallow = struct
         continue_with_handler h k
           (fun x -> handler.retc (Handler.unsafe_make ()) x)
           (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-          effc Null v
+          effc Null Null v
 
       let discontinue_with (h : Handler.t @ yielding) (Cont k) e
             (handler : (_, _) handler) =
@@ -419,7 +455,7 @@ module Shallow = struct
         discontinue_with_handler h k
           (fun x -> handler.retc (Handler.unsafe_make ()) x)
           (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-          effc Null e
+          effc Null Null e
 
       let discontinue_with_backtrace (h : Handler.t @ yielding) (Cont k) e bt
             (handler : (_, _) handler) =
@@ -431,7 +467,7 @@ module Shallow = struct
         discontinue_with_handler_with_backtrace h k
           (fun x -> handler.retc (Handler.unsafe_make ()) x)
           (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-          effc Null e bt
+          effc Null Null e bt
     end
   end
 
@@ -451,7 +487,8 @@ module Shallow = struct
         | None -> Prim.reperform eff k last_fiber
       in
       continue_with_handler (Handler.unsafe_make ())
-        k handler.retc handler.exnc effc (This handler.tickc) v
+        k handler.retc handler.exnc effc (This handler.tickc)
+        (initial_tls_for k) v
 
     let discontinue_with (Cont k) e handler =
       let effc eff k last_fiber =
@@ -462,7 +499,8 @@ module Shallow = struct
         | None -> Prim.reperform eff k last_fiber
       in
       discontinue_with_handler (Handler.unsafe_make ())
-        k handler.retc handler.exnc effc (This handler.tickc) e
+        k handler.retc handler.exnc effc (This handler.tickc)
+        (initial_tls_for k) e
 
     let discontinue_with_backtrace (Cont k) e bt handler =
       let effc eff k last_fiber =
@@ -473,7 +511,8 @@ module Shallow = struct
         | None -> Prim.reperform eff k last_fiber
       in
       discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
-        k handler.retc handler.exnc effc (This handler.tickc) e bt
+        k handler.retc handler.exnc effc (This handler.tickc)
+        (initial_tls_for k) e bt
 
     module Safe = struct
       module With_handler = struct
@@ -496,7 +535,7 @@ module Shallow = struct
           continue_with_handler h k
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-            effc (This handler.tickc) v
+            effc (This handler.tickc) (initial_tls_for k) v
 
         let discontinue_with (h : Handler.t @ yielding) (Cont k) e
               (handler : (_, _) handler) =
@@ -510,7 +549,7 @@ module Shallow = struct
           discontinue_with_handler h k
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-            effc (This handler.tickc) e
+            effc (This handler.tickc) (initial_tls_for k) e
 
         let discontinue_with_backtrace (h : Handler.t @ yielding) (Cont k) e bt
               (handler : (_, _) handler) =
@@ -524,7 +563,7 @@ module Shallow = struct
           discontinue_with_handler_with_backtrace h k
             (fun x -> handler.retc (Handler.unsafe_make ()) x)
             (fun e -> handler.exnc (Handler.unsafe_make ()) e)
-            effc (This handler.tickc) e bt
+            effc (This handler.tickc) (initial_tls_for k) e bt
       end
     end
   end

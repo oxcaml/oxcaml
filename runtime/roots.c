@@ -38,6 +38,9 @@ void caml_do_roots (
   int do_final_val)
 {
   scan_roots_hook hook;
+  /* [tls_state] is a plain domain root (not a generational global root)
+     because it is updated by plain stores from assembly code. */
+  f(fdata, d->tls_state, &d->tls_state);
   caml_do_local_roots(f, fflags, fdata,
                       d->local_roots, d->current_stack, d->gc_regs,
                       d->dynamic_bindings);

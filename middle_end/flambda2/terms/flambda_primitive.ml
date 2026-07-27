@@ -1162,6 +1162,9 @@ let effects_and_coeffects_of_nullary_primitive p : Effects_and_coeffects.t =
     (* This doesn't really have effects, but without effects, these primitives
        get deleted during lambda_to_flambda. *)
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
+  (* [Tls_get] reads state that changes at fiber switches (calls) and is never
+     CSE'd (see [nullary_primitive_eligible_for_cse]); [Has_coeffects] and
+     [Can't_move_before_any_branch] pin it in place. *)
   | Dls_get | Tls_get | Domain_index ->
     No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Poll | Cpu_relax ->

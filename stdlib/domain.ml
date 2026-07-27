@@ -422,6 +422,24 @@ module TLS0 = struct
 
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
+
+    let has_initial_keys () =
+      match (Atomic.get parent_keys : key_initializer_list) with
+      | [] -> false
+      | _ :: _ -> true
+
+    type state = tls_state
+
+    let make_initial_state () : state =
+      let st = ref (Obj_opt.fresh ()) in
+      List.iter
+        (fun (KV ((idx, _), v)) ->
+          let cur = !st in
+          let size = Array.length cur in
+          (if idx >= size then st := Obj_opt.grow_array cur idx size);
+          Array.unsafe_set !st idx (Obj_opt.some (v ())))
+        (get_initial_keys ());
+      !st
   end
 end
 
