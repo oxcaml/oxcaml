@@ -704,9 +704,10 @@ and expression i ppf x =
       line i ppf "%a\n" fmt_sort sort;
       list i case ppf l1;
       list i case ppf l2;
-  | Texp_try (e, l1, l2) ->
+  | Texp_try (e, sort, l1, l2) ->
       line i ppf "Texp_try\n";
       expression i ppf e;
+      line i ppf "%a\n" fmt_sort sort;
       list i case ppf l1;
       list i case ppf l2;
   | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";

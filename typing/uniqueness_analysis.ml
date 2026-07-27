@@ -2426,7 +2426,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
        twice - and can also be run when the non-effect case is run. *)
     let uf_all_cases = UF.seqs [uf_eff_cases; uf_eff_cases; uf_cases] in
     UF.seq uf_arg uf_all_cases
-  | Texp_try (body, cases, eff_cases) ->
+  | Texp_try (body, _, cases, eff_cases) ->
     let uf_body = check_uniqueness_exp ~overwrite:None ienv body in
     let value = Match_single (Paths.fresh ()) in
     let uf_cases = check_uniqueness_cases ienv value cases in

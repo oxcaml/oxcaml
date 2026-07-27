@@ -103,7 +103,7 @@ let rec iterator ~scope rebuild_env =
     | Texp_match (_, _, f1, f2, _) ->
         bind_cases f1;
         bind_cases f2
-    | Texp_try (_, f1, f2) ->
+    | Texp_try (_, _, f1, f2) ->
         bind_cases f1;
         bind_cases f2
     | Texp_function { params; _ } ->
