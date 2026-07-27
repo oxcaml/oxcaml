@@ -8,7 +8,7 @@
 (* This test file should be kept up to date with any [ident_*] in [predef.ml]. *)
 
 module type S = sig type exn += Exit end
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 [%%expect {|
 module type S = sig type exn += Exit end
 |}];;
