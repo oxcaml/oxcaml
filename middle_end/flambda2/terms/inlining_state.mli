@@ -34,7 +34,10 @@ val increment_depth : t -> is_stub:bool -> by:int -> t
 
 val is_depth_exceeded : t -> bool
 
-val meet : t -> t -> t
+(** The depths are summed and the arguments are combined (see
+    [Inlining_arguments.combine]; [from_env] must be the state of the current
+    simplification environment). *)
+val combine : from_env:t -> from_metadata:t -> t
 
 val with_arguments : Inlining_arguments.t -> t -> t
 
