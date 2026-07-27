@@ -88,6 +88,7 @@ let target = host
 let systhread_supported = false
 let flexdll_dirs = []
 let ar_supports_response_files = true
+let ar_thin_archives_flags = "rc"
 
 let runtime5 = true
 let no_stack_checks = false
