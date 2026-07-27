@@ -34,7 +34,7 @@ module Validator : sig
   val validate_reachability : Cfg.t -> unit
 end = struct
   let z3_code_of_cfg (cfg : Cfg.t) =
-    let id_gen = Cfg_z3.Id_gen.create cfg in
+    let id_gen = Cfg_z3.create_label_id_gen cfg in
     let buffer = Buffer.create 4096 in
     let fmt = Format.formatter_of_buffer buffer in
     Format.fprintf fmt
@@ -54,7 +54,7 @@ end = struct
 (rule (=> (and (reachable a) (edge a b)) (reachable b)))
 (rule (=> (and (not (reachable a)) (is-node a)) (unreachable a)))
 |}
-      (Cfg_z3.Id_gen.width id_gen);
+      (Cfg_z3.Label_id_gen.width id_gen);
     Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
     Format.fprintf fmt "\n%s" "(query unreachable)";
     Format.pp_print_flush fmt ();

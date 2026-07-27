@@ -458,7 +458,7 @@ end = struct
   let calculate_idom (cfg : Cfg.t) : doms =
     let buffer = Buffer.create 4096 in
     let fmt = Format.formatter_of_buffer buffer in
-    let id_gen = Cfg_z3.Id_gen.create cfg in
+    let id_gen = Cfg_z3.create_label_id_gen cfg in
     Cfg_z3.fmt_dom_code_begin fmt ~id_gen;
     Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
     Cfg_z3.fmt_dom_code_end fmt;

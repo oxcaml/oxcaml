@@ -17,63 +17,128 @@ let run_z3 code =
   let output = In_channel.with_open_text output_file In_channel.input_all in
   if ret <> 0
   then
-    Misc.fatal_errorf "Z3 failed with return code %d. Output: @.%s" ret output;
+    Misc.fatal_errorf "Z3 failed with return code %d. Input: @.%s@.Output: @.%s"
+      ret code output;
   output
 
-module Id_gen = struct
+let fmt_fact fmt relation arguments =
+  let fmt_argument fmt argument = Format.fprintf fmt " %s" argument in
+  Format.fprintf fmt "(rule (%s%a))@." relation
+    (Format.pp_print_list fmt_argument)
+    arguments
+
+module type Id_gen_S = sig
+  type key
+
+  type t
+
+  val create : key list -> t
+
+  val get_id : t -> key:key -> string
+
+  val width : t -> int
+
+  val key_of_id_exn : t -> int -> key
+end
+
+module type Id_key = sig
+  type t
+
+  val compare : t -> t -> int
+
+  val format : Format.formatter -> t -> unit
+
+  module Tbl : Hashtbl.S with type key = t
+end
+
+module Make_id_gen (Key : Id_key) = struct
+  type key = Key.t
+
   type t =
-    { id_table : int Label.Tbl.t;
-      labels_by_id : Label.t array;
+    { id_table : int Key.Tbl.t;
+      keys_by_id : key array;
       width : int
     }
 
   let bitwidth_of_count count =
     match count with 0 | 1 -> 1 | num_blocks -> 1 + Misc.log2 (num_blocks - 1)
 
-  let create (cfg : Cfg.t) =
-    let labels_by_id = cfg.blocks |> Label.Tbl.to_seq_keys |> Array.of_seq in
-    Array.sort Label.compare labels_by_id;
-    (* CR hwasilewski for xclerc: do we want this sort? not required but
-       provides determins across runs, i.e if we compile the same cfg (with the
-       same labels) it will have the same z3 IDs. Not sure there is much gain
-       from this. *)
-    let block_count = Array.length labels_by_id in
-    let id_table = Label.Tbl.create block_count in
-    Array.iteri (fun id label -> Label.Tbl.add id_table label id) labels_by_id;
-    { id_table; labels_by_id; width = bitwidth_of_count block_count }
+  let create (keys : key list) =
+    let keys_by_id = keys |> List.sort_uniq Key.compare |> Array.of_list in
+    let key_count = Array.length keys_by_id in
+    let id_table = Key.Tbl.create key_count in
+    Array.iteri (fun id key -> Key.Tbl.add id_table key id) keys_by_id;
+    { id_table; keys_by_id; width = bitwidth_of_count key_count }
 
   let width t = t.width
 
-  let get_id { id_table; width; labels_by_id = _ } ~label =
+  let get_id { id_table; width; keys_by_id = _ } ~key =
     let id_number =
-      match Label.Tbl.find_opt id_table label with
+      match Key.Tbl.find_opt id_table key with
       | Some id -> id
-      | None ->
-        Misc.fatal_errorf "No Z3 id assigned to CFG label %a" Label.format label
+      | None -> Misc.fatal_errorf "No Z3 id assigned to %a" Key.format key
     in
     Printf.sprintf "(_ bv%d %d)" id_number width
 
-  let label_of_id t id =
-    if id < 0 || id >= Array.length t.labels_by_id
+  let key_of_id_exn t id =
+    if id < 0 || id >= Array.length t.keys_by_id
     then Misc.fatal_errorf "Invalid Z3 node ID %d" id;
-    t.labels_by_id.(id)
+    t.keys_by_id.(id)
 end
 
-let z3_graph_of_cfg fmt ~(cfg : Cfg.t) ~(id_gen : Id_gen.t) =
-  Format.fprintf fmt "(rule (entry %s))"
-    (Id_gen.get_id id_gen ~label:cfg.entry_label);
+module Label_id_gen = Make_id_gen (Label)
+module Instruction_id_gen = Make_id_gen (InstructionId)
+
+module Reg_id_gen = Make_id_gen (struct
+  type t = Reg.t
+
+  let compare = Reg.compare
+
+  let format = Printreg.reg
+
+  module Tbl = Reg.Tbl
+end)
+
+let create_label_id_gen (cfg : Cfg.t) =
+  cfg.blocks |> Label.Tbl.to_seq_keys |> List.of_seq |> Label_id_gen.create
+
+let create_instruction_id_gen (cfg : Cfg.t) =
+  Cfg.fold_all_instructions cfg ~init:[]
+    ~f:
+      { f =
+          (fun instruction_ids instruction ->
+            instruction.Cfg.id :: instruction_ids)
+      }
+  |> Instruction_id_gen.create
+
+let create_reg_id_gen (cfg : Cfg.t) =
+  let add_instruction_regs : type a.
+      Reg.t list -> a Cfg.instruction -> Reg.t list =
+   fun regs instruction ->
+    let add_regs regs regs_to_add =
+      Array.fold_left (fun regs reg -> reg :: regs) regs regs_to_add
+    in
+    let regs = add_regs regs instruction.arg in
+    add_regs regs instruction.res
+  in
+  let init_regs = Proc.loc_exn_bucket :: Array.to_list cfg.fun_args in
+  Cfg.fold_all_instructions cfg ~init:init_regs ~f:{ f = add_instruction_regs }
+  |> Reg_id_gen.create
+
+let z3_graph_of_cfg fmt ~(cfg : Cfg.t) ~(id_gen : Label_id_gen.t) =
+  fmt_fact fmt "entry" [Label_id_gen.get_id id_gen ~key:cfg.entry_label];
   Label.Tbl.iter
     (fun label (value : Cfg.basic_block) ->
-      let id = Id_gen.get_id id_gen ~label in
-      Format.fprintf fmt "(rule (is-node %s))\n" id;
+      let id = Label_id_gen.get_id id_gen ~key:label in
+      fmt_fact fmt "is-node" [id];
       Cfg.successor_labels ~exn:true ~normal:true value
       |> Label.Set.iter (fun succ_label ->
-          let succ_id = Id_gen.get_id id_gen ~label:succ_label in
-          Format.fprintf fmt "(rule (edge %s %s))\n" id succ_id))
+          let succ_id = Label_id_gen.get_id id_gen ~key:succ_label in
+          fmt_fact fmt "edge" [id; succ_id]))
     cfg.blocks
 
 let fmt_dom_code_begin fmt ~id_gen =
-  let width = Id_gen.width id_gen in
+  let width = Label_id_gen.width id_gen in
   Format.fprintf fmt
     {|
 (define-sort node () (_ BitVec %d))
@@ -127,6 +192,53 @@ let fmt_dom_code_end fmt =
 (query df :print-answer true)
 (echo "END_DF")
 |}
+
+let fmt_liveness_code_begin fmt instr_id_gen reg_id_gen =
+  Format.fprintf fmt
+    {|
+(define-sort instr () (_ BitVec %d))
+(define-sort reg () (_ BitVec %d))
+
+(declare-rel next (instr instr))
+(declare-rel arg (instr reg))
+(declare-rel res (instr reg))
+(declare-rel exn-next (instr instr))
+(declare-rel exn-bucket (reg))
+(declare-rel expected-before (instr reg))
+(declare-rel expected-across (instr reg))
+(declare-rel tailcall-self (instr))
+
+(declare-rel before (instr reg))
+(declare-rel across (instr reg))
+(declare-rel not-removable (instr))
+(declare-rel bad ())
+
+(declare-var i0 instr)
+(declare-var i1 instr)
+(declare-var r reg)
+
+(rule (=> (and (res i0 r) (next i0 i1) (before i1 r)) (not-removable i0)))
+
+(rule (=> (and (next i0 i1) (before i1 r)
+               (not (res i0 r))
+               (not (tailcall-self i0)))
+          (across i0 r)))
+
+(rule (=> (and (exn-next i0 i1) (before i1 r) (not (exn-bucket r))) (across i0 r)))
+
+(rule (=> (across i0 r) (before i0 r)))
+(rule (=> (and (not-removable i0) (arg i0 r)) (before i0 r)))
+
+(rule (=> (and (not (expected-before i0 r)) (before i0 r)) bad))
+(rule (=> (and (expected-before i0 r) (not (before i0 r))) bad))
+
+(rule (=> (and (not (expected-across i0 r)) (across i0 r)) bad))
+(rule (=> (and (expected-across i0 r) (not (across i0 r))) bad))
+|}
+    (Instruction_id_gen.width instr_id_gen)
+    (Reg_id_gen.width reg_id_gen)
+
+let fmt_liveness_code_end fmt = Format.pp_print_string fmt "(query bad)"
 
 (* CR hwasilewski for xclerc: here begins the parsing code written by GPT, I
    haven't really read it *)
@@ -222,14 +334,14 @@ let parse_idom_pairs output =
   | result :: _ ->
     Misc.fatal_errorf "Unexpected IDOM query result from Z3: %S" result
 
-let parse_doms ~(id_gen : Id_gen.t) ~entry_label output =
-  let doms = Label.Tbl.create (Array.length id_gen.labels_by_id) in
+let parse_doms ~(id_gen : Label_id_gen.t) ~entry_label output =
+  let doms = Label.Tbl.create (Array.length id_gen.keys_by_id) in
   Label.Tbl.add doms entry_label entry_label;
   parse_idom_pairs output
   |> List.iter (fun (node_id, immediate_dominator_id) ->
-      let node = Id_gen.label_of_id id_gen node_id in
+      let node = Label_id_gen.key_of_id_exn id_gen node_id in
       let immediate_dominator =
-        Id_gen.label_of_id id_gen immediate_dominator_id
+        Label_id_gen.key_of_id_exn id_gen immediate_dominator_id
       in
       if Label.Tbl.mem doms node
       then
