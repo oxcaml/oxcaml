@@ -1,7 +1,7 @@
 (* TEST
    compile_only = "true";
    flambda2;
-   ocamlopt_flags += " -flambda2-inline-small-function-size 0";
+   ocamlopt_flags += " -flambda2-inline-small-function-size 0 -X argument-types-useful=fine";
    setup-ocamlopt.opt-build-env;
    ocamlopt.opt with dump-raw, dump-simplify;
    check-fexpr-dump;
