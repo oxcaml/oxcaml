@@ -27,9 +27,9 @@ type error =
 exception Error of error
 
 (* Copy a compilation unit from a .cmo or .cma into the archive *)
-let copy_compunit ic oc compunit =
-  seek_in ic compunit.cu_pos;
-  compunit.cu_pos <- pos_out oc;
+let copy_compunit ic ofs oc compunit =
+  seek_in ic ofs;
+  compunit.cu_pos <- Pos_internal (pos_out oc);
   compunit.cu_force_link <- compunit.cu_force_link || !Clflags.link_everything;
   copy_file_chunk ic oc compunit.cu_codesize;
   if compunit.cu_debug > 0 then begin
@@ -37,6 +37,15 @@ let copy_compunit ic oc compunit =
     compunit.cu_debug <- pos_out oc;
     copy_file_chunk ic oc compunit.cu_debugsize
   end
+
+let maybe_copy_compunit ic filename oc compunit =
+  match compunit.cu_pos with
+  | Pos_external _ ->
+     () (* Leave external references as is *)
+  | Pos_internal offset when !Clflags.thin_library ->
+     compunit.cu_pos <- Pos_external {filename; offset}
+  | Pos_internal offset ->
+     copy_compunit ic offset oc compunit
 
 (* Add C objects and options and "custom" info from a library descriptor *)
 
@@ -63,6 +72,7 @@ let copy_object_file oc name =
     with Not_found ->
       raise(Error(File_not_found name)) in
   let ic = open_in_bin file_name in
+  let basename = Filename.basename file_name in
   try
     let buffer = really_input_string ic (String.length cmo_magic_number) in
     if buffer = cmo_magic_number then begin
@@ -70,7 +80,7 @@ let copy_object_file oc name =
       seek_in ic compunit_pos;
       let compunit = (input_value ic : compilation_unit_descr) in
       Bytelink.check_consistency file_name compunit;
-      copy_compunit ic oc compunit;
+      maybe_copy_compunit ic basename oc compunit;
       close_in ic;
       [name,compunit]
     end else
@@ -80,7 +90,7 @@ let copy_object_file oc name =
       let toc = (input_value ic : library) in
       List.iter (Bytelink.check_consistency file_name) toc.lib_units;
       add_ccobjs toc;
-      List.iter (copy_compunit ic oc) toc.lib_units;
+      List.iter (maybe_copy_compunit ic basename oc) toc.lib_units;
       close_in ic;
       List.map (fun u -> name, u) toc.lib_units
     end else

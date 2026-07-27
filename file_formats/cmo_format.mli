@@ -34,9 +34,13 @@ type reloc_info =
 
 (* Descriptor for compilation units *)
 
+type file_position =
+  | Pos_internal of int
+  | Pos_external of { filename: string; offset: int }
+
 type compilation_unit_descr =
   { cu_name: Compilation_unit.t;        (* Name of compilation unit *)
-    mutable cu_pos: int;                (* Absolute position in file *)
+    mutable cu_pos: file_position;      (* Position of contents *)
     cu_codesize: int;                   (* Size of code block *)
     cu_reloc: (reloc_info * int) list;  (* Relocation information *)
     cu_arg_descr: Lambda.arg_descr option;
@@ -52,6 +56,7 @@ type compilation_unit_descr =
     mutable cu_force_link: bool;        (* Must be linked even if unref'ed *)
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
     cu_debugsize: int }                 (* Length of debugging info *)
+
 
 (* Format of a .cmo file:
      magic number (Config.cmo_magic_number)

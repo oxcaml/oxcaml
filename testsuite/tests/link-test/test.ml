@@ -19,7 +19,10 @@
    module = "test.ml";
    ocamlc.byte;
    module = "";
-   flags = "-a -no-alias-deps";
+   split [
+   | flags = "-a -no-alias-deps";
+   | flags = "-a -thin-library -no-alias-deps";
+   ]
    all_modules = "submodule.cmo aliases.cmo external.cmo external_for_pack.cmo";
    program = "mylib.cma";
    ocamlc.byte;
@@ -57,7 +60,10 @@
    module = "test.ml";
    ocamlopt.byte;
    module = "";
-   flags = "-no-alias-deps -a";
+   split [
+   | flags = "-a -no-alias-deps";
+   | flags = "-a -thin-library -no-alias-deps";
+   ]
    all_modules = "submodule.cmx aliases.cmx external.cmx external_for_pack.cmx";
    program = "mylib.cmxa";
    ocamlopt.byte;

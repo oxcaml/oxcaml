@@ -127,10 +127,17 @@ module Bytecode = struct
     Obj.t * (unit -> Obj.t)
     = "caml_reify_bytecode"
 
+  let get_internal_pos (compunit : Cmo_format.compilation_unit_descr) =
+    match compunit.cu_pos with
+    | Pos_internal ofs -> ofs
+    | Pos_external _ ->
+       let name = Compilation_unit.(Name.to_string (name compunit.cu_name)) in
+       raise (DT.Error (Unavailable_unit name))
+
   let run lock (ic, file_name, file_digest, _old_st) ~unit_header ~priv:_ =
     let clos = Mutex.protect lock (fun () ->
         let compunit : Cmo_format.compilation_unit_descr = unit_header in
-        seek_in ic compunit.cu_pos;
+        seek_in ic (get_internal_pos compunit);
         let code =
           Bigarray.Array1.create Bigarray.Char Bigarray.c_layout
             compunit.cu_codesize
