@@ -1031,6 +1031,62 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       then ()
       else set_vupper ~log v (VarMap.add key x v.vupper)
 
+  (* Proof of soundness for [add_vlower_reversed].
+
+    [add_vlower_reversed] is not safe to call in general: its soundness
+    depends on being called from [update_level_finalize].
+
+    Let's recall the solver variable invariant, denoted INV(v):
+
+     1) v.lower < v.upper
+     2) ∀ (f, u) ∈ v.vlower: u.level ≤ v.level
+     3) ∀ (f, u) ∈ v.vupper: u.level < v.level
+     4) ∀ (f, u) ∈ v.vlower: f u.upper ≤ v.upper
+     5) ∀ (f, u) ∈ v.vupper: v.lower ≤ f u.lower
+     6) ∀ (f, u) ∈ v.vlower, (g, w) ∈ v.vupper:
+       (g'f, u) ∈ w.vlower
+     ∨ (f'g, w) ∈ u.vupper
+
+    PRECONDITION: must be called from update_level_finalize where the
+    following holds:
+    1) u.level < v.level
+    2) f v.upper < u.upper
+    3) ∀ (g,w') ∈ u.vupper:
+       w'.level < v.level ⇒ (f'g,w') ∈ v.vupper
+       w'.level ≥ v.level ⇒ (g'f,v) ∈ w'.vlower
+
+    ARGUMENT 1:
+    We are tightening u.lower to f v.lower.
+    PROOF OBLIGATION: ∀ (g,w’) ∈ u.vupper: f v.lower < g w’.lower
+
+    By INV.3 we know that w’.level < u.level.
+    By transitivity with P.1 we then know that w’level < v.level
+    By P.3 we then know that (f’g,w’) ∈ v.vupper
+    By INV.5 we then know that v.lower < f’g w’.lower
+    By left adjoint we conclude: f v.lower < g w’.lower
+
+    ARGUMENT 2:
+    We are adding (fh,w) to u.vlower, (where `(h,w) ∈  without propagating
+    or checking bounds.
+    PROOF OBLIGATION:
+       fh w.upper < u.upper
+       ∀ (g,w’) ∈ u.vupper: (g’fh,w) ∈ w’.vlower ∨
+                           (h’f’g,w’) ∈ w.vupper
+
+    By P.2 we know that f v.upper < u.upper
+    By INV.4 we know that h w.upper < v.upper
+    By right adjoint we know that v.upper < f’ u.upper
+    By transitivity we know that h w.upper < f’ u.upper
+    By left adjoint we know that fh w.upper < u.upper
+
+    The second proof obligation follows similarly.
+    We know that (h,w) ∈ v.vlower.
+    Introduce an arbitrary (g,w’) ∈ u.vupper.
+    By P.3 and w’.level < v.level we know that (f’g,w’) ∈ v.vupper
+    By P.6 we conclude our proof obligation holds.
+
+  *)
+
   (* Add a vlower entry for the relation [f' u <= v], tighten the upper bound of [u],
   and recursively add relations to maintain invariant.
   The lower and upper bounds of [u] and [v] are not checked, upper bound is not pushed
@@ -1053,6 +1109,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then ()
     else begin
       push_upper_bound ~log dst v f f_hint u;
+      (* We are tightening u.lower to f v.lower.
+           This is sound by ARGUMENT 1 above *)
       set_vlower ~log v (VarMap.add key x v.vlower);
       VarMap.iter
         (fun _ (Amorphvar (w, h, h_hint)) ->
@@ -1064,6 +1122,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           if w.level < u.level
           then add_vupper_nocheck ~log dst u w fh fh_hint
           else add_vlower_reversed ~log pp dst w u fh fh_hint)
+          (* We are adding (fh,w) to u.vlower without propagating or
+               checking bounds. This is soud by ARGUMENT 2 above *)
         v.vupper
     end
 
