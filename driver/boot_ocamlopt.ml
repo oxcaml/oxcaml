@@ -10,6 +10,6 @@ module Unix_for_owee = struct
 end
 
 let () =
-  exit (Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S) Sys.argv
-    Format.err_formatter
+  exit (Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+    Sys.argv Format.err_formatter
     ~flambda2:Flambda2.lambda_to_cmm)
