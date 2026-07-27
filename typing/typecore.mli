@@ -182,7 +182,6 @@ val optimise_allocations: unit -> unit
 
 val has_poly_constraint : Parsetree.pattern -> bool
 
-
 val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
 val name_cases :
           string -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
@@ -356,7 +355,7 @@ type error =
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
-  | Optional_poly_param
+  | Optional_poly_param of string
   | Exclave_in_nontail_position
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported

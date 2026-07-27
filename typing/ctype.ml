@@ -1880,6 +1880,12 @@ let instance_poly ?(keep_names=false) univars sch =
       ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
+let maybe_instance_poly ty =
+  match get_desc ty with
+  | Tpoly (ty', tyvars) ->
+    instance_poly ~keep_names:true tyvars ty'
+  | _ -> ty
+
 (** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
     it. When asking for the jkind of a [Tpoly], we don't want to let those
     vars escape the scope. To resolve this, we substitute all occurrences of
@@ -2814,7 +2820,7 @@ let contained_without_boxing env ty =
     end
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
-  | Tpoly (ty, _) -> [ty]
+  | Tpoly (ty, univars) -> [instance_poly_for_jkind univars ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
@@ -5668,18 +5674,18 @@ type filter_arrow_failure =
 exception Filter_arrow_failed of filter_arrow_failure
 
 type filtered_arrow =
-  { ty_arg : type_expr;
+  { ty_param : type_expr;
     arg_mode : Mode.Alloc.lr;
     ty_ret : type_expr;
     ret_mode : Mode.Alloc.lr
   }
 
-let filter_arrow env t l ~force_tpoly =
+let filter_arrow env t l ~param_hole =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
-    let ty_arg =
-      if not force_tpoly then begin
+    let ty_param =
+      if param_hole then begin
         assert (not (is_optional l));
         newvar2 level k_arg
       end else begin
@@ -5703,9 +5709,10 @@ let filter_arrow env t l ~force_tpoly =
     let arg_mode = Alloc.newvar () in
     let ret_mode = Alloc.newvar () in
     let t' =
-      newty2 ~level (Tarrow ((l, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
+      newty2 ~level
+        (Tarrow ((l, arg_mode, ret_mode), ty_param, ty_ret, commu_ok))
     in
-    t', { ty_arg; arg_mode; ty_ret; ret_mode }
+    t', { ty_param; arg_mode; ty_ret; ret_mode }
   in
   let t =
     try expand_head_trace env t
@@ -5731,34 +5738,28 @@ let filter_arrow env t l ~force_tpoly =
       end;
       link_type t t';
       arrow_desc
-  | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
+  | Tarrow((l', arg_mode, ret_mode), ty_param, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then
-        { ty_arg; arg_mode; ty_ret; ret_mode }
+        { ty_param; arg_mode; ty_ret; ret_mode }
       else raise (Filter_arrow_failed
                     (Label_mismatch
                        { got = l; expected = l'; expected_type = t }))
   | _ ->
       raise (Filter_arrow_failed Not_a_function)
 
-exception Filter_mono_failed
-
-let filter_mono ty =
-  match get_desc ty with
-  | Tpoly(ty, []) -> ty
-  | Tpoly _ -> raise Filter_mono_failed
-  | _ -> assert false
-
-exception Filter_arrow_mono_failed
-
-let filter_arrow_mono env t l =
-  match filter_arrow env t l ~force_tpoly:true with
-  | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
-  | {ty_arg; _} as farr ->
-      match filter_mono ty_arg with
-      | exception Filter_mono_failed -> raise Filter_arrow_mono_failed
-      | ty_arg -> { farr with ty_arg }
+let is_really_poly env ty =
+  let snap = Btype.snapshot () in
+  let any = Jkind.Builtin.any ~why:Dummy_jkind in
+  let really_poly =
+    try
+      unify env (newmono (newvar any)) ty;
+      false
+    with Unify _ -> true
+  in
+  Btype.backtrack snap;
+  really_poly
 
 type filter_method_failure =
   | Unification_error of unification_error
@@ -7769,13 +7770,9 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
-        let cstrs =
-          subtype_rec
-            env
-            (Subtype.Diff {got = t2; expected = t1} :: trace)
-            t2 t1
-            cstrs
-        in
+        (* the trace will be updated at the next step due to the Tpoly wrapping
+           of parameter. *)
+        let cstrs = subtype_rec env trace t2 t1 cstrs in
         let a2 = cross_left_alloc env t2 a2 in
         subtype_alloc_mode env trace a2 a1;
         let r2 = cross_right_alloc_ret env u2 r2 in
@@ -7846,11 +7843,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
           (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
+        let trace = Subtype.Diff {got = u1; expected = u2} :: trace in
         subtype_rec env trace u1 u2 cstrs
     | (Tpoly (u1, tl1), Tpoly (u2, [])) ->
+        let trace = Subtype.Diff {got = t1; expected = u2} :: trace in
         let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
     | (Tpoly (u1, tl1), Tpoly (u2,tl2)) ->
+        let trace = Subtype.Diff {got = t1; expected = t2} :: trace in
         begin try
           enter_poly env u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)

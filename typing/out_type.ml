@@ -1441,13 +1441,16 @@ let rec tree_of_modal_typexp mode modal ty =
         let arg_mode = Alloc.zap_to_legacy marg in
         let t1 =
           if is_optional l then
-            match
-              get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
-            with
-            | Tconstr(path, [ty], _)
-              when Path.same path Predef.path_option ->
-                tree_of_typexp mode arg_mode ty
-            | _ -> Otyp_stuff "<hidden>"
+            if tpoly_is_mono ty1 then
+              match
+                get_desc
+                  (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
+              with
+              | Tconstr(path, [ty], _)
+                when Path.same path Predef.path_option ->
+                  tree_of_typexp mode arg_mode ty
+              | _ -> Otyp_stuff "<hidden>"
+            else Otyp_stuff "<hidden>"
           else
             tree_of_typexp mode arg_mode ty1
         in

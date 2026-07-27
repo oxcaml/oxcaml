@@ -52,9 +52,11 @@ exception Error of Location.t * error
    about the runtime properties of a type - in particular, in
    [maybe_pointer_ty], when checking whether a type crosses externality. *)
 let scrape_ty env ty =
+  (* CR dkalinichenko *)
   let ty =
     match get_desc ty with
-    | Tpoly(ty, _) -> ty
+    | Tpoly (ty, []) -> ty
+    | Tpoly _ -> Ctype.maybe_instance_poly ty
     | _ -> ty
   in
   match get_desc ty with
@@ -80,14 +82,6 @@ let scrape_ty env ty =
 (* See [scrape_ty]; this returns the [type_desc] of a scraped [type_expr]. *)
 let scrape env ty =
   Option.map get_desc (scrape_ty env ty)
-
-let scrape_poly env ty =
-  let ty = scrape_ty env ty in
-  Option.map (fun ty ->
-      match get_desc ty with
-      | Tpoly (ty, _) -> get_desc ty
-      | d -> d)
-    ty
 
 let is_function_type env ty =
   match scrape env ty with
@@ -391,7 +385,7 @@ let array_kind_of_elt env loc ty =
     raise (Error (loc, Unsupported_void_in_array))
 
 let array_type_kind ~elt_ty env loc ty =
-  match scrape_poly env ty with
+  match scrape env ty with
   | Some (Tconstr(p, [elt_ty], _))
     when Path.same p Predef.path_array || Path.same p Predef.path_iarray ->
       array_kind_of_elt env loc elt_ty
@@ -432,7 +426,7 @@ let array_type_kind ~elt_ty env loc ty =
     end
 
 let array_type_mut env ty =
-  match scrape_poly env ty with
+  match scrape env ty with
   | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 

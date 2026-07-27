@@ -99,10 +99,7 @@ let extract_target_type env ty =
   | None -> None
   | Some ty ->
     let ty = fst ty in
-    match Ctype.filter_mono ty with
-    | exception Ctype.Filter_mono_failed ->
-        None
-    | ty -> Some ty
+    Btype.tpoly_get_mono_opt ty
 
 let extract_target_parameters env ty =
   match extract_target_type env ty with

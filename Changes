@@ -44,6 +44,19 @@ OCaml 5.4.0 (9 October 2025)
   (Clément Allain and Gabriel Scherer, review by KC Sivaramakrishnan,
    Basile Clément and Olivier Nicole)
 
+- #13806 Enable the use of function parameters with polymorphic types.
+  (Ulysse Gérard, Leo White, review by Florian Angeletti, Samuel Vivien, Gabriel
+  Scherer and Jacques Garrigue)
+
+- #14603, #14604: avoid Ctype.apply failures when mixing
+  polymorphic types and unboxed constructors.
+  (Gabriel Scherer and Stefan Muenzel, report by Brandon Stride,
+   review by Florian Angeletti)
+
+- #14434, #14652: Protect check_counter_example_pat against polymorphic types,
+  restoring type soundness.
+  (Stephen Dolan and Jacques Garrigue, report and review by Alistair O'Brien)
+
 ### Standard library:
 
 * #14124: Do not raise Invalid_argument on negative List.{drop,take}.

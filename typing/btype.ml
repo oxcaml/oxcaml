@@ -167,7 +167,8 @@ let newty3 ~level ~scope desc =
 let newty2 ~level desc =
   newty3 ~level ~scope:Ident.lowest_scope desc
 
-let newgenty desc = newty2 ~level:generic_level desc
+let newgenty desc      = newty2 ~level:generic_level desc
+let newgenmono desc    = newgenty (Tpoly(desc, []))
 let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
@@ -195,6 +196,33 @@ let type_origin decl =
       Definition
 
 let dummy_method = "*dummy method*"
+
+                  (********************************)
+                  (*  Utilities for poly types    *)
+                  (********************************)
+
+let tpoly_is_mono ty =
+  match get_desc ty with
+  | Tpoly(_, []) -> true
+  | Tpoly(_, _ :: _) -> false
+  | _ -> assert false
+
+let tpoly_get_poly ty =
+  match get_desc ty with
+  | Tpoly(ty, vars) -> (ty, vars)
+  | _ -> assert false
+
+let tpoly_get_mono ty =
+  match get_desc ty with
+  | Tpoly(ty, []) -> ty
+  | _ -> assert false
+
+let tpoly_get_mono_opt ty =
+  match get_desc ty with
+  | Tpoly(ty, []) -> Some ty
+  | Tpoly _ -> None
+  | _ -> assert false
+
 
 (**** Representative of a type ****)
 
@@ -868,26 +896,6 @@ let instance_variable_type label sign =
   match Vars.find label sign.csig_vars with
   | (_, _, ty) -> ty
   | exception Not_found -> assert false
-
-                  (********************************)
-                  (*  Utilities for poly types    *)
-                  (********************************)
-
-let tpoly_is_mono ty =
-  match get_desc ty with
-  | Tpoly(_, []) -> true
-  | Tpoly(_, _ :: _) -> false
-  | _ -> assert false
-
-let tpoly_get_poly ty =
-  match get_desc ty with
-  | Tpoly(ty, vars) -> (ty, vars)
-  | _ -> assert false
-
-let tpoly_get_mono ty =
-  match get_desc ty with
-  | Tpoly(ty, []) -> ty
-  | _ -> assert false
 
                   (*******************************)
                   (*  Utilities for box types    *)
