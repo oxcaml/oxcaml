@@ -273,6 +273,11 @@ val instance_prim:
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
         Jkind.Sort.t option
 
+(** The join of the yielding modes of the first [arity] parameters of a
+    primitive of type [ty]; [Yielding.max] if [ty] has fewer arrows. *)
+val prim_params_yielding:
+        Env.t -> type_expr -> arity:int -> Mode.Yielding.l
+
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)

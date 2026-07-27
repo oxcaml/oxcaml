@@ -110,6 +110,18 @@ type region_close =
     tail call because the outer region needs to end there.)
 *)
 
+(** Whether an application might perform a free effect (i.e. an effect
+    handled in the parent stack). [Unyielding] means the applied
+    function and all of its arguments were at mode [unyielding], so the
+    call can never perform a free effect. Only meaningful for bytecode
+    (it is recorded in debug events for consumers such as js_of_ocaml);
+    native backends ignore it. *)
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+val join_yielding_kind : yielding_kind -> yielding_kind -> yielding_kind
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Phys_equal : sig
@@ -1011,6 +1023,11 @@ and lfunction = private
     ret_mode: locality_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
+    yielding: yielding_kind;
+    (** [Unyielding] if fully applying the closure can never perform a free
+        effect (it neither closes over nor is passed any yielding value).
+        Only set precisely by [Translcore]; other construction sites
+        conservatively default to [May_yield]. *)
   }
 
 and lkindtemplate =
@@ -1051,6 +1068,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
@@ -1289,6 +1307,10 @@ val lfunction' :
   mode:locality_mode ->
   ret_mode:locality_mode ->
   lfunction
+
+(* Set the yielding mode of a closure (defaults to [May_yield] from the
+   smart constructors). [Translcore] uses this to record the precise mode. *)
+val lfunction_with_yielding : yielding_kind -> lfunction -> lfunction
 
 
 val iter_head_constructor: (lambda -> unit) -> lambda -> unit

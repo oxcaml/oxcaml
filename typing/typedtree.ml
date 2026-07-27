@@ -294,11 +294,12 @@ and expression_desc =
         ret_mode : Mode.Alloc.l modes;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
+        yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list
       * partial
@@ -422,7 +423,8 @@ and expression_desc =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
 
 and meth =
   | Tmeth_name of string
@@ -632,8 +634,9 @@ and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
   | Tmod_functor of functor_parameter * module_expr
-  | Tmod_apply of module_expr * module_expr * module_coercion
-  | Tmod_apply_unit of module_expr
+  | Tmod_apply of
+      module_expr * module_expr * module_coercion * Mode.Yielding.l
+  | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
   | Tmod_unpack of expression * Types.module_type
@@ -696,7 +699,7 @@ and module_coercion =
       ; pos_cc_list : (int * module_coercion) list
       ; id_pos_list : (Ident.t * int * module_coercion) list
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
   | Tcoerce_invalid
@@ -725,6 +728,7 @@ and primitive_coercion =
     pc_type: type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
     pc_env: Env.t;
     pc_loc : Location.t;
   }
@@ -813,10 +817,12 @@ and include_kind =
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
 
 and 'a include_infos =
@@ -1530,7 +1536,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_function { params; body; _ } ->
       let acc = fold_antiquote_fun_params f acc params in
       fold_antiquote_function_body f acc body
-  | Texp_apply (exp, list, _, _, _) ->
+  | Texp_apply (exp, list, _, _, _, _) ->
       let acc = fold_antiquote_exp f acc exp in
       fold_antiquote_args f acc list
   | Texp_match (exp, _, cases, eff_cases, _) ->
