@@ -48,7 +48,7 @@ let create ~return_continuation ~exn_continuation ~toplevel_my_region
       }
   }
 
-let of_metadata_and_body metadata body = { body; metadata }
+let create_of_metadata_and_body metadata body = { body; metadata }
 
 let metadata t = t.metadata
 

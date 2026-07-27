@@ -78,7 +78,7 @@ module Staged = struct
            ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata))
         final_typing_env
     in
-    ( Flambda_unit.of_metadata_and_body unit_metadata body,
+    ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       free_names,
       all_code,
       slot_offsets,

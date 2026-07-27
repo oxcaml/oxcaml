@@ -37,7 +37,7 @@ val create :
   used_value_slots:Value_slot.Set.t Or_unknown.t ->
   t
 
-val of_metadata_and_body : Metadata.t -> Flambda.Expr.t -> t
+val create_of_metadata_and_body : Metadata.t -> Flambda.Expr.t -> t
 
 val metadata : t -> Metadata.t
 
