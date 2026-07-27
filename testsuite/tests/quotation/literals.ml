@@ -44,15 +44,11 @@
 (* char# *)
 <[ #'a' ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #'a'
-Uncaught exception: Misc.Fatal_error
-
+- : <[char#]> expr = <[#'a']>
 |}];;
 <[ #'\n' ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #'\n'
-Uncaught exception: Misc.Fatal_error
-
+- : <[char#]> expr = <[#'\n']>
 |}];;
 
 (* string *)
@@ -124,41 +120,29 @@ Uncaught exception: Misc.Fatal_error
 (* int8 *)
 <[ 0s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant 0s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8]> expr = <[0s]>
 |}];;
 <[ 127s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant 127s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8]> expr = <[127s]>
 |}];;
 <[ -128s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant -128s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8]> expr = <[-128s]>
 |}];;
 
 (* int16 *)
 <[ 0S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant 0S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16]> expr = <[0S]>
 |}];;
 <[ 32767S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant 32767S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16]> expr = <[32767S]>
 |}];;
 <[ -32768S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant -32768S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16]> expr = <[-32768S]>
 |}];;
 
 (* int32 *)
@@ -206,61 +190,43 @@ Uncaught exception: Misc.Fatal_error
 (* int# *)
 <[ #0m ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #0m
-Uncaught exception: Misc.Fatal_error
-
+- : <[int#]> expr = <[#0m]>
 |}];;
 <[ #42m ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #42m
-Uncaught exception: Misc.Fatal_error
-
+- : <[int#]> expr = <[#42m]>
 |}];;
 <[ -#1m ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant -#1m
-Uncaught exception: Misc.Fatal_error
-
+- : <[int#]> expr = <[#-1m]>
 |}];;
 
 (* int8# *)
 <[ #0s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #0s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8#]> expr = <[#0s]>
 |}];;
 <[ #127s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #127s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8#]> expr = <[#127s]>
 |}];;
 <[ -#128s ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant -#128s
-Uncaught exception: Misc.Fatal_error
-
+- : <[int8#]> expr = <[#-128s]>
 |}];;
 
 (* int16# *)
 <[ #0S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #0S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16#]> expr = <[#0S]>
 |}];;
 <[ #32767S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant #32767S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16#]> expr = <[#32767S]>
 |}];;
 <[ -#32768S ]>
 [%%expect {|
->> Fatal error: Translquote: cannot quote constant -#32768S
-Uncaught exception: Misc.Fatal_error
-
+- : <[int16#]> expr = <[#-32768S]>
 |}];;
 
 (* int32# *)

@@ -1170,15 +1170,21 @@ end
 module Ast = struct
   type constant =
     | Int of int
-    | Int32 of int32
-    | Int64 of int64
-    | Nativeint of nativeint
     | Char of char
+    | UntaggedChar of int
     | String of string * string option
     | Float of string
     | Float32 of string
     | UnboxedFloat of string
     | UnboxedFloat32 of string
+    | Int8 of int
+    | Int16 of int
+    | Int32 of int32
+    | Int64 of int64
+    | Nativeint of nativeint
+    | UntaggedInt of int
+    | UntaggedInt8 of int
+    | UntaggedInt16 of int
     | UnboxedInt32 of int32
     | UnboxedInt64 of int64
     | UnboxedNativeint of nativeint
@@ -1494,15 +1500,21 @@ module Ast = struct
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
     | Char c -> pp fmt "%C" c
+    | UntaggedChar n -> pp fmt "#%C" (Char.chr (n land 0xff))
     | String (s, id_opt) -> (
       match id_opt with
       | None -> pp fmt "%S" s
       | Some id -> pp fmt "{%s|%s|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
+    | Int8 n -> pp fmt "%ds" n
+    | Int16 n -> pp fmt "%dS" n
     | Int32 n -> pp fmt "%ldl" n
     | Int64 n -> pp fmt "%LdL" n
     | Nativeint n -> pp fmt "%ndn" n
+    | UntaggedInt n -> pp fmt "#%dm" n
+    | UntaggedInt8 n -> pp fmt "#%ds" n
+    | UntaggedInt16 n -> pp fmt "#%dS" n
     | UnboxedFloat s -> pp fmt "#%s" s
     | UnboxedFloat32 s -> pp fmt "#%ss" s
     | UnboxedInt32 n -> pp fmt "#%ldl" n
@@ -1530,7 +1542,8 @@ module Ast = struct
 
   (* Used to check whether the expression should be parenthesised *)
   and is_negative_const = function
-    | Int n -> n < 0
+    | Int n | Int8 n | Int16 n
+    | UntaggedInt n | UntaggedInt8 n | UntaggedInt16 n -> n < 0
     | Int32 n -> n < 0l
     | Int64 n -> n < 0L
     | Nativeint n -> n < 0n
@@ -1539,7 +1552,7 @@ module Ast = struct
     | UnboxedInt32 n -> n < 0l
     | UnboxedInt64 n -> n < 0L
     | UnboxedNativeint n -> n < 0n
-    | Char _ | String _ -> false
+    | Char _ | UntaggedChar _ | String _ -> false
 
   and print_pat_with_parens env fmt pat =
     match pat with
@@ -2142,11 +2155,21 @@ module Constant = struct
 
   let char c = Ast.Char c
 
+  let untagged_char i = Ast.UntaggedChar i
+
   let string s id = Ast.String (s, id)
 
   let float f = Ast.Float f
 
   let float32 f = Ast.Float32 f
+
+  let unboxed_float f = Ast.UnboxedFloat f
+
+  let unboxed_float32 f = Ast.UnboxedFloat32 f
+
+  let int8 i = Ast.Int8 i
+
+  let int16 i = Ast.Int16 i
 
   let int32 i = Ast.Int32 i
 
@@ -2154,15 +2177,18 @@ module Constant = struct
 
   let nativeint i = Ast.Nativeint i
 
+  let untagged_int i = Ast.UntaggedInt i
+
+  let untagged_int8 i = Ast.UntaggedInt8 i
+
+  let untagged_int16 i = Ast.UntaggedInt16 i
+
   let unboxed_int32 i = Ast.UnboxedInt32 i
 
   let unboxed_int64 i = Ast.UnboxedInt64 i
 
   let unboxed_nativeint i = Ast.UnboxedNativeint i
 
-  let unboxed_float f = Ast.UnboxedFloat f
-
-  let unboxed_float32 f = Ast.UnboxedFloat32 f
 end
 
 module Binding_error = struct

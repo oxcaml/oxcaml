@@ -461,6 +461,10 @@ module Constant : sig
 
   val float32 : Debuginfo.Scoped_location.t -> string -> t'
 
+  val int8 : Debuginfo.Scoped_location.t -> int -> t'
+
+  val int16 : Debuginfo.Scoped_location.t -> int -> t'
+
   val int32 : Debuginfo.Scoped_location.t -> int32 -> t'
 
   val int64 : Debuginfo.Scoped_location.t -> int64 -> t'
@@ -476,6 +480,14 @@ module Constant : sig
   val unboxed_int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
   val unboxed_nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+
+  val untagged_char : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int8 : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int16 : Debuginfo.Scoped_location.t -> int -> t'
 end = struct
   type s = lambda
 
@@ -504,6 +516,12 @@ end = struct
     apply1 "Constant" "float32" loc
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
+  let int8 loc x =
+    apply1 "Constant" "int8" loc (Lconst (Const_base (Const_int x)))
+
+  let int16 loc x =
+    apply1 "Constant" "int16" loc (Lconst (Const_base (Const_int x)))
+
   let int32 loc x =
     apply1 "Constant" "int32" loc (Lconst (Const_base (Const_int32 x)))
 
@@ -522,16 +540,26 @@ end = struct
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
   let unboxed_int32 loc x =
-    apply1 "Constant" "unboxed_int32" loc
-      (Lconst (Const_base (Const_unboxed_int32 x)))
+    apply1 "Constant" "unboxed_int32" loc (Lconst (Const_base (Const_int32 x)))
 
   let unboxed_int64 loc x =
-    apply1 "Constant" "unboxed_int64" loc
-      (Lconst (Const_base (Const_unboxed_int64 x)))
+    apply1 "Constant" "unboxed_int64" loc (Lconst (Const_base (Const_int64 x)))
 
   let unboxed_nativeint loc x =
     apply1 "Constant" "unboxed_nativeint" loc
-      (Lconst (Const_base (Const_unboxed_nativeint x)))
+      (Lconst (Const_base (Const_nativeint x)))
+
+  let untagged_char loc x =
+    apply1 "Constant" "untagged_char" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int loc x =
+    apply1 "Constant" "untagged_int" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int8 loc x =
+    apply1 "Constant" "untagged_int8" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int16 loc x =
+    apply1 "Constant" "untagged_int16" loc (Lconst (Const_base (Const_int x)))
 end
 
 module Modes : sig
@@ -2374,6 +2402,8 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_string (x, _, lopt) -> Constant.string loc x lopt
     | Const_float x -> Constant.float loc x
     | Const_float32 x -> Constant.float32 loc x
+    | Const_int8 x -> Constant.int8 loc x
+    | Const_int16 x -> Constant.int16 loc x
     | Const_int32 x -> Constant.int32 loc x
     | Const_int64 x -> Constant.int64 loc x
     | Const_nativeint x -> Constant.nativeint loc x
@@ -2382,12 +2412,10 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
     | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
     | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
-    (* CR metaprogramming aivaskovic:
-      consider implementing in CamlinternalQuote *)
-    | Const_untagged_char _ | Const_int8 _ | Const_int16 _
-    | Const_untagged_int _ | Const_untagged_int8 _ | Const_untagged_int16 _ ->
-      fatal_errorf "Translquote: cannot quote constant %s"
-        (Printpat.pretty_const const))
+    | Const_untagged_char x -> Constant.untagged_char loc x
+    | Const_untagged_int x -> Constant.untagged_int loc x
+    | Const_untagged_int8 x -> Constant.untagged_int8 loc x
+    | Const_untagged_int16 x -> Constant.untagged_int16 loc x)
   |> Constant.wrap
 
 let quote_loc loc =
