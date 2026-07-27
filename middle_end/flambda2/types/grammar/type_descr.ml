@@ -155,13 +155,16 @@ end = struct
       | Equals simple ->
         Simple.pattern_match' simple
           ~const:(fun _ -> Not_expanded t)
-          ~symbol:(fun _ ~coercion ->
+          ~symbol:(fun symbol ~coercion ->
             let coercion' = project_coercion coercion in
             match coercion' with
             | Known coercion' ->
               if coercion == coercion'
               then Not_expanded t
-              else Not_expanded (Equals (Simple.with_coercion simple coercion'))
+              else
+                Not_expanded
+                  (Equals
+                     (Simple.with_coercion (Simple.symbol symbol) coercion'))
             | Unknown -> Expanded unknown)
           ~var:(fun var ~coercion ->
             let coercion' = project_coercion coercion in
@@ -171,7 +174,9 @@ end = struct
               then Expanded (expand var ~coercion:coercion')
               else if coercion == coercion'
               then Not_expanded t
-              else Not_expanded (Equals (Simple.with_coercion simple coercion'))
+              else
+                Not_expanded
+                  (Equals (Simple.with_coercion (Simple.var var) coercion'))
             | Unknown -> Expanded unknown)
   end
 
