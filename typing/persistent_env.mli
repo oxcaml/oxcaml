@@ -122,9 +122,11 @@ val read_cmi_file :
      'a t -> string
   -> Global_module.Name.t * Subst.Lazy.persistent_signature
 
-(** Read a cmi without registering its persistent name, so the caller
-    can pull in parameterised modules without declaring their parameters.
-    Memoised; raises [Not_found] when no cmi can be loaded. *)
+(** Read a CU and register it as an "import" of the current compilation
+    unit — i.e., type checking of the current CU relies on the content
+    of that CU.  Does NOT register it as a persistent module, which
+    would impose typing constraints between it and the current
+    persistent module, such as the "parameter subset rule". *)
 val find_import :
   'a t -> Compilation_unit.Name.t ->
   Compilation_unit.t option
