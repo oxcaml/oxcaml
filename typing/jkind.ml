@@ -2386,7 +2386,8 @@ let for_unboxed_record_with_updates lbls =
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
-  (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
+  (* This should really use [layout_of] *)
+  Breadcrumbs.until_kind_of;
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
     let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in

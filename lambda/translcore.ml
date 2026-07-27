@@ -665,9 +665,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   (* Some (Const_block(runtime_tag, constants)) *)
                   None
               | Constructor_mixed shape ->
-                  (* CR layouts v5: once all-void records are allowed, handle
-                     constructors with all-void inline records, which are stored
-                     as immediates *)
+                  Breadcrumbs.assume_inline_records_are_blocks;
                   if !Clflags.native_code then
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Some (Const_mixed_block(runtime_tag, shape, constants))
@@ -698,9 +696,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                                Lambda.block_shape_of_value_kinds (Some shape),
                                alloc_mode)
                 | Constructor_mixed shape ->
-                    (* CR layouts v5: once all-void records are allowed, handle
-                       constructors with all-void inline records, which are
-                       stored as immediates *)
+                    Breadcrumbs.assume_inline_records_are_blocks;
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
                 | Constructor_variable ->
@@ -737,9 +733,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                                (Some (Lambda.generic_value :: shape)),
                              alloc_mode)
               | Constructor_mixed shape ->
-                  (* CR layouts v5: once all-void records are allowed, handle
-                     constructors with all-void inline records, which are stored
-                     as immediates *)
+                  Breadcrumbs.assume_inline_records_are_blocks;
                   let shape = Lambda.transl_mixed_product_shape shape in
                   let shape =
                     (* This corresponds to the poly variant hash.  This will
@@ -859,10 +853,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-          (* CR layouts v5: once all-void records are allowed, handle
-             constructors with all-void inline records, which are stored as
-             immediates *)
         | Record_mixed shape ->
+          Breadcrumbs.assume_inline_records_are_blocks;
           let shape =
             Lambda.transl_mixed_product_shape_for_read
               ~get_value_kind:(fun i ->
@@ -985,10 +977,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             fatal_error
               "Mixed inlined records not supported for extensible variants"
         | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-          (* CR layouts v5: once all-void records are allowed, handle
-             constructors with all-void inline records, which are stored as
-             immediates *)
         | Record_mixed shape ->
+          Breadcrumbs.assume_inline_records_are_blocks;
           let field_shape =
             Typeopt.transl_mixed_block_element newval.exp_env newval.exp_loc
               newval.exp_type shape.(lbl.lbl_pos)
@@ -2356,10 +2346,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                 fatal_error
                   "Mixed inlined records not supported for extensible variants"
             | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-                (* CR layouts v5: once all-void records are allowed, handle
-                  constructors with all-void inline records, which are stored as
-                  immediates *)
             | Record_mixed shape ->
+                Breadcrumbs.assume_inline_records_are_blocks;
                 let field_shape =
                   Typeopt.transl_mixed_block_element expr.exp_env expr.exp_loc
                     expr.exp_type shape.(lbl.lbl_pos)
@@ -2437,10 +2425,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                     Pfloatfield (i, sem, alloc_heap)
                  | Record_ufloat -> Pufloatfield (i, sem)
                  | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-                   (* CR layouts v5: once all-void records are allowed, handle
-                      constructors with all-void inline records, which are
-                      stored as immediates *)
                  | Record_mixed shape ->
+                   Breadcrumbs.assume_inline_records_are_blocks;
                    let shape =
                      Lambda.transl_mixed_product_shape_for_read
                        ~get_value_kind:(fun i ->
@@ -2575,9 +2561,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             Lprim (Pmakeblock (0, mut, Shape shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed _) ->
-            (* CR layouts v5: once all-void records are allowed, handle
-              constructors with all-void inline records, which are stored as
-              immediates *)
+            Breadcrumbs.assume_inline_records_are_blocks;
             let shape = Lambda.transl_mixed_product_shape shape in
             Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)

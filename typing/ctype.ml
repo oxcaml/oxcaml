@@ -8667,10 +8667,13 @@ let check_decl_jkind env decl jkind =
   let type_equal = type_equal env in
   let type_jkind_purely = type_jkind_purely env in
   let context = mk_jkind_context_always_principal env in
-  (* CR layouts v2.8: When we have [layout_of], this logic should move to the
-     place where [type_jkind] is set. But for now, it has to be here, because we
-     want this in module inclusion but not other places (because substitutions
-     won't improve the layout). Internal ticket 2912. *)
+  let () =
+    (* When we have [layout_of], this logic should move to the place where
+       [type_jkind] is set. But for now, it has to be here, because we want this
+       in module inclusion but not other places (because substitutions won't
+       improve the layout). *)
+    Breadcrumbs.until_kind_of
+  in
   (* CR layouts v2.8: This improvement ignores types with both [@@unboxed]
      and [@@unsafe_allow_any_mode_crossing], because the stdlib didn't build
      otherwise. But we really shouldn't allow mixing those two features, and

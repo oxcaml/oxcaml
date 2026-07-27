@@ -1410,8 +1410,9 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         lbls
     in
     let rep = Types.Record_unboxed_product in
-    (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
+      (* Update this once we have [layout_of] layouts *)
+      Breadcrumbs.until_kind_of;
       Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
     in
     let kind =
@@ -3196,14 +3197,17 @@ type step_result =
   | Is_cyclic
 let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
   let contained_parameters tyl layout =
-    (* A type whose layout has [any] could contain all its parameters.
-       CR layouts v11: update this function for [layout_of] layouts. *)
+    (* A type whose layout has [any] could contain all its parameters. *)
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
       | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
+    in
+    let () =
+      (* A type with layout [layout_of 'a] could contain ['a]. *)
+      Breadcrumbs.until_kind_of
     in
     if has_any layout then tyl else []
   in
