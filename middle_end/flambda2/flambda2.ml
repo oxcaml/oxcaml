@@ -211,15 +211,17 @@ let flambda_to_flambda0 : type m.
                    differently. In the future, LTO support will split pre- and
                    post- traverse work between separate processes. *)
                 if Flambda_features.support_lto ()
-                then
+                then (
                   let deps, traverse_rebuild =
                     Flambda2_reaper.Reaper.Staged.traverse flambda
                   in
+                  Flambda2_reaper.Cmr_format.save
+                    ~filename:(prefixname ^ ".cmr") "Hello, cmr!";
                   let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
                   let unit_metadata = Flambda_unit.metadata flambda in
                   Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
                     ~traverse_rebuild ~solved_dep ~machine_width ~cmx_loader
-                    ~all_code ~final_typing_env
+                    ~all_code ~final_typing_env)
                 else
                   Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
                     ~all_code ~final_typing_env flambda)
@@ -352,3 +354,10 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     cmm
   in
   Profile.record_call "flambda2" run
+
+let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width:_
+    ~keep_symbol_tables:_ ~cmr_filename =
+  let cmr_data = Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename in
+  Printf.eprintf "Loaded data from CMR file: %s\n" cmr_data;
+  (* CR mvellacott: implement! *)
+  Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"

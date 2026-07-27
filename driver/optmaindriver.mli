@@ -29,4 +29,11 @@ val main
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
+  -> reaped_flambda2_to_cmm:(
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    keep_symbol_tables:bool ->
+    cmr_filename:string ->
+    Cmm.phrase list)
   -> int
