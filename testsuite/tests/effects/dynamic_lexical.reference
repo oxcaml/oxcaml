@@ -48,3 +48,25 @@ escaped generator own binding [expect 42]: 42
 # Test 9: handle survives fork-point stack growth
 child d_lex after growth [expect 1]: 1
 child d_worker [expect 222]: 222
+
+# Test 10: bindings above a freeze are invisible to bounded children
+inline sees own rebind [expect 9]: 9
+inline sees own binding [expect 5]: 5
+stolen child sees frozen state [expect 1]: 1
+stolen child misses inline binding [expect 7]: 7
+inline still sees rebind [expect 9]: 9
+after inline child [expect 1]: 1
+second scope above freeze [expect 8]: 8
+after second scope [expect 1]: 1
+fresh table survives GC [expect over-lay]: over-lay
+after unfreeze [expect 1]: 1
+after scope [expect null]: null
+
+# Test 11: nested freezes bound their children separately
+nested child sees inline binding [expect 5]: 5
+nested child sees outer scope [expect 1]: 1
+nested child own worker [expect 200]: 200
+outer child misses inline binding [expect 7]: 7
+outer child sees outer scope [expect 1]: 1
+after nested inline [expect null]: null
+after scope [expect null]: null

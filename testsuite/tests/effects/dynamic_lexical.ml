@@ -17,6 +17,10 @@ type fiber
 external current_fiber : unit -> fiber = "caml_dynamic_current_fiber"
 external set_lexical_parent : fiber -> unit = "caml_dynamic_set_lexical_parent"
 external set_lexical_root : unit -> unit = "caml_dynamic_set_lexical_root"
+type bound
+external freeze : unit -> bound = "caml_dynamic_freeze"
+external unfreeze : unit -> unit = "caml_dynamic_unfreeze" [@@noalloc]
+external set_lexical_bound : bound -> unit = "caml_dynamic_set_lexical_bound"
 
 let print_null = function
   | This x -> Int.to_string x
@@ -323,3 +327,109 @@ let () =
                 (get d_lex);
               Printf.printf "child d_worker [expect 222]: %s\n"
                 (get d_worker)))))))
+
+(* Test 10: freezing. fork_join freezes the fork point's newest dynamic
+   table before publishing the stolen child, then runs the other child
+   inline as a plain call on the same fiber. The inline child's with_temps
+   go to a fresh table pushed above the frozen one: the fiber's own chain
+   sees them, but the stolen child — bounded at the frozen table — keeps
+   reading the state as it was when it was forked. (The "stolen" child is
+   simulated by fibers mounted above the inline execution; unlike a real
+   stolen child its spine passes through the frozen fiber, so we only
+   assert lookups that resolve before reaching it.) *)
+
+let d_str : string Dynamic.t = Dynamic.make ()
+
+let () =
+  reset ();
+  print_endline
+    "\n# Test 10: bindings above a freeze are invisible to bounded children";
+  passthrough (fun () ->
+    (* fiber F: the fork point *)
+    set_lexical_root ();
+    let f = current_fiber () in
+    with_temp d_lex 1 ~f:(fun () ->
+      let b = freeze () in
+      (* the inline child: a plain call on F, rebinding d_lex *)
+      with_temp d_lex 9 ~f:(fun () ->
+        with_temp d_child 5 ~f:(fun () ->
+          Printf.printf "inline sees own rebind [expect 9]: %s\n" (get d_lex);
+          Printf.printf "inline sees own binding [expect 5]: %s\n"
+            (get d_child);
+          passthrough (fun () ->
+            (* fiber S: the stolen child's worker *)
+            with_temp d_child 7 ~f:(fun () ->
+              passthrough (fun () ->
+                (* fiber C: the stolen child, pinned and bounded *)
+                set_lexical_parent f;
+                set_lexical_bound b;
+                Printf.printf
+                  "stolen child sees frozen state [expect 1]: %s\n"
+                  (get d_lex);
+                Printf.printf
+                  "stolen child misses inline binding [expect 7]: %s\n"
+                  (get d_child))));
+          Printf.printf "inline still sees rebind [expect 9]: %s\n"
+            (get d_lex)));
+      Printf.printf "after inline child [expect 1]: %s\n" (get d_lex);
+      (* a second scope while still frozen gets a fresh table again *)
+      with_temp d_lex 8 ~f:(fun () ->
+        Printf.printf "second scope above freeze [expect 8]: %s\n" (get d_lex));
+      Printf.printf "after second scope [expect 1]: %s\n" (get d_lex);
+      (* bindings above a freeze are GC roots *)
+      with_temp d_str (String.concat "-" ["over"; "lay"]) ~f:(fun () ->
+        Gc.full_major ();
+        (match Dynamic.get d_str with
+         | This s ->
+           Printf.printf "fresh table survives GC [expect over-lay]: %s\n" s
+         | Null -> print_endline "fresh table survives GC: null"));
+      unfreeze ();
+      Printf.printf "after unfreeze [expect 1]: %s\n" (get d_lex));
+    Printf.printf "after scope [expect null]: %s\n" (get d_lex))
+
+(* Test 11: nested fork/join while frozen. Each freeze marks the fork
+   point's newest table and bounds that fork's children there: children of
+   the outer fork never see bindings the inline child pushed (even once a
+   nested freeze makes them immutable), while children of the nested fork
+   do. *)
+
+let () =
+  reset ();
+  print_endline "\n# Test 11: nested freezes bound their children separately";
+  passthrough (fun () ->
+    set_lexical_root ();
+    let f = current_fiber () in
+    with_temp d_lex 1 ~f:(fun () ->
+      let outer = freeze () in
+      (* outer inline child *)
+      with_temp d_child 5 ~f:(fun () ->
+        let nested = freeze () in
+        (* a child of the nested fork sees the inline child's bindings *)
+        passthrough (fun () ->
+          with_temp d_worker 200 ~f:(fun () ->
+            passthrough (fun () ->
+              set_lexical_parent f;
+              set_lexical_bound nested;
+              Printf.printf
+                "nested child sees inline binding [expect 5]: %s\n"
+                (get d_child);
+              Printf.printf "nested child sees outer scope [expect 1]: %s\n"
+                (get d_lex);
+              Printf.printf "nested child own worker [expect 200]: %s\n"
+                (get d_worker))));
+        (* a child of the outer fork does not *)
+        passthrough (fun () ->
+          with_temp d_child 7 ~f:(fun () ->
+            passthrough (fun () ->
+              set_lexical_parent f;
+              set_lexical_bound outer;
+              Printf.printf
+                "outer child misses inline binding [expect 7]: %s\n"
+                (get d_child);
+              Printf.printf "outer child sees outer scope [expect 1]: %s\n"
+                (get d_lex))));
+        unfreeze ());
+      Printf.printf "after nested inline [expect null]: %s\n" (get d_child);
+      unfreeze ());
+    Printf.printf "after scope [expect null]: %s\n" (get d_lex))
+
