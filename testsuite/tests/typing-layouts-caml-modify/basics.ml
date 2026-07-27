@@ -698,3 +698,38 @@ let () =
   let r = { p = P #(Int, "a") } in
   test ~expect_caml_modifies:1
     (fun () -> r.p <- P #(Unit, "b"); ignore (Sys.opaque_identity r))
+
+(* Polymorphic write where ['a]'s kind at the use site is more precise than
+   the declared [value] parameter: only the string word needs the barrier *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+  end in
+  let[@inline never] set : ('a : immediate). 'a t -> #(string * 'a) -> unit =
+    fun t v -> t.x <- v
+  in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, via a polymorphic record field *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type setter = { apply : ('b : immediate). 'b t -> #(string * 'b) -> unit }
+  end in
+  let s = Sys.opaque_identity { apply = fun t v -> t.x <- v } in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> s.apply t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, where the parameter is instantiated to an unboxed existential *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type u = U : ('a : immediate). 'a -> u [@@unboxed]
+  end in
+  let[@inline never] set (t : u t) v = t.x <- v in
+  let t = { x = #("s", U 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))
