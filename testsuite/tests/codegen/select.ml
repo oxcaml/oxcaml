@@ -68,6 +68,37 @@ select_constant:
   ret
 |}]
 
+(* CR ttebbi: We could constant-fold this. *)
+let select_same_constant b x = Builtins.select b 0 0
+[%%expect_asm X86_64{|
+select_constant:
+  movq  %rax, %rbx
+  movl  $1, %eax
+  movl  $1, %edi
+  cmpq  $1, %rbx
+  cmovne %rdi, %rax
+  ret
+|}]
+
+(* CR ttebbi: Extra mov %rax, %rdi *)
+let select_same_var b x = Builtins.select b x x
+[%%expect_asm X86_64{|
+select_constant:
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  ret
+|}]
+
+(* CR ttebbi: Could be just movq %rbx, %rax *)
+let select_equal (x : int) (y : int) = Builtins.select (x = y) x y
+[%%expect_asm X86_64{|
+select_constant:
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  cmpq  %rax, %rdi
+  cmove %rdi, %rax
+  ret
+|}]
 
 (* CR ttebbi: Unnecessary moves. *)
 let select_int32 b (x : int32#) (y : int32#) =
