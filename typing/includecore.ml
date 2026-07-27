@@ -1284,7 +1284,7 @@ module Variant_diffing = struct
     =
     let shape_of_layout = function
       | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_variable _ -> None
     in
     let shapes1, shapes2 =
       match rep1, rep2 with
@@ -1594,8 +1594,8 @@ let type_declarations_consistency env decl1 decl2 =
     | None -> None
 
 (* See Note [Contravariance of type parameter jkinds]. *)
-let type_declarations ?(equality = false) ~loc env ~mark name
-      decl1 path decl2 =
+let type_declarations ?(equality = false) ?(allow_supertype = false) ~loc env
+      ~mark name decl1 path decl2 =
   Builtin_attributes.check_alerts_inclusion
     ~def:decl1.type_loc
     ~use:decl2.type_loc
@@ -1701,14 +1701,28 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           mark usage cstrs1;
           if equality then mark Env.Exported cstrs2
         end;
+        let variant_diff =
+          Variant_diffing.compare_with_representation ~loc env
+            decl1.type_params
+            decl2.type_params
+            cstrs1
+            cstrs2
+            rep1
+            rep2
+        in
+        let variant_diff =
+          match variant_diff with
+          | Some (Variant_mismatch changes) when allow_supertype ->
+              (* If everything is a deletion, we're good *)
+              let is_deletion : variant_change -> bool = function
+                | Delete _ -> true
+                | _ -> false
+              in
+              if List.for_all is_deletion changes then None else variant_diff
+          | Some _ | None -> None
+        in
         Misc.Stdlib.Option.first_some
-          (Variant_diffing.compare_with_representation ~loc env
-              decl1.type_params
-              decl2.type_params
-              cstrs1
-              cstrs2
-              rep1
-              rep2)
+          variant_diff
           (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_record(labels1,rep1,umc1), Type_record(labels2,rep2,umc2)) -> begin

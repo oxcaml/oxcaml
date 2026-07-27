@@ -992,11 +992,10 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           idx+1,
           match result with
           | None -> None
-          | Some (num_nodes_visited,
-                  next_const, consts, next_tag, non_consts) ->
+          | Some (num_nodes_visited, consts, non_consts) ->
             match cstr_layouts.(idx) with
-            | Cstr_layout_variable -> None
-            | Cstr_layout_known { shape = cstr_shape; _ } ->
+            | Cstr_layout_variable _ -> None
+            | Cstr_layout_known { tag; shape = cstr_shape; _ } ->
                 let (is_mutable, num_nodes_visited), fields =
                   for_one_constructor constructor ~depth ~num_nodes_visited
                     ~cstr_shape
@@ -1005,26 +1004,23 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                 else match fields with
                 | Constructor_uniform xs
                     when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
+                  let consts = tag :: consts in
+                  Some (num_nodes_visited, consts, non_consts)
                 | Constructor_mixed shape
                     when mixed_block_shape_is_empty shape ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
+                  let consts = tag :: consts in
+                  Some (num_nodes_visited, consts, non_consts)
                 | Constructor_mixed _ | Constructor_uniform _ ->
                   let non_consts =
-                    (next_tag, fields) :: non_consts
+                    (tag, fields) :: non_consts
                   in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
-          (0, Some (num_nodes_visited, 0, [], 0, []))
+                  Some (num_nodes_visited, consts, non_consts))
+          (0, Some (num_nodes_visited, [], []))
           cstrs
       in
       begin match result with
       | None -> (num_nodes_visited, Pgenval)
-      | Some (num_nodes_visited, _, consts, _, non_consts) ->
+      | Some (num_nodes_visited, consts, non_consts) ->
         match non_consts with
         | [] -> assert false  (* See [List.for_all is_constant], above *)
         | _::_ ->

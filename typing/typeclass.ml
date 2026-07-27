@@ -1632,6 +1632,7 @@ let temp_abbrev loc id arity uid =
        type_ikind = Types.ikinds_todo "typeclass temp_abbrev";
        type_private = Public;
        type_manifest = Some ty;
+       type_supertype = None;
        type_variance = Variance.unknown_signature ~injective:false ~arity;
        type_separability = Types.Separability.default_signature ~arity;
        type_is_newtype = false;
@@ -1866,6 +1867,7 @@ let class_infos define_class kind
      type_ikind = Types.ikinds_todo "typeclass temp_abbrev";
      type_private = Public;
      type_manifest = Some obj_ty;
+     type_supertype = None;
      type_variance = Variance.unknown_signature ~injective:false ~arity;
      type_separability = Types.Separability.default_signature ~arity;
      type_is_newtype = false;

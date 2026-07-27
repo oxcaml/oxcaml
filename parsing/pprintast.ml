@@ -2136,11 +2136,16 @@ and type_def_list ctxt f (rf, exported, l) =
       | Some jkind ->
           Format.dprintf " : %a" (jkind_annotation ctxt) jkind
     in
-    pp f "@[<2>%s %a%a%a%t%s%a@]%a" kwd
+    let subtype =
+      match x.ptype_supertype with
+      | None -> Format.dprintf ""
+      | Some ty -> Format.dprintf " <: %a" (core_type ctxt) ty
+    in
+    pp f "@[<2>%s %a%a%a%t%t%s%a@]%a" kwd
       nonrec_flag rf
       type_params x.ptype_params
       ident_of_name x.ptype_name.txt
-      layout_annot eq
+      layout_annot subtype eq
       (type_declaration ctxt) x
       (item_attributes ctxt) x.ptype_attributes
   in

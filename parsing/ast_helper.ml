@@ -613,6 +613,7 @@ module Type = struct
       ?(kind = Ptype_abstract)
       ?(priv = Public)
       ?manifest
+      ?supertype
       ?jkind_annotation
       name =
     {
@@ -622,6 +623,7 @@ module Type = struct
      ptype_kind = kind;
      ptype_private = priv;
      ptype_manifest = manifest;
+     ptype_supertype = supertype;
      ptype_attributes = add_text_attrs text (add_docs_attrs docs attrs);
      ptype_jkind_annotation = jkind_annotation;
      ptype_loc = loc;

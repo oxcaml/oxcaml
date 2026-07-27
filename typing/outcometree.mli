@@ -215,6 +215,7 @@ and out_type_decl =
   { otype_name: string;
     otype_params: out_type_param list;
     otype_type: out_type;
+    otype_supertype: out_type option;
     otype_private: Asttypes.private_flag;
 
     (* Some <=> we should print this annotation;

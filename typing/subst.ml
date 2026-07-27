@@ -872,6 +872,8 @@ let rec type_declaration' copy_scope s decl =
           None -> None
         | Some ty -> Some(typexp copy_scope s decl.type_loc ty)
       end;
+    type_supertype =
+      Option.map (typexp copy_scope s decl.type_loc) decl.type_supertype;
     type_jkind = jkind copy_scope s decl.type_loc decl.type_jkind;
     type_ikind = (
       (* Preserve constructor ikinds via [s.types] (path rename or identity-env

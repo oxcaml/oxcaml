@@ -841,6 +841,7 @@ type type_declaration =
 
     type_private: private_flag;
     type_manifest: type_expr option;
+    type_supertype: type_expr option;
     type_variance: Variance.t list;
     (* covariant, contravariant, weakly contravariant, injective *)
     type_separability: Separability.t list;
@@ -981,7 +982,8 @@ and variant_representation =
 
 and cstr_layout =
   | Cstr_layout_known of
-      { shape : constructor_representation;
+      { tag : int;
+        shape : constructor_representation;
         sorts : Jkind_types.Sort.Const.t array;
         (* [sorts] has a jkind for each argument of the corresponding
            constructor.
@@ -993,7 +995,7 @@ and cstr_layout =
            [Constructor_mixed] if the inlined record has any unboxed fields.
         *)
       }
-  | Cstr_layout_variable
+  | Cstr_layout_variable of { tag : int }
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
      typedecl time. Counterpart of [Record_variable] for variants. *)

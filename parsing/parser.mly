@@ -4022,17 +4022,17 @@ generic_type_declaration(flag, kind):
   params = type_parameters
   id = mkrhs(LIDENT)
   jkind_annotation = jkind_constraint?
-  kind_priv_manifest = kind
+  kind_priv_manifest_supertype = kind
   cstrs = constraints
   attrs2 = post_item_attributes
     {
-      let (kind, priv, manifest) = kind_priv_manifest in
+      let (kind, priv, manifest, supertype) = kind_priv_manifest_supertype in
       let docs = symbol_docs $sloc in
       let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       (flag, ext),
-      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs
-        ?jkind_annotation
+      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ?supertype ~attrs ~loc
+        ~docs ?jkind_annotation
     }
 ;
 %inline generic_and_type_declaration(kind):
@@ -4041,17 +4041,17 @@ generic_type_declaration(flag, kind):
   params = type_parameters
   id = mkrhs(LIDENT)
   jkind_annotation = jkind_constraint?
-  kind_priv_manifest = kind
+  kind_priv_manifest_supertype = kind
   cstrs = constraints
   attrs2 = post_item_attributes
     {
-      let (kind, priv, manifest) = kind_priv_manifest in
+      let (kind, priv, manifest, supertype) = kind_priv_manifest_supertype in
       let docs = symbol_docs $sloc in
       let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let text = symbol_text $symbolstartpos in
-      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ~attrs ~loc ~docs ~text
-        ?jkind_annotation
+      Type.mk id ~params ~cstrs ~kind ~priv ?manifest ?supertype ~attrs ~loc
+        ~docs ~text ?jkind_annotation
     }
 ;
 %inline constraints:
@@ -4087,15 +4087,20 @@ nonempty_type_kind:
   ioption(terminated(core_type, EQUAL))
     { $1 }
 ;
+%inline type_supertype:
+  ioption(preceded(COLONGREATER, core_type))
+    { $1 }
+;
 type_kind:
-    /*empty*/
-      { (Ptype_abstract, Public, None) }
-  | EQUAL nonempty_type_kind
-      { $2 }
+    sup = type_supertype
+      { (Ptype_abstract, Public, None, sup) }
+  | sup = type_supertype
+    EQUAL nonempty_type_kind
+      { let (kind, priv, manifest) = $3 in (kind, priv, manifest, sup) }
 ;
 %inline type_subst_kind:
     COLONEQUAL nonempty_type_kind
-      { $2 }
+      { let (kind, priv, manifest) = $2 in (kind, priv, manifest, None) }
 ;
 type_parameters:
     /* empty */

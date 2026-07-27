@@ -489,7 +489,7 @@ module Type_decl_shape = struct
           kind = constructor_repr;
           args
         }
-    | Cstr_layout_known _, None | Cstr_layout_variable, _ -> None
+    | Cstr_layout_known _, None | Cstr_layout_variable _, _ -> None
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with

@@ -1607,6 +1607,7 @@ and find_type_unboxed_version path env seen =
              "env unboxed Tbox manifest path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some inner;
+      type_supertype = None;
       type_variance = decl.type_variance;
       type_separability =
         Types.Separability.default_signature ~arity:decl.type_arity;
@@ -1655,6 +1656,7 @@ and find_type_unboxed_version path env seen =
           (Format_doc.asprintf "env unboxed alias path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some man;
+      type_supertype = None;
       type_variance = decl.type_variance;
       (* Variance is the same as the boxed version *)
       type_separability;

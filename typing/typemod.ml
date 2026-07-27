@@ -977,6 +977,7 @@ module Merge = struct
               type_ikind = Types.ikinds_todo "merge constraint temporary";
               type_private = Private;
               type_manifest = None;
+              type_supertype = None;
               type_variance =
                 List.map
                   (fun (_, (v, i)) ->

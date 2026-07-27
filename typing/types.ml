@@ -453,6 +453,9 @@ type type_declaration =
     type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
+    type_supertype: type_expr option;
+    (* CR-someday lmaurer: Could also be a list of supertypes (with a common
+       supertype) *)
     type_variance: Variance.t list;
     type_separability: Separability.t list;
     type_is_newtype: bool;
@@ -537,10 +540,11 @@ and variant_representation =
 
 and cstr_layout =
   | Cstr_layout_known of
-      { shape : constructor_representation;
+      { tag : int;
+        shape : constructor_representation;
         sorts : Jkind_types.Sort.Const.t array;
       }
-  | Cstr_layout_variable
+  | Cstr_layout_variable of { tag : int }
 
 and constructor_representation =
   | Constructor_uniform_value
@@ -944,12 +948,14 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_boxed layouts1, Variant_boxed layouts2 ->
       Misc.Stdlib.Array.equal
         (fun l1 l2 -> match l1, l2 with
-           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_variable { tag = t1 },
+             Cstr_layout_variable { tag = t2 } ->
+             t1 == t2
            | Cstr_layout_known { shape = s1; sorts = ss1 },
              Cstr_layout_known { shape = s2; sorts = ss2 } ->
              equal_constructor_representation_up_to_scannable_axes s1 s2
              && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
-           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+           | (Cstr_layout_known _ | Cstr_layout_variable _), _ -> false)
         layouts1
         layouts2
   | Variant_extensible, Variant_extensible ->

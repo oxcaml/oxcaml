@@ -199,6 +199,7 @@ val value_descriptions:
 
 val type_declarations:
   ?equality:bool ->
+  ?allow_supertype:bool ->
   loc:Location.t ->
   Env.t -> mark:bool -> string ->
   type_declaration -> Path.t -> type_declaration -> type_mismatch option

@@ -656,6 +656,8 @@ and type_declaration i ppf x =
   line i ppf "ptype_private = %a\n" fmt_private_flag x.ptype_private;
   line i ppf "ptype_manifest =\n";
   option (i+1) core_type ppf x.ptype_manifest;
+  line i ppf "ptype_supertype =\n";
+  option (i+1) core_type ppf x.ptype_supertype;
   line i ppf "ptype_jkind_annotation =\n";
   option (i+1) jkind_annotation ppf x.ptype_jkind_annotation
 

@@ -170,6 +170,7 @@ let add_type_declaration bv td =
     (fun (ty1, ty2, _) -> add_type bv ty1; add_type bv ty2)
     td.ptype_cstrs;
   add_opt add_type bv td.ptype_manifest;
+  add_opt add_type bv td.ptype_supertype;
   let add_tkind = function
     Ptype_abstract -> ()
   | Ptype_variant cstrs ->

@@ -390,6 +390,7 @@ in
       type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest = unboxed_type_manifest;
+      type_supertype = None;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
       type_separability = Types.Separability.default_signature ~arity;
       type_is_newtype = false;
@@ -409,6 +410,7 @@ in
       type_ikind;
       type_private = sdecl.ptype_private;
       type_manifest;
+      type_supertype = None;
       type_variance = Variance.unknown_signature ~injective:false ~arity;
       type_separability = Types.Separability.default_signature ~arity;
       type_is_newtype = false;
@@ -1002,13 +1004,19 @@ let transl_declaration env sdecl (id, uid) =
         Some jkind, annot
     | None -> None, None
   in
-  let (tman, man) = match sdecl.ptype_manifest with
+  let transl_simple_type_opt_in_decl sty =
+    match sty with
       None -> None, None
     | Some sty ->
       let no_row = not (is_fixed_type sdecl) in
-      let cty = transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty in
+      let cty =
+        transl_simple_type ~new_var_jkind:Any env ~closed:no_row
+          Mode.Alloc.Const.legacy sty
+      in
       Some cty, Some cty.ctyp_type
   in
+  let (tman, man) = transl_simple_type_opt_in_decl sdecl.ptype_manifest in
+  let (tsup, sup) = transl_simple_type_opt_in_decl sdecl.ptype_supertype in
   (* jkind_default is the jkind to use for now as the type_jkind when there
      is no annotation and no manifest.
      See Note [Default jkinds in transl_declaration].
@@ -1130,7 +1138,7 @@ let transl_declaration env sdecl (id, uid) =
                         | Cstr_record _ -> [| Jkind.Sort.Const.scannable |]
                       in
                       Cstr_layout_known
-                        { shape = Constructor_uniform_value; sorts })
+                        { tag = -1; shape = Constructor_uniform_value; sorts })
                    (Array.of_list cstrs)
                ),
                Jkind.for_non_float ~why:Boxed_variant
@@ -1225,6 +1233,7 @@ let transl_declaration env sdecl (id, uid) =
         type_ikind = Types.ikinds_todo "update_decl_jkind initial";
         type_private = sdecl.ptype_private;
         type_manifest = man;
+        type_supertype = sup;
         type_variance = Variance.unknown_signature ~injective:false ~arity;
         type_separability = Types.Separability.default_signature ~arity;
         type_is_newtype = false;
@@ -1267,6 +1276,7 @@ let transl_declaration env sdecl (id, uid) =
         typ_cstrs = cstrs;
         typ_loc = sdecl.ptype_loc;
         typ_manifest = tman;
+        typ_supertype = tsup;
         typ_kind = tkind;
         typ_private = sdecl.ptype_private;
         typ_attributes = sdecl.ptype_attributes;
@@ -1417,6 +1427,13 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
              simplifies things. *)
           None
     in
+    let type_supertype =
+      (* CR-someday lmaurer: We could conceivably have unboxed subtypes, with
+         the exciting (?) property that being an unboxed subtype could change
+         the type's layout (adding more registers, say). But for now we only
+         have declared subtypes among things of layout [value]. *)
+      None
+    in
     Some
       {
         type_params = decl.type_params;
@@ -1426,6 +1443,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
         type_ikind = Types.ikinds_todo "derive_unboxed_versions";
         type_private = decl.type_private;
         type_manifest;
+        type_supertype;
         type_variance =
           Variance.unknown_signature ~injective:false ~arity:decl.type_arity;
         type_separability =
@@ -1732,7 +1750,17 @@ let narrow_to_manifest_jkind env loc path decl =
    need to check that the equation refers to a type of the same kind
    with the same constructors and labels. *)
 let check_kind_coherence env loc dpath decl =
-  match decl.type_kind, decl.type_manifest with
+  let manifest_or_supertype, ~is_manifest =
+    match decl.type_manifest, decl.type_supertype with
+    | Some _, Some _ ->
+      (* XXX Should be non-fatal *)
+      Misc.fatal_errorf "Can't combine manifest and supertype: %a"
+        (Format_doc.compat Path.print) dpath
+    | Some man, None -> Some man, ~is_manifest:true
+    | None, Some sup -> Some sup, ~is_manifest:false
+    | None, None -> None, ~is_manifest:false
+  in
+  match decl.type_kind, manifest_or_supertype with
   | (Type_variant _ | Type_record _ | Type_record_unboxed_product _
     | Type_open),
     Some ty ->
@@ -1759,6 +1787,7 @@ let check_kind_coherence env loc dpath decl =
                     assert false
               in
               Includecore.type_declarations ~loc ~equality:true env
+                ~allow_supertype:(not is_manifest)
                 ~mark:true
                 (Path.last path)
                 decl'
@@ -2521,10 +2550,16 @@ let rec update_decl_jkind env dpath decl =
       end
     | cstrs, Variant_boxed cstr_layouts ->
       let cstrs =
+        let consts = ref 0 in
+        let non_consts = ref 0 in
         List.mapi (fun idx cstr ->
-          let cd_args, _all_void, jkinds, arg_sorts =
+          let cd_args, all_void, jkinds, arg_sorts =
             update_constructor_arguments_sorts env cstr.Types.cd_loc
               cstr.Types.cd_args
+          in
+          let post_incr r = let value = !r in incr r; value in
+          let tag =
+            if all_void then post_incr consts else post_incr non_consts
           in
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
@@ -2534,12 +2569,12 @@ let rec update_decl_jkind env dpath decl =
           let () =
             match cstr_repr, arg_sorts with
             | Ok shape, Some sorts ->
-                cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
+                cstr_layouts.(idx) <- Cstr_layout_known { tag; shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
             | _, _ ->
                 assert_any_args_support loc;
-                cstr_layouts.(idx) <- Cstr_layout_variable
+                cstr_layouts.(idx) <- Cstr_layout_variable { tag }
           in
           let cstr = { cstr with Types.cd_args } in
           cstr
@@ -4792,6 +4827,15 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       in
       cty, cty.ctyp_type
   in
+  let (tsup, sup) = match sdecl.ptype_supertype with
+      None -> None, None
+    | Some sty ->
+      let cty =
+        transl_simple_type ~new_var_jkind:Any env ~closed:no_row
+          Mode.Alloc.Const.legacy sty
+      in
+      Some cty, Some cty.ctyp_type
+  in
   (* In the second part, we check the consistency between the two
      declarations and compute a "merged" declaration; we now need to
      work in the larger signature environment [sig_env], because
@@ -4830,6 +4874,10 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       begin match Env.find_type path sig_env with
       | { type_unboxed_version = Some decl ; _ } ->
         let man = Ctype.newconstr (Path.unboxed_version path) args in
+        let sup =
+          (* CR-someday lmaurer: See comment in [derive_unboxed_version] *)
+          None
+        in
         let type_kind =
           match sig_decl.type_unboxed_version, arity_ok with
           | Some { type_kind ; _ }, true -> type_kind
@@ -4849,6 +4897,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
              Types.ikinds_todo reason);
           type_private = priv;
           type_manifest = Some man;
+          type_supertype = sup;
           type_variance = [];
           type_separability = Types.Separability.default_signature ~arity;
           type_is_newtype = false;
@@ -4888,6 +4937,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
          Types.ikinds_todo reason);
       type_private = priv;
       type_manifest = Some man;
+      type_supertype = sup;
       type_variance = [];
       type_separability = Types.Separability.default_signature ~arity;
       type_is_newtype = false;
@@ -4929,6 +4979,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_ikind = new_sig_decl.type_ikind;
       type_private = new_sig_decl.type_private;
       type_manifest = new_sig_decl.type_manifest;
+      type_supertype = new_sig_decl.type_supertype;
       type_unboxed_default = new_sig_decl.type_unboxed_default;
       type_is_newtype = new_sig_decl.type_is_newtype;
       type_expansion_scope = new_sig_decl.type_expansion_scope;
@@ -4972,6 +5023,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_cstrs = constraints;
     typ_loc = loc;
     typ_manifest = Some tman;
+    typ_supertype = tsup;
     typ_kind = Ttype_abstract;
     typ_private = sdecl.ptype_private;
     typ_attributes = sdecl.ptype_attributes;
@@ -4994,6 +5046,7 @@ let transl_package_constraint ~loc ty =
     type_ikind = Types.ikinds_todo "transl_package_constraint";
     type_private = Public;
     type_manifest = Some ty;
+    type_supertype = None;
     type_variance = [];
     type_separability = [];
     type_is_newtype = false;
@@ -5019,6 +5072,7 @@ let abstract_type_decl ~injective ~jkind ~params =
       type_ikind = Types.ikinds_todo "abstract_type_decl";
       type_private = Public;
       type_manifest = None;
+      type_supertype = None;
       type_variance = Variance.unknown_signature ~injective ~arity;
       type_separability = Types.Separability.default_signature ~arity;
       type_is_newtype = false;
@@ -5036,6 +5090,7 @@ let abstract_type_decl ~injective ~jkind ~params =
           type_ikind = Types.ikinds_todo "abstract_type_decl unboxed";
           type_private = Public;
           type_manifest = None;
+          type_supertype = None;
           type_variance = Variance.unknown_signature ~injective ~arity;
           type_separability = Types.Separability.default_signature ~arity;
           type_is_newtype = false;

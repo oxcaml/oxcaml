@@ -231,6 +231,7 @@ module T = struct
        ptype_kind;
        ptype_private;
        ptype_manifest;
+       ptype_supertype;
        ptype_attributes;
        ptype_jkind_annotation;
        ptype_loc} =
@@ -247,6 +248,7 @@ module T = struct
                 ptype_cstrs)
       ~kind:(sub.type_kind sub ptype_kind)
       ?manifest:(map_opt (sub.typ sub) ptype_manifest)
+      ?supertype:(map_opt (sub.typ sub) ptype_supertype)
       ~docs:Docstrings.empty_docs
       ?jkind_annotation:ptype_jkind_annotation
 

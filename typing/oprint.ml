@@ -983,14 +983,20 @@ and print_out_type_decl kwd ppf td =
           td.otype_params
           print_lident td.otype_name
   in
+  let print_supertype ppf =
+    function
+      Some ty -> fprintf ppf " <:@ %a" !out_type ty
+    | None -> ()
+  in
   let print_manifest ppf =
     function
       Otyp_manifest (ty, _) -> fprintf ppf " =@ %a" !out_type ty
     | _ -> ()
   in
   let print_name_params ppf =
-    fprintf ppf "%s %t%a%a" kwd type_defined
+    fprintf ppf "%s %t%a%a%a" kwd type_defined
       print_out_jkind_annot td.otype_jkind
+      print_supertype td.otype_supertype
       print_manifest td.otype_type
   in
   let ty =

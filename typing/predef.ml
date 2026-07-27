@@ -625,6 +625,7 @@ let decl_of_type_constr tconstr =
           type_loc = Location.none;
           type_private = Asttypes.Public;
           type_manifest = None;
+          type_supertype = None;
           type_variance = [];
           type_separability = [];
           type_is_newtype = false;
@@ -645,6 +646,7 @@ let decl_of_type_constr tconstr =
      type_loc = Location.none;
      type_private = Asttypes.Public;
      type_manifest = None;
+     type_supertype = None;
      type_variance = [];
      type_separability = [];
      type_is_newtype = false;
@@ -700,6 +702,10 @@ let decl_of_type_constr tconstr =
     let array_of_list_map_option f l =
       Misc.Stdlib.List.map_option f l |> Option.map Array.of_list
     in
+    (* There aren't any built-in types with all-void constructors so we can
+       assume that it's easy to know which tag counter to use. *)
+    let consts = ref 0 in
+    let non_consts = ref 0 in
     let mk_elt { cd_args } =
       let sorts = match cd_args with
         | Cstr_tuple args ->
@@ -707,10 +713,16 @@ let decl_of_type_constr tconstr =
         | Cstr_record lbls ->
           array_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
       in
+      let post_incr r = let value = !r in incr r; value in
+      let tag = match cd_args with
+        | Cstr_tuple [] -> post_incr consts
+        | Cstr_tuple (_ :: _)
+        | Cstr_record _ -> post_incr non_consts
+      in
       match sorts with
       | Some sorts ->
-        Cstr_layout_known { shape = Constructor_uniform_value; sorts }
-      | None -> Cstr_layout_variable
+        Cstr_layout_known { tag; shape = Constructor_uniform_value; sorts }
+      | None -> Cstr_layout_variable { tag }
     in
     Type_variant (
       constrs,

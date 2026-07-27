@@ -236,6 +236,7 @@ let type_declaration sub x =
     x.typ_cstrs;
   sub.type_kind sub x.typ_kind;
   Option.iter (sub.typ sub) x.typ_manifest;
+  Option.iter (sub.typ sub) x.typ_supertype;
   List.iter (fun (c, _) -> sub.typ sub c) x.typ_params
 
 let type_declarations sub (_, list) = List.iter (sub.type_declaration sub) list

@@ -1950,6 +1950,7 @@ let prepare_decl id decl =
         prepare_type ty;
         Some ty
   in
+  Option.iter prepare_type decl.type_supertype;
   begin match decl.type_kind with
   | Type_abstract _ -> ()
   | Type_variant (cstrs, _rep,_umc) ->
@@ -2076,6 +2077,9 @@ let tree_of_type_decl id decl =
         None,
         false
   in
+  let otype_supertype =
+    Option.map (tree_of_typexp Type) decl.type_supertype
+  in
   (* The algorithm for setting [lay] here is described as Case (C1) in
      Note [When to print jkind annotations] *)
   let is_value =
@@ -2099,6 +2103,7 @@ let tree_of_type_decl id decl =
   { otype_name = name;
     otype_params = args;
     otype_type = ty;
+    otype_supertype;
     otype_private = priv;
     otype_jkind;
     otype_unboxed = unboxed;
@@ -2517,6 +2522,7 @@ let dummy =
     type_ikind = Types.ikinds_todo "print dummy";
     type_private = Public;
     type_manifest = None;
+    type_supertype = None;
     type_variance = [];
     type_separability = [];
     type_is_newtype = false;

@@ -1601,6 +1601,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_ikind = Types.ikinds_todo "new_local_type";
     type_private = Public;
     type_manifest = manifest;
+    type_supertype = None;
     type_variance = [];
     type_separability = [];
     type_is_newtype = true;
@@ -2348,6 +2349,18 @@ let safe_abbrev env ty =
       Btype.backtrack snap;
       cleanup_abbrev ();
       false
+
+let find_supertype env ty =
+  let path, args = match get_desc ty with
+    | Tconstr (path, args, _) -> path, args
+    | _ -> assert false
+  in
+  (* XXX Deal with args *)
+  ignore args;
+  match Env.find_type path env with
+  | { type_supertype = Some sup; _ } -> sup
+  | { type_supertype = None; _ }
+  | exception Not_found -> assert false
 
 let rec try_expand_once_gen expand_abbrev env ty =
   match get_desc ty with
@@ -3661,6 +3674,14 @@ let generic_private_abbrev env path =
        type_private = Private;
        type_manifest = Some body} ->
          get_level body = generic_level
+    | _ -> false
+  with Not_found -> false
+
+let has_generic_supertype env path =
+  try
+    match Env.find_type path env with
+      {type_supertype = Some sup} ->
+        get_level sup = generic_level
     | _ -> false
   with Not_found -> false
 
@@ -7800,6 +7821,9 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tconstr(p1, _, _), _)
       when generic_private_abbrev env p1 && safe_abbrev_opt env t1 ->
         subtype_rec env trace (expand_abbrev_opt env t1) t2 cstrs
+    | (Tconstr(p1, _, _), _)
+      when has_generic_supertype env p1 ->
+        subtype_rec env trace (find_supertype env t1) t2 cstrs
 (*  | (_, Tconstr(p2, _, _)) when generic_private_abbrev false env p2 ->
         subtype_rec env trace t1 (expand_abbrev_opt env t2) cstrs *)
     | (Tobject (f1, _), Tobject (f2, _))
@@ -8405,6 +8429,20 @@ let rec nondep_type_decl env mid is_covariant decl =
                 Private
             with Nondep_cannot_erase _ ->
               None, decl.type_private
+    (* XXX Just copying code blindly here. Need to understand and probably
+       refactor with above. *)
+    in
+    let st, priv =
+      match decl.type_supertype with
+      | None -> None, priv
+      | Some ty ->
+          try Some (nondep_type_rec env mid ty), priv
+          with Nondep_cannot_erase _ when is_covariant ->
+            clear_hash ();
+            try Some (nondep_type_rec ~expand_private:true env mid ty),
+                Private
+            with Nondep_cannot_erase _ ->
+              None, priv
     and jkind =
       let jkind = nondep_jkind_base env mid decl.type_jkind in
       try Jkind.map_type_expr (nondep_type_rec env mid) jkind
@@ -8432,6 +8470,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_jkind = jkind;
       type_ikind = Types.ikinds_todo "nondep_type_decl";
       type_manifest = tm;
+      type_supertype = st;
       type_private = priv;
       type_variance = decl.type_variance;
       type_separability = decl.type_separability;

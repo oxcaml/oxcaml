@@ -87,6 +87,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
           type_ikind = Types.ikinds_todo "datarepr boxed record";
           type_private = priv;
           type_manifest = None;
+          type_supertype = None;
           type_variance = Variance.unknown_signature ~injective:true ~arity;
           type_separability = Types.Separability.default_signature ~arity;
           type_is_newtype = false;
@@ -157,11 +158,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
         [| Cstr_layout_known
-             { shape = Constructor_uniform_value; sorts = [| sort |] } |],
+             { tag = 0; shape = Constructor_uniform_value; sorts = [| sort |] } |],
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
-        [| Cstr_layout_variable |], true
+        [| Cstr_layout_variable { tag = 0 } |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -169,21 +170,22 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
     | Variant_with_null, _ ->
       let layout cstr =
+        let tag = 0 in
         match classify_variant_with_null_constructor cstr with
         | Variant_with_null_nullary ->
           Cstr_layout_known
-            { shape = Constructor_uniform_value; sorts = [| |] }
+            { tag; shape = Constructor_uniform_value; sorts = [| |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
-            { shape = Constructor_uniform_value; sorts = [| sort |] }
+            { tag; shape = Constructor_uniform_value; sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = None; _ }; _ } ->
           (* Sort may be [None] during the recursive-decl temp-env phase
              (see Note [Default jkinds in transl_declaration] in typedecl.ml);
              the temp-env descriptors are not consumed, and the real ones are
              recomputed after [update_decls_jkind] fills the sorts. *)
-          Cstr_layout_variable
+          Cstr_layout_variable { tag }
       in
       Array.of_list (List.map layout cstrs), false
   in
@@ -193,7 +195,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       (fun layout ->
          let all_void =
            match layout with
-           | Cstr_layout_variable ->
+           | Cstr_layout_variable _ ->
              (* Someday we'll want to let a constructor be constant iff the type
                 argument is void (after all, [unit# option] is [bool]), but
                 we're not there yet. For now, assume [Some #()] (so to speak) is
@@ -210,7 +212,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          is_const)
       cstr_layouts
   in
-  let describe_constructor (src_index, const_tag, nonconst_tag, acc)
+  let describe_constructor (src_index, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
     let cstr_name = Ident.name cd_id in
     let cstr_res =
@@ -218,17 +220,12 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape =
+    let runtime_tag, cstr_shape =
       match cstr_layouts.(src_index) with
-      | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_known { tag; shape; _ } -> tag, Some shape
+      | Cstr_layout_variable { tag } -> tag, None
     in
     let cstr_constant = cstr_constant.(src_index) in
-    let runtime_tag, const_tag, nonconst_tag =
-      if cstr_constant
-      then const_tag, 1 + const_tag, nonconst_tag
-      else nonconst_tag, const_tag, 1 + nonconst_tag
-    in
     let cstr_tag =
       match rep with
       | Variant_with_null ->
@@ -268,9 +265,9 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         cstr_inlined;
         cstr_uid = cd_uid;
       } in
-    (src_index+1, const_tag, nonconst_tag, (cd_id, cstr) :: acc)
+    (src_index+1, (cd_id, cstr) :: acc)
   in
-  let (_,_,_,cstrs) = List.fold_left describe_constructor (0,0,0,[]) cstrs in
+  let (_,cstrs) = List.fold_left describe_constructor (0,[]) cstrs in
   List.rev cstrs
 
 let extension_descr ~current_unit path_ext ext =

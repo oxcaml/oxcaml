@@ -1317,6 +1317,7 @@ and type_declaration =
     typ_kind: type_kind;
     typ_private: private_flag;
     typ_manifest: core_type option;
+    typ_supertype: core_type option;
     typ_loc: Location.t;
     typ_attributes: attributes;
     typ_jkind_annotation: Parsetree.jkind_annotation option;
