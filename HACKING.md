@@ -103,6 +103,17 @@ Prior to `make install` you can do:
 testsuite runs much faster if you install GNU parallel. This is likely
 already present on Linux machines. On macOS, install Homebrew, then `brew
 install parallel`.
+- `make runtest-upstream-boot` to run the upstream testsuite with the boot
+compiler (i.e. the compiler built by the system compiler) instead of the
+final compiler. This does not build the main compiler at all: only the
+stdlib, the bytecode compilers and tools, and the expect tool are built in
+support of the testsuite, so it is much faster than `make runtest-upstream`;
+it is also useful when the final compiler itself is miscompiled. Tests that
+need more than that (the otherlibs, the native compiler-libs, ocamldebug,
+etc.) are skipped; see `oxcaml/testsuite/boot-test-list`. Some kept
+directories contain a few tests that fail in this mode for the same
+reasons. After a first run, single tests can be re-run against the boot
+compiler with `make test-one-no-rebuild TEST=...`.
 
 There is also a `make ci` target which does a full build and test run.
 

@@ -17,12 +17,14 @@ toplevels_installed = top opttop
 CLEAN_DUNE_WORKSPACES = \
   duneconf/boot.ws \
   duneconf/runtime_stdlib.ws \
-  duneconf/main.ws
+  duneconf/main.ws \
+  duneconf/boottest.ws
 
 # These are getting rm -rf'd, so be careful with this.
 
 CLEAN_DIRS = \
   _build \
+  _build_boottest \
   _build_upstream \
   _compare \
   _coverage \

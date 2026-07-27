@@ -465,7 +465,8 @@
  (enabled_if
   (or
    (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
+   (= %{context_name} "runtime_stdlib")
+   (= %{context_name} "boottest")))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
 
