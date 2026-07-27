@@ -4832,8 +4832,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       { ktmpl_params = kind_params;
         ktmpl_return = return;
         ktmpl_body = Lambda.rename fresh_vars param;
-        ktmpl_mode = env_alloc_mode;
         ktmpl_env = env;
+        ktmpl_env_mode = env_alloc_mode;
         ktmpl_loc = Scoped_location.of_location ~scopes loc;
       }
     in

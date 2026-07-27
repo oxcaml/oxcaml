@@ -1017,8 +1017,8 @@ and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_return: layout;
     ktmpl_body: lambda;
-    ktmpl_mode: locality_mode;
     ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
   }
 
