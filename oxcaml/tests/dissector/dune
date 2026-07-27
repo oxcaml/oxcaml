@@ -557,7 +557,7 @@
        -o mylib.cmxa)))
 
 ; unusedlib is an archive none of whose units are referenced, so the dissector
-; must skip the whole archive
+; must not link any of its members into the executable
 (rule
  (enabled_if
   (and (= %{context_name} "main")

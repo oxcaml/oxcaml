@@ -89,8 +89,8 @@ end
     @param ml_objfiles
       The OCaml object files (.o, .a derived from .cmx, .cmxa), each paired with
       the entry symbols of the required compilation units it provides (see
-      {!Partial_link.link_one_partition}). Archives that provide no required
-      compilation units are skipped.
+      {!Partial_link.link_one_partition}). An archive contributes only the
+      members of these units to the link.
     @param startup_obj The startup object file
     @param ccobjs Extra C object files from -cclib (Clflags.ccobjs)
     @param runtime_libs Runtime libraries (from runtime_lib ())
