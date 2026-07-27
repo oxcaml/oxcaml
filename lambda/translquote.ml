@@ -2817,6 +2817,7 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
+        | Tmod _ -> fatal_errorf "Translquote: unexpected Tmod"
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields
