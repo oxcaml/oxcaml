@@ -14,7 +14,47 @@
 (**************************************************************************)
 
 module Staged = struct
-  let traverse = Traverse.run
+  module TraverseRebuild = struct
+    type t =
+      { toplevel_expr : Rev_expr.t;
+        code : Rev_expr.rev_code Code_id.Map.t;
+        ordered_code_ids : Code_id.t array;
+        kinds : Flambda_kind.t Name.Map.t;
+        fixed_arity_continuations : Continuation.Set.t;
+        continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
+        code_deps : Traverse_acc.code_dep Code_id.Map.t;
+        all_sets_of_closures :
+          (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      }
+  end
+
+  let traverse unit =
+    let Traverse.
+          { toplevel_expr;
+            code;
+            ordered_code_ids;
+            deps;
+            kinds;
+            fixed_arity_continuations;
+            continuation_info;
+            code_deps;
+            all_sets_of_closures
+          } =
+      Traverse.run unit
+    in
+    let rebuild_data =
+      TraverseRebuild.
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          kinds;
+          fixed_arity_continuations;
+          continuation_info;
+          code_deps;
+          all_sets_of_closures
+        }
+    in
+    deps, rebuild_data
 
   let solve deps =
     let solved_dep =
@@ -29,7 +69,7 @@ module Staged = struct
     in
     solved_dep
 
-  let rebuild ~unit_metadata ~traverse_result ~solved_dep ~machine_width
+  let rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
       ~cmx_loader ~all_code ~final_typing_env =
     let load_code = Flambda_cmx.get_imported_code cmx_loader in
     let get_code_metadata code_id =
@@ -38,18 +78,17 @@ module Staged = struct
         | Some code -> code
         | None -> Exported_code.find_exn (load_code ()) code_id)
     in
-    let Traverse.
+    let TraverseRebuild.
           { toplevel_expr;
             code;
             ordered_code_ids;
-            deps = _;
             kinds;
             fixed_arity_continuations;
             continuation_info;
             code_deps;
             all_sets_of_closures
           } =
-      traverse_result
+      traverse_rebuild
     in
     let types_rewrite_context =
       Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
@@ -83,8 +122,8 @@ end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
-  let traverse_result = Staged.traverse unit in
-  let solved_dep = Staged.solve traverse_result.deps in
+  let deps, traverse_rebuild = Staged.traverse unit in
+  let solved_dep = Staged.solve deps in
   let unit_metadata = Flambda_unit.metadata unit in
-  Staged.rebuild ~unit_metadata ~traverse_result ~solved_dep ~machine_width
+  Staged.rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
     ~cmx_loader ~all_code ~final_typing_env

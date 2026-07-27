@@ -212,15 +212,13 @@ let flambda_to_flambda0 : type m.
                    post- traverse work between separate processes. *)
                 if Flambda_features.support_lto ()
                 then
-                  let traverse_result =
+                  let deps, traverse_rebuild =
                     Flambda2_reaper.Reaper.Staged.traverse flambda
                   in
-                  let solved_dep =
-                    Flambda2_reaper.Reaper.Staged.solve traverse_result.deps
-                  in
+                  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
                   let unit_metadata = Flambda_unit.metadata flambda in
                   Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-                    ~traverse_result ~solved_dep ~machine_width ~cmx_loader
+                    ~traverse_rebuild ~solved_dep ~machine_width ~cmx_loader
                     ~all_code ~final_typing_env
                 else
                   Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
