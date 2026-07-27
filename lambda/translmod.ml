@@ -1805,28 +1805,8 @@ let transl_functorization_intf ~params =
 let transl_functorization compilation_unit
       (params : Global_module.Parameter_name.t list)
       (modules : Global_module.t list)
-      ~ext
-      ~(read_format :
-          Misc.filepath ->
-          Lambda.main_module_block_format * Lambda.arg_descr option)
+      ~find_impl_by_name
       ~coercion : program =
-  let find_impl_by_name ~chain cu
-      : Lambda.main_module_block_format * Lambda.arg_descr option =
-    let base = Compilation_unit.base_filename cu ^ ext in
-    match Load_path.find_normalized base with
-    | filename -> read_format filename
-    | exception Not_found ->
-        let required_by =
-          List.map
-            (fun gm ->
-              Printf.sprintf ", required by %s" (Global_module.to_string gm))
-            chain
-          |> String.concat ""
-        in
-        Location.raise_errorf
-          "@[<hov>Cannot find %s on the load path%s.@]"
-          base required_by
-  in
   let make_func, required_globals =
     transl_functorization_make ~params ~modules ~find_impl_by_name
   in
