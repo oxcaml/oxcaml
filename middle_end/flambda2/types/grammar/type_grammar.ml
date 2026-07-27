@@ -3298,8 +3298,8 @@ and project_head_of_kind_rec_info ~to_project ~expand head =
     then head
     else
       match expand var with
-      | Rec_info r -> begin
-        match TD.descr r with
+      | Rec_info r ->
+        begin match TD.descr r with
         | Ok (No_alias r) -> r
         | Ok (Equals simple) ->
           Simple.pattern_match' simple
@@ -3319,10 +3319,11 @@ and project_head_of_kind_rec_info ~to_project ~expand head =
           Misc.fatal_errorf "Depth variable %a was expanded to Bottom"
             Variable.print var
         | Unknown -> raise Depth_variable_removed
-      end
+        end
       | ( Value _ | Naked_immediate _ | Naked_float _ | Naked_int32 _
-        | Naked_int64 _ | Naked_nativeint _ | Region _ | Naked_float32 _|Naked_int8 _|Naked_int16 _|Naked_vec128 _|
-    Naked_vec256 _|Naked_vec512 _ ) as ty ->
+        | Naked_int64 _ | Naked_nativeint _ | Region _ | Naked_float32 _
+        | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
+        | Naked_vec512 _ ) as ty ->
         Misc.fatal_errorf
           "Wrong kind while expanding %a: expecting [Rec_info], got type %a"
           Variable.print var print ty)
