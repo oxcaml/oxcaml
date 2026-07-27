@@ -197,8 +197,9 @@ let maybe_region get_layout lam =
   let rec remove_tail_markers_and_exclave = function
     | Lapply ({ap_region_close = Rc_close_at_apply} as ap) ->
        Lapply ({ap with ap_region_close = Rc_normal})
-    | Lsend (k, lmet, lobj, largs, Rc_close_at_apply, mode, loc, layout) ->
-       Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
+    | Lsend (k, lmet, lobj, largs, Rc_close_at_apply, mode, loc, layout,
+             yielding) ->
+       Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout, yielding)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
     | Lsplice _ ->
@@ -1161,12 +1162,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match met with
         | Tmeth_val id ->
             let obj = transl_exp ~scopes Lambda.layout_object expr in
-            Lsend (Self, Lvar id, obj, [], pos, mode, loc, layout)
+            Lsend (Self, Lvar id, obj, [], pos, mode, loc, layout, Unyielding)
         | Tmeth_name nm ->
             let obj = transl_exp ~scopes Lambda.layout_object expr in
             let (tag, cache) = Translobj.meth obj nm in
             let kind = if cache = [] then Public else Cached in
-            Lsend (kind, tag, obj, cache, pos, mode, loc, layout)
+            Lsend (kind, tag, obj, cache, pos, mode, loc, layout, Unyielding)
         | Tmeth_ancestor(meth, path_self) ->
             let self = transl_value_path loc e.exp_env path_self in
             Lapply {ap_loc = loc;
@@ -1174,9 +1175,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
-                    (* Object code can never close over a yielding value (see
-                       the OO tests in yielding_lambda.ml), so calling an
-                       ancestor method cannot yield *)
+                    (* Object code can never close over a yielding value, so
+                       calling an ancestor method cannot yield *)
                     ap_yielding = Unyielding;
                     ap_region_close = pos;
                     ap_probe = None;
@@ -1198,8 +1198,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_region_close=pos;
         ap_mode=alloc_heap;
         (* [new] runs the object's initialization, but object code can never
-           close over a yielding value (see the OO tests in
-           yielding_lambda.ml), so it cannot yield *)
+           close over a yielding value, so it cannot yield *)
         ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
@@ -1639,23 +1638,29 @@ and transl_apply ~scopes
   =
   let lapply funct args loc pos mode result_layout =
     match funct, pos with
-    | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _), _ ->
-        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout)
-    | Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _), _ ->
-        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
-    | Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _),
+    | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
+        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
+    | Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _, sy), _ ->
+        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
+    | Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _, sy),
       (Rc_normal | Rc_nontail) ->
-        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _), _), _ ->
-        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout)
+      Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _), _ ->
+        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _), _), _ ->
-        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+      Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _, sy), _), _ ->
+        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _), _),
+      Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _, sy), _),
       (Rc_normal | Rc_nontail) ->
-        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Lapply ({ ap_region_close = (Rc_normal | Rc_nontail) } as ap),
       (Rc_normal | Rc_nontail) ->
         (* The merged application applies more arguments through the

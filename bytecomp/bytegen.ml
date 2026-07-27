@@ -411,7 +411,7 @@ and comp_expr stack_info env exp sz cont =
            :: comp_expr stack_info env func
                 (sz + 3 + nargs)
                 (Kapply nargs :: cont1))
-  | Send { method_kind; met; obj; args; nontail } ->
+  | Send { method_kind; met; obj; args; nontail; yielding = _ } ->
     let obj_and_args = obj :: args in
     let nargs = List.length obj_and_args in
     let getmethod, args' =
@@ -777,6 +777,35 @@ and comp_expr stack_info env exp sz cont =
                  (Kevent ev
                  :: Kappterm (nargs, sz + nargs)
                  :: discard_dead_code cont))
+        | Send
+            { method_kind;
+              met;
+              obj;
+              args;
+              nontail = false;
+              yielding = Unyielding
+            } ->
+          (* As [Apply]: the pseudo event sits at the [Kappterm] following the
+             method lookup. *)
+          let obj_and_args = obj :: args in
+          let nargs = List.length obj_and_args in
+          let getmethod, args' =
+            match method_kind with
+            | Self -> Kgetmethod, met :: obj_and_args
+            | Public -> (
+              match met with
+              | Const (Const_base (Const_int n)) -> Kgetpubmet n, obj_and_args
+              | _ -> Kgetdynmet, met :: obj_and_args)
+          in
+          let ev =
+            { (event Event_pseudo (Event_unyielding_call nargs)) with
+              ev_stacksize = sz + nargs
+            }
+          in
+          comp_args stack_info env args' sz
+            (getmethod :: Kevent ev
+            :: Kappterm (nargs, sz + nargs)
+            :: discard_dead_code cont)
         | _ -> comp_expr stack_info env lam sz cont
       else
         let info =
@@ -784,6 +813,8 @@ and comp_expr stack_info env exp sz cont =
           | Apply { args; yielding = Unyielding; _ } ->
             Event_unyielding_call (List.length args)
           | Apply { args; _ } -> Event_return (List.length args)
+          | Send { obj; args; yielding = Unyielding; _ } ->
+            Event_unyielding_call (List.length (obj :: args))
           | Send { obj; args; _ } -> Event_return (List.length (obj :: args))
           | Prim (_, args) | Context_switch (_, args) ->
             Event_return (List.length args)

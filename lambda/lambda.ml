@@ -1089,6 +1089,7 @@ type lambda =
   | Lsend of
       meth_kind * lambda * lambda * lambda list
       * region_close * locality_mode * scoped_location * layout
+      * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -1231,7 +1232,7 @@ let rec try_to_find_location lam =
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _, _)
   | Levent (_, { lev_loc = loc; _ })
   | Lsplice (loc, _) ->
     loc
@@ -1687,8 +1688,9 @@ let make_key e =
         Lsequence (tr_rec env e1,tr_rec env e2)
     | Lassign (x,e) ->
         Lassign (x,tr_rec env e)
-    | Lsend (m,e1,e2,es,pos,mo,_loc,layout) ->
-        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
+    | Lsend (m,e1,e2,es,pos,mo,_loc,layout,yielding) ->
+        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,
+               layout,yielding)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
@@ -1791,7 +1793,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f for_from; f for_to; f for_body
   | Lassign(_, e) ->
       f e
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       List.iter f (met::obj::args)
   | Levent (e, _evt) ->
       tail e
@@ -1884,7 +1886,7 @@ let rec free_variables = function
            (Ident.Set.remove for_id (free_variables for_body)))
   | Lassign(id, e) ->
       Ident.Set.add id (free_variables e)
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       free_variables_list
         (Ident.Set.union (free_variables met) (free_variables obj))
         args
@@ -2211,9 +2213,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         assert (not (Ident.Map.mem id s));
         let id = try Ident.Map.find id l with Not_found -> id in
         Lassign(id, subst s l e)
-    | Lsend (k, met, obj, args, pos, mode, loc, layout) ->
+    | Lsend (k, met, obj, args, pos, mode, loc, layout, yielding) ->
         Lsend (k, subst s l met, subst s l obj, subst_list s l args,
-               pos, mode, loc, layout)
+               pos, mode, loc, layout, yielding)
     | Levent (lam, evt) ->
         let old_env = evt.lev_env in
         let env_updates =
@@ -2492,13 +2494,13 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lassign (v, old_e) ->
       let new_e = f old_e in
       if old_e == new_e then lam else Lassign (v, new_e)
-  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout) ->
+  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout, yielding) ->
       let new_m = f old_m in
       let new_o = f old_o in
       let new_el = Misc.Stdlib.List.map_sharing f old_el in
       if old_m == new_m && old_o == new_o && old_el == new_el
       then lam
-      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout)
+      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout, yielding)
   | Levent (old_l, ev) ->
       let new_l = tail old_l in
       if old_l == new_l then lam else Levent (new_l, ev)
@@ -3532,7 +3534,7 @@ let may_allocate_in_region lam =
 
     | Lapply {ap_mode=Alloc_local}
     | Lkindinstantiate {kinst_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Alloc_local,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
