@@ -1070,6 +1070,33 @@ end = struct
       types
 end
 
+module Aliases_of_existentials = struct
+  type t =
+    { aliases_of_variables :
+        Variable_in_target_env.Set.t Variable_in_target_env.Map.t
+    }
+
+  let empty = { aliases_of_variables = Variable_in_target_env.Map.empty }
+
+  let aliases_of_existential_var t var =
+    try Variable_in_target_env.Map.find var t.aliases_of_variables
+    with Not_found -> Variable_in_target_env.Set.empty
+
+  let add t ~(demoted_var : Variable_in_target_env.t)
+      ~(existential_var : Variable_in_target_env.t) =
+    let aliases_of_canonical_element =
+      aliases_of_existential_var t existential_var
+    in
+    let aliases_of_existential_var =
+      Variable_in_target_env.Set.add demoted_var aliases_of_canonical_element
+    in
+    let aliases_of_variables =
+      Variable_in_target_env.Map.add existential_var aliases_of_existential_var
+        t.aliases_of_variables
+    in
+    { aliases_of_variables }
+end
+
 (** {1 Public interface} *)
 
 type env_id = Index.t
@@ -1083,6 +1110,7 @@ type definition_in_joined_envs =
 type t =
   { joined_envs : Joined_envs.t;
     types_in_target_env : Type_in_target_env.t Name_in_target_env.Map.t;
+    aliases_of_existentials : Aliases_of_existentials.t;
     definitions_in_joined_envs :
       definition_in_joined_envs Variable_in_target_env.Map.t;
     bindings : Bindings_in_target_env.t
@@ -1091,6 +1119,7 @@ type t =
 let create ~joined_envs ~bindings =
   { joined_envs;
     types_in_target_env = Name_in_target_env.Map.empty;
+    aliases_of_existentials = Aliases_of_existentials.empty;
     definitions_in_joined_envs = Variable_in_target_env.Map.empty;
     bindings
   }
@@ -1328,6 +1357,11 @@ let join_aliases_into_bindings env equations_to_join =
           let existential_var, env =
             existential_for_these_simples env canonicals kind
           in
+          let aliases_of_existentials =
+            Aliases_of_existentials.add env.aliases_of_existentials
+              ~demoted_var:var ~existential_var
+          in
+          let env = { env with aliases_of_existentials } in
           let simple = Simple_in_target_env.var existential_var in
           add_equals_in_target_env env simple))
 
@@ -1625,6 +1659,142 @@ let cut_for_join typing_env ~cut_after =
   in
   incremental_equations, symbol_projections
 
+let move_inverse_relation ~from ~to_ inverse_relations =
+  match Variable.Map.find from inverse_relations with
+  | exception Not_found -> inverse_relations
+  | names ->
+    let inverse_relations = Variable.Map.remove from inverse_relations in
+    Variable.Map.union_total_shared
+      (fun _ rels1 rels2 ->
+        TG.Relation.Map.union_total_shared
+          (fun _ names1 names2 -> Name.Set.union names1 names2)
+          rels1 rels2)
+      (Variable.Map.singleton to_ names)
+      inverse_relations
+
+let move_equation ~from ~to_ equations =
+  let from = Name.var from in
+  let to_ = Name.var to_ in
+  if Name.Map.mem to_ equations
+  then
+    Misc.fatal_errorf
+      "Cannot move equation from %a to %a: there is already an equation: %a"
+      Name.print from Name.print to_ TG.print
+      (Name.Map.find to_ equations);
+  match Name.Map.find from equations with
+  | exception Not_found -> equations
+  | ty ->
+    let equations = Name.Map.remove from equations in
+    Name.Map.add to_ ty equations
+
+let move_definition ~from ~to_ definitions =
+  let from = Variable_in_target_env.create from in
+  let to_ = Variable_in_target_env.create to_ in
+  match Variable_in_target_env.Map.find from definitions with
+  | exception Not_found -> definitions
+  | defn ->
+    let definitions = Variable_in_target_env.Map.remove from definitions in
+    Variable_in_target_env.Map.add to_ defn definitions
+
+let alias_equations_for_existential kind ~canonical_element ~demoted_aliases
+    equations =
+  let ty = TG.alias_type_of kind canonical_element in
+  let equations =
+    Variable_in_target_env.Set.fold
+      (fun alias equations ->
+        Name.Map.add (Name.var (alias :> Variable.t)) ty equations)
+      demoted_aliases equations
+  in
+  ty, equations
+
+let define_or_eliminate_variables_and_add_equations ~meet_expanded_head env
+    source_env inverse_relations =
+  let target_env =
+    Bindings_in_target_env.fold_imported_variables
+      (fun var kind target_env ->
+        ME.add_variable_definition target_env
+          (var :> Variable.t)
+          kind Name_mode.in_types)
+      env.bindings source_env
+  in
+  let equations = (env.types_in_target_env :> TG.t Name.Map.t) in
+  let definitions = env.definitions_in_joined_envs in
+  let target_env, to_expand, equations, inverse_relations, definitions =
+    Bindings_in_target_env.fold_existential_variables
+      (fun var kind
+           (target_env, to_expand, equations, inverse_relations, definitions) ->
+        let aliases_of_var =
+          Aliases_of_existentials.aliases_of_existential_var
+            env.aliases_of_existentials var
+        in
+        let var = (var :> Variable.t) in
+        match Variable_in_target_env.Set.choose_opt aliases_of_var with
+        | None ->
+          (* This includes existential variables that have no other aliases, and
+             imported variables. *)
+          let target_env =
+            ME.add_variable_definition target_env var kind Name_mode.in_types
+          in
+          target_env, to_expand, equations, inverse_relations, definitions
+        | Some canon_var ->
+          let demoted_aliases =
+            Variable_in_target_env.Set.remove canon_var aliases_of_var
+          in
+          let canon_var = (var :> Variable.t) in
+          let definitions =
+            move_definition definitions ~from:var ~to_:canon_var
+          in
+          let equations = move_equation equations ~from:var ~to_:canon_var in
+          let inverse_relations =
+            move_inverse_relation inverse_relations ~from:var ~to_:canon_var
+          in
+          let ty, equations =
+            alias_equations_for_existential kind equations
+              ~canonical_element:(Simple.var canon_var) ~demoted_aliases
+          in
+          let to_expand = Variable.Map.add var ty to_expand in
+          target_env, to_expand, equations, inverse_relations, definitions)
+      env.bindings
+      (target_env, Variable.Map.empty, equations, inverse_relations, definitions)
+  in
+  let to_project = Variable.Map.keys to_expand in
+  let rec expand var =
+    match Variable.Map.find var to_expand with
+    | exception Not_found -> assert false
+    | ty -> (
+      match TG.get_alias_opt ty with
+      | None -> TG.project_variables_out ~to_project ~expand ty
+      | Some simple ->
+        Simple.pattern_match' simple
+          ~const:(fun _ -> ty)
+          ~symbol:(fun _ ~coercion:_ -> ty)
+          ~var:(fun var ~coercion ->
+            if Variable.Set.mem var to_project
+            then TG.apply_coercion (expand var) coercion
+            else ty))
+  in
+  let equations =
+    Name.Map.map (TG.project_variables_out ~to_project ~expand) equations
+  in
+  let equations_for_inverse_relations =
+    Variable.Map.map
+      (fun inverse_relations ->
+        TG.Head_of_kind_naked_immediate.create_inverse_relations
+          inverse_relations
+        |> TG.create_from_head_naked_immediate
+        |> TG.project_variables_out ~to_project ~expand)
+      inverse_relations
+    |> Name.var_map
+  in
+  let target_env =
+    ME.add_env_extension ~meet_expanded_head target_env (TEE.from_map equations)
+  in
+  let target_env =
+    ME.add_env_extension ~meet_expanded_head target_env
+      (TEE.from_map equations_for_inverse_relations)
+  in
+  target_env, definitions
+
 let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
     source_env source_tenv joined_envs equations_to_join
     symbol_projections_to_join =
@@ -1664,59 +1834,15 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         equations_for_bindings env ~since:env_before_this_round
       in
       if Name_in_target_env.Map.is_empty new_equations_to_join
-      then
-        let env_extension_for_inverse_relations =
-          TEE.from_map
-            (Variable.Map.map
-               (fun inverse_relations ->
-                 TG.create_from_head_naked_immediate
-                   (TG.Head_of_kind_naked_immediate.create_inverse_relations
-                      inverse_relations))
-               inverse_relations
-            |> Name.var_map)
-        in
-        ( (* We compute symbol projections last so that we can pick up
-             existential variables, but there is no need to create existential
-             variables from symbol projections since they would not be
-             accessible.
-
-             CR-someday bclement: perform CSE for symbol projections? *)
-          t.types_in_target_env,
-          env_extension_for_inverse_relations,
-          n_way_join_symbol_projections t symbol_projections_to_join,
-          t )
+      then inverse_relations, t
       else loop t new_equations_to_join inverse_relations
     in
-    let equations, env_extension_for_inverse_relations, symbol_projections, env
-        =
+    let inverse_relations, env =
       loop env equations_to_join Variable.Map.empty
     in
-    let target_env =
-      Bindings_in_target_env.fold_imported_variables
-        (fun var kind target_env ->
-          ME.add_variable_definition target_env
-            (var :> Variable.t)
-            kind Name_mode.in_types)
-        env.bindings source_env
-    in
-    let target_env =
-      Bindings_in_target_env.fold_existential_variables
-        (fun var kind target_env ->
-          ME.add_variable_definition target_env
-            (var : Variable_in_target_env.t :> Variable.t)
-            kind Name_mode.in_types)
-        env.bindings target_env
-    in
-    let target_env =
-      ME.add_env_extension ~meet_expanded_head target_env
-        (TEE.from_map
-           (equations
-             : Type_in_target_env.t Name_in_target_env.Map.t
-             :> TG.t Name.Map.t))
-    in
-    let target_env =
-      ME.add_env_extension ~meet_expanded_head target_env
-        env_extension_for_inverse_relations
+    let target_env, definitions =
+      define_or_eliminate_variables_and_add_equations ~meet_expanded_head env
+        source_env inverse_relations
     in
     let target_env =
       Variable_in_target_env.Map.fold
@@ -1724,9 +1850,10 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
           ME.add_symbol_projection target_env
             (var :> Variable.t)
             symbol_projection)
-        symbol_projections target_env
+        (n_way_join_symbol_projections env symbol_projections_to_join)
+        target_env
     in
-    target_env, new_definitions_in_joined_envs env ~since:empty_env
+    target_env, definitions
   with Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "\n@[<v 2>%tContext is:%t cut and join of levels:@ %a@]\n"
