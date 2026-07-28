@@ -28,10 +28,9 @@ val arg_contains_reg64 : reg64 -> arg -> bool
 
 val writes_to_reg64 : reg64 -> instruction -> bool
 
-(** Whether [instr] is certain to leave the value of the operand unchanged: an
-    immediate never changes, and a general-purpose register only changes when
-    written to. We currently conservatively return [false] for all other
-    operands. *)
+(** Whether [instr] is certain to leave the value of the operand unchanged. We
+    currently handle immediates and register operands, but conservatively return
+    [false] for others. *)
 val arg_unchanged_by : arg -> instruction -> bool
 
 val reads_from_reg64 : reg64 -> instruction -> bool
