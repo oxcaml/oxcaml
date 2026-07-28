@@ -502,7 +502,7 @@ CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
 
   int tag = 0;
   // These arrays are always mixed blocks without packing.
-  // This currently differs from e.g. int32# array, which is allocated as a
+  // This currently differs from e.g. int32_u array, which is allocated as a
   // custom block, and is packed.
   int reserved = Reserved_mixed_block_scannable_wosize_native(0);
 

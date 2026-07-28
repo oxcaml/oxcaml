@@ -15,16 +15,16 @@ When small numbers are enabled, the following float32 types are available:
 
 ```
 float32
-float32#
+float32_u
 float32 array
-float32# array
+float32_u array
 ```
 
 Literals use the `s` suffix:
 
 ```
 1.0s  : float32
-#1.0s : float32#
+#1.0s : float32_u
 ```
 
 Pattern matching on `float32`s is not supported.
@@ -40,18 +40,18 @@ The boxed `float32` type is encoded as a custom block with similar semantics to
 `int32`.  Similarly, `float32 array` is a typical OxCaml array containing boxed
 elements.
 
-The `float32#` type is unboxed:
+The `float32_u` type is unboxed:
 
-- Function arguments and returns of type `float32#` are passed using
+- Function arguments and returns of type `float32_u` are passed using
   floating-point registers.
 
-- Record fields of type `float32#` are not boxed, but each take up one word of
+- Record fields of type `float32_u` are not boxed, but each take up one word of
   space.  Using float32 records requires the mixed blocks extension, which is
   also enabled by default.
 
-- Arrays of type `float32# array` contain tightly packed unboxed float32
+- Arrays of type `float32_u array` contain tightly packed unboxed float32
   elements.  The array itself is a custom block with similar semantics to
-  `int32# array`.
+  `int32_u array`.
 
 Like floats, compiler optimizations allow boxed float32s to remain unboxed while
 being manipulated within the scope of a function.
@@ -65,7 +65,7 @@ provides helper functions for working with float32s.
 external float32_stub : (float32[@unboxed]) -> (float32[@unboxed]) =
   "boxed_float32_stub" "unboxed_float32_stub"
 
-external float32_hash_stub : float32# -> float32# =
+external float32_hash_stub : float32_u -> float32_u =
   "boxed_float32_stub" "unboxed_float32_stub"
 
 (* ... *)
@@ -126,7 +126,7 @@ immediate, so polymorphic hash and compare work as expected. `int8 array` and
 
 The types `int8#` and `int16#` are passed around using general purpose
 registers, but do not have a tag bit. They are sign-extended to the width of a
-`nativeint#`. The ints in `int8# array`s and `int16# array`s are packed, but
+`nativeint_u`. The ints in `int8# array`s and `int16# array`s are packed, but
 they are not packed in any other context. For example, an `int8# array` of
 length 30 takes up 4 words of memory, plus the header word, but a
 `#(int8# * int8#)` takes up 2 words of memory and requires 2 registers to pass

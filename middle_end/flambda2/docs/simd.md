@@ -27,12 +27,12 @@ Unlike intrinsics, SIMD loads and stores are represented as flambda2-visible pri
   The address is computed as `array + index * 8`; the safe primitives bounds-check against `0, length - 1`.
   Aligned load/store is not available because these values may be moved by the GC.
 
-- `nativeint# array`, `int64# array`: the corresponding primitives take an index in `nativeint`s/`int64`s and are required to operate on `int64x2`s.
+- `nativeint_u array`, `int64_u array`: the corresponding primitives take an index in `nativeint`s/`int64`s and are required to operate on `int64x2`s.
   The address is computed as `array + index * 8`; the safe primitives bounds-check against `0, length - 1`.
-  The primitives on `nativeint# array` are only available in 64-bit mode.
+  The primitives on `nativeint_u array` are only available in 64-bit mode.
   Aligned load/store is not available because these values may be moved by the GC.
 
-- `int32# array`: the corresponding primitives take an index in `int32`s and are required to operate on `int32x4`s.
+- `int32_u array`: the corresponding primitives take an index in `int32`s and are required to operate on `int32x4`s.
   The address is computed as `array + index * 4`; the safe primitives bounds-check against `0, length - 3`.
   Aligned load/store is not available because these values may be moved by the GC.
 
