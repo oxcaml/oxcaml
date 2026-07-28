@@ -20,6 +20,20 @@ type t
 
 type raw
 
+(* CR mvellacott: [create_table_data] and [import_renaming] are exposed so that
+   CMRs can reuse them, and can be hidden again once the formats are merged. *)
+
+(** The exported forms of hashconsed identifiers in the marshalled data. *)
+type table_data
+
+val create_table_data : Ids_for_export.t -> table_data
+
+val import_renaming :
+  table_data:table_data ->
+  used_value_slots:Value_slot.Set.t ->
+  original_compilation_unit:Compilation_unit.t ->
+  Renaming.t * Code_id.t Code_id.Map.t
+
 val from_raw : sections:File_sections.t -> raw -> t
 
 val create_raw :
