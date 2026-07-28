@@ -1230,6 +1230,12 @@ let (alloc_int_revapply_app @ noalloc_strict) (a : int) (b : int) =
 val alloc_int_revapply_app : int -> (int -> int) @ local = <fun>
 |}]
 
+let (alloc_int_add_revapply @ noalloc_strict) (a : int) =
+  a |> (( + ) a)
+[%%expect{|
+val alloc_int_add_revapply : int -> int = <fun>
+|}]
+
 (* [@@] with a simple head: [( ~- )] fully applied. *)
 let (alloc_int_apply @ noalloc_strict) (a : int) = ( ~- ) @@ a
 [%%expect{|
@@ -1243,6 +1249,12 @@ let (alloc_int_apply_app @ noalloc_strict) (a : int) (b : int) =
 val alloc_int_apply_app : int -> (int -> int) @ local = <fun>
 |}]
 
+let (alloc_int_add_apply @ noalloc_strict) (a : int) =
+  (( + ) a) @@ a
+[%%expect{|
+val alloc_int_add_apply : int -> int = <fun>
+|}]
+
 (* Guard: a *partial* application through [|>] stays rejected -- [( + ) a] is a
    closure, so [( + )] is not fully applied and reports the [noalloc] error. *)
 let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
@@ -1252,6 +1264,17 @@ Line 1, characters 67-72:
                                                                        ^^^^^
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 50-72,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+let (alloc_int_apply_partial @ noalloc_strict) (a : int) = ( + ) @@ a
+[%%expect{|
+Line 1, characters 59-64:
+1 | let (alloc_int_apply_partial @ noalloc_strict) (a : int) = ( + ) @@ a
+                                                               ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 47-69,
          which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
