@@ -56,7 +56,8 @@ type texp_ident_identifier = ident_kind * unique_use
 let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
     (path, lid, desc) =
   let mode = Mode.Value.(disallow_right legacy) in
-  Texp_ident { path; lid; desc; kind; unique_use; mode }
+  let staticity = Mode.Staticity.(disallow_left legacy) in
+  Texp_ident { path; lid; desc; kind; unique_use; staticity; mode }
 
 type nonrec apply_arg = apply_arg
 
