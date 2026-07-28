@@ -33,6 +33,10 @@ CAMLextern void caml_sys_init (const char_os * exe_name, char_os ** argv);
 
 CAMLnoret CAMLextern void caml_do_exit (int);
 
+/* The command-line arguments as an OCaml array of strings (a
+   generational global root), set by [caml_sys_init]. */
+CAMLextern value caml_main_argv;
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_SYS_H */

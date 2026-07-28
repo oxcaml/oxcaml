@@ -1083,13 +1083,10 @@ runtime_COMMON_C_SOURCES = \
   addrmap \
   afl \
   alloc \
-  array \
   backtrace \
   bigarray \
-  blake2 \
   callback \
   codefrag \
-  compare \
   custom \
   debugger \
   domain \
@@ -1099,6 +1096,7 @@ runtime_COMMON_C_SOURCES = \
   fiber \
   dynamic \
   finalise \
+  float32 \
   floats \
   gc_ctrl \
   gc_stats \
@@ -1107,7 +1105,6 @@ runtime_COMMON_C_SOURCES = \
   intern \
   ints \
   io \
-  lexing \
   lf_skiplist \
   main \
   major_gc \
@@ -1118,17 +1115,14 @@ runtime_COMMON_C_SOURCES = \
   minor_gc \
   misc \
   obj \
-  parsing \
   platform \
   printexc \
-  prng \
   roots \
   runtime_events \
   shared_heap \
   signals \
   simd \
   cpu \
-  float32 \
   skiplist \
   startup_aux \
   str \
@@ -1137,6 +1131,31 @@ runtime_COMMON_C_SOURCES = \
   $(TSAN_NATIVE_RUNTIME_C_SOURCES) \
   $(UNIX_OR_WIN32) \
   weak
+
+# C implementations of standard library functions: ordinary library code
+# written in C rather than OCaml, as opposed to the runtime system proper
+# (GC, domains, signals, ...).  It lives in stdlib/prims/ rather than
+# runtime/, but is still compiled into the runtime libraries.
+stdlib_prims_C_SOURCES = \
+  array_prims \
+  bigarray_prims \
+  blake2 \
+  compare \
+  float32_prims \
+  floats_prims \
+  gc_ctrl_prims \
+  hash_prims \
+  ints_prims \
+  io_prims \
+  lexing \
+  md5_prims \
+  obj_prims \
+  parsing \
+  prng \
+  str_prims \
+  sys_prims
+
+stdlib_prims_C_FILES = $(stdlib_prims_C_SOURCES:%=stdlib/prims/%.c)
 
 runtime_BYTECODE_ONLY_C_SOURCES = \
   backtrace_byt \
@@ -1237,6 +1256,20 @@ libasmrunpic_OBJECTS = $(runtime_NATIVE_C_SOURCES:.c=.npic.$(O)) \
 
 libcomprmarsh_OBJECTS = runtime/zstd.npic.$(O)
 
+## The stdlib C primitives libraries.  The bytecode objects make up
+## libcamlprims*, the native objects libasmprims*; ocamlrun links the
+## bytecode objects directly, and ocamlc -custom and ocamlopt add the
+## appropriate library when linking, ahead of the runtime library.
+## Unlike the runtime, these come in a single flavour per backend
+## (plus PIC): they contain no debug- or instrumentation-conditional
+## code beyond CAMLassert, so the debug and instrumented runtimes
+## link the regular primitives.
+
+libcamlprims_OBJECTS = $(stdlib_prims_C_FILES:.c=.b.$(O))
+libcamlprimspic_OBJECTS = $(stdlib_prims_C_FILES:.c=.bpic.$(O))
+libasmprims_OBJECTS = $(stdlib_prims_C_FILES:.c=.n.$(O))
+libasmprimspic_OBJECTS = $(stdlib_prims_C_FILES:.c=.npic.$(O))
+
 ## General (non target-specific) assembler and compiler flags
 
 runtime_CPPFLAGS = -DCAMLDLLIMPORT= -DIN_CAML_RUNTIME
@@ -1314,10 +1347,12 @@ runtime/build_config.h: $(ROOTDIR)/Makefile.config $(SAK)
 
 ## Runtime libraries and programs
 
-runtime/ocamlrun$(EXE): runtime/prims.$(O) runtime/libcamlrun.$(A)
+runtime/ocamlrun$(EXE): runtime/prims.$(O) $(libcamlprims_OBJECTS) \
+  runtime/libcamlrun.$(A)
 	$(V_MKEXE)$(MKEXE) -o $@ $^ $(BYTECCLIBS)
 
-runtime/ocamlruns$(EXE): runtime/prims.$(O) runtime/libcamlrun_non_shared.$(A)
+runtime/ocamlruns$(EXE): runtime/prims.$(O) $(libcamlprims_OBJECTS) \
+  runtime/libcamlrun_non_shared.$(A)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^ $(BYTECCLIBS))
 
 runtime/libcamlrun.$(A): $(libcamlrun_OBJECTS)
@@ -1326,13 +1361,15 @@ runtime/libcamlrun.$(A): $(libcamlrun_OBJECTS)
 runtime/libcamlrun_non_shared.$(A): $(libcamlrun_non_shared_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
-runtime/ocamlrund$(EXE): runtime/prims.$(O) runtime/libcamlrund.$(A)
+runtime/ocamlrund$(EXE): runtime/prims.$(O) $(libcamlprims_OBJECTS) \
+  runtime/libcamlrund.$(A)
 	$(V_MKEXE)$(MKEXE) $(MKEXEDEBUGFLAG) -o $@ $^ $(BYTECCLIBS)
 
 runtime/libcamlrund.$(A): $(libcamlrund_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
-runtime/ocamlruni$(EXE): runtime/prims.$(O) runtime/libcamlruni.$(A)
+runtime/ocamlruni$(EXE): runtime/prims.$(O) $(libcamlprims_OBJECTS) \
+  runtime/libcamlruni.$(A)
 	$(V_MKEXE)$(MKEXE) -o $@ $^ $(INSTRUMENTED_RUNTIME_LIBS) $(BYTECCLIBS)
 
 runtime/libcamlruni.$(A): $(libcamlruni_OBJECTS)
@@ -1341,7 +1378,8 @@ runtime/libcamlruni.$(A): $(libcamlruni_OBJECTS)
 runtime/libcamlrun_pic.$(A): $(libcamlrunpic_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
-runtime/libcamlrun_shared.$(SO): $(libcamlrunpic_OBJECTS)
+runtime/libcamlrun_shared.$(SO): $(libcamlrunpic_OBJECTS) \
+  $(libcamlprimspic_OBJECTS)
 	$(V_MKDLL)$(MKDLL) -o $@ $^ $(BYTECCLIBS)
 
 runtime/libasmrun.$(A): $(libasmrun_OBJECTS)
@@ -1356,10 +1394,25 @@ runtime/libasmruni.$(A): $(libasmruni_OBJECTS)
 runtime/libasmrun_pic.$(A): $(libasmrunpic_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
-runtime/libasmrun_shared.$(SO): $(libasmrunpic_OBJECTS)
+runtime/libasmrun_shared.$(SO): $(libasmrunpic_OBJECTS) \
+  $(libasmprimspic_OBJECTS)
 	$(V_MKDLL)$(MKDLL) -o $@ $^ $(NATIVECCLIBS)
 
 runtime/libcomprmarsh.$(A): $(libcomprmarsh_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
+## Stdlib C primitives libraries
+
+stdlib/prims/libcamlprims.$(A): $(libcamlprims_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
+stdlib/prims/libcamlprims_pic.$(A): $(libcamlprimspic_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
+stdlib/prims/libasmprims.$(A): $(libasmprims_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
+stdlib/prims/libasmprims_pic.$(A): $(libasmprimspic_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
 ## Runtime target-specific preprocessor and compiler flags
@@ -1393,6 +1446,37 @@ runtime/%.npic.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(SHAREDLIB_CFLAGS)
 runtime/%.npic.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
 $(DEPDIR)/runtime/%.npic.$(D): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
 
+# The stdlib C primitives are compiled with the same flags as the
+# runtime, since they end up in the runtime libraries.
+stdlib/prims/%.$(O): OC_CPPFLAGS += $(runtime_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.$(D): OC_CPPFLAGS += $(runtime_CPPFLAGS)
+
+stdlib/prims/%.bd.$(O): OC_CPPFLAGS += $(ocamlrund_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.bd.$(D): OC_CPPFLAGS += $(ocamlrund_CPPFLAGS)
+
+stdlib/prims/%.bi.$(O): OC_CPPFLAGS += $(ocamlruni_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.bi.$(D): OC_CPPFLAGS += $(ocamlruni_CPPFLAGS)
+
+stdlib/prims/%.bpic.$(O): OC_CFLAGS += $(SHAREDLIB_CFLAGS)
+
+stdlib/prims/%.n.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
+stdlib/prims/%.n.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.n.$(D): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
+
+stdlib/prims/%.nd.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
+stdlib/prims/%.nd.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrund_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.nd.$(D): \
+  OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrund_CPPFLAGS)
+
+stdlib/prims/%.ni.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
+stdlib/prims/%.ni.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.ni.$(D): \
+  OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
+
+stdlib/prims/%.npic.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(SHAREDLIB_CFLAGS)
+stdlib/prims/%.npic.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
+$(DEPDIR)/stdlib/prims/%.npic.$(D): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
+
 # The major GC performs better with this flag on Intel processors
 # This is a workaround for an Intel CPU bug:
 # https://www.intel.co.uk/content/www/uk/en/support/articles/000055650/processors.html
@@ -1400,7 +1484,7 @@ runtime/major_gc.%.$(O): OC_CFLAGS += $(INTEL_JCC_BUG_CFLAGS)
 
 # Partial inlining on (at least) caml_string_compare seems to produce
 # worse code.
-runtime/str.%.$(O): OC_CFLAGS += $(NO_PARTIAL_INLINING_CFLAGS)
+stdlib/prims/str_prims.%.$(O): OC_CFLAGS += $(NO_PARTIAL_INLINING_CFLAGS)
 
 ## Compilation of runtime C files
 
@@ -1417,9 +1501,10 @@ ifneq "$(1)" "%"
 # ones will not be generated. For this reason, we don't use -MG and
 # instead include $(runtime_BUILT_HEADERS) in the order only dependencies
 # to ensure that they exist before dependencies are computed.
-$(DEPDIR)/$(1).$(D): runtime/%.c | $(DEPDIR)/runtime $(runtime_BUILT_HEADERS)
+$(DEPDIR)/$(1).$(D): $(2).c \
+    | $(DEPDIR)/$(patsubst %/,%,$(dir $(1))) $(runtime_BUILT_HEADERS)
 	$$(V_CCDEPS)$$(DEP_CC) $$(OC_CPPFLAGS) $$(CPPFLAGS) $$< -MT \
-	  'runtime/$$*$(subst runtime/%,,$(1)).$(O)' -MF $$@
+	  '$(subst %,$$*,$(1)).$(O)' -MF $$@
 endif # ifneq "$(1)" "%"
 $(1).$(O): $(2).c
 else
@@ -1434,6 +1519,9 @@ endef
 $(DEPDIR)/runtime:
 	$(MKDIR) $@
 
+$(DEPDIR)/stdlib/prims:
+	$(MKDIR) $@
+
 runtime_OBJECT_TYPES = % %.b %.bd %.bi %.bpic
 ifeq "$(NATIVE_COMPILER)" "true"
 runtime_OBJECT_TYPES += %.n %.nd %.ni %.np %.npic
@@ -1441,6 +1529,10 @@ endif
 
 $(foreach runtime_OBJECT_TYPE, $(runtime_OBJECT_TYPES), \
   $(eval $(call COMPILE_C_FILE,runtime/$(runtime_OBJECT_TYPE),runtime/%)))
+
+$(foreach runtime_OBJECT_TYPE, $(runtime_OBJECT_TYPES), \
+  $(eval \
+    $(call COMPILE_C_FILE,stdlib/prims/$(runtime_OBJECT_TYPE),stdlib/prims/%)))
 
 runtime/$(UNIX_OR_WIN32)_non_shared.%.$(O): \
   OC_CPPFLAGS += -DBUILDING_LIBCAMLRUNS
@@ -1489,9 +1581,11 @@ runtime/%_libasmrunpic.obj: runtime/%.asm
 ## Runtime dependencies
 
 runtime_DEP_FILES := $(addsuffix .b, \
-  $(basename $(runtime_BYTECODE_C_SOURCES) runtime/instrtrace))
+  $(basename $(runtime_BYTECODE_C_SOURCES) $(stdlib_prims_C_FILES) \
+              runtime/instrtrace))
 ifeq "$(NATIVE_COMPILER)" "true"
-runtime_DEP_FILES += $(addsuffix .n, $(basename $(runtime_NATIVE_C_SOURCES)))
+runtime_DEP_FILES += $(addsuffix .n, \
+  $(basename $(runtime_NATIVE_C_SOURCES) $(stdlib_prims_C_FILES)))
 endif
 runtime_DEP_FILES += $(addsuffix d, $(runtime_DEP_FILES)) \
              $(addsuffix i, $(runtime_DEP_FILES)) \
@@ -1511,6 +1605,7 @@ stdlib/libcamlrun.$(A): runtime-all
 	cd stdlib; $(LN) ../runtime/libcamlrun.$(A) .
 clean::
 	rm -f $(addprefix runtime/, *.o *.obj *.a *.lib *.so *.dll ld.conf)
+	rm -f $(addprefix stdlib/prims/, *.o *.obj *.a *.lib)
 	rm -f $(addprefix runtime/, ocamlrun ocamlrund ocamlruni ocamlruns sak)
 	rm -f $(addprefix runtime/, \
 	  ocamlrun.exe ocamlrund.exe ocamlruni.exe ocamlruns.exe sak.exe)

@@ -44,12 +44,22 @@ let runtime_lib () =
   let variant =
     if !Clflags.runtime_variant = "nnp" then "" else !Clflags.runtime_variant
   in
-  let libname = "libasmrun" ^ variant ^ ext_lib in
-  try
-    if !Clflags.nopervasives || not !Clflags.with_runtime
-    then []
-    else [Load_path.find libname]
-  with Not_found -> raise (Linkenv.Error (File_not_found libname))
+  let find libname =
+    try Load_path.find libname
+    with Not_found -> raise (Linkenv.Error (File_not_found libname))
+  in
+  if !Clflags.nopervasives || not !Clflags.with_runtime
+  then []
+  else
+    (* The stdlib C primitives live in their own library, linked ahead of the
+       runtime library proper. The force-link object pulls all of them in, so
+       that dynamically-loaded OCaml code can use any stdlib primitive even if
+       the main program does not. The primitives come in a single flavour (plus
+       PIC), shared by all runtime variants. *)
+    let prims_variant = if String.equal variant "_pic" then variant else "" in
+    [ find ("stdlib_prims_force_link" ^ ext_obj);
+      find ("libasmprims" ^ prims_variant ^ ext_lib);
+      find ("libasmrun" ^ variant ^ ext_lib) ]
 
 (* Second pass: generate the startup file and link it with everything else *)
 

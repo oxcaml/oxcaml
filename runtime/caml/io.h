@@ -95,6 +95,9 @@ CAMLextern int caml_channel_binary_mode (struct channel *);
 
 CAMLextern int caml_flush_partial (struct channel *);
 CAMLextern void caml_flush (struct channel *);
+/* Like [caml_flush], but does nothing rather than raising if the
+   channel is closed. */
+CAMLextern void caml_flush_noexc (struct channel *);
 CAMLextern void caml_flush_if_unbuffered (struct channel *);
 CAMLextern void caml_putch(struct channel *, int);
 CAMLextern void caml_putword (struct channel *, uint32_t);
@@ -125,6 +128,14 @@ CAMLextern void caml_channel_cleanup_on_raise(void);
 
 CAMLextern struct channel * caml_all_opened_channels;
 CAMLextern caml_plat_mutex caml_all_opened_channels_mutex;
+
+/* Mark a channel as managed by the GC and put it on the list of open
+   channels. */
+CAMLextern void caml_channel_register(struct channel *, int flags);
+
+/* Run any pending actions, releasing the channel lock (for channels
+   managed by the GC) while they run. */
+CAMLextern void caml_channel_check_pending(struct channel *);
 
 /* Conversion between file_offset and int64_t */
 

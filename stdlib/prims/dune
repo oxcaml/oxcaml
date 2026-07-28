@@ -1,0 +1,63 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                     Thomas Refis, Jane Street Europe                   *
+;*                                                                        *
+;*   Copyright 2018 Jane Street Group LLC                                 *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+; The C implementations of stdlib functions, built into their own
+; libraries: libcamlprims* (bytecode) and libasmprims* (native),
+; linked by ocamlc -custom and ocamlopt ahead of the runtime
+; libraries.  The force-link object pulls every primitive into native
+; executables, for dynamically-loaded code.
+
+(rule
+ (targets libcamlprims.a libcamlprims_pic.a
+   libasmprims.a libasmprims_pic.a
+   force_link.n.o)
+ (mode    fallback)
+ (deps
+   ../../Makefile.config
+   ../../Makefile.build_config
+   ../../Makefile.config_if_required
+   ../../Makefile.common ../../Makefile.upstream
+   ../../Makefile.menhir
+   ../../Makefile.best_binaries
+   ../../Makefile.dev
+   ../../.depend.menhir
+   ../../config.status
+   ../StdlibModules
+   (glob_files ../../runtime/caml/*.h)
+   ../../runtime/float16.h
+   ../../runtime/build_config.h
+   ../../runtime/caml/domain_state.tbl
+   (glob_files *.c)
+ )
+ (action
+ (no-infer
+   (progn
+     ; -o: build_config.h is provided by the runtime dune rules; make
+     ; must treat it as up to date rather than rebuild it (that needs sak).
+     (bash "cd ../.. && make V=1 -j8 -f Makefile.upstream COMPUTE_DEPS=false \
+    -o runtime/build_config.h \
+    stdlib/prims/libcamlprims.a stdlib/prims/libcamlprims_pic.a \
+    stdlib/prims/libasmprims.a stdlib/prims/libasmprims_pic.a \
+    stdlib/prims/force_link.n.o")))))
+
+(install
+  (files
+    libcamlprims.a
+    libcamlprims_pic.a
+    libasmprims.a
+    libasmprims_pic.a
+    (force_link.n.o as stdlib_prims_force_link.o)
+  )
+  (section lib)
+  (package ocaml_runtime_stdlib))
