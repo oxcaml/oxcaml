@@ -87,6 +87,7 @@ and instrument = function
   | Clet (v, e, body) -> Clet (v, instrument e, instrument body)
   | Cphantom_let (v, defining_expr, body) ->
     Cphantom_let (v, defining_expr, instrument body)
+  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, instrument body)
   | Ctuple es -> Ctuple (List.map instrument es)
   | Cop (op, es, dbg) -> Cop (op, List.map instrument es, dbg)
   | Csequence (e1, e2) -> Csequence (instrument e1, instrument e2)
