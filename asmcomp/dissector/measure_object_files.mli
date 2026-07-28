@@ -35,7 +35,10 @@
 (** Errors that can occur when measuring object files. *)
 type error =
   | File_not_found of string
-  | Duplicate_file of string
+  | Unrecognized_input of
+      { filename : string;
+        magic : string
+      }  (** The file is neither an ELF relocatable object nor an ar archive. *)
 
 (** Exception wrapper for measurement errors. *)
 exception Error of error
