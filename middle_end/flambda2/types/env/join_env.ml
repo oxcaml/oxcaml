@@ -162,8 +162,8 @@ end = struct
   let[@inline] fold_iterator ~f ~init iterator =
     let rec loop iterator acc =
       match Name_map_join_iterator.current iterator with
-      | None -> acc
-      | Some name ->
+      | Null -> acc
+      | This name ->
         Name_map_join_iterator.accept iterator;
         let acc = (f [@inlined hint]) name acc in
         Name_map_join_iterator.advance iterator;
