@@ -41,6 +41,8 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
+  (* Rebuild a reaped compilation unit. The output prefix should come with
+     [.reaped] appended. *)
   val reaper_rebuild :
     cmr_file:string -> output_prefix:string -> keep_symbol_tables:bool -> unit
 
@@ -205,8 +207,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Reaper_rebuild { compile_from_reaped_flambda; cmr_file } ->
-      (* Rebuild a reaped compilation unit. The output prefix should be
-         [foo.reaped]. *)
       (* CR mvellacott: write the rebuilt unit's .cmx. *)
       compile_from_reaped_flambda ~keep_symbol_tables ~cmr_file info
     | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
@@ -343,7 +343,7 @@ let native unix
           let machine_width = Target_system.Machine_width.Sixty_four in
           (* CR mvellacott: the required globals should be read from the .cmx
              rather than assumed empty. *)
-          Asmgen.compile_implementation_from_reaped_flambda unix
+          Asmgen.compile_implementation_from_cmm unix
             ~required_globals:Compilation_unit.Set.empty
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)

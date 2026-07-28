@@ -694,7 +694,7 @@ type direct_to_cmm =
 
 type pipeline = Direct_to_cmm of direct_to_cmm
 
-type reaped_flambda_direct_to_cmm =
+type make_cmm =
   ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
 
 let asm_filename output_prefix =
@@ -702,7 +702,7 @@ let asm_filename output_prefix =
   then output_prefix ^ ext_asm
   else Filename.temp_file "camlasm" ext_asm
 
-let compile_cmm_implementation unix ?toplevel ~required_globals ~sourcefile
+let compile_implementation_from_cmm unix ?toplevel ~required_globals ~sourcefile
     ~prefixname ~ppf_dump make_cmm =
   compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
@@ -716,17 +716,12 @@ let compile_cmm_implementation unix ?toplevel ~required_globals ~sourcefile
 
 let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~ppf_dump (program : Lambda.program) =
-  compile_cmm_implementation unix ?toplevel
+  let make_cmm =
+    match pipeline with Direct_to_cmm direct_to_cmm -> direct_to_cmm program
+  in
+  compile_implementation_from_cmm unix ?toplevel
     ~required_globals:program.required_globals ~sourcefile ~prefixname ~ppf_dump
-    (fun ~ppf_dump ~prefixname ->
-      match pipeline with
-      | Direct_to_cmm direct_to_cmm ->
-        direct_to_cmm ~ppf_dump ~prefixname program)
-
-let compile_implementation_from_reaped_flambda unix ~required_globals
-    ~sourcefile ~prefixname ~ppf_dump (to_cmm : reaped_flambda_direct_to_cmm) =
-  compile_cmm_implementation unix ~required_globals ~sourcefile ~prefixname
-    ~ppf_dump to_cmm
+    make_cmm
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in

@@ -161,7 +161,7 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
       (* CR mvellacott: change validation: should take one .ltosol and many
          .cmx files (potentially other files too?). *)
       let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
-      let cmr_file, inputs = match
+      let cmr_file, (_other_inputs : string list) = match
         List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
       with
         | [cmr_file], inputs -> cmr_file, inputs
@@ -171,9 +171,6 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
              %d: [%s])"
             (List.length cmr_files) (String.concat ", " cmr_files)
       in
-      List.iter
-        (fun file -> Printf.printf "other rebuild input: %s\n" file)
-        inputs;
       Compiler.reaper_rebuild ~cmr_file
         ~output_prefix:(Compenv.output_prefix cmr_file ^ ".reaped")
         ~keep_symbol_tables:false;

@@ -32,6 +32,9 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(* CR mvellacott: once implemented, document the effect of [keep_symbol_tables]
+   in the signature below. *)
+
 (** Rebuild a reaped compilation unit from its reaped Flambda data. *)
 type compile_from_reaped_flambda =
   keep_symbol_tables:bool -> cmr_file:string -> Compile_common.info -> unit

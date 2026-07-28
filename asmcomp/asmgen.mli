@@ -27,7 +27,7 @@ type direct_to_cmm =
 type pipeline = Direct_to_cmm of direct_to_cmm
 
 (** The type of converters producing Cmm from a reaped compilation unit. *)
-type reaped_flambda_direct_to_cmm =
+type make_cmm =
   ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
 
 (** Compile an implementation from Lambda using the given middle end. *)
@@ -43,13 +43,14 @@ val compile_implementation :
 
 (** Compile an implementation from the Cmm phrases produced by the given
     converter, e.g. when rebuilding a reaped compilation unit. *)
-val compile_implementation_from_reaped_flambda :
+val compile_implementation_from_cmm :
   (module Compiler_owee.Unix_intf.S) ->
+  ?toplevel:(string -> bool) ->
   required_globals:Compilation_unit.Set.t ->
   sourcefile:string option ->
   prefixname:string ->
   ppf_dump:Format.formatter ->
-  reaped_flambda_direct_to_cmm ->
+  make_cmm ->
   unit
 
 (** [compile_implementation_linear] reads Linear IR from [progname] file
