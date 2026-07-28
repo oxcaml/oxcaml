@@ -722,24 +722,14 @@ module Bindings_in_target_env : sig
 
   val exists_in_target_env : t -> Variable.t -> Variable_in_target_env.t option
 
-  (* Return the (unique across the whole join) name to be used to represent an
-     imported variable. *)
-  val import_from_all_envs :
-    t -> Variable_in_one_joined_env.t -> K.t -> Variable_in_target_env.t * t
+  (* Mark a variable as imported in the target env, so that it gets redefined in
+     the target env. *)
+  val import_from_all_envs : t -> Variable_in_one_joined_env.t -> K.t -> t
 
   (* Return the (unique across the whole join) name to be used to represent this
      set of simples in joined environments. *)
   val existential_for_these_simples :
     t -> Simples_in_joined_envs.t -> K.t -> Variable_in_target_env.t * t
-
-  type definition_in_joined_envs =
-    | Imported_var of Variable_in_one_joined_env.t * K.t
-    | These_canonicals of Simple_in_one_joined_env.t Index.Map.t * K.t
-
-  (* Assuming that [t] derives from [since], returns the definitions of local
-     variables that have been added to [t] after [since]. *)
-  val new_bindings :
-    t -> since:t -> definition_in_joined_envs Name_in_target_env.Map.t
 
   (* Assuming that [t] derives from [since], extract the created variables from
      [t], adding them to [since]. Any information about the created variables
@@ -747,7 +737,10 @@ module Bindings_in_target_env : sig
      forgotten, and they won't appear in the [new_bindings]. *)
   val forget_definition_of_created_variables : t -> since:t -> t
 
-  val fold_created_variables :
+  val fold_imported_variables :
+    (Variable_in_one_joined_env.t -> K.t -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val fold_existential_variables :
     (Variable_in_target_env.t -> K.t -> 'a -> 'a) -> t -> 'a -> 'a
 
   (* These are for the join of env extensions, see [prepare_nested_join]. *)
@@ -763,42 +756,31 @@ module Bindings_in_target_env : sig
 end = struct
   type coercion_to_canonical_in_target_env = Coercion.t
 
-  type definition_in_joined_envs =
-    | Imported_var of Variable_in_one_joined_env.t * K.t
-    | These_canonicals of Simple_in_one_joined_env.t Index.Map.t * K.t
-
   type t =
     { source_env : Source_env.t;
       existential_for_these_simples :
         Variable_in_target_env.t Simples_in_joined_envs.Map.t;
-      (* Maps a set of [simples] in joined environments to the (unique across
-         the whole join) name used to represent this exact set of simples in the
-         target environment. *)
-      imported_variables :
-        Variable_in_target_env.t Variable_in_one_joined_env.Map.t;
-      (* Maps a local variable (a variable that exists in at least one joined
-         environment) to its name in the target environment.
-
-         The underlying variable used in the joined and target environments is
-         the same, only the type-level metadata changes.
-
-         CR bclement: This should just be a set now. *)
-      created_variables : K.t Variable_in_target_env.Map.t;
-      (* This contains all the local variables (existentials or imported) that
-         exist in the target environment but not in the source environment. *)
-      definitions_in_joined_envs :
-        definition_in_joined_envs Name_in_target_env.Map.t;
-      (* Reverse map from local variables to their definition. *)
+          (* Maps a set of [simples] in joined environments to the (unique
+             across the whole join) name used to represent this exact set of
+             simples in the target environment. *)
+      imported_variables : K.t Variable_in_one_joined_env.Map.t;
+          (* Set of variables that have been imported from at least one of the
+             joined environments into the target environment. *)
+      existential_variables : K.t Variable_in_target_env.Map.t;
+          (* This contains all the existential variables, created during the
+             join, that exist in the target environment but not in the source
+             environment or in any of the joined environments. *)
       aliases_of_names_in_joined_envs :
         coercion_to_canonical_in_target_env Name_in_target_env.Map.t
         Name_in_one_joined_env.Map.t
         Index.Map.t;
-      (* For each joined environment and each name in the joined environment,
-         record the set of names in the target environment it is equal to (and
-         the corresponding coercions).
+          (* For each joined environment and each name in the joined
+             environment, record the set of names in the target environment it
+             is equal to (and the corresponding coercions).
 
-         This is used to implement [replay_definitions_of_aliases_in_target_env]
-         in the join of env extensions, see [prepare_nested_join]. *)
+             This is used to implement
+             [replay_definitions_of_aliases_in_target_env] in the join of env
+             extensions, see [prepare_nested_join]. *)
       equations_for_local_vars :
         Type_in_one_joined_env.t Variable_in_target_env.Map.t Index.Map.t
           (* Environment extensions to use in each of the joined environments to
@@ -814,27 +796,19 @@ end = struct
       existential_for_these_simples = Simples_in_joined_envs.Map.empty;
       imported_variables = Variable_in_one_joined_env.Map.empty;
       aliases_of_names_in_joined_envs = Index.Map.empty;
-      definitions_in_joined_envs = Name_in_target_env.Map.empty;
       equations_for_local_vars = Index.Map.empty;
-      created_variables = Variable_in_target_env.Map.empty
+      existential_variables = Variable_in_target_env.Map.empty
     }
-
-  let new_bindings t ~since =
-    Name_in_target_env.Map.diff_shared
-      (fun _ new_definition _old_definition -> Some new_definition)
-      t.definitions_in_joined_envs since.definitions_in_joined_envs
 
   let forget_definition_of_created_variables t ~since =
     (* We still need to record the fact that we created those variables in order
        to add them to the target environment at the end of the join. *)
-    { since with created_variables = t.created_variables }
+    { since with
+      existential_variables = t.existential_variables;
+      imported_variables = t.imported_variables
+    }
 
   let source_env { source_env; _ } = source_env
-
-  let is_local_variable { created_variables; _ } var =
-    if Variable_in_target_env.Map.mem var created_variables
-    then Some var
-    else None
 
   let exists_in_target_env t var =
     match Source_env.exists_in_source_env (source_env t) var with
@@ -842,7 +816,11 @@ end = struct
       Some (Variable_in_target_env.from_source_env var_in_source_env)
     | None ->
       let var = Variable_in_target_env.create var in
-      if Variable_in_target_env.Map.mem var t.created_variables
+      if
+        Variable_in_target_env.Map.mem var t.existential_variables
+        || Variable_in_one_joined_env.Map.mem
+             (Variable_in_one_joined_env.create (var :> Variable.t))
+             t.imported_variables
       then Some var
       else None
 
@@ -870,24 +848,23 @@ end = struct
               aliases_in_target_env))
       simples aliases_in_target_env
 
-  let record_definition_for t ~var_in_target_env definition =
-    (* name_in_target_env ~ coercion_to_name_in_target_env(definition) *)
-    let definitions_in_joined_envs =
-      Name_in_target_env.Map.add
-        (Name_in_target_env.var var_in_target_env)
-        definition t.definitions_in_joined_envs
-    in
-    match definition with
-    | Imported_var (imported_var, _kind) ->
-      let imported_variables =
-        Variable_in_one_joined_env.Map.add imported_var var_in_target_env
-          t.imported_variables
+  let has_existential_for_these_simples t simples =
+    Simples_in_joined_envs.Map.find_opt simples t.existential_for_these_simples
+
+  let existential_for_these_simples t simples kind =
+    match has_existential_for_these_simples t simples with
+    | Some existing_canonical -> existing_canonical, t
+    | None ->
+      let var =
+        let name = Simples_in_joined_envs.choose_a_suitable_name simples in
+        Variable_in_target_env.create (Variable.create name kind)
       in
-      ( var_in_target_env,
-        { t with imported_variables; definitions_in_joined_envs } )
-    | These_canonicals (simples, kind) ->
+      let existential_variables =
+        Variable_in_target_env.Map.add var kind t.existential_variables
+      in
+      let t = { t with existential_variables } in
       let existential_for_these_simples =
-        Simples_in_joined_envs.Map.add simples var_in_target_env
+        Simples_in_joined_envs.Map.add simples var
           t.existential_for_these_simples
       in
       (* The following is some bookkeeping so that we know how to replay the
@@ -896,75 +873,41 @@ end = struct
       let equations_for_local_vars =
         (* If the variable is a fresh variable, record it so that we can replay
            its definition during the join of env extensions. *)
-        match is_local_variable t var_in_target_env with
-        | None -> t.equations_for_local_vars
-        | Some var ->
-          Index.Map.update_many
-            (fun _index existentials simple ->
-              let ty = Type_in_one_joined_env.alias_type_of kind simple in
-              let existentials_in_one_joined_env =
-                Variable_in_target_env.Map.add var ty
-                  (Option.value ~default:Variable_in_target_env.Map.empty
-                     existentials)
-              in
-              Some existentials_in_one_joined_env)
-            t.equations_for_local_vars simples
+        Index.Map.update_many
+          (fun _index existentials simple ->
+            let ty = Type_in_one_joined_env.alias_type_of kind simple in
+            let existentials_in_one_joined_env =
+              Variable_in_target_env.Map.add var ty
+                (Option.value ~default:Variable_in_target_env.Map.empty
+                   existentials)
+            in
+            Some existentials_in_one_joined_env)
+          t.equations_for_local_vars simples
       in
       let aliases_of_names_in_joined_envs =
         update_aliases_of_names_in_joined_envs simples
           t.aliases_of_names_in_joined_envs ~f:(fun coercion aliases ->
             (* definition ~ coercion(name_in_joined_env) *)
             Name_in_target_env.Map.add
-              (Name_in_target_env.var var_in_target_env)
+              (Name_in_target_env.var var)
               coercion aliases)
       in
-      ( var_in_target_env,
+      ( var,
         { t with
           equations_for_local_vars;
           existential_for_these_simples;
-          aliases_of_names_in_joined_envs;
-          definitions_in_joined_envs
+          aliases_of_names_in_joined_envs
         } )
 
-  let create_name_for_definition t definition =
-    let var, kind =
-      match definition with
-      | Imported_var (var, kind) ->
-        let var = (var : Variable_in_one_joined_env.t :> Variable.t) in
-        Variable_in_target_env.create var, kind
-      | These_canonicals (simples, kind) ->
-        let name = Simples_in_joined_envs.choose_a_suitable_name simples in
-        Variable_in_target_env.create (Variable.create name kind), kind
-    in
-    let created_variables =
-      Variable_in_target_env.Map.add var kind t.created_variables
-    in
-    let t = { t with created_variables } in
-    record_definition_for t ~var_in_target_env:var definition
-
-  let is_imported_from_all_joined_envs t var =
-    Variable_in_one_joined_env.Map.find_opt var t.imported_variables
-
-  let has_existential_for_these_simples t simples =
-    Simples_in_joined_envs.Map.find_opt simples t.existential_for_these_simples
-
-  let existing_canonical_for t definition =
-    match definition with
-    | Imported_var (imported_var, _kind) ->
-      is_imported_from_all_joined_envs t imported_var
-    | These_canonicals (simples, _kind) ->
-      has_existential_for_these_simples t simples
-
-  let get_or_create_canonical_for t definition =
-    match existing_canonical_for t definition with
-    | None -> create_name_for_definition t definition
-    | Some existing_canonical -> existing_canonical, t
-
-  let existential_for_these_simples t simples kind =
-    get_or_create_canonical_for t (These_canonicals (simples, kind))
-
   let import_from_all_envs t imported_var kind =
-    get_or_create_canonical_for t (Imported_var (imported_var, kind))
+    if Variable_in_one_joined_env.Map.mem imported_var t.imported_variables
+    then t
+    else
+      let imported_variables =
+        Variable_in_one_joined_env.Map.add imported_var kind
+          t.imported_variables
+      in
+      { t with imported_variables }
 
   let replay_definition_of_aliases_in_target_env t index equations =
     match Index.Map.find_opt index t.aliases_of_names_in_joined_envs with
@@ -993,10 +936,15 @@ end = struct
     | None -> Variable_in_target_env.Map.empty
     | Some existentials -> existentials
 
-  let fold_created_variables f t acc =
+  let fold_imported_variables f t acc =
     (* CR bclement: iterate in order consistent with the recorded binding
        times. *)
-    Variable_in_target_env.Map.fold f t.created_variables acc
+    Variable_in_one_joined_env.Map.fold f t.imported_variables acc
+
+  let fold_existential_variables f t acc =
+    (* CR bclement: iterate in order consistent with the recorded binding
+       times. *)
+    Variable_in_target_env.Map.fold f t.existential_variables acc
 end
 
 module Joined_envs : sig
@@ -1128,14 +1076,65 @@ type env_id = Index.t
 
 type 'a join_arg = env_id * 'a
 
+type definition_in_joined_envs =
+  | Imported_var of Variable_in_one_joined_env.t * K.t
+  | These_canonicals of Simple_in_one_joined_env.t Index.Map.t * K.t
+
 type t =
   { joined_envs : Joined_envs.t;
     types_in_target_env : Type_in_target_env.t Name_in_target_env.Map.t;
+    definitions_in_joined_envs :
+      definition_in_joined_envs Variable_in_target_env.Map.t;
     bindings : Bindings_in_target_env.t
   }
 
 let create ~joined_envs ~bindings =
-  { joined_envs; types_in_target_env = Name_in_target_env.Map.empty; bindings }
+  { joined_envs;
+    types_in_target_env = Name_in_target_env.Map.empty;
+    definitions_in_joined_envs = Variable_in_target_env.Map.empty;
+    bindings
+  }
+
+let new_definitions_in_joined_envs t ~since =
+  Variable_in_target_env.Map.diff_shared
+    (fun _ new_definition _old_definition -> Some new_definition)
+    t.definitions_in_joined_envs since.definitions_in_joined_envs
+
+let existential_for_these_simples env canonicals kind =
+  let existential_var, bindings =
+    Bindings_in_target_env.existential_for_these_simples env.bindings canonicals
+      kind
+  in
+  let definitions_in_joined_envs =
+    if
+      Variable_in_target_env.Map.mem existential_var
+        env.definitions_in_joined_envs
+    then env.definitions_in_joined_envs
+    else
+      Variable_in_target_env.Map.add existential_var
+        (These_canonicals (canonicals, kind))
+        env.definitions_in_joined_envs
+  in
+  existential_var, { env with bindings; definitions_in_joined_envs }
+
+let import_from_all_envs env var kind =
+  let bindings =
+    Bindings_in_target_env.import_from_all_envs env.bindings var kind
+  in
+  let imported_var =
+    Variable_in_target_env.create
+      (var : Variable_in_one_joined_env.t :> Variable.t)
+  in
+  let definitions_in_joined_envs =
+    if
+      Variable_in_target_env.Map.mem imported_var env.definitions_in_joined_envs
+    then env.definitions_in_joined_envs
+    else
+      Variable_in_target_env.Map.add imported_var
+        (Imported_var (var, kind))
+        env.definitions_in_joined_envs
+  in
+  { env with bindings; definitions_in_joined_envs }
 
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 
@@ -1319,19 +1318,18 @@ let join_aliases_into_bindings env equations_to_join =
           add_equals_in_target_env env
             (Simple_in_target_env.from_source_env canonical)
         | Import_from_all_joined_envs (imported_var, coercion) ->
-          let imported_var, bindings =
-            Bindings_in_target_env.import_from_all_envs env.bindings
-              imported_var kind
+          let env = import_from_all_envs env imported_var kind in
+          let imported_var =
+            Variable_in_target_env.create (imported_var :> Variable.t)
           in
           let simple = Simple_in_target_env.var ~coercion imported_var in
-          add_equals_in_target_env { env with bindings } simple
+          add_equals_in_target_env env simple
         | Existential_for_these_simples ->
-          let existential_var, bindings =
-            Bindings_in_target_env.existential_for_these_simples env.bindings
-              canonicals kind
+          let existential_var, env =
+            existential_for_these_simples env canonicals kind
           in
           let simple = Simple_in_target_env.var existential_var in
-          add_equals_in_target_env { env with bindings } simple))
+          add_equals_in_target_env env simple))
 
 let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
     env_extension name relation ~scrutinee =
@@ -1639,10 +1637,10 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
     let concrete_equations_to_join, env =
       join_aliases_into_bindings empty_env equations_to_join
     in
-    let equations_for_bindings bindings ~since =
-      let new_bindings = Bindings_in_target_env.new_bindings bindings ~since in
-      Name_in_target_env.Map.map
-        (fun (definition : Bindings_in_target_env.definition_in_joined_envs) ->
+    let equations_for_bindings env ~since =
+      let new_bindings = new_definitions_in_joined_envs env ~since in
+      Variable.Map.map
+        (fun (definition : definition_in_joined_envs) ->
           match definition with
           | Imported_var (var, kind) ->
             Joined_envs.alias_types_of_local_var joined_envs kind var
@@ -1650,19 +1648,20 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
             Index.Map.map
               (fun simple -> Type_in_one_joined_env.alias_type_of kind simple)
               simples)
-        new_bindings
+        (new_bindings :> definition_in_joined_envs Variable.Map.t)
+      |> Name.var_map |> Name_in_target_env.create_map
     in
     let equations_to_join =
       Name_in_target_env.Map.disjoint_union concrete_equations_to_join
-        (equations_for_bindings env.bindings ~since:empty_bindings)
+        (equations_for_bindings env ~since:empty_env)
     in
     let rec loop t equations_to_join inverse_relations =
-      let bindings_before_this_round = t.bindings in
+      let env_before_this_round = t in
       let inverse_relations, t =
         n_way_join_round ~n_way_join_type t equations_to_join inverse_relations
       in
       let new_equations_to_join =
-        equations_for_bindings t.bindings ~since:bindings_before_this_round
+        equations_for_bindings env ~since:env_before_this_round
       in
       if Name_in_target_env.Map.is_empty new_equations_to_join
       then
@@ -1685,22 +1684,28 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
           t.types_in_target_env,
           env_extension_for_inverse_relations,
           n_way_join_symbol_projections t symbol_projections_to_join,
-          t.bindings )
+          t )
       else loop t new_equations_to_join inverse_relations
     in
-    let ( equations,
-          env_extension_for_inverse_relations,
-          symbol_projections,
-          bindings ) =
+    let equations, env_extension_for_inverse_relations, symbol_projections, env
+        =
       loop env equations_to_join Variable.Map.empty
     in
     let target_env =
-      Bindings_in_target_env.fold_created_variables
+      Bindings_in_target_env.fold_imported_variables
+        (fun var kind target_env ->
+          ME.add_variable_definition target_env
+            (var :> Variable.t)
+            kind Name_mode.in_types)
+        env.bindings source_env
+    in
+    let target_env =
+      Bindings_in_target_env.fold_existential_variables
         (fun var kind target_env ->
           ME.add_variable_definition target_env
             (var : Variable_in_target_env.t :> Variable.t)
             kind Name_mode.in_types)
-        bindings source_env
+        env.bindings target_env
     in
     let target_env =
       ME.add_env_extension ~meet_expanded_head target_env
@@ -1721,8 +1726,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
             symbol_projection)
         symbol_projections target_env
     in
-    ( target_env,
-      Bindings_in_target_env.new_bindings bindings ~since:empty_bindings )
+    target_env, new_definitions_in_joined_envs env ~since:empty_env
   with Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf "\n@[<v 2>%tContext is:%t cut and join of levels:@ %a@]\n"
@@ -1736,16 +1740,16 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
 module Analysis = struct
   type 'a t =
     { definitions_in_joined_envs :
-        Bindings_in_target_env.definition_in_joined_envs
-        Name_in_target_env.Map.t;
+        definition_in_joined_envs Variable_in_target_env.Map.t;
       canonical_definitions_at_normal_mode :
-        (Simple_in_one_joined_env.t Index.Map.t * K.t) Name_in_target_env.Map.t;
+        (Simple_in_one_joined_env.t Index.Map.t * K.t)
+        Variable_in_target_env.Map.t;
       external_ids : 'a Index.Map.t
     }
 
   let print ppf { definitions_in_joined_envs; _ } =
-    Name_in_target_env.Map.print
-      (fun ppf (def : Bindings_in_target_env.definition_in_joined_envs) ->
+    Variable_in_target_env.Map.print
+      (fun ppf (def : definition_in_joined_envs) ->
         match def with
         | Imported_var (var, _) ->
           Format.fprintf ppf "@[<hov 1>(imported@ %a)@]"
@@ -1756,9 +1760,8 @@ module Analysis = struct
 
   let create ~external_ids ~joined_envs definitions_in_joined_envs =
     let canonical_definitions_at_normal_mode =
-      Name_in_target_env.Map.filter_map
-        (fun _name
-             (definition : Bindings_in_target_env.definition_in_joined_envs) ->
+      Variable_in_target_env.Map.filter_map
+        (fun _name (definition : definition_in_joined_envs) ->
           match definition with
           | Imported_var (var, kind) ->
             let var = (var :> Variable.t) in
@@ -1837,8 +1840,8 @@ module Analysis = struct
       ~symbol:(fun _ ~coercion:_ -> Invariant_in_all_uses simple)
       ~var:(fun var ~coercion:_ ->
         match
-          Name_in_target_env.Map.find_opt
-            (Name_in_target_env.create (Name.var var))
+          Variable_in_target_env.Map.find_opt
+            (Variable_in_target_env.create var)
             t.definitions_in_joined_envs
         with
         | None ->
@@ -1881,10 +1884,10 @@ module Analysis = struct
   end
 
   let fold_variables_created_at_join ~f t ~init =
-    Name_in_target_env.Map.fold
-      (fun name (canonicals_in_joined_envs, kind) acc ->
+    Variable_in_target_env.Map.fold
+      (fun var (canonicals_in_joined_envs, kind) acc ->
         (f [@inlined hint])
-          (name :> Name.t)
+          (Name.var (var :> Variable.t))
           { Simples_at_join.canonicals_in_joined_envs;
             external_ids = t.external_ids
           }
@@ -1961,17 +1964,15 @@ let n_way_join_canonicals env kind simples =
   | Canonical_in_source_env simple ->
     Simple_in_target_env.from_source_env simple, env
   | Import_from_all_joined_envs (imported_var, coercion) ->
-    let imported_var, bindings =
-      Bindings_in_target_env.import_from_all_envs env.bindings imported_var kind
+    let env = import_from_all_envs env imported_var kind in
+    let imported_var =
+      Variable_in_target_env.create (imported_var :> Variable.t)
     in
     let simple = Simple_in_target_env.var ~coercion imported_var in
-    simple, { env with bindings }
+    simple, env
   | Existential_for_these_simples ->
-    let existential_var, bindings =
-      Bindings_in_target_env.existential_for_these_simples env.bindings simples
-        kind
-    in
-    Simple_in_target_env.var existential_var, { env with bindings }
+    let existential_var, env = existential_for_these_simples env simples kind in
+    Simple_in_target_env.var existential_var, env
 
 let n_way_join_simples t kind simples : _ Or_bottom.t * t =
   match simples with
