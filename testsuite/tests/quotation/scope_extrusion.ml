@@ -22,10 +22,10 @@ val gensym_ref : unit -> <[int]> expr = <fun>
 |}];;
 
 (* caught by printing *)
-let e = gensym_ref ()
+gensym_ref ()
 [%%expect {|
-val e : <[int]> expr =
-  Uncaught exception: Failure("Identifier x bound at file , line 3, characters 12-50\nis extruded outside its scope:\nit is used at file , line 3, characters 38-39\ninside the quote at file , line 3, characters 36-41")
+- : <[int]> expr =
+Uncaught exception: Failure("Identifier x bound at file , line 3, characters 12-50\nis extruded outside its scope:\nit is used at file , line 3, characters 38-39\ninside the quote at file , line 3, characters 36-41")
 
 |}];;
 
@@ -49,12 +49,11 @@ val gensym_exn : unit -> <[int]> expr @ once = <fun>
 |}];;
 
 (* caught by printing *)
-let e = gensym_exn ()
+gensym_exn ()
 [%%expect {|
-Line 1, characters 8-21:
-1 | let e = gensym_exn ()
-            ^^^^^^^^^^^^^
-Error: This value is "once" but is expected to be "many".
+- : <[int]> expr =
+Uncaught exception: Failure("Identifier x bound at file , line 3, characters 9-47\nis extruded outside its scope:\nit is used at file , line 3, characters 42-43\ninside the quote at file , line 3, characters 40-45")
+
 |}];;
 
 (* caught by splicing *)
@@ -96,4 +95,20 @@ safe_eff ()
 [%%expect {|
 val safe_eff : unit -> <[unit -> int]> expr = <fun>
 - : <[unit -> int]> expr = <[fun () -> let x = 42 in x]>
+|}];;
+
+(* We can print if we are still in scope *)
+let safe_eff () =
+  match <[ fun () -> let x = 42 in $(Effect.perform (Extrude <[x]>)) ]> with
+  | x -> x
+  | effect Extrude x, k ->
+    print_endline (Quote.string_of_expr x);
+    Effect.Deep.continue k (Obj.magic_many <[ $x ]>)
+;;
+safe_eff ()
+[%%expect {|
+val safe_eff : unit -> <[unit -> int]> expr = <fun>
+Exception:
+Failure
+ "Identifier x bound at file , line 2, characters 21-68\nis extruded outside its scope:\nit is used at file , line 2, characters 63-64".
 |}];;
