@@ -2873,6 +2873,91 @@ RULES: TC.Prim.ArrayAccess, TC.Prim.ArrayAccess.Vector
   flagged-not-silent protocol applied to my own words, which is how
   it should work.
 
+- PER-RULE SOLIDITY ANNOTATIONS (2026-07-23, design ruling; gates
+  the round): (1) NO derived-never-declared violation — the README
+  scoreboard's generator-owned-region precedent governs; the
+  annotation is OUTPUT co-located with sources, protected by three
+  conditions: the derivation pipeline never reads annotation
+  content (outputs are not inputs — state this clause in the
+  record-76 carve-out beyond main's draft), the
+  annotation-vs-derivation disagree check hard-fails regen, and
+  hand edits inside markers are destroyed. (2) OUTSIDE the fence,
+  after the close — inside would force an exemption INSIDE the
+  triples-census byte-identity's domain, weakening the strongest
+  invariant we have; outside keeps fences 100% human-authored,
+  parser blindness trivially true, and the fence-close line itself
+  becomes the visible provenance boundary. Generator normalizes the
+  byte layout (fence close / annotation / blank line) for
+  determinism. (3) NO .v twin, blessed with stronger grounds:
+  regen writing theories/ would churn .vo timestamps (build
+  invalidation for zero proof content) and violate
+  citation-not-mirror; if proof-side visibility is ever wanted, a
+  generated SOLIDITY.md beats touching theories/. (4) Churn is the
+  FEATURE (site-visible DISPUTED is the findings' delivery
+  vehicle), and annotation-only chapter hunks get the
+  REGENERATION-DIFF stamp class Dijkstra already operates —
+  machine-checkable (all changed lines within markers) with the
+  invariant "every annotation hunk traces to a stamped
+  derivation-input delta". TWO REFINEMENTS offered: render FLAGS,
+  not caveat recounts (the caveat lines sit directly above in the
+  fence; the annotation's job is the derived consequence — ⚠/
+  pending-upstream (watched)/[stale] — and silence when clean);
+  and lighten "derived, do not edit" ×453 to a per-chapter-head
+  generator notice plus a short per-line tail ("derived —
+  [board]") — markers carry the machine protection, the human
+  warning need not repeat 453 times.
+
+- HEADER SCHEMA V2 (2026-07-24, design-delta ruling; user-approved
+  plan): PASS on all three deltas with ONE catch and two wording
+  fixes. (1) The census carve-out ADEQUATELY replaces v1's
+  outside-placement protection, for a reason stronger than the
+  plan states: the census was never whole-header byte-identity —
+  it has always been id|kind pairs, and the header already carries
+  four non-census keyword families (CODE, CAVEAT, VERIFIED,
+  CHECKED) that live doc-side only; GRADE/PROOF are two more. And
+  since the .v comments do NOT gain them (no-.v-twin stands),
+  doc/.v disagreement on the new lines is impossible BY
+  CONSTRUCTION, not by exemption. Exactly-one-GRADE, unknown-value
+  hard-fails, and strict mismatch-before-rewrite freshness all
+  RATIFIED (the checksum property carries). THE CATCH: the plan
+  says PROOF value "complete today, envelope/reflexivity
+  reserved" — but the corpus HAS envelope-Qed instances
+  (MutableBlockMissedBottom, NullPremise, SimpleModeBoundary,
+  StaticDynamicSplit's clauses, AddrConfined's kernel) and a
+  reflexivity instance (CoercionErasure); emitting "complete" for
+  them would OVERCLAIM the proof's extent (their Qeds are on
+  envelopes, not the stated rule) — a false derived line on day
+  one. RULED: implement all three values now (the Traceability
+  instance lists are ground truth the classifier already consumes)
+  or omit the PROOF line on those instances until implemented;
+  never "complete" for them. WORDING FIX: "a Qed under a
+  non-defining role" conflates role with artifact kind — it means
+  "a Qed'd PROPERTY artifact (any role); defining clauses carry no
+  PROOF line" (CodeAgeLoose is ROLE definition and correctly gets
+  PROOF complete because it is a property about γ, not a γ
+  clause). (2) ROLE rename 1:1-NESS RATIFIED, zero reclassification
+  findings: direction-of-authority IS the constrained-subject
+  remedy test in new clothes (what-would-you-fix =
+  who-answers-to-whom); tested against the edge cases —
+  algorithm-shaped TC.*/OS.* rules land specification exactly per
+  my authority-not-content clause, imprecision witnesses are named
+  in implementation's gloss verbatim, the GLB known-false works
+  unchanged; OS.Apply.Effect remains the standing boundary case
+  under ANY naming (its subject is modeling scope, awkward in
+  descriptive and in implementation alike — mapped, no finding,
+  noted). The rename IMPROVES two old awkward spots: "specification"
+  reads correctly for model-of-runtime rules where "normative"
+  strained, and "interpretive" becomes literally the word
+  ("definition") my criterion always glossed it as. Criterion
+  re-word is mechanical; README-once scope caveat adequate (the
+  two-axis separation already says proof certifies the model).
+  (3) Header order as normative spec: RATIFIED with one sentence
+  added — the WRITER normalizes order (derived-line order drift =
+  strict mismatch), while SOURCE lines keep their authored
+  internal order (CAVEATs among themselves; the CODE cascade's
+  internal order, which is meaningful — first anchor primary —
+  moves to the bottom AS A UNIT).
+
 ## Stamps (machine-readable; the "mechanized" axis's fidelity-stamp provenance)
 
 Solidity-schema provenance (record 76; semantics-bundle ruling (3)): the
@@ -4648,7 +4733,7 @@ RULES: none
 - Status: resolved — both asks landed and verified (entry 20 discipline sentence + W-34); nothing remains open.
 
 ### KF-058 — T.Gamma.Closures.CodeAgeLoose: the symmetric "version-class" γ is refuted by sibling specializations; only the directional up-set reading validates meet_code_id (medium-high; code-read finding)
-RULES: T.Gamma.Closures.CodeAgeLoose
+RULES: T.Gamma.Closures.CodeAgeLoose, T.Gamma.Value.Closures
 - Chapter: 07-types-domain.md:789 (the rule block; the γ wording it constrains
   is T.Gamma.Value.Closures at :768 — same defect, not yet named in RULES:
   pending adjudication); Rocq: theories/Concretization.v:186-187
@@ -4693,6 +4778,115 @@ RULES: T.Gamma.Closures.CodeAgeLoose
 - Status: open — filed 2026-07-24 off the first CHECKED code-read pass (two
   independent adversarial refutations plus reader evidence, session record);
   doc + .v reword and fidelity re-review needed.
+- ADJUDICATION (2026-07-24, reviewer): ACCEPTED as filed, severity
+  confirmed. The sibling construction is the classic counterexample
+  to symmetrizing a partial order — two respecializations of one
+  ancestor are class-related through it while their up-sets are
+  disjoint — and the T.Meet.Bottom violation is immediate (the
+  symmetric class gives the sibling types a common inhabitant at
+  the ancestor's code while meet_code_id answers Bottom). Verified
+  myself: Concretization.v:185-186 defines code_age_same_class
+  "related in either direction" verbatim as cited. The
+  pending RULES: question is answered YES — T.Gamma.Value.Closures joins
+  the header (the γ wording defect lives in its block; the
+  DISPUTED suspension of both rules is the honest derivation;
+  board moves to DISPUTED 2 on the next regen). The candidate fix
+  is endorsed including the Qed re-review, which lands in my lane
+  when the reword arrives. MY ERRATUM #6, owned: row 69's green
+  review carried my parenthetical endorsement "either-direction
+  class = preorder symmetrization, right" — the sibling witness
+  refutes exactly that judgment; the transcription-fidelity half
+  of the verdict stands (the .v faithfully transcribes the doc's
+  reading — both are wrong together), but the semantic endorsement
+  was mine and it was wrong. Sixth entry in the errata series,
+  second in the endorsed-semantics class (with #5). PROCESS NOTE
+  (attribution CORRECTED 2026-07-24, crossed with main's note): this
+  is the first finding filed into this ledger from OUTSIDE the crew —
+  external commit 197212e927 ("flambda2 formalism: inaugurate the
+  CHECKED evidence rung", ancestor verified), authored by another
+  session and announced by the user; the same commit performed the
+  ten CHECKED acts (reader + two skeptics + referee structure,
+  freshness attestation keyed to 7bf23efaf6). Template-conformance
+  and the finding's craft credit that session's record. Protocol
+  adopted with the external-channel extension: crew filings route to
+  me at filing time; external filings and evidence acts attribute by
+  commit and main routes them to me on sight. Filing-then-
+  adjudication confirmed as the right order (suspension fires
+  immediately; the reviewer's adjudication delta gates any remedy).
+  WRAP-TRAP NOTE (2026-07-24): my adjudication prose fired
+  the header-token wrap trap (this one mine). Hopper's mechanical
+  rewrap verified content-preserving. Author's hygiene habit,
+  binding on this file: the header token must never begin a line
+  outside a header — the parser cannot distinguish, by design.
+  COUNT AMENDED (2026-07-24, later): FOUR firings — the fourth was
+  this very note's first draft, whose own wrapping put the token at
+  a line start; Hopper's second mechanical rewrap also verified
+  content-preserving. All four firings were in prose about the
+  mechanism itself; this amendment therefore avoids writing the
+  token at all, which is the only wrapping-proof spelling.
+  STRUCTURAL KILL RATIFIED (2026-07-24): the header regex tightens
+  to COLUMN-0-ONLY on my yes — Dijkstra's corpus evidence (all 60
+  legitimate headers column-0; the only indented instance ever was
+  the live trap; house style indents continuations, so the classes
+  are disjoint by construction) makes indented prose structurally
+  unable to fire. Unrepresentability supersedes the author habit
+  above, which stands as history. The Status-line sibling kill is
+  DECLINED (Status lines are legitimately bulleted and indented; no
+  column rule separates them) — in its place, ruled: an UNKNOWN
+  first word after "Status:" must WARN rather than silently parse
+  as open (the template's "one of open" episode is the witness for
+  the silent-misparse class; open-by-default stays, being the safe
+  direction, but malformation surfaces loudly). Dijkstra's retro
+  convention ADOPTED as author discipline: deltas that move
+  derivations ride with their regen in one exchange.
+  LANDING DELTAS (2026-07-24): both rulings landed bundled
+  (self-tests 55→57, corpus quiet — zero new warnings). Two
+  in-frame design notes RULED: (i) the warn-guard firing on the
+  DECIDING Status line only is RATIFIED — the guard protects the
+  decision, not the archive; my three legacy history lines
+  (:477/:538/:970) staying silent is correct, and warning on them
+  would have nagged without protecting. (ii) REBUTTED becomes a
+  CLOSED word (the one-token change taken): it is template menu
+  vocabulary, so using it must not warn; its semantics are
+  unambiguous — a rebutted finding is a FAILED finding, and a
+  failed finding cannot honestly suspend a rule's grade; and the
+  classification is decidable now, so it is decided now rather
+  than deferred to a warn-and-classify that has a predetermined
+  answer. Misspellings still surface via the unknown-word warn.
+  The wrap trap is dead as a class; the author habit stands
+  retired to history. LANDED AND CONFIRMED (same day): rebutted
+  closed with the grounds in the code comment, fixture KF-106
+  carrying the semantics ("rebutted — the witness was wrong"
+  closes without warning, disputes nothing), self-test 58, board
+  unchanged; the menu-is-a-promise and guard-protects-the-decision
+  principles both ledgered tool-side with my ratification.
+  Parser-hardening arc CLOSED on Dijkstra's stamp; queues empty
+  both sides; next event: the finale re-certification.
+- RESOLUTION (2026-07-24, re-review complete): BOTH remedy halves
+  verified and KF-058 is CLOSED. Doc half (ch. 07, four rewords,
+  all read): CodeAgeLoose's rule body states the directional up-set
+  reading with the sibling refutation and the sharp "forced by two
+  facts, not by T.Meet.Sound (⊇-only, vacuous here)" framing; the
+  Bottom re-gloss sits in fact (a) ("mutually incomparable cids");
+  the fexpr hedge in fact (b) (:900-903, "any other producer of
+  Code carrying newer_version_of … no respecialization involved");
+  Value.Closures' clause, caveat, and NOTES all directional
+  (:849-860); the meet_code_id Both_inputs disclosure quotes the
+  code's own "kind of lying here" comment. Mechanization half
+  (Concretization.v, verified via git diff — the rocq tree is now
+  tracked, so the remedy IS the uncommitted diff): the symmetric
+  class definition DELETED (zero residue by grep);
+  function_type_code_ok and the theorem's premise both read
+  `code_age_newer_eq E cid_act cid`, argument order verified
+  against the DEFINITION (TypeGrammar.v:506-511 — CAN_step walks
+  te_code_age's newer↦older map, so first-argument-is-newer:
+  cid_act is cid-or-NEWER, the up-set, the adjudication's exact
+  phrase). SURVIVAL CLAIM VERIFIED, not assumed: the diff contains
+  ZERO proof-script hunks — definition deletion, two premise
+  lines, comment rewrites only; the Qed's body is untouched.
+  Census 453 ids / 32 Admitted terminators re-confirmed by my own
+  greps. Both rules release from DISPUTED on the next regen.
+- Status: resolved — both remedy halves verified (ch. 07 rewords + the directional Concretization.v fix, Qed surviving untouched); closed by the reviewer's re-review 2026-07-24.
 
 <!-- Finding template (safe in any form: the parser blanks comment
      blocks before parsing — comments are not data):

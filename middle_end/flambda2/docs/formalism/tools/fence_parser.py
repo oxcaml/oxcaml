@@ -48,19 +48,39 @@ from collections import Counter, namedtuple
 
 # --- Vocabulary --------------------------------------------------------------
 
-KIND_KEYWORDS = ("STATUS", "CLAIM")
-PHANTOM_KEYWORDS = ("STATUS", "CLAIM", "CAVEAT", "CHECKED", "VERIFIED")
+KIND_KEYWORDS = ("STATUS", "CLAIM", "ROLE")
+PHANTOM_KEYWORDS = (
+    "STATUS", "CLAIM", "ROLE", "CAVEAT", "CHECKED", "VERIFIED",
+    "GRADE", "PROOF",
+)
 
+# Pairing legality (record 77): the value domain is conditioned on the
+# keyword; crossed triples (e.g. "ROLE normative") hard-fail. CLAIM is
+# accepted mid-sweep only and retires at end-state (like STATUS before it).
 STATUS_VALUES = frozenset(["normative", "descriptive", "conjectured"])
 CLAIM_VALUES = frozenset(["normative", "descriptive", "interpretive"])
-KIND_VALUES = {"STATUS": STATUS_VALUES, "CLAIM": CLAIM_VALUES}
+ROLE_VALUES = frozenset(["specification", "implementation", "definition"])
+KIND_VALUES = {
+    "STATUS": STATUS_VALUES,
+    "CLAIM": CLAIM_VALUES,
+    "ROLE": ROLE_VALUES,
+}
+
+# Derived in-fence lines (record 77): generator-owned, closed keyword set
+# {GRADE, PROOF}. Recognized by the parser but NEVER fed to derivation;
+# their content (KF ids in a DISPUTED grade, watch names in flags) must be
+# invisible to every downstream scanner.
+PROOF_VALUES = frozenset(["complete", "envelope", "reflexivity"])
+RE_GRADE_VALUE = re.compile(r"^(?:[ABCD]\b|DISPUTED \([^)]+\))")
 
 RE_FENCE_RULE_OPEN = re.compile(r"^```rule\s*$")
 RE_FENCE_OPEN = re.compile(r"^```\S")  # any other opening fence, e.g. ```ocaml
 RE_FENCE_CLOSE = re.compile(r"^```\s*$")
 
 RE_RULE = re.compile(r"^RULE\s+(\S+)\s*$")
-RE_KIND = re.compile(r"^(STATUS|CLAIM)\s+(\S+)\s*$")
+RE_KIND = re.compile(r"^(STATUS|CLAIM|ROLE)\s+(\S+)\s*$")
+RE_GRADE = re.compile(r"^GRADE\s+(\S.*?)\s*$")
+RE_PROOF = re.compile(r"^PROOF\s+(\S+)\s*$")
 RE_CODE = re.compile(r"^CODE\s+(\S+)\s*$")
 RE_VERIFIED = re.compile(r"^VERIFIED\s+(\S+)(?:\s+@\s+(\S+))?\s*$")
 RE_CHECKED = re.compile(r"^CHECKED\s+@\s+(\S+)\s*$")
@@ -71,9 +91,13 @@ RE_CAVEAT_KIND = re.compile(
 )
 # Any header line starting with a keyword we own (used to distinguish
 # "malformed known keyword" from "unrecognized header line").
-RE_HEADER_KEYWORD = re.compile(r"^(RULE|STATUS|CLAIM|CODE|VERIFIED|CHECKED|CAVEAT)\b")
+RE_HEADER_KEYWORD = re.compile(
+    r"^(RULE|STATUS|CLAIM|ROLE|GRADE|PROOF|CODE|VERIFIED|CHECKED|CAVEAT)\b"
+)
 # Mid-line uppercase keyword mention (strand_scan only).
-RE_KEYWORD_WORD = re.compile(r"\b(STATUS|CLAIM|CAVEAT|CHECKED|VERIFIED)\b")
+RE_KEYWORD_WORD = re.compile(
+    r"\b(STATUS|CLAIM|ROLE|GRADE|PROOF|CAVEAT|CHECKED|VERIFIED)\b"
+)
 
 ParseResult = namedtuple("ParseResult", ["fences", "triples", "failures"])
 
@@ -81,7 +105,10 @@ ParseResult = namedtuple("ParseResult", ["fences", "triples", "failures"])
 def _phantom_match(line):
     """Return the keyword if this line reads as an uppercase keyword plus a
     payload (the prose-convention violation), else None."""
-    m = re.match(r"^(STATUS|CLAIM|CAVEAT|CHECKED|VERIFIED)\b(.*)$", line)
+    m = re.match(
+        r"^(STATUS|CLAIM|ROLE|GRADE|PROOF|CAVEAT|CHECKED|VERIFIED)\b(.*)$",
+        line,
+    )
     if m and m.group(2).strip():
         return m.group(1)
     return None
@@ -95,6 +122,84 @@ def _failure(kind, path, line, message):
 
 def format_failure(f):
     return f"{f['file']}:{f['line']}: [{f['kind']}] {f['message']}"
+
+
+# --- Generator-owned regions (site annotations) -------------------------------
+# The regen tool writes marker-delimited solidity annotations into the
+# chapters (one after each rule fence, one notice per chapter head).
+# Those regions are OUTPUT, never input (record 76 site-annotation
+# carve-out): every scanner blanks them before parsing (line numbers
+# preserved), and a rule fence or keyword-with-payload shape inside one
+# is a hard failure.
+
+RE_GENERATED_BEGIN = re.compile(r"^<!--\s*solidity(?:-note)?:begin\b")
+RE_GENERATED_END = re.compile(r"^<!--\s*solidity(?:-note)?:end\b")
+_RE_ENTRY_SHAPED = re.compile(
+    r"^(?:```rule\s*$"
+    r"|(?:RULE|STATUS|CLAIM|ROLE|GRADE|PROOF|CODE|VERIFIED|CHECKED|CAVEAT)"
+    r"\s+\S)"
+)
+
+
+def blank_generated_regions(lines, path, failures):
+    """Replace generator-owned regions (markers included) with empty lines,
+    preserving line count and trailing newlines. Appends failures for
+    unbalanced markers and for entry-shaped content inside a region."""
+    out = []
+    in_region = False
+    for i, raw in enumerate(lines):
+        line = raw.rstrip("\n")
+        blank = "\n" if raw.endswith("\n") else ""
+        if not in_region and RE_GENERATED_BEGIN.match(line):
+            in_region = True
+            out.append(blank)
+            continue
+        if in_region:
+            if RE_GENERATED_END.match(line):
+                in_region = False
+            elif RE_GENERATED_BEGIN.match(line):
+                failures.append(
+                    _failure(
+                        "generated-region-unbalanced",
+                        path,
+                        i + 1,
+                        "nested generated-region begin marker",
+                    )
+                )
+            elif _RE_ENTRY_SHAPED.match(line):
+                failures.append(
+                    _failure(
+                        "entry-shaped-in-generated-region",
+                        path,
+                        i + 1,
+                        f"rule-fence/keyword-shaped line inside a "
+                        f"generator-owned region: {line!r}",
+                    )
+                )
+            out.append(blank)
+            continue
+        if RE_GENERATED_END.match(line):
+            failures.append(
+                _failure(
+                    "generated-region-unbalanced",
+                    path,
+                    i + 1,
+                    "end marker with no open region",
+                )
+            )
+            out.append(blank)
+            continue
+        out.append(raw)
+    if in_region:
+        failures.append(
+            _failure(
+                "generated-region-unbalanced",
+                path,
+                len(lines),
+                "generated region never closed",
+            )
+        )
+    return out
 
 
 # --- Per-file parse -----------------------------------------------------------
@@ -125,6 +230,7 @@ def parse_file(path):
             lines = fh.readlines()
     except OSError as e:
         return [], [_failure("io-error", path, 0, str(e))]
+    lines = blank_generated_regions(lines, path, failures)
 
     fences = []
     i, n = 0, len(lines)
@@ -184,6 +290,10 @@ def _parse_rule_fence(lines, start, path, chapter, failures):
         verified=[],
         checked=[],
         caveats=[],
+        # Derived, generator-owned lines (record 77): recorded for the
+        # writer's freshness check only — NEVER inputs to derivation.
+        grades=[],
+        proofs=[],
         chapter=chapter,
         path=path,
         line=start + 1,
@@ -246,6 +356,36 @@ def _parse_rule_fence(lines, start, path, chapter, failures):
                         f"{{{', '.join(sorted(KIND_VALUES[kw]))}}}",
                     )
                 )
+            i += 1
+            continue
+        m = RE_GRADE.match(raw)
+        if m:
+            if not RE_GRADE_VALUE.match(m.group(1)):
+                failures.append(
+                    _failure(
+                        "bad-derived-value",
+                        path,
+                        lineno,
+                        f"GRADE value {m.group(1)!r} is not a letter or "
+                        "DISPUTED (...)",
+                    )
+                )
+            fence["grades"].append(dict(value=m.group(1), line=lineno))
+            i += 1
+            continue
+        m = RE_PROOF.match(raw)
+        if m:
+            if m.group(1) not in PROOF_VALUES:
+                failures.append(
+                    _failure(
+                        "bad-derived-value",
+                        path,
+                        lineno,
+                        f"PROOF value {m.group(1)!r} not in "
+                        f"{{{', '.join(sorted(PROOF_VALUES))}}}",
+                    )
+                )
+            fence["proofs"].append(dict(value=m.group(1), line=lineno))
             i += 1
             continue
         m = RE_CODE.match(raw)
@@ -353,6 +493,16 @@ def _parse_rule_fence(lines, start, path, chapter, failures):
         )
     else:
         _, fence["keyword"], fence["value"] = kinds[0]
+    for fam, label in ((fence["grades"], "GRADE"), (fence["proofs"], "PROOF")):
+        if len(fam) > 1:
+            failures.append(
+                _failure(
+                    "multiple-derived-lines",
+                    path,
+                    fence["line"],
+                    f"rule {rid}: {len(fam)} {label} lines; at most one",
+                )
+            )
     return fence, i
 
 
@@ -456,6 +606,9 @@ def strand_scan(formalism_dir):
         except OSError as e:
             records.append(_failure("io-error", path, 0, str(e)))
             continue
+        # Generated regions are output, not input; the hard entry-shaped
+        # check runs on parse_chapters' channel, so failures are dropped.
+        lines = blank_generated_regions(lines, path, [])
         n = len(lines)
         in_fence = None  # None | 'rule' | 'other'
         in_header = False
@@ -746,6 +899,136 @@ def _selftest():
             s["file"] == "03-bad.md" and "counting trap" in s["message"]
             for s in strands
         )
+
+        # Generated regions (site annotations) are blanked before parsing:
+        # a fence followed by a well-formed annotation parses identically
+        # to the bare fence, including line numbers, and the annotation's
+        # own content raises no phantom/strand records.
+        bare = (
+            "# Chapter\n"
+            "\n"
+            "```rule\n"
+            "RULE T.Anno.One\n"
+            "CLAIM normative\n"
+            "CODE a.ml#f\n"
+            "---\n"
+            "body\n"
+            "```\n"
+            "\n"
+            "Prose after.\n"
+        )
+        annotated = (
+            "# Chapter\n"
+            "\n"
+            "<!-- solidity-note:begin -->\n"
+            "> _generator-owned notice_\n"
+            "<!-- solidity-note:end -->\n"
+            "\n"
+            "```rule\n"
+            "RULE T.Anno.One\n"
+            "CLAIM normative\n"
+            "CODE a.ml#f\n"
+            "---\n"
+            "body\n"
+            "```\n"
+            "<!-- solidity:begin T.Anno.One -->\n"
+            "_Solidity:_ **C** — derived\n"
+            "<!-- solidity:end T.Anno.One -->\n"
+            "\n"
+            "Prose after.\n"
+        )
+        write(d, "05-anno.md", annotated)
+        f5, fail5 = parse_file(os.path.join(d, "05-anno.md"))
+        assert fail5 == [], fail5
+        assert len(f5) == 1 and f5[0]["id"] == "T.Anno.One"
+        assert f5[0]["line"] == 7  # line numbers preserved by blanking
+        write(d, "06-bare.md", bare)
+        f6, _ = parse_file(os.path.join(d, "06-bare.md"))
+        assert f6[0]["value"] == f5[0]["value"] == "normative"
+        assert not any(
+            s["file"] == "05-anno.md" for s in strand_scan(d)
+        )
+        # Entry-shaped content INSIDE markers hard-fails: a rule fence and
+        # a keyword-with-payload line each produce a failure; an unclosed
+        # region is also a failure.
+        write(
+            d,
+            "07-annobad.md",
+            "# Chapter\n"
+            "<!-- solidity:begin T.Anno.Evil -->\n"
+            "```rule\n"
+            "RULE T.Anno.Evil\n"
+            "<!-- solidity:end T.Anno.Evil -->\n"
+            "<!-- solidity:begin T.Anno.Open -->\n"
+            "never closed\n",
+        )
+        _, fail7 = parse_file(os.path.join(d, "07-annobad.md"))
+        kinds7 = Counter(f["kind"] for f in fail7)
+        assert kinds7["entry-shaped-in-generated-region"] == 2, fail7
+        assert kinds7["generated-region-unbalanced"] == 1, fail7
+
+        # v2 headers (record 77): ROLE keyword, derived GRADE/PROOF lines,
+        # pairing legality, derived-line multiplicity and value checks.
+        write(
+            d,
+            "08-v2.md",
+            "# Chapter\n"
+            "\n"
+            "```rule\n"
+            "RULE T.V2.Good\n"
+            "GRADE B\n"
+            "PROOF complete\n"
+            "ROLE specification\n"
+            "CHECKED @ deadbeef00\n"
+            "CODE a.ml#f\n"
+            "---\n"
+            "body\n"
+            "```\n"
+            "\n"
+            "```rule\n"
+            "RULE T.V2.Disputed\n"
+            "GRADE DISPUTED (KF-058) [stale]\n"
+            "ROLE definition\n"
+            "CODE a.ml#g\n"
+            "---\n"
+            "body\n"
+            "```\n"
+            "\n"
+            "```rule\n"
+            "RULE T.V2.Crossed\n"
+            "ROLE normative\n"
+            "CODE a.ml#h\n"
+            "---\n"
+            "body\n"
+            "```\n"
+            "\n"
+            "```rule\n"
+            "RULE T.V2.BadDerived\n"
+            "GRADE B\n"
+            "GRADE C\n"
+            "PROOF partial\n"
+            "ROLE implementation\n"
+            "CODE a.ml#i\n"
+            "---\n"
+            "body\n"
+            "```\n",
+        )
+        f8, fail8 = parse_file(os.path.join(d, "08-v2.md"))
+        by8 = {f["id"]: f for f in f8}
+        assert by8["T.V2.Good"]["keyword"] == "ROLE"
+        assert by8["T.V2.Good"]["value"] == "specification"
+        assert by8["T.V2.Good"]["grades"][0]["value"] == "B"
+        assert by8["T.V2.Good"]["proofs"][0]["value"] == "complete"
+        assert by8["T.V2.Disputed"]["grades"][0]["value"] == (
+            "DISPUTED (KF-058) [stale]"
+        )
+        k8 = Counter(f["kind"] for f in fail8)
+        assert k8["bad-keyword-value"] == 1, fail8  # crossed: ROLE normative
+        assert k8["multiple-derived-lines"] == 1, fail8  # two GRADE lines
+        assert k8["bad-derived-value"] == 1, fail8  # PROOF partial
+        # Derived-line content (the KF id, the flag) is invisible to the
+        # strand scan: header lines never reach the mid-line scan.
+        assert not any(s["file"] == "08-v2.md" for s in strand_scan(d))
 
     print("fence_parser self-tests passed.")
 

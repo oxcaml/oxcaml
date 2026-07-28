@@ -104,11 +104,12 @@ for `Value`; other kinds must use `Anything`.
 
 ```rule
 RULE WF.Subkind.Erasable
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: subkind irrelevance is asserted locally only; the whole-pipeline claim is §13's.
 CODE kinds/flambda_kind.ml#With_subkind.erase_subkind
 CODE kinds/flambda_kind.ml#With_subkind.equal_ignoring_subkind
 CODE kinds/flambda_kind.ml#With_subkind.has_useful_subkind_info
-CAVEAT disclosure: subkind irrelevance is asserted locally only; the whole-pipeline claim is §13's.
 ---
 erase_subkind(κ̂) = (kind(κ̂), Nullable, Anything)   when kind(κ̂) = Value
 erase_subkind(κ̂) = κ̂                                otherwise
@@ -142,7 +143,8 @@ the whole-pipeline level and verified only locally here.
 
 ```rule
 RULE WF.Subkind.Scannable
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE kinds/flambda_kind.ml#With_subkind.must_be_gc_scannable
 ---
 must_be_gc_scannable(κ̂) = true
@@ -215,7 +217,8 @@ list of register-width kinds the backend actually passes:
 
 ```rule
 RULE WF.Arity.Unarize
-CLAIM normative
+GRADE C
+ROLE specification
 CODE kinds/flambda_arity.ml#unarize
 CODE kinds/flambda_arity.ml#Component.unarize
 ---
@@ -246,7 +249,8 @@ Key derived operations, all in `kinds/flambda_arity.ml`:
 
 ```rule
 RULE WF.Arity.ApplyFlavours
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/apply_expr.mli#create
 CODE terms/apply_expr.mli#args_arity
 CODE terms/apply_expr.mli#return_arity
@@ -266,7 +270,8 @@ total on well-scoped simples and is computed by `Simple.kind`.
 
 ```rule
 RULE WF.Kind.Var
-CLAIM normative
+GRADE C
+ROLE specification
 CODE term_basics/simple.ml#kind
 CODE identifiers/int_ids.ml#Variable.kind
 ---
@@ -279,7 +284,8 @@ read back by `Variable.kind`. "`Γ(x) = κ`" is exactly this stored kind.
 
 ```rule
 RULE WF.Kind.Symbol
-CLAIM normative
+GRADE C
+ROLE specification
 CODE term_basics/simple.ml#kind
 ---
 
@@ -292,7 +298,8 @@ coercion. (`Symbol.t` carries no kind field.)
 
 ```rule
 RULE WF.Kind.Const
-CLAIM normative
+GRADE C
+ROLE specification
 CODE identifiers/reg_width_const.ml#kind
 CODE identifiers/int_ids.mli#Const.Descr
 ---
@@ -315,7 +322,8 @@ Rec_info other than via `Poison`.
 
 ```rule
 RULE WF.Kind.Coerce
-CLAIM normative
+GRADE C
+ROLE specification
 CODE identifiers/coercion0.mli#S
 CODE term_basics/simple.ml#kind
 ---
@@ -343,7 +351,8 @@ must agree in kind. Singleton patterns bind one variable whose kind must match
 
 ```rule
 RULE WF.Let.Singleton
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda.ml#Named.kind
 CODE terms/flambda.mli#Named.kind
 CODE bound_identifiers/bound_pattern.mli#t
@@ -363,7 +372,8 @@ patterns). See WF.Named.* below.
 
 ```rule
 RULE WF.Let.SetOfClosures
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda.mli#Named
 CODE bound_identifiers/bound_pattern.mli#t
 CODE simplify/simplify_set_of_closures.ml
@@ -383,10 +393,11 @@ them at kind Value when opening the binding (`simplify_set_of_closures.ml`:
 
 ```rule
 RULE WF.Let.Static
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: the shape-matching contract against bound_static is asserted only coarsely here; pinning the precise per-piece contract is an open question deferred to 06.
 CODE terms/flambda.mli#Named
 CODE bound_identifiers/bound_pattern.mli#t
-CAVEAT disclosure: the shape-matching contract against bound_static is asserted only coarsely here; pinning the precise per-piece contract is an open question deferred to 06.
 ---
 n = Static_consts g
 pattern = Static bound_static
@@ -401,7 +412,8 @@ are of kind Value.
 
 ```rule
 RULE WF.Named.Prim
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda.ml#Named.kind
 CODE terms/flambda_primitive.mli#result_kind
 CODE terms/flambda_primitive.ml#result_kind'
@@ -419,7 +431,8 @@ immediate).
 
 ```rule
 RULE WF.Named.Simple
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda.ml#Named.kind
 ---
 Γ ⊢ s : κ
@@ -429,7 +442,8 @@ CODE terms/flambda.ml#Named.kind
 
 ```rule
 RULE WF.Named.RecInfo
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda.ml#Named.kind
 ---
 
@@ -441,7 +455,8 @@ CODE terms/flambda.ml#Named.kind
 
 ```rule
 RULE WF.Prim.ArgKinds
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/flambda_primitive.mli#arg_kind_of_unary_primitive
 CODE terms/flambda_primitive.mli#args_kind_of_binary_primitive
 CODE terms/flambda_primitive.mli#args_kind_of_variadic_primitive
@@ -465,11 +480,12 @@ it is fatal when the flag is on and rewrites to `Invalid` when off — see §6.
 
 ```rule
 RULE WF.Prim.MakeBlockMixed
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/mixed-01-record.md @ c59c5780b0
 CODE terms/flambda_primitive.ml#args_kind_of_variadic_primitive
 CODE middle_end/flambda2/simplify/simplify_primitive.ml#simplify_primitive
 CODE kinds/flambda_kind.mli#Mixed_block_shape.field_kinds
-VERIFIED 14-validation/mixed-01-record.md @ c59c5780b0
 ---
 p = Make_block(Mixed(t, σ), μ, mode) applied to s₁ … sₙ       σ = ⟨p₀, ē⟩
 args_kind_of_variadic_primitive(p) = Variadic_mixed σ
@@ -488,7 +504,8 @@ See [§06](06-primitives-memory.md) `P.Variadic.MakeBlock.Mixed` for the denotat
 
 ```rule
 RULE WF.Switch.Scrutinee
-CLAIM normative
+GRADE C
+ROLE specification
 CODE terms/switch_expr.ml#t
 CODE simplify/simplify_switch_expr.ml#simplify_arm
 ---
@@ -508,7 +525,8 @@ form of the same scrutinee constraint is WF.Syntax.SwitchScrutinee in
 
 ```rule
 RULE WF.Switch.NonEmpty
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_switch_expr.ml
 CODE simplify/expr_builder.ml
 CODE terms/flambda.mli#Invalid
@@ -526,13 +544,14 @@ at least two arms is WF.Syntax.SwitchMinArms in [§02](02-syntax.md).
 
 ```rule
 RULE WF.ApplyCont.Arity
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: only the per-use add_use check is ungated; Continuation_uses.union's analogous arity check is gated by -flambda2-kind-checks — benign, as add_use already validated every use.
 CODE terms/apply_cont_expr.mli#create
 CODE bound_identifiers/bound_parameters.mli#arity
 CODE bound_identifiers/bound_parameter.mli#kind
 CODE simplify/env/continuation_uses.ml#add_use
 CODE simplify/simplify_apply_cont_expr.ml#inline_linearly_used_continuation
-CAVEAT disclosure: only the per-use add_use check is ungated; Continuation_uses.union's analogous arity check is gated by -flambda2-kind-checks — benign, as add_use already validated every use.
 ---
 Apply_cont k s₁ … sₙ         k has parameters p₁ … pₙ with kinds κ̂₁ … κ̂ₙ
 n = num params of k (after unarization)
@@ -568,7 +587,8 @@ permitted and handled specially rather than rejected.
 
 ```rule
 RULE WF.Apply.ArgKinds
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml#simplify_apply_shared
 CODE terms/apply_expr.mli#args_arity
 ---
@@ -584,7 +604,8 @@ replaced by `Invalid (Application_argument_kind_mismatch …)`.
 
 ```rule
 RULE WF.Apply.DirectArity
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml#arity_mismatch
 CODE terms/flambda.mli#Invalid
 ---
@@ -601,7 +622,8 @@ detupled first (`simplify_direct_tuple_application`).
 
 ```rule
 RULE WF.Apply.DirectResultArity
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml
 CODE terms/flambda.mli#Invalid
 ---
@@ -620,7 +642,8 @@ WF.Apply.Partial). Mismatch ⟹ fatal under `-flambda2-kind-checks`, else
 
 ```rule
 RULE WF.Apply.Over
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml
 CODE simplify/simplify_common.ml
 CODE terms/flambda.mli#Invalid
@@ -638,7 +661,8 @@ that cannot return is `Invalid (Over_application_never_returns …)`
 
 ```rule
 RULE WF.Apply.Partial
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml
 CODE terms/flambda.mli#Invalid
 ---
@@ -658,7 +682,8 @@ Calling a local-returning closure with a normal (non-local) apply is
 
 ```rule
 RULE WF.Region.Var
-CLAIM normative
+GRADE C
+ROLE specification
 CODE from_lambda/closure_conversion.ml
 CODE terms/flambda_primitive.ml#result_kind_of_variadic_primitive
 ---
@@ -674,7 +699,8 @@ for the region stack semantics.
 
 ```rule
 RULE WF.RecInfo.MyDepth
-CLAIM normative
+GRADE C
+ROLE specification
 CODE simplify/simplify_apply_expr.ml
 CODE simplify/simplify_set_of_closures.ml
 CODE terms/flambda.mli#Function_params_and_body.create
@@ -698,12 +724,13 @@ applications.
 
 ```rule
 RULE WF.Check.Gated
-CLAIM descriptive
+GRADE D
+ROLE implementation
+CAVEAT disclosure: the -flambda2-kind-checks checks are conservative and may fatally reject legitimate layout-poly GADT code, which is why the flag defaults to off.
 CODE ui/flambda_features.ml#kind_checks
 CODE driver/oxcaml_flags.ml
 CODE driver/oxcaml_args.ml
 CODE simplify/simplify_apply_expr.ml#simplify_apply_shared
-CAVEAT disclosure: the -flambda2-kind-checks checks are conservative and may fatally reject legitimate layout-poly GADT code, which is why the flag defaults to off.
 ---
 `Flambda_features.kind_checks ()` defaults to false
 if true : a kind/arity mismatch at an Apply is a `Misc.fatal_errorf`

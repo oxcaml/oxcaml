@@ -52,6 +52,9 @@ import sys
 TOOLS_DIR = os.path.dirname(os.path.realpath(__file__))
 FORMALISM_DIR = os.path.dirname(TOOLS_DIR)
 FLAMBDA2_DIR = os.path.dirname(os.path.dirname(FORMALISM_DIR))
+
+sys.path.insert(0, TOOLS_DIR)
+import fence_parser  # noqa: E402 (generated-region blanking)
 REPO_ROOT = os.path.dirname(os.path.dirname(FLAMBDA2_DIR))
 
 # Anchor paths are written relative to middle_end/flambda2/ except a few
@@ -230,6 +233,9 @@ def extract_rule_events(formalism_dir=FORMALISM_DIR, legacy_verified_ok=False):
         chapter = os.path.basename(path)
         with open(path) as fh:
             lines = fh.readlines()
+        # Generated regions are output, not input; the entry-shaped hard
+        # check runs on fence_parser's channel, so failures are dropped.
+        lines = fence_parser.blank_generated_regions(lines, path, [])
         i, n = 0, len(lines)
         while i < n:
             if re.match(r"^```rule\s*$", lines[i]):

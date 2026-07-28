@@ -21,7 +21,8 @@ the GC (`Calloc`, regions) are [`19`](19-cmm-memory-gc.md); layouts are
 
 ```rule
 RULE TC.Simple
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#simple
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple
 ---
@@ -41,7 +42,8 @@ tagged immediates get `Cconst_int (2n+1)`, naked numbers the corresponding
 
 ```rule
 RULE TC.Prim.Sound
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_complex
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
@@ -71,7 +73,8 @@ subtlest correctness argument (to_cmm.md, "Let-binding substitution").
 
 ```rule
 RULE TC.Let.Simple
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#bind_var_to_simple
 ---
@@ -86,7 +89,8 @@ emitted (the value is substituted at uses). Matches OS.Let.Simple.
 
 ```rule
 RULE TC.Let.Prim
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_prim
 CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
 ---
@@ -108,13 +112,14 @@ binding is still translated so its own arguments can be inlined
 
 ```rule
 RULE TC.Let.Subst
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: substitution-time validity check is gated by the `cmm_safe_subst` flag (off by default); only validity_stages maintenance and flush-time validity branching are unconditional.
+CAVEAT disclosure: effects model has a known imprecision around End_region — immutable loads of locally-allocated blocks could move past it; let_expr0's forced-flush workaround compensates (recorded in the rule's NOTES).
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#bind_variable
 CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#add_binding_to_env
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
-CAVEAT disclosure: substitution-time validity check is gated by the `cmm_safe_subst` flag (off by default); only validity_stages maintenance and flush-time validity branching are unconditional.
-CAVEAT disclosure: effects model has a known imprecision around End_region — immutable loads of locally-allocated blocks could move past it; let_expr0's forced-flush workaround compensates (recorded in the rule's NOTES).
 ---
 Delayed bindings in D are held in TWO parallel "stage" stacks (add_binding_to_env
 threads a binding onto both): an effect_stages stack — a stage is a set of
@@ -154,7 +159,8 @@ End_region — a known imprecision of the effects model (19).
 
 ```rule
 RULE TC.Let.SetOfClosures
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#let_dynamic_set_of_closures
 ---
 e = Let (Set_of_closures bound_vars = Set_of_closures (soc, am)) e_body
@@ -170,7 +176,8 @@ Slot_offsets (17, R.Val.Clos / R.Obj.Closures).
 
 ```rule
 RULE TC.Let.Static
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#static_consts
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#let_expr0
 ---
@@ -190,7 +197,8 @@ bindings emit nothing (Singleton _, Rec_info; matches OS.Let.RecInfo).
 
 ```rule
 RULE TC.Prim.TagUntag
-CLAIM normative
+GRADE C
+ROLE specification
 CODE backend/cmm_helpers.ml#tag_int
 CODE backend/cmm_helpers.ml#untag_int
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion
@@ -207,7 +215,8 @@ tagged form directly (16, TC.Switch). tag_int has peephole cases; untag_int fold
 
 ```rule
 RULE TC.Prim.BoxUnbox
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#box_number
 CODE backend/cmm_helpers.ml#box_int_gen
 CODE backend/cmm_helpers.ml#unbox_int
@@ -239,7 +248,8 @@ detail (heap vs local, GC) in 19.
 
 ```rule
 RULE TC.Prim.ReinterpretBoxedVector
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 ---
 Reinterpret_boxed_vector:  ⟦arg⟧ ⤳ arg
@@ -256,7 +266,8 @@ P.Unary.ReinterpretBoxedVector (05).
 
 ```rule
 RULE TC.Prim.MakeBlock
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#make_block
 CODE backend/cmm_helpers.ml#make_alloc_generic
 ---
@@ -275,7 +286,8 @@ of P.Variadic.MakeBlock.*. Mixed-block flat-suffix packing is little-endian-only
 
 ```rule
 RULE TC.Prim.BlockLoad
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_load
 CODE backend/cmm_helpers.ml#get_field_computed
 CODE backend/cmm_helpers.ml#field_address
@@ -295,7 +307,8 @@ loads are little-endian-only (get_field_unboxed). Cmm image of P.Unary.BlockLoad
 
 ```rule
 RULE TC.Prim.BlockSet
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#block_set
 CODE backend/cmm_helpers.ml#setfield_computed
 ---
@@ -318,7 +331,8 @@ little-endian-only. Cmm image of P.Binary.BlockSet.*.
 
 ```rule
 RULE TC.Prim.ProjectFunctionSlot
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
 CODE backend/cmm_helpers.ml#infix_field_address
 ---
@@ -338,7 +352,8 @@ bare pointer. Cmm image of P.Unary.ProjectFunctionSlot / Move_within_set_of_clos
 
 ```rule
 RULE TC.Prim.ProjectValueSlot
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#prim_simple
 CODE backend/cmm_helpers.ml#get_field_computed
 ---
@@ -356,11 +371,12 @@ P.Unary.ProjectValueSlot). Cmm image of P.Unary.ProjectValueSlot.
 
 ```rule
 RULE TC.Prim.NumConv
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: the open int→float32 double-rounding soundness bug (13 §4.7, float32_double_round) lives in S.Rewrite.Prim.ConstFold, not to_cmm; TC.Prim.NumConv single-rounds via one Cstatic_cast.
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#arithmetic_conversion
 CODE backend/cmm_helpers.ml#float32_of_int
 CODE backend/cmm.mli#static_cast
-CAVEAT disclosure: the open int→float32 double-rounding soundness bug (13 §4.7, float32_double_round) lives in S.Rewrite.Prim.ConstFold, not to_cmm; TC.Prim.NumConv single-rounds via one Cstatic_cast.
 ---
 Num_conv {src; dst}:  ⟦e⟧ ⤳ Scalar_type.static_cast, i.e.
   Int→Int   → width-adjust (sign/zero extend + tagging), then sign_extend for int32 dst
@@ -386,7 +402,8 @@ The nativeint widening is a 64-bit-target detail.
 
 ```rule
 RULE TC.Prim.StringLoad
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#string_like_load
 CODE backend/cmm_helpers.ml#unaligned_load_16
 ---
@@ -410,11 +427,12 @@ P.Binary.StringOrBigstringLoad / P.Ternary.BytesOrBigstringSet.
 
 ```rule
 RULE TC.Prim.ArrayAccess
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT watch(W-43): array_load drops the mutability annotation (loads emitted Mutable); a CR in array_load asks for block_load-style threading — update this rule's emission line if that refactor lands.
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set0
 CODE backend/cmm_helpers.ml#array_indexing
-CAVEAT watch(W-43): array_load drops the mutability annotation (loads emitted Mutable); a CR in array_load asks for block_load-style threading — update this rule's emission line if that refactor lands.
 ---
 Array_load (ak, index i tagged):  ⟦arr; i⟧ ⤳ Cop(Cload{chunk(ak); Mutable}, [array_indexing log2(ak) arr i])
 Array_set (ak, …):                ⟦arr; i; v⟧ ⤳ int_array_set / addr_array_store (caml_modify
@@ -440,7 +458,8 @@ vector array reads the header size and shifts by log2(words per element)
 
 ```rule
 RULE TC.Prim.ArrayAccess.Vector
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load_vector
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_set_vector
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#array_load
@@ -468,12 +487,13 @@ vec128 loads from 2/4-vec128 products).
 
 ```rule
 RULE TC.Prim.BigarrayAccess
-CLAIM normative
+GRADE A
+ROLE specification
+CAVEAT disclosure: elt_size/chunk agreement rests on the Flambda element_kind and Cmm bigarray_word_kind tables being kept consistent only by convention (round-trip via Bigarray_kind.to_lambda).
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#bigarray_load_or_store
 CODE backend/cmm_helpers.ml#bigarray_load
 CODE backend/cmm_helpers.ml#bigarray_store
-VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
-CAVEAT disclosure: elt_size/chunk agreement rests on the Flambda element_kind and Cmm bigarray_word_kind tables being kept consistent only by convention (round-trip via Bigarray_kind.to_lambda).
 ---
 Bigarray_load (bk, flat offset i tagged):  ⟦ba; i⟧ ⤳
   Cop(Cload{chunk(bk); Mutable}, [array_indexing{typ:Addr} log2(elt_size(bk)) data i])
@@ -501,10 +521,11 @@ field 1 (06 P.Binary.BigarrayGetAlignment).
 
 ```rule
 RULE TC.Prim.BigarrayLength
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#unary_primitive
 CODE backend/cmm_helpers.ml#field_address
-VERIFIED 14-validation/bigarray_access.md @ 001f7bf76c
 ---
 Bigarray_length {dimension = d}:  ⟦ba⟧ ⤳
   Cop(Cload{Word_int; Mutable}, [field_address ba (4 + d)])

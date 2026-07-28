@@ -123,7 +123,8 @@ We write `⟦s⟧ρ` for the value of a `Simple` `s = x | sym | c` under `ρ`:
 
 ```rule
 RULE OS.Simple.Eval
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/term_basics/simple.mli#t
 CODE middle_end/flambda2/term_basics/coercion.mli#t
 ---
@@ -244,7 +245,8 @@ subexpressions to descend into — the language is in ANF, so every operand is a
 
 ```rule
 RULE OS.Let.Simple
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Let_expr
 CODE middle_end/flambda2/terms/flambda.mli#Named
 ---
@@ -258,7 +260,8 @@ v = ⟦s⟧ρ
 
 ```rule
 RULE OS.Let.Prim.Pure
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
 CODE middle_end/flambda2/terms/effects.mli#t
@@ -285,7 +288,8 @@ region) and so match OS.Let.Prim.Effect, not this rule.
 
 ```rule
 RULE OS.Let.Prim.Effect
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/flambda_primitive.mli#effects_and_coeffects
 ---
@@ -312,7 +316,8 @@ not as a control transfer; genuine OCaml-level raising goes through
 
 ```rule
 RULE OS.Let.SetOfClosures
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/set_of_closures.mli#create
 CODE middle_end/flambda2/bound_identifiers/alloc_mode.mli#For_allocations
@@ -341,7 +346,8 @@ allocation time.
 
 ```rule
 RULE OS.Let.Static
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/terms/static_const.mli#t
 CODE middle_end/flambda2/terms/flambda.mli#Static_const_or_code
@@ -375,7 +381,8 @@ one-shot installation is well-defined despite mutual reference.
 
 ```rule
 RULE OS.Let.RecInfo
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Named
 CODE middle_end/flambda2/term_basics/rec_info_expr.mli#t
 ---
@@ -394,7 +401,8 @@ to erasing the binding entirely (the backend does not emit anything for it).
 
 ```rule
 RULE OS.LetCont.NonRec
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
 CODE middle_end/flambda2/terms/flambda.mli#Non_recursive_let_cont_handler
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
@@ -413,7 +421,8 @@ when `k` is used.
 
 ```rule
 RULE OS.LetCont.Rec
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#Let_cont_expr
 CODE middle_end/flambda2/terms/flambda.mli#Recursive_let_cont_handlers
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#make_rewrite_for_recursive_continuation
@@ -447,7 +456,8 @@ handler in the *definition* environment recorded for `k`.
 
 ```rule
 RULE OS.ApplyCont
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/apply_cont_expr.mli#create
 CODE middle_end/flambda2/terms/flambda.mli#Continuation_handler
 ---
@@ -468,7 +478,8 @@ Boundary continuations (installed by `Apply`, §4.3) are entered by the same
 
 ```rule
 RULE OS.ApplyCont.Return
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
 CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
 ---
@@ -489,7 +500,8 @@ undefined behaviour (OS.Invalid); see OS.Apply.NeverReturns.
 
 ```rule
 RULE OS.ApplyCont.ExnBoundary
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/exn_continuation.mli#t
 CODE middle_end/flambda2/terms/exn_continuation.mli#extra_args
 ---
@@ -521,10 +533,11 @@ non-exceptional path pops it; raising pops it and jumps to it.
 
 ```rule
 RULE OS.ApplyCont.TrapPush
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 CODE middle_end/flambda2/terms/trap_action.mli#t
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda.ml#cps
-VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 ---
 e = Apply_cont k (s̄),  trap_action(e) = Some (Push { exn_handler = k_h })
 K(k) = Handler ⟨x̄, e_h, ρ_def, K_def, d⟩
@@ -538,10 +551,11 @@ of the try). Generated as the entry edge of a `Ltrywith` body.
 
 ```rule
 RULE OS.ApplyCont.TrapPop
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 CODE middle_end/flambda2/terms/trap_action.mli#t
 CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
-VERIFIED 14-validation/new-06-trap.md @ c59c5780b0
 ---
 e = Apply_cont k (s̄),  trap_action(e) = Some (Pop { exn_handler = k_h; raise_kind })
 k ≠ k_h                                   -- not a raise (cf. is_raise)
@@ -557,7 +571,8 @@ on `trap_action.mli` `Pop`); it names *which* frame is popped.
 
 ```rule
 RULE OS.ApplyCont.Raise
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/apply_cont_expr.ml#is_raise
 CODE middle_end/flambda2/from_lambda/closure_conversion.ml#close_raise0
 CODE middle_end/flambda2/terms/trap_action.mli#Raise_kind
@@ -583,7 +598,8 @@ OS.ApplyCont.ExnBoundary fires instead, forwarding to the caller's handler.
 
 ```rule
 RULE OS.Switch
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/switch_expr.mli#create
 CODE middle_end/flambda2/terms/switch_expr.mli#arms
 ---
@@ -600,10 +616,11 @@ no default case.
 
 ```rule
 RULE OS.Switch.Undef
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: two-arm to_cmm lowering silently falls into an arm on out-of-range discriminants; the model's stuck/UB conclusion holds only because well-formedness makes that path unreachable.
 CODE middle_end/flambda2/terms/switch_expr.mli#create
 CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#switch
-CAVEAT disclosure: two-arm to_cmm lowering silently falls into an arm on out-of-range discriminants; the model's stuck/UB conclusion holds only because well-formedness makes that path unreachable.
 ---
 e = Switch { scrutinee = s; arms }
 ⟦s⟧ρ = naked_imm n
@@ -641,7 +658,8 @@ a `Result_continuation` (`Return k` or `Never_returns`), an `Exn_continuation`
 
 ```rule
 RULE OS.Apply.Direct
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/apply_expr.mli#create
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/flambda.mli#Function_params_and_body
@@ -685,7 +703,8 @@ callee's arity. The three cases — full, partial, and over-application — are 
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Full
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/code_metadata.mli#params_arity
 ---
@@ -705,7 +724,8 @@ after that adjustment.
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Partial
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/code_metadata.mli#first_complex_local_param
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_partial_application
@@ -736,11 +756,12 @@ verified line-by-line against the direct-case model above.
 
 ```rule
 RULE OS.Apply.IndirectUnknownArity.Over
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: model narrowing — the fresh Begin_region/End_region pair wrapping both calls for a local-returning callee is deliberately elided from this rule.
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 CODE middle_end/flambda2/terms/apply_expr.mli#return_arity
 CODE middle_end/flambda2/simplify/simplify_common.ml#split_direct_over_application
-CAVEAT disclosure: model narrowing — the fresh Begin_region/End_region pair wrapping both calls for a local-returning callee is deliberately elided from this rule.
 ---
 e = Apply { callee = Some s_f; args = s̄; call_kind = Function Indirect_unknown_arity;
             continuation = Return k_c; exn_continuation = ⟨k_x, ē_extra⟩; alloc_mode = am }
@@ -778,7 +799,8 @@ modelled.
 
 ```rule
 RULE OS.Apply.IndirectKnownArity
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/call_kind.mli#Function_call
 ---
 e = Apply { callee = Some s_f; call_kind = Function (Indirect_known_arity code_ids); … }
@@ -796,7 +818,8 @@ are otherwise identical to a full indirect call.
 
 ```rule
 RULE OS.Apply.CCall
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/call_kind.mli#t
 CODE middle_end/flambda2/terms/apply_expr.mli#create
 ---
@@ -821,7 +844,8 @@ semantics.
 
 ```rule
 RULE OS.Apply.Method
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/call_kind.mli#Method_kind
 ---
 e = Apply { call_kind = Method { kind; obj = s_obj }; args = s̄; continuation = Return k_c; … }
@@ -838,9 +862,10 @@ here and the resolution is not grounded against the code.
 
 ```rule
 RULE OS.Apply.Effect
-CLAIM descriptive
-CODE middle_end/flambda2/terms/call_kind.mli#Effect
+GRADE D
+ROLE implementation
 CAVEAT disclosure: Effect applications are syntax-only in the model — documented in 02 but given no operational rules (per the 01 scope ledger); this scope boundary is the rule's whole descriptive content.
+CODE middle_end/flambda2/terms/call_kind.mli#Effect
 ---
 call_kind = Effect (Perform | Reperform | Resume | With_stack | With_stack_preemptible)
 --------------------------------------------------
@@ -856,7 +881,8 @@ Listed for completeness only.
 
 ```rule
 RULE OS.Apply.NeverReturns
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/apply_expr.mli#Result_continuation
 CODE middle_end/flambda2/terms/apply_expr.mli#returns
 ---
@@ -876,7 +902,8 @@ ill-formed (undefined behaviour).
 
 ```rule
 RULE OS.Invalid
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda.mli#expr_descr
 CODE middle_end/flambda2/terms/flambda.mli#Invalid
 ---
@@ -898,7 +925,8 @@ ever reached, because a correct Simplify guarantees it never is. Soundness
 
 ```rule
 RULE OS.Unit.Init
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_unit.mli#create
 ---
 u : Flambda_unit.t
@@ -920,7 +948,8 @@ halting entries below. Compilation of the module body eventually defines
 
 ```rule
 RULE OS.Unit.Final
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_unit.mli#return_continuation
 CODE middle_end/flambda2/terms/flambda_unit.mli#module_symbol
 ---

@@ -2,7 +2,7 @@
    preserves observable behaviour through the representation
    relation -- a forward simulation between the Flambda machine
    (Opsem.v/Machine.v) and the Cmm machine (Cmm.v/CmmMemory.v).
-   All 12 rules of the chapter are CLAIM normative (eight as
+   All 12 rules of the chapter are ROLE specification (eight as
    documented anchors under their EXCEPTION sanctions, one hybrid,
    three theorems).
 
@@ -487,7 +487,7 @@ Definition custom_boxed_var_payload (sc : static_const) : Prop :=
   | _ => False
   end.
 
-(** RULE INV.ToCmm.Simulates (CLAIM normative) -- 20-to-cmm-soundness.md
+(** RULE INV.ToCmm.Simulates (ROLE specification) -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#expr
 
@@ -628,7 +628,7 @@ Admitted.
 (* 5. End-to-end composition and Invalid (ch. 20 s3)                  *)
 (* ================================================================== *)
 
-(** RULE INV.ToCmm.EndToEnd (CLAIM normative)
+(** RULE INV.ToCmm.EndToEnd (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/flambda2.ml#flambda_to_flambda0
     CODE middle_end/flambda2/to_cmm/to_cmm.ml#unit
@@ -723,7 +723,7 @@ Theorem INV_ToCmm_EndToEnd :
         L0 b' o.
 Admitted.
 
-(** RULE INV.ToCmm.InvalidUnreached (CLAIM normative)
+(** RULE INV.ToCmm.InvalidUnreached (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_expr.ml#invalid
     CODE middle_end/flambda2/to_cmm/to_cmm_primitive.ml#nullary_primitive
@@ -799,10 +799,10 @@ Admitted.
 (*    anchors and the AddrConfined hybrid                             *)
 (* ================================================================== *)
 
-(* Catalog 37's decision rule (CORRESPONDENCE.md): a conjectured
-   property whose quantification is irreducibly over unmodeled pass
+(* Catalog 37's decision rule (CORRESPONDENCE.md): a property of any
+   role whose quantification is irreducibly over unmodeled pass
    internals becomes a documented anchor -- full rule-text citation,
-   _documented := True, true CLAIM preserved in the comment.  Eight
+   _documented := True, true ROLE preserved in the comment.  Eight
    of the nine discharging invariants quantify over exactly such
    internals (slot_offsets / dacc / cmx accumulators, to_cmm_env
    bookkeeping, the fatal-site inventory, linker state, and the
@@ -810,7 +810,7 @@ Admitted.
    hybrid exception, with one clause proved outright on its
    mechanized envelope. *)
 
-(** RULE INV.ToCmm.SlotLiveness (CLAIM normative)
+(** RULE INV.ToCmm.SlotLiveness (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/flambda2.ml#build_run_result
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#finalize
@@ -853,7 +853,7 @@ Admitted.
     Dead offset entry, i.e. Cinvalid EXECUTED at runtime. *)
 Definition INV_ToCmm_SlotLiveness_documented : Prop := True.
 
-(** RULE INV.ToCmm.ClosureScanBoundary (CLAIM normative)
+(** RULE INV.ToCmm.ClosureScanBoundary (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#update_set_for_slot
     CODE middle_end/flambda2/simplify_shared/slot_offsets.ml#layout_aux
@@ -888,7 +888,7 @@ Definition INV_ToCmm_SlotLiveness_documented : Prop := True.
     below). *)
 Definition INV_ToCmm_ClosureScanBoundary_documented : Prop := True.
 
-(** RULE INV.ToCmm.AddrConfined (CLAIM normative)
+(** RULE INV.ToCmm.AddrConfined (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#machtype_of_kind
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
@@ -939,7 +939,7 @@ Proof.
     simpl in Hin; intuition discriminate.
 Qed.
 
-(** RULE INV.ToCmm.EffectLinear (CLAIM normative)
+(** RULE INV.ToCmm.EffectLinear (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_effects.ml#classify_let_binding
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_delayed_lets
@@ -982,7 +982,7 @@ Qed.
     INV_ToCmm_Simulates). *)
 Definition INV_ToCmm_EffectLinear_documented : Prop := True.
 
-(** RULE INV.ToCmm.CallConvCoherent (CLAIM normative)
+(** RULE INV.ToCmm.CallConvCoherent (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/terms/code_metadata.ml#function_slot_size
     CODE middle_end/flambda2/to_cmm/to_cmm_set_of_closures.ml#fill_slot
@@ -1016,7 +1016,7 @@ Definition INV_ToCmm_EffectLinear_documented : Prop := True.
     preserves that flag verbatim for the final report. *)
 Definition INV_ToCmm_CallConvCoherent_documented : Prop := True.
 
-(** RULE INV.ToCmm.StaticUpdateBarrier (CLAIM normative)
+(** RULE INV.ToCmm.StaticUpdateBarrier (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_shared.ml#make_update
     CODE middle_end/flambda2/to_cmm/to_cmm_static.ml#update_field
@@ -1052,7 +1052,7 @@ Definition INV_ToCmm_CallConvCoherent_documented : Prop := True.
     validation all tocmm-* case studies perform. *)
 Definition INV_ToCmm_StaticUpdateBarrier_documented : Prop := True.
 
-(** RULE INV.ToCmm.LoweringTotal (CLAIM normative)
+(** RULE INV.ToCmm.LoweringTotal (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#inline_variable
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#get_continuation
@@ -1087,7 +1087,7 @@ Definition INV_ToCmm_StaticUpdateBarrier_documented : Prop := True.
     INV.NameMode.Coherent is stated in Soundness.v. *)
 Definition INV_ToCmm_LoweringTotal_documented : Prop := True.
 
-(** RULE INV.ToCmm.SymbolInitPlacement (CLAIM normative)
+(** RULE INV.ToCmm.SymbolInitPlacement (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#place_symbol_inits
     CODE middle_end/flambda2/to_cmm/to_cmm_env.ml#flush_bindings
@@ -1122,7 +1122,7 @@ Definition INV_ToCmm_LoweringTotal_documented : Prop := True.
     at top level -- a latent hazard if lifting ever changes. *)
 Definition INV_ToCmm_SymbolInitPlacement_documented : Prop := True.
 
-(** RULE INV.ToCmm.SymbolLocality (CLAIM normative)
+(** RULE INV.ToCmm.SymbolLocality (ROLE specification)
     -- 20-to-cmm-soundness.md
     CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol
     CODE middle_end/flambda2/to_cmm/to_cmm_result.ml#symbol_of_code_id

@@ -40,9 +40,11 @@ primitive, scalar or not:
 
 ```rule
 RULE P.Contract.NoRaiseNoControl
-CLAIM normative
-CODE middle_end/flambda2/terms/flambda_primitive.mli#t
+GRADE B
+PROOF complete
+ROLE specification
 CHECKED @ 7bf23efaf6
+CODE middle_end/flambda2/terms/flambda_primitive.mli#t
 ---
 p is a primitive application, v̄ its argument values, H a heap
 --------------------------------------------------
@@ -207,7 +209,8 @@ immediate kinds it operates on a **16-bit** quantity, per the `mli`:
 
 ```rule
 RULE P.Unary.IntArith.SwapByteEndianness
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Unary_int_arith
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#For_int16s
 CODE middle_end/flambda2/numbers/target_ocaml_int.ml#get_least_significant_16_bits_then_byte_swap
@@ -230,7 +233,8 @@ NOTES: swap_κ per kind:
 
 ```rule
 RULE P.Unary.FloatArith
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_float_arith_op
 CODE middle_end/flambda2/numbers/numeric_types.ml#Float_by_bit_pattern_gen
 ---
@@ -261,11 +265,12 @@ The conversion `conv_{src→dst}` is defined componentwise below. Let
 
 ```rule
 RULE P.Unary.NumConv
-CLAIM normative
-CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_int_conv
-CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
+GRADE C compiler-bug
+ROLE specification
 CAVEAT disclosure: flambda_primitive.mli under-states the float→immediate defined range as ℤ_W; the model follows the folder, which is defined (backend-matching) on all of ℤ_Wₙ.
 CAVEAT compiler-bug: integer→float32 constant folds double-round for |x| ≥ 2^53 (all four number_adjuncts.ml folder sites, :251/:342/:460/:846-class, route through a 53-bit double) where the backend single-rounds directly (to_cmm_primitive.ml:1157-1159 → cmm_helpers.ml:5687-5698 → emit.ml:1683-1684, cvtsi2ss) — the confirmed 13 §4.7 finding, one finding covering both the int and int64/nativeint arms; violates INV.Rewrite.Local (i); witness 14-validation/float32_double_round.md; a fix exists on branch fix-float32-double-rounding (informational; not in this tree).
+CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Make_simplify_int_conv
+CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
 ---
 src, dst ∈ Standard_int_or_float;  v = val_src(a) the argument value
 conv_{src→dst}(a) defined below (undef where noted)
@@ -313,11 +318,12 @@ determines the domain of `a`):
 
 ```rule
 RULE P.Unary.NumConv.FloatToInt.OutOfRange
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: where the result is undef it is target-processor-defined (not portable), not a compile/run divergence; backend-vs-C-runtime instruction match checked by xclerc/mshinwell (number_adjuncts.ml top comment).
 CODE middle_end/flambda2/numbers/target_ocaml_int.ml#of_float
 CODE middle_end/flambda2/numbers/numeric_types.ml#Short_int
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
-CAVEAT disclosure: where the result is undef it is target-processor-defined (not portable), not a compile/run divergence; backend-vs-C-runtime instruction match checked by xclerc/mshinwell (number_adjuncts.ml top comment).
 ---
 src ∈ {Naked_float, Naked_float32};  a ∈ 𝔽
 u(dst) = Wₙ for dst ∈ {Tagged_immediate, Naked_immediate};
@@ -351,7 +357,8 @@ target-processor-defined (not portable) rather than a compile/run divergence.
 
 ```rule
 RULE P.Unary.NumConv.Int32ToInt64.SignExtend
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#For_int32s
 CODE middle_end/flambda2/z3/sign_extension.py
 ---
@@ -374,7 +381,8 @@ that is dead code, [§10](10-simplify-rewrites.md), not `undef`).
 
 ```rule
 RULE P.Unary.BooleanNot
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_boolean_not
 ---
 i ∈ {0, 1}
@@ -395,7 +403,8 @@ value model tracks the integer `i`, not its tagged encoding.)
 
 ```rule
 RULE P.Unary.TagImmediate
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_tag_immediate
 ---
 i ∈ ℤ_W
@@ -405,7 +414,8 @@ i ∈ ℤ_W
 
 ```rule
 RULE P.Unary.UntagImmediate
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_untag_immediate
 ---
 i ∈ ℤ_W
@@ -425,7 +435,8 @@ a *tagged* immediate, so they must (un)tag rather than copy bits.
 
 ```rule
 RULE P.Unary.Reinterpret64.Int64AsFloat64
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_int64_as_unboxed_float64
 CODE middle_end/flambda2/numbers/numeric_types.ml#Float_by_bit_pattern_gen
 ---
@@ -439,7 +450,8 @@ including any NaN pattern. Total.
 
 ```rule
 RULE P.Unary.Reinterpret64.Float64AsInt64
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_float64_as_unboxed_int64
 ---
 b ∈ 𝔽₆₄
@@ -452,7 +464,8 @@ Total.
 
 ```rule
 RULE P.Unary.Reinterpret64.Int64AsTaggedInt63
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_unboxed_int64_as_tagged_int63
 ---
 w ∈ ℤ_64  (an int64 holding a tagged machine word)
@@ -467,7 +480,8 @@ tagged world, so a different computation is required." `>>ᵤ` is logical shift.
 
 ```rule
 RULE P.Unary.Reinterpret64.TaggedInt63AsInt64
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#Simplify_reinterpret_tagged_int63_as_unboxed_int64
 ---
 i ∈ ℤ_W  (a tagged immediate)
@@ -490,7 +504,8 @@ primitive it came from, `Preinterpret_boxed_vector_as_tuple` /
 
 ```rule
 RULE P.Unary.ReinterpretBoxedVector
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_primitive.mli#unary_primitive
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#convert_lprim
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_reinterpret_boxed_vector
@@ -525,7 +540,8 @@ the heap.
 
 ```rule
 RULE P.Unary.BoxNumber
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_box_number
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -543,7 +559,8 @@ the simplifier records the inverse `Unbox_number` CSE equation
 
 ```rule
 RULE P.Unary.UnboxNumber
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_unbox_number
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
@@ -570,7 +587,8 @@ There is no integer overflow trap: every result is `wrap_{w(κ)}`.
 
 ```rule
 RULE P.Binary.IntArith.Total
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#Num_common
 ---
@@ -588,7 +606,8 @@ and `x / (−1)` to this `Sub` form (`Negation_of_the_other_side`).
 
 ```rule
 RULE P.Binary.IntArith.DivMod
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
 CODE middle_end/flambda2/numbers/target_ocaml_int.ml#div
 ---
@@ -604,7 +623,8 @@ b = −1 (see P.Binary.IntArith.DivMinIntByMinusOne).
 
 ```rule
 RULE P.Binary.IntArith.DivModByZero
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_arith
 CODE middle_end/flambda2/from_lambda/lambda_to_flambda_primitives.ml#check_zero_division
 ---
@@ -624,13 +644,14 @@ programs, and the simplifier treats a statically-zero divisor as `Invalid`
 
 ```rule
 RULE P.Binary.IntArith.DivMinIntByMinusOne
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: former suspected violation refuted — backend never emits a bare trapping idiv for min_int/−1 (cmm_helpers.div_int/mod_int, make_safe_divmod, PR#5513); folded value matches runtime.
+CAVEAT disclosure: for Naked_immediate this rule inherits open question 4 (arithmetic width); moot only if such arithmetic is never emitted.
 CODE middle_end/flambda2/numbers/target_ocaml_int.ml#div
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#For_int64s
 CODE backend/cmm_helpers.ml#div_int
 CODE backend/cmm_helpers.ml#make_safe_divmod
-CAVEAT disclosure: former suspected violation refuted — backend never emits a bare trapping idiv for min_int/−1 (cmm_helpers.div_int/mod_int, make_safe_divmod, PR#5513); folded value matches runtime.
-CAVEAT disclosure: for Naked_immediate this rule inherits open question 4 (arithmetic width); moot only if such arithmetic is never emitted.
 ---
 κ a Standard_int kind, w = w(κ)
 --------------------------------------------------
@@ -664,7 +685,8 @@ right), parameterized by `κ`. The *shift count* is a naked immediate (an OCaml
 
 ```rule
 RULE P.Binary.IntShift
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#with_shift
 ---
@@ -688,9 +710,10 @@ refinement notes below for what the *folder* does with it.
 
 ```rule
 RULE P.Binary.IntShift.OutOfRange.FolderPicksZero
-CLAIM descriptive
-CODE middle_end/flambda2/simplify/number_adjuncts.ml#with_shift
+GRADE D
+ROLE implementation
 CAVEAT disclosure: for Tagged_immediate the folder's shift cut-off is 64 while the value width is W = 63 — a legal refinement of undef via Target_ocaml_int.shift_left (declared unspecified for y ≥ 63); intent deferred to open question 2.
+CODE middle_end/flambda2/simplify/number_adjuncts.ml#with_shift
 ---
 op ∈ {Lsl, Lsr, Asr};  s < 0 or s ≥ w(κ)  [in the folder's own cut-off]
 --------------------------------------------------
@@ -707,7 +730,8 @@ tagged immediate and s ∈ {63} (64-bit) the folder calls the underlying
 
 ```rule
 RULE P.Binary.IntShift.ByZero
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_shift
 ---
 op ∈ {Lsl, Lsr, Asr};  a ∈ ℤ_{w(κ)}
@@ -731,7 +755,8 @@ integers) and `cmp_u(a, b)` be unsigned comparison (compare `[a]_w`, `[b]_w`).
 
 ```rule
 RULE P.Binary.IntComp.Bool
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_comp
 CODE middle_end/flambda2/simplify/number_adjuncts.ml#compare_unsigned_generic
 ---
@@ -755,7 +780,8 @@ OCaml immediates and comparing their tagged/shifted representations agree.
 
 ```rule
 RULE P.Binary.IntComp.CompareFunction
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Int_ops_for_binary_comp
 ---
 κ a Standard_int kind, w = w(κ);  a, b ∈ ℤ_w;  su ∈ {Signed, Unsigned}
@@ -776,7 +802,8 @@ is a NaN, `x/0.` is `±∞`).
 
 ```rule
 RULE P.Binary.FloatArith
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_arith_gen
 CODE middle_end/flambda2/numbers/numeric_types.ml#IEEE_semantics
 ---
@@ -806,7 +833,8 @@ convention).
 
 ```rule
 RULE P.Binary.FloatComp.Bool
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_comp_gen
 CODE middle_end/flambda2/numbers/numeric_types.ml#IEEE_semantics
 ---
@@ -828,7 +856,8 @@ still resolves the result (`result_of_comparison_with_nan`).
 
 ```rule
 RULE P.Binary.FloatComp.CompareFunction
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/simplify_binary_primitive.ml#Float_ops_for_binary_comp_gen
 CODE middle_end/flambda2/numbers/numeric_types.ml#IEEE_semantics
 ---
@@ -864,7 +893,8 @@ Each primitive is classified by `Effects_and_coeffects.t` in
 
 ```rule
 RULE P.Effects.PureScalars
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive
 ---
@@ -884,7 +914,8 @@ completeness; its denotation is [§06](06-primitives-memory.md).)
 
 ```rule
 RULE P.Effects.FloatRoundingMode
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_binary_primitive
 ---
@@ -905,7 +936,8 @@ is also why constant folding of float primitives is gated on the same flag.
 
 ```rule
 RULE P.Effects.BoxNumber
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/terms/flambda_primitive.ml#effects_and_coeffects_of_unary_primitive
 ---
 κ a Boxable_number kind;  a an Alloc_mode.For_allocations.t

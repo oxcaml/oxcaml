@@ -89,12 +89,18 @@ ALL_VARIANTS = [
     V_REFLEXIVITY_QED,
 ]
 
-# Claim-kind vocabulary per keyword (mid-migration: STATUS is the retired
-# keyword, CLAIM the record-76 one; both are legal until the sweep finishes).
+# Kind vocabulary per keyword, pairing legality (record 77): STATUS is
+# retired, CLAIM is the record-76 keyword accepted mid-sweep, ROLE is the
+# v2 keyword. Crossed pairs (e.g. ROLE normative) hard-fail.
 KINDS_BY_KEYWORD = {
     "STATUS": {"normative", "descriptive", "conjectured"},
     "CLAIM": {"normative", "descriptive", "interpretive"},
+    "ROLE": {"specification", "implementation", "definition"},
 }
+
+# The 1:1 rename map, for checks that are keyed on a kind CLASS rather
+# than a keyword (mid-sweep a chapter may carry either vocabulary).
+_IMPL_KINDS = {"descriptive", "implementation"}
 
 _THEOREM_KEYWORDS = {
     "Theorem",
@@ -118,7 +124,7 @@ _AXIOM_KEYWORDS = {"Parameter", "Parameters", "Axiom", "Axioms", "Conjecture", "
 
 _RULE_COMMENT_RE = re.compile(r"\(\*\*\s*RULE\s+([A-Za-z0-9.]+)")
 _HEADER_RE = re.compile(
-    r"\(\*\*\s*RULE\s+[A-Za-z0-9.]+\s*\(\s*(STATUS|CLAIM)\s+([a-z-]+)\s*\)"
+    r"\(\*\*\s*RULE\s+[A-Za-z0-9.]+\s*\(\s*(STATUS|CLAIM|ROLE)\s+([a-z-]+)\s*\)"
 )
 _TERMINATOR_RE = re.compile(r"\b(Admitted|Qed|Defined|Abort)\s*\.")
 _ANCHOR_BODY_RE = re.compile(r"^[^.]*?:\s*Prop\s*:=\s*True\s*\.", re.S)
@@ -304,7 +310,7 @@ def scan_theories(theories_dir):
                     Failure(
                         "rule-header", rule_id, where,
                         "RULE comment lacks a well-formed "
-                        "(STATUS <kind>) / (CLAIM <kind>) header",
+                        "(STATUS/CLAIM/ROLE <kind>) header",
                     )
                 )
             comment_end = _comment_end(text, m.start())
@@ -660,7 +666,7 @@ def crosscheck(artifacts, variants):
             for a in artifacts
             if a["file"] == g["file"]
             and a["artifact"] == DOCUMENTED_ANCHOR
-            and a["kind"] != "descriptive"
+            and a["kind"] not in _IMPL_KINDS
             and (g["glob"] is None or fnmatch.fnmatchcase(a["id"], g["glob"]))
         )
         if n != g["count"]:
@@ -709,7 +715,7 @@ def crosscheck(artifacts, variants):
                 "DESCRIPTIVE-AS-DEFINING-listed but classified %s (expected "
                 "defining)" % a["artifact"],
             )
-        if a["kind"] != "descriptive":
+        if a["kind"] not in _IMPL_KINDS:
             mismatch(
                 rid, "%s:%d" % (a["file"], a["line"]),
                 "DESCRIPTIVE-AS-DEFINING-listed but claim kind is %s"
@@ -755,7 +761,7 @@ def crosscheck(artifacts, variants):
             )
         if (
             a["artifact"] == DOCUMENTED_ANCHOR
-            and a["kind"] not in (None, "descriptive")
+            and a["kind"] is not None and a["kind"] not in _IMPL_KINDS
             and not _exception_covers(a, variants)
             and a["id"] not in variants[V_HYBRID]
         ):
@@ -767,7 +773,7 @@ def crosscheck(artifacts, variants):
             )
         if (
             a["artifact"] == DEFINING
-            and a["kind"] == "descriptive"
+            and a["kind"] in _IMPL_KINDS
             and a["id"] not in variants[V_DESCRIPTIVE_AS_DEFINING]
         ):
             mismatch(
@@ -777,7 +783,7 @@ def crosscheck(artifacts, variants):
             )
         if (
             a["artifact"] in (THEOREM_ADMITTED, THEOREM_QED)
-            and a["kind"] == "descriptive"
+            and a["kind"] in _IMPL_KINDS
             # Post-migration (batch C re-key): the ENVELOPE-QED variant
             # sanctions a Qed under ANY claim kind ("true CLAIM
             # preserved"), so envelope-listed descriptive Theorems are

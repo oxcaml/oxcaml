@@ -7,10 +7,10 @@
     values of other names); the doc's set form gamma_E(T) is the
     derived [gamma_set] below (exists rho H consistent with E).
 
-    All T.Gamma.* rules are CLAIM interpretive: the code does not
+    All T.Gamma.* rules are ROLE definition: the code does not
     compute gamma, and this reading is the doc's intended denotation.
-    Per the status mapping, the per-former clauses are constructors
-    (conjectured defining clauses) and the two property rules
+    Per the role mapping, the per-former clauses are constructors
+    (defining clauses) and the two property rules
     (T.Gamma.Kind, T.Gamma.Closures.CodeAgeLoose) are theorems.
 
     Owner: Scott (wave 3).  Imports: Base, Syntax, Values,
@@ -181,15 +181,13 @@ Definition closure_has_slots
   (forall w, In w (socc_value_slots c) ->
      exists v, venv w = Some v).
 
-(* The version class of a code id under the newer_version_of preorder
-   (T.Gamma.Closures.CodeAgeLoose): related in either direction. *)
-Definition code_age_same_class (E : tenv) (c1 c2 : code_id) : Prop :=
-  code_age_newer_eq E c1 c2 \/ code_age_newer_eq E c2 c1.
-
 (* Code-pointer admission for the selected function slot: when the
    case's function type is known, the slot's actual code id implements
-   SOME code-age-related version of the function_type's code_id, NOT
-   necessarily that code id exactly (T.Gamma.Value.Closures,
+   the function_type's code_id OR A NEWER VERSION of it (the up-set of
+   code_id under the newer_version_of order), NOT necessarily code_id
+   exactly — directional only, never an older version, and never the
+   symmetric version class, which admits sibling specializations of a
+   common ancestor (KF-058) (T.Gamma.Value.Closures,
    T.Gamma.Closures.CodeAgeLoose).  The function_type's rec_info is
    opaque here (ch. 07 sec. 6; ch. 11 owns it). *)
 Definition function_type_code_ok (E : tenv)
@@ -200,7 +198,7 @@ Definition function_type_code_ok (E : tenv)
   | Some (Ou_known (Mk_function_type cid _)) =>
       exists cid_act ai,
         funs f = Some (cid_act, ai) /\
-        code_age_same_class E cid_act cid
+        code_age_newer_eq E cid_act cid
   | _ => True
   end.
 
@@ -282,7 +280,7 @@ Definition string_contents_ok (sc : string_contents) (bytes : list Z)
 
 Inductive gamma (E : tenv) (rho : env) (H : heap)
   : ftype -> value -> Prop :=
-  (** RULE T.Gamma.TopBottom (CLAIM interpretive) -- 07-types-domain.md
+  (** RULE T.Gamma.TopBottom (ROLE definition) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_descr.mli#unknown
       CODE middle_end/flambda2/types/grammar/type_descr.mli#bottom
       gamma_E(Unknown_kappa) = all values of kind kappa (constructor
@@ -293,7 +291,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       ftype_is_unknown T = true ->
       value_has_kind v (kind_of_ftype T) ->
       gamma E rho H T v
-  (** RULE T.Gamma.Alias (CLAIM interpretive) -- 07-types-domain.md
+  (** RULE T.Gamma.Alias (ROLE definition) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#alias_type_of
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#get_alias_exn
       gamma_E(Equals s) under rho is the singleton { rho(s) }.
@@ -309,7 +307,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       simple_eval rho s = Some v ->
       value_has_kind v (kind_of_ftype T) ->
       gamma E rho H T v
-  (** RULE T.Gamma.Value.Nullability (CLAIM interpretive)
+  (** RULE T.Gamma.Value.Nullability (ROLE definition)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_value
       VERIFIED 14-validation/n_way_join_preserves_null.md
@@ -328,7 +326,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
       gamma E rho H
         (FT_value (Oub_ok (No_alias (Mk_head_value nn (Maybe_null yo)))))
         V_null
-  (** RULE T.Gamma.Naked.Relational (CLAIM interpretive)
+  (** RULE T.Gamma.Naked.Relational (ROLE definition)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.ml#head_of_kind_naked_immediate
       gamma of a Naked_immediate head with set S and relations M,
@@ -346,7 +344,7 @@ Inductive gamma (E : tenv) (rho : env) (H : heap)
           exists w, rho x = Some w /\ relation_denotes H R w n) ->
       gamma E rho H (FT_naked_immediate (Oub_ok (No_alias h)))
         (V_naked_imm n)
-  (** RULE T.Gamma.Naked.Set (CLAIM interpretive) -- 07-types-domain.md
+  (** RULE T.Gamma.Naked.Set (ROLE definition) -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_naked_float
       For each remaining naked-number kind, gamma of a head is the
       finite set of constants it names (one constructor per kind;
@@ -415,7 +413,7 @@ with gamma_vnn (E : tenv) (rho : env) (H : heap)
 
 with gamma_hvnn (E : tenv) (rho : env) (H : heap)
   : head_value_non_null -> value -> Prop :=
-  (** RULE T.Gamma.Value.Variant (CLAIM interpretive)
+  (** RULE T.Gamma.Value.Variant (ROLE definition)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
       gamma(Variant) = gamma(immediates) u gamma(blocks): tagged
@@ -438,7 +436,7 @@ with gamma_hvnn (E : tenv) (rho : env) (H : heap)
       get_tag_witness rho H gt a ->
       sat_ext E rho H (ext_when_block ex) ->
       gamma_hvnn E rho H (HV_variant ii imms gt bl ex u) (V_ptr a)
-  (** RULE T.Gamma.Value.Boxed (CLAIM interpretive)
+  (** RULE T.Gamma.Value.Boxed (ROLE definition)
       -- 07-types-domain.md
       CODE middle_end/flambda2/types/grammar/type_grammar.mli#head_of_kind_value_non_null
       Boxed_kappa T am: pointers to a boxed number of naked kind kappa
@@ -495,7 +493,7 @@ with gamma_blocks_arm (E : tenv) (rho : env) (H : heap)
       gamma_blocks E rho H rl a ->
       gamma_blocks_arm E rho H (Ou_known rl) a
 
-(** RULE T.Gamma.Value.RowLikeBlocks (CLAIM interpretive)
+(** RULE T.Gamma.Value.RowLikeBlocks (ROLE definition)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_blocks
     gamma(row_like_for_blocks) = block pointers p such that for some
@@ -564,7 +562,7 @@ with gamma_array_contents (E : tenv) (rho : env) (H : heap)
       Forall2 (gamma E rho H) Ts elems ->
       gamma_array_contents E rho H (Ou_known (AC_immutable Ts)) elems
 
-(** RULE T.Gamma.Value.Closures (CLAIM interpretive)
+(** RULE T.Gamma.Value.Closures (ROLE definition)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#row_like_for_closures
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#closures_entry
@@ -610,7 +608,7 @@ with gamma_closures (E : tenv) (rho : env) (H : heap)
       sat_ext E rho H eps ->
       gamma_closures E rho H (Mk_row_like_for_closures kc oc) l f
 
-(** RULE T.Gamma.EnvExtension (CLAIM interpretive)
+(** RULE T.Gamma.EnvExtension (ROLE definition)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.ml#env_extension
     CODE middle_end/flambda2/types/env/typing_env_extension.mli#t
@@ -679,7 +677,7 @@ Definition consistent (E : tenv) (rho : env) (H : heap) : Prop :=
 Definition gamma_set (E : tenv) (T : ftype) (v : value) : Prop :=
   exists rho H, consistent E rho H /\ gamma E rho H T v.
 
-(** RULE T.Gamma.Kind (CLAIM interpretive) -- 07-types-domain.md
+(** RULE T.Gamma.Kind (ROLE definition) -- 07-types-domain.md
     CODE middle_end/flambda2/types/grammar/type_grammar.mli#kind
     gamma_E(T) contains only values of kind kappa(T): concretization
     never crosses kinds.  Stated under consistency, the doc's ambient
@@ -704,18 +702,20 @@ Proof.
   end.
 Qed.
 
-(** RULE T.Gamma.Closures.CodeAgeLoose (CLAIM interpretive)
+(** RULE T.Gamma.Closures.CodeAgeLoose (ROLE definition)
     -- 07-types-domain.md
     CODE middle_end/flambda2/types/meet_and_join.ml#meet_code_id
     CODE middle_end/flambda2/types/env/code_age_relation.ml#meet
     CODE middle_end/flambda2/types/env/typing_env.ml#add_to_code_age_relation
     The gamma clause for Closures code pointers reads the
-    function_type's code_id up to the newer_version_of preorder, not
-    exactly: a closure whose actual code id cid_act is merely
-    code-age-related to the stated cid is admitted whenever the other
-    premises hold.  In this mechanization the loose reading is built
-    into function_type_code_ok, so the rule is provable by applying
-    the constructors (Qed rather than Admitted).  The doc's NOTES on
+    function_type's code_id DIRECTIONALLY — the stated cid or a NEWER
+    version of it (its up-set under the newer_version_of order) — not
+    exactly, and NOT symmetrically: a version-class reading admits
+    sibling specializations of a common ancestor, whose up-sets are
+    disjoint and whose meet the code answers Bottom (KF-058).  In
+    this mechanization the directional reading is built into
+    function_type_code_ok, so the rule is provable by applying the
+    constructors (Qed rather than Admitted).  The doc's NOTES on
     meet_code_id's Both_inputs abuse live in the ch. 07 doc rule's own
     NOTES; ch. 08's mechanization does not model meet_code_id
     (MeetJoin.v holds te_code_age constant through descent). *)
@@ -729,7 +729,7 @@ Theorem T_Gamma_Closures_CodeAgeLoose :
     closure_has_slots funs venv (socc_of_domain (rli_domain idx)) ->
     ftm f = Some (Ou_known (Mk_function_type cid ri)) ->
     funs f = Some (cid_act, ai) ->
-    code_age_same_class E cid_act cid ->
+    code_age_newer_eq E cid_act cid ->
     (forall f' T, ctm f' = Some T ->
         gamma E rho H T (V_clos l f')) ->
     (forall w T, vtm w = Some T ->

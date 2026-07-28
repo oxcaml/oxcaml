@@ -7,30 +7,33 @@ and the Markdown chapters say the same thing.
 ## Traceability
 
 - One Rocq artifact per rule. Every artifact is immediately preceded by a
-  comment `(** RULE <id> (CLAIM <kind>) — <chapter file> ... *)` quoting the
-  rule's id, claim kind, and chapter. Premises appear in the same order as in
-  the Markdown rule block. (MIGRATION IN PROGRESS, record 76: fences and
-  comments not yet swept carry the retired keyword `STATUS`; the census
-  invariant during the migration is byte-identity of id|keyword|value TRIPLES
-  doc↔.v, so each rule's keyword flips on both sides in one flagged delta.)
+  comment `(** RULE <id> (ROLE <value>) — <chapter file> ... *)` quoting the
+  rule's id, role, and chapter. Premises appear in the same order as in
+  the Markdown rule block. (Rename COMPLETE, record 77: the retired
+  keyword `CLAIM` and its value vocabulary were renamed 1:1 to `ROLE`
+  {specification, implementation, definition} by the certified
+  2026-07-27 sweep; the end-state census law holds — doc↔.v
+  byte-identity of id|ROLE pairs, 453 = 365 specification / 75
+  implementation / 13 definition, zero `CLAIM` in fences or artifact
+  headers.)
 - Rule id → Rocq identifier: replace each `.` with `_`
   (`OS.Let.Prim.Pure` → `OS_Let_Prim_Pure`).
-- Claim kind → artifact kind:
-  - defining clause (normative or interpretive) → constructor of an
+- Role → artifact kind:
+  - defining clause (specification or definition) → constructor of an
     `Inductive` judgment (or a `Definition`/`Fixpoint` equation) — the γ
     family stays an Inductive;
-  - property (normative or interpretive) → `Theorem ...` — `Admitted.` until
-    proved; a `Qed` never changes the claim kind (it is a formal-axis badge,
-    record 76);
-  - descriptive → comment block + `Definition <id>_documented : Prop := True.`
+  - property (specification or definition) → `Theorem ...` — `Admitted.` until
+    proved; a `Qed` never changes the role (it is a formal-axis fact,
+    records 76/77);
+  - implementation → comment block + `Definition <id>_documented : Prop := True.`
     anchor (heuristics/architecture/imprecision witnesses are documented, not
     modeled);
   - EXCEPTION (sanctioned; catalog 37's decision rule): a property of any
-    claim kind whose quantification is irreducibly over
+    role whose quantification is irreducibly over
     unmodeled pass internals (dacc/flow_acc/required_names/slot_offsets/
     cmx) OR over out-of-scope or absent components (the entry-40
     sharpened boundary) becomes a documented anchor: full rule-text citation,
-    `_documented := True`, true CLAIM preserved in the comment. Current
+    `_documented := True`, true ROLE preserved in the comment. Current
     instances: seven ch. 13 `INV.*` conjectures (`Soundness.v`); the ch. 09
     anchor set (`SimplifyStructure.v`; 16 anchors — count pinned for the
     classifier's set-equality, per the semantics-bundle ruling); and six
@@ -56,8 +59,8 @@ and the Markdown chapters say the same thing.
     `WF.Syntax.NonRecOccursPositive` (`Syntax.v` — caller-maintained
     metadata invariant, entry 27's whitelist family), and
     `OS.Apply.Effect` (`Opsem.v` — unformalized apply kind; listing
-    retires after its adjudicated descriptive flip, when the default
-    anchor mapping covers it).
+    retires after its adjudicated flip to ROLE implementation, when
+    the default anchor mapping covers it).
   - HYBRID variant of the exception (sanctioned; strictly stronger than a
     whole-rule anchor): when only SOME clauses of a property quantify over
     unmodeled internals, the modelable clauses are stated as a real
@@ -77,11 +80,11 @@ and the Markdown chapters say the same thing.
     code-witnessed envelope and proved outright via
     `machtype_of_kind_data_no_addr`; entry 70). Instances survive claim
     reclassification (record 76's blanket ruling — `AccumBoxElim` keeps
-    this shape under CLAIM descriptive).
-  - DESCRIPTIVE-AS-DEFINING-CLAUSE variant (sanctioned): a descriptive
+    this shape under ROLE implementation).
+  - DESCRIPTIVE-AS-DEFINING-CLAUSE variant (sanctioned): an implementation
     rule whose documented term shape is load-bearing for the development
     (an inhabited union arm, or exact fold content) may be encoded as a
-    defining constructor with CLAIM descriptive preserved in the comment
+    defining constructor with ROLE implementation preserved in the comment
     and a fidelity caveat (algorithm-dependent shape). Instances:
     `S.Unbox.ContParam.Rewrite` (`Unboxing.v`),
     `S.Rewrite.Prim.ConstFold.Float` and `S.Rewrite.Prim.ObjDupElide`
@@ -96,9 +99,9 @@ and the Markdown chapters say the same thing.
     `S.Struct.JoinParams.AnalysisExtraParams` (`SimplifyStructure.v`;
     provided for chs. 10/12 entry-type reasoning, currently unconsumed).
   - ENVELOPE-QED variant (sanctioned; strictly stronger than the mapping):
-    a not-yet-proved property (any claim kind) whose code-witnessed ENVELOPE is derivable in the
+    a not-yet-proved property (any role) whose code-witnessed ENVELOPE is derivable in the
     encoding may be stated on that envelope under its RULE header (true
-    CLAIM preserved) and proved outright (`Qed`), with the comment saying
+    ROLE preserved) and proved outright (`Qed`), with the comment saying
     "stated on the envelope, proved outright". Cousin of the
     by-construction True-Qed (entry 27) and reflexivity-Qed (entry 34)
     precedents. Current instances: `T.Meet.MutableBlockMissedBottom`,
@@ -108,18 +111,18 @@ and the Markdown chapters say the same thing.
     `INV.ToCmm.AddrConfined`'s clause (i) (`machtype_of_kind_data_no_addr`,
     `ToCmmSoundness.v`, within its hybrid; entry 70).
   - REFLEXIVITY-QED variant (sanctioned; entry 34's precedent, list-
-    registered at the batch-4 residual): a rule of any claim kind whose
+    registered at the batch-4 residual): a rule of any role whose
     pinned transcription is definitionally true in the encoding may carry
-    a reflexivity-class `Qed` under its RULE header (true CLAIM preserved;
+    a reflexivity-class `Qed` under its RULE header (true ROLE preserved;
     the comment says why the proof is free). Instance:
-    `T.Meet.Store.CoercionErasure` (`MeetJoin.v`, CLAIM descriptive —
+    `T.Meet.Store.CoercionErasure` (`MeetJoin.v`, ROLE implementation —
     survives reclassification per record 76's never-drop-a-Qed ruling).
   - REFUTED-CONJECTURE variant (sanctioned; KF-053, entry 73): a
     rule whose asserted property is refuted by the development's own
     record — a `Qed`'d counterexample witness in the same file — is stated
     as a named `Definition <id>_claim : Prop`, NOT asserted (zero axiom
     footprint; the rule id stays greppable on the RULE comment and the
-    `_claim` name), with the comment carrying the true CLAIM, the
+    `_claim` name), with the comment carrying the true ROLE, the
     demotion rationale, and the witness's name. The plain
     conjectured → `Theorem ... Admitted.` mapping deliberately does NOT
     apply: an `Admitted` universal with a `Qed`'d refutation in scope is a
@@ -133,8 +136,11 @@ and the Markdown chapters say the same thing.
   DERIVES per-rule evidence and grades per record 76 — evidence is always
   recomputed, never trusted from disk, and a hand-written evidence summary
   anywhere is an error.
-- Prose convention: never write the uppercase words `RULE`, `CLAIM`, `STATUS`,
-  `CAVEAT`, `CHECKED`, or `VERIFIED` followed by an ID-SHAPED payload (a
+- Prose convention: never write the uppercase words `RULE`, `ROLE`, `GRADE`,
+  `PROOF`, `CAVEAT`, `CHECKED`, or `VERIFIED` — nor the retired historical
+  keywords `CLAIM` (record 77) and `STATUS` (record 76), which stay
+  scan-protected — followed by
+  an ID-SHAPED payload (a
   dotted or capitalized-token form) in prose — such text greps as a phantom
   header line. Terms of art like "the RULE comment" are fine (and are what
   the implemented scan tolerates); when in doubt, use lowercase forms — the
@@ -1482,7 +1488,10 @@ here (writers: append as you add them):
     mechanized, never more). "Mechanized" REQUIRES the fidelity-review
     stamp (unreviewed Admitted certifies falsities — the Admitted-false
     campaign is the existence proof) and EXCLUDES documented anchors
-    (else the rung is uniformly true and stops discriminating). Fence
+    (else the rung is uniformly true and stops discriminating). External
+    evidence acts and findings enter the record by COMMIT MESSAGE
+    carrying the freshness attestation; crew acts by flag (the
+    197212e927 precedent). Fence
     event lines feeding derivation: `CHECKED @ <commit>` (code-reading
     verification), `VERIFIED <study> @ <commit>`, and
     `CAVEAT <kind>: <text>` with kinds {known-false, compiler-bug,
@@ -1577,6 +1586,31 @@ here (writers: append as you add them):
     catalog mutually checking); the derived index join FAILS on any
     doc/.v disagreement, never picks a side; double-run determinism;
     every regeneration diff row traces to a stamped source delta.
+    SITE ANNOTATIONS (ruled 2026-07-24; the README-scoreboard
+    precedent at rule-site scale): the generator maintains a
+    marker-delimited, visibly-rendered solidity annotation immediately
+    after each rule fence — derivation OUTPUT co-located with sources,
+    never a declaration. Hand edits inside markers are destroyed on
+    regeneration; an annotation that fails to reproduce under regen is
+    stale-or-hand-edited, both findings; ALL scanners blank marker
+    regions before parsing (generated regions are not source data; a
+    rule fence or keyword-with-id-shaped-payload inside markers
+    hard-fails); and THE DERIVATION PIPELINE NEVER READS ANNOTATION
+    CONTENT — outputs are not inputs, so a corrupted annotation cannot
+    survive by feeding itself. Placement is OUTSIDE the fence (the
+    doc↔.v triples domain stays 100% human-authored); there is NO .v
+    twin (regen writing theories/ would churn .vo timestamps —
+    build invalidation for zero proof content — and violate
+    citation-not-mirror; a generated standalone summary is the
+    sanctioned alternative if proof-side visibility is ever wanted).
+    Annotations render the DERIVED consequence (grade, demoting/
+    display flags, [stale], DISPUTED with finding ids), not caveat
+    recounts; one generator-owned notice per chapter head carries the
+    edits-destroyed contract. Annotation-only deltas audit as the
+    regeneration-diff class (every changed line within markers; the
+    tracing source delta is the FIDELITY/doc event that moved the
+    derivation), flagged wholesale per the amended W-36 convention
+    with the trigger named.
     PHANTOM-SCAN SCOPE (ruled): the scan protects MACHINE-CONSUMED
     surfaces — chapter fences, theories/ comments, FIDELITY RULES:
     headers, and this catalog's Traceability section (parser ground
@@ -1592,6 +1626,89 @@ here (writers: append as you add them):
     plus machine-drafted, author-verified in full before feeding the
     index; DISPUTED derivation makes these headers load-bearing for
     grading, accepted knowingly.
+
+77. **Header schema v2: in-fence GRADE/PROOF and the ROLE vocabulary**
+    (user-directed 2026-07-24, design iterated through Q&A before
+    implementation; Knuth design-delta PASS + Dijkstra invariant
+    blessing codified here; supersedes record 76's SITE ANNOTATIONS
+    paragraph — v1's after-fence annotation blocks and per-chapter
+    notices are REMOVED by the sweep, record 76 itself untouched as
+    historical text).
+    CANONICAL HEADER ORDER (normative): `RULE`, `GRADE`, `PROOF`?,
+    `ROLE`, `CAVEAT`*, `VERIFIED`*, `CHECKED`*, `CODE`+ — topline grade
+    first, trust qualifiers with the role, certifications above the
+    anchor cascade, cascade at the BOTTOM. The writer normalizes
+    keyword order; SOURCE lines keep their authored internal order
+    (CAVEATs among themselves; the CODE cascade — internal order
+    meaningful, first anchor primary — moves as a unit).
+    THE ROLE VOCABULARY (field `CLAIM` renamed `ROLE`; values 1:1, no
+    reclassification — any rule whose classification would change under
+    the new names is a finding, not a rename): `normative` →
+    `specification` (the code answers to the rule; divergence is a bug
+    in code or spec; algorithm-shaped rules like TC.*/OS.* are
+    specifications — authority decides, not content); `descriptive` →
+    `implementation` (the rule answers to the code; documents the
+    spec-free surface — heuristics, orderings, cost models, imprecision
+    witnesses; divergence means the doc is outdated, not violated);
+    `interpretive` → `definition` (formalism-side apparatus the other
+    roles are judged against; answers only to the model's coherence).
+    The constrained-subject classifier criterion and the
+    direction-of-authority reading are the same test in new clothes.
+    Abbreviations `spec`/`impl`/`def` are sanctioned for DERIVED tables
+    and scoreboards only; fences carry the full words. Standing
+    boundary case noted for honesty: OS.Apply.Effect (subject is
+    modeling scope) is awkward under any naming; mapped, no finding.
+    DERIVED IN-FENCE LINES: `GRADE <letter | DISPUTED (KF-nnn, …)>`
+    with flags inline (false-as-stated, compiler-bug, pending-upstream
+    (watched), [stale], (hybrid)) and `PROOF <extent>` are
+    generator-owned lines INSIDE the fence header. Protection carries
+    over from v1 with the placement argument replaced by a stronger
+    one: the census was never whole-header identity but id|kind PAIRS,
+    and the header already carries doc-side-only keyword families
+    (CODE/CAVEAT/VERIFIED/CHECKED); GRADE and PROOF are two more, and
+    since the .v RULE comments do NOT gain them (no-.v-twin standing),
+    doc/.v disagreement on them is impossible BY CONSTRUCTION. The
+    derived-keyword set is CLOSED at {GRADE, PROOF} (any other
+    generator-written keyword hard-fails); exactly one GRADE and at
+    most one PROOF per fence; unknown values hard-fail; hand edits to
+    derived lines are destroyed on regeneration; strict-mode freshness:
+    a derived line that mismatches the derivation BEFORE rewrite
+    hard-fails. OUTPUTS ARE NOT INPUTS: no pipeline stage reads
+    GRADE/PROOF content, and ALL scanner channels (census, events,
+    strand/phantom, finding and watch scanners) exclude derived lines
+    before parsing — in particular the KF ids inside a DISPUTED grade
+    and watch names inside flags are invisible to the finding/watch
+    scanners, so a derived line can never re-open a finding.
+    PROOF VOCABULARY (extent, not epistemics; the
+    proof-certifies-the-model-never-the-code caveat lives once in the
+    README): `complete` — a Qed'd PROPERTY artifact of any role,
+    proving the stated rule (defining clauses carry no PROOF line);
+    `envelope` — the Qed is on a code-witnessed envelope of the stated
+    rule (the ENVELOPE-QED instances, incl. hybrid-interior clauses);
+    `reflexivity` — the definitional-unfolding class (entry 34's).
+    ALL THREE EMIT FROM DAY ONE, sourced from the Traceability instance
+    lists as ground truth (table lookup, not new analysis); emitting
+    `complete` for an envelope or reflexivity instance is a FALSE
+    derived line and hard-fails.
+    SWEEP INVARIANT (the auditor's, binding; frozen baseline at
+    ~/tmp/v2-baseline-{doc,v}-sorted.txt, 453 triples, doc↔.v
+    byte-identical, 365/75/13 all-CLAIM): mid-sweep triples
+    id|keyword|value with keyword ∈ {CLAIM, ROLE} and PAIRING
+    LEGALITY — value domain conditioned on the keyword, crossed triples
+    hard-fail; CLAIM strictly shrinking, shrink = exactly the batch's
+    flagged set; per-RULE doc+.v atomicity (chapter batching is
+    convenience, the rule is the unit); mapping legality against the
+    FROZEN baseline; END-STATE = doc↔.v byte-identity of id|ROLE pairs,
+    453 = 365 specification / 75 implementation / 13 definition, zero
+    CLAIM anywhere (CLAIM then retires to the historical keyword list;
+    records ≤ 76 exemption untouched; this record is scanned). BOARD
+    IDENTITY AT EVERY BATCH BOUNDARY: A 38 · B 18 · C 300 · D 97 ·
+    DISPUTED 0 — the round is rename + rendering relocation; any grade
+    movement is a hard finding. Audit split: derived-line hunks
+    certified wholesale by regen byte-reproduction; source hunks by
+    SCRUBBED line-multiset (derived lines, v1 markers, and notices
+    dropped from both sides first) modulo the canonical reorder and the
+    1:1 rename map.
 
 ## Build
 

@@ -25,17 +25,12 @@
 # Python 3 stdlib only. Runnable from any cwd: paths are resolved relative to
 # this script's own location.
 #
-# Usage (canonical, via the Makefile target — also generates the duneconf/
-# workspace files the alias needs):
-#   make regen-flambda2-formalism-rule-index
-#
-# or via the Dune alias directly (regenerates, checks, and promotes the
-# results into the tree in one step):
-#   dune build --root=. --workspace=duneconf/main.ws \
-#     @middle_end/flambda2/docs/formalism/regen-rule-index --auto-promote
-#
-# Direct invocation (updates rule-index.md and README.md in place):
+# Usage (canonical; from the repository root):
 #   python3 middle_end/flambda2/docs/formalism/tools/regen_rule_index.py
+#
+# The Makefile target (make regen-flambda2-formalism-rule-index) and the Dune
+# alias it wraps are broken while the dune sandbox excludes rocq/, which this
+# script must read; use the direct invocation.
 #
 # Under Dune, the rule in ../dune passes --out-index/--out-readme so the
 # generated files are separate build targets, which Dune then diffs against
@@ -57,7 +52,6 @@ FLAMBDA2_DIR = os.path.dirname(
     os.path.dirname(FORMALISM_DIR)
 )  # .../middle_end/flambda2
 REPO_ROOT = os.path.dirname(os.path.dirname(FLAMBDA2_DIR))  # repo root
-FLAMBDA2_REL = os.path.relpath(FLAMBDA2_DIR, REPO_ROOT)  # middle_end/flambda2
 
 INDEX_PATH = os.path.join(FORMALISM_DIR, "rule-index.md")
 README_PATH = os.path.join(FORMALISM_DIR, "README.md")
@@ -221,13 +215,12 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
     A('[`README.md`](README.md) ("Rule blocks" and "Rule ID namespaces") for the')
     A("block format and the meaning of each namespace prefix.")
     A("")
-    A("**_Agents: weigh a rule by its CLAIM kind × derived grade × CAVEAT"
-      " lines, never by kind alone — see [§ How agents should use this"
+    A("**_Agents: weigh a rule by its ROLE × derived grade × CAVEAT"
+      " lines, never by role alone — see [§ How agents should use this"
       " index](#how-agents-should-use-this-index)._**")
     A("")
     if scoreboard is not None and grade_by_id:
         by_grade = Counter(row["grade"] for row in grade_by_id.values())
-        by_status = Counter(r["status"] for r in rules)
         by_chap = Counter(r["chapter"] for r in rules)
         cc = scoreboard["caveat_counts"]
         A("## Solidity scoreboard")
@@ -250,9 +243,11 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
             A(f"{g:<9}{c:>4}  {bar}".rstrip())
         A("```")
         A("")
-        A("- **By claim:** normative "
-          f"{by_status['normative']}, descriptive {by_status['descriptive']}, "
-          f"interpretive {by_status['interpretive']}")
+        by_role = Counter(solidity_join.role_of(r["status"]) for r in rules)
+        A("- **By role:** specification "
+          f"{by_role['specification']} (spec), implementation "
+          f"{by_role['implementation']} (impl), definition "
+          f"{by_role['definition']} (def)")
         disputed = sorted(
             (row for row in grade_by_id.values() if row["grade"] == "DISPUTED"),
             key=lambda r: r["id"],
@@ -318,8 +313,8 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
     A("## How agents should use this index")
     A("")
     A("- To answer a question or synthesize a test, grep here for candidate rules,")
-    A("  then read the owning chapter section. Weigh a rule by its CLAIM kind plus")
-    A("  its caveats and derived evidence; `descriptive` rules are")
+    A("  then read the owning chapter section. Weigh a rule by its ROLE plus")
+    A("  its caveats and derived evidence; `implementation` rules are")
     A("  current-behaviour documentation and may drift with the code.")
     A("- When code under `middle_end/flambda2/` changes, grep the **Code anchors**")
     A("  column for the changed file, then follow the sync protocol in `README.md`.")
@@ -330,34 +325,31 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
     A("run:")
     A("")
     A("```")
-    A("make regen-flambda2-formalism-rule-index")
+    A("python3 middle_end/flambda2/docs/formalism/tools/regen_rule_index.py")
     A("```")
     A("")
-    A("or build the Dune alias directly:")
-    A("")
-    A("```")
-    A("dune build --root=. --workspace=duneconf/main.ws \\")
-    A(f"  @{FLAMBDA2_REL}/docs/formalism/regen-rule-index --auto-promote")
-    A("```")
+    A("(The `make regen-flambda2-formalism-rule-index` target and the Dune alias it")
+    A("wraps are broken while the dune sandbox excludes `rocq/`, which the generator")
+    A("must read; use the direct invocation.)")
     A("")
     A("The underlying script scans each `NN-*.md` for fenced")
-    A("`rule` blocks, reads the `RULE` / `CLAIM` / `CODE` / `VERIFIED` / `CAVEAT` header")
+    A("`rule` blocks, reads the `RULE` / `ROLE` / `CODE` / `VERIFIED` / `CAVEAT` header")
     A("lines, buckets by namespace prefix (the text before the first `.` in the")
     A("ID), runs the consistency checks below, rewrites this file, and refreshes")
     A("the rule/case-study counts in [`README.md`](README.md). It exits non-zero")
     A("if any check fails (duplicate IDs, rules with no anchor, or unresolvable")
-    A("anchors), recording the failures in the section below either way. The Dune")
-    A("alias does not run as part of the default build; the `--auto-promote` flag")
-    A("copies the regenerated files back into the source tree.")
+    A("anchors), recording the failures in the section below either way.")
     A("")
     A("## Columns")
     A("")
     A("- **Rule ID** — the rule's stable ID (`RULE` header). Globally unique; never")
     A("  renumbered or reused.")
-    A("- **Claim** — `normative` (the subject is something the code computes or")
-    A("  the runtime does), `descriptive` (documents the current")
-    A("  algorithm/heuristic; may change), or `interpretive` (formalism-side")
-    A("  apparatus; falsity is remediable only by a doc/model edit). Evidence and")
+    A("- **Role** — the rule's direction of authority (record 77; shown")
+    A("  abbreviated): `spec` = specification (the code answers to the rule;")
+    A("  divergence is a bug in code or spec), `impl` = implementation (the")
+    A("  rule answers to the code; documents the spec-free surface and may")
+    A("  drift), `def` = definition (formalism-side apparatus the other roles")
+    A("  are judged against). Fences carry the full words. Evidence and")
     A("  grades are DERIVED by the tooling, never declared (record 76).")
     A("- **Grade** — the derived solidity grade (record 76), monotone on the two")
     A("  evidence axes: A = validated × mechanized (no demoting flag), B =")
@@ -388,7 +380,7 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
         A("")
         A(f"{len(rs)} rules.")
         A("")
-        A("| Rule ID | Claim | Grade | Chapter | Artifact | Code anchors | Verified |")
+        A("| Rule ID | Role | Grade | Chapter | Artifact | Code anchors | Verified |")
         A("|---|---|---|---|---|---|---|")
         for r in sorted(rs, key=lambda r: (r["chapter"], r["line"])):
             a = art_by_id.get(r["id"])
@@ -400,7 +392,8 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
             g = grade_by_id.get(r["id"])
             grade = solidity_join.render_grade(g) if g else "—"
             A(
-                f"| `{r['id']}` | {r['status']} | {grade} | {r['chapter']} | "
+                f"| `{r['id']}` | {solidity_join.display_value(r['status'])} "
+                f"| {grade} | {r['chapter']} | "
                 f"{art} | {fmt_codes(r['codes'])} | {fmt_verified(r['verified'])} |"
             )
         A("")
@@ -495,6 +488,335 @@ def render_index(rules, duplicates, no_anchor, missing_file, missing_name,
 # --- README count update ----------------------------------------------------
 
 
+# --- Per-rule in-fence derived lines (chapter writer v2, record 77) ----------
+# The generator maintains GRADE and PROOF lines INSIDE each rule fence
+# header and normalizes the header to the canonical keyword order:
+# RULE, GRADE, PROOF?, ROLE/CLAIM, CAVEAT*, VERIFIED*, CHECKED*, CODE+.
+# Source lines keep their authored internal order within each family;
+# the CODE cascade moves as a unit (first anchor primary). v1's
+# marker-delimited annotation blocks and per-chapter notices are REMOVED
+# (superseded; _strip_generated cleans any stragglers). Outputs are never
+# inputs: derivation never reads GRADE/PROOF; hand edits to them are
+# destroyed on regeneration, and a derived line that mismatches the
+# derivation BEFORE rewrite hard-fails the run (freshness) while the
+# rewrite itself restores truth on disk.
+
+_HEADER_FAMILY_RES = None  # built lazily from fence_parser's regexes
+
+
+def _strip_generated(lines):
+    """Remove generator-owned regions entirely (markers included)."""
+    out = []
+    in_region = False
+    for ln in lines:
+        if not in_region and fence_parser.RE_GENERATED_BEGIN.match(ln):
+            in_region = True
+            continue
+        if in_region:
+            if fence_parser.RE_GENERATED_END.match(ln):
+                in_region = False
+            continue
+        out.append(ln)
+    return out
+
+
+def _strip_v1_layout(lines):
+    """Remove v1 generated regions and repair the one blank-line scar the
+    removal leaves: the chapter-head notice sat between two blank lines,
+    so stripping it doubles the blank after the title."""
+    lines = _strip_generated(lines)
+    if lines and lines[0].startswith("# "):
+        j = 1
+        while j < len(lines) and lines[j].strip() == "":
+            j += 1
+        if j > 2:
+            lines = [lines[0], ""] + lines[j:]
+    return lines
+
+
+def _rewrite_header(chapter, rid, header, deriv, failures):
+    """Rewrite one fence-header line list to the canonical order (record
+    77): RULE, GRADE, PROOF?, kind, CAVEAT*, VERIFIED*, CHECKED*, CODE+.
+    Source families keep their authored internal order; GRADE/PROOF are
+    replaced by fresh derivations. Returns the new lines, or None (fence
+    left untouched, failure recorded) on anything the writer does not
+    own."""
+    fams = dict(rule=[], grade=[], proof=[], kind=[], caveat=[],
+                verified=[], checked=[], code=[])
+    for ln in header:
+        if fence_parser.RE_RULE.match(ln):
+            fams["rule"].append(ln)
+        elif fence_parser.RE_GRADE.match(ln):
+            fams["grade"].append(ln)
+        elif fence_parser.RE_PROOF.match(ln):
+            fams["proof"].append(ln)
+        elif fence_parser.RE_KIND.match(ln):
+            fams["kind"].append(ln)
+        elif fence_parser.RE_CAVEAT.match(ln):
+            fams["caveat"].append(ln)
+        elif fence_parser.RE_VERIFIED.match(ln):
+            fams["verified"].append(ln)
+        elif fence_parser.RE_CHECKED.match(ln):
+            fams["checked"].append(ln)
+        elif fence_parser.RE_CODE.match(ln):
+            fams["code"].append(ln)
+        else:
+            failures.append(
+                f"{chapter}: rule {rid}: unrecognized header line {ln!r}; "
+                "fence left untouched"
+            )
+            return None
+    d = deriv.get(rid) if rid is not None else None
+    if d is None:
+        failures.append(
+            f"{chapter}: rule fence with id {rid!r} has no derived row; "
+            "fence left untouched"
+        )
+        return None
+    # Freshness (strict): a derived line that mismatches the derivation
+    # before rewrite is stale or hand-edited — hard-fail the run; the
+    # rewrite below still restores truth on disk. Absence is not
+    # staleness (first insertion is silent).
+    for old in fams["grade"]:
+        if old != d["grade"]:
+            failures.append(
+                f"{chapter}: {rid}: stale/hand-edited derived line {old!r} "
+                f"(derivation: {d['grade']!r}); rewritten"
+            )
+    for old in fams["proof"]:
+        if old != d["proof"]:
+            failures.append(
+                f"{chapter}: {rid}: stale/hand-edited derived line {old!r} "
+                f"(derivation: {d['proof']!r}); rewritten"
+            )
+    out = list(fams["rule"])
+    out.append(d["grade"])
+    if d["proof"]:
+        out.append(d["proof"])
+    for fam in ("kind", "caveat", "verified", "checked", "code"):
+        out.extend(fams[fam])
+    return out
+
+
+def _rebuild_chapter(chapter, text, deriv, failures):
+    """Strip the v1 layout, then rewrite every rule-fence header to the
+    canonical v2 order with fresh GRADE/PROOF lines. deriv of None runs
+    the v1-removal-only walk (the tripwire baseline)."""
+    lines = _strip_v1_layout(text.split("\n"))
+    if not (lines and lines[0].startswith("# ")):
+        failures.append(f"{chapter}: does not open with a '# ' title line")
+        return None
+    if deriv is None:
+        out = list(lines)
+    else:
+        out = []
+        i, n = 0, len(lines)
+        state = "out"
+        header = None
+        rid = None
+        while i < n:
+            ln = lines[i]
+            if state == "out":
+                if fence_parser.RE_FENCE_RULE_OPEN.match(ln):
+                    state = "header"
+                    header = []
+                    rid = None
+                elif fence_parser.RE_FENCE_OPEN.match(ln):
+                    state = "fence"
+                out.append(ln)
+            elif state == "header":
+                if re.match(r"^---", ln):
+                    new_header = _rewrite_header(
+                        chapter, rid, header, deriv, failures
+                    )
+                    out.extend(new_header if new_header is not None
+                               else header)
+                    out.append(ln)
+                    state = "fence"
+                elif fence_parser.RE_FENCE_CLOSE.match(ln):
+                    failures.append(
+                        f"{chapter}: rule {rid}: fence closed before '---'; "
+                        "left untouched"
+                    )
+                    out.extend(header)
+                    out.append(ln)
+                    state = "out"
+                else:
+                    m = fence_parser.RE_RULE.match(ln)
+                    if m and rid is None:
+                        rid = m.group(1)
+                    header.append(ln)
+            else:  # inside a fence body / non-rule fence
+                if fence_parser.RE_FENCE_CLOSE.match(ln):
+                    state = "out"
+                out.append(ln)
+            i += 1
+        if state != "out":
+            failures.append(f"{chapter}: unclosed fence at EOF")
+    while out and out[-1] == "":
+        out.pop()
+    out.append("")
+    return "\n".join(out)
+
+
+def _writer_view(text):
+    """The tripwire projection: (sequence of all non-header lines, sorted
+    multiset of source header lines). The writer may ONLY reorder header
+    source lines and rewrite derived GRADE/PROOF lines — both texts of a
+    correct rewrite project to the same view."""
+    seq, headers = [], []
+    state = "out"
+    for ln in text.split("\n"):
+        if state == "out":
+            if fence_parser.RE_FENCE_RULE_OPEN.match(ln):
+                state = "header"
+            elif fence_parser.RE_FENCE_OPEN.match(ln):
+                state = "fence"
+            seq.append(ln)
+        elif state == "header":
+            if re.match(r"^---", ln):
+                state = "fence"
+                seq.append(ln)
+            elif fence_parser.RE_FENCE_CLOSE.match(ln):
+                state = "out"
+                seq.append(ln)
+            elif (fence_parser.RE_GRADE.match(ln)
+                  or fence_parser.RE_PROOF.match(ln)):
+                pass  # derived: generator-owned, excluded from the view
+            else:
+                headers.append(ln)
+        else:
+            if fence_parser.RE_FENCE_CLOSE.match(ln):
+                state = "out"
+            seq.append(ln)
+    return seq, sorted(headers)
+
+
+def rewrite_chapters(deriv):
+    """Rewrite every rule-bearing chapter to the v2 header layout.
+    Returns (fence_count, chapter_count, changed_files, failures)."""
+    failures = []
+    fences = 0
+    changed = []
+    n_chapters = 0
+    for path in fence_parser.chapter_files(FORMALISM_DIR):
+        chapter = os.path.basename(path)
+        with open(path) as fh:
+            text = fh.read()
+        # A chapter with no rule fences (01-overview) is not ours.
+        if not any(
+            fence_parser.RE_FENCE_RULE_OPEN.match(ln)
+            for ln in text.split("\n")
+        ):
+            continue
+        n_chapters += 1
+        new_text = _rebuild_chapter(chapter, text, deriv, failures)
+        if new_text is None:
+            continue
+        # Tripwire: outside the fence headers the writer may only remove
+        # the v1 layout; inside them it may only reorder source lines and
+        # rewrite derived ones. Both texts must project to the same view.
+        baseline = _rebuild_chapter(chapter, text, None, [])
+        if baseline is None or _writer_view(new_text) != _writer_view(baseline):
+            failures.append(
+                f"{chapter}: writer changed content outside its ownership "
+                "(tripwire); file NOT written"
+            )
+            continue
+        fences += sum(
+            1 for ln in new_text.split("\n")
+            if fence_parser.RE_GRADE.match(ln)
+        )
+        if new_text != text:
+            with open(path, "w") as fh:
+                fh.write(new_text)
+            changed.append(chapter)
+    return fences, n_chapters, changed, failures
+
+
+def _writer_selftest():
+    """Self-tests for the v2 chapter writer (record 77): canonical order,
+    v1 removal, freshness loudness, tripwire invariance, idempotence."""
+    checks = [0]
+
+    def check(cond, label):
+        assert cond, label
+        checks[0] += 1
+
+    CH = (
+        "# Chapter\n"
+        "\n"
+        "<!-- solidity-note:begin -->\n"
+        "> notice\n"
+        "<!-- solidity-note:end -->\n"
+        "\n"
+        "Intro prose.\n"
+        "\n"
+        "```rule\n"
+        "RULE T.W.One\n"
+        "CLAIM normative\n"
+        "CODE a.ml#f\n"
+        "CODE b.ml#g\n"
+        "CAVEAT disclosure: note.\n"
+        "VERIFIED s.md @ deadbeef00\n"
+        "---\n"
+        "body\n"
+        "```\n"
+        "<!-- solidity:begin T.W.One -->\n"
+        "_Solidity:_ **B** — derived\n"
+        "<!-- solidity:end T.W.One -->\n"
+        "\n"
+        "```rule\n"
+        "RULE T.W.Two\n"
+        "GRADE C\n"
+        "ROLE definition\n"
+        "CODE a.ml#h\n"
+        "---\n"
+        "body\n"
+        "```\n"
+        "\n"
+        "Tail prose.\n"
+    )
+    deriv = {
+        "T.W.One": dict(grade="GRADE B", proof="PROOF complete"),
+        "T.W.Two": dict(grade="GRADE B", proof=None),
+    }
+    fails = []
+    new = _rebuild_chapter("ch.md", CH, deriv, fails)
+    lines = new.split("\n")
+    i = lines.index("RULE T.W.One")
+    check(
+        lines[i + 1] == "GRADE B"
+        and lines[i + 2] == "PROOF complete"
+        and lines[i + 3] == "CLAIM normative"
+        and lines[i + 4].startswith("CAVEAT ")
+        and lines[i + 5].startswith("VERIFIED ")
+        and lines[i + 6] == "CODE a.ml#f"
+        and lines[i + 7] == "CODE b.ml#g"
+        and lines[i + 8] == "---",
+        "canonical order; CODE cascade last in authored order",
+    )
+    check(
+        "solidity:begin" not in new and "solidity-note" not in new,
+        "v1 blocks and chapter notice removed",
+    )
+    check(
+        any("stale/hand-edited" in f for f in fails),
+        "stale derived line is loud (freshness)",
+    )
+    j = lines.index("RULE T.W.Two")
+    check(lines[j + 1] == "GRADE B", "stale GRADE rewritten to derivation")
+    base = _rebuild_chapter("ch.md", CH, None, [])
+    check(
+        _writer_view(new) == _writer_view(base),
+        "tripwire: views of rewrite and baseline agree",
+    )
+    fails2 = []
+    again = _rebuild_chapter("ch.md", new, deriv, fails2)
+    check(again == new and fails2 == [], "writer idempotent and quiet")
+    print(f"regen writer self-test: {checks[0]} checks passed.")
+
+
 SCOREBOARD_BEGIN = "<!-- scoreboard:begin — generated by tools/regen_rule_index.py; do not edit -->"
 SCOREBOARD_END = "<!-- scoreboard:end -->"
 
@@ -508,7 +830,7 @@ def readme_scoreboard_block(rules, grade_by_id, scoreboard):
     the moment it is most confusing, no derived ratios (denominators are
     arguments)."""
     by_grade = Counter(row["grade"] for row in grade_by_id.values())
-    by_status = Counter(r["status"] for r in rules)
+    by_role = Counter(solidity_join.role_of(r["status"]) for r in rules)
     cc = scoreboard["caveat_counts"]
     grades = " · ".join(
         f"{g} {by_grade.get(g, 0)}" for g in ("A", "B", "C", "D", "DISPUTED")
@@ -525,9 +847,9 @@ def readme_scoreboard_block(rules, grade_by_id, scoreboard):
         f"> **Scoreboard** ({len(rules)} rules · "
         f"{scoreboard['case_studies']} case studies) —",
         f"> grades **{grades}** {gloss} ·",
-        f"> claims **{by_status['normative']} normative / "
-        f"{by_status['descriptive']} descriptive / "
-        f"{by_status['interpretive']} interpretive** ·",
+        f"> roles **{by_role['specification']} specification / "
+        f"{by_role['implementation']} implementation / "
+        f"{by_role['definition']} definition** ·",
         f"> caveats **{cc['known-false']} known-false · "
         f"{cc['compiler-bug']} compiler-bug · "
         f"{cc['pending-upstream']} pending-upstream (watched) · "
@@ -546,16 +868,21 @@ def update_readme(rules, case_studies, out_path, grade_by_id=None,
     """Surgically replace the total/by-status rule counts, the case-study
     count, and the scoreboard block in README.md, writing the result to
     out_path. Idempotent: reruns produce no further change."""
-    by_status = Counter(r["status"] for r in rules)
+    by_role = Counter(solidity_join.role_of(r["status"]) for r in rules)
     total = len(rules)
     with open(README_PATH) as fh:
         text = fh.read()
 
+    # Word-alternation patterns keep the page's own vocabulary mid-sweep
+    # (the 1:1 rename map makes the combined counts sweep-invariant).
     subs = [
         (r"\*\*\d+ rules\*\* across chapters", f"**{total} rules** across chapters"),
-        (r"\*\*\d+ normative\*\*", f"**{by_status['normative']} normative**"),
-        (r"\*\*\d+ descriptive\*\*", f"**{by_status['descriptive']} descriptive**"),
-        (r"\*\*\d+ interpretive\*\*", f"**{by_status['interpretive']} interpretive**"),
+        (r"\*\*\d+ (normative|specification)\*\*",
+         f"**{by_role['specification']} \\1**"),
+        (r"\*\*\d+ (descriptive|implementation)\*\*",
+         f"**{by_role['implementation']} \\1**"),
+        (r"\*\*\d+ (interpretive|definition)\*\*",
+         f"**{by_role['definition']} \\1**"),
         (r"\*\*\d+ case studies\*\*", f"**{case_studies} case studies**"),
     ]
     unmatched = []
@@ -594,12 +921,20 @@ def main():
         "directory) instead of updating rule-index.md in place",
     )
     parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="run the chapter-writer self-tests and exit",
+    )
+    parser.add_argument(
         "--out-readme",
         default=None,
         help="write the count-updated README here instead of updating "
         "README.md in place",
     )
     args = parser.parse_args()
+    if args.selftest:
+        _writer_selftest()
+        return
     out_index = os.path.abspath(args.out_index) if args.out_index else INDEX_PATH
     out_readme = os.path.abspath(args.out_readme) if args.out_readme else README_PATH
 
@@ -615,12 +950,13 @@ def main():
     duplicates, no_anchor, missing_file, missing_name = run_checks(rules)
     case_studies = count_case_studies()
 
-    # STRICT JOIN (record 76 ruling (8)): the migration's completion
-    # event has occurred (STATUS count reached zero), so any STATUS
-    # row anywhere is a hard phantom-class error from here on.
+    # STRICT JOIN (record 76 ruling (8); extended per record 77's
+    # end-state): each migration's completion event has occurred
+    # (STATUS, then CLAIM, reached zero), so any STATUS or CLAIM row
+    # anywhere is a hard phantom-class error from here on.
     retired_keyword = [
-        f"{r['id']} ({r['chapter']}:{r['line']}): retired STATUS keyword"
-        for r in rules if r.get("keyword") == "STATUS"
+        f"{r['id']} ({r['chapter']}:{r['line']}): retired {r['keyword']} keyword"
+        for r in rules if r.get("keyword") in ("STATUS", "CLAIM")
     ]
 
     # .v-side artifact classification + doc/.v join (record 76: the join
@@ -653,8 +989,8 @@ def main():
         for f in art_failures
     ]
     retired_keyword_v = [
-        f"{a['id']} ({a['file']}:{a['line']}): retired STATUS keyword (.v)"
-        for a in artifacts if a.get("keyword") == "STATUS"
+        f"{a['id']} ({a['file']}:{a['line']}): retired {a['keyword']} keyword (.v)"
+        for a in artifacts if a.get("keyword") in ("STATUS", "CLAIM")
     ]
     join_failures.extend(retired_keyword_v)
 
@@ -807,12 +1143,12 @@ def main():
         grade_by_id=grade_by_id, scoreboard=scoreboard,
     )
 
-    by_status = Counter(r["status"] for r in rules)
+    by_role = Counter(solidity_join.role_of(r["status"]) for r in rules)
     print(f"Scanned {len(rules)} rules across chapters 02-20.")
     print(
-        f"  normative {by_status['normative']}, "
-        f"descriptive {by_status['descriptive']}, "
-        f"interpretive {by_status['interpretive']}"
+        f"  specification {by_role['specification']}, "
+        f"implementation {by_role['implementation']}, "
+        f"definition {by_role['definition']}"
     )
     by_grade = Counter(r["grade"] for r in join_result["rules"])
     print(
@@ -888,6 +1224,37 @@ def main():
 
     if hard_fail:
         sys.exit(1)
+
+    # Per-rule site annotations: written only from a green derivation, and
+    # only in-place (a dry run via --out-index/--out-readme leaves the
+    # chapters untouched).
+    if args.out_index is None and args.out_readme is None:
+        env_ids = set(variants.get("envelope-qed", {}))
+        refl_ids = set(variants.get("reflexivity-qed", ()))
+        deriv = {}
+        for rid, row in grade_by_id.items():
+            a = art_by_id.get(rid) or {}
+            pv = solidity_join.proof_value(
+                rid,
+                art_kind_map.get(a.get("artifact")),
+                a.get("artifact") == artifact_classifier.THEOREM_QED,
+                env_ids,
+                refl_ids,
+            )
+            deriv[rid] = dict(
+                grade=solidity_join.grade_line(row),
+                proof=(f"PROOF {pv}" if pv else None),
+            )
+        sites, n_chaps, changed, ann_failures = rewrite_chapters(deriv)
+        if ann_failures:
+            print(f"FAIL: {len(ann_failures)} chapter-writer failure(s):")
+            for fl in ann_failures:
+                print(f"  {fl}")
+            sys.exit(1)
+        print(
+            f"Headers refreshed: {sites} fences across "
+            f"{n_chaps} chapters ({len(changed)} file(s) changed)."
+        )
     print("All consistency checks passed.")
 
 

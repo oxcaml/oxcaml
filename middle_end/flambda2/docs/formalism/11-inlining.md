@@ -51,7 +51,8 @@ result may be allocated. The code carries a *result mode* (`Alloc_heap` or
 
 ```rule
 RULE S.Inline.ModeMismatchInvalid
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline
 ---
 call_kind(apply) = Function, direct to cid    code(cid) available
@@ -77,12 +78,13 @@ alloc mode `α`. Let `d₀` be the callee's *rec-info* as known at the call site
 
 ```rule
 RULE S.Inline.Substitute
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/new-05-inline-fold.md @ c59c5780b0
 CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#inline
 CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body
 CODE middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body
 CODE middle_end/flambda2/simplify/simplify_apply_expr.ml#simplify_direct_full_application
-VERIFIED 14-validation/new-05-inline-fold.md @ c59c5780b0
 ---
 apply = Apply cid s_callee s̄ with return κ_ret, exn κ_exn, alloc mode α
 code(cid) binds ⟨k_ret^c, k_exn^c, x̄, x_myclos, α^c, x_mydepth, e_body⟩
@@ -109,7 +111,8 @@ the caller's region:
 
 ```rule
 RULE S.Inline.Substitute.Region
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify_shared/inlining_helpers.ml#make_inlined_body
 ---
 --------------------------------------------------
@@ -142,7 +145,8 @@ which re-raises with the extra args:
 
 ```rule
 RULE S.Inline.Substitute.ExnExtraArgs
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/simplify_shared/inlining_helpers.ml#wrap_inlined_body_for_exn_extra_args
 ---
 Inline?(apply, …, E) = inline    extra_args(κ_exn) = ā (nonempty)
@@ -192,10 +196,11 @@ by a per-call-site procedure (section 2.2).
 
 ```rule
 RULE S.Inline.DeclDecision
-CLAIM descriptive
+GRADE B
+ROLE implementation
+VERIFIED 14-validation/code_size_of_single_arg_switch.md @ 1c1940b7ea
 CODE middle_end/flambda2/simplify_shared/function_decl_inlining_decision.ml#make_decision0
 CODE middle_end/flambda2/terms/function_decl_inlining_decision_type.ml#behaviour
-VERIFIED 14-validation/code_size_of_single_arg_switch.md @ 1c1940b7ea
 ---
 Given the code's inline attribute, stub flag, cost metrics (size), functor flag,
 recursive flag, and the inlining arguments in force at the definition:
@@ -229,12 +234,13 @@ the call-site rec-info (section 3); `attr` is the call's `Inlined_attribute.t`
 
 ```rule
 RULE S.Inline.Decision
-CLAIM descriptive
+GRADE B
+ROLE implementation
+CAVEAT disclosure: Missing_code (step 2) owes an Inlining_impossible warning that the code does not yet emit; outstanding CRs track emitting it.
+VERIFIED 14-validation/missing_code.md @ 1c1940b7ea
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision
 CODE middle_end/flambda2/simplify_shared/call_site_inlining_decision_type.ml#can_inline
-VERIFIED 14-validation/missing_code.md @ 1c1940b7ea
-CAVEAT disclosure: Missing_code (step 2) owes an Inlining_impossible warning that the code does not yet emit; outstanding CRs track emitting it.
 ---
 0. jsir mode                          ⇒ Jsir_inlining_disabled            (keep)
 1. attr = Never_inlined               ⇒ Never_inlined_attribute           (keep)
@@ -277,13 +283,14 @@ per-declaration classification of section 2.1 via the callee's
 
 ```rule
 RULE S.Inline.Speculative
-CLAIM descriptive
-CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#might_inline
-CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
-CODE middle_end/flambda2/terms/cost_metrics.ml#evaluate
+GRADE B
+ROLE implementation
 VERIFIED 14-validation/inlining_cost_of_primitive_on_parameters.md @ 1c1940b7ea
 VERIFIED 14-validation/removed_operations_of_switch.md @ 1c1940b7ea
 VERIFIED 14-validation/speculative_inlining_lifted_constants.md @ 1c1940b7ea
+CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#might_inline
+CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#speculative_inlining
+CODE middle_end/flambda2/terms/cost_metrics.ml#evaluate
 ---
 in a stub                                    ⇒ In_a_stub                    (keep)
 declaration says must_be_inlined             ⇒ Definition_says_inline       (inline)
@@ -389,7 +396,8 @@ Two limits keep the inliner terminating; both are side conditions of
 
 ```rule
 RULE S.Inline.DepthLimit
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
 CODE middle_end/flambda2/terms/inlining_state.ml#is_depth_exceeded
 CODE middle_end/flambda2/simplify/simplify_rec_info_expr.ml#depth_may_exceed
@@ -412,7 +420,8 @@ steps living in `S.Inline.Decision`:
 
 ```rule
 RULE S.Inline.Unroll.Begin
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
 CODE middle_end/flambda2/simplify/inlining/inlining_transforms.ml#make_inlined_body
 CODE middle_end/flambda2/term_basics/coercion.ml#change_depth
@@ -430,7 +439,8 @@ see the Unrolling state. This is step 1 of unrolling.
 
 ```rule
 RULE S.Inline.Unroll.Continue
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/simplify/inlining/call_site_inlining_decision.ml#make_decision0
 CODE middle_end/flambda2/simplify/simplify_rec_info_expr.ml#known_remaining_unrolling_depth
 ---

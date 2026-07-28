@@ -54,11 +54,12 @@ implementations; the *algorithmic* descriptions (`descriptive`) follow
 
 ```rule
 RULE T.Meet.Dispatch
-CLAIM descriptive
+GRADE D
+ROLE implementation
+CAVEAT disclosure: -flambda2-meet-algorithm is accepted but a no-op in driver/oxcaml_args.ml; meet-vs-join algorithm selection is entirely via -flambda2-join-algorithm.
 CODE middle_end/flambda2/types/meet.ml#meet
 CODE middle_end/flambda2/ui/flambda_features.ml#use_n_way_join
 CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
-CAVEAT disclosure: -flambda2-meet-algorithm is accepted but a no-op in driver/oxcaml_args.ml; meet-vs-join algorithm selection is entirely via -flambda2-join-algorithm.
 ---
 join_algorithm() = Binary  (default)
 --------------------------------------------------
@@ -85,7 +86,8 @@ consistent with both inputs.
 
 ```rule
 RULE T.Meet.Sound
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet.ml#meet
 CODE middle_end/flambda2/types/env/meet_env.ml#meet
 ---
@@ -103,7 +105,8 @@ NOTES: Over-approximation of the intersection. The *ideal* meet is exact,
 
 ```rule
 RULE T.Meet.Bottom
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet.ml#meet
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
 ---
@@ -125,9 +128,10 @@ than a separately-verified guarantee.
 
 ```rule
 RULE T.Meet.GreatestLowerBound
-CLAIM normative
-CODE middle_end/flambda2/types/meet_and_join.mli#meet
+GRADE D ⚠ false-as-stated
+ROLE specification
 CAVEAT known-false: GLB fails as a universal claim — Variant ⊓ Mutable_block discards Row_like equations (meet_and_join.ml ~line 1017), returning a sound lower bound that is not greatest; sharpest witness T.Meet.MutableBlockMissedBottom, whose result γ is disjoint from an input's.
+CODE middle_end/flambda2/types/meet_and_join.mli#meet
 ---
 E ⊢ T₁ ⊓ T₂ = T ▷ ε
 --------------------------------------------------
@@ -155,7 +159,8 @@ each input by whether it is (or canonicalizes to) an *alias* type `= s`. Writing
 
 ```rule
 RULE T.Meet.AliasAlias
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/env/meet_env.ml#meet
 CODE middle_end/flambda2/types/env/meet_env.ml#add_alias_between_canonicals
 ---
@@ -172,7 +177,8 @@ NOTES: Meeting two aliases always records their equality, so returning either
 
 ```rule
 RULE T.Meet.AliasConcrete
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/env/meet_env.ml#meet
 CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
 ---
@@ -198,15 +204,17 @@ observe.
 
 ```rule
 RULE T.Meet.Store.CoercionErasure
-CLAIM descriptive
+GRADE B
+PROOF reflexivity
+ROLE implementation
+CAVEAT disclosure: rec_info skew is replacement, not composition — apply_coercion_function_type ignores `from` (CR lmaurer, type_grammar.ml:2154-58).
+CAVEAT disclosure: silent coercion erasure reachable for closures/Unknown/alias canonicals and for heads apply_coercion passes untouched (Mutable_block, Region, Value heads with non_null Unknown/Bottom); the is_id-gated concrete heads (Variant, Boxed_*, String, Array) instead fatal-error at store time (meet_env.ml:161) — crash landmine, not soundness hole, for those.
+CAVEAT watch(W-37): soundness rests on coercions being value-preserving and γ ignoring Rec_info; a future non-value-preserving coercion or Rec_info-sensitive γ breaks soundness at this store point.
+CHECKED @ 7bf23efaf6
 CODE middle_end/flambda2/types/env/meet_env.ml#add_concrete_equation_on_canonical
 CODE middle_end/flambda2/types/env/meet_env.ml#record_demotion
 CODE middle_end/flambda2/identifiers/coercion0.mli#change_depth
 CODE middle_end/flambda2/types/grammar/type_grammar.ml#apply_coercion
-CHECKED @ 7bf23efaf6
-CAVEAT disclosure: rec_info skew is replacement, not composition — apply_coercion_function_type ignores `from` (CR lmaurer, type_grammar.ml:2154-58).
-CAVEAT disclosure: silent coercion erasure reachable for closures/Unknown/alias canonicals and for heads apply_coercion passes untouched (Mutable_block, Region, Value heads with non_null Unknown/Bottom); the is_id-gated concrete heads (Variant, Boxed_*, String, Array) instead fatal-error at store time (meet_env.ml:161) — crash landmine, not soundness hole, for those.
-CAVEAT watch(W-37): soundness rests on coercions being value-preserving and γ ignoring Rec_info; a future non-value-preserving coercion or Rec_info-sensitive γ breaks soundness at this store point.
 ---
 add_equation resolves a name x to its canonical simple  y @ co  with co ≠ Id;
 the incoming fact ty (a type of y @ co) meets the coerced existing type
@@ -244,7 +252,8 @@ When both inputs are concrete, meet expands each to a head
 
 ```rule
 RULE T.Meet.NakedNumber
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_expanded_head0
 CODE middle_end/flambda2/types/meet_and_join.ml#set_meet
 ---
@@ -258,9 +267,10 @@ NOTES: Naked floats/int8/16/32/64/nativeint/vec128/256/512 and naked immediates.
 
 ```rule
 RULE T.Meet.ValueHeadIncompatible
-CLAIM normative
-CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
+GRADE C
+ROLE specification
 CAVEAT disclosure: ⊥ for differing value-head constructors assumes no dubious Obj uses mixing representations; per the code comment it "could break very hard" otherwise.
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
 ---
 T₁, T₂ are non-null value heads with different top constructors
   (e.g. Variant vs Boxed_float, String vs Closures, ...)
@@ -280,11 +290,13 @@ from an input's.
 
 ```rule
 RULE T.Meet.MutableBlockMissedBottom
-CLAIM descriptive
-CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
-CHECKED @ 7bf23efaf6
+GRADE B
+PROOF envelope
+ROLE implementation
 CAVEAT disclosure: no in-compiler trigger known (Mutable_block types attach only to fresh names; shapes never Mutable_block) — domain-level types-API counterexample, not a witnessed Simplify miscompile; same flank as S.Struct.EnvRefineOnly (b).
 CAVEAT disclosure: after the missed ⊥, downstream prover answers about the name are vacuously sound but epistemically garbage; Simplify also misses the Invalid/dead-code detection.
+CHECKED @ 7bf23efaf6
+CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_value_non_null
 ---
 meeting T₁ = Variant{immediates = S ≠ ⊥, blocks = Known B} against
 T₂ = Mutable_block, where γ_E(T₁) ∩ γ_E(T₂) = ∅ (e.g. B the empty row-like: T₁ an
@@ -323,7 +335,8 @@ preserve and propagate this relational content.
 
 ```rule
 RULE T.Meet.Variant
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_variant
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_relation
 ---
@@ -345,12 +358,13 @@ NOTES: get_tag is met *inside* meet_disjunction because reductions it triggers
 
 ```rule
 RULE T.Meet.BlockShape
-CLAIM normative
+GRADE A
+ROLE specification
+VERIFIED 14-validation/mixed-04-join.md @ c59c5780b0
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_row_like_for_blocks
 CODE middle_end/flambda2/types/meet_and_join.ml#join_row_like_for_blocks
 CODE middle_end/flambda2/types/grammar/more_type_creators.ml#unknown_from_shape
 CODE middle_end/flambda2/kinds/flambda_kind.ml#Block_shape.equal
-VERIFIED 14-validation/mixed-04-join.md @ c59c5780b0
 ---
 meeting two block cases with shapes σ₁, σ₂ (as part of the Row_like block meet):
   Block_shape.equal σ₁ σ₂  ⟹  the met index keeps shape σ₁ (fields met pointwise)
@@ -373,7 +387,8 @@ shapes differing in prefix size or any flat_suffix_element are incompatible.
 
 ```rule
 RULE T.Meet.Relational
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/meet_and_join.ml#reduce_inverse_relations
 CODE middle_end/flambda2/types/meet_and_join.ml#meet_head_of_kind_naked_immediate
 ---
@@ -404,7 +419,8 @@ updated, breaking cycles through aliases.
 
 ```rule
 RULE T.Meet.Terminates
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/env/meet_env.ml#adding_equation_for_name
 CODE middle_end/flambda2/types/meet_and_join.ml#meet
 ---
@@ -425,12 +441,13 @@ lost.
 
 ```rule
 RULE T.Join.Sound
-CLAIM normative
-CODE middle_end/flambda2/types/meet_and_join.ml#join
-CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
+GRADE A
+ROLE specification
+CAVEAT disclosure: least-upper-bound-ness is intent only; only the over-approximation direction (γ_E(T) ⊇ union of branch γ) is normative — join may legally return larger types up to Unknown.
 VERIFIED 14-validation/n_way_join_null.md @ 1c1940b7ea
 VERIFIED 14-validation/n_way_join_preserves_null.md @ 1c1940b7ea
-CAVEAT disclosure: least-upper-bound-ness is intent only; only the over-approximation direction (γ_E(T) ⊇ union of branch γ) is normative — join may legally return larger types up to Unknown.
+CODE middle_end/flambda2/types/meet_and_join.ml#join
+CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
 ---
 E ⊢ T₁ ⊔ ⋯ ⊔ Tₙ = T
 --------------------------------------------------
@@ -457,7 +474,8 @@ strictly earlier than the name being defined, that alias is the join result.
 
 ```rule
 RULE T.Join.SharedAlias
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet_and_join.ml#join
 ---
 all_aliases_of(s₁) in target  ∩  all_aliases_of(s₂) in target  ∋  s
@@ -475,7 +493,8 @@ constant-propagation persistence.
 
 ```rule
 RULE T.Join.ConstAgreement
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/meet_and_join.ml#join
 CODE middle_end/flambda2/types/env/aliases.mli#find_best
 CODE middle_end/flambda2/types/env/typing_env.ml#alias_is_bound_strictly_earlier
@@ -508,7 +527,8 @@ T.Join.Sound.
 
 ```rule
 RULE T.Join.Head
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/meet_and_join.ml#join_expanded_head
 CODE middle_end/flambda2/types/meet_and_join.ml#join_head_of_kind_value_non_null
 ---
@@ -525,7 +545,8 @@ NOTES: When two alias types are joined and neither the shared-alias case nor a
 
 ```rule
 RULE T.Join.Cutoff
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/meet_and_join.ml#join
 CODE middle_end/flambda2/ui/flambda_features.ml#join_depth
 ---
@@ -547,7 +568,8 @@ once, and adds their join to the ancestor (as if by a meet).
 
 ```rule
 RULE T.Join.Levels
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/join_levels.ml#cut_and_n_way_join
 CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
 ---
@@ -572,7 +594,8 @@ environment bottom (types.md, "Join algorithm").
 
 ```rule
 RULE T.Join.Existentials
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/types/env/join_env.ml#cut_and_n_way_join0
 CODE middle_end/flambda2/types/join_levels_old.ml#cut_and_n_way_join
 ---
@@ -595,7 +618,8 @@ before the handler is simplified.
 
 ```rule
 RULE T.Join.RecursiveParamsUnknown
-CLAIM descriptive
+GRADE D
+ROLE implementation
 CODE middle_end/flambda2/simplify/simplify_let_cont_expr.ml#simplify_single_recursive_handler
 CODE middle_end/flambda2/simplify/env/downwards_env.ml#add_parameters_with_unknown_types
 ---
@@ -633,7 +657,8 @@ test applicability. Two result flavours encode the two naming conventions:
 
 ```rule
 RULE T.Prove.Sound
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/provers.mli#proof_of_property
 CODE middle_end/flambda2/types/provers.ml#prove_is_int
 ---
@@ -647,10 +672,11 @@ NOTES: Proved is a universal claim over the concretization. Unknown is always a
 
 ```rule
 RULE T.Prove.MeetShortcut
-CLAIM normative
+GRADE C
+ROLE specification
+CAVEAT disclosure: Known_result is universal only over γ_E(T) ∩ γ_E(shape), not all γ_E(T) when Null ∈ γ; consumers must treat it as shape-conditional (UB-licensed otherwise); per T.Prove.MeetShortcut.NullPremise.
 CODE middle_end/flambda2/types/provers.mli#meet_shortcut
 CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
-CAVEAT disclosure: Known_result is universal only over γ_E(T) ∩ γ_E(shape), not all γ_E(T) when Null ∈ γ; consumers must treat it as shape-conditional (UB-licensed otherwise); per T.Prove.MeetShortcut.NullPremise.
 ---
 E ⊢ meet_X(T) ⇒ r'
 --------------------------------------------------
@@ -674,15 +700,17 @@ NOTES: The Known_result meaning is stated over γ_E(T) ∩ γ_E(shape X) — the
 
 ```rule
 RULE T.Prove.MeetShortcut.NullPremise
-CLAIM descriptive
-CODE middle_end/flambda2/types/provers.ml#gen_value_to_meet
-CODE middle_end/flambda2/types/provers.ml#gen_value_to_proof
-CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
-CHECKED @ 7bf23efaf6
+GRADE B
+PROOF envelope
+ROLE implementation
 CAVEAT disclosure: the naïve reading "Known_result r is universal over γ_E(t)" is refuted — gen_value_to_meet discards is_null; traced at the prover level (Null ∈ γ yet Known_result {1}), not a checked-in test.
 CAVEAT disclosure: gen_value_to_proof returns Unknown on Maybe_null while gen_value_to_meet answers from the non-null head; the asymmetry is deliberate but was previously recorded nowhere.
 CAVEAT disclosure: no live miscompile — every current meet_* consumer is UB on Null or frontend-guarded; null-DEFINED operations (prove_physical_equality, reify) do their own Null handling.
 CAVEAT watch(W-38): a future meet_* consumer well-defined on Null becomes a live hazard with no local signal; audit new meet-shortcut call sites for Null-definedness.
+CHECKED @ 7bf23efaf6
+CODE middle_end/flambda2/types/provers.ml#gen_value_to_meet
+CODE middle_end/flambda2/types/provers.ml#gen_value_to_proof
+CODE middle_end/flambda2/types/provers.ml#meet_equals_tagged_immediates
 ---
 t : Value type with is_null = Maybe_null (Null ∈ γ_E(t));
 meet_X ∈ the meet-shortcut provers built on gen_value_to_meet
@@ -715,12 +743,14 @@ T.Gamma.Value.Nullability, T.Prove.Sound.
 
 ```rule
 RULE T.Prove.SimpleModeBoundary
-CLAIM normative
+GRADE B
+PROOF envelope
+ROLE specification
+CHECKED @ 7bf23efaf6
 CODE middle_end/flambda2/types/provers.ml#prove_equals_to_simple_of_kind
 CODE middle_end/flambda2/types/provers.ml#meet_block_field_simple
 CODE middle_end/flambda2/types/env/typing_env.ml#get_canonical_simple_exn
 CODE middle_end/flambda2/simplify/simplify_unary_primitive.ml#simplify_project_value_slot
-CHECKED @ 7bf23efaf6
 ---
 a prover returns a Simple s intended for TERM substitution
 (prove_equals_to_simple_of_kind, meet_tagging_of_simple,
@@ -781,7 +811,8 @@ Prover families (from `provers.mli`), grouped by what they establish:
 
 ```rule
 RULE T.Prove.GetTag
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/provers.ml#prove_get_tag
 ---
 E ⊢ prove_get_tag(T) ⇒ Proved(tags)
@@ -802,7 +833,8 @@ chapter-local judgment `E ⊢ T ⇓ H` ("`T` expands to head `H`").
 
 ```rule
 RULE T.Expand.Head
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/expand_head.ml#expand_head
 CODE middle_end/flambda2/types/expand_head.ml#expand_head0
 ---
@@ -832,7 +864,8 @@ Invalid`. We write `E ⊢ reify(T) ⇒ r`.
 
 ```rule
 RULE T.Reify.Sound
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/reify.ml#reify
 ---
 E ⊢ reify(T) ⇒ r
@@ -849,7 +882,8 @@ NOTES: Reify only commits to Simple / Lift when the type denotes a *single*
 
 ```rule
 RULE T.Reify.LiftLocalGuard
-CLAIM normative
+GRADE C
+ROLE specification
 CODE middle_end/flambda2/types/reify.ml#reify
 CODE middle_end/flambda2/types/provers.ml#never_holds_locally_allocated_values
 ---

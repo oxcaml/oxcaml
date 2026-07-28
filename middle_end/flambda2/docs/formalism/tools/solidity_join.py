@@ -70,12 +70,41 @@ import re
 EMPIRICAL_RUNGS = {"stated": 0, "code-read": 1, "validated": 2}
 FORMAL_RUNGS = {"unmechanized": 0, "mechanized": 1}
 
-# Legal keyword-line values, per keyword (mid-migration both keywords are
-# live; STATUS ⊎ CLAIM = 453 is the census module's check, not ours).
+# Legal keyword-line values, per keyword (pairing legality — the value
+# domain is conditioned on the keyword; mid-sweep CLAIM and ROLE are both
+# live, record 77; STATUS remains for the historical checks).
 LEGAL_VALUES = {
     "CLAIM": frozenset({"normative", "descriptive", "interpretive"}),
     "STATUS": frozenset({"normative", "descriptive", "conjectured"}),
+    "ROLE": frozenset({"specification", "implementation", "definition"}),
 }
+
+# The 1:1 rename map (record 77; no reclassification — a rule whose
+# classification would change under the new names is a finding, not a
+# rename) and the abbreviations sanctioned for DERIVED tables and
+# scoreboards only (fences carry the full words).
+CLAIM_TO_ROLE = {
+    "normative": "specification",
+    "descriptive": "implementation",
+    "interpretive": "definition",
+}
+ROLE_ABBREV = {
+    "specification": "spec",
+    "implementation": "impl",
+    "definition": "def",
+}
+
+
+def display_value(value):
+    """Rendering form for a kind value in derived tables: ROLE values
+    abbreviate; legacy CLAIM values pass through unchanged mid-sweep."""
+    return ROLE_ABBREV.get(value, value)
+
+
+def role_of(value):
+    """A kind value normalized to the ROLE vocabulary (identity on ROLE
+    values, the 1:1 map on CLAIM values) — for combined mid-sweep counts."""
+    return CLAIM_TO_ROLE.get(value, value)
 
 # CAVEAT kinds and the display flags they induce. watch(W-nn) and
 # disclosure are recorded but induce no display flag.
@@ -144,11 +173,34 @@ _FINDING_HEADING_RE = re.compile(r"^###\s+((?:KF-\d+|Finding\b).*?)\s*$")
 # wrong # level, wrong case) would silently become plain section
 # boundaries and drop out of the DISPUTED derivation; warn instead.
 _FINDING_ISH_RE = re.compile(r"^#{1,3}\s+(?:KF-|Finding\b)", re.IGNORECASE)
-_RULES_HEADER_RE = re.compile(r"^\s*(?:[-*]\s*)?RULES:\s*(.*?)\s*$")
+# RULES: headers are COLUMN-0 ONLY (the ratified structural kill for the
+# wrap trap): the file's house style indents all continuation lines, so
+# legitimate headers and wrapped prose are disjoint by construction —
+# every legitimate header sits at column 0 and all four historical trap
+# firings were indented continuations. Indented "RULES:" prose is now
+# structurally unable to impersonate a header.
+_RULES_HEADER_RE = re.compile(r"^RULES:\s*(.*?)\s*$")
 _STATUS_LINE_RE = re.compile(r"^\s*[-*]\s*Status:\s*(\S+)")
 _CLOSED_STATUS_WORDS = frozenset(
-    {"resolved", "closed", "fixed", "retired", "withdrawn", "discharged", "superseded"}
+    {
+        "resolved",
+        "closed",
+        "fixed",
+        "retired",
+        "withdrawn",
+        "discharged",
+        "superseded",
+        # rebutted = a FAILED finding, which cannot honestly suspend a
+        # rule's grade; template-menu vocabulary must never warn.
+        "rebutted",
+    }
 )
+# Status words that legitimately leave a finding open. A DECIDING Status
+# word outside both sets warns rather than silently parsing as open
+# (open-by-default stays — suspension is the safe direction — but the
+# malformation must surface; the witness was the template's "one of
+# open ..." line).
+_KNOWN_OPEN_STATUS_WORDS = frozenset({"open", "escalated"})
 
 
 def _blank_html_comments(lines):
@@ -277,17 +329,27 @@ def parse_fidelity_rules_text(text, where="FIDELITY.md"):
             )
         is_open = True
         saw_status = False
+        last_word = None
         for bl in body:
             m = _STATUS_LINE_RE.match(bl)
             if m:
                 saw_status = True
-                word = m.group(1).strip().rstrip(":;,.—-").lower()
-                is_open = word not in _CLOSED_STATUS_WORDS
+                last_word = m.group(1).strip().rstrip(":;,.—-").lower()
+                is_open = last_word not in _CLOSED_STATUS_WORDS
         if not saw_status:
             _fail(
                 failures,
                 "fidelity-open-status",
                 f"{finding_id}: no '- Status:' line; treating the finding as OPEN",
+                where=loc,
+                severity="warning",
+            )
+        elif is_open and last_word not in _KNOWN_OPEN_STATUS_WORDS:
+            _fail(
+                failures,
+                "fidelity-status-syntax",
+                f"{finding_id}: unrecognized Status word {last_word!r} decides "
+                "the entry; treating the finding as OPEN",
                 where=loc,
                 severity="warning",
             )
@@ -876,6 +938,53 @@ def render_evidence(row):
     return f"{row['empirical']} / {row['formal']}"
 
 
+# --- Derived in-fence lines (record 77, for the v2 chapter writer) -----------
+
+# Flag display forms on the GRADE line, in canonical order. Badges are
+# NOT flags: the PROOF line owns the formal-extent information.
+_GRADE_FLAG_FORMS = (
+    ("false-as-stated", "⚠ false-as-stated"),
+    ("compiler-bug", "compiler-bug"),
+    ("pending-upstream", "pending-upstream (watched)"),
+    ("stale", "[stale]"),
+    ("hybrid", "(hybrid)"),
+)
+
+
+def grade_line(row):
+    """The generator-owned in-fence GRADE line: topline letter (or
+    DISPUTED with its finding ids), then the present flags in canonical
+    order with their ruled display forms."""
+    g = row["grade"]
+    if g == "DISPUTED" and row.get("disputed_by"):
+        head = f"DISPUTED ({', '.join(row['disputed_by'])})"
+    else:
+        head = g
+    parts = ["GRADE " + head]
+    flags = set(row.get("flags") or [])
+    for flag, form in _GRADE_FLAG_FORMS:
+        if flag in flags:
+            parts.append(form)
+    return " ".join(parts)
+
+
+def proof_value(rid, artifact_kind, qed, envelope_ids, reflexivity_ids):
+    """The derived PROOF value (extent, not epistemics), or None for no
+    line. Ground truth is the Traceability instance lists, consulted
+    FIRST: `complete` may only name a Qed'd PROPERTY artifact that is in
+    neither list — emitting `complete` for an envelope or reflexivity
+    instance would be a FALSE derived line, and this ordering makes it
+    structurally impossible. Defining clauses, anchors, demoted claims,
+    and Admitted theorems carry no PROOF line."""
+    if rid in reflexivity_ids:
+        return "reflexivity"
+    if rid in envelope_ids:
+        return "envelope"
+    if artifact_kind == "theorem" and qed:
+        return "complete"
+    return None
+
+
 # --- Self-test ----------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -1141,25 +1250,34 @@ if __name__ == "__main__":
 ## Findings
 
 ### KF-101 — a finding with rule targets (high)
-- RULES: A.Rule.One, H.Rule.Mix
+RULES: A.Rule.One, H.Rule.Mix
 - Chapter: 04-opsem.md:1.
-- What differs: something.
+- What differs: something, wrapped so a continuation line begins
+  RULES: which must NOT read as a second header (column-0 only).
 
 ### KF-102 — a resolved finding (low)
-- RULES: A.Rule.One
+RULES: A.Rule.One
 - Chapter: 04-opsem.md:2.
 - Status: resolved — fixed upstream.
 
 ### Finding #16 verification — a doc-level finding
-- RULES: none
+RULES: none
 - Chapter: 10-simplify-rewrites.md:3.
 
 ### KF-103 — missing its RULES header (medium)
 - Chapter: 04-opsem.md:4.
 
 ### KF-104 — malformed id in header (low)
-- RULES: lowercase.bad.id
+RULES: lowercase.bad.id
 - Status: open — under review.
+
+### KF-105 — unrecognized deciding status word (low)
+RULES: none
+- Status: one of open / resolved — junk that must warn, not silently open.
+
+### KF-106 — a rebutted finding (low)
+RULES: A.Rule.One
+- Status: rebutted — the witness was wrong; the finding failed.
 
 ## Watch items (not findings)
 
@@ -1167,9 +1285,23 @@ if __name__ == "__main__":
 """
     findings, ffail = parse_fidelity_rules_text(FIDELITY_FIXTURE, where="fix.md")
     by_fid = {f["finding_id"]: f for f in findings}
-    check(len(findings) == 5, "fidelity: five entries found")
+    check(len(findings) == 7, "fidelity: seven entries found")
     check(by_fid["KF-101"]["rules"] == ["A.Rule.One", "H.Rule.Mix"]
           and by_fid["KF-101"]["open"], "fidelity: rules parsed, open by default")
+    # Column-0 kill: KF-101's indented "RULES:" continuation is prose, not
+    # a second header — no multiple-headers failure anywhere in the fixture.
+    check(not any("multiple RULES" in f["detail"] for f in ffail),
+          "fidelity: indented RULES: prose cannot fire the header regex")
+    # A deciding unrecognized Status word warns and stays open.
+    check(by_fid["KF-105"]["open"]
+          and any(f["check"] == "fidelity-status-syntax"
+                  and "KF-105" in f["detail"]
+                  and f["severity"] == "warning" for f in ffail),
+          "fidelity: unknown deciding status word warns, parses open")
+    # Rebutted = failed finding = CLOSED (menu vocabulary, never warns).
+    check(not by_fid["KF-106"]["open"]
+          and not any("KF-106" in f["detail"] for f in ffail),
+          "fidelity: rebutted closes without warning")
     check(not by_fid["KF-102"]["open"], "fidelity: Status resolved closes")
     check(by_fid["Finding #16 verification"]["rules"] == []
           and by_fid["Finding #16 verification"]["has_rules_header"],
@@ -1256,5 +1388,36 @@ if __name__ == "__main__":
           "render_evidence")
     check(render_grade(row(res, "F.Rule.CB")) == "B [compiler-bug, stale]",
           "render_grade: flags")
+
+    # 19. v2 derived in-fence lines (record 77).
+    check(grade_line(dict(grade="B", flags=[], disputed_by=[])) == "GRADE B",
+          "grade_line: bare letter")
+    check(grade_line(dict(grade="DISPUTED", disputed_by=["KF-058"],
+                          flags=["hybrid"]))
+          == "GRADE DISPUTED (KF-058) (hybrid)",
+          "grade_line: disputed with ids and flag")
+    check(grade_line(dict(grade="D", flags=["false-as-stated", "stale"],
+                          disputed_by=[]))
+          == "GRADE D ⚠ false-as-stated [stale]",
+          "grade_line: flag forms in canonical order")
+    env = {"T.Env.Rule"}
+    refl = {"T.Refl.Rule"}
+    check(proof_value("A.Plain.Qed", "theorem", True, env, refl)
+          == "complete", "proof_value: plain Qed'd property is complete")
+    check(proof_value("T.Env.Rule", "theorem", True, env, refl)
+          == "envelope",
+          "proof_value: envelope instance NEVER reads complete (table first)")
+    check(proof_value("T.Refl.Rule", "theorem", True, env, refl)
+          == "reflexivity", "proof_value: reflexivity instance by table")
+    check(proof_value("A.Def.Clause", "constructor", False, env, refl) is None,
+          "proof_value: defining clause carries no PROOF line")
+    check(proof_value("A.Adm.Thm", "theorem", False, env, refl) is None,
+          "proof_value: Admitted theorem carries no PROOF line")
+    check(display_value("specification") == "spec"
+          and display_value("normative") == "normative",
+          "display_value: abbreviates ROLE, passes legacy through")
+    check(role_of("descriptive") == "implementation"
+          and role_of("definition") == "definition",
+          "role_of: 1:1 map, identity on ROLE values")
 
     print(f"solidity_join self-test: {CHECKS[0]} checks passed.")
