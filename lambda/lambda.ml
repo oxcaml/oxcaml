@@ -3614,7 +3614,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     8
   | Punboxedfloatarray Unboxed_float32 ->
-    (* float32# arrays are packed *)
+    (* float32_u arrays are packed *)
     4
   | Punboxedfloatarray Unboxed_float64 -> 8
   | Punboxedoruntaggedintarray Untagged_int8 ->
@@ -3624,7 +3624,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
     (* int16# arrays are packed *)
     2
   | Punboxedoruntaggedintarray Unboxed_int32 ->
-    (* int32# arrays are packed *)
+    (* int32_u arrays are packed *)
     4
   | Punboxedoruntaggedintarray
       (Untagged_int | Unboxed_int64 | Unboxed_nativeint) ->

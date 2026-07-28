@@ -283,7 +283,7 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
        For unboxed products, note that [Array_length] in [Flambda_primitive] is
        a unarized-array-length operation, that arrays of unboxed products are
        represented by mixed blocks with tag zero (not custom blocks), and that
-       arrays of unboxed products are not packed in any way (e.g. int32#
+       arrays of unboxed products are not packed in any way (e.g. int32_u
        elements occupy 64 bits). *)
     assert (C.wordsize_shift = C.numfloat_shift);
     C.addr_array_length arr dbg

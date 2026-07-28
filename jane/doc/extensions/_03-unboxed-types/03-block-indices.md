@@ -155,8 +155,8 @@ representation to be stable between versions._
 Consider the following type:
 
 ```ocaml
-type a = #{ s : string; i : int64# }
-type b = #{ i : int64#; a : a; s : string }
+type a = #{ s : string; i : int64_u }
+type b = #{ i : int64_u; a : a; s : string }
 type c = { mutable b : b; s : string }
 ```
 

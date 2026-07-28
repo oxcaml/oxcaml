@@ -188,6 +188,8 @@ module Identifier : sig
 
     val unboxed_int64 : t
 
+    val unboxed_float32 : t
+
     val int8x16 : t
 
     val int16x8 : t

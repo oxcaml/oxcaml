@@ -1447,7 +1447,7 @@ let message = function
   | Incompatible_with_upstream (Non_value_sort layout) ->
       msg "External declaration here is not upstream compatible.@ \
            @[The only types with non-value layouts allowed are@ \
-           float#, int32#, int64#, and nativeint#.@ \
+           float#, int32_u, int64_u, and nativeint_u.@ \
            Unknown type with layout@ %s encountered.@]" layout
   | Incompatible_with_upstream (Unboxed_attribute layout) ->
       msg "%a attribute must be added@ to@ external@ declaration@ \

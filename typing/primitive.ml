@@ -769,7 +769,7 @@ let prim_has_valid_reprs ~loc prim =
     (* This doesn't prevent
 
        {|
-          external get : float# array -> int -> int32# =
+          external get : float# array -> int -> int32_u =
             "%array_safe_get"
        |}
 
