@@ -4,7 +4,7 @@
  native;
 *)
 
-(* A test comparing allocations when using unboxed [nativeint#]es to allocations
+(* A test comparing allocations when using unboxed [nativeint_u]es to allocations
    when using boxed [nativeints]. *)
 
 (* Hide polymorphic equality *)

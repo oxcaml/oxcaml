@@ -91,12 +91,12 @@ let floatu_array_element_size = size_in_bytes ([||] : float# array)
 let _ = check_floatu ~init:#42.0 ~element_size:floatu_array_element_size
 
 (* unboxed int64s *)
-let check_int64u ~(init : int64#) ~element_size =
+let check_int64u ~(init : int64_u) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"int64#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"int64_u" (Obj.repr x)
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
@@ -108,23 +108,23 @@ let check_int64u ~(init : int64#) ~element_size =
       assert (tag = expected_tag);
       (* Check mixed block has zero scannable fields *)
       match Sys.backend_type with
-      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"int64#" (Obj.repr x) 0
+      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"int64_u" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
   List.iter check_one array_sizes_to_check
 
-let int64u_array_element_size = size_in_bytes ([||] : int64# array)
+let int64u_array_element_size = size_in_bytes ([||] : int64_u array)
 
 let _ = check_int64u ~init:#42L ~element_size:int64u_array_element_size
 
 (* unboxed nativeints *)
-let check_nativeintu ~(init : nativeint#) ~element_size =
+let check_nativeintu ~(init : nativeint_u) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"nativeint#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"nativeint_u" (Obj.repr x)
     else begin
       (* Non-empty arrays have specific tags and are mixed blocks *)
       let tag = Obj.tag (Obj.repr x) in
@@ -136,18 +136,18 @@ let check_nativeintu ~(init : nativeint#) ~element_size =
       assert (tag = expected_tag);
       (* Check mixed block has zero scannable fields *)
       match Sys.backend_type with
-      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"nativeint#" (Obj.repr x) 0
+      | Native -> Block_checks.check_mixed_block_scannable_size ~array_type:"nativeint_u" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
   List.iter check_one array_sizes_to_check
 
-let nativeintu_array_element_size = size_in_bytes ([||] : nativeint# array)
+let nativeintu_array_element_size = size_in_bytes ([||] : nativeint_u array)
 
 let _ = check_nativeintu ~init:#42n ~element_size:nativeintu_array_element_size
 
 (* unboxed float32s *)
-let check_float32u ~(init : float32#) ~element_size =
+let check_float32u ~(init : float32_u) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* These arrays are packed in native code *)
@@ -159,7 +159,7 @@ let check_float32u ~(init : float32#) ~element_size =
     in
     assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"float32#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"float32_u" (Obj.repr x)
     else begin
       (* Check tag based on actual array length (n) not padded length *)
       let tag = Obj.tag (Obj.repr x) in
@@ -171,18 +171,18 @@ let check_float32u ~(init : float32#) ~element_size =
           else unboxed_float32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
-        Block_checks.check_mixed_block_scannable_size ~array_type:"float32#" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"float32_u" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
   List.iter check_one array_sizes_to_check
 
-let float32u_array_element_size = size_in_bytes ([||] : float32# array)
+let float32u_array_element_size = size_in_bytes ([||] : float32_u array)
 
 let _ = check_float32u ~init:#42.0s ~element_size:float32u_array_element_size
 
 (* unboxed int32s *)
-let check_int32u ~(init : int32#) ~element_size =
+let check_int32u ~(init : int32_u) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* These arrays are packed in native code *)
@@ -194,7 +194,7 @@ let check_int32u ~(init : int32#) ~element_size =
     in
     assert ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"int32#" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"int32_u" (Obj.repr x)
     else begin
       (* Check tag based on actual array length (n) not padded length *)
       let tag = Obj.tag (Obj.repr x) in
@@ -206,13 +206,13 @@ let check_int32u ~(init : int32#) ~element_size =
           else unboxed_int32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
-        Block_checks.check_mixed_block_scannable_size ~array_type:"int32#" (Obj.repr x) 0
+        Block_checks.check_mixed_block_scannable_size ~array_type:"int32_u" (Obj.repr x) 0
       | Bytecode | Other _ -> ()
     end
   in
   List.iter check_one array_sizes_to_check
 
-let int32u_array_element_size = size_in_bytes ([||] : int32# array)
+let int32u_array_element_size = size_in_bytes ([||] : int32_u array)
 
 let _ = check_int32u ~init:#42l ~element_size:int32u_array_element_size
 
@@ -396,7 +396,7 @@ let _ = check_scannable_product2 ~init:(mk_el ())
           ~element_size:scannable_product2_array_element_size
 
 (* simple ignorable products *)
-let check_ignorable_product1 ~(init : #(int * float32# * int * int64#))
+let check_ignorable_product1 ~(init : #(int * float32_u * int * int64_u))
       ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
@@ -418,13 +418,13 @@ let check_ignorable_product1 ~(init : #(int * float32# * int * int64#))
   List.iter check_one array_sizes_to_check
 
 let ignorable_product1_array_element_size =
-  size_in_bytes ([||] : #(int * float32# * int * int64#) array)
+  size_in_bytes ([||] : #(int * float32_u * int * int64_u) array)
 
 let _ = check_ignorable_product1 ~init:#(42, #42.0s, 0, #42L)
           ~element_size:ignorable_product1_array_element_size
 
 (* complex ignorable products *)
-type t_ignore = #{ x : int; y : #(float# * int32#); z: int32# }
+type t_ignore = #{ x : int; y : #(float# * int32_u); z: int32_u }
 
 let check_ignorable_product2 ~(init : #(int * t_ignore * bool * t_ignore))
       ~element_size =
@@ -459,8 +459,8 @@ let ignorable_product2_array_element_size =
 let _ = check_ignorable_product2 ~init:(mk_el ())
           ~element_size:ignorable_product2_array_element_size
 
-(* check lack of float32# packing in unboxed product arrays *)
-let check_float32u_pair ~(init : #(float32# * float32#)) ~element_size =
+(* check lack of float32_u packing in unboxed product arrays *)
+let check_float32u_pair ~(init : #(float32_u * float32_u)) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* 2 because there are two components in the unboxed product *)
@@ -484,8 +484,8 @@ let float32u_pair_array_element_size =
 let _ = check_float32u_pair ~init:#(#1.0s, #42.1s)
           ~element_size:float32u_pair_array_element_size
 
-(* check lack of int32# packing in unboxed product arrays *)
-let check_int32u_pair ~(init : #(int32# * int32#)) ~element_size =
+(* check lack of int32_u packing in unboxed product arrays *)
+let check_int32u_pair ~(init : #(int32_u * int32_u)) ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     (* 2 because there are two components in the unboxed product *)
