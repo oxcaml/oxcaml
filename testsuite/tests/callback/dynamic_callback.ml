@@ -7,19 +7,6 @@
  }
 *)
 
-module Dynamic = struct
-  type 'a t
-
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-  external push : 'a t -> 'a -> unit = "caml_dynamic_push"
-  external pop : 'a t -> unit = "caml_dynamic_pop"
-
-  let with_temporarily d v ~f =
-    push d v;
-    Fun.protect f ~finally:(fun () -> pop d)
-end
-
 (* Runs [f] on a fresh stack, so that the dynamic bindings of the caller are
    only reachable through the parent stack, which callbacks from C do not
    see. *)

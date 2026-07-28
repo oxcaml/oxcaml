@@ -38,7 +38,7 @@ module type Code_metadata_accessors_result_type = sig
   (* Zero-indexed position of the first local param, to be able to determine the
      allocation modes of partial applications. If there is no local parameter,
      equal to the number of (complex) parameters. *)
-  val first_complex_local_param : 'a t -> int
+  val first_complex_local_param : 'a t -> First_complex_local_param.t
 
   val result_arity : 'a t -> [`Unarized] Flambda_arity.t
 
@@ -97,7 +97,7 @@ type 'a create_type =
   newer_version_of:Code_id.t option ->
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
-  first_complex_local_param:int ->
+  first_complex_local_param:First_complex_local_param.t ->
   result_arity:[`Unarized] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.locality_mode ->
@@ -139,6 +139,8 @@ val with_result_arity : [`Unarized] Flambda_arity.t -> t -> t
 val with_params_arity : [`Complex] Flambda_arity.t -> t -> t
 
 val with_param_modes : Alloc_mode.For_types.t list -> t -> t
+
+val with_first_complex_local_param : First_complex_local_param.t -> t -> t
 
 val with_is_tupled : bool -> t -> t
 

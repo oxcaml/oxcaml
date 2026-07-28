@@ -1376,39 +1376,39 @@ CAMLexport value caml_get_preemption_effect(void) {
 /* Call the tick handler for each running fiber *in reverse order*, stopping as
    soon as one preempts
 
-   Returns Val_true if a preemption occurred, Val_false if one did not, or an
-   encoded exception result if any of the callbacks raised an exception.
+   Returns Result_value(Val_true) if a preemption occurred,
+   Result_value(Val_false) if one did not, or a Result_exception
+   result if any of the callbacks raised an exception.
 */
-value caml_tick_fiber_exn(struct stack_info *stack) {
-  CAMLparam0();
-  CAMLlocal1(res);
+caml_result caml_tick_fiber_res(struct stack_info *stack) {
+  caml_result res;
 
   if (Stack_parent(stack)) {
-    res = caml_tick_fiber_exn(Stack_parent(stack));
-    if (Is_exception_result(res) || res == Val_true) {
-      CAMLreturn(res);
+    res = caml_tick_fiber_res(Stack_parent(stack));
+    if (caml_result_is_exception(res) || res.data == Val_true) {
+      return res;
     }
   }
 
   if (Stack_is_preemptible(stack)) {
-    res = caml_callback_exn(Stack_handle_tick(stack), Val_unit);
-    if (Is_exception_result(res)) {
-      CAMLreturn(res);
+    res = caml_callback_res(Stack_handle_tick(stack), Val_unit);
+    if (caml_result_is_exception(res)) {
+      return res;
     }
 
-    switch (Long_val(res)) {
+    switch (Long_val(res.data)) {
     case TICK_RESULT_PREEMPT:
-      CAMLreturn(Val_true);
+      return Result_value(Val_true);
     case TICK_RESULT_CONTINUE:
       break;
     default: {
       value exn =
         caml_exception_failure_value(caml_copy_string(
           "caml_tick_fiber: tick_handler returned invalid result"));
-      CAMLreturn(Make_exception_result(exn));
+      return Result_exception(exn);
     }
     }
   }
 
-  CAMLreturn(Val_false);
+  return Result_value(Val_false);
 }

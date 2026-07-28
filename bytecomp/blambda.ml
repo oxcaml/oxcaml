@@ -57,7 +57,9 @@ type context_switch =
   | Reperform
   | With_stack
   | With_stack_preemptible
-  | Resume
+  | Continue
+  | Discontinue
+  | Discontinue_with_backtrace
 
 type comparison = Instruct.comparison =
   | Eq
@@ -135,7 +137,8 @@ and blambda =
   | Apply of
       { func : blambda;
         args : blambda list;
-        nontail : bool
+        nontail : bool;
+        yielding : Lambda.yielding_kind
       }
   | Function of bfunction
   | Let of

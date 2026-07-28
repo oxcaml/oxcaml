@@ -981,6 +981,7 @@ let info_events _ppf lexbuf =
             (match ev.ev_info with
                Event_function -> "/fun"
              | Event_return _ -> "/ret"
+             | Event_unyielding_call _ -> "/ret(unyielding)"
              | Event_other    -> ""))
            (match ev.ev_repr with
               Event_none        -> ""

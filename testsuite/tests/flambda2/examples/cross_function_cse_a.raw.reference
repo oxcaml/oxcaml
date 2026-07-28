@@ -1,0 +1,53 @@
+(let code inline(always) size(7)
+       some_0 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val ] =
+   let Pmakeblock = %block.[`0`].my_alloc_region (x) in
+   cont k1 (Pmakeblock)
+ in
+ let code size(21)
+       f_1 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   let a = %block.[`0`].my_alloc_region (x) in
+   (let inlined_dbg = %inlined_apply () in
+    let x_1 = x in
+    let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
+    cont k3 (Pmakeblock))
+     where k3 (b : [ 0 | 0 of val ]) =
+       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+       cont k1 (Pmakeblock)
+ in
+ let code size(21)
+       g_2 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   (let inlined_dbg = %inlined_apply () in
+    let x_1 = x in
+    let Pmakeblock = %block.[`0`].my_alloc_region (x_1) in
+    cont k3 (Pmakeblock))
+     where k3 (a : [ 0 | 0 of val ]) =
+       let b = %block.[`0`].my_alloc_region (x) in
+       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+       cont k1 (Pmakeblock)
+ in
+ let $camlCross_function_cse_a__s0 =
+   closure some_0 @some &toplevel.alloc_region
+ in
+ let $camlCross_function_cse_a__s1 = closure f_1 @f &toplevel.alloc_region in
+ let $camlCross_function_cse_a__s2 = closure g_2 @g &toplevel.alloc_region in
+ let $camlCross_function_cse_a__s3 =
+   Block 0 ($camlCross_function_cse_a__s0,
+            $camlCross_function_cse_a__s1,
+            $camlCross_function_cse_a__s2)
+ in
+ cont k ($camlCross_function_cse_a__s3))
+  where k define_root_symbol (module_block) =
+    let field_0 = $camlCross_function_cse_a__s0 in
+    let field_1 = $camlCross_function_cse_a__s1 in
+    let field_2 = $camlCross_function_cse_a__s2 in
+    let $camlCross_function_cse_a = Block 0 (field_0, field_1, field_2) in
+    cont done ($camlCross_function_cse_a)

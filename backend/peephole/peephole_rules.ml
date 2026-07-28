@@ -42,7 +42,13 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
       (* We only consider the removal of spill and reload instructions because a
          move from/to an arbitrary memory location could fail because of memory
          protection. *)
-      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
+      (* If [snd] reads the location it overwrites (i.e. is an identity move),
+         deleting [fst] would change the value [snd] reads. Such moves are
+         currently removed by [Regalloc_utils.simplify_cfg] before this pass
+         runs, but do not rely on that here. *)
+      if U.are_equal_regs snd_val.arg.(0) snd_val.res.(0)
+      then None
+      else delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
     | _, _ -> None)
   | _ -> None
 
@@ -124,21 +130,11 @@ let are_compatible op1 op2 imm1 imm2 :
     then U.sub_immediates Isub imm1 imm2
     else U.sub_immediates Iadd imm2 imm1
   | Ilsl, Imul ->
-    (* [imm1] is guaranteed to be within bounds for [Ilsl], but [1 lsl imm1] may
-       not be within bounds for [Imul]. *)
-    U.assert_within_range Ilsl imm1;
-    let imm1 = 1 lsl imm1 in
-    if U.is_immediate_for_intop Imul imm1
-    then U.mul_immediates Imul imm1 imm2
-    else None
+    (* [(x lsl imm1) * imm2] is [x * (imm2 lsl imm1)]. *)
+    U.lsl_immediates Imul imm2 imm1
   | Imul, Ilsl ->
-    (* [imm2] is guaranteed to be within bounds for [Ilsl], but [1 lsl imm2] may
-       not be within bounds for [Imul]. *)
-    U.assert_within_range Ilsl imm2;
-    let imm2 = 1 lsl imm2 in
-    if U.is_immediate_for_intop Imul imm2
-    then U.mul_immediates Imul imm1 imm2
-    else None
+    (* [(x * imm1) lsl imm2] is [x * (imm1 lsl imm2)]. *)
+    U.lsl_immediates Imul imm1 imm2
   | Imul, Imul -> U.mul_immediates op1 imm1 imm2
   (* CR-soon gtulba-lecu: check this last case | Imod, Imod -> if imm1 mod imm2
      = 0 then Some (Imod, imm2) else None
@@ -222,7 +218,15 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
       in
       if to_remove
       then (
-        let continue = Some (U.prev_at_most U.go_back_const cell) in
+        (* Compute the continuation from cells that survive the deletion: if
+           [cell] were the first element of the block, [prev_at_most] would
+           return [cell] itself, and the traversal would then operate on a
+           deleted cell. *)
+        let continue =
+          match DLL.prev cell with
+          | Some _ as prev -> prev
+          | None -> DLL.next cell
+        in
         DLL.delete_curr cell;
         continue)
       else None

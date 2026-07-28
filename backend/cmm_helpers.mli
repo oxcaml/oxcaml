@@ -165,6 +165,9 @@ val tag_int : expression -> Debuginfo.t -> expression
 (** Integer untagging. [untag_int x = (x asr 1)] *)
 val untag_int : expression -> Debuginfo.t -> expression
 
+(** Unsigned integer untagging. [untag_int x = (x lsr 1)] *)
+val unsigned_untag_int : expression -> Debuginfo.t -> expression
+
 (** signed division of two register-width integers *)
 val div_int :
   ?dividend_cannot_be_min_int:bool ->
@@ -173,6 +176,9 @@ val div_int :
   Debuginfo.t ->
   expression
 
+(** unsigned division of two register-width integers *)
+val unsigned_div_int : expression -> expression -> Debuginfo.t -> expression
+
 (** signed remainder of two register-width integers *)
 val mod_int :
   ?dividend_cannot_be_min_int:bool ->
@@ -180,6 +186,9 @@ val mod_int :
   expression ->
   Debuginfo.t ->
   expression
+
+(** unsigned remainder of two register-width integers *)
+val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
 
 (** Boolean negation *)
 val mk_not : Debuginfo.t -> expression -> expression
@@ -664,7 +673,11 @@ val mul_int_caml : binary_primitive
 
 val div_int_caml : binary_primitive
 
+val unsigned_div_int_caml : binary_primitive
+
 val mod_int_caml : binary_primitive
+
+val unsigned_mod_int_caml : binary_primitive
 
 val and_int_caml : binary_primitive
 
@@ -1261,11 +1274,17 @@ val with_stack_preemptible :
   arg:expression ->
   expression
 
-val resume :
+val continue :
+  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+
+val discontinue :
+  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+
+val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
-  f:expression ->
-  arg:expression ->
+  exn:expression ->
+  bt:expression ->
   expression
 
 val reperform :

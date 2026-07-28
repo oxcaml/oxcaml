@@ -4,21 +4,12 @@
 *)
 
 module Dynamic = struct
-  type 'a t
+  include Dynamic
 
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-  external push : 'a t -> 'a -> unit = "caml_dynamic_push"
+  (* Expose the implementation of dynamic for testing. *)
+  external push : 'a t -> 'a @ contended portable -> unit = "caml_dynamic_push"
   external pop : 'a t -> unit = "caml_dynamic_pop"
-
-  (* A Dynamic.t is represented at runtime as the immediate OO-id that is also
-     used as its hash (Hash_dyn = Long_val). Exposing it lets us construct
-     deterministic hash collisions from OCaml. *)
   external hash : 'a t -> int = "%identity"
-
-  let with_temporarily d v ~f =
-    push d v;
-    Fun.protect f ~finally:(fun () -> pop d)
 end
 
 let str_or_null = function This s -> s | Null -> "null"
@@ -66,7 +57,7 @@ let test_table_growth () =
     if i = n then begin
       let visible = ref 0 and correct = ref true in
       Array.iteri
-        (fun j d ->
+        (fun j (d : int Dynamic.t) ->
           match Dynamic.get d with
           | This v ->
             incr visible;
@@ -132,7 +123,8 @@ let test_gc () =
   print_endline "\n# GC root scanning of live bindings";
   let flush_gc () =
     for _ = 1 to 64 do
-      ignore (Dynamic.get (Dynamic.make ()))
+      let _ = Dynamic.get (Dynamic.make ()) in
+      ()
     done;
     Gc.full_major ();
     Gc.compact ()

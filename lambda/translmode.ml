@@ -27,6 +27,11 @@ let transl_locality_mode_r locality =
      to ceil and determined; here we push it again just to get the constant. *)
   Locality.zap_to_ceil locality |> transl_locality_mode
 
+let transl_yielding_mode_l yielding =
+  match Yielding.zap_to_floor yielding with
+  | Yielding.Const.Unyielding -> Unyielding
+  | Yielding.Const.Yielding -> May_yield
+
 let transl_alloc_mode_l mode =
   (* we only take the locality axis *)
   Alloc.proj_comonadic Areality mode |> transl_locality_mode_l
