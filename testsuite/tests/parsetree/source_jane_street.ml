@@ -1236,7 +1236,7 @@ result: 7.000000
 val f : float# -> float# = <fun>
 larger match result: 3.000000
 - : unit = ()
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 |}]
 
 let x =
@@ -1255,7 +1255,7 @@ test_int64 "result" (f #7L);;
 
 [%%expect{|
 val x : unit = ()
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}]
@@ -1437,7 +1437,7 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 (* small numbers *)
 
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
@@ -1452,13 +1452,13 @@ let z () = #42S
 
 [%%expect{|
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
 type t6 = int16#
 val x : float32 = 3.1400001s
-val x : unit -> float32# = <fun>
+val x : unit -> float32_u = <fun>
 val y : int8 = 42s
 val y : unit -> int8# = <fun>
 val z : int16 = 42S

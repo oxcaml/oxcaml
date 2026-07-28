@@ -6,10 +6,10 @@
 
 module F32 = Stdlib_stable.Float32_u
 
-external box_int32 : int32# -> (int32[@local_opt]) = "%box_int32"
-external unbox_int32 : (int32[@local_opt]) -> int32# = "%unbox_int32"
-external box_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
-external unbox_int64 : (int64[@local_opt]) -> int64# = "%unbox_int64"
+external box_int32 : int32_u -> (int32[@local_opt]) = "%box_int32"
+external unbox_int32 : (int32[@local_opt]) -> int32_u = "%unbox_int32"
+external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
+external unbox_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 external unbox_float : (float[@local_opt]) -> float# = "%unbox_float"
 
@@ -859,7 +859,7 @@ module Noalloc = struct
     if Stdlib.( >= ) x 0l then of_bits x else neg (of_bits (Stdlib.Int32.neg x))
   ;;
 
-  let[@inline] of_int32_preserve_order i : float32# =
+  let[@inline] of_int32_preserve_order i : float32_u =
     F32.of_float32 ((of_int32_preserve_order [@inlined hint]) i)
   ;;
 

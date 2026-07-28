@@ -29,7 +29,7 @@ module Module_1 = struct
 end
 
 module Coerced_module_1 : sig
-  val bar : int64#
+  val bar : int64_u
   val qux : int
 end = Module_1
 
@@ -155,7 +155,7 @@ module With_products = struct
 end
 
 module Coerced_products : sig
-  val prod1 : #(float# * #(string * void * int64#))
+  val prod1 : #(float# * #(string * void * int64_u))
   val boxed : string
 end = With_products
 
@@ -205,8 +205,8 @@ end
 
 module type Output = sig
   val v : void
-  val extra : int64#
-  val product : #(float# * void * string * int64#)
+  val extra : int64_u
+  val product : #(float# * void * string * int64_u)
   val prefixed_z : string
   val tripled_y : float#
   val doubled_x : int

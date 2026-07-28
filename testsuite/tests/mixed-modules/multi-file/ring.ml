@@ -6,11 +6,11 @@ type free_ring_elt =
   | Multiply of free_ring_elt * free_ring_elt
 
 type void : void
-type t = #(int64# * float# * void * free_ring_elt)
+type t = #(int64_u * float# * void * free_ring_elt)
 
 external void : unit -> void = "%unbox_unit"
-external box_int64 : int64# -> int64 = "%box_int64"
-external unbox_int64 : int64 -> int64# = "%unbox_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
+external unbox_int64 : int64 -> int64_u = "%unbox_int64"
 external box_float : float# -> float = "%box_float"
 external unbox_float : float -> float# = "%unbox_float"
 external int_of_int64 : int64 -> int = "%int_of_int64"

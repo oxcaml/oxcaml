@@ -270,7 +270,7 @@ let size_component : machtype_component -> int = function
   | Float -> Arch.size_float
   | Float32 ->
     (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
-       Note that packed float32# arrays are handled via a separate path. *)
+       Note that packed float32_u arrays are handled via a separate path. *)
     Arch.size_float
   | Vec128 -> Arch.size_vec128
   | Valx2 ->
@@ -297,7 +297,7 @@ let size_expr env exp =
     | Cconst_float _ -> Arch.size_float
     | Cconst_float32 _ ->
       (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
-         Note that packed float32# arrays are handled via a separate path. *)
+         Note that packed float32_u arrays are handled via a separate path. *)
       Arch.size_float
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256

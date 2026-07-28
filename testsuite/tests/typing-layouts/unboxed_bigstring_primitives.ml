@@ -23,15 +23,15 @@
 (* CR layouts: add the unboxed simd externals once we support them *)
 open Bigarray
 type bigstring = (char, int8_unsigned_elt, c_layout) Array1.t
-external caml_bigstring_get_32 : bigstring -> int -> int32# = "%caml_bigstring_get32#"
-external caml_bigstring_get_64 : bigstring -> int -> int64# = "%caml_bigstring_get64#"
-external caml_bigstring_set_32 : bigstring -> int -> int32# -> unit = "%caml_bigstring_set32#"
-external caml_bigstring_set_64 : bigstring -> int -> int64# -> unit = "%caml_bigstring_set64#"
+external caml_bigstring_get_32 : bigstring -> int -> int32_u = "%caml_bigstring_get32#"
+external caml_bigstring_get_64 : bigstring -> int -> int64_u = "%caml_bigstring_get64#"
+external caml_bigstring_set_32 : bigstring -> int -> int32_u -> unit = "%caml_bigstring_set32#"
+external caml_bigstring_set_64 : bigstring -> int -> int64_u -> unit = "%caml_bigstring_set64#"
 
-external unsafe_caml_bigstring_get_32 : bigstring -> int -> int32# = "%caml_bigstring_get32u#"
-external unsafe_caml_bigstring_get_64 : bigstring -> int -> int64# = "%caml_bigstring_get64u#"
-external unsafe_caml_bigstring_set_32 : bigstring -> int -> int32# -> unit = "%caml_bigstring_set32u#"
-external unsafe_caml_bigstring_set_64 : bigstring -> int -> int64# -> unit = "%caml_bigstring_set64u#"
+external unsafe_caml_bigstring_get_32 : bigstring -> int -> int32_u = "%caml_bigstring_get32u#"
+external unsafe_caml_bigstring_get_64 : bigstring -> int -> int64_u = "%caml_bigstring_get64u#"
+external unsafe_caml_bigstring_set_32 : bigstring -> int -> int32_u -> unit = "%caml_bigstring_set32u#"
+external unsafe_caml_bigstring_set_64 : bigstring -> int -> int64_u -> unit = "%caml_bigstring_set64u#"
 
 external[@layout_poly] ignore : ('a : any). 'a -> unit = "%ignore"
 

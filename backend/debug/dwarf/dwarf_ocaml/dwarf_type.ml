@@ -260,8 +260,8 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
     | [value] kind                     | [size_addr]   | regular OCaml value   |
     | [int8#]                          | 1 byte        | densely packed 8/word |
     | [int16#]                         | 2 bytes       | densely packed 4/word |
-    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
-    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | [int32_u], [float32_u]           | 4 bytes       | densely packed 2/word |
+    | [int64_u],[float#],[nativeint_u] | 8 bytes       | exactly one word      |
     | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
     |                                  | extended      | takes 16 bytes per    |
     |                                  | fields        | element               |
@@ -1689,7 +1689,7 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
         (* CR sspies: In case of unboxed projections, we do not have the type
            names of the individual fields available. And obtaining them in
            general is not straightforward, since they could be hidden behind a
-           type alias (e.g., [type prod = #{ a: int64#; b: float# }]). What we
+           type alias (e.g., [type prod = #{ a: int64_u; b: float# }]). What we
            currently do is match the style of unarization variables by appending
            "_unboxed" for the projections to indicate that the type is not the
            same. *)

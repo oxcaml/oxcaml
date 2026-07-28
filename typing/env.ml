@@ -887,7 +887,7 @@ type lookup_error =
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
-  | No_unboxed_version of Longident.t * type_declaration
+  | No_unboxed_version of Longident.t * type_declaration * string option
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
@@ -4490,8 +4490,16 @@ let lookup_type ~errors ~use ~loc lid env =
     | decl ->
       Path.unboxed_version path, decl
     | exception Not_found ->
+      (* These types formerly had unboxed versions, since renamed *)
+      let renamed_to =
+        if Path.same path Predef.path_int32 then Some "int32_u"
+        else if Path.same path Predef.path_int64 then Some "int64_u"
+        else if Path.same path Predef.path_nativeint then Some "nativeint_u"
+        else if Path.same path Predef.path_float32 then Some "float32_u"
+        else None
+      in
       may_lookup_error errors loc env
-        (No_unboxed_version (lid, data.tda_declaration))
+        (No_unboxed_version (lid, data.tda_declaration, renamed_to))
 
 let lookup_modtype_lazy ~errors ~use ~loc lid env =
   match lid with
@@ -5375,13 +5383,18 @@ let report_lookup_error_doc loc env = function
            ~offender:(fun ppf -> !print_type_expr ppf typ)
            env ppf v)
         err
-  | No_unboxed_version (lid, decl) ->
+  | No_unboxed_version (lid, decl, renamed_to) ->
       let has_atomic_field lbls =
         List.exists
           (fun (ld : Types.label_declaration) -> Types.is_atomic ld.ld_mutable)
           lbls
       in
       let sub =
+        match renamed_to with
+        | Some name ->
+          [Location.msg "@{<hint>Hint@}: Did you mean %a?"
+             Style.inline_code name]
+        | None ->
         match decl.type_kind with
         | Type_record (_, Record_unboxed, _) ->
           [Location.msg

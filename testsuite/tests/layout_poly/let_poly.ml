@@ -3,15 +3,15 @@
  expect.opt;
 *)
 
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 [%%expect{|
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 |}]
 
 (* Simple let poly_ with a polymorphic function *)

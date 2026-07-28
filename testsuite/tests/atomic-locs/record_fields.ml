@@ -209,11 +209,11 @@ let ok_project (t: int t) = t.f
 val ok_project : int t -> int = <fun>
 |}];;
 
-let wrong_project (t: int64# t) = t.f
+let wrong_project (t: int64_u t) = t.f
 [%%expect{|
-Line 1, characters 34-35:
-1 | let wrong_project (t: int64# t) = t.f
-                                      ^
+Line 1, characters 35-36:
+1 | let wrong_project (t: int64_u t) = t.f
+                                       ^
 Error: Accessing atomic fields (here "f") of mixed records is not yet
        supported.
 |}];;
@@ -225,11 +225,11 @@ let ok_set (t: int t) = t.f <- 42
 val ok_set : int t -> unit = <fun>
 |}];;
 
-let wrong_set (t: int64# t) = t.f <- 42
+let wrong_set (t: int64_u t) = t.f <- 42
 [%%expect{|
-Line 1, characters 30-39:
-1 | let wrong_set (t: int64# t) = t.f <- 42
-                                  ^^^^^^^^^
+Line 1, characters 31-40:
+1 | let wrong_set (t: int64_u t) = t.f <- 42
+                                   ^^^^^^^^^
 Error: Accessing atomic fields (here "f") of mixed records is not yet
        supported.
 |}];;
@@ -241,11 +241,11 @@ let ok_loc (t: int t) = [%atomic.loc t.f]
 val ok_loc : int t -> int atomic_loc = <fun>
 |}];;
 
-let wrong_loc (t: int64# t) = [%atomic.loc t.f];
+let wrong_loc (t: int64_u t) = [%atomic.loc t.f];
 [%%expect{|
-Line 1, characters 43-44:
-1 | let wrong_loc (t: int64# t) = [%atomic.loc t.f];
-                                               ^
+Line 1, characters 44-45:
+1 | let wrong_loc (t: int64_u t) = [%atomic.loc t.f];
+                                                ^
 Error: Use of "[%atomic.loc]" with mixed record fields (here "f") is forbidden.
 |}];;
 
@@ -315,11 +315,11 @@ let ok_project (t: int t) = match t with A r -> r.f
 val ok_project : int t -> int = <fun>
 |}];;
 
-let wrong_project (t: int64# t) = match t with A r -> r.f
+let wrong_project (t: int64_u t) = match t with A r -> r.f
 [%%expect{|
-Line 1, characters 54-55:
-1 | let wrong_project (t: int64# t) = match t with A r -> r.f
-                                                          ^
+Line 1, characters 55-56:
+1 | let wrong_project (t: int64_u t) = match t with A r -> r.f
+                                                           ^
 Error: Accessing atomic fields (here "f") of mixed records is not yet
        supported.
 |}];;
@@ -331,11 +331,11 @@ let ok_set (t: int t) = match t with A r -> r.f <- 42
 val ok_set : int t -> unit = <fun>
 |}];;
 
-let wrong_set (t: int64# t) = match t with A r -> r.f <- 42
+let wrong_set (t: int64_u t) = match t with A r -> r.f <- 42
 [%%expect{|
-Line 1, characters 50-59:
-1 | let wrong_set (t: int64# t) = match t with A r -> r.f <- 42
-                                                      ^^^^^^^^^
+Line 1, characters 51-60:
+1 | let wrong_set (t: int64_u t) = match t with A r -> r.f <- 42
+                                                       ^^^^^^^^^
 Error: Accessing atomic fields (here "f") of mixed records is not yet
        supported.
 |}];;
@@ -347,11 +347,11 @@ let ok_loc (t: int t) = match t with A r -> [%atomic.loc r.f]
 val ok_loc : int t -> int atomic_loc = <fun>
 |}];;
 
-let wrong_loc (t: int64# t) = match t with A r -> [%atomic.loc r.f]
+let wrong_loc (t: int64_u t) = match t with A r -> [%atomic.loc r.f]
 [%%expect{|
-Line 1, characters 63-64:
-1 | let wrong_loc (t: int64# t) = match t with A r -> [%atomic.loc r.f]
-                                                                   ^
+Line 1, characters 64-65:
+1 | let wrong_loc (t: int64_u t) = match t with A r -> [%atomic.loc r.f]
+                                                                    ^
 Error: Use of "[%atomic.loc]" with mixed record fields (here "f") is forbidden.
 |}];;
 
@@ -730,7 +730,7 @@ module Functional_update_multi_copy_ok :
 |}]
 (* Pattern matching follows the same rules in mixed blocks. *)
 module Pattern_matching = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
+  type t = { x : int64_u; mutable y : int [@atomic] }
 
   let forbidden { x; y } = x + y
 end
@@ -746,7 +746,7 @@ Error: Atomic fields (here "y") are forbidden in patterns,
 
 (* ... except for wildcards, to allow exhaustive record patterns. *)
 module Pattern_matching_wildcard = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
+  type t = { x : int64_u; mutable y : int [@atomic] }
 
   [@@@warning "+missing-record-field-pattern"]
   let warning { x } = x
@@ -776,10 +776,10 @@ Warning 9 [missing-record-field-pattern]: the following labels are not bound
 
 module Pattern_matching_wildcard :
   sig
-    type t = { x : int64#; mutable y : int [@atomic]; }
-    val warning : t -> int64#
-    val allowed : t -> int64#
-    val also_allowed : t -> int64#
+    type t = { x : int64_u; mutable y : int [@atomic]; }
+    val warning : t -> int64_u
+    val allowed : t -> int64_u
+    val also_allowed : t -> int64_u
   end
 |}]
 
@@ -950,13 +950,13 @@ Error: Atomic record fields must have layout value.
 |}]
 
 module Non_value_atomic_single_bits32 = struct
-  type t = { mutable f : int32# [@atomic] }
+  type t = { mutable f : int32_u [@atomic] }
 end
 
 [%%expect{|
-Line 2, characters 13-41:
-2 |   type t = { mutable f : int32# [@atomic] }
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 13-42:
+2 |   type t = { mutable f : int32_u [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
 

@@ -38,15 +38,15 @@ let fst (type a : value) (t : a t) = t.fst
 val fst : 'a t -> 'a = <fun>
 |}]
 
-let fst (t : int64# t) = t.fst
+let fst (t : int64_u t) = t.fst
 [%%expect{|
-val fst : int64# t -> int64# = <fun>
+val fst : int64_u t -> int64_u = <fun>
 |}]
 
-let fst (t : int64# t) =
+let fst (t : int64_u t) =
   match t with { fst; _ } -> fst
 [%%expect{|
-val fst : int64# t -> int64# = <fun>
+val fst : int64_u t -> int64_u = <fun>
 |}]
 
 let fst (type a : bits64) (t : a t) = t.fst
@@ -65,9 +65,9 @@ let set_snd t a = t.snd <- a
 val set_snd : 'a t -> 'a -> unit = <fun>
 |}]
 
-let set_snd t (a : int64#) = t.snd <- a
+let set_snd t (a : int64_u) = t.snd <- a
 [%%expect {|
-val set_snd : int64# t -> int64# -> unit = <fun>
+val set_snd : int64_u t -> int64_u -> unit = <fun>
 |}]
 
 let set_snd (type a : bits64) (t : a t) a = t.snd <- a
@@ -105,14 +105,14 @@ let make (type a : value) fst snd : a t = { fst; snd }
 val make : 'a -> 'a -> 'a t = <fun>
 |}]
 
-let make (fst : int64#) snd = { fst; snd }
+let make (fst : int64_u) snd = { fst; snd }
 [%%expect{|
-val make : int64# -> int64# -> int64# t = <fun>
+val make : int64_u -> int64_u -> int64_u t = <fun>
 |}]
 
-let make (fst : int64#) (snd : int64#) = { fst; snd }
+let make (fst : int64_u) (snd : int64_u) = { fst; snd }
 [%%expect{|
-val make : int64# -> int64# -> int64# t = <fun>
+val make : int64_u -> int64_u -> int64_u t = <fun>
 |}]
 
 let make (type a : bits64) (fst : a) (snd : a) = { fst; snd }
@@ -120,9 +120,9 @@ let make (type a : bits64) (fst : a) (snd : a) = { fst; snd }
 val make : ('a : bits64). 'a -> 'a -> 'a t = <fun>
 |}]
 
-external box_int64 : int64# -> int64 = "%box_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
 [%%expect {|
-external box_int64 : int64# -> int64 = "%box_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
 |}]
 
 (* Test that typing and genprintval work when the actual type has kind value *)
@@ -133,12 +133,12 @@ val test_block_with_values : int t = {fst = 1; snd = 2}
 
 let make_test_block () = { fst = #1L; snd = #2L } |> Sys.opaque_identity
 [%%expect {|
-val make_test_block : unit -> int64# t = <fun>
+val make_test_block : unit -> int64_u t = <fun>
 |}]
 
 let test_block = make_test_block ()
 [%%expect {|
-val test_block : int64# t = {fst = <abstr>; snd = <abstr>}
+val test_block : int64_u t = {fst = <abstr>; snd = <abstr>}
 |}]
 
 let test_direct =
@@ -174,11 +174,11 @@ let test_set_via_index =
 val test_set_via_index : int64 = 42L
 |}]
 
-let test_unboxed_pair_block : #(int64# * int64#) t =
+let test_unboxed_pair_block : #(int64_u * int64_u) t =
   { fst = #(#1L, #2L); snd = #(#3L, #4L) }
 |> Sys.opaque_identity
 [%%expect {|
-val test_unboxed_pair_block : #(int64# * int64#) t =
+val test_unboxed_pair_block : #(int64_u * int64_u) t =
   {fst = #(<abstr>, <abstr>); snd = #(<abstr>, <abstr>)}
 |}]
 
@@ -188,11 +188,11 @@ let test_unboxed_pair_direct =
 val test_unboxed_pair_direct : int64 = 4L
 |}]
 
-let test_nested_block : int64# t# t =
+let test_nested_block : int64_u t# t =
   { fst = #{ fst = #1L; snd = #2L }; snd = #{ fst = #3L; snd = #4L } }
 |> Sys.opaque_identity
 [%%expect {|
-val test_nested_block : int64# t# t =
+val test_nested_block : int64_u t# t =
   {fst = #{fst = <unknown>; snd = <unknown>};
    snd = #{fst = <unknown>; snd = <unknown>}}
 |}]
@@ -205,7 +205,7 @@ val test_nested_direct : int64 = 4L
 
 let test_nested_via_index =
   let idx =
-    ((.snd.#snd) : (int64# t# t, int64#) idx_mut)
+    ((.snd.#snd) : (int64_u t# t, int64_u) idx_mut)
     |> Sys.opaque_identity
   in
   Idx_mut.get test_nested_block idx |> box_int64

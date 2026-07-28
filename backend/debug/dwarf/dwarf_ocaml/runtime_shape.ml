@@ -605,10 +605,10 @@ let print_unboxed fmt unb =
   let s =
     match unb with
     | Unboxed_float -> "float#"
-    | Unboxed_float32 -> "float32#"
-    | Unboxed_nativeint -> "nativeint#"
-    | Unboxed_int64 -> "int64#"
-    | Unboxed_int32 -> "int32#"
+    | Unboxed_float32 -> "float32_u"
+    | Unboxed_nativeint -> "nativeint_u"
+    | Unboxed_int64 -> "int64_u"
+    | Unboxed_int32 -> "int32_u"
     | Unboxed_int16 -> "int16#"
     | Unboxed_int8 -> "int8#"
     | Unboxed_simd svs -> Format.asprintf "%a#" print_simd_vec_split svs

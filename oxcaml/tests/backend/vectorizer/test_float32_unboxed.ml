@@ -21,7 +21,7 @@ module Float32 = struct
 end
 
 module Float32_u = struct
-  type t = float32#
+  type t = float32_u
 
   external to_float32 : t -> (float32[@local_opt]) = "%box_float32" [@@warning "-187"]
 
@@ -37,8 +37,8 @@ module Float32_u = struct
   end
 end
 
-type t1 = { mutable d0 : float32# ;
-            mutable d1: float32#; mutable d2: float32#; mutable d3: float32#  }
+type t1 = { mutable d0 : float32_u ;
+            mutable d1: float32_u; mutable d2: float32_u; mutable d3: float32_u  }
 
 (* Not vectorized because float32 fields are not adjacent in a record, they are padded
 to 64-bits. *)

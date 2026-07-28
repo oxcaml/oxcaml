@@ -428,7 +428,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -437,7 +437,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
@@ -463,7 +463,7 @@ external unsafe_set_i64 : ('a : value) ('b : bits64).
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -475,7 +475,7 @@ external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
@@ -584,7 +584,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -593,7 +593,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
@@ -624,7 +624,7 @@ external unsafe_set_ptr_i64 :
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -638,7 +638,7 @@ external unsafe_set_ptr_prod :
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in

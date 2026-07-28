@@ -299,12 +299,12 @@ type c : float64 mod everything
 type d = c
 |}]
 
-type a : float32 = float32#
+type a : float32 = float32_u
 type b : float32 mod global aliased many immutable stateless external_ = a
 type c : float32 mod global aliased many immutable stateless external_
 type d : float32 = c
 [%%expect{|
-type a = float32#
+type a = float32_u
 type b = a
 type c : float32 mod everything
 type d = c
@@ -356,24 +356,24 @@ type t : any mod global aliased many immutable stateless external_ = float#
 type t = float#
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = float32#
+type t : any mod global aliased many immutable stateless external_ = float32_u
 [%%expect{|
-type t = float32#
+type t = float32_u
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = int64#
+type t : any mod global aliased many immutable stateless external_ = int64_u
 [%%expect{|
-type t = int64#
+type t = int64_u
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = int32#
+type t : any mod global aliased many immutable stateless external_ = int32_u
 [%%expect{|
-type t = int32#
+type t = int32_u
 |}]
 
-type t : any mod global aliased many immutable stateless external_ = nativeint#
+type t : any mod global aliased many immutable stateless external_ = nativeint_u
 [%%expect{|
-type t = nativeint#
+type t = nativeint_u
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int8x16#
@@ -418,11 +418,11 @@ let x : (_ : value mod contended) = 10
 val x : int = 10
 |}]
 
-let f (x : nativeint#) =
+let f (x : nativeint_u) =
   let _ : (_ : word mod portable many aliased) = x in
   ()
 [%%expect {|
-val f : nativeint# -> unit = <fun>
+val f : nativeint_u -> unit = <fun>
 |}]
 
 type t_value : value
