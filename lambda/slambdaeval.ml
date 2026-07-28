@@ -105,10 +105,15 @@ module rec Types : sig
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   val print_closure : Fmt.formatter -> closure -> unit
@@ -126,10 +131,15 @@ end = struct
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   let print_closure ppf { clo_params; clo_body; clo_env = _ } =
@@ -151,13 +161,13 @@ end = struct
         slv_runtime
     | SLVlayout layout ->
       Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
-    | SLVrecord fields ->
+    | SLVrecord { id; values } ->
       let print_fields ppf =
         Array.iter
           (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
-          fields
+          values
       in
-      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
+      Fmt.fprintf ppf "@[<hv 2>%s[%t@;<1 -2>]@]" id print_fields
     | SLVclosure id -> Template_id.print ppf id
 
   and print_value_or_missing ppf = function
@@ -267,8 +277,11 @@ end = struct
   let symbol_arg_of_value (v : Types.value) =
     match v with
     | SLVlayout l -> symbol_arg_of_layout l
-    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
-      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+    | SLVrecord { id; values = _ } -> id
+    | SLVhalves _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected halves"
+    | SLVclosure _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected closure"
 end
 
 module CU_data = struct
@@ -294,8 +307,9 @@ module Ctx = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
-      mutable instantiated_template_ids : Ident.Set.t;
-      mutable instantiations : (Ident.t * lambda) list
+      instantiated_templates : Types.halves Ident.Tbl.t;
+      mutable instantiations : (Ident.t * lambda) list;
+      uniqueify : int Misc.Stdlib.String.Tbl.t
     }
 
   let create ~cu_static_data =
@@ -303,8 +317,9 @@ module Ctx = struct
     { cu_static_data =
         (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
       store = Template_store.empty ();
-      instantiated_template_ids = Ident.Set.empty;
-      instantiations = []
+      instantiated_templates = Ident.Tbl.create 10;
+      instantiations = [];
+      uniqueify = Misc.Stdlib.String.Tbl.create 10
     }
 
   let cu_static_data t cu =
@@ -343,18 +358,29 @@ module Ctx = struct
         arg_names
       |> Ident.create_persistent
     in
-    if not (Ident.Set.mem name t.instantiated_template_ids)
-    then begin
-      (* f might recursively call this function so make sure to mark this name
-         as visited before calling it. *)
-      t.instantiated_template_ids
-        <- Ident.Set.add name t.instantiated_template_ids;
-      let lam = eval_apply closure args in
-      t.instantiations <- (name, lam) :: t.instantiations
-    end;
-    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+    let slv_comptime =
+      match Ident.Tbl.find_opt t.instantiated_templates name with
+      | Some value -> value.slv_comptime
+      | None -> begin
+        (* f might recursively call this function so make sure to mark this name
+          as visited before calling it. *)
+        Ident.Tbl.replace t.instantiated_templates name
+          { Types.slv_comptime = Missing; slv_runtime = Lambda.dummy_constant };
+        let value : Types.halves = eval_apply closure args in
+        Ident.Tbl.replace t.instantiated_templates name value;
+        t.instantiations <- (name, value.slv_runtime) :: t.instantiations;
+        value.slv_comptime
+        end
+    in
+    Present (SLVhalves { slv_comptime; slv_runtime = Lvar name })
 
   let instantiations t = t.instantiations
+
+  let uniqueify t id =
+    let counter = Misc.Stdlib.String.Tbl.find_opt t.uniqueify id in
+    let counter = Option.value counter ~default:0 in
+    Misc.Stdlib.String.Tbl.replace t.uniqueify id (counter + 1);
+    id ^ string_of_int counter
 end
 
 include Types
@@ -366,7 +392,7 @@ let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
-  | Trecord : value Or_missing.t array value_type
+  | Trecord : record value_type
   | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
@@ -423,10 +449,18 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   | SLmissing -> Missing
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
-    Present (SLVrecord values)
+    let id =
+      Fmt.asprintf "%a_%a"
+        (Fmt.pp_print_option Compilation_unit.print)
+        (Current_unit.get_cu ())
+        (Fmt.pp_print_option Fmt.pp_print_string)
+        (Option.map Slambdaident.name name)
+    in
+    let id = Ctx.uniqueify ctx id in
+    Present (SLVrecord { id; values })
   | SLfield (slam, i) ->
     let* fields = eval_slam ctx env slam |>> expect Trecord in
-    fields.(i)
+    fields.values.(i)
   | SLproj_comptime slam ->
     let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
@@ -448,11 +482,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
         let env_body =
           Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
         in
-        let { slv_comptime = _; slv_runtime } =
-          eval_slam ctx env_body clo_body
-          |> expect_not_missing |> expect Thalves
-        in
-        slv_runtime)
+        eval_slam ctx env_body clo_body |> expect_not_missing |> expect Thalves)
 
 and eval_var env id = Env.find env id
 
