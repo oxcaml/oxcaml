@@ -512,6 +512,7 @@ module Gen = struct
               record env rtyp path labels Unboxed_product
             | Type_abstract _ | Type_open -> [])
           end
+        | Tbox _param -> [ (* CR: not sure what to do here *) ]
         | Tarrow _ ->
           let rec left_types acc env ty =
             match get_desc ty with

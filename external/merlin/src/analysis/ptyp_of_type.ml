@@ -71,6 +71,9 @@ and core_type type_expr =
   | Tconstr (path, type_exprs, _abbrev) ->
     let loc = Untypeast.lident_of_path path |> Location.mknoloc in
     Typ.constr loc @@ List.map ~f:core_type type_exprs
+  | Tbox type_expr ->
+    let loc = Untypeast.lident_of_path Predef.path_box |> Location.mknoloc in
+    Typ.constr loc [ core_type type_expr ]
   | Tquote_eval ty ->
     let loc = Untypeast.lident_of_path Predef.path_eval |> Location.mknoloc in
     Typ.constr loc [ Typ.quote (core_type ty) ]

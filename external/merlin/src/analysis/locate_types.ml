@@ -52,6 +52,11 @@ let rec create_type_tree ty : Type_tree.t =
     let ty_without_args = Btype.newgenty (Tconstr (path, [], abbrev_memo)) in
     let children = List.map arg_tys ~f:create_type_tree in
     { data = Type_ref { path; ty = ty_without_args }; children }
+  | Tbox arg_ty ->
+    let path = Predef.path_box in
+    let ty_without_args = Btype.newgenty (Tconstr (path, [], ref Types.Mnil)) in
+    let children = [ create_type_tree arg_ty ] in
+    { data = Type_ref { path; ty = ty_without_args }; children }
   | Tlink ty | Tpoly (ty, _) | Trepr (ty, _) -> create_type_tree ty
   | Tobject (fields_type, _) ->
     let rec extract_field_types (ty : Types.type_expr) =
