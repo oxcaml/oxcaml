@@ -10,10 +10,10 @@
  }
 *)
 
-(* We're likely to remove %get_header in favour of calls to
-   caml_obj_is_stack under runtime5 (since testing a block's colour isn't
-   sufficient to check for local allocations) so this doesn't check for local
-   allocations any more. *)
+(* The only way to test for a block being stack-allocated is with
+   caml_obj_is_stack (previously the colour bits were sufficient) so
+   this test doesn't check for local allocations any more. *)
+
 
 external repr : ('a[@local_opt]) -> (Obj.t[@local_opt]) = "%identity"
 external get_header_unsafe : (Obj.t[@local_opt]) -> nativeint = "%get_header"

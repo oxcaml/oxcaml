@@ -86,18 +86,6 @@ function caml_memprof_discard(t) {
   return 0;
 }
 
-//Provides: caml_eventlog_resume
-//Version: < 5.0
-function caml_eventlog_resume(unit) {
-  return 0;
-}
-
-//Provides: caml_eventlog_pause
-//Version: < 5.0
-function caml_eventlog_pause(unit) {
-  return 0;
-}
-
 //Provides: caml_gc_huge_fallback_count
 //Version: < 5.0
 function caml_gc_huge_fallback_count(unit) {

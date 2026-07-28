@@ -22626,11 +22626,6 @@
       [0,
        [11, "heap_chunks: ", [4, 0, 0, 0, [12, 10, 0]]],
        "heap_chunks: %d\n"];
-   function eventlog_pause(param){
-     /*<<gc.ml:65:24>>*/ return 0;
-    /*<<gc.ml:65:26>>*/ }
-   function eventlog_resume(param){ /*<<gc.ml:66:25>>*/ return 0;
-    /*<<gc.ml:66:27>>*/ }
    function print_stat(c){
     var st =  /*<<gc.ml:71:11>>*/ runtime.caml_gc_stat(0);
      /*<<gc.ml:72:2>>*/ caml_call3(Stdlib_Printf[1], c, _a_, st[4]);
@@ -22704,8 +22699,6 @@
        function(_u_){return runtime.caml_final_release(_u_);},
        create_alarm,
        delete_alarm,
-       eventlog_pause,
-       eventlog_resume,
        [0,
         null_tracker,
         start,
