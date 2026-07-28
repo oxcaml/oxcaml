@@ -18,7 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    open_modules : string list;
+    open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;
@@ -41,6 +41,9 @@ let dump_warnings st =
 let dump_visible_include ({ path; cmx_guaranteed } : Clflags.visible_include) =
   `Assoc [ ("path", `String path); ("cmx_guaranteed", `Bool cmx_guaranteed) ]
 
+let dump_open_arg = function
+  | Clflags.Open s | Open_cmi s -> `String s
+
 let dump_ocaml x =
   `Assoc
     [ ("include_dirs", `List (List.map ~f:dump_visible_include x.include_dirs));
@@ -55,7 +58,7 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
-      ("open_modules", Json.list Json.string x.open_modules);
+      ("open_args", Json.list dump_open_arg x.open_args);
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
       ("warnings", dump_warnings x.warnings);
@@ -960,8 +963,12 @@ let ocaml_flags =
       " Reject invalid formats accepted by legacy implementations" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
-          { ocaml with open_modules = md :: ocaml.open_modules }),
+          { ocaml with open_args = Open md :: ocaml.open_args }),
       "<module>  Opens the module <module> before typing" );
+    ( "-open-cmi",
+      Marg.param "module" (fun md ocaml ->
+          { ocaml with open_args = Open_cmi md :: ocaml.open_args }),
+      "<file.cmi>  Same as -open, but reads the signature from <file.cmi>" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1064,7 +1071,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
-        open_modules = [];
+        open_args = [];
         ppx = [];
         pp = None;
         warnings = Warnings.backup ();
