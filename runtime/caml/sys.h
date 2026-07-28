@@ -19,6 +19,8 @@
 #ifdef CAML_INTERNALS
 
 #include "misc.h"
+#include "mlvalues.h"
+#include <stddef.h>
 
 CAMLextern char * caml_strerror(int errnum, char * buf, size_t buflen);
 

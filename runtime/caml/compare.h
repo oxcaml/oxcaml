@@ -18,6 +18,8 @@
 
 #ifdef CAML_INTERNALS
 
+#include "misc.h"
+
 CAMLextern int caml_compare_unordered;
 
 #endif /* CAML_INTERNALS */

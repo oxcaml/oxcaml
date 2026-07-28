@@ -34,12 +34,9 @@
 #include "caml/dynamic.h"
 #include "caml/gc_ctrl.h"
 #include "caml/platform.h"
-#include "caml/minor_gc.h"
 #include "caml/misc.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
-#include "caml/obj.h"
-#include "caml/startup_aux.h"
 #include "caml/shared_heap.h"
 #ifdef NATIVE_CODE
 #include "caml/stack.h"
@@ -50,7 +47,6 @@
 #endif
 #ifdef __linux__
 /* for gettid */
-#include <sys/types.h>
 #include <sys/syscall.h>
 #endif
 

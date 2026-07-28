@@ -16,8 +16,10 @@
 #ifndef CAML_ALLOC_H
 #define CAML_ALLOC_H
 
+#include "config.h"
 #include "misc.h"
 #include "mlvalues.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

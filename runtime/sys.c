@@ -19,12 +19,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h> /* for _wchdir and _wgetcwd */
@@ -59,9 +57,7 @@
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
 #include "caml/signals.h"
-#include "caml/fiber.h"
 #include "caml/sys.h"
-#include "caml/startup.h"
 #include "caml/callback.h"
 #include "caml/startup_aux.h"
 #include "caml/major_gc.h"

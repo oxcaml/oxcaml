@@ -22,6 +22,8 @@
 
 #include "mlvalues.h"
 #include "misc.h"
+#include <stdio.h>
+#include "config.h"
 
 extern CAMLthread_local intnat caml_icount;
 void caml_stop_here (void);

@@ -22,11 +22,9 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "caml/backtrace.h"
 #include "caml/memory.h"
 #include "caml/callback.h"
 #include "caml/domain.h"
-#include "caml/major_gc.h"
 #ifndef NATIVE_CODE
 #include "caml/dynlink.h"
 #endif
@@ -34,11 +32,9 @@
 #include "caml/osdeps.h"
 #include "caml/shared_heap.h"
 #include "caml/startup_aux.h"
-#include "caml/prims.h"
 #include "caml/signals.h"
 #include "caml/gc_ctrl.h"
 #include "caml/fiber.h"
-#include "caml/platform.h"
 
 #include <pthread.h>
 #include <sys/resource.h>

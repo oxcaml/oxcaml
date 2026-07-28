@@ -16,6 +16,9 @@
 #ifndef CAML_SIGNALS_H
 #define CAML_SIGNALS_H
 
+#include "config.h"
+#include <stddef.h>
+#include "domain_state.h"
 #if defined(CAML_INTERNALS)
 #include <signal.h>
 #endif

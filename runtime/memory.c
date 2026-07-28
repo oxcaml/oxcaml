@@ -36,7 +36,6 @@
 #include "caml/signals.h"
 #include "caml/shared_heap.h"
 #include "caml/domain.h"
-#include "caml/roots.h"
 #include "caml/alloc.h"
 #include "caml/fiber.h"
 #include "caml/platform.h"

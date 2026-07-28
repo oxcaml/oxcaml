@@ -23,6 +23,9 @@
 #include <pthread.h>
 #include <string.h>
 
+#include "caml/platform.h"
+#include "caml/config.h"
+#include "caml/memory.h"
 #include "caml/sync.h"
 
 #ifdef __linux__

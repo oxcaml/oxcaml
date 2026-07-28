@@ -18,6 +18,7 @@
 #define CAML_SIMD_H
 
 // SIMD is only supported on 64-bit targets
+#include "config.h"
 #define Words_per_vec128 2
 #define Words_per_vec256 4
 

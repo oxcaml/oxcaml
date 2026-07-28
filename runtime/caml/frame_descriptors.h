@@ -23,6 +23,8 @@
 
 #include <stdbool.h>
 #include "config.h"
+#include "misc.h"
+#include <stdint.h>
 
 /* The compiler generates a "frame descriptor" for every potential
  * return address. Each loaded module has a block of memory, the

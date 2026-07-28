@@ -35,7 +35,6 @@ intnat caml_globals_inited = 0;
 
 CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
 
-#include <stdio.h>
 #include <string.h>
 #include <limits.h>
 

@@ -25,11 +25,8 @@
 #include <assert.h>
 #include "caml/alloc.h"
 #include "caml/custom.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
-#include "caml/fiber.h"
-#include "caml/domain.h"
 
 CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
                                            reserved_t reserved)

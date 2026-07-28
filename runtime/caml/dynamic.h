@@ -19,6 +19,8 @@
 
 #include "mlvalues.h"
 #include "roots.h"
+#include <stddef.h>
+#include "misc.h"
 
 /* Define a new dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit);

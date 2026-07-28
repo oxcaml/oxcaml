@@ -16,6 +16,8 @@
 #ifndef CAML_THREADS_H
 #define CAML_THREADS_H
 
+#include <caml/misc.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
