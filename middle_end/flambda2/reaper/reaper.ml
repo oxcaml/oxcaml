@@ -14,7 +14,7 @@
 (**************************************************************************)
 
 module Staged = struct
-  module TraverseRebuild = struct
+  module Traverse_rebuild = struct
     type t =
       { toplevel_expr : Rev_expr.t;
         code : Rev_expr.rev_code Code_id.Map.t;
@@ -43,7 +43,7 @@ module Staged = struct
       Traverse.run unit
     in
     let rebuild_data =
-      TraverseRebuild.
+      Traverse_rebuild.
         { toplevel_expr;
           code;
           ordered_code_ids;
@@ -78,7 +78,7 @@ module Staged = struct
         | Some code -> code
         | None -> Exported_code.find_exn (load_code ()) code_id)
     in
-    let TraverseRebuild.
+    let Traverse_rebuild.
           { toplevel_expr;
             code;
             ordered_code_ids;

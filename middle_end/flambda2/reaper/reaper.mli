@@ -14,12 +14,12 @@
 (**************************************************************************)
 
 module Staged : sig
-  module TraverseRebuild : sig
+  module Traverse_rebuild : sig
     type t
   end
 
   (** Traverse the compilation unit in preparation for Reaper analysis. *)
-  val traverse : Flambda_unit.t -> Global_flow_graph.graph * TraverseRebuild.t
+  val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t
 
   (** Run Reaper analysis for a compilation unit producing a Reaper solution. *)
   val solve : Global_flow_graph.graph -> Unboxing_analysis.result
@@ -28,7 +28,7 @@ module Staged : sig
       with dead code removed. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
-    traverse_rebuild:TraverseRebuild.t ->
+    traverse_rebuild:Traverse_rebuild.t ->
     solved_dep:Unboxing_analysis.result ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
