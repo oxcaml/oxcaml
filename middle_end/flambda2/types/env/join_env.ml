@@ -1596,14 +1596,14 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
     | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ->
       Misc.fatal_error "Kind mismatch for output of relation: expected %a")
 
-let add_to_inverse_relations inverse_relations name relation ~scrutinee =
-  Name.Map.union_total_shared
+let add_to_inverse_relations inverse_relations var relation ~scrutinee =
+  Variable.Map.union_total_shared
     (fun _ inv_rels1 inv_rels2 ->
       TG.Relation.Map.union_total_shared
         (fun _ names1 names2 -> Name.Set.union names1 names2)
         inv_rels1 inv_rels2)
     inverse_relations
-    (Name.Map.singleton name
+    (Variable.Map.singleton var
        (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
 
 let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
@@ -1634,7 +1634,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
       (* If we have no immediates, we can add the inverse relation on [get_tag]
          at the toplevel. *)
       let inverse_relations =
-        add_to_inverse_relations inverse_relations (Name.var get_tag_var)
+        add_to_inverse_relations inverse_relations get_tag_var
           TG.Relation.get_tag ~scrutinee:name
       in
       ty, inverse_relations
@@ -1655,7 +1655,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
         match is_int with
         | None -> inverse_relations
         | Some is_int_var ->
-          add_to_inverse_relations inverse_relations (Name.var is_int_var)
+          add_to_inverse_relations inverse_relations is_int_var
             TG.Relation.is_int ~scrutinee:name
       in
       let ty =
@@ -1703,7 +1703,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
       match is_null with
       | None -> inverse_relations
       | Some is_null_var ->
-        add_to_inverse_relations inverse_relations (Name.var is_null_var)
+        add_to_inverse_relations inverse_relations is_null_var
           TG.Relation.is_null ~scrutinee:name
     in
     ty, inverse_relations
@@ -1870,12 +1870,13 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       then
         let env_extension_for_inverse_relations =
           TEE.from_map
-            (Name.Map.map
+            (Variable.Map.map
                (fun inverse_relations ->
                  TG.create_from_head_naked_immediate
                    (TG.Head_of_kind_naked_immediate.create_inverse_relations
                       inverse_relations))
-               inverse_relations)
+               inverse_relations
+            |> Name.var_map)
         in
         ( (* We compute symbol projections last so that we can pick up
              existential variables, but there is no need to create existential
@@ -1897,7 +1898,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
         (create ~joined_envs ~bindings)
         equations_to_join
         (Bindings_in_target_env.alias_types_in_target_env bindings)
-        Name.Map.empty
+        Variable.Map.empty
     in
     let target_env =
       Bindings_in_target_env.fold_created_variables
@@ -2430,7 +2431,7 @@ let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
             { bindings = bindings_after_extension; _ } ) =
         n_way_join_round ~n_way_join_type
           (create ~joined_envs ~bindings)
-          concrete_types_to_join alias_types_in_target_env Name.Map.empty
+          concrete_types_to_join alias_types_in_target_env Variable.Map.empty
       in
       (* It is possible for the call to [add_env_extension] in
          [prepare_nested_join] above to create new variables, which do not exist
