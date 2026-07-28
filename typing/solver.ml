@@ -1221,20 +1221,33 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (c, b, l * allowed) C.morph ->
       (c, b, l * allowed) Comp_hint.Morph_hint.t ->
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log:_ _pp dst v f _f_hint u g g_hint ->
+   fun ~log:_ pp dst v f f_hint u g g_hint ->
     let src_f = C.src dst f in
     let f' = C.right_adjoint dst f in
+    let _, _, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let f'g = C.compose src_f f' (C.disallow_left g) in
+    let f'g_hint =
+      Comp_hint.Morph_hint.Compose
+        (f'_hint, Comp_hint.Morph_hint.disallow_left g_hint)
+    in
     let zap_log, ceil =
       zap_to_ceil_morphvar_aux src_f
         (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id))
     in
     let floor =
-      floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (u, g, g_hint))
+      floor_reachable_morphvar src_f ~stop:ceil (Amorphvar (u, f'g, f'g_hint))
     in
-    undo_changes zap_log;
-    if C.le src_f ceil (C.apply src_f f' floor)
-    then Ok ()
+    if C.le src_f ceil floor
+    then begin
+      undo_changes zap_log;
+      Ok ()
+    end
     else
+      let floor =
+        floor_reachable_morphvar dst ~stop:(C.max dst)
+          (Amorphvar (u, g, g_hint))
+      in
+      undo_changes zap_log;
       let ceil = C.apply dst f ceil in
       Error (ceil, Comp_hint.Unknown ceil, floor, Comp_hint.Unknown floor)
 
