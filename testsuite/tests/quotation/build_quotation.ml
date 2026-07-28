@@ -63,7 +63,7 @@ end
 module Exc : sig exception E end
 |}];;
 
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 (* Tests *)
 
@@ -531,7 +531,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 ]>
 |}];;
 
-(* Non-top-level functor *)
+(* Non-persistent functor *)
 module Make = Set.Make;;
 <[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
@@ -544,7 +544,7 @@ Error: Identifier "Make" is used at line 2, characters 18-22,
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
 
-(* Non-top-level functor argument *)
+(* Non-persistent functor argument *)
 module Int' = Int;;
 <[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
 [%%expect {|

@@ -1716,7 +1716,7 @@ let class_infos define_class kind
         let make_param (sty, v) =
           try
             let jkind = Jkind.Builtin.value ~why:Class_type_argument in
-            let param = transl_type_param env (Pident ty_id) jkind sty in
+            let param, _ = transl_type_param env (Pident ty_id) jkind sty in
             (* CR layouts: we require class type parameters to be values, but
                we should lift this restriction. Doing so causes bad error messages
                today, so we wait for tomorrow. *)

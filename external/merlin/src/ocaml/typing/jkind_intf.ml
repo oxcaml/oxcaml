@@ -463,7 +463,6 @@ module History = struct
           position : int;
           arity : int
         }
-    | Overapproximation_of_with_bounds
     | Inside_quote
     | Evaluated_quote
     | Old_style_unboxed_type

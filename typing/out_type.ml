@@ -910,6 +910,8 @@ let printer_iter_type_expr f ty =
       if field_kind_repr kind = Fpublic then
         f ty1;
       f ty2
+  | Tmod (ty, _) ->
+      f ty
   | _ ->
       Btype.iter_type_expr f ty
 
@@ -1311,6 +1313,10 @@ let tree_of_modalities mut t =
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
+let out_modalities_of_mod_bounds mod_bounds =
+  Typemode.untransl_mod_bounds mod_bounds
+  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+
 let tree_of_modes (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
@@ -1353,19 +1359,12 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     { diff with forkable; yielding; contention; portability }
   in
   (* Step 2: Print the modes *)
-  let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
-  let modes =
-    [ print_to_string_opt Mode.Locality.Const.print diff.areality
-    ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
-    ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
-    ; print_to_string_opt Mode.Portability.Const.print diff.portability
-    ; print_to_string_opt Mode.Contention.Const.print diff.contention
-    ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
-    ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
-    ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
-    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
-  in
-  List.filter_map (fun x -> x) modes
+  List.filter_map
+    (fun (Mode.Alloc.Axis.P ax) ->
+      diff
+      |> Mode.Alloc.Const.Option.proj ax
+      |> Option.map (Fmt.asprintf "%a" (Mode.Alloc.Const.print_axis ax)))
+    Mode.Alloc.Axis.all
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -1494,6 +1493,10 @@ let rec tree_of_modal_typexp mode modal ty =
         end
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
+    | Tmod (ty, mod_bounds) ->
+        Otyp_mod
+          ( tree_of_typexp mode alloc_mode ty,
+            out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
           (Env.enter_quotation !printing_env)
@@ -1772,7 +1775,7 @@ let tree_of_typexp mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
-  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  if Ctype.contains_initial_stage_splice (Env.stage !printing_env :> int) ty
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)

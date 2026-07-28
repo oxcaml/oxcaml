@@ -1372,9 +1372,12 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
     with
     | None -> []
     | Some fields ->
-      Unboxed_fields.fold_with_kind
-        (fun kind v acc -> (v, kind) :: acc)
-        fields []
+      (* These are in the same order as the parameters introduced in
+         [Rebuild.rebuild_function_params_and_body]. *)
+      List.rev
+        (Unboxed_fields.fold_with_kind
+           (fun kind v acc -> (v, kind) :: acc)
+           fields [])
   in
   let new_vars, new_env_extension =
     TypesRewrite.rewrite_env_extension_with_extra_variables old_typing_env

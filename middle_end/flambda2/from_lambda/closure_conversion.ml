@@ -139,7 +139,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     let c = Numeric_types.Float_by_bit_pattern.create (float_of_string c) in
     register_const acc dbg (SC.boxed_float (Const c)) "float"
   | Const_base (Const_float32 c) ->
-    let c = Numeric_types.Float32_by_bit_pattern.create (float_of_string c) in
+    let c = Numeric_types.Float32_by_bit_pattern.of_string c in
     register_const acc dbg (SC.boxed_float32 (Const c)) "float32"
   | Const_base (Const_int32 c) ->
     register_const acc dbg (SC.boxed_int32 (Const c)) "int32"
@@ -153,8 +153,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
   | Const_base (Const_untagged_char c) ->
     ( acc,
-      reg_width
-        (RWC.naked_int8 (Numeric_types.Int8.unsigned_of_int_exn (Char.code c))),
+      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
       "untagged_char" )
   | Const_base (Const_untagged_int c) ->
     ( acc,
@@ -2274,12 +2273,13 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     Flambda_arity.create main_code_params_arity,
     main_code_param_modes,
     false,
-    (* first_complex_local_param = 0, but function should never be partially
-       applied anyway *)
-    0,
+    First_complex_local_param.Never_partially_applied,
     result_arity_main_code,
     unboxed_return_continuation,
     my_unboxed_closure )
+
+let first_complex_local_param_of_function_decl decl =
+  First_complex_local_param.Index (Function_decl.first_complex_local_param decl)
 
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
@@ -2514,7 +2514,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   let wrapper_code =
     Code.create code_id ~params_and_body:wrapper_params_and_body
       ~free_names_of_params_and_body ~params_arity ~param_modes
-      ~first_complex_local_param:(Function_decl.first_complex_local_param decl)
+      ~first_complex_local_param:
+        (first_complex_local_param_of_function_decl decl)
       ~result_arity:return ~result_types:Unknown
       ~result_mode:(Function_decl.result_mode decl)
       ~stub:true ~inline:Inline_attribute.Default_inline
@@ -2835,7 +2836,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         params_arity,
         unarized_param_modes,
         is_tupled,
-        Function_decl.first_complex_local_param decl,
+        first_complex_local_param_of_function_decl decl,
         return,
         return_continuation,
         my_closure )
@@ -2919,8 +2920,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
-    | Alloc_heap -> false
-    | Alloc_local -> true
+    | Alloc_heap -> true
+    | Alloc_local -> false
   in
   let main_code =
     Code.create main_code_id ~params_and_body
@@ -3100,7 +3101,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         let metadata =
           Code_metadata.create code_id ~params_arity
             ~first_complex_local_param:
-              (Function_decl.first_complex_local_param decl)
+              (first_complex_local_param_of_function_decl decl)
             ~param_modes ~result_arity ~result_types:Unknown
             ~result_mode:(Function_decl.result_mode decl)
             ~stub:(Function_decl.stub decl) ~inline:Never_inline
@@ -3356,6 +3357,15 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     ~result_arity ~arity ~first_complex_local_param ~result_mode =
   (* In case of partial application, creates a wrapping function from scratch to
      allow inlining and lifting *)
+  let first_complex_local_param =
+    match (first_complex_local_param : First_complex_local_param.t) with
+    | Index index -> index
+    | Never_partially_applied ->
+      Misc.fatal_errorf
+        "Partial application of %a, whose code metadata states that it is \
+         never partially applied"
+        Ident.print apply.func
+  in
   let wrapper_id = Ident.create_local ("partial_" ^ Ident.name apply.func) in
   let wrapper_id_duid = Flambda_debug_uid.none in
   (* CR sspies: In the future, improve the debugging UIDs here if possible. *)

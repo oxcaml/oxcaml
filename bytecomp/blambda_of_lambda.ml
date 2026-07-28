@@ -297,14 +297,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor exp
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
-  | Lapply { ap_func; ap_args; ap_region_close } ->
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
     Apply
       { func = comp_expr ap_func;
         args = List.map comp_expr ap_args;
-        nontail = is_nontail ap_region_close
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
       }
   | Lsend (kind, met, obj, args, rc, _, _, _) ->
     Send
@@ -1034,8 +1036,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
              ~offset:(tagged_immediate 0)
              ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
              ~elt:(element_of_array_kind kind))
+      | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> (
+        (* These kinds are flat [Double_array_tag] arrays even under
+           [-no-flat-float-array], so [caml_array_make] must not be used. *)
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_floatarray_make")
+        | Alloc_local -> binary (Ccall "caml_floatarray_make_local"))
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
-      | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _ -> (
+      | Punboxedoruntaggedintarray _
+      | Punboxedfloatarray Unboxed_float32 -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
         | Alloc_local -> binary (Ccall "caml_array_make_local"))
@@ -1399,7 +1408,12 @@ let thunkify_compilation_unit_initialization ~thunk_name blam =
             free_variables = Ident.Set.empty
           };
       body =
-        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
     }
 
 let blambda_of_lambda ~compilation_unit x =

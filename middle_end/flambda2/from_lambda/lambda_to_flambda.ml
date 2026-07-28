@@ -505,6 +505,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding = _;
         ap_loc;
         ap_tailcall = _;
         ap_inlined;
@@ -1208,7 +1209,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1394,8 +1396,8 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode } : L.lfunction) :
-    Function_decl.t =
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
+      L.lfunction) : Function_decl.t =
   let contains_no_escaping_local_allocs =
     match ret_mode with Alloc_heap -> true | Alloc_local -> false
   in
@@ -1711,7 +1713,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ -> Lambda.fatal_error_invalid_constructor action)
+        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+          Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee

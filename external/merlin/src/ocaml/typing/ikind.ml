@@ -34,7 +34,7 @@ let fresh_unknown_uid () : Types.Uid.t =
   let current_unit =
     Some
       (Unit_info.make_dummy ~input_name:"<ikind>"
-         (Compilation_unit.get_current_or_dummy ()))
+         (Current_unit.get_cu_or_dummy ()))
   in
   Types.Uid.mk ~current_unit
 

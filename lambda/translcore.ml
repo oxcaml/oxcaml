@@ -60,6 +60,22 @@ let pat_contains_gadt pat =
 let cases_contain_gadt cases =
   List.exists (fun { c_lhs; _ } -> pat_contains_gadt c_lhs) cases
 
+let param_is_partial_gadt_match fp =
+  match fp.fp_kind with
+  | Tparam_pat pat -> (
+      match fp.fp_partial with
+      | Total -> false
+      | Partial -> pat_contains_gadt pat)
+  | Tparam_optional_default (pat, _, _) ->
+      (* The caller can omit an optional argument, so its pattern is
+         effectively partial *)
+      pat_contains_gadt pat
+
+let cases_are_partial_gadt_match cases (partial : partial) =
+  match partial with
+  | Total -> false
+  | Partial -> cases_contain_gadt cases
+
 let join_layout_of_cases sort cases =
   match cases with
   | [] -> None
@@ -75,6 +91,19 @@ let join_layout_of_cases sort cases =
                Lambda.join_layout acc (layout_pat sort c_lhs))
              first_layout rest)
       else Some first_layout
+
+let split_fun_ty fun_ty =
+  match fun_ty with
+  | None -> (None, None)
+  | Some (env, ty) -> (
+      match Typeopt.is_function_type env ty with
+      | Some (arg_ty, res_ty) -> (Some (env, arg_ty), Some (env, res_ty))
+      | None -> (None, None))
+
+let layout_of_fun_arg_ty fun_arg_ty loc sort =
+  match fun_arg_ty with
+  | Some (env, ty) -> layout_or_sort env loc sort ty
+  | None -> layout_of_sort loc sort
 
 let field_offset_for_label lbl repres =
   match repres with
@@ -318,7 +347,14 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
               Mode.Alloc.disallow_right Mode.Alloc.legacy }
         }
       in
-      let return_sort = Jkind.Sort.default_for_transl_and_get method_.ret_sort in
+      let return_sort =
+        Jkind.Sort.default_for_transl_and_get method_.ret_sort
+      in
+      (* We keep the outer function's yielding mode and drop [method_]'s: object
+         code can never close over a yielding value, so the inner method is
+         always unyielding and contributes nothing to the join. *)
+      (* CR: if we ever infer modes for methods, we should handle yielding
+         here. *)
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_alloc_mode_l method_.ret_mode.mode_modes;
@@ -339,8 +375,9 @@ let rec iter_exn_names f pat =
 
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
-  | Val_prim p, Id_prim (poly_mode, poly_sort) ->
-      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
+  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
+        (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
@@ -416,20 +453,23 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
-and transl_exp0 ~in_new_scope ~scopes layout e =
+and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
-  | Texp_apply_layout (_, args) ->
-      let sorts = List.map Jkind.Sort.var_default_to_scannable_and_get args in
-      Misc.fatal_errorf
-        "Translcore: translation of layout-polymorphic instantiation is not \
-         yet supported@ (layout args: [%a])"
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
-           (Format_doc.compat Jkind.Sort.Const.format))
-        sorts
+  | Texp_apply_layout (func, args) ->
+      Lkindinstantiate {
+        kinst_func = (transl_exp ~scopes Lambda.layout_template_env func);
+        kinst_args = List.map
+          (fun var ->
+            let layout = Jkind.Sort.var_default_to_scannable_and_get var in
+            Typeopt.layout_of_sort e.exp_loc layout)
+          args;
+        kinst_result_layout = layout;
+        kinst_mode = alloc_local;
+        kinst_loc = (of_location ~scopes e.exp_loc);
+      }
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       transl_let ~scopes ~return_layout:layout rec_flag pat_expr_list
@@ -438,15 +478,16 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
-                    zero_alloc } ->
+                    yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
-                                        kind = Id_prim (pmode, psort); _ };
+                                        kind = Id_prim (pmode, psort, _); _ };
                  exp_type = prim_type; } as funct,
-               oargs, pos, ap_mode, zero_alloc)
+               oargs, pos, ap_mode, ap_yielding, zero_alloc)
     when can_apply_primitive p pmode pos oargs ->
       let rec cut_args prim_repr oargs =
         match prim_repr, oargs with
@@ -475,6 +516,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       let stack =
         List.exists (function (Texp_stack, _, _) -> true | _ -> false) e.exp_extra
       in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let lam =
         let loc =
           map_scopes
@@ -484,7 +526,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack
+          ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam
@@ -497,17 +539,18 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode
+             ~position ~mode ~yielding
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
-  | Texp_apply(funct, oargs, position, ap_mode, zero_alloc)
+  | Texp_apply(funct, oargs, position, ap_mode, ap_yielding, zero_alloc)
     ->
       let tailcall = Translattribute.get_tailcall_attribute funct in
       let inlined = Translattribute.get_inlined_attribute funct in
       let specialised = Translattribute.get_specialised_attribute funct in
       let position = transl_apply_position position in
       let mode = transl_locality_mode_l ap_mode in
+      let yielding = transl_yielding_mode_l ap_yielding in
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
@@ -515,7 +558,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout:layout
-           ~position ~mode (transl_exp ~scopes Lambda.layout_function funct)
+           ~position ~mode ~yielding
+           (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -869,7 +913,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       fatal_error "transl_exp0: variable unboxed-product record representation"
     | Record_unboxed_product ->
       let lbl_layout l =
-        let sort = unboxed_label_sort l record_sorts in
+        let sort =
+          Jkind.Sort.default_for_transl_and_get
+            (unboxed_label_sort l record_sorts)
+        in
         if l.lbl_pos = lbl.lbl_pos then
           (* This is the field being projected, so give it a precise value kind
              (by using the known type of the expression) *)
@@ -908,7 +955,7 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
       in
       let sort_newval =
         match label_sort Legacy lbl record_sorts with
-        | `Sort s -> s
+        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort_arg
       in
       let arg_layout = layout_exp sort_arg arg in
@@ -1127,6 +1174,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
+                    (* Object code can never close over a yielding value (see
+                       the OO tests in yielding_lambda.ml), so calling an
+                       ancestor method cannot yield *)
+                    ap_yielding = Unyielding;
                     ap_region_close = pos;
                     ap_probe = None;
                     ap_tailcall = Default_tailcall;
@@ -1146,6 +1197,10 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         ap_result_layout=layout;
         ap_region_close=pos;
         ap_mode=alloc_heap;
+        (* [new] runs the object's initialization, but object code can never
+           close over a yielding value (see the OO tests in
+           yielding_lambda.ml), so it cannot yield *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1179,6 +1234,9 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
              ap_result_layout=Lambda.layout_object;
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
+             (* [copy] shallow-copies the object block; it never runs user
+                code, so it can't yield *)
+             ap_yielding=Unyielding;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -1428,6 +1486,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
           ap_result_layout = return_layout;
           ap_region_close = Rc_normal;
           ap_mode = alloc_local;
+          (* The probe handler is the user's [%probe] body, so may yield *)
+          ap_yielding = May_yield;
           ap_loc;
           ap_tailcall = Default_tailcall;
           ap_inlined = Never_inlined;
@@ -1573,6 +1633,7 @@ and transl_apply ~scopes
       ?(assume_zero_alloc = Zero_alloc_utils.Assume_info.none)
       ?(position=Rc_normal)
       ?(mode=alloc_heap)
+      ?(yielding=May_yield)
       ~result_layout
       lam sargs loc
   =
@@ -1597,9 +1658,14 @@ and transl_apply ~scopes
         Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
     | Lapply ({ ap_region_close = (Rc_normal | Rc_nontail) } as ap),
       (Rc_normal | Rc_nontail) ->
+        (* The merged application applies more arguments through the
+           intermediate closure, so it is unyielding only if both layers
+           are. *)
         Lapply
           {ap with ap_args = ap.ap_args @ args; ap_loc = loc;
-                   ap_region_close = pos; ap_mode = mode; ap_result_layout = result_layout }
+                   ap_region_close = pos; ap_mode = mode;
+                   ap_yielding = join_yielding_kind ap.ap_yielding yielding;
+                   ap_result_layout = result_layout }
     | lexp, _ ->
       (* [assume_zero_alloc] is not used in the cases above but
          Misplaced_attribute won't be reported for it.
@@ -1619,6 +1685,7 @@ and transl_apply ~scopes
           ap_result_layout=result_layout;
           ap_region_close=pos;
           ap_mode=mode;
+          ap_yielding=yielding;
           ap_tailcall=tailcall;
           ap_inlined=inlined;
           ap_specialised=specialised;
@@ -1731,7 +1798,8 @@ and transl_apply ~scopes
    [trans_curried_function]).
 *)
 and transl_function_without_attributes
-    ~scopes ~return_sort ~return_mode ~mode ~region loc repr params body =
+    ~scopes ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
+    body =
   let return_layout =
     match body with
     | Tfunction_body exp ->
@@ -1742,15 +1810,16 @@ and transl_function_without_attributes
   in
   match
     transl_tupled_function ~scopes loc params body
-      ~return_mode ~return_layout ~mode ~region
+      ~return_mode ~return_layout ~mode ~region ~fun_ty
   with
   | Some result -> result
   | None ->
       transl_curried_function ~scopes loc repr params body
-        ~return_mode ~return_layout ~mode ~region
+        ~return_mode ~return_layout ~mode ~region ~fun_ty
 
 and transl_tupled_function
-      ~scopes ~return_mode ~return_layout ~mode ~region loc params body
+      ~scopes ~return_mode ~return_layout ~mode ~region ~fun_ty loc params
+      body
   =
   let eligible_cases =
     match params, body with
@@ -1801,15 +1870,27 @@ and transl_tupled_function
           | _ -> None
         in
         let value_kinds =
-          match
-            Option.bind (join_layout_of_cases arg_sort cases)
-              tuple_value_kinds
-          with
-          | Some kinds -> kinds
-          | None ->
-              Misc.fatal_error
-                "Translcore.transl_tupled_function: \
-                 Argument should be a tuple, but couldn't get the kinds"
+          if cases_are_partial_gadt_match cases partial
+          then
+            (* Under a partial GADT match, we can't rely on the pattern's
+               types as the caller can still pass a missing constructor, so we
+               compute kinds from the function's own type instead. *)
+            let fun_arg_ty, _ = split_fun_ty fun_ty in
+            (match
+               tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
+             with
+             | Some kinds -> kinds
+             | None -> List.init size (fun _ -> Lambda.generic_value))
+          else
+            match
+              Option.bind (join_layout_of_cases arg_sort cases)
+                tuple_value_kinds
+            with
+            | Some kinds -> kinds
+            | None ->
+                Misc.fatal_error
+                  "Translcore.transl_tupled_function: \
+                   Argument should be a tuple, but couldn't get the kinds"
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
@@ -1892,7 +1973,7 @@ and add_type_shapes_of_patterns patterns =
   List.iter add_case patterns
 
 and transl_curried_function ~scopes loc repr params body
-    ~return_layout ~return_mode ~region ~mode
+    ~return_layout ~return_mode ~region ~mode ~fun_ty
   =
   let { nlocal } =
     let param_curries =
@@ -1906,6 +1987,19 @@ and transl_curried_function ~scopes loc repr params body
        | Tfunction_cases fc -> param_curries @ [ Final_arg, fc.fc_arg_mode ])
   in
   add_type_shapes_of_params params;
+  (* The layout of a parameter that comes after a partial match on a GADT
+     constructor must not be narrowed by the equations introduced by that
+     constructor, as the caller can still pass a missing constructor. Such
+     layouts are read from the function's own type instead. See
+     oxcaml/oxcaml#6356 *)
+  let (any_param_is_partial_gadt_match, fc_fun_ty), param_widening_info =
+    List.fold_left_map
+      (fun (seen, fun_ty) fp ->
+        let fun_arg_ty, fun_res_ty = split_fun_ty fun_ty in
+        ( (seen || param_is_partial_gadt_match fp, fun_res_ty),
+          (seen, fun_arg_ty) ))
+      (false, fun_ty) params
+  in
   let cases_param, body =
     match body with
     | Tfunction_body body ->
@@ -1915,15 +2009,18 @@ and transl_curried_function ~scopes loc repr params body
           fc_loc; fc_arg_sort; fc_arg_mode }
       ->
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
+        let fc_arg_ty, _ = split_fun_ty fc_fun_ty in
         let arg_layout =
-          match join_layout_of_cases fc_arg_sort fc_cases with
-          | Some arg_layout -> arg_layout
-          | None ->
-              (* ppxes can generate empty function cases, which compiles to
-                 a function that always raises Match_failure. We try less
-                 hard to calculate a detailed layout that the middle-end can
-                 use for optimizations. *)
-              layout_of_sort fc_loc fc_arg_sort
+          if any_param_is_partial_gadt_match
+             || cases_are_partial_gadt_match fc_cases fc_partial
+          then layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
+          else
+            match join_layout_of_cases fc_arg_sort fc_cases with
+            | Some arg_layout -> arg_layout
+            | None ->
+                (* ppxes can generate empty function cases, which compiles to
+                   a function that always raises Match_failure. *)
+                layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
         in
         let arg_mode = transl_alloc_mode_l fc_arg_mode in
         add_type_shapes_of_cases fc_cases;
@@ -1949,7 +2046,7 @@ and transl_curried_function ~scopes loc repr params body
   in
   let body, params =
     List.fold_right
-      (fun fp (body, params) ->
+      (fun (fp, (follows_partial_gadt, fun_arg_ty)) (body, params) ->
         let { fp_param; fp_param_debug_uid; fp_kind; fp_mode; fp_sort;
               fp_partial; fp_loc } = fp in
         let arg_env, arg_type, attributes =
@@ -1960,7 +2057,11 @@ and transl_curried_function ~scopes loc repr params body
               expr.exp_env, Predef.type_option expr.exp_type, Translattribute.transl_param_attributes pat
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
-        let arg_layout = layout arg_env fp_loc fp_sort arg_type in
+        let arg_layout =
+          if follows_partial_gadt || param_is_partial_gadt_match fp
+          then layout_of_fun_arg_ty fun_arg_ty fp_loc fp_sort
+          else layout arg_env fp_loc fp_sort arg_type
+        in
         let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in
         let param =
           { name = fp_param;
@@ -1992,7 +2093,7 @@ and transl_curried_function ~scopes loc repr params body
                 ~param:fp_param
         in
         body, param :: params)
-      params
+      (List.combine params param_widening_info)
       (body, Option.to_list cases_param)
     in
     (* chunk params according to Lambda.max_arity. If Lambda.max_arity = n and
@@ -2076,7 +2177,7 @@ and transl_curried_function ~scopes loc repr params body
 
 and transl_function ~in_new_scope ~scopes e params body
       ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc =
+      ~zero_alloc ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2111,6 +2212,7 @@ and transl_function ~in_new_scope ~scopes e params body
       (function repr ->
          transl_function_without_attributes
            ~mode ~return_sort ~return_mode
+           ~fun_ty:(Some (e.exp_env, e.exp_type))
            ~scopes e.exp_loc repr ~region params body)
   in
   let zero_alloc : Lambda.zero_alloc_attribute =
@@ -2139,7 +2241,8 @@ and transl_function ~in_new_scope ~scopes e params body
   in
   let loc = of_location ~scopes e.exp_loc in
   let body = if region then maybe_region_layout return body else body in
-  let lam = lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lf = lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+  let lam = Lfunction (lfunction_with_yielding yielding lf) in
   Translattribute.add_function_attributes lam e.exp_loc attrs
 
 (* Like transl_exp, but used when a new scope was just introduced. *)
@@ -2200,7 +2303,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_var { id; uid; _ } -> id, uid
+            | Tpat_fun_layout { id; uid; lpoly }
+                when List.is_empty (Lpoly.get_exn lpoly) ->
+              id, uid
             | _ -> Misc.fatal_error "Translcore.transl_let")
         pat_expr_list in
       let transl_case
@@ -2587,7 +2693,10 @@ and transl_idx ~scopes loc _env ba uas =
     begin match uas with
     | [] -> idx
     | Uaccess_unboxed_field (_, lbl, sorts) :: _ ->
-      let sorts = unboxed_label_all_sorts lbl sorts in
+      let sorts =
+        Array.map Jkind.Sort.default_for_transl_and_get
+          (unboxed_label_all_sorts lbl sorts)
+      in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =
         if Int.equal (Array.length sorts) 1 then
@@ -2937,6 +3046,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                ap_result_layout = result_layout;
                ap_region_close=Rc_normal;
                ap_mode=alloc_heap;
+               (* CR aspsmith: More precise inference for yielding once
+                  let-operators have mode inference *)
+               ap_yielding=May_yield;
                ap_tailcall = Default_tailcall;
                ap_inlined = Default_inlined;
                ap_specialised = Default_specialise;
@@ -2970,7 +3082,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
            let ghost_loc = { loc with loc_ghost = true } in
            transl_function_without_attributes ~scopes ~region:true
              ~return_sort:case_sort ~mode:alloc_heap ~return_mode
-             loc repr []
+             ~fun_ty:None loc repr []
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
@@ -2995,6 +3107,9 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         let_.bop_op_type;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    (* CR aspsmith: More precise inference for yielding once
+       let-operators have mode inference *)
+    ap_yielding=May_yield;
     ap_tailcall = Default_tailcall;
     ap_inlined = Default_inlined;
     ap_specialised = Default_specialise;
@@ -3015,13 +3130,13 @@ let transl_scoped_exp ~scopes layout exp =
   maybe_region_layout layout (transl_scoped_exp ~scopes layout exp)
 
 let transl_apply
-      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ~result_layout fn
-      args loc =
+      ~scopes ?tailcall ?inlined ?specialised ?position ?mode ?yielding
+      ~result_layout fn args loc =
   maybe_region_layout result_layout
     (transl_apply
        ~scopes ?tailcall ?inlined ?specialised
        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none ?position ?mode
-       ~result_layout fn args loc)
+       ?yielding ~result_layout fn args loc)
 
 (* Error report *)
 

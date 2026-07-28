@@ -795,7 +795,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
             ~newer_version_of ~params_arity ~param_modes
-            ~first_complex_local_param:(Flambda_arity.num_params params_arity)
+            ~first_complex_local_param:
+              (First_complex_local_param.Index
+                 (Flambda_arity.num_params params_arity))
             ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)

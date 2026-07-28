@@ -458,6 +458,12 @@ let mk_dissector_partition_size f =
        pass (default: %g)"
       Clflags.dissector_partition_size_default )
 
+let mk_dissector_max_linker_parallelism f =
+  ( "-dissector-max-linker-parallelism",
+    Arg.Int f,
+    "<n>  Run at most <n> partial links concurrently in the dissector pass; 0 \
+     means no limit (default: 0)" )
+
 let mk_ddissector f =
   ("-ddissector", Arg.Unit f, " Print verbose logging from the dissector pass")
 
@@ -1352,6 +1358,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -1542,6 +1549,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
       mk_dissector_partition_size F.dissector_partition_size;
+      mk_dissector_max_linker_parallelism F.dissector_max_linker_parallelism;
       mk_ddissector F.ddissector;
       mk_ddissector_sizes F.ddissector_sizes;
       mk_ddissector_verbose F.ddissector_verbose;
@@ -1681,6 +1689,19 @@ let set_dissector_partition_size f =
       (Arg.Bad
          "-dissector-partition-size must be greater than 0 and less than 2 GiB");
   Clflags.dissector_partition_size := Some f
+
+let set_dissector_max_linker_parallelism n =
+  let bound =
+    match n with
+    | 0 -> Misc.Maybe_bounded.Unbounded
+    | n when n >= 1 -> Misc.Maybe_bounded.Bounded { bound = n }
+    | _ ->
+        raise
+          (Arg.Bad
+             "-dissector-max-linker-parallelism must be a nonnegative integer \
+              (0 means no limit)")
+  in
+  Oxcaml_flags.dissector_max_linker_parallelism := bound
 
 module Extra_options = struct
   type 'a arg_parser = string -> 'a ref -> string -> unit
@@ -1962,6 +1983,7 @@ module Oxcaml_options_impl = struct
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
   let dissector_partition_size = set_dissector_partition_size
+  let dissector_max_linker_parallelism = set_dissector_max_linker_parallelism
   let ddissector = set' Clflags.ddissector
   let ddissector_sizes = set' Clflags.ddissector_sizes
   let ddissector_verbose = set' Clflags.ddissector_verbose
@@ -2713,6 +2735,14 @@ module Extra_params = struct
         | None ->
             raise
               (Arg.Bad (Printf.sprintf "Expected float for %s, got %S" name v)))
+    | "dissector-max-linker-parallelism" -> (
+        match int_of_string_opt v with
+        | Some n ->
+            set_dissector_max_linker_parallelism n;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected int for %s, got %S" name v)))
     | "ddissector" -> set' Clflags.ddissector
     | "ddissector-sizes" -> set' Clflags.ddissector_sizes
     | "ddissector-verbose" -> set' Clflags.ddissector_verbose

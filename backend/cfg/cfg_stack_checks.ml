@@ -165,12 +165,25 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
      instruction's live-in. As [instr.live] is the live-across set, recover the
      live-in by adding the next instruction's arguments. This is what the
      emitter's [save_simd] needs to preserve SIMD registers across the realloc
-     handler (a C call that clobbers caller-save SIMD registers). *)
-  let live =
-    match DLL.hd block.body with
-    | Some hd -> Reg.add_set_array hd.live hd.arg
+     handler (a C call that clobbers caller-save SIMD registers).
+
+     [Prologue] and [Epilogue] are skipped: they are inserted by [Cfg_prologue]
+     after liveness was last computed, so their [live] field is a copy of a
+     neighbour's live-across set that does not account for registers dying at
+     the next instruction (and their [arg] is empty). Since they neither use nor
+     define registers, the block's live-in is the live-in of the first other
+     instruction. *)
+  let rec live_in_from (cell : Cfg.basic Cfg.instruction DLL.cell option) =
+    match cell with
     | None -> Reg.add_set_array block.terminator.live block.terminator.arg
+    | Some cell -> (
+      let instr = DLL.value cell in
+      match instr.desc with
+      | Prologue | Epilogue -> live_in_from (DLL.next cell)
+      | Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Stack_check _ ->
+        Reg.add_set_array instr.live instr.arg)
   in
+  let live = live_in_from (DLL.hd_cell block.body) in
   let check : Cfg.basic Cfg.instruction =
     (* CR xclerc for xclerc: double check `available_before` and
        `available_across`.

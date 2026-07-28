@@ -2214,7 +2214,7 @@ let add_exception_ident id =
 let remove_exception_ident id =
   Hashtbl.remove try_ids id
 
-let lambda_of_prim prim_name prim loc args arg_exps =
+let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   match prim, args with
   | Primitive (prim, arity), args when arity = List.length args ->
       Lprim(prim, args, loc)
@@ -2291,6 +2291,9 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         ap_probe = None;
         ap_region_close = pos;
         ap_mode = alloc_heap;
+        (* [yielding] is the joined yielding mode of the application of the
+           [%apply] / [%revapply] primitive itself. *)
+        ap_yielding = yielding;
       }
   | Peek None, _ | Poke None, _ ->
       raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))
@@ -2384,7 +2387,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
-let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
+let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2407,7 +2410,9 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
           let arg_mode = to_locality arg in
-          let params, return = make_params ret_ty repr_args repr_res in
+          let params, return =
+            make_params ret_ty repr_args repr_res
+          in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
             (* The eta expansion is not actually visible at the source level,
@@ -2421,15 +2426,18 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
   let args = List.map (fun p -> Lvar p.name) params in
+  let yielding = transl_yielding_mode_l yielding in
   match params with
-  | [] -> lambda_of_prim p.prim_name prim loc args None
+  | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
   | _ ->
      let loc =
        Debuginfo.Scoped_location.map_scopes
          Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
-     let body = lambda_of_prim p.prim_name prim loc args None in
+     let body =
+       lambda_of_prim p.prim_name prim ~yielding loc args None
+     in
      let locality_mode = to_locality p.prim_native_repr_res in
      let () =
        (* CR mshinwell: Write a version of [primitive_may_allocate] that
@@ -2610,7 +2618,7 @@ let primitive_needs_event_after = function
   | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
-    path exp args arg_exps pos =
+    ~yielding path exp args arg_exps pos =
   let prim =
     transl_primitive_common
       loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
@@ -2638,7 +2646,9 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
+  let lam =
+    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
+  in
   let lam =
     if primitive_needs_event_after prim then begin
       match exp with

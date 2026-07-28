@@ -4,7 +4,7 @@
 
 let use_static (x @ static) = ()
 [%%expect{|
-val use_static : 'a -> unit = <fun>
+val use_static : 'a @ static -> unit = <fun>
 |}]
 
 let x @ static = 42
@@ -71,7 +71,7 @@ let foo (b @ dynamic) @ static =
     match[@warning "-8"] b with
     | 42 -> "hello"
 [%%expect{|
-val foo : int -> string = <fun>
+val foo : int -> string @ static = <fun>
 |}]
 
 (** single branch is static, but the value matched stays at its mode *)
@@ -132,7 +132,7 @@ let foo (b @ dynamic) @ static =
     match[@warning "-8"] b with
     | 'a' .. 'z' -> "hello"
 [%%expect{|
-val foo : char -> string = <fun>
+val foo : char -> string @ static = <fun>
 |}]
 
 type t = Foo of bool
@@ -162,35 +162,35 @@ let foo (b @ static) @ static =
     match b with
     | (Bar x | Baz x) -> fun () -> x = true
 [%%expect{|
-val foo : u -> (unit -> bool) = <fun>
+val foo : u @ static -> (unit -> bool) @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match b with
     | true | false -> "hello"
 [%%expect{|
-val foo : bool -> string = <fun>
+val foo : bool -> string @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match[@warning "-8"] b with
     | Foo true -> "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match b with
     | `Foo -> "hello"
 [%%expect{|
-val foo : [< `Foo ] -> string = <fun>
+val foo : [< `Foo ] -> string @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match[@warning "-8"] b with
     | [| |] -> "hello"
 [%%expect{|
-val foo : ('a : value_maybe_null). 'a array -> string = <fun>
+val foo : ('a : value_maybe_null). 'a array -> string @ static = <fun>
 |}]
 
 (* Testing exceptions *)
@@ -213,28 +213,28 @@ let foo (b @ dynamic) @ static =
     match b with
     | b' -> "hello"
 [%%expect{|
-val foo : 'a -> string = <fun>
+val foo : 'a -> string @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match b with
     | _ -> "hello"
 [%%expect{|
-val foo : 'a -> string = <fun>
+val foo : 'a -> string @ static = <fun>
 |}]
 
 let foo (b : unit @ dynamic) @ static =
     match b with
     | () -> "hello"
 [%%expect{|
-val foo : unit -> string = <fun>
+val foo : unit -> string @ static = <fun>
 |}]
 
 let foo (b @ dynamic) @ static =
     match b with
     | (a, b) -> "hello"
 [%%expect{|
-val foo : 'a * 'b -> string = <fun>
+val foo : 'a * 'b -> string @ static = <fun>
 |}]
 
 (* CR-someday zqian: test dynamic modality once we care about the staticity
@@ -243,7 +243,7 @@ val foo : 'a * 'b -> string = <fun>
 (* TESTING patterns as function parameters *)
 let foo : _ @ dynamic -> _ @ static = fun (Foo _) -> "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 let foo : _ @ dynamic -> _ @ static = fun (Foo x) -> x
@@ -270,24 +270,24 @@ Error: This value is "dynamic"
 
 let foo : _ @ dynamic -> _ @ static = fun (Bar x | Baz x ) -> "hello"
 [%%expect{|
-val foo : u -> string = <fun>
+val foo : u -> string @ static = <fun>
 |}]
 
 let foo : _ @ dynamic -> _ @ static = fun (Foo x) -> "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 let[@warning "-8"] foo : _ @ dynamic -> _ @ static = function
     | Foo true -> "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 let foo : _ @ dynamic -> _ @ static = function
     | Foo x -> "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 let foo : _ @ dynamic -> _ @ static = function
@@ -308,7 +308,7 @@ let foo (b : t @ dynamic) @ static =
     let[@warning "-8"] (Foo true) = b in
     "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 
@@ -316,7 +316,7 @@ let foo (b : t @ dynamic) @ static =
     let[@warning "-8"] (Foo _x) = b in
     "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 
@@ -324,7 +324,7 @@ let foo (b  @ dynamic) @ static =
     let (Bar _x | Baz _x) = b in
     "hello"
 [%%expect{|
-val foo : u -> string = <fun>
+val foo : u -> string @ static = <fun>
 |}]
 
 let foo (b  @ static) =
@@ -363,14 +363,14 @@ Error: The expression is "dynamic" because try-with clauses are always dynamic.
 let foo (b : t @ static) @ dynamic =
     try b with e -> Foo true
 [%%expect{|
-val foo : t -> t = <fun>
+val foo : t @ static -> t = <fun>
 |}]
 
 let foo (b : t @ dynamic) @ static =
     let (Foo x) = b in
     "hello"
 [%%expect{|
-val foo : t -> string = <fun>
+val foo : t -> string @ static = <fun>
 |}]
 
 (* TESTING modules *)
@@ -467,7 +467,7 @@ let f (x @ static) =
     ()
   done
 [%%expect{|
-val f : 'a -> unit = <fun>
+val f : 'a @ static -> unit = <fun>
 |}]
 
 let f (x @ dynamic) =

@@ -402,6 +402,7 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -420,16 +421,23 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.switch_to_section_raw
-        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      let name =
+        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+      in
+      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -2273,16 +2281,22 @@ let emit_instr ~first ~last ~fallthrough i =
       I.movzx al (res i 0)
     end
   | Lop (Intop_imm (Icomp cmp, n)) ->
+    let emit_cmp () =
+      match cmp, n with
+      | (Ceq | Cne), 0 -> output_test_zero i.arg.(0)
+      | (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge), _ ->
+        I.cmp (int n) (arg i 0)
+    in
     if
       Reg.is_reg i.res.(0)
       && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
     then begin
       I.xor (res32 i 0) (res32 i 0);
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) (res8 i 0)
     end
     else begin
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) al;
       I.movzx al (res i 0)
     end

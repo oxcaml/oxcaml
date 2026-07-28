@@ -1217,15 +1217,20 @@ let emit_named_text_section func_name =
   then (
     (* CR sspies: Clean this up and add proper support for function sections in
        the new asm directives. *)
-    D.switch_to_section_raw
-      ~names:[".text.caml." ^ S.encode (S.create_global func_name)]
-      ~flags:(Some "ax") ~args:["%progbits"] ~is_delayed:false;
+    let name = ".text.caml." ^ S.encode (S.create_global func_name) in
+    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
+      ~is_delayed:false;
+    Emitaux.enter_code_section name;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
        file, we pretend the section is called Text rather than the function
        specific text section. *)
     D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 (* Emit code to load an emitted literal *)
 
