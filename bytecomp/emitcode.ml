@@ -459,7 +459,10 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       cu_codesize = !out_position;
       cu_reloc = List.rev !reloc_info;
       cu_arg_descr = arg_descr;
-      cu_imports = Env.imports() |> Array.of_list;
+      cu_imports =
+        (Env.imports()
+         |> List.filter (fun i -> not (Import_info.excluded_by_no_crc i))
+         |> Array.of_list);
       cu_format = main_module_block_format;
       cu_primitives = List.map Primitive.byte_name
                                !Translmod.primitive_declarations;

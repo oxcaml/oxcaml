@@ -427,6 +427,11 @@ let mk_no_alias_deps f =
   "-no-alias-deps", Arg.Unit f,
   " Do not record dependencies for module aliases"
 
+let mk_no_crc f =
+  "-no-crc", Arg.String f,
+  "<module>  Omit <module>'s row from the import tables of produced artifacts \
+   (may be repeated)"
+
 let mk_app_funct f =
   "-app-funct", Arg.Unit f, " Activate applicative functors"
 
@@ -1262,6 +1267,7 @@ module type Compiler_options = sig
   val _linkall : unit -> unit
   val _requires_metaprogramming : unit -> unit
   val _uses_metaprogramming : unit -> unit
+  val _no_crc : string -> unit
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
@@ -1555,6 +1561,7 @@ struct
     mk_nocwd F._nocwd;
     mk_nopervasives F._nopervasives;
     mk_o F._o;
+    mk_no_crc F._no_crc;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
@@ -1845,6 +1852,7 @@ struct
     mk_o2 F._o2;
     mk_o3 F._o3;
     mk_o4 F._o4;
+    mk_no_crc F._no_crc;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
@@ -2171,6 +2179,7 @@ struct
     mk_o2 F._o2;
     mk_o3 F._o3;
     mk_o4 F._o4;
+    mk_no_crc F._no_crc;
     mk_opaque F._opaque;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
@@ -2626,6 +2635,7 @@ module Default = struct
     let _match_context_rows n = match_context_rows := n
     let _no_keep_docs = clear keep_docs
     let _no_keep_locs = clear keep_locs
+    let _no_crc s = no_crc := Misc.Stdlib.String.Set.add s !no_crc
     let _noautolink = set no_auto_link
     let _o s = output_name := (Some s)
     let _opaque = set opaque

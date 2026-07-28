@@ -322,11 +322,12 @@ let build_unit_info ~main_module_block_format ~arg_descr =
      module keeps track of, they're not values that get accumulated over time,
      they just get computed once. (Arguably we should remove [set_export_info]
      by the same reasoning.) *)
+  let keep import = not (Import_info.excluded_by_no_crc import) in
   { ui_unit = current_unit.uib_unit;
     ui_defines = current_unit.uib_defines;
     ui_arg_descr = arg_descr;
-    ui_imports_cmi = Env.imports();
-    ui_imports_cmx = current_unit.uib_imports_cmx;
+    ui_imports_cmi = List.filter keep (Env.imports());
+    ui_imports_cmx = List.filter keep current_unit.uib_imports_cmx;
     ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
     ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
     ui_format = main_module_block_format;

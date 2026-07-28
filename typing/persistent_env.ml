@@ -1145,7 +1145,10 @@ let make_cmi penv modname kind sign alerts =
   in
   (* Need to calculate [params] before these since [global_of_global_name] has
      side effects *)
-  let crcs = imports penv in
+  (* [-no-crc]: omit the named modules' rows from the import table. *)
+  let crcs =
+    List.filter (fun i -> not (Import_info.excluded_by_no_crc i)) (imports penv)
+  in
   let globals =
     Hashtbl.to_seq_values penv.globals
     |> Seq.filter_map

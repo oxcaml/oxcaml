@@ -1,0 +1,19 @@
+File no_crc.cmi
+Unit name: No_crc
+Is parameter: no
+Parameters:
+Interfaces imported:
+	00000000000000000000000000000000	No_crc
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Globals in scope:
+File no_crc.cmo
+Unit name: No_crc
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	No_crc
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Required globals:
+	Dep
+Uses unsafe features: no
+Force link: no
