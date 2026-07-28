@@ -319,7 +319,7 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
     Variable.Set.fold
       (fun var acc -> (Variable.name_stamp var, var) :: acc)
       required_extra_args.extra_args_for_aliases []
-    |> List.sort (fun (stamp1, _) (stamp2, _) -> Int.compare stamp1 stamp2)
+    |> List.sort (fun (stamp1, _) (stamp2, _) -> Int.compare stamp2 stamp1)
   in
   List.fold_left
     (fun epa (_stamp, var) ->
