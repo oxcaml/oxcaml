@@ -55,6 +55,21 @@ let may_equal_constr c1 c2 =
      | tag1, tag2 ->
          equal_tag tag1 tag2)
 
+(* For a [Variant_with_null_boxed] variant, recover how this constructor is
+   represented at run time.  Returns [None] for every other representation
+   (ordinary boxed/unboxed/value/extensible variants), which lets callers keep
+   their existing paths for those. *)
+let erased_kind_of_constructor cstr : erased_kind option =
+  match cstr.cstr_repr, cstr.cstr_tag with
+  | Variant_with_null_boxed erased, Ordinary { src_index; _ } ->
+    Some erased.(src_index).erased
+  | Variant_with_null_boxed _, Null -> Some Erased_null
+  | Variant_with_null_boxed _, Extension _
+  | ( ( Variant_unboxed | Variant_boxed _ | Variant_extensible
+      | Variant_with_null ),
+      (Ordinary _ | Null | Extension _) ) ->
+    None
+
 let cstr_res_type_path cstr =
   match get_desc cstr.cstr_res with
   | Tconstr (p, _, _) -> p

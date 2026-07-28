@@ -237,6 +237,8 @@ type error =
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
   | Bad_or_null_attribute of string
+  | Unsupported_repr_attribute of string
+  | Bad_repr_attribute of string
   | Zero_alloc_attr_unsupported of Builtin_attributes.zero_alloc_attribute
   | Zero_alloc_attr_non_function
   | Zero_alloc_attr_bad_user_arity
