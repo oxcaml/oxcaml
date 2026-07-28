@@ -113,7 +113,18 @@ let sections_to_list section_tbl =
 (* Save sections to files for verification *)
 let save_sections_to_files sections section_tbl =
   let dir = !Emitaux.output_prefix ^ ".binary-sections" in
-  (try Sys.mkdir dir 0o755 with Sys_error _ -> ());
+  (* Remove any files left over from a previous compilation with the same output
+     prefix (e.g. when a test compiles the same file twice with different
+     flags). Files are only written below for sections that exist and, for
+     relocations, only when there is at least one, so stale files would
+     otherwise be wrongly attributed to the current compilation during
+     verification. *)
+  if Sys.file_exists dir && Sys.is_directory dir
+  then
+    Array.iter
+      (fun file -> Misc.remove_file (Filename.concat dir file))
+      (Sys.readdir dir)
+  else Sys.mkdir dir 0o755;
   List.iter
     (fun (name, state) ->
       (* Convert section name like ".text" to "section_text" *)
