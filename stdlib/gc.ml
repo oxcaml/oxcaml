@@ -67,14 +67,6 @@ external full_major : unit -> unit @@ portable = "caml_gc_full_major"
 external compact : unit -> unit @@ portable = "caml_gc_compaction"
 external get_minor_free : unit -> int @@ portable = "caml_get_minor_free"
 
-(* CR ocaml 5 all-runtime5: These functions are no-ops upstream. We should
-   make them no-ops internally when we delete the corresponding C functions
-   from the runtime -- they're already marked as deprecated in the mli.
-*)
-
-external eventlog_pause : unit -> unit @@ portable = "caml_eventlog_pause"
-external eventlog_resume : unit -> unit @@ portable = "caml_eventlog_resume"
-
 open Printf
 
 let print_stat c =
