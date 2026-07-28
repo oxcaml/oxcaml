@@ -337,14 +337,12 @@ Line 1, characters 16-45:
 Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
-(* CR-soon zqian: should work once layout instantiation is handled by slambda *)
 module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end  @ static) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : sig val f : layout_ l. ('a : l). 'a -> 'a end) -> sig end
 |}]
 
 (* You can add additional constraint on the modal bounds, which doesn't affect

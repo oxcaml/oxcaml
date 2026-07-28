@@ -54,3 +54,10 @@ let transl_unique_barrier barrier =
         Language_extension.maturity_of_unique_for_destruction
     then Must_stay_here
     else assert false
+
+let transl_staticity_mode = function
+  | Staticity.Static -> Static
+  | Staticity.Dynamic -> Dynamic
+
+let transl_staticity_mode_r staticity =
+  Staticity.zap_to_ceil staticity |> transl_staticity_mode

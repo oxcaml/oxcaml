@@ -32,9 +32,7 @@ end @ static = struct
   let h = M.f
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S) -> sig val h : 'a -> 'b -> unit end
 |}]
 
 module F (M : S @ static) : sig
@@ -87,9 +85,7 @@ module F (M : S @ static) = struct
     M.f y x
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S) -> sig val g : int -> float# -> unit end
 |}]
 
 (* Two layout variables instantiated independently *)
@@ -99,9 +95,12 @@ end @ static) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module G :
+  functor
+    (M : sig
+           val map : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b
+         end)
+    -> sig val apply_int_to_float : (int -> float#) -> int -> float# end
 |}]
 
 (* partial instantiation; the uninstantiated sort stays a variable for further unification *)
@@ -110,9 +109,8 @@ module F (M :S @ static) = struct
   let h (x : float#)= g x
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : S) -> sig val g : float# -> unit val h : float# -> unit end
 |}]
 
 (* partial instantiation; the uninstantiated sort defaults to [value] *)
@@ -201,9 +199,8 @@ end @ static) = struct
   let _ = M.f
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module I :
+  functor (M : sig val f : layout_ l. ('a : l). 'a -> 'a end) -> sig end
 |}]
 
 (* Layout-poly value used in a type-constrained binding *)
@@ -213,9 +210,9 @@ end @ static) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module J :
+  functor (M : sig val id : layout_ l. ('a : l). 'a -> 'a end) ->
+    sig val f : int -> int end
 |}]
 
 (* Inst_mutvar: mutable variable of a layout-poly type *)

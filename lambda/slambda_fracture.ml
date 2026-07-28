@@ -339,6 +339,25 @@ let rec fracture_lam lambda : slambda =
         ktmpl_env;
         ktmpl_loc
       } ->
+    (* A kind template fractures into a compile-time template over its kind
+       parameters, paired with a runtime block capturing its free variables.
+
+       The template's evaluates to a pair representing the body: the
+       compile-time half is the body's compile-time half; the runtime half is a
+       function of that environment to the original body.
+
+       {[
+         let <free_var_0> = <fracture free_var_0> in
+         ...
+         { c = template <...ktmpl_params> ->
+                let body = <fracture ktmpl_body> in
+                { c = body.c
+                ; r = << fun closure ->
+                          let <free_var_0> = closure.<0> in
+                          ...
+                          $(body.r) >> }
+         ; r = << makeblock ($(<free_var_0>.r), ...) >> }
+       ]} *)
     let env = Ident.Map.to_list ktmpl_env in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
@@ -423,6 +442,11 @@ let rec fracture_lam lambda : slambda =
       kind_function env
   | Lkindinstantiate
       { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
+    (* {[
+         let fun = <fracture kinst_func> in
+         let app = fun.c <...kinst_args> in
+         { c = app.c; r = << $(app.r) $(fun.r) >> }
+       ]} *)
     slet_local "fun" kinst_func (fun fun_c fun_r ->
         let app_id = Slambdaident.create_local "app" in
         let app_var = SLvar app_id in
@@ -450,9 +474,32 @@ let rec fracture_lam lambda : slambda =
                       }
                 }
           })
-  | Ltemplate ({ kind; params; return; body; attr; loc; mode; ret_mode }, env)
-    ->
-    let env = Ident.Map.to_list env in
+  | Ltemplate
+      { tmpl_func = { kind; params; return; body; attr; loc; mode; ret_mode };
+        tmpl_env;
+        tmpl_static_params
+      } ->
+    (* Like [Lkindtemplate] but parameters are static rather than erased so they
+       survive into the lambda code. Only the first [tmpl_static_params]
+       parameters are static the rest are dynamic. Note that the arguments
+       passed by instantiation are the compile-time halves so we must bind the
+       runtime halves to their new name inside the function.
+
+       {[
+         let <free_var_0> = <fracture free_var_0> in
+         ...
+         { c = template <...params[:tmpl_static_params]> ->
+                 let <param0> = { c = param0; r = << <param0> >> } in
+                 ...
+                 let body = <fracture body> in
+                 { c = body.c
+                 ; r = << fun closure <params> ->
+                            let <free_var_0> = closure.<0> in
+                            ...
+                            $(body.r) >> }
+         ; r = << makeblock ($(<free_var_0>.r), ...) >> }
+       ]} *)
+    let env = Ident.Map.to_list tmpl_env in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
         (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
@@ -503,6 +550,20 @@ let rec fracture_lam lambda : slambda =
                   ~attr ~loc ~mode ~ret_mode
             })
     in
+    let templated_function_body =
+      List.fold_left
+        (fun body { name; _ } ->
+          let sname = Slambdaident.of_ident name in
+          SLlet
+            { slet_name = sname;
+              slet_value =
+                SLhalves
+                  { sval_comptime = SLvar sname; sval_runtime = Lvar name };
+              slet_body = body
+            })
+        templated_function_body params
+    in
+    let static_params = List.take tmpl_static_params params in
     let free_var_capture =
       List.map
         (fun (id, _) -> Lsplice (loc, SLvar (Slambdaident.of_ident id)))
@@ -515,7 +576,7 @@ let rec fracture_lam lambda : slambda =
               { sfun_params =
                   Misc.Stdlib.Array.of_list_map
                     (fun { name; _ } -> Slambdaident.of_ident name)
-                    params;
+                    static_params;
                 sfun_body = templated_function_body
               };
           sval_runtime =
@@ -534,6 +595,14 @@ let rec fracture_lam lambda : slambda =
           })
       kind_function env
   | Linstantiate ({ ap_func; ap_args; ap_loc; _ } as ap) ->
+    (* {[
+         let fun = <fracture ap_func> in
+         let argn = <fracture ap_args.(n)> in
+         ...
+         let arg0 = <fracture ap_args.(0)> in
+         let app = fun.c arg0.c ... in
+         { c = app.c; r = << $(app) $(fun.r) $(arg0.r) ... >> }
+       ]} *)
     slet_local "fun" ap_func (fun fun_c fun_r ->
         slet_local_list "arg" ap_args (fun args_c args_r ->
             let app_id = Slambdaident.create_local "app" in
