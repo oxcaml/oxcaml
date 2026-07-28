@@ -46,7 +46,11 @@ jobs:
         if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
         run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
-      - name: 'Check for the "skip 80ch" PR tag (merge queue)'
+      - name: 'Check for the "skip xxx" PR tag'
+        if: ${{ contains( github.event.pull_request.labels.*.name, 'skip xxx') }}
+        run: echo skip_xxx=y >> "$GITHUB_ENV"
+
+      - name: 'Check for the "skip 80ch" and "skip xxx" PR tags (merge queue)'
         if: ${{ github.event_name == 'merge_group' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,10 +59,12 @@ jobs:
           # HEAD_REF looks like refs/heads/gh-readonly-queue/main/pr-<N>-<sha>
           if [[ "$HEAD_REF" =~ /pr-([0-9]+)- ]]; then
             pr_number="${BASH_REMATCH[1]}"
-            if gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" \
-                 --json labels --jq '.labels[].name' | grep -qxF 'skip 80ch'; then
-              echo SKIP_80CH=y >> "$GITHUB_ENV"
-            fi
+            gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" \
+              --json labels --jq '
+                .labels[].name
+                | if   . == "skip 80ch" then "SKIP_80CH=y"
+                  elif . == "skip xxx"  then "skip_xxx=y"
+                  else empty end' >> "$GITHUB_ENV"
           else
             echo "Could not parse PR number from '$HEAD_REF'; not skipping 80ch."
           fi
@@ -69,3 +75,10 @@ jobs:
       - name: Check for Conflict Markers
         if: ${{ !cancelled() }}
         run: bash tools/ci/actions/check-conflicts.sh
+
+      - name: 'Check for New "xxx" Markers'
+        if: ${{ !cancelled() }}
+        run: |
+          if [[ -z "${skip_xxx+x}" ]]; then
+            bash scripts/check-xxx.sh
+          fi

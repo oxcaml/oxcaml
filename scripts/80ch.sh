@@ -29,31 +29,25 @@ if [ -f "$repo_root_for_config/Makefile.config" ]; then
 fi
 opam_exec=${opam_exec:-}
 
-# Compute the feature base as the most recent common ancestor with main branch
-# For GitHub Actions with a merge commit, HEAD^1 is the correct base
-# For local development, use merge-base with oxcaml/main
-if [ -n "${GITHUB_ACTIONS:-}" ]; then
-  # In GitHub Actions, use the first parent of the merge commit
-  feature_base="HEAD^1"
-else
-  # Check if remote/main exists
-  if ! git rev-parse --verify main@{upstream} >/dev/null 2>&1; then
-    echo "Error: Cannot find oxcaml/main branch." >&2
-    echo "Please set up the oxcaml remote:" >&2
-    echo "  git remote add oxcaml https://github.com/oxcaml/oxcaml.git" >&2
-    echo "  git fetch oxcaml" >&2
-    exit 1
+. "$(dirname "$0")/added-lines.sh"
+
+check_line_length() {
+  local changed_file="$1"
+  local current_line="$2"
+  local line_content="$3"
+  if [ ${#line_content} -gt 80 ]; then
+    printf \
+'::error file=%s,line=%s,title=%s::Line %s is too long in %s\n' \
+      "$changed_file" "$current_line" \
+      'Line is longer than 80 characters' \
+      "$current_line" \
+      "$changed_file"
   fi
+}
 
-  # remote/main exists, use merge-base to find common ancestor
-  feature_base="$(git merge-base HEAD main@{upstream})"
-fi
+should_check_file() {
+  local changed_file="$1"
 
-find_diff() {
-# Iterate through all files changed since this branch forked off of main.
-git diff --no-ext-diff --name-only "$feature_base" -z | \
-while read -d $'\0' -r changed_file
-do
   # This case statement skips a hard-coded set of files.
   case "$changed_file" in
     # Don't check tests for long lines
@@ -69,68 +63,21 @@ do
     middle_end/flambda2/parser/flambda_lex.ml | \
     tools/simdgen/amd64_simd_instrs.ml | \
     tools/debug_printers.ml)
-      continue ;;
+      return 1 ;;
   esac
-
-  # Only check regular files that currently exist
-  [ -f "$changed_file" ] || continue
 
   # Only check ml, mli, and mly files for long lines
   case "$changed_file" in
     *.ml | *.mli | *.mly) ;;
-    *) continue ;;
+    *) return 1 ;;
   esac
 
   # Don't check autoformatted files (there's a bug in `ocamlformat` that
   # sometimes produces lines over 80 characters)
   $opam_exec ocamlformat --print-config "$changed_file" 2>&1 \
-  | grep -q disable=false && continue
+  | grep -q disable=false && return 1
 
-  # Parse git diff output to find added lines and their line numbers
-  # This approach is portable and works on both Linux and macOS
-  # Use --no-ext-diff to ensure we get standard git diff format
-  git diff --no-ext-diff -U0 "$feature_base" -- "$changed_file" | {
-    in_hunk=false
-    while IFS= read -r line; do
-      case "$line" in
-        @@*)
-          # Parse the @@ header to get the starting line number
-          # Format: @@ -old_start,old_count +new_start,new_count @@
-          # We need the new_start number
-          hunk_info="${line#*+}"  # Remove everything before the +
-          hunk_info="${hunk_info%%,*}"  # Get just the number before the comma
-          hunk_info="${hunk_info%% *}"  # Remove anything after a space
-          current_line="$hunk_info"
-          in_hunk=true
-          ;;
-        +*)
-          if [ "$in_hunk" = true ] && [ "${line#+++}" = "$line" ]; then
-            # This is an added line (not the +++ header)
-            line_content="${line#+}"
-            if [ ${#line_content} -gt 80 ]; then
-              printf \
-'::error file=%s,line=%s,title=%s::Line %s is too long in %s\n' \
-                "$changed_file" "$current_line" \
-                'Line is longer than 80 characters' \
-                "$current_line" \
-                "$changed_file"
-            fi
-            current_line=$((current_line + 1))
-          fi
-          ;;
-        *)
-          # Not an added line
-          ;;
-      esac
-    done
-  }
-done
+  return 0
 }
 
-output="$(find_diff)"
-if [ -n "$output" ]; then
-  printf '%s\n' "$output"
-  exit 1
-else
-  exit 0
-fi
+run_added_lines_check should_check_file check_line_length
