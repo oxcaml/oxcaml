@@ -1,0 +1,5 @@
+File "_none_", line 1:
+Error: The file main.cmx was compiled with -no-trans-deps
+       (or depends on a unit that was),
+       so its import table is not a complete transitive closure
+       and it cannot be packed.

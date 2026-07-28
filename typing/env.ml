@@ -1297,6 +1297,9 @@ let check_pers_mod ~allow_hidden ~loc name =
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
 
+let crcs_complete_of_unit name =
+  Persistent_env.crcs_complete_of_unit !persistent_env name
+
 let is_imported_opaque modname =
   Persistent_env.is_imported_opaque !persistent_env modname
 

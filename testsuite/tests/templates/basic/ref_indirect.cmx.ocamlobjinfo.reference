@@ -22,6 +22,7 @@ Send functions:
 Force link: no
 File ref_indirect.cmi
 Unit name: Ref_indirect
+Import table complete: YES
 Is parameter: no
 Parameters:
 	Monoid

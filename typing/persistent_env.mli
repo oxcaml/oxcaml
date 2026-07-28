@@ -237,5 +237,10 @@ val parameters : 'a t -> Global_module.Parameter_name.t list
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t
 
+(* Whether the given compilation unit's import table is a complete transitive
+   closure (false if it was compiled with [-no-trans-deps] or depends on such a
+   unit) *)
+val crcs_complete_of_unit: 'a t -> Compilation_unit.Name.t -> bool
+
 (* Forward declaration to break mutual recursion with Typecore. *)
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref

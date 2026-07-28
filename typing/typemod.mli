@@ -146,6 +146,7 @@ type error =
   | Non_generalizable_module of
       { vars : type_expr list; item : value_description; mty : module_type }
   | Implementation_is_required of string
+  | Cannot_pack_unit_with_incomplete_imports of string
   | Interface_not_compiled of string
   | Not_allowed_in_functor_body of Mtype.Contains_type_or_jkind.t
   | Not_includable_in_functor_body of Mtype.Contains_type_or_jkind.t

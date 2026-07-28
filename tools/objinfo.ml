@@ -157,10 +157,12 @@ let print_cma_infos (lib : Cmo_format.library) =
   printf "\n";
   List.iter print_cmo_infos lib.lib_units
 
-let print_cmi_infos name crcs kind params global_name_bindings =
+let print_cmi_infos name crcs crcs_complete kind params global_name_bindings =
   if not !quiet then begin
     let open Cmi_format in
     printf "Unit name: %a\n" Compilation_unit.Name.output name;
+    printf "Import table complete: %s\n"
+      (if crcs_complete then "YES" else "no");
     let is_param =
       match kind with
       | Normal _ -> false
@@ -513,6 +515,7 @@ let dump_obj_by_kind filename ic obj_kind =
          | None -> ()
          | Some cmi ->
             print_cmi_infos cmi.Cmi_format.cmi_name cmi.Cmi_format.cmi_crcs
+              cmi.Cmi_format.cmi_crcs_complete
               cmi.Cmi_format.cmi_kind cmi.Cmi_format.cmi_params
               cmi.Cmi_format.cmi_globals
        end;

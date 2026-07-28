@@ -75,6 +75,7 @@ type 'sg cmi_infos_generic = {
     cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : crcs;
+    cmi_crcs_complete : bool;
     cmi_flags : flags;
 }
 
@@ -174,6 +175,7 @@ let input_cmi_lazy ic =
       header_params = params;
     } = (input_value ic : header) in
   let crcs = (input_value ic : crcs) in
+  let crcs_complete = (input_value ic : bool) in
   let flags = (input_value ic : flags) in
   (* CR ocaml 5 compressed-marshal mshinwell: upstream uses [Compression] *)
   {
@@ -183,6 +185,7 @@ let input_cmi_lazy ic =
       cmi_sign = (deserialize data sign, staticity);
       cmi_params = params;
       cmi_crcs = crcs;
+      cmi_crcs_complete = crcs_complete;
       cmi_flags = flags;
     }
 
@@ -254,6 +257,7 @@ let output_cmi filename oc cmi =
   in
   let crcs = Array.append [| my_info |] cmi.cmi_crcs in
   output_value oc (crcs : crcs);
+  output_value oc (cmi.cmi_crcs_complete : bool);
   output_value oc (cmi.cmi_flags : flags);
   crc
 

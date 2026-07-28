@@ -33,6 +33,7 @@ module type Common_options = sig
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
+  val _no_trans_deps : unit -> unit
   val _app_funct : unit -> unit
   val _no_app_funct : unit -> unit
   val _directory : string -> unit

@@ -36,6 +36,11 @@ type 'sg cmi_infos_generic = {
     cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : Import_info.t array;
+    (* [cmi_crcs_complete] is [true] when [cmi_crcs] is the full transitive
+       closure of interface dependencies (the default). It is [false] when the
+       unit was compiled with [-no-trans-deps] (only direct dependencies are
+       recorded) or when any dependency was itself incomplete. *)
+    cmi_crcs_complete : bool;
     cmi_flags : pers_flags list;
 }
 

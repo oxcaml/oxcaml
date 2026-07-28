@@ -636,6 +636,10 @@ val register_parameter: Global_module.Parameter_name.t -> unit
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: Compilation_unit.Name.t -> Digest.t
 
+(* Whether the given compilation unit's import table is a complete transitive
+   closure (false if compiled with [-no-trans-deps] or depending on such) *)
+val crcs_complete_of_unit: Compilation_unit.Name.t -> bool
+
 (* Return the set of compilation units imported, with their CRC *)
 val imports: unit -> Import_info.t list
 

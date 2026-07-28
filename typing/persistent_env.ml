@@ -108,6 +108,7 @@ type import = {
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
+  imp_crcs_complete : bool;
   imp_flags : Cmi_format.pers_flags list;
 }
 
@@ -319,17 +320,6 @@ let fold {persistent_structures; _} f x =
 
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl flags filename =
-  let {crc_units; _} = penv in
-  List.iter
-    (function
-        | Rectypes -> ()
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
-  Consistbl.check crc_units modname impl crc filename;
-  add_import penv modname
-
 (* Add an import to the hash table. Checks that we are allowed to access
    this .cmi. *)
 
@@ -393,10 +383,12 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_uid = uid;
       imp_visibility = visibility;
       imp_crcs = crcs;
+      imp_crcs_complete = cmi.cmi_crcs_complete;
       imp_flags = flags;
     }
   in
-  if check then check_consistency penv import;
+  if check && not !Clflags.no_trans_deps then check_consistency penv import;
+  add_import penv modname;
   Hashtbl.add imports modname (Found import);
   import
 
@@ -716,7 +708,7 @@ and acknowledge_new_pers_name penv check global_name global import =
              pn_global = global;
              pn_sign;
            } in
-  if check then check_consistency penv import;
+  if check && not !Clflags.no_trans_deps then check_consistency penv import;
   Hashtbl.add persistent_names global_name pn;
   remember_global penv global ~precision:Exact ~mentioned_by:Current;
   pn
@@ -1047,13 +1039,107 @@ let crc_of_unit penv name =
       | None -> assert false
       | Some crc -> crc
 
-let imports {imported_units; crc_units; _} =
-  let imports =
-    Consistbl.extract (CU.Name.Set.elements !imported_units)
-      crc_units
-  in
-  List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
-    imports
+(* Whether [name]'s import table is a complete transitive closure. Reads from
+   the (already-loaded) import, so no extra file access when [name] has been
+   imported. *)
+let crcs_complete_of_unit penv name =
+  let import = find_import ~allow_hidden:true penv ~check:true name in
+  import.imp_crcs_complete
+
+(*
+A relaxed consistency model
+
+To justify recording only direct imports in artifacts, we propose a relaxed
+consistency model. The special case of [-pack] is handled in
+[Typemod.package_units] which we ignore here for simplicity.
+
+- A [cmi] contains an import table of interfaces.
+  The signature in the [cmi], discarding its import table, already carries
+  meaning. For example, if [a.cmi] says [val f : B.t -> unit], that means
+  module [A] contains an [f] of that type, without any meaning assigned to
+  [B.t], even if [B] is in [a.cmi]'s import table and [b.cmi] specifies what
+  [B.t] is.
+
+  The imported interfaces are only the build dependencies (what was used to
+  compile the source [mli] to the current [cmi]) and are unrelated to our
+  consistency model.
+
+  Therefore, [a.cmi] claims that module [A] has the specific signature stored
+  in the [a.cmi].
+
+- Now consider [cmx]. When a module [a.ml] calls [B.foo], it could either be
+  compiled to a direct call to [B.foo] or be inlined. Therefore, the
+  corresponding [a.cmx] relies on a certain interface of [b.cmi] and
+  potentially on a certain [b.cmx].
+
+  The semantics of [a.cmx] is:
+  - Assumption 1: the other modules have the signatures as described by the
+    imported signatures
+  - Assumption 2: the other modules are implemented in the way described by
+    the imported implementations
+  - The machine code in [a.cmx] witnesses the claim made by the imported
+    interface of [A].
+
+When linking [cmx], we extract the assumptions from each [cmx], as well as the
+claim witnessed by each [cmx] and its implementation, and check that they
+don't conflict:
+- two [cmx] shouldn't make conflicting assumptions, such as module [A] having
+  different signatures or implementations.
+- Assumptions might not be witnessed (partial linking), but a conflicting
+  claim should not be witnessed. For example, a [cmx] assumes module [A] has a
+  certain signature, but [a.cmx] witnesses a module [A] with a different
+  signature.
+- Two [cmx] witnessing conflicting claims: [a_0.cmx] and [a_1.cmx] both
+  witnessing module [A] but with different signatures.
+
+
+Notice that conflicts only happen between two claims describing the same module.
+Therefore, we index claims by the module names and find conflicts by that.
+*)
+
+(*
+Dealing with packs
+
+In the above, we treat [CU.Name.t] as globally unique, which allows the
+"global index by module name" approach to consistency checking.
+However, with [-pack], this is no longer true - [-pack] erases the members'
+[CU.Name.t] from the global namespace to allow other modules with the same
+[CU.Name.t].
+This ruins the global uniqueness of [CU.Name.t].
+Fortunately [CU.Name.t] is still locally unique: upon [-pack],
+[CU.Name.t] is unique among the transitive dependencies,
+which allows us to perform a consistency check. In particular, we want to rule
+out all conflicts under the members' [CU.Name.t]. After the [-pack], the
+members are erased and can't have conflicts with code outside of the pack.
+
+To acquire the transitive dependencies of [-pack], we require all members to
+have the complete transitive dependencies in their import tables.
+
+See test [packs/inconsistent-value]. *)
+let imports penv =
+  let names = CU.Name.Set.elements !(penv.imported_units) in
+  if !Clflags.no_trans_deps then
+    (* Direct dependencies only: for each imported unit record just its own
+       self-CRC, i.e. its self entry in its import table. Names referenced but
+       never loaded (e.g. weak dependencies) become alias-only entries. *)
+    List.map
+      (fun name ->
+         let spec =
+           match find_import_info_in_cache penv name with
+           | Some imp ->
+             (match
+                Array.find_opt (Import_info.Intf.has_name ~name) imp.imp_crcs
+              with
+              | Some info -> Import_info.Intf.info info
+              | None -> None)
+           | None -> None
+         in
+         Import_info.Intf.create name spec)
+      names
+  else
+    (* Full transitive closure, accumulated in the consistency table. *)
+    Consistbl.extract names penv.crc_units
+    |> List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
 
 let require_intf_for_quote {quoted_intfs; _} name =
   quoted_intfs := CU.Name.Set.add name !quoted_intfs
@@ -1159,6 +1245,18 @@ let make_cmi penv modname kind sign alerts =
             else Some gn_global)
     |> Array.of_seq
   in
+  (* The import table is a complete transitive closure only if we didn't opt out
+     with [-no-trans-deps] and every interface we loaded was itself complete. *)
+  let cmi_crcs_complete =
+    (not !Clflags.no_trans_deps)
+    && Hashtbl.fold
+         (fun _name info acc ->
+            acc
+            && (match info with
+                | Found imp -> imp.imp_crcs_complete
+                | Missing -> true))
+         penv.imports true
+  in
   {
     cmi_name = modname;
     cmi_kind = kind;
@@ -1166,29 +1264,25 @@ let make_cmi penv modname kind sign alerts =
     cmi_sign = sign;
     cmi_params = params;
     cmi_crcs = Array.of_list crcs;
+    cmi_crcs_complete;
     cmi_flags = flags
   }
 
 let save_cmi penv psig =
   let { Persistent_signature.filename; cmi; _ } = psig in
   Misc.try_finally (fun () ->
-      let {
-        cmi_name = modname;
-        cmi_kind = kind;
-        cmi_flags = flags;
-      } = cmi in
-      let crc =
+      let modname = cmi.cmi_name in
+      let (_ : Digest.t) =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
           ~mode: [Open_binary] filename
           (fun temp_filename oc -> output_cmi temp_filename oc cmi) in
-      (* Enter signature in consistbl so that imports() and crc_of_unit() will
-         also return its crc *)
-      let data : Import_info.Intf.Nonalias.Kind.t =
-        match kind with
-        | Normal { cmi_impl } -> Normal cmi_impl
-        | Parameter -> Parameter
-      in
-      save_import penv crc modname data flags filename
+      (* Re-read the interface we just wrote: its on-disk import table now
+         carries the self entry (prepended by [output_cmi]), so that [imports]
+         and [crc_of_unit] can find this unit and, unless [-no-trans-deps], so
+         that it is entered into the consistency table. *)
+      let cmi = read_cmi_lazy filename in
+      let psig = { psig with Persistent_signature.cmi } in
+      ignore (acknowledge_import penv ~check:true modname psig : import)
     )
     ~exceptionally:(fun () -> remove_file filename)
 

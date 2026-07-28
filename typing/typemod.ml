@@ -74,6 +74,7 @@ type error =
   | Non_generalizable_module of
       { vars : type_expr list; item : value_description; mty : module_type }
   | Implementation_is_required of string
+  | Cannot_pack_unit_with_incomplete_imports of string
   | Interface_not_compiled of string
   | Not_allowed_in_functor_body of Mtype.Contains_type_or_jkind.t
   | Not_includable_in_functor_body of Mtype.Contains_type_or_jkind.t
@@ -4744,6 +4745,13 @@ let package_units initial_env objfiles target_cmi modulename =
          let sg, _ =
            Env.read_signature global_name (Unit_info.companion_cmi artifact)
          in
+         (* Refuse to pack a member whose import table is not a complete
+            transitive closure -- one compiled with [-no-trans-deps], or
+            transitively depending on such a unit. See the [-pack] discussion
+            in the note above [Persistent_env.imports]. *)
+         if not (Env.crcs_complete_of_unit (Compilation_unit.name modname))
+         then raise(Error(Location.none, Env.empty,
+                          Cannot_pack_unit_with_incomplete_imports f));
          if Unit_info.is_cmi artifact &&
             not(Mtype.no_code_needed_sig (Lazy.force Env.initial) sg)
          then raise(Error(Location.none, Env.empty,
@@ -4988,6 +4996,13 @@ let report_error ~loc _env = function
         "@[The interface %a@ declares values, not just types.@ \
            An implementation must be provided.@]"
         Location.Doc.quoted_filename intf_name
+  | Cannot_pack_unit_with_incomplete_imports file_name ->
+      Location.errorf ~loc
+        "@[The file %a@ was compiled with %a@ (or depends on a unit that \
+           was),@ so its import table is not a complete transitive closure@ \
+           and it cannot be packed.@]"
+        Location.Doc.quoted_filename file_name
+        Style.inline_code "-no-trans-deps"
   | Interface_not_compiled intf_name ->
       Location.errorf ~loc
         "@[Could not find the .cmi file for interface@ %a.@]"

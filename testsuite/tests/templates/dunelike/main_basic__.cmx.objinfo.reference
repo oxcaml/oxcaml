@@ -1,5 +1,6 @@
 File main_basic/main_basic__.cmi
 Unit name: Main_basic__
+Import table complete: YES
 Is parameter: no
 Parameters:
 Interfaces imported:
