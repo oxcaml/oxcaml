@@ -652,7 +652,9 @@
   cfg_dataflow
   cfg_deadcode
   cfg_liveness
+  cfg_liveness_validate
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse
@@ -660,6 +662,7 @@
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_z3
   cfg_prologue
   cfg_merge_blocks
   extra_debug
