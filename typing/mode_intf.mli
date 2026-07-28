@@ -811,7 +811,8 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val zap_to_legacy : lr -> Const.t
+    (** [arg] determines co-/contravariance. *)
+    val zap_to_legacy : arg:bool -> lr -> Const.t
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
