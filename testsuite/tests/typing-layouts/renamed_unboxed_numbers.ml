@@ -3,15 +3,45 @@
  expect;
 *)
 
-let nativeint (x : nativeint_u) : nativeint# = x
-let int32 (x : int32_u) : int32# = x
-let int64 (x : int64_u) : int64# = x
-let float32 (x : float32_u) : float32# = x
+(* [nativeint#], [int32#], [int64#], and [float32#] were removed in favor of
+   the standalone types [nativeint_u], [int32_u], [int64_u], and
+   [float32_u]: the boxed versions are custom blocks, so they should not have
+   unboxed versions. *)
+
+type t = nativeint#
 [%%expect{|
-val nativeint : nativeint_u -> nativeint# = <fun>
-val int32 : int32_u -> int32# = <fun>
-val int64 : int64_u -> int64# = <fun>
-val float32 : float32_u -> float32# = <fun>
+Line 1, characters 9-19:
+1 | type t = nativeint#
+             ^^^^^^^^^^
+Error: The type "nativeint" has no unboxed version.
+Hint: Did you mean "nativeint_u"?
+|}]
+
+type t = int32#
+[%%expect{|
+Line 1, characters 9-15:
+1 | type t = int32#
+             ^^^^^^
+Error: The type "int32" has no unboxed version.
+Hint: Did you mean "int32_u"?
+|}]
+
+type t = int64#
+[%%expect{|
+Line 1, characters 9-15:
+1 | type t = int64#
+             ^^^^^^
+Error: The type "int64" has no unboxed version.
+Hint: Did you mean "int64_u"?
+|}]
+
+type t = float32#
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = float32#
+             ^^^^^^^^
+Error: The type "float32" has no unboxed version.
+Hint: Did you mean "float32_u"?
 |}]
 
 type nativeint_u_kind : word = nativeint_u
