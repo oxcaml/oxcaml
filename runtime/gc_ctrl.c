@@ -117,6 +117,22 @@ void caml_init_gc (void)
   caml_init_gc_stats(caml_params->max_domains);
 }
 
+/* This primitive reports which runtime variant is running, so it must
+   be compiled into the runtime libraries (once per variant) rather
+   than with the Gc primitives in stdlib/prims/gc_ctrl_prims.c, which
+   are built only once. */
+CAMLprim value caml_runtime_variant (value unit)
+{
+  CAMLassert (unit == Val_unit);
+#if defined (DEBUG)
+  return caml_copy_string ("d");
+#elif defined (CAML_INSTR)
+  return caml_copy_string ("i");
+#else
+  return caml_copy_string ("");
+#endif
+}
+
 struct gc_tweak {
   const char* name;
   uintnat* ptr; /* TODO: atomic_uintnat? */

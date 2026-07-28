@@ -738,6 +738,13 @@ let build_custom_runtime prim_name exec_name =
     if not !Clflags.with_runtime
     then ""
     else "-lcamlrun" ^ !Clflags.runtime_variant in
+  let prims_lib =
+    (* The primitives library has a single flavour (plus PIC). *)
+    if not !Clflags.with_runtime
+    then ""
+    else if String.equal !Clflags.runtime_variant "_pic"
+    then "-lcamlprims_pic"
+    else "-lcamlprims" in
   let stable_name =
     if not !Clflags.keep_camlprimc_file then
       Some "camlprim.c"
@@ -748,7 +755,7 @@ let build_custom_runtime prim_name exec_name =
   let result =
     Ccomp.compile_file ~output:prims_obj ?stable_name prim_name = 0
     && Ccomp.call_linker Ccomp.Exe exec_name
-        ([prims_obj] @ List.rev !Clflags.ccobjs @ [runtime_lib])
+        ([prims_obj] @ List.rev !Clflags.ccobjs @ [prims_lib; runtime_lib])
         (Clflags.std_include_flag "-I" ^ " " ^ Config.bytecomp_c_libraries) = 0
   in
   remove_file prims_obj;
@@ -882,8 +889,15 @@ extern "C" {
                    if not !Clflags.with_runtime
                    then ""
                    else "-lcamlrun" ^ !Clflags.runtime_variant in
+                 let prims_lib =
+                   if not !Clflags.with_runtime
+                   then ""
+                   else if String.equal !Clflags.runtime_variant "_pic"
+                   then "-lcamlprims_pic"
+                   else "-lcamlprims" in
                  Ccomp.call_linker mode output_name
-                   ([obj_file] @ List.rev !Clflags.ccobjs @ [runtime_lib])
+                   ([obj_file] @ List.rev !Clflags.ccobjs
+                    @ [prims_lib; runtime_lib])
                    c_libs = 0
                ) then raise (Error Custom_runtime);
            end
