@@ -154,7 +154,7 @@ apply ccall noalloc
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
-         let $camlLocal_exns_to_jumps__Exit2399 =
+         let $camlLocal_exns_to_jumps__Exit2420 =
            Block immutable_unique
            248 ($camlLocal_exns_to_jumps__immstring147, Pccall_1)
          in
@@ -224,7 +224,7 @@ apply ccall noalloc
                     $camlLocal_exns_to_jumps__f1_4,
                     $camlLocal_exns_to_jumps__f2_5,
                     $camlLocal_exns_to_jumps__f3_6,
-                    $camlLocal_exns_to_jumps__Exit2399,
+                    $camlLocal_exns_to_jumps__Exit2420,
                     $camlLocal_exns_to_jumps__f4_7)
          in
          cont done ($camlLocal_exns_to_jumps))

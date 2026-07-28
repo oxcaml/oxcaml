@@ -1,0 +1,5 @@
+checked 500 inputs, ok=true
+p3 [] = []
+p3 [7] = [58]
+p3 [1;2;3] = [14;8;4]
+eff = [8;6;4;2] effects = abcd

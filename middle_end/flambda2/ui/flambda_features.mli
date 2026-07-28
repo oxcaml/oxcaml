@@ -34,6 +34,10 @@ val unbox_along_intra_function_control_flow : unit -> bool
 
 val backend_cse_at_toplevel : unit -> bool
 
+(** Whether to peel the first iteration of loops arising from loopified
+    tail-recursive functions (as opposed to explicit source loops). *)
+val peel_loopified : unit -> bool
+
 val cse_depth : unit -> int
 
 val join_depth : unit -> int

@@ -664,6 +664,32 @@ let addressing_offset_in_bytes
   | Iscaled _, _ -> None
   | Iindexed2scaled _, _ -> None
 
+(* If [op] computes [disp + sum_i coeff.(i) * arg.(i)] exactly from its integer
+   register arguments (i.e. it is an affine combination of them), return
+   [Some (coeff, disp)] with one coefficient per argument; otherwise [None].
+   Used by the SSA bounds-check analysis to see through [lea] index
+   computations. *)
+let specific_operation_as_affine :
+    specific_operation -> (int array * int) option = function
+  | Ilea addr -> (
+    match addr with
+    | Iindexed d -> Some ([| 1 |], d)
+    | Iindexed2 d -> Some ([| 1; 1 |], d)
+    | Iscaled (scale, d) -> Some ([| scale |], d)
+    | Iindexed2scaled (scale, d) -> Some ([| 1; scale |], d)
+    | Ibased _ -> None)
+  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
+  | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
+  | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _ ->
+    None
+
+(* amd64 has no fused integer multiply-add specific operation ([i * k + c]
+   stays as separate [Imul]/[Iadd], which the SSA affine analyses already
+   handle), so there is nothing to decode here. *)
+let specific_operation_as_muladd :
+    specific_operation -> (int * int * int * bool) option =
+ fun _ -> None
+
 let isomorphic_specific_operation op1 op2 =
   match op1, op2 with
   | Ilea a1, Ilea a2 -> equal_addressing_mode_without_displ a1 a2

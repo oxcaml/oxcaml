@@ -131,6 +131,7 @@ val create_non_recursive_let_cont_without_free_names :
 
 val create_recursive_let_cont :
   Are_rebuilding_terms.t ->
+  first_iteration_peeled:bool ->
   invariant_params:Bound_parameters.t ->
   Continuation_handler.t Continuation.Lmap.t ->
   body:t ->

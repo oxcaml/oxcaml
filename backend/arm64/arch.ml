@@ -332,6 +332,37 @@ let equal_specific_operation left right =
 let isomorphic_specific_operation op1 op2 =
   equal_specific_operation op1 op2
 
+(* If [op] computes [disp + sum_i coeff.(i) * arg.(i)] exactly from its integer
+   register arguments (i.e. it is an affine combination of them), return
+   [Some (coeff, disp)] with one coefficient per argument; otherwise [None].
+   Used by the SSA bounds-check analysis to see through scaled-add index
+   computations. A negative shift is a right shift (not affine), so [None]. *)
+let specific_operation_as_affine :
+    specific_operation -> (int array * int) option = function
+  | Ishiftarith (op, s) ->
+    if s >= 0 && s < 16
+    then
+      let scaled = 1 lsl s in
+      (match op with
+      | Ishiftadd -> Some ([| 1; scaled |], 0)
+      | Ishiftsub -> Some ([| 1; -scaled |], 0))
+    else None
+  | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ | Imuladd | Imulsub
+  | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf | Isqrtf
+  | Ibswap _ | Imove32 | Isignext _ | Isimd _ | Illvm_intrinsic _ ->
+    None
+
+(* [Imuladd] computes [arg.(0) * arg.(1) + arg.(2)] (MADD); [Imulsub] computes
+   [arg.(2) - arg.(0) * arg.(1)] (MSUB), i.e. the product is negated. *)
+let specific_operation_as_muladd :
+    specific_operation -> (int * int * int * bool) option = function
+  | Imuladd -> Some (0, 1, 2, false)
+  | Imulsub -> Some (0, 1, 2, true)
+  | Ishiftarith _ | Ifar_poll | Ifar_alloc _ | Ifar_stackcheck _ | Inegmulf
+  | Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _
+  | Imove32 | Isignext _ | Isimd _ | Illvm_intrinsic _ ->
+    None
+
 (* Specific operations that are pure *)
 
 let operation_is_pure : specific_operation -> bool = function
