@@ -6516,22 +6516,23 @@ let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
    function is not relaxed here. Supporting it would require [type_let] to
    propagate the binding's zero_alloc into the pattern variable's
    [val_zero_alloc]. *)
-let relax_alloc (desc : Types.value_description) mode =
+let relax_alloc (desc : Types.value_description) mode ~applied_arity =
   match desc.val_kind with
   | Val_prim prim ->
-    if prim_is_noalloc_when_fully_applied prim then
+    if prim_is_noalloc_when_fully_applied prim && applied_arity >= prim.prim_arity then
       Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
     else mode
   | _ ->
     (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
+    (* CR shsong: Only exempt check if fully applied!!! Otherwise there would be soundness issue. *)
     match Zero_alloc.get desc.val_zero_alloc with
-    | Check { strict; opt = false; _ } | Assume { strict; _ } ->
+    | Check { strict; opt = false; arity; _ } | Assume { strict; arity; _ } when applied_arity >= arity ->
       let c =
         if strict then Allocation.Const.Noalloc_strict
         else Allocation.Const.Noalloc
       in
       Value.meet_const_with Allocation c mode
-    | Check _ | Default_zero_alloc | Ignore_assert_all -> mode
+    | Check _ | Assume _ | Default_zero_alloc | Ignore_assert_all -> mode
 
 (* Whether [funct] is an identifier that [relax_alloc] relaxes AND is fully
    applied ([applied_arity] arguments cover its arity). Only then must the
@@ -9182,7 +9183,7 @@ and type_ident env ?(recarg=Rejected) ?(applied_arity=0) lid =
     They may still trigger closure allocation when they are
     (1) referenced with no arguments or (2) partially applied, which
     will be handled by register_allocation_mode below. *)
-  let relax_mode = relax_alloc desc mode in
+  let relax_mode = relax_alloc desc mode ~applied_arity in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (relax_mode, locks)
