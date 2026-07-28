@@ -363,20 +363,20 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Typedtree.alloc_mode_r option; }
+      mutable env_alloc_mode : Mode.Locality.r option; }
   val make:
-    ?env_alloc_mode:Typedtree.alloc_mode_r
+    ?env_alloc_mode:Mode.Locality.r
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Typedtree.alloc_mode_r option -> unit
+  val set_env_alloc_mode : t -> Mode.Locality.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Typedtree.alloc_mode_r option; }
+      mutable env_alloc_mode : Mode.Locality.r option; }
   let make ?env_alloc_mode env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
