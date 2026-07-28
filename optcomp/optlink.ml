@@ -202,7 +202,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           (Linkenv.Error
              (Requires_metaprogramming_without_flag resolved_pathname));
       ( resolved_pathname :: full_paths,
-        object_pathname :: object_pathnames,
+        { Linkenv.path = object_pathname; units = info.ui_defines }
+        :: object_pathnames,
         unit :: tolink,
         cached_genfns_imports )
     | Library (resolved_pathname, infos) ->
@@ -224,7 +225,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         raise
           (Linkenv.Error
              (Requires_metaprogramming_without_flag resolved_pathname));
-      let object_pathnames =
+      let object_pathnames units_of_lib =
         match
           find_companion_object_file ~requested_filename ~resolved_pathname
             ~artifact_ext:Backend.ext_flambda_lib ~object_ext:Backend.ext_lib
@@ -238,9 +239,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             List.is_empty infos.lib_units
             && not (Sys.file_exists object_pathname)
           then object_pathnames
-          else object_pathname :: object_pathnames
+          else
+            let units = List.concat_map (fun u -> u.defines) units_of_lib in
+            { Linkenv.path = object_pathname; units } :: object_pathnames
         | Resolved_via_manifest_and_found_in_load_path object_pathname ->
-          object_pathname :: object_pathnames
+          let units = List.concat_map (fun u -> u.defines) units_of_lib in
+          { Linkenv.path = object_pathname; units } :: object_pathnames
         | Resolved_via_manifest_but_not_found_in_load_path object_filename ->
           (* The archive was resolved through a manifest with no entry for the
              corresponding [.a]/[.lib] file. This is only legitimate when the
@@ -255,11 +259,10 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                     { object_filename; requested_filename }))
       in
       (* [resolved_pathname] is always returned irrespective of the
-         [object_pathnames] calculation above and the units calculation below:
-         the aim is to know the full set of files which were provided on the
-         command line. *)
-      ( resolved_pathname :: full_paths,
-        object_pathnames,
+         [object_pathnames] calculation above and the [units_of_lib] calculation
+         below: the aim is to know the full set of files which were provided on
+         the command line. *)
+      let units_of_lib =
         List.fold_right
           (fun info reqd ->
             let li_name = CU.name info.li_name in
@@ -319,7 +322,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               Linkenv.check_consistency linkenv ~unit [||] [||];
               unit :: reqd)
             else reqd)
-          infos.lib_units tolink,
+          infos.lib_units []
+      in
+      ( resolved_pathname :: full_paths,
+        object_pathnames units_of_lib,
+        units_of_lib @ tolink,
         cached_genfns_imports )
 
   (* Second pass: generate the startup file and link it with everything else *)
@@ -344,8 +351,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         in
         Clflags.ccobjs := !Clflags.ccobjs @ Linkenv.lib_ccobjs linkenv;
         Clflags.all_ccopts := Linkenv.lib_ccopts linkenv @ !Clflags.all_ccopts;
-        Backend.link_shared ml_objfiles output_name ~ppf_dump ~genfns
-          ~units_tolink)
+        Backend.link_shared
+          (List.map (fun f -> f.Linkenv.path) ml_objfiles)
+          output_name ~ppf_dump ~genfns ~units_tolink)
 
   (* Main entry point *)
 

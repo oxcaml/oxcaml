@@ -125,7 +125,9 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   (* Collect files to analyze for partitioning. C stubs and runtime libraries
      are passthrough (passed directly to final linker, not partially linked). *)
   let files_to_measure =
-    List.map (fun f -> f, MOF.OCaml) ml_objfiles
+    List.map
+      (fun (file, required_symbols) -> file, MOF.OCaml { required_symbols })
+      ml_objfiles
     @ [startup_obj, MOF.Startup]
     @ match cached_genfns with None -> [] | Some f -> [f, MOF.Cached_genfns]
   in
