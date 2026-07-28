@@ -51,6 +51,9 @@ module Unboxed_or_untagged_array_tags = struct
 
   let unboxed_mask_array_tag = 11
 
+  (* int8 and int16 array tags are aligned such that the lowest bits contain the
+     padding size. *)
+
   let untagged_int16_array_zero_tag = 12
 
   let untagged_int16_array_three_tag = 13
