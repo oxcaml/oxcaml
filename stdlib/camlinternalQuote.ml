@@ -3119,3 +3119,46 @@ module Exp = struct
     let ast = With_free_vars.value ~free:(fun _ _ -> ()) exp in
     Ast.print_exp (new_env ()) fmt ast
 end
+
+module Injector = struct
+  type entry =
+    { name : string;
+      value : Obj.t;
+      approx : string
+    }
+
+  type t =
+    { compilation_unit_name : string;
+      mutable entries : entry list;  (* in reverse injection order *)
+      mutable next_value : int
+    }
+
+  (* CR metaprogramming: not thread-safe; injectors are expected to be
+     created and populated from a single thread (see [Eval]). *)
+  let next_injector = ref 0
+
+  let create () =
+    let id = !next_injector in
+    incr next_injector;
+    { compilation_unit_name = "Eval_inject__" ^ string_of_int id;
+      entries = [];
+      next_value = 0
+    }
+
+  let compilation_unit_name t = t.compilation_unit_name
+
+  let contents t = List.rev t.entries
+end
+
+let inject_with_approx (injector : Injector.t) (value : Obj.t)
+    (approx : string) : Code.t =
+  let name = "v" ^ string_of_int injector.next_value in
+  injector.next_value <- injector.next_value + 1;
+  injector.entries <- { name; value; approx } :: injector.entries;
+  Code.of_exp Loc.unknown
+    (Exp.mk
+       (Exp_desc.ident
+          (Identifier.Value.dot
+             (Identifier.Module.global_module injector.compilation_unit_name)
+             name))
+       [])

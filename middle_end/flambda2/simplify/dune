@@ -43,6 +43,7 @@
   flambda2_algorithms
   flambda2_bound_identifiers
   flambda2_cmx
+  flambda2_classic_mode_types
   flambda2_identifiers
   flambda2_kinds
   flambda2_lattices

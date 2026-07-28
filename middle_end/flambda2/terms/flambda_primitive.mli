@@ -501,6 +501,12 @@ type unary_primitive =
           read the tag of a possibly-lazy value from ocamlopt-generated code.
           Tag reads that are allowed to be lazy tags (by the type system) should
           always go through caml_obj_tag, which is opaque to the compiler. *)
+  | Reify_approx
+      (** Compile-time reification of the classic-mode approximation of the
+          argument, resolved during [Simplify] to a constant string: the
+          marshalled [Value_approximation.Standalone.t] form of the argument's
+          type (converted to an approximation). Never survives to [To_cmm]. See
+          [%reify_approx] in [Translprim] and inject_plan.md. *)
   | Peek of Flambda_kind.Standard_int_or_float.t
   | Make_lazy of
       { lazy_tag : Lazy_block_tag.t;

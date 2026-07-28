@@ -314,6 +314,8 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Peek _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
+  | Reify_approx ->
+    Misc.fatal_error "[Reify_approx] should have been resolved by [Simplify]"
   | Make_lazy { lazy_tag; alloc_region = _ } ->
     let tag = Flambda_primitive.Lazy_block_tag.to_tag lazy_tag in
     let expr, env, res =

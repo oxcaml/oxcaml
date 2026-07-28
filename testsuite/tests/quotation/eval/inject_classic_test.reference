@@ -1,0 +1,5 @@
+toplevel function: 42
+two-argument function: 42
+stdlib function: [3; 2; 1]
+local closure: 42
+ref after eval'd incr: 42

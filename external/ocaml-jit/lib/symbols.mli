@@ -49,6 +49,11 @@ val aggregate : current:t -> new_symbols:t -> t
 val target_to_string : Binary_emitter_intf.target -> string
 (** Convert a typed target to its encoded string representation *)
 
+val add : t -> string -> Address.t -> t
+(** Add a binding of a symbol to an address, replacing any existing binding.
+    Used e.g. to bind the module block symbols of compilation units
+    synthesised at runtime by [Eval] (value injection). *)
+
 val find : t -> string -> Address.t option
 (** Lookup a symbol's address in the given symbol map. If it is missing from the map
     look it up using dlsym. *)

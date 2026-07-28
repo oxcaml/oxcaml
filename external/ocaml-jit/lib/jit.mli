@@ -34,6 +34,12 @@ val jit_load_program :
 (** Load and run a Lambda program. Automatically selects backend based on
     architecture (x86 or arm64). *)
 
+val jit_register_symbol : string -> Obj.t -> unit
+(** Bind a symbol (given unprefixed; the target's symbol prefix is added
+    automatically) to the address of the given value, so that subsequently
+    JIT-loaded code can refer to it.  The value must not move: use an
+    out-of-heap block registered as a GC root (see [Eval]). *)
+
 val jit_lookup_symbol : string -> Obj.t option
 
 val set_debug : unit -> unit

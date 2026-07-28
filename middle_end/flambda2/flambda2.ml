@@ -95,8 +95,9 @@ type run_result =
     reachable_names : NO.t
   }
 
-let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
-    slot_offsets : run_result =
+let build_run_result unit ~machine_width ~free_names ~final_typing_env
+    ~extra_root_names ~extra_approxs ~sections ~all_code slot_offsets :
+    run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
     NO.function_slots_in_normal_projections free_names
@@ -120,8 +121,9 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
     Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
   in
   let reachable_names, cmx =
-    Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-      ~used_value_slots ~exported_offsets ~sections all_code
+    Flambda_cmx.prepare_cmx_file_contents ~machine_width ~final_typing_env
+      ~module_symbol ~extra_root_names ~extra_approxs ~used_value_slots
+      ~exported_offsets ~sections all_code
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; reachable_names }
@@ -175,12 +177,21 @@ let flambda_to_flambda0 : type m.
             final_typing_env;
             all_code;
             slot_offsets;
-            unit = flambda
+            unit = flambda;
+            reified_approx_names;
+            reified_lookup_approxs
           } =
         Profile.record_call ~accumulate:true "simplify" (fun () ->
             Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
               raw_flambda)
       in
+      (* Units referenced by reified approximations must have their cmx data
+         available wherever the marshalled approximations are demarshalled (see
+         [Eval]); and the code they reference must be exported to this unit's
+         cmx (via [extra_root_names] below). *)
+      Compilenv.record_reified_approx_units
+        (Flambda2_classic_mode_types.Value_approximation
+         .compilation_units_of_free_names reified_approx_names);
       (if Flambda_features.inlining_report ()
        then
          let output_prefix = Printf.sprintf "%s.%d" prefixname round in
@@ -236,8 +247,9 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-        build_run_result flambda ~free_names ~final_typing_env ~sections
-          ~all_code slot_offsets
+        build_run_result flambda ~machine_width ~free_names ~final_typing_env
+          ~extra_root_names:reified_approx_names
+          ~extra_approxs:reified_lookup_approxs ~sections ~all_code slot_offsets
       in
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
@@ -307,13 +319,15 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   let sections = Compilenv.current_sections () in
   let { Closure_conversion.unit = raw_flambda;
         code_slot_offsets;
-        metadata = close_prog_metadata
+        metadata = close_prog_metadata;
+        reified_approx_units
       } =
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
           ~sections module_initializer)
   in
+  Compilenv.record_reified_approx_units reified_approx_units;
   invoke_compilation_unit_callbacks compilation_unit;
   flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
     ~close_prog_metadata ~code_slot_offsets ~sections raw_flambda

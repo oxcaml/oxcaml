@@ -221,7 +221,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
         | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
         | Reinterpret_boxed_vector | Untag_immediate | Tag_immediate
         | Is_boxed_float | Is_flat_float_array | End_region _ | End_try_region _
-        | Obj_dup _ | Get_header | Peek _ | Make_lazy _ ),
+        | Obj_dup _ | Get_header | Reify_approx | Peek _ | Make_lazy _ ),
         _ )
   | Binary
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _

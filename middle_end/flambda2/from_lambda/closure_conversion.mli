@@ -96,7 +96,9 @@ type 'a close_program_metadata =
 type 'a close_program_result =
   { unit : Flambda_unit.t;
     metadata : 'a close_program_metadata;
-    code_slot_offsets : Slot_offsets.t Code_id.Map.t
+    code_slot_offsets : Slot_offsets.t Code_id.Map.t;
+    reified_approx_units : Compilation_unit.Set.t
+        (* See [Closure_conversion_aux.Acc.reified_approx_units]. *)
   }
 
 val close_program :

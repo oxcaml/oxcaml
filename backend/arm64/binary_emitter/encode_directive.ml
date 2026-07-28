@@ -415,7 +415,20 @@ let is_absolute_symbol_reference state ~all_sections ~current_section
          - On Linux RELA: addend in relocation, emit 0 in data *)
       if is_same_section
       then
-        if for_jit || !emit_relocs_for_all_symbol_refs
+        if for_jit
+        then (
+          (* JIT: local labels and symbols are all resolvable directly (see
+             [Symbols.from_binary_section]), so keep the original target and
+             carry the addend in the relocation record, which is applied by
+             [For_jit.compute_value]. (The in-place data is overwritten when the
+             relocation is applied, so the nearest-global-symbol encoding used
+             for Mach-O object files below would lose the offset to the
+             target.) *)
+          SS.add_relocation_at_current_offset state
+            ~reloc_kind:
+              (R_AARCH64_ABS64 { target; addend = Int64.to_int addend });
+          Some addend)
+        else if !emit_relocs_for_all_symbol_refs
         then (
           let target_offset = Option.get same_section_offset in
           if is_rela_platform ()
@@ -482,20 +495,30 @@ let is_absolute_symbol_reference state ~all_sections ~current_section
               else Int64.add addend (Int64.of_int target_offset)
             in
             (* Keep original target in relocation for JIT use. The conversion to
-               section+offset for verification is done in emit.ml *)
+               section+offset for verification is done in emit.ml. For the JIT,
+               the addend must be carried in the relocation record: the in-place
+               data is overwritten when the relocation is applied. *)
             SS.add_relocation_at_current_offset state
-              ~reloc_kind:(R_AARCH64_ABS64 { target; addend = 0 });
+              ~reloc_kind:
+                (R_AARCH64_ABS64
+                   { target;
+                     addend = (if for_jit then Int64.to_int addend else 0)
+                   });
             Some data_value)
 
 (* Handle unresolved symbol reference by emitting the addend (on macOS) or zeros
-   (on Linux) and recording a relocation for the linker to patch. *)
-let emit_unresolved_symbol_relocation state ~width_bytes c =
+   (on Linux) and recording a relocation for the linker to patch. For the JIT,
+   the addend is carried in the relocation record (the in-place data is
+   overwritten when the relocation is applied). *)
+let emit_unresolved_symbol_relocation state ~for_jit ~width_bytes c =
   let buf = SS.buffer state in
   let addend =
     match target_and_addend_of_constant c with
     | Some (target, addend) when width_bytes = 8 ->
       SS.add_relocation_at_current_offset state
-        ~reloc_kind:(R_AARCH64_ABS64 { target; addend = 0 });
+        ~reloc_kind:
+          (R_AARCH64_ABS64
+             { target; addend = (if for_jit then Int64.to_int addend else 0) });
       addend
     | Some _ ->
       let symbol_name = Option.get (extract_symbol_name c) in
@@ -540,7 +563,10 @@ let emit_constant state ~all_sections ~current_section constant =
   in
   match value_opt with
   | Some value -> D.Directive.emit_int_le buf ~width_bytes value
-  | None -> emit_unresolved_symbol_relocation state ~width_bytes c
+  | None ->
+    emit_unresolved_symbol_relocation state
+      ~for_jit:(All_section_states.for_jit all_sections)
+      ~width_bytes c
 
 let emit_alignment state ~bytes ~(fill : D.align_padding) =
   let buf = SS.buffer state in

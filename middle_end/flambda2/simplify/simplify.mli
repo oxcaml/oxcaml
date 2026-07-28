@@ -25,7 +25,16 @@ type simplify_result = private
     final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
-    unit : Flambda_unit.t
+    unit : Flambda_unit.t;
+    reified_approx_names : Name_occurrences.t;
+        (** Free names of the approximations reified by [Reify_approx]; see
+            [Downwards_acc.reified_approx_names]. *)
+    reified_lookup_approxs :
+      Code_or_metadata.t Flambda2_classic_mode_types.Value_approximation.t
+      Symbol.Map.t
+        (** Approximations of reified dynamic closures, registered under
+            manufactured lookup symbols; see
+            [Downwards_acc.reified_lookup_approxs]. *)
   }
 
 val run :

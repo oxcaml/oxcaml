@@ -717,3 +717,34 @@ and Code : sig
 
   val print : Format.formatter -> t -> unit
 end
+
+(** Store of values injected into quotes, for evaluation in the context of
+    the current program execution only (see [Eval.inject]).  An injector
+    corresponds to a compilation unit synthesised at runtime by [Eval]: each
+    injected value becomes a field of that unit's module block. *)
+module Injector : sig
+  type entry =
+    { name : string;  (** Name of the value within the compilation unit. *)
+      value : Obj.t;
+      approx : string
+          (** Marshalled [Value_approximation.Standalone.t] giving the
+              middle-end approximation of [value], or [""] when none is
+              available (e.g. in bytecode). *)
+    }
+
+  type t
+
+  val create : unit -> t
+
+  val compilation_unit_name : t -> string
+
+  (** In injection order; the [i]th entry is field [i] of the module
+      block. *)
+  val contents : t -> entry list
+end
+
+(** The runtime part of the [%inject] primitive: stores the value and its
+    approximation in the injector and returns a quote denoting the injected
+    value's name within the injector's compilation unit.  Applications of
+    [%inject] are compiled to calls to this function; see [Translprim]. *)
+val inject_with_approx : Injector.t -> Obj.t -> string -> Code.t
