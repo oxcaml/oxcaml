@@ -2445,7 +2445,8 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
-let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
+let transl_primitive
+      loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2541,12 +2542,24 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
        | Alloc_heap :: args -> count_nlocal args
        | (Alloc_local :: _) as args -> List.length args
      in
-     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args)
-     in lfunction
+     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args) in
+     let zero_alloc : Lambda.zero_alloc_attribute =
+       match (zero_alloc : Zero_alloc.const) with
+       | Default_zero_alloc -> Default_zero_alloc
+       | Check { strict; opt; arity = _; loc; custom_error_msg } ->
+         if Builtin_attributes.is_zero_alloc_check_enabled ~opt
+         then Check { strict; loc; custom_error_msg }
+         else Default_zero_alloc
+       | Assume _ | Ignore_assert_all ->
+         Misc.fatal_error
+           "Translprim.transl_primitive: [~zero_alloc] should be default or \
+            stronger"
+     in
+     lfunction
        ~kind:(Curried {nlocal})
        ~params
        ~return
-       ~attr:default_stub_attribute
+       ~attr:{ default_stub_attribute with zero_alloc }
        ~loc
        ~body
        ~mode:alloc_heap

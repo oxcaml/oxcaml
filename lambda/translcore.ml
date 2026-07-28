@@ -378,7 +378,7 @@ let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
-        (Some path)
+        ~zero_alloc:(Zero_alloc.get desc.val_zero_alloc) (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
