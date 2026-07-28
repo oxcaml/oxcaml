@@ -10,7 +10,7 @@
 
 module Test = struct
 
-end
+  end
 [%%expect{|
 module Test : sig end @@ stateless noalloc_strict
 |}]
@@ -47,7 +47,7 @@ end
 Line 2, characters 7-17:
 2 |   let[@zero_alloc strict] span_pair (a : int) (b : int) =
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP3.Test.span_pair (camlTOP3__span_pair_2_3_code).
+Error: Annotation check for zero_alloc strict failed on function TOP3.Test.span_pair (camlTOP3__span_pair_4_5_code).
 Line 3, characters 18-24:
 3 |     if a < b then (a, b) else (b, a)
                       ^^^^^^
@@ -99,7 +99,7 @@ end
 Line 2, characters 7-17:
 2 |   let[@zero_alloc strict] rec iter f l =
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP5.Test.iter (camlTOP5__iter_6_7_code).
+Error: Annotation check for zero_alloc strict failed on function TOP5.Test.iter (camlTOP5__iter_8_9_code).
 Line 5, characters 17-20:
 5 |     | x :: xs -> f x; iter f xs
                      ^^^
@@ -205,48 +205,46 @@ module Test = struct
   let (add_partial @ alloc) (x : int) = (+) x
 
   (* Referencing the primitive without applying it allocates a closure. *)
-  let (add_ref @ alloc) () = (+)
+  let (add_ref @ noalloc_strict) () = (+)
 
   (* Float [+.] boxes its result, so it allocates even when fully applied.*)
   let (add_float @ alloc) (x : float) (y : float) = x +. y
 end
 [%%expect{|
-module Test :
-  sig
-    val add : int -> (int -> int) @ local @@ noalloc_strict
-    val add_partial : int -> int -> int
-    val add_ref : unit -> int -> int -> int
-    val add_float : float -> float -> float
-  end @@ portable
+Line 6, characters 38-41:
+6 |   let (add_ref @ noalloc_strict) () = (+)
+                                          ^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 6, characters 33-41
+         which is expected to be "noalloc_strict".
 |}]
 
 (* 4c. A [noalloc_strict] function forces every allocation in its body to be
    local. *)
 module Test = struct
-  let (make_pair @ noalloc_strict) (x : int) = (x, x)
+  let (make_pair @ noalloc_strict) (x : int) = exclave_ (x, x)
 end
 [%%expect{|
-Line 2, characters 47-53:
-2 |   let (make_pair @ noalloc_strict) (x : int) = (x, x)
-                                                   ^^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 2, characters 35-53,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+module Test : sig val make_pair : int -> int * int @ local end @@ stateless
+  noalloc_strict
 |}]
 
 (* 4d. Closure allocation is just another allocation, so in a multi-argument
    [noalloc_strict] function the intermediate closures are local too. *)
 module Test = struct
-  let (add3 @ noalloc_strict) (x : int) (y : int) (z : int) = z
-  let escaping_partial () = exclave_ add3 1 2
+  (*= let (add3 @ noalloc_strict) (x : int) (y : int) (z : int) = z *)
+  let (add3 @ noalloc_strict) (x: int) (y: int) = let (foo @ global) = fun x -> x in foo
+  let escaping_partial () = add3 1 2
 end
 [%%expect{|
-module Test :
-  sig
-    val add3 : int -> (int -> int -> int) @ local
-    val escaping_partial : unit -> (int -> int) @ local
-  end @@ stateless noalloc_strict
+Line 3, characters 71-81:
+3 |   let (add3 @ noalloc_strict) (x: int) (y: int) = let (foo @ global) = fun x -> x in foo
+                                                                           ^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 3, characters 30-88,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* ==================================================================== *)
@@ -355,6 +353,21 @@ Error: The return value of a zero_alloc function is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
+(* Example: applied_arity > func arity *)
+module Test = struct
+
+  let f x = x
+
+  let g x y = (x, y)
+
+  let test () =
+    f g 1 2
+
+end
+[%%expect{|
+module Test : sig val f : 'a -> 'a end @@ stateless noalloc_strict
+|}]
+
 
 (* ==================================================================== *)
 (* Appendix: assorted [zero_alloc] backend-check behaviours             *)
@@ -374,7 +387,7 @@ let[@zero_alloc] pair x = (x, x)
 Line 1, characters 5-15:
 1 | let[@zero_alloc] pair x = (x, x)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP28.pair (camlTOP28__pair_84_80_code).
+Error: Annotation check for zero_alloc failed on function TOP17.pair (camlTOP17__pair_36_35_code).
 Line 1, characters 26-32:
 1 | let[@zero_alloc] pair x = (x, x)
                               ^^^^^^
@@ -391,7 +404,7 @@ exception E of int
 Line 2, characters 5-15:
 2 | let[@zero_alloc strict] may_raise x = if x > 0 then x else raise (E x)
          ^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP30.may_raise (camlTOP30__may_raise_86_82_code).
+Error: Annotation check for zero_alloc strict failed on function TOP19.may_raise (camlTOP19__may_raise_38_37_code).
 Line 2, characters 65-70:
 2 | let[@zero_alloc strict] may_raise x = if x > 0 then x else raise (E x)
                                                                      ^^^^^
@@ -423,11 +436,11 @@ end
 Line 3, characters 7-17:
 3 |   let[@zero_alloc] caller x = let (a, _) = allocates x in a
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP32.No_assume.caller (camlTOP32__caller_93_90_code).
+Error: Annotation check for zero_alloc failed on function TOP21.No_assume.caller (camlTOP21__caller_45_45_code).
 Line 3, characters 43-54:
 3 |   let[@zero_alloc] caller x = let (a, _) = allocates x in a
                                                ^^^^^^^^^^^
-Error: called function may allocate (direct call camlTOP32__allocates_92_89_code)
+Error: called function may allocate (direct call camlTOP21__allocates_44_44_code)
 |}]
 
 (* Frontend allocation axis: the [noalloc] mode.  This is a typing-time check,
