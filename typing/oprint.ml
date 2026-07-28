@@ -985,7 +985,7 @@ and print_out_type_decl kwd ppf td =
   in
   let print_supertype ppf =
     function
-      Some ty -> fprintf ppf " <:@ %a" !out_type ty
+      Some ty -> fprintf ppf " :>@ %a" !out_type ty
     | None -> ()
   in
   let print_manifest ppf =

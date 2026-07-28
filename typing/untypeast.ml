@@ -260,6 +260,7 @@ let type_declaration sub decl =
     ~kind:(sub.type_kind sub decl.typ_kind)
     ~priv:decl.typ_private
     ?manifest:(Option.map (sub.typ sub) decl.typ_manifest)
+    ?supertype:(Option.map (sub.typ sub) decl.typ_supertype)
     ~docs:Docstrings.empty_docs
     ?jkind_annotation:decl.typ_jkind_annotation
     (map_loc sub decl.typ_name)

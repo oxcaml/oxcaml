@@ -158,7 +158,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
         [| Cstr_layout_known
-             { tag = 0; shape = Constructor_uniform_value; sorts = [| sort |] } |],
+             { tag = 0;
+               shape = Constructor_uniform_value;
+               sorts = [| sort |]
+             } |],
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
@@ -212,6 +215,26 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          is_const)
       cstr_layouts
   in
+  (* 1 + largest tag per class; can exceed the counts when constructors
+     inherit sparse tags from a supertype *)
+  let const_span, nonconst_span =
+    match rep with
+    | Variant_boxed _ ->
+        let const_span = ref 0 and nonconst_span = ref 0 in
+        Array.iteri
+          (fun i layout ->
+             let tag = cstr_layout_tag layout in
+             let span =
+               if cstr_constant.(i) then const_span else nonconst_span
+             in
+             if tag + 1 > !span then span := tag + 1)
+          cstr_layouts;
+        !const_span, !nonconst_span
+    | Variant_unboxed | Variant_with_null ->
+        (* All tags are 0, so the spans equal the counts *)
+        !num_consts, !num_nonconsts
+    | Variant_extensible -> assert false
+  in
   let describe_constructor (src_index, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
     let cstr_name = Ident.name cd_id in
@@ -258,6 +281,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         cstr_constant;
         cstr_consts = !num_consts;
         cstr_nonconsts = !num_nonconsts;
+        cstr_const_span = const_span;
+        cstr_nonconst_span = nonconst_span;
         cstr_generalized = cd_res <> None;
         cstr_private = decl.type_private;
         cstr_loc = cd_loc;
@@ -293,6 +318,8 @@ let extension_descr ~current_unit path_ext ext =
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;
       cstr_nonconsts = -1;
+      cstr_const_span = -1;
+      cstr_nonconst_span = -1;
       cstr_private = ext.ext_private;
       cstr_generalized = ext.ext_ret_type <> None;
       cstr_loc = ext.ext_loc;

@@ -210,10 +210,12 @@ and 'label mixed_block_field =
 and constructor =
   | Constructor_with_tuple_arg of
       { name : string;
+        tag : int;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        tag : int;
         args : string mixed_block_field list
       }
 
@@ -407,10 +409,12 @@ let hash_mixed_block_field (type label) (hash_label : label -> int)
   Hashtbl.hash (hash field_type, hash_label label)
 
 let hash_constructor = function
-  | Constructor_with_tuple_arg { name; args } ->
-    Hashtbl.hash (0, name, List.map (hash_mixed_block_field (fun () -> 0)) args)
-  | Constructor_with_record_arg { name; args } ->
-    Hashtbl.hash (1, name, List.map (hash_mixed_block_field Hashtbl.hash) args)
+  | Constructor_with_tuple_arg { name; tag; args } ->
+    Hashtbl.hash
+      (0, name, tag, List.map (hash_mixed_block_field (fun () -> 0)) args)
+  | Constructor_with_record_arg { name; tag; args } ->
+    Hashtbl.hash
+      (1, name, tag, List.map (hash_mixed_block_field Hashtbl.hash) args)
 
 let hash_array_kind = function
   | Regular s -> Hashtbl.hash (0, hash s)
@@ -474,11 +478,11 @@ let tuple args =
       Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
   }
 
-let constructor_with_tuple_arg ~name ~args =
-  Constructor_with_tuple_arg { name; args }
+let constructor_with_tuple_arg ~name ~tag ~args =
+  Constructor_with_tuple_arg { name; tag; args }
 
-let constructor_with_record_arg ~name ~args =
-  Constructor_with_record_arg { name; args }
+let constructor_with_record_arg ~name ~tag ~args =
+  Constructor_with_record_arg { name; tag; args }
 
 let variant constructors =
   let desc = Variant { constructors; kind = Variant_boxed } in
@@ -510,11 +514,13 @@ let variant_attribute_unboxed ~constructor_name
     | None ->
       Constructor_with_tuple_arg
         { name = constructor_name;
+          tag = 0;
           args = [{ field_type = constructor_arg.field_type; label = () }]
         }
     | Some label ->
       Constructor_with_record_arg
         { name = constructor_name;
+          tag = 0;
           args = [{ field_type = constructor_arg.field_type; label }]
         }
   in
@@ -810,12 +816,15 @@ and equal_record_field { field_type = type1; label = label1 }
 
 and equal_constructor c1 c2 =
   match c1, c2 with
-  | ( Constructor_with_tuple_arg { name = name1; args = args1 },
-      Constructor_with_tuple_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_tuple_field args1 args2
-  | ( Constructor_with_record_arg { name = name1; args = args1 },
-      Constructor_with_record_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_record_field args1 args2
+  | ( Constructor_with_tuple_arg { name = name1; tag = tag1; args = args1 },
+      Constructor_with_tuple_arg { name = name2; tag = tag2; args = args2 } ) ->
+    String.equal name1 name2 && Int.equal tag1 tag2
+    && List.equal equal_tuple_field args1 args2
+  | ( Constructor_with_record_arg { name = name1; tag = tag1; args = args1 },
+      Constructor_with_record_arg { name = name2; tag = tag2; args = args2 } )
+    ->
+    String.equal name1 name2 && Int.equal tag1 tag2
+    && List.equal equal_record_field args1 args2
   | Constructor_with_tuple_arg _, Constructor_with_record_arg _ -> false
   | Constructor_with_record_arg _, Constructor_with_tuple_arg _ -> false
 
@@ -855,6 +864,10 @@ and equal_predef p1 p2 =
 let constructor_name = function
   | Constructor_with_tuple_arg { name; _ } -> name
   | Constructor_with_record_arg { name; _ } -> name
+
+let constructor_tag = function
+  | Constructor_with_tuple_arg { tag; _ } -> tag
+  | Constructor_with_record_arg { tag; _ } -> tag
 
 let constructor_args = function
   | Constructor_with_tuple_arg { args; _ } ->

@@ -400,8 +400,8 @@ let create_attribute_unboxed_record_die ~reference ~parent_proto_die ?name
     ()
 
 let create_simple_variant_die ~reference ~parent_proto_die ?name
-    simple_constructors =
-  Debugging_the_compiler.add_enum ~reference simple_constructors;
+    (simple_constructors : (string * int) list) =
+  Debugging_the_compiler.add_enum ~reference (List.map fst simple_constructors);
   let enum =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
       ~tag:Dwarf_tag.Enumeration_type
@@ -410,11 +410,11 @@ let create_simple_variant_die ~reference ~parent_proto_die ?name
         |> attribute_list_with_optional_name name)
       ()
   in
-  List.iteri
-    (fun i constructor ->
+  List.iter
+    (fun (constructor, tag) ->
       Proto_die.create_ignore ~parent:(Some enum) ~tag:Dwarf_tag.Enumerator
         ~attribute_values:
-          [ DAH.create_const_value ~value:(Int64.of_int ((2 * i) + 1));
+          [ DAH.create_const_value ~value:(Int64.of_int ((2 * tag) + 1));
             DAH.create_name constructor ]
         ())
     simple_constructors
@@ -488,14 +488,15 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
   done
 
 let create_complex_variant_die ~reference ~parent_proto_die ?name
-    ~simple_constructors
+    ~(simple_constructors : (string * int) list)
     ~(complex_constructors :
-       (string * (string option * Proto_die.reference * RL.t) list) list) () =
+       (string * int * (string option * Proto_die.reference * RL.t) list) list)
+    () =
   let complex_constructors_names =
-    List.map (fun (name, _) -> name) complex_constructors
+    List.map (fun (name, _, _) -> name) complex_constructors
   in
   Debugging_the_compiler.add_enum ~reference
-    (simple_constructors @ complex_constructors_names);
+    (List.map fst simple_constructors @ complex_constructors_names);
   let value_size = Arch.size_addr in
   let variant_part_immediate_or_pointer =
     let int_or_ptr_structure =
@@ -560,13 +561,13 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
     in
     Debugging_the_compiler.add_enum
       ~reference:(Proto_die.reference enum_die)
-      simple_constructors;
-    List.iteri
-      (fun i name ->
+      (List.map fst simple_constructors);
+    List.iter
+      (fun (name, tag) ->
         Proto_die.create_ignore ~parent:(Some enum_die)
           ~tag:Dwarf_tag.Enumerator
           ~attribute_values:
-            [ DAH.create_const_value ~value:(Int64.of_int i);
+            [ DAH.create_const_value ~value:(Int64.of_int tag);
               DAH.create_name name ]
           ())
       simple_constructors;
@@ -641,12 +642,14 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
           ~attribute_values:[DAH.create_byte_size_exn ~byte_size:1]
           ()
       in
-      List.iteri
-        (fun i (name, _) ->
+      (* These enum values are the runtime tags of the blocks; they must stay
+         consistent with the [discr_value]s of the variants below. *)
+      List.iter
+        (fun (name, tag, _) ->
           Proto_die.create_ignore ~parent:(Some enum_die)
             ~tag:Dwarf_tag.Enumerator
             ~attribute_values:
-              [ DAH.create_const_value ~value:(Int64.of_int i);
+              [ DAH.create_const_value ~value:(Int64.of_int tag);
                 DAH.create_name name ]
             ())
         complex_constructors;
@@ -662,12 +665,12 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
         (DAH.create_discr
            ~proto_die_reference:(Proto_die.reference discriminant))
     in
-    List.iteri
-      (fun i (constructor_name, fields) ->
+    List.iter
+      (fun (constructor_name, tag, fields) ->
         let subvariant =
           Proto_die.create ~parent:(Some variant_part_pointer)
             ~tag:Dwarf_tag.Variant
-            ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int i)]
+            ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int tag)]
             ()
         in
         Debugging_the_compiler.add
@@ -1260,14 +1263,15 @@ let partition_constructors constructors ~f =
   List.partition_map
     (fun (constr : RS.constructor) ->
       let constr_name = RS.constructor_name constr in
+      let tag = RS.constructor_tag constr in
       let args = RS.constructor_args constr in
       match args with
-      | [] -> Left constr_name
+      | [] -> Left (constr_name, tag)
       | _ :: _ ->
         let args =
           List.map (fun { RS.label; field_type } -> f label field_type) args
         in
-        Right (constr_name, args))
+        Right (constr_name, tag, args))
     constructors
 
 (* CR sspies: We have to be careful here, because LLDB currently disambiguates
@@ -1358,6 +1362,12 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     let simple_constructors, complex_constructors =
       partition_constructors constructors ~f:(fun _label field_type ->
           die field_type)
+    in
+    (* Polymorphic variants dispatch on hashes of the constructor names rather
+       than on the tags. *)
+    let simple_constructors = List.map fst simple_constructors in
+    let complex_constructors =
+      List.map (fun (name, _tag, args) -> name, args) complex_constructors
     in
     create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
       ~simple_constructors ~complex_constructors ()

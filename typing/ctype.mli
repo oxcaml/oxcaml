@@ -476,6 +476,10 @@ val match_class_declarations:
 
 val enlarge_type: Env.t -> type_expr -> type_expr * bool
         (* Make a type larger, flag is true if some pruning had to be done *)
+val find_supertype: Env.t -> type_expr -> type_expr option
+        (* If [ty] is a [Tconstr] whose declaration has a supertype, that
+           supertype instantiated at [ty]'s arguments (fresh nodes); else
+           [None]. *)
 val subtype: Env.t -> type_expr -> type_expr -> unit -> unit
         (* [subtype env t1 t2] checks that [t1] is a subtype of [t2].
            It accumulates the constraints the type variables must

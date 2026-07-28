@@ -1,0 +1,42 @@
+coerce identity: OK
+transitive coerce: OK
+vowel match: A
+vowel match: E
+round Ln: OK
+round Cr: OK
+round Dot: OK
+coerce block equal: OK
+compare vowel: OK
+repr vowel E: OK
+repr round Dot: OK
+tag round Cr: OK
+marshal round-trip: OK
+bigsub f: 0
+bigsub f: 1
+bigsub f: 1
+bigsub f: 1
+bigsub g: -1
+bigsub g: 5
+bigsub g: 37
+bigsub g: -1
+bigsub2 h K00: OK
+bigsub2 h K04: OK
+bigsub2 h K39: OK
+psub PFloat tag: OK
+psub PMixed tag: OK
+psub PMut tag: OK
+psub PNone repr: OK
+psub: F3.5
+psub: M2/1.5
+psub: R10
+psub: N
+coerce float payload: OK
+coerce mixed payload: OK
+mutate payload: OK
+repr vowel A: OK
+tag round Ln: OK
+repr bigsub K05: OK
+repr bigsub K37: OK
+tag bigsub V1: OK
+tag param L: OK
+tag param N: OK

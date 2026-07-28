@@ -88,8 +88,11 @@ val check_recmod_jkind_decl:
     Env.t -> Location.t -> Ident.t list -> Path.t ->
     Types.jkind_declaration -> unit
 
-(* Checks that constraints are respected in the [type_declaration] *)
+(* Checks that constraints are respected in the [type_declaration].
+   [group_ids] are the other members of the declaration's recursive group,
+   which its supertype may not refer to. *)
 val check_coherence:
+    ?group_ids:Ident.Set.t ->
     Env.t -> Location.t -> Path.t -> type_declaration -> unit
 
 (* for fixed types *)
@@ -248,6 +251,13 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Manifest_and_supertype
+  | Supertype_not_a_variant of type_expr
+  | Supertype_in_recursive_group of type_expr
+  | Supertype_on_non_variant
+  | Supertype_not_boxed
+  | Supertype_bad_parameters of type_expr
+  | Supertype_in_with_constraint
 
 exception Error of Location.t * error
 

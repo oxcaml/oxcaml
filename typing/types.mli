@@ -1307,6 +1307,9 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
+(* The runtime tag of a constructor, from its layout. *)
+val cstr_layout_tag : cstr_layout -> int
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 

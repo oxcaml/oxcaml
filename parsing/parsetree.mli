@@ -750,7 +750,7 @@ and type_declaration =
      ptype_kind: type_kind;
      ptype_private: private_flag;  (** for [= private ...] *)
      ptype_manifest: core_type option;  (** represents [= T] *)
-     ptype_supertype: core_type option;  (** represents [<: T] *)
+     ptype_supertype: core_type option;  (** represents [:> T] *)
      ptype_attributes: attributes;  (** [... [\@\@id1] [\@\@id2]] *)
      ptype_jkind_annotation: jkind_annotation option; (** for [: jkind] *)
      ptype_loc: Location.t;

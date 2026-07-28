@@ -181,6 +181,7 @@ module T = struct
        ptype_kind;
        ptype_private = _;
        ptype_manifest;
+       ptype_supertype;
        ptype_attributes;
        ptype_jkind_annotation;
        ptype_loc} =
@@ -191,6 +192,7 @@ module T = struct
       ptype_cstrs;
     sub.type_kind sub ptype_kind;
     iter_opt (sub.typ sub) ptype_manifest;
+    iter_opt (sub.typ sub) ptype_supertype;
     sub.location sub ptype_loc;
     sub.attributes sub ptype_attributes;
     Option.iter (sub.jkind_annotation sub) ptype_jkind_annotation

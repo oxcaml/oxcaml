@@ -523,6 +523,8 @@ let mk_constructor_description cstr_name =
     cstr_tag = Ordinary { src_index = 0; runtime_tag = 0 };
     cstr_consts = 0;
     cstr_nonconsts = 0;
+    cstr_const_span = 0;
+    cstr_nonconst_span = 0;
     cstr_generalized = false;
     cstr_private = Public;
     cstr_loc = Location.none;

@@ -893,6 +893,10 @@ let closed_type_decl decl =
       None    -> ()
     | Some ty -> close_type mark ty
     end;
+    begin match decl.type_supertype with
+      None    -> ()
+    | Some ty -> close_type mark ty
+    end;
     None
   with Non_closed (ty, _) ->
     Some ty
@@ -1730,6 +1734,7 @@ let instance_declaration decl =
         decl with
         type_params = List.map copy decl.type_params;
         type_manifest = Option.map copy decl.type_manifest;
+        type_supertype = Option.map copy decl.type_supertype;
         type_kind = map_kind copy decl.type_kind;
         type_jkind = Jkind.map_type_expr copy decl.type_jkind;
         type_unboxed_version = Option.map instance decl.type_unboxed_version;
@@ -2350,17 +2355,23 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+(* Instantiate the declared supertype of [ty] (a [Tconstr]) at [ty]'s type
+   arguments. The result consists of fresh nodes, so unifying with it cannot
+   corrupt the declaration. Termination of repeated expansion relies on
+   supertype chains being well-founded, which [Typedecl.check_supertype]
+   enforces (a supertype must be a previously defined type). *)
 let find_supertype env ty =
-  let path, args = match get_desc ty with
-    | Tconstr (path, args, _) -> path, args
-    | _ -> assert false
-  in
-  (* XXX Deal with args *)
-  ignore args;
-  match Env.find_type path env with
-  | { type_supertype = Some sup; _ } -> sup
-  | { type_supertype = None; _ }
-  | exception Not_found -> assert false
+  match get_desc ty with
+  | Tconstr (path, args, _) -> begin
+      match Env.find_type path env with
+      | { type_supertype = Some sup; type_params; _ } -> begin
+          match apply env type_params sup args with
+          | sup -> Some sup
+          | exception Cannot_apply -> None
+        end
+      | { type_supertype = None; _ } | exception Not_found -> None
+    end
+  | _ -> None
 
 let rec try_expand_once_gen expand_abbrev env ty =
   match get_desc ty with
@@ -7735,6 +7746,14 @@ let enlarge_type env ty =
 
 let subtypes = TypePairs.create 17
 
+(* Supertype paths currently being expanded on the active [subtype_rec] chain.
+   Unlike abbreviations, [find_supertype] returns freshly instantiated nodes
+   each time, so the physical-node cycle guard [subtypes] never catches a
+   supertype/manifest knot (constructible via recursive modules). A path can
+   only recur along one expansion chain if the supertypes form a cycle, which
+   declaration order otherwise forbids; treat a repeat as "not a subtype". *)
+let subtype_expanding = ref Path.Set.empty
+
 let subtype_error ~env ~trace ~unification_trace =
   raise (Subtype (Subtype.error
                     ~trace:(expand_subtype_trace env (List.rev trace))
@@ -7822,8 +7841,17 @@ let rec subtype_rec env trace t1 t2 cstrs =
       when generic_private_abbrev env p1 && safe_abbrev_opt env t1 ->
         subtype_rec env trace (expand_abbrev_opt env t1) t2 cstrs
     | (Tconstr(p1, _, _), _)
-      when has_generic_supertype env p1 ->
-        subtype_rec env trace (find_supertype env t1) t2 cstrs
+      when has_generic_supertype env p1
+           && not (Path.Set.mem p1 !subtype_expanding) ->
+        begin match find_supertype env t1 with
+        | Some sup ->
+            let saved = !subtype_expanding in
+            subtype_expanding := Path.Set.add p1 saved;
+            let cstrs = subtype_rec env trace sup t2 cstrs in
+            subtype_expanding := saved;
+            cstrs
+        | None -> (trace, t1, t2, !univar_pairs)::cstrs
+        end
 (*  | (_, Tconstr(p2, _, _)) when generic_private_abbrev false env p2 ->
         subtype_rec env trace t1 (expand_abbrev_opt env t2) cstrs *)
     | (Tobject (f1, _), Tobject (f2, _))
@@ -8022,6 +8050,7 @@ and subtype_row env trace row1 row2 cstrs =
 
 let subtype env ty1 ty2 =
   TypePairs.clear subtypes;
+  subtype_expanding := Path.Set.empty;
   with_univar_pairs [] (fun () ->
     (* Build constraint set. *)
     let cstrs =
@@ -8429,20 +8458,15 @@ let rec nondep_type_decl env mid is_covariant decl =
                 Private
             with Nondep_cannot_erase _ ->
               None, decl.type_private
-    (* XXX Just copying code blindly here. Need to understand and probably
-       refactor with above. *)
-    in
-    let st, priv =
+    and st =
+      (* A supertype only enables coercions, so unlike a manifest it can
+         simply be dropped: doing so is sound and, since it plays no role in
+         type identity, requires no privacy adjustment. *)
       match decl.type_supertype with
-      | None -> None, priv
+      | None -> None
       | Some ty ->
-          try Some (nondep_type_rec env mid ty), priv
-          with Nondep_cannot_erase _ when is_covariant ->
-            clear_hash ();
-            try Some (nondep_type_rec ~expand_private:true env mid ty),
-                Private
-            with Nondep_cannot_erase _ ->
-              None, priv
+          (try Some (nondep_type_rec env mid ty)
+           with Nondep_cannot_erase _ when is_covariant -> None)
     and jkind =
       let jkind = nondep_jkind_base env mid decl.type_jkind in
       try Jkind.map_type_expr (nondep_type_rec env mid) jkind

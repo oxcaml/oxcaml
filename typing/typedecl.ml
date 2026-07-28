@@ -158,6 +158,13 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Manifest_and_supertype
+  | Supertype_not_a_variant of type_expr
+  | Supertype_in_recursive_group of type_expr
+  | Supertype_on_non_variant
+  | Supertype_not_boxed
+  | Supertype_bad_parameters of type_expr
+  | Supertype_in_with_constraint
 
 open Typedtree
 
@@ -1016,6 +1023,10 @@ let transl_declaration env sdecl (id, uid) =
       Some cty, Some cty.ctyp_type
   in
   let (tman, man) = transl_simple_type_opt_in_decl sdecl.ptype_manifest in
+  Option.iter
+    (fun sty ->
+      Language_extension.assert_enabled ~loc:sty.ptyp_loc Subtypes ())
+    sdecl.ptype_supertype;
   let (tsup, sup) = transl_simple_type_opt_in_decl sdecl.ptype_supertype in
   (* jkind_default is the jkind to use for now as the type_jkind when there
      is no annotation and no manifest.
@@ -1745,75 +1756,151 @@ let narrow_to_manifest_jkind env loc path decl =
     in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
+(* Check that a supertype is legal: it must be (headed by) a previously
+   defined boxed variant type, and only a variant (or abstract) type may
+   declare one. Run for every kind, including abstract: an abstract
+   declaration's supertype still licenses coercions, so it must be validated
+   even though there is no kind to compare it against. *)
+let check_supertype env loc ~group_ids dpath decl =
+  match decl.type_supertype with
+  | None -> ()
+  | Some sup ->
+    begin match decl.type_manifest, decl.type_kind with
+    | Some _, Type_abstract _ ->
+      (* With an explicit variant definition, an equation and a supertype can
+         both be checked against it, but a bare equation gives no way to
+         justify the supertype. *)
+      (* CR-someday lmaurer: We intend to support combining a supertype with
+         a bare equation, e.g. [type t :> letter = vowel], by checking that
+         the equated type is (transitively) a subtype of the supertype. *)
+      raise (Error (loc, Manifest_and_supertype))
+    | _, _ -> ()
+    end;
+    begin match get_desc sup with
+    | Tconstr (path, args, _) ->
+      let in_group =
+        Path.same path dpath
+        || (match path with
+            | Path.Pident id -> Ident.Set.mem id group_ids
+            | _ -> false)
+      in
+      (* Requiring the supertype to be previously defined keeps supertype
+         chains well-founded, which [Ctype.subtype_rec] relies on for
+         termination, and guarantees its constructor tags are final when
+         [update_decl_jkind] inherits them. *)
+      if in_group then
+        raise (Error (loc, Supertype_in_recursive_group sup));
+      begin match Env.find_type path env with
+      | { type_kind = Type_variant (_, Variant_boxed _, _); _ } -> ()
+      | _ -> raise (Error (loc, Supertype_not_a_variant sup))
+      | exception Not_found ->
+        raise (Error (loc, Unavailable_type_constructor path))
+      end;
+      (* Constrain this declaration's own kind against the supertype:
+         - An abstract declaration skips [check_kind_coherence]'s comparison,
+           so enforce here that the supertype is applied to this declaration's
+           own parameters (as a manifest would be); otherwise e.g.
+           [type 'a s :> ('a s) t] yields an unimplementable signature and,
+           under [-rectypes], divergence.
+           CR-someday lmaurer: for concrete kinds this same invariant is
+           enforced by [check_kind_coherence] via [Includecore.Arity];
+           unifying the two would give one diagnostic.
+         - The coercion is a no-op, so the subtype must share the supertype's
+           boxed representation; an [@@unboxed] (or otherwise special) variant
+           has no such representation (its value is its bare payload), so it
+           is not a subtype of anything, and tag inheritance
+           ([update_decl_jkind]) only runs for the boxed branch anyway. *)
+      begin match decl.type_kind with
+      | Type_abstract _ ->
+        if List.length args <> decl.type_arity
+        || (match Ctype.equal env false args decl.type_params with
+            | () -> false
+            | exception Ctype.Equality _ -> true)
+        then raise (Error (loc, Supertype_bad_parameters sup))
+      | Type_variant (_, Variant_boxed _, _) -> ()
+      | Type_variant (_, (Variant_unboxed | Variant_with_null
+                         | Variant_extensible), _) ->
+        raise (Error (loc, Supertype_not_boxed))
+      | Type_record _ | Type_record_unboxed_product _ | Type_open ->
+        raise (Error (loc, Supertype_on_non_variant))
+      end
+    | _ -> raise (Error (loc, Supertype_not_a_variant sup))
+    end
+
 (* Check that the type expression (if present) is compatible with the kind.
    If both a variant/record definition and a type equation are given,
    need to check that the equation refers to a type of the same kind
-   with the same constructors and labels. *)
-let check_kind_coherence env loc dpath decl =
-  let manifest_or_supertype, ~is_manifest =
-    match decl.type_manifest, decl.type_supertype with
-    | Some _, Some _ ->
-      (* XXX Should be non-fatal *)
-      Misc.fatal_errorf "Can't combine manifest and supertype: %a"
-        (Format_doc.compat Path.print) dpath
-    | Some man, None -> Some man, ~is_manifest:true
-    | None, Some sup -> Some sup, ~is_manifest:false
-    | None, None -> None, ~is_manifest:false
-  in
-  match decl.type_kind, manifest_or_supertype with
-  | (Type_variant _ | Type_record _ | Type_record_unboxed_product _
-    | Type_open),
-    Some ty ->
-    begin match get_desc ty with
-    | Tconstr(path, args, _) ->
-      begin
-      try
-        let decl' = Env.find_type path env in
-        let err =
-          if List.length args <> List.length decl.type_params
-          then Some Includecore.Arity
-          else begin
-            match Ctype.equal env false args decl.type_params with
-            | exception Ctype.Equality err ->
-                Some (Includecore.Constraint err)
-            | () ->
-              let subst =
-                Subst.Unsafe.add_type_path dpath path Subst.identity in
-              let decl =
-                match Subst.Unsafe.type_declaration subst decl with
-                | Ok decl -> decl
-                | Error (Fcm_type_substituted_away _) ->
-                      (* no module type substitution in [subst] *)
-                    assert false
-              in
-              Includecore.type_declarations ~loc ~equality:true env
-                ~allow_supertype:(not is_manifest)
-                ~mark:true
-                (Path.last path)
-                decl'
-                dpath
-                decl
-          end
-        in
-        if err <> None then
-          raise (Error(loc, Definition_mismatch (ty, env, err)))
-      with Not_found ->
-        raise(Error(loc, Unavailable_type_constructor path))
+   with the same constructors and labels. Similarly, a variant definition
+   with a supertype must declare a subset of the supertype's constructors,
+   with equal argument types and inherited tags. *)
+let check_kind_coherence env loc ~group_ids dpath decl =
+  check_supertype env loc ~group_ids dpath decl;
+  let check_against ~is_manifest ty =
+    match decl.type_kind with
+    | Type_abstract _ -> ()
+    | Type_variant _ | Type_record _ | Type_record_unboxed_product _
+    | Type_open ->
+      begin match get_desc ty with
+      | Tconstr(path, args, _) ->
+        begin
+        try
+          let decl' = Env.find_type path env in
+          let err =
+            if List.length args <> List.length decl.type_params
+            then Some Includecore.Arity
+            else begin
+              match Ctype.equal env false args decl.type_params with
+              | exception Ctype.Equality err ->
+                  Some (Includecore.Constraint err)
+              | () ->
+                let decl =
+                  if not is_manifest then
+                    (* Unlike a manifest, a supertype is not an equation, so
+                       recursive occurrences of [dpath] must match literally.
+                       (Substituting would e.g. equate [A of {mutable x : t}]
+                       with the supertype's [A of {mutable x : s}], making
+                       the zero-cost coercion unsound.) *)
+                    decl
+                  else begin
+                    let subst =
+                      Subst.Unsafe.add_type_path dpath path Subst.identity in
+                    match Subst.Unsafe.type_declaration subst decl with
+                    | Ok decl -> decl
+                    | Error (Fcm_type_substituted_away _) ->
+                          (* no module type substitution in [subst] *)
+                        assert false
+                  end
+                in
+                Includecore.type_declarations ~loc ~equality:true env
+                  ~allow_supertype:(not is_manifest)
+                  ~mark:true
+                  (Path.last path)
+                  decl'
+                  dpath
+                  decl
+            end
+          in
+          if err <> None then
+            raise (Error(loc, Definition_mismatch (ty, env, err)))
+        with Not_found ->
+          raise(Error(loc, Unavailable_type_constructor path))
+        end
+      | _ -> raise (Error(loc, Definition_mismatch (ty, env, None)))
       end
-    | _ -> raise (Error(loc, Definition_mismatch (ty, env, None)))
-    end
-  | _ -> ()
+  in
+  Option.iter (check_against ~is_manifest:true) decl.type_manifest;
+  Option.iter (check_against ~is_manifest:false) decl.type_supertype
 
-let check_coherence env loc dpath decl =
-  check_kind_coherence env loc dpath decl;
+let check_coherence ?(group_ids = Ident.Set.empty) env loc dpath decl =
+  check_kind_coherence env loc ~group_ids dpath decl;
   match decl.type_unboxed_version with
   | Some decl' ->
-    check_kind_coherence env loc (Path.unboxed_version dpath) decl'
+    check_kind_coherence env loc ~group_ids (Path.unboxed_version dpath) decl'
   | None -> ()
 
-let check_abbrev env sdecl (id, decl) =
+let check_abbrev env ~group_ids sdecl (id, decl) =
   let path = Path.Pident id in
-  check_coherence env sdecl.ptype_loc path decl;
+  check_coherence ~group_ids env sdecl.ptype_loc path decl;
   (id, narrow_to_manifest_jkind env sdecl.ptype_loc path decl)
 
 let all_void_sort_option sort =
@@ -2549,6 +2636,39 @@ let rec update_decl_jkind env dpath decl =
           assert false
       end
     | cstrs, Variant_boxed cstr_layouts ->
+      (* If the declaration has a supertype (or re-exports a variant type via
+         its manifest), each constructor keeps the runtime tag of the
+         same-named constructor of that type, so that subtype values need no
+         conversion. The resulting tags may be sparse. Otherwise, constant and
+         non-constant constructors are numbered separately, in order.
+
+         When no tag can be inherited (unknown or non-variant head, missing
+         constructor, or a type from the same recursive group whose own tags
+         aren't assigned yet), fall back to numbering: [check_kind_coherence]
+         rejects all such declarations before the tags are consumed. *)
+      let inherited_tags =
+        let head =
+          match decl.type_supertype, decl.type_manifest with
+          | Some ty, _ | None, Some ty -> Some ty
+          | None, None -> None
+        in
+        match head with
+        | None -> None
+        | Some ty ->
+          match get_desc ty with
+          | Tconstr (path, _, _) -> begin
+              match Env.find_type path env with
+              | { type_kind =
+                    Type_variant (cstrs', Variant_boxed layouts, _); _ } ->
+                Some
+                  (List.mapi
+                     (fun i (cd : Types.constructor_declaration) ->
+                        Ident.name cd.cd_id, cstr_layout_tag layouts.(i))
+                     cstrs')
+              | _ | exception Not_found -> None
+            end
+          | _ -> None
+      in
       let cstrs =
         let consts = ref 0 in
         let non_consts = ref 0 in
@@ -2559,7 +2679,14 @@ let rec update_decl_jkind env dpath decl =
           in
           let post_incr r = let value = !r in incr r; value in
           let tag =
-            if all_void then post_incr consts else post_incr non_consts
+            let inherited =
+              Option.bind inherited_tags
+                (List.assoc_opt (Ident.name cstr.Types.cd_id))
+            in
+            match inherited with
+            | Some tag when tag >= 0 -> tag
+            | Some _ | None ->
+              if all_void then post_incr consts else post_incr non_consts
           in
           let cstr_repr =
             update_constructor_representation env cd_args jkinds
@@ -3808,7 +3935,11 @@ let transl_type_decl env rec_flag sdecl_list =
         raise (Error (loc, Separability err))
   in
   (* Check re-exportation, updating [type_jkind] from the manifest *)
-  let decls = List.map2 (check_abbrev new_env) sdecl_list decls in
+  let group_ids =
+    List.fold_left (fun acc (id, _) -> Ident.Set.add id acc)
+      Ident.Set.empty ids_list
+  in
+  let decls = List.map2 (check_abbrev new_env ~group_ids) sdecl_list decls in
   let shapes = shape_declarations env decls in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env ~shapes:(Some shapes) decls env in
@@ -4827,15 +4958,18 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       in
       cty, cty.ctyp_type
   in
-  let (tsup, sup) = match sdecl.ptype_supertype with
-      None -> None, None
-    | Some sty ->
-      let cty =
-        transl_simple_type ~new_var_jkind:Any env ~closed:no_row
-          Mode.Alloc.Const.legacy sty
-      in
-      Some cty, Some cty.ctyp_type
-  in
+  (* The grammar cannot put a supertype on a [with type] constraint; only a
+     preprocessor (ppx) could forge the AST. Reject it rather than silently
+     installing an unvalidated supertype. The legitimate case — constraining
+     a subtype member, e.g. [S with type t = vowel] — carries no supertype
+     here and inherits [sig_decl]'s below.
+     CR-someday lmaurer: [S with type t :> u] would be a reasonable feature
+     (the natural way to constrain the subtype member of a [module type of]).
+     Supporting it means validating this supertype like a source declaration
+     (see [check_supertype]) and extending the grammar; out of scope here. *)
+  (match sdecl.ptype_supertype with
+   | None -> ()
+   | Some sty -> raise (Error (sty.ptyp_loc, Supertype_in_with_constraint)));
   (* In the second part, we check the consistency between the two
      declarations and compute a "merged" declaration; we now need to
      work in the larger signature environment [sig_env], because
@@ -4923,6 +5057,16 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       sig_decl.type_jkind
     else
       Type_abstract Definition, false, sig_decl.type_jkind
+  in
+  let sup =
+    (* A variant kind inherited from the signature keeps its supertype: the
+       constructors' tags come from it, and inclusion checks it. (For an
+       abstract signature declaration the manifest justifies the supertype
+       instead; see [Includecore.type_declarations].) A supertype spelled in
+       the constraint itself is rejected above, so there is none to prefer. *)
+    match type_kind with
+    | Type_variant _ -> sig_decl.type_supertype
+    | _ -> None
   in
   let new_sig_decl =
     { type_params = params;
@@ -5023,7 +5167,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_cstrs = constraints;
     typ_loc = loc;
     typ_manifest = Some tman;
-    typ_supertype = tsup;
+    typ_supertype = None;
     typ_kind = Ttype_abstract;
     typ_private = sdecl.ptype_private;
     typ_attributes = sdecl.ptype_attributes;
@@ -5151,7 +5295,7 @@ let check_recmod_typedecl env loc recmod_ids path decl =
      instead of fixing the spurious failures, we choose to just not perform the check,
      with the intention of fixing the jkind soundness issue once the other soundness issue
      is resolved. *)
-  check_kind_coherence env loc path decl
+  check_kind_coherence env loc ~group_ids:Ident.Set.empty path decl
 
 let check_recmod_jkind_decl env loc recmod_ids path decl =
   check_well_founded_jkind_decl env loc recmod_ids path decl
@@ -5947,6 +6091,36 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
+  | Manifest_and_supertype ->
+    Location.errorf ~loc
+      "A type declaration cannot have both a type equation and a supertype."
+  | Supertype_not_a_variant ty ->
+    Location.errorf ~loc
+      "@[The supertype@;<1 2>%a@ is not a variant type.@ \
+       Only a type declared as a variant can be a supertype.@]"
+      quoted_type ty
+  | Supertype_in_recursive_group ty ->
+    Location.errorf ~loc
+      "@[The supertype@;<1 2>%a@ must be defined before this declaration;@ \
+       it cannot be part of the same recursive group.@]"
+      quoted_type ty
+  | Supertype_on_non_variant ->
+    Location.errorf ~loc
+      "Only variant types can declare a supertype."
+  | Supertype_not_boxed ->
+    Location.errorf ~loc
+      "@[A variant type with a supertype must use the default (boxed)@ \
+       representation.@ A type with an unboxed or special representation@ \
+       cannot be a subtype.@]"
+  | Supertype_bad_parameters ty ->
+    Location.errorf ~loc
+      "@[The supertype@;<1 2>%a@ must be applied to the parameters of this@ \
+       type declaration.@]"
+      quoted_type ty
+  | Supertype_in_with_constraint ->
+    Location.errorf ~loc
+      "A supertype annotation is not allowed in a %a constraint."
+      Style.inline_code "with type"
 
 let () =
   Location.register_error_of_exn

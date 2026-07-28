@@ -931,6 +931,9 @@ let rec compare_mixed_block_element e1 e2 =
   | Void, _ -> -1
   | _, Void -> 1
 
+let cstr_layout_tag = function
+  | Cstr_layout_known { tag; _ } | Cstr_layout_variable { tag } -> tag
+
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
 
@@ -950,10 +953,11 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
         (fun l1 l2 -> match l1, l2 with
            | Cstr_layout_variable { tag = t1 },
              Cstr_layout_variable { tag = t2 } ->
-             t1 == t2
-           | Cstr_layout_known { shape = s1; sorts = ss1 },
-             Cstr_layout_known { shape = s2; sorts = ss2 } ->
-             equal_constructor_representation_up_to_scannable_axes s1 s2
+             t1 = t2
+           | Cstr_layout_known { tag = t1; shape = s1; sorts = ss1 },
+             Cstr_layout_known { tag = t2; shape = s2; sorts = ss2 } ->
+             t1 = t2
+             && equal_constructor_representation_up_to_scannable_axes s1 s2
              && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
            | (Cstr_layout_known _ | Cstr_layout_variable _), _ -> false)
         layouts1

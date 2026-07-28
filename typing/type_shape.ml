@@ -444,7 +444,7 @@ module Type_decl_shape = struct
           list
     in
     match (arg_layout : Types.cstr_layout), args with
-    | Cstr_layout_known { shape = constructor_repr; _ }, Some args ->
+    | Cstr_layout_known { tag; shape = constructor_repr; _ }, Some args ->
       let constructor_repr =
         match (constructor_repr : Types.constructor_representation) with
         | Constructor_mixed shapes ->
@@ -486,6 +486,7 @@ module Type_decl_shape = struct
       Some
         { Shape.name;
           constr_uid = Some cstr_args.cd_uid;
+          cstr_tag = tag;
           kind = constructor_repr;
           args
         }
@@ -678,7 +679,7 @@ module Type_decl_shape = struct
         constrs
     | Variant constructors ->
       List.for_all
-        (fun { name = _; constr_uid = _; kind = _; args } ->
+        (fun { name = _; constr_uid = _; cstr_tag = _; kind = _; args } ->
           List.for_all
             (fun { field_name = _; field_uid = _; field_value = sh, _ } ->
               is_closed_type_shape sh)

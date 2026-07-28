@@ -35,6 +35,12 @@ type constructor_description =
        the null pointer) *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
+    cstr_const_span: int;
+    (* 1 + largest constant-constructor tag; equals [cstr_consts] except
+       when constructors inherit sparse tags from a supertype *)
+    cstr_nonconst_span: int;
+    (* 1 + largest non-constant-constructor tag; equals [cstr_nonconsts]
+       except when constructors inherit sparse tags from a supertype *)
     cstr_generalized: bool;             (* Constrained return type? *)
     cstr_private: private_flag;         (* Read-only constructor? *)
     cstr_loc: Location.t;

@@ -316,6 +316,9 @@ and 'a complex_constructors = 'a complex_constructor list
 and 'a complex_constructor =
   { name : string;
     constr_uid: Uid.t option;
+    cstr_tag: int;
+    (** The runtime tag of the constructor.  Tags may be sparse: a subtype
+        inherits the tags of the same-named constructors of its supertype. *)
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }

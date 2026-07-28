@@ -356,9 +356,9 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
                 | Type_record_unboxed_product _;
       type_manifest = _ } ->
     let mn =
-      match decl.type_manifest with
-        None -> []
-      | Some ty -> [ false, ty ]
+      List.map (fun ty -> false, ty)
+        (Option.to_list decl.type_manifest
+         @ Option.to_list decl.type_supertype)
     in
     let vari =
       match decl.type_kind with
@@ -377,7 +377,8 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
                      {decl with type_private = Private}
                      (add_false [ ty ])
                 )
-                (Option.to_list decl.type_manifest)
+                (Option.to_list decl.type_manifest
+                 @ Option.to_list decl.type_supertype)
             in
             let constructor_variance =
               List.map

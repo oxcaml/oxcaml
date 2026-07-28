@@ -412,6 +412,9 @@ type type_mismatch =
   | Variance
   | Record_mismatch of record_mismatch
   | Variant_mismatch of variant_change list
+  | Constructor_tag of { name : string; tag1 : int; tag2 : int }
+  | Supertype_only_on of position
+  | Supertype_mismatch of Errortrace.equality_error
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
@@ -819,6 +822,25 @@ let report_type_mismatch first second decl env ppf err =
       report_record_mismatch first second decl env ppf err
   | Variant_mismatch err ->
       report_patch pp_variant_diff first second decl env ppf err
+  | Constructor_tag { name; tag1; tag2 } ->
+      pr "Constructor %a has a different runtime representation:@ \
+          its tag is %d in %s %s@ but %d in %s %s."
+        Style.inline_code name tag1 first decl tag2 second decl
+  | Supertype_only_on ord ->
+      pr "%s %s has a supertype and %s does not."
+        (String.capitalize_ascii (choose ord first second)) decl
+        (choose_other ord first second)
+  | Supertype_mismatch err ->
+      pr "Their supertypes differ:@,";
+      report_type_inequality env ppf err;
+      (* CR-someday lmaurer: because inclusion requires the supertypes to be
+         equal, a subtype member of a [module type of ...] cannot currently
+         be relaxed by a plain [with type]; it takes a destructive
+         substitution with another subtype of the same supertype. Once
+         [with type t :> u] is supported this hint can point there; for now
+         the workaround is too situational to spell out in every mismatch. *)
+      pr "@ @[<2>Hint: signature inclusion requires the two supertypes to be@ \
+          equal.@]"
   | Unboxed_representation (ord, attrs) ->
       pr "Their internal representations differ:@ %s %s %s."
          (choose ord first second) decl
@@ -1308,9 +1330,32 @@ module Variant_diffing = struct
       | [cstr] -> cstr.Types.cd_attributes
       | _ -> []
     in
+    let tag_mismatch cstr_layouts1 cstr_layouts2 =
+      (* Runtime tags are part of the representation: structurally equal
+         declarations can still disagree once constructors inherit tags from
+         a supertype. Reaching here means the structural diff already found
+         the constructors equal and in order, so the layout arrays are
+         aligned with [cstrs1]/[cstrs2] and with each other; a parallel scan
+         suffices. *)
+      let n = Array.length cstr_layouts1 in
+      if Array.length cstr_layouts2 <> n then None
+      else
+        let rec loop i =
+          if i >= n then None
+          else
+            let tag1 = cstr_layout_tag cstr_layouts1.(i) in
+            let tag2 = cstr_layout_tag cstr_layouts2.(i) in
+            if tag1 <> tag2 then
+              let name = Ident.name (List.nth cstrs1 i).Types.cd_id in
+              Some (Constructor_tag { name; tag1; tag2 })
+            else loop (i + 1)
+        in
+        loop 0
+    in
     match err, rep1, rep2 with
+    | None, Variant_boxed cstr_layouts1, Variant_boxed cstr_layouts2 ->
+        tag_mismatch cstr_layouts1 cstr_layouts2
     | None, Variant_unboxed, Variant_unboxed
-    | None, Variant_boxed _, Variant_boxed _
     | None, Variant_extensible, Variant_extensible
     | None, Variant_with_null, Variant_with_null -> None
     | Some err, _, _ ->
@@ -1640,7 +1685,14 @@ let type_declarations ?(equality = false) ?(allow_supertype = false) ~loc env
       | () -> None
   in
   if err <> None then err else
-  let err = match (decl1.type_manifest, decl2.type_manifest) with
+  (* Under [allow_supertype] (the subtype-coherence check) [decl2] is the
+     subtype and [decl1] its supertype; [decl2]'s manifest is a re-export
+     target, not a claim of equality with [decl1], so comparing manifests
+     here would spuriously reject valid re-exports (the constructor and tag
+     comparison below is what matters). *)
+  let err =
+    if allow_supertype then None
+    else match (decl1.type_manifest, decl2.type_manifest) with
       (_, None) -> None
     | (Some ty1, Some ty2) ->
          type_manifest env ty1 ty2 decl2.type_private decl2.type_kind
@@ -1651,6 +1703,38 @@ let type_declarations ?(equality = false) ?(allow_supertype = false) ~loc env
         match Ctype.equal env false [ty1] [ty2] with
         | exception Ctype.Equality err -> Some (Manifest err)
         | () -> None
+  in
+  if err <> None then err else
+  (* A declared supertype determines the constructors' runtime tags, so if
+     the second declaration has one, the first must have an equal one. (The
+     reverse needs no check here: if the second declaration exposes
+     constructors, differing tags are caught below; if it is abstract,
+     forgetting the supertype is sound.) Skipped for [allow_supertype]: there
+     [decl2]'s supertype is the relation being established against [decl1],
+     not an interface to match. *)
+  let err =
+    if allow_supertype then None
+    else match decl1.type_supertype, decl2.type_supertype with
+      | _, None -> None
+      | Some ty1, Some ty2 ->
+          begin match Ctype.equal env false [ty1] [ty2] with
+          | exception Ctype.Equality err -> Some (Supertype_mismatch err)
+          | () -> None
+          end
+      | None, Some ty2 ->
+          (* An equation can also justify the claim: [type t = m] matches
+             [type t :> s] when [m]'s own declaration has supertype [s].
+             (CR-someday lmaurer: Follow chains of supertypes.) *)
+          let justified =
+            match Option.bind decl1.type_manifest (Ctype.find_supertype env)
+            with
+            | None -> false
+            | Some s1 ->
+                match Ctype.equal env false [s1] [ty2] with
+                | exception Ctype.Equality _ -> false
+                | () -> true
+          in
+          if justified then None else Some (Supertype_only_on Second)
   in
   if err <> None then err else
   let mark_and_compare_records record_form labels1 rep1 labels2 rep2 =
@@ -1713,13 +1797,20 @@ let type_declarations ?(equality = false) ?(allow_supertype = false) ~loc env
         let variant_diff =
           match variant_diff with
           | Some (Variant_mismatch changes) when allow_supertype ->
-              (* If everything is a deletion, we're good *)
+              (* A subtype may omit constructors of its supertype, so
+                 deletions are fine (and not worth reporting); anything else
+                 is an error. *)
               let is_deletion : variant_change -> bool = function
                 | Delete _ -> true
                 | _ -> false
               in
-              if List.for_all is_deletion changes then None else variant_diff
-          | Some _ | None -> None
+              begin match
+                List.filter (fun c -> not (is_deletion c)) changes
+              with
+              | [] -> None
+              | changes -> Some (Variant_mismatch changes)
+              end
+          | (Some _ | None) as variant_diff -> variant_diff
         in
         Misc.Stdlib.Option.first_some
           variant_diff

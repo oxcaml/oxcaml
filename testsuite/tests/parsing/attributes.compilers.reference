@@ -90,6 +90,8 @@
         ptype_private = Public
         ptype_manifest =
           None
+        ptype_supertype =
+          None
         ptype_jkind_annotation =
           None
     ]
@@ -133,6 +135,8 @@
                     ]
                 ptype_private = Public
                 ptype_manifest =
+                  None
+                ptype_supertype =
                   None
                 ptype_jkind_annotation =
                   None
@@ -202,6 +206,8 @@
                         core_type (attributes.ml[39,498+58]..[39,498+61])
                           Ptyp_constr "M.t" (attributes.ml[39,498+58]..[39,498+61])
                           []
+                    ptype_supertype =
+                      None
                     ptype_jkind_annotation =
                       None
               ]
@@ -231,6 +237,8 @@
                   Ptype_abstract
                 ptype_private = Public
                 ptype_manifest =
+                  None
+                ptype_supertype =
                   None
                 ptype_jkind_annotation =
                   None
@@ -275,6 +283,8 @@
                     core_type (attributes.ml[53,681+34]..[53,681+37])
                       Ptyp_constr "int" (attributes.ml[53,681+34]..[53,681+37])
                       []
+                ptype_supertype =
+                  None
                 ptype_jkind_annotation =
                   None
           ]

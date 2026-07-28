@@ -147,10 +147,12 @@ and 'label mixed_block_field = private
 and constructor = private
   | Constructor_with_tuple_arg of
       { name : string;
+        tag : int;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        tag : int;
         args : string mixed_block_field list
       }
 
@@ -234,17 +236,20 @@ val map_mixed_block_field_label :
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_tuple_arg :
-  name:string -> args:unit mixed_block_field list -> constructor
+  name:string -> tag:int -> args:unit mixed_block_field list -> constructor
 
 (** Create a constructor with record-style arguments for use in variants.
 
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_record_arg :
-  name:string -> args:string mixed_block_field list -> constructor
+  name:string -> tag:int -> args:string mixed_block_field list -> constructor
 
 (** Get the name of a constructor. *)
 val constructor_name : constructor -> string
+
+(** Get the runtime tag of a constructor. *)
+val constructor_tag : constructor -> int
 
 (** Get the arguments of a constructor as a list of fields with optional labels.
     Tuple-style constructors have [None] labels, record-style constructors have

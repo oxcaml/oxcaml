@@ -88,6 +88,7 @@ module Example = struct
                          ; ptype_kind = Ptype_abstract
                          ; ptype_private = Public
                          ; ptype_manifest = Some core_type
+                         ; ptype_supertype = None
                          ; ptype_attributes = []
                          ; ptype_loc = loc
                          ; ptype_jkind_annotation =

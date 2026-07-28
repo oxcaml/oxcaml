@@ -1029,9 +1029,11 @@ and lambda_apply =
   }
 
 and lambda_switch =
-  { sw_numconsts: int;                  (* Number of integer cases *)
+  { sw_numconsts: int;                  (* 1 + the largest possible immediate
+                                           value of the scrutinee *)
     sw_consts: (int * lambda) list;     (* Integer cases *)
-    sw_numblocks: int;                  (* Number of tag block cases *)
+    sw_numblocks: int;                  (* 1 + the largest possible block
+                                           tag of the scrutinee *)
     sw_blocks: (int * lambda) list;     (* Tag block cases *)
     sw_failaction : lambda option}      (* Action to take if failure *)
 

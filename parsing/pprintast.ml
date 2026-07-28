@@ -2139,7 +2139,7 @@ and type_def_list ctxt f (rf, exported, l) =
     let subtype =
       match x.ptype_supertype with
       | None -> Format.dprintf ""
-      | Some ty -> Format.dprintf " <: %a" (core_type ctxt) ty
+      | Some ty -> Format.dprintf " :> %a" (core_type ctxt) ty
     in
     pp f "@[<2>%s %a%a%a%t%t%s%a@]%a" kwd
       nonrec_flag rf

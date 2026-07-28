@@ -140,6 +140,9 @@ type type_mismatch =
   | Variance
   | Record_mismatch of record_mismatch
   | Variant_mismatch of variant_change list
+  | Constructor_tag of { name : string; tag1 : int; tag2 : int }
+  | Supertype_only_on of position
+  | Supertype_mismatch of Errortrace.equality_error
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position

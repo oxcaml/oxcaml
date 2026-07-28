@@ -43,6 +43,8 @@
                     Ptyp_constr "int" (hash_ambiguity.ml[9,169+12]..[9,169+15])
                     []
                 ]
+        ptype_supertype =
+          None
         ptype_jkind_annotation =
           None
     ]
@@ -76,6 +78,8 @@
             ]
         ptype_private = Public
         ptype_manifest =
+          None
+        ptype_supertype =
           None
         ptype_jkind_annotation =
           None
@@ -114,6 +118,8 @@
             ]
         ptype_private = Public
         ptype_manifest =
+          None
+        ptype_supertype =
           None
         ptype_jkind_annotation =
           None

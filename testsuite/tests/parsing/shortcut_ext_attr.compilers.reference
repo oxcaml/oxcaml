@@ -531,6 +531,8 @@
                 Ptyp_package
                   package_type "M" (shortcut_ext_attr.ml[61,1304+20]..[61,1304+21])
                   []
+        ptype_supertype =
+          None
         ptype_jkind_annotation =
           None
     ]
@@ -622,6 +624,8 @@
                 core_type (shortcut_ext_attr.ml[79,1615+19]..[79,1615+22])
                   Ptyp_constr "int" (shortcut_ext_attr.ml[79,1615+19]..[79,1615+22])
                   []
+            ptype_supertype =
+              None
             ptype_jkind_annotation =
               None
           type_declaration "t" (shortcut_ext_attr.ml[80,1638+10]..[80,1638+11]) (shortcut_ext_attr.ml[80,1638+0]..[80,1638+17])
@@ -639,6 +643,8 @@
                 core_type (shortcut_ext_attr.ml[80,1638+14]..[80,1638+17])
                   Ptyp_constr "int" (shortcut_ext_attr.ml[80,1638+14]..[80,1638+17])
                   []
+            ptype_supertype =
+              None
             ptype_jkind_annotation =
               None
         ]
@@ -856,6 +862,8 @@
                         core_type (shortcut_ext_attr.ml[101,2020+21]..[101,2020+24])
                           Ptyp_constr "int" (shortcut_ext_attr.ml[101,2020+21]..[101,2020+24])
                           []
+                    ptype_supertype =
+                      None
                     ptype_jkind_annotation =
                       None
                   type_declaration "t'" (shortcut_ext_attr.ml[102,2045+12]..[102,2045+14]) (shortcut_ext_attr.ml[102,2045+2]..[102,2045+20])
@@ -873,6 +881,8 @@
                         core_type (shortcut_ext_attr.ml[102,2045+17]..[102,2045+20])
                           Ptyp_constr "int" (shortcut_ext_attr.ml[102,2045+17]..[102,2045+20])
                           []
+                    ptype_supertype =
+                      None
                     ptype_jkind_annotation =
                       None
                 ]

@@ -3748,7 +3748,8 @@ let combine_regular_constructor value_kind loc arg cstr partial
         act
     | _ -> (
         match
-          (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
+          (cstr.cstr_const_span, cstr.cstr_nonconst_span,
+           consts, nonconsts, null)
         with
         | 1, 1, [ (0, act1) ], [ (0, act2) ], None
           when not (Clflags.is_flambda2 ()) ->
@@ -3805,9 +3806,9 @@ let combine_regular_constructor value_kind loc arg cstr partial
             | None ->
                 (* In the general case, emit a switch. *)
                 let sw =
-                  { sw_numconsts = cstr.cstr_consts;
+                  { sw_numconsts = cstr.cstr_const_span;
                     sw_consts = consts;
-                    sw_numblocks = cstr.cstr_nonconsts;
+                    sw_numblocks = cstr.cstr_nonconst_span;
                     sw_blocks = nonconsts;
                     sw_failaction = fail_opt
                   }

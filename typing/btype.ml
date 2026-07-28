@@ -467,6 +467,7 @@ let type_iterators_without_type_expr =
   and it_type_declaration it td =
     List.iter (it.it_type_expr it) td.type_params;
     Option.iter (it.it_type_expr it) td.type_manifest;
+    Option.iter (it.it_type_expr it) td.type_supertype;
     Option.iter (it.it_type_declaration it) td.type_unboxed_version;
     it.it_type_kind it td.type_kind
   and it_extension_constructor it td =

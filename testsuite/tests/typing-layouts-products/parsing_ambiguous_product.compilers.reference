@@ -12,6 +12,8 @@
         ptype_private = Public
         ptype_manifest =
           None
+        ptype_supertype =
+          None
         ptype_jkind_annotation =
           Some
             jkind (parsing_ambiguous_product.ml[12,327+10]..[12,327+49])
@@ -42,6 +44,8 @@
         ptype_private = Public
         ptype_manifest =
           None
+        ptype_supertype =
+          None
         ptype_jkind_annotation =
           Some
             jkind (parsing_ambiguous_product.ml[14,380+10]..[14,380+45])
@@ -71,6 +75,8 @@
           Ptype_abstract
         ptype_private = Public
         ptype_manifest =
+          None
+        ptype_supertype =
           None
         ptype_jkind_annotation =
           Some

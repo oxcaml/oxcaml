@@ -564,6 +564,7 @@ and 'a complex_constructors = 'a complex_constructor list
 and 'a complex_constructor =
   { name : string;
     constr_uid: Uid.t option;
+    cstr_tag: int;
     kind : constructor_representation;
     args : 'a complex_constructor_argument list
   }
@@ -583,14 +584,14 @@ let poly_variant_constructors_map f pvs =
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
     pvs
 
-let complex_constructor_map f { name; constr_uid; kind; args } =
+let complex_constructor_map f { name; constr_uid; cstr_tag; kind; args } =
   let args =
     List.map
       (fun { field_name; field_uid; field_value } ->
         { field_name; field_uid; field_value = f field_value })
       args
   in
-  { name; constr_uid; kind; args }
+  { name; constr_uid; cstr_tag; kind; args }
 
 let complex_constructors_map f = List.map (complex_constructor_map f)
 
@@ -601,9 +602,10 @@ let equal_complex_constructor_arguments eq
   eq field_value1 field_value2
 
 let equal_complex_constructor eq
-    { name = name1; kind = kind1; args = args1 }
-    { name = name2; kind = kind2; args = args2 } =
+    { name = name1; cstr_tag = tag1; kind = kind1; args = args1 }
+    { name = name2; cstr_tag = tag2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
+  Int.equal tag1 tag2 &&
   Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
