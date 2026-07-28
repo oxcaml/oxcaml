@@ -141,6 +141,13 @@ let writes_to_reg64 target = function
     (* Conservative: assume any SIMD instruction may write to target. *)
     true
 
+let arg_unchanged_by arg instr =
+  match arg with
+  | Imm _ | Sym _ -> true
+  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+    not (writes_to_reg64 (underlying_reg64 arg |> Option.get) instr)
+  | Regf _ | Mem _ | Mem64_RIP _ -> false
+
 let reads_from_reg64 target = function
   | MOV (src, dst)
   | MOVSX (src, dst)
