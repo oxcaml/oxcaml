@@ -2777,7 +2777,8 @@ module Code = struct
     { exp; loc }
 
   let exp_close ?loc exp =
-    With_free_vars.value ~free:(Binding_error.scope_extrusion ?loc) exp
+    With_free_vars.check ~invalid:(Binding_error.scope_extrusion ?loc) exp;
+    With_free_vars.value ~free:(fun _var _loc -> ()) exp
 
   module Closed = struct
     type exp = t

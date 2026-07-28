@@ -98,17 +98,18 @@ val safe_eff : unit -> <[unit -> int]> expr = <fun>
 |}];;
 
 (* We can print if we are still in scope *)
+let cell = ref ""
 let safe_eff () =
   match <[ fun () -> let x = 42 in $(Effect.perform (Extrude <[x]>)) ]> with
   | x -> x
   | effect Extrude x, k ->
-    print_endline (Quote.string_of_expr x);
+    cell := Quote.string_of_expr x;
     Effect.Deep.continue k (Obj.magic_many <[ $x ]>)
 ;;
-safe_eff ()
+safe_eff ();; !cell
 [%%expect {|
+val cell : string ref = {contents = ""}
 val safe_eff : unit -> <[unit -> int]> expr = <fun>
-Exception:
-Failure
- "Identifier x bound at file , line 2, characters 21-68\nis extruded outside its scope:\nit is used at file , line 2, characters 63-64".
+- : <[unit -> int]> expr = <[fun () -> let x = 42 in x]>
+- : string = "x"
 |}];;
