@@ -361,6 +361,9 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         (* These combinators build quotation AST; they never run the quoted
+            code, so they can't yield *)
+         ap_yielding = Unyielding;
          ap_loc = loc;
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
@@ -2763,7 +2766,7 @@ let assert_no_jkinds jkind =
     jkind
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
-   Used for annotating polymorphic applications with higher-rank types. *)
+   Used for annotating the results of type inspections in quotes. *)
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
@@ -2817,6 +2820,7 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
+        | Tmod _ -> fatal_errorf "Translquote: unexpected Tmod"
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields
@@ -2853,8 +2857,8 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_constr (Predef.path_box, mkloc lident loc, [go ty])
         | Tsplice _ ->
           fatal_errorf
-            "Translquote [at %a]:@ Explicitly quantified type variables@ \
-             cannot be spliced@ within quoted higher-rank function types"
+            "Translquote [at %a]:@ Splices cannot appear in type annotations \
+             inserted in quotations@ for higher-rank or package types."
             Location.print_loc_in_lowercase loc
         | Tquote_eval _ ->
           let lident = Untypeast.lident_of_path Predef.path_eval in
@@ -2917,6 +2921,12 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   | Tpat_inspected_type (Polymorphic_parameter (Param ty)) ->
     Pat.constraint_ loc pat_lam
       (type_for_annotation ~env ~loc:(to_location loc) ty
+      |> quote_core_type ~scopes)
+      (Modes.wrap Modes.legacy)
+    |> Pat.wrap
+  | Tpat_inspected_type (Module_pack pty) ->
+    Pat.constraint_ loc pat_lam
+      (type_for_annotation ~env ~loc:(to_location loc) pty
       |> quote_core_type ~scopes)
       (Modes.wrap Modes.legacy)
     |> Pat.wrap
@@ -3434,11 +3444,11 @@ and quote_module_exp ~transl stage loc env mod_exp =
   | Tmod_ident (path, _) ->
     let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
-  | Tmod_apply (funct, arg, _) ->
+  | Tmod_apply (funct, arg, _, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     let transl_arg = quote_module_exp ~transl stage loc env arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap
-  | Tmod_apply_unit funct ->
+  | Tmod_apply_unit (funct, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     Module.apply_unit loc transl_funct |> Module.wrap
   | Tmod_constraint (mod_exp, _, _, _) ->
@@ -3625,6 +3635,14 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
          (Modes.wrap Modes.legacy)
       |> Type_constraint.wrap)
     |> Exp_desc.wrap
+  | Texp_inspected_type (Module_pack pty) ->
+    Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
+      (Type_constraint.constraint_ loc
+         (type_for_annotation ~env ~loc:(to_location loc) pty
+         |> quote_core_type ~scopes)
+         (Modes.wrap Modes.legacy)
+      |> Type_constraint.wrap)
+    |> Exp_desc.wrap
   | Texp_ghost_region -> lambda
   | Texp_borrowed ->
     Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
@@ -3638,8 +3656,7 @@ and update_env_with_extra ~loc extra =
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
-  | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_inspected_type _ -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
@@ -3652,8 +3669,7 @@ and update_env_without_extra ~loc extra =
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
   | Texp_mode _ -> ()
-  | Texp_inspected_type (Label_disambiguation _) -> ()
-  | Texp_inspected_type (Polymorphic_parameter _) -> ()
+  | Texp_inspected_type _ -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
 
@@ -3764,7 +3780,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
           e.exp_extra
       in
       Exp_desc.function_ loc fn
-    | Texp_apply (fn, args, _, _, _) ->
+    | Texp_apply (fn, args, _, _, _, _) ->
       let fn = quote_expression ~scopes ~transl stage fn in
       let args =
         List.filter

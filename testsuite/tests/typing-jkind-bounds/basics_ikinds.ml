@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension small_numbers -w -220";
+ flags = "-extension small_numbers -w -181-220";
  expect;
 *)
 
@@ -1361,7 +1361,7 @@ let f (type a : value) (x : a t) =
 [%%expect{|
 type _ t =
     A : ('a : immediate). 'a t
-  | B : ('b : value mod portable aliased). 'b -> 'b t
+  | B : ('b : value mod aliased portable). 'b -> 'b t
   | C : 'c t
 val f : 'a t -> unit = <fun>
 |}]
@@ -1387,7 +1387,7 @@ let f (type a : value) (x : a t) =
 [%%expect{|
 type _ t =
     A : ('a : immediate). 'a t
-  | B : ('b : value mod portable aliased). 'b -> 'b t
+  | B : ('b : value mod aliased portable). 'b -> 'b t
   | C : 'c t
 Line 17, characters 6-7:
 17 |     f y

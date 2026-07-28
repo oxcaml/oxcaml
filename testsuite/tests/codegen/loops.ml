@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -flambda2-no-simplify-stubs";
  expect.opt;
 *)
 
@@ -96,7 +97,7 @@ loop_with_non_dominating_load:
 .L0:
   testb $1, %bl
   je    .L1
-  movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2573@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11

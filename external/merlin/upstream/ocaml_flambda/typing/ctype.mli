@@ -288,10 +288,11 @@ val apply:
            set to true.
            Exception [Cannot_apply] is raised in case of failure. *)
 
-val reduce_head: expand_eval:bool -> Env.t -> type_expr -> type_expr
-(** Exhaustively beta-reduce head-position quotes, splices and quote-evals.
-    If [expand_eval] is true, expands [Predef]'s [eval]s into [Tquote_eval]
-    enabling further reductions. *)
+val reduce_head:
+  expand_reducible_abbrevs:bool -> Env.t -> type_expr -> type_expr
+(** Exhaustively beta-reduce head-position quotes, splices, quote-evals, and
+    boxes. If [expand_reducible_abbrevs] is true, expands [Predef]'s [eval]s and
+    [box]es into [Tquote_eval] and [Tbox], enabling further reductions. *)
 
 val try_expand_once_opt: Env.t -> type_expr -> type_expr
 val try_expand_safe_opt: Env.t -> type_expr -> type_expr
@@ -644,10 +645,10 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : (type_declaration * unwrapped_type_expr) option;
-    (* We store the declaration rather than a bool to avoid re-writing the
-       with-bounds of [or_null], and to be more robust for the future where we
-       have user-defined [or_null]-like types
+  ; or_null : unwrapped_or_null option;
+    (* We store the declaration and arguments rather than a bool to avoid
+       re-writing the with-bounds of [or_null], and to be more robust for the
+       future where we have user-defined [or_null]-like types
 
        Note [unwrapped_type_expr backtracking for or_null]:
 
@@ -668,6 +669,8 @@ type unwrapped_type_expr =
        [estimate_type_jkind] to fix another bug.
     *)
   }
+
+and unwrapped_or_null
 
 val get_unboxed_type_representation :
   Env.t ->
@@ -760,8 +763,8 @@ val check_type_externality :
 val is_always_gc_ignorable : Env.t -> type_expr -> bool
 
 (* Check whether a type's nullability is less than some target.
-   Uses get_nullability which is potentially cheaper than calling type_jkind
-   if all with-bounds are irrelevant. *)
+   Potentially cheaper than just calling [type_jkind], because this can stop
+   expansion once it succeeds. *)
 val check_type_nullability :
   Env.t -> type_expr -> Jkind_axis.Nullability.t -> bool
 

@@ -63,7 +63,7 @@ end
 module Exc : sig exception E end
 |}];;
 
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 (* Tests *)
 
@@ -268,6 +268,17 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun (x, y) -> x + y ]>;;
 [%%expect {|
 - : <[int * int -> int]> expr = <[fun (x, y) -> x + y]>
+|}];;
+
+<[ fun (Some x) -> x ]>;;
+[%%expect {|
+Line 1, characters 7-15:
+1 | <[ fun (Some x) -> x ]>;;
+           ^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "None"
+
+- : <[$('a) option -> $('a)]> expr = <[fun (Some (x)) -> x]>
 |}];;
 
 <[ function | _ -> 12 ]>;;
@@ -520,7 +531,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 ]>
 |}];;
 
-(* Non-top-level functor *)
+(* Non-persistent functor *)
 module Make = Set.Make;;
 <[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
@@ -533,7 +544,7 @@ Error: Identifier "Make" is used at line 2, characters 18-22,
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
 
-(* Non-top-level functor argument *)
+(* Non-persistent functor argument *)
 module Int' = Int;;
 <[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
@@ -830,9 +841,23 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+(* CR metaprogramming jbachurski: Eliminating the duplicate type constraint
+   to make the printer output nicer is tracked by internal ticket 7290. *)
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
-<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    x -> M.clear (M.create x)
+]>
+|}];;
+
+<[fun (module M : Hashtbl.S) -> (module M : Hashtbl.S)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> (module Hashtbl.S)]> expr =
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    -> ((module M) : (module Stdlib.Hashtbl.S))
+]>
 |}];;
 
 <[ fun (module _ : S) x -> 42 ]>;;
@@ -1678,7 +1703,7 @@ exception E
 <[ fun (module M : T) -> let open M in foo + 1 ]>
 [%%expect {|
 - : <[(module T) -> int]> expr =
-<[fun (module M : T) -> let open! M in M.foo + 1]>
+<[fun (((module M) : (module T)) : (module T)) -> let open! M in M.foo + 1]>
 |}];;
 
 (* Cross-stage open *)

@@ -1,3 +1,4 @@
+(lldb) command script import frames.py
 (lldb) settings set stop-line-count-before 0
 (lldb) settings set stop-line-count-after 0
 (lldb) settings set stop-disassembly-display never
@@ -6,57 +7,29 @@
 (lldb) script print("=== Testing OCaml/C boundary - string allocation ===")
 (lldb) br set -o true -n caml_alloc_string
 (lldb) c
-(lldb) bt 5
+(lldb) frames caml_alloc_string Stdlib.String.make f_allocate_string
 (lldb) script print("=== Testing OCaml/C boundary - array allocation ===")
 (lldb) br set -o true -n caml_array_make
 (lldb) c
-(lldb) bt 4
+(lldb) frames caml_array_make f_inner
 (lldb) script print("=== Testing OCaml/C boundary - bytes blit ===")
 (lldb) br set -o true -n caml_blit_bytes
 (lldb) c
-(lldb) bt 4
-(lldb) script print("=== Testing OCaml/C boundary - GC minor ===")
-(lldb) br set -o true -n caml_gc_minor
-(lldb) c
-(lldb) bt 3
+(lldb) frames caml_blit_bytes Stdlib.Bytes.blit f_bytes_blit
 (lldb) script print("=== Testing OCaml/C boundary - polymorphic hash ===")
 (lldb) br set -o true -n caml_hash_exn
 (lldb) c
-(lldb) bt 5
-(lldb) script print("=== Testing OCaml/C boundary - polymorphic compare ===")
-(lldb) br set -o true -n caml_compare
-(lldb) c
-(lldb) bt 4
-(lldb) script print("=== Testing OCaml/C boundary - marshal output ===")
-(lldb) br set -o true -n caml_output_value_to_buffer
-(lldb) c
-(lldb) bt 4
-(lldb) script print("=== Testing OCaml/C boundary - unmarshal input ===")
-(lldb) br set -o true -n caml_input_value_from_bytes
-(lldb) c
-(lldb) bt 4
+(lldb) frames caml_hash_exn f_hash add
 (lldb) script print("=== Testing OCaml/C boundary - MD5 hash ===")
 (lldb) br set -o true -n caml_md5_string
 (lldb) c
-(lldb) bt 4
-(lldb) script print("=== Testing OCaml/C boundary - getenv ===")
-(lldb) br set -o true -n caml_sys_getenv
-(lldb) c
-(lldb) bt 4
-(lldb) script print("=== Testing OCaml/C boundary - bigarray create ===")
-(lldb) br set -o true -n caml_ba_create
-(lldb) c
-(lldb) bt 4
+(lldb) frames caml_md5_string f_md5
 (lldb) script print("=== Testing OCaml/C boundary - large tuple (caml_alloc_shr_check_gc) ===")
 (lldb) br set -o true -n caml_alloc_shr_check_gc
 (lldb) c
-(lldb) bt 3
+(lldb) frames caml_alloc_shr_check_gc f_large_tuple
 (lldb) script print("=== Testing OCaml/C boundary - callback (C calls OCaml) ===")
 (lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_callback_inner
 (lldb) c
-(lldb) bt 6
-(lldb) script print("=== Testing OCaml/C boundary - finalizer (C calls OCaml during GC) ===")
-(lldb) br set -o true -n Test_ocaml_and_c_dwarf.f_my_finalizer
-(lldb) c
-(lldb) bt 6
+(lldb) frames f_callback_inner caml_start_program f_callback
 (lldb) quit

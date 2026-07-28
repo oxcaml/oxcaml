@@ -251,6 +251,8 @@ let mkappl (func, args, layout) =
          ap_args=args;
          ap_region_close=Rc_normal;
          ap_mode=alloc_heap;
+         (* All OO prims are builtins which do not yield *)
+         ap_yielding=Unyielding;
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
@@ -897,6 +899,9 @@ let transl_class_rebind ~scopes cl vf =
         ap_result_layout=layout_obj;
         ap_region_close=Rc_normal;
         ap_mode=alloc_heap;
+        (* obj_init is a builtin function which does not yield, and does not
+           execute user code. *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -1093,7 +1098,8 @@ let free_methods l =
     | Lvar _ | Lmutvar _ | Lconst _ | Lapply _
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
-    | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
+    | Levent _ | Lifused _ | Lregion _ | Lexclave _
+    | Lkindtemplate _ | Lkindinstantiate _ -> ()
     | Lsplice _ ->
       fatal_error_invalid_constructor l
   in free l; !fv

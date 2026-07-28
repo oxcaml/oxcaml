@@ -2,6 +2,10 @@ let[@inline never] [@local never] f_start () = ()
 
 let _ = f_start ()
 
+(* Utility to ensure a breakpoint on a function lands on the first
+   instruction. *)
+let[@inline never] [@local never] keep x = x
+
 module type OrderedType = sig
   type t
 
@@ -234,6 +238,7 @@ let string_store3 =
 let _ = f_string_store string_store3
 
 let[@inline never] [@local never] f_set_operations (set : IntSet.t) =
+  let set = keep set in
   let size = IntSet.size set in
   let has_10 = IntSet.mem 10 set in
   let sum = IntSet.fold ( + ) set 0 in
@@ -242,6 +247,7 @@ let[@inline never] [@local never] f_set_operations (set : IntSet.t) =
 let _ = f_set_operations int_set3
 
 let[@inline never] [@local never] f_store_operations (store : IntStore.t) =
+  let store = keep store in
   let size = IntStore.size store in
   let lookup_result = IntStore.find 1 store in
   size, lookup_result

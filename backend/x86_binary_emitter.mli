@@ -59,6 +59,10 @@ val relocations : buffer -> Relocation.t list
 
 val assemble_section : arch -> section -> buffer
 
+(** Forget label positions recorded by previous [assemble_section] calls.
+    Call once per program, before assembling its first section. *)
+val clear_cross_section_labels : unit -> unit
+
 val get_symbol : buffer -> StringMap.key -> symbol
 
 val contents_mut : buffer -> bytes

@@ -132,19 +132,31 @@ type submode_reason =
   | Constructor of Longident.t
   | Other
 
-type unsupported_stack_allocation =
+type always_heap_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
 
-let print_unsupported_stack_allocation ppf = function
+let print_always_heap_allocation ppf = function
   | Lazy -> Format_doc.fprintf ppf "lazy expressions"
   | Module -> Format_doc.fprintf ppf "modules"
   | Object -> Format_doc.fprintf ppf "objects"
   | List_comprehension -> Format_doc.fprintf ppf "list comprehensions"
   | Array_comprehension -> Format_doc.fprintf ppf "array comprehensions"
+
+type always_static_allocation =
+  | Constant
+  | Src_pos
+  | Unboxed_unit
+  | Unboxed_bool
+
+let print_always_static_allocation ppf = function
+  | Constant -> Format_doc.fprintf ppf "literals"
+  | Src_pos -> Format_doc.fprintf ppf "source position literals"
+  | Unboxed_unit -> Format_doc.fprintf ppf "unboxed unit literals"
+  | Unboxed_bool -> Format_doc.fprintf ppf "unboxed boolean literals"
 
 type mutable_restriction =
   | In_group
@@ -246,6 +258,9 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
+  | Atomic_in_functional_update of label
+  | Mixed_record_atomic_access of Longident.t
+  | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -310,7 +325,8 @@ type error =
   | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
-  | Unsupported_stack_allocation of unsupported_stack_allocation
+  | Always_heap_allocation of always_heap_allocation
+  | Always_static_allocation of always_static_allocation
   | Not_allocation
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
@@ -568,6 +584,9 @@ let as_single_mode {mode; tuple_modes; _} =
       in
       Value.meet (mode :: l)
   | None -> mode
+
+let proj_staticity mode =
+  Staticity.disallow_left (Value.proj_monadic Staticity mode)
 
 let mode_morph f expected_mode =
   let mode = as_single_mode expected_mode in
@@ -1003,7 +1022,9 @@ let constant_desc
   | Pconst_char c -> Ok (Const_char c)
   | Pconst_untagged_char c ->
       if Language_extension.is_enabled Small_numbers
-      then Ok (Const_untagged_char c)
+      then
+        let extra_bits = Sys.int_size - 8 in
+        Ok (Const_untagged_char ((Char.code c lsl extra_bits) asr extra_bits))
       else Error (Untagged_char_literal c)
   | Pconst_string (s,loc,d) -> Ok (Const_string (s,loc,d))
   | Pconst_float (f,None)-> Ok (Const_float f)
@@ -1306,6 +1327,44 @@ let mode_spliced =
 let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
+
+(* Does this record representation permit atomic field usage? *)
+let allows_atomic_field_usage = function
+  | Record_boxed -> true
+  | Record_inlined (_tag, ctor_repres, _variant_repres) -> (
+      match ctor_repres with
+      | Constructor_uniform_value -> true
+      | Constructor_mixed _ -> false
+      (* At this point, we should know the constructor representation. *)
+      | Constructor_variable -> false)
+  (* Reads/writes of atomic record fields are currently only supported for
+     labels whose logical offset matches the physical field position. To support
+     mixed records, we will add atomic primitives to lambda that consider mixed
+     block field reordering. *)
+  | Record_mixed _ -> false
+  (* The remaining cases should be unreachable. *)
+  (* [@@unboxed] already prohibits mutable (and therefore atomic) fields. *)
+  | Record_unboxed
+  (* [@atomic] fields disable the float record optimization. *)
+  | Record_float | Record_ufloat
+  (* At this point, we should know the record representation. *)
+  | Record_dummy _ | Record_variable ->
+      false
+
+(* CR-soon jkerrigan: simplify after we allow access of atomic fields in mixed
+   records. *)
+type atomic_field_use = Access | Loc
+
+(* Raises if we try to use an atomic field from a mixed record. *)
+let check_atomic_field_usage ~usage ~loc ~env record_repres mutability lid =
+  if Types.is_atomic mutability && not (allows_atomic_field_usage record_repres)
+  then
+    let err =
+      match usage with
+      | Access -> Mixed_record_atomic_access lid
+      | Loc -> Mixed_record_atomic_loc lid
+    in
+    raise (Error (loc, env, err))
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -3252,6 +3311,10 @@ let forbid_atomic_field_patterns loc penv (label_lid, label, pat) =
   if Types.is_atomic label.lbl_mut && not (wildcard pat) then
     raise (Error (loc, !!penv, Atomic_in_pattern label_lid.txt))
 
+let forbid_atomic_in_record_update loc env lbl =
+  if Types.is_atomic lbl.lbl_mut then
+    raise (Error (loc, env, Atomic_in_functional_update lbl.lbl_name))
+
 (** [type_pat] propagates the expected type, and
     unification may update the typing environment. *)
 let rec type_pat
@@ -3405,7 +3468,7 @@ and type_pat_aux
         let alloc_mode = simple_pat_mode mode in
         let ty_sort =
           match label_sort record_form label sorts with
-          | `Sort s -> Jkind.Sort.of_const s
+          | `Sort s -> s
           | `Same_as_record_sort -> record_sort
         in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
@@ -3502,12 +3565,21 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_unpack name ->
       let t = instance expected_ty in
+      let pat_extra = [
+        Tpat_unpack, name.loc, sp.ppat_attributes;
+        (* [t] is intentionally not instantiated here, as it is still refined
+           e.g. in [map_half_typed_cases]. Ideally, we'd copy it after that.
+           However, at that point it is required to be closed, and hence
+           hopefully nothing surprising happens to it. *)
+        Tpat_inspected_type (Module_pack t), loc, []
+        ]
+      in
       begin match name.txt with
       | None ->
           rvp {
             pat_desc = Tpat_any;
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, name.loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -3526,7 +3598,7 @@ and type_pat_aux
             pat_desc = Tpat_var { id; name = v; uid; sort;
                                   mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
-            pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
+            pat_extra;
             pat_type = t;
             pat_attributes = [];
             pat_env = !!penv;
@@ -3599,7 +3671,8 @@ and type_pat_aux
         expand_interval (Char.code c1) (Char.code c2)
           ~make:(fun loc i -> Const.char ~loc (Char.chr i))
       | Const_untagged_char c1, Const_untagged_char c2 ->
-        expand_interval (Char.code c1) (Char.code c2)
+        (* Intervals are specified by character code, as for [char]. *)
+        expand_interval (c1 land 0xff) (c2 land 0xff)
           ~make:(fun loc i -> Const.untagged_char ~loc (Char.chr i))
       | _ ->
         raise (Error (loc, !!penv, Invalid_interval))
@@ -5118,7 +5191,7 @@ let rec is_nonexpansive exp =
       is_nonexpansive body
   | Texp_letmutable(pat_exp, body) ->
       is_nonexpansive pat_exp.vb_expr && is_nonexpansive body
-  | Texp_apply(e, (_,Omitted _)::el, _, _, _) ->
+  | Texp_apply(e, (_,Omitted _)::el, _, _, _, _) ->
       is_nonexpansive e && List.for_all is_nonexpansive_arg (List.map snd el)
   | Texp_match(e, _, cases, _, _) ->
      (* Not sure this is necessary, if [e] is nonexpansive then we shouldn't
@@ -5162,7 +5235,7 @@ let rec is_nonexpansive exp =
            | Kept _ -> true)
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
-  | Texp_atomic_loc(exp, _, _, _, _) -> is_nonexpansive exp
+  | Texp_atomic_loc { record = exp; _ } -> is_nonexpansive exp
   | Texp_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_unboxed_field { record = exp; _ } -> is_nonexpansive exp
   | Texp_idx (ba, _uas) ->
@@ -5211,7 +5284,7 @@ let rec is_nonexpansive exp =
   | Texp_apply (
       { exp_desc =
         Texp_ident { desc = {val_kind = Val_prim prim}; kind = Id_prim _; _ } },
-        args, _, _, _) ->
+        args, _, _, _, _) ->
      is_nonexpansive_prim prim args
   | Texp_array (_, _, _ :: _, _)
   | Texp_apply _
@@ -6677,6 +6750,7 @@ and type_expect_
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
                 (Record_field lbl.lbl_name) lbl.lbl_mut mode;
+              forbid_atomic_in_record_update extended_expr_loc env lbl;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (extended_expr_loc, Expression) }
@@ -6898,11 +6972,15 @@ and type_expect_
             in
             Texp_ident { path; lid; desc; kind;
               unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+                (as_single_mode expected_mode);
+              staticity = proj_staticity (as_single_mode expected_mode);
+              mode = actual_mode }
         | _ ->
             Texp_ident { path; lid; desc; kind;
               unique_use = unique_use ~loc ~env actual_mode
-                (as_single_mode expected_mode); mode = actual_mode }
+                (as_single_mode expected_mode);
+              staticity = proj_staticity (as_single_mode expected_mode);
+              mode = actual_mode }
       in
       let exp = rue {
         exp_desc; exp_loc = loc; exp_extra = [];
@@ -7214,7 +7292,7 @@ and type_expect_
         | _ ->
             (rt, funct), sargs
       in
-      let (args, ty_ret, mode_ret, pm) =
+      let (args, ty_ret, mode_ret, pm, ap_yielding) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
       let mode_ret = Alloc.disallow_right mode_ret in
@@ -7238,7 +7316,7 @@ and type_expect_
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
         exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
-                              zero_alloc);
+                              ap_yielding, zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
@@ -7443,6 +7521,8 @@ and type_expect_
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
+      check_atomic_field_usage ~usage:Access ~loc:record.exp_loc ~env
+        record_repres label.lbl_mut lid.txt;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
@@ -7572,6 +7652,8 @@ and type_expect_
           ~why:Field_assignment
           ~containing_type:ty_record
       in
+      check_atomic_field_usage ~usage:Access ~loc ~env record_repres
+        label.lbl_mut lid.txt;
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8264,12 +8346,17 @@ and type_expect_
               raise (Error (loc, env, Not_a_packed_module ty_expected))
           in
           let (modl, pack') = !type_package env m pack in
+          let exp_type = newty (Tpackage pack') in
+          let exp_extra =
+            Texp_inspected_type (Module_pack (Ctype.instance exp_type))
+          in
           let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
           submode ~loc ~env mode expected_mode;
           rue {
             exp_desc = Texp_pack modl;
-            exp_loc = loc; exp_extra = [];
-            exp_type = newty (Tpackage pack');
+            exp_loc = loc;
+            exp_extra = [exp_extra, loc, []];
+            exp_type;
             exp_attributes = sexp.pexp_attributes;
             exp_env = env }
       end
@@ -8465,10 +8552,13 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, _, rmode, label, ambiguity, ty_arg, _ =
+          let record, record_sort, _, rmode, label, ambiguity, ty_arg,
+              record_repres =
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
+          check_atomic_field_usage ~usage:Loc ~loc:record.exp_loc ~env
+            record_repres label.lbl_mut lid.txt;
           Env.mark_label_used Env.Projection label.lbl_uid;
           if (not (Types.is_atomic label.lbl_mut))
           then raise (Error (loc, env, Label_not_atomic lid.txt));
@@ -8488,14 +8578,23 @@ and type_expect_
               (Texp_inspected_type (Label_disambiguation ambiguity), loc, [])
                 :: record.exp_extra }
           in
-          rue {
-            exp_desc =
-              Texp_atomic_loc
-                (record, record_sort, lid, label, alloc_mode);
-            exp_loc = loc; exp_extra = [];
-            exp_type = instance (Predef.type_atomic_loc ty_arg);
-            exp_attributes = sexp.pexp_attributes;
-            exp_env = env }
+          rue
+            {
+              exp_desc =
+                Texp_atomic_loc {
+                  record;
+                  record_sort;
+                  record_repres;
+                  lid;
+                  label;
+                  alloc_mode
+                };
+              exp_loc = loc;
+              exp_extra = [];
+              exp_type = instance (Predef.type_atomic_loc ty_arg);
+              exp_attributes = sexp.pexp_attributes;
+              exp_env = env;
+            }
       | _ ->
           raise (Error (loc, env, Invalid_atomic_loc_payload))
       end
@@ -8510,8 +8609,11 @@ and type_expect_
            exp_env = env }
   | Pexp_stack e ->
       let exp = type_expect env expected_mode e ty_expected_explained in
-      let unsupported category =
-        raise (Error (exp.exp_loc, env, Unsupported_stack_allocation category))
+      let always_heap category =
+        raise (Error (exp.exp_loc, env, Always_heap_allocation category))
+      in
+      let always_static category =
+        raise (Error (exp.exp_loc, env, Always_static_allocation category))
       in
       begin match exp.exp_desc with
       | Texp_function { alloc_mode; _} | Texp_tuple (_, alloc_mode)
@@ -8531,15 +8633,19 @@ and type_expect_
           in
           Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
         end
-      | Texp_list_comprehension _ -> unsupported List_comprehension
-      | Texp_array_comprehension _ -> unsupported Array_comprehension
-      | Texp_new _ -> unsupported Object
-      | Texp_override _ -> unsupported Object
-      | Texp_lazy _ -> unsupported Lazy
-      | Texp_object _ -> unsupported Object
-      | Texp_pack _ -> unsupported Module
+      | Texp_list_comprehension _ -> always_heap List_comprehension
+      | Texp_array_comprehension _ -> always_heap Array_comprehension
+      | Texp_new _ -> always_heap Object
+      | Texp_override _ -> always_heap Object
+      | Texp_lazy _ -> always_heap Lazy
+      | Texp_object _ -> always_heap Object
+      | Texp_pack _ -> always_heap Module
+      | Texp_constant _ -> always_static Constant
+      | Texp_src_pos -> always_static Src_pos
+      | Texp_unboxed_unit -> always_static Unboxed_unit
+      | Texp_unboxed_bool _ -> always_static Unboxed_bool
       | Texp_apply({ exp_desc =
-          Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _)
+          Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _, _)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
           (* CR zqian: Move/Copy [Lambda.primitive_may_allocate] to [typing], then we can
           check primitive allocation here, and also improve the logic in [type_ident]. *)
@@ -9060,7 +9166,11 @@ and type_ident env ?(recarg=Rejected) lid =
            register_allocation_mode (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
-       [], ty, Id_prim (Option.map Locality.disallow_right mode, sort)
+       let yielding =
+         prim_params_yielding env ty ~arity:prim.prim_arity
+       in
+       [], ty,
+       Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with
@@ -10041,6 +10151,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
          Texp_ident { path = Path.Pident id;
                       lid = mknoloc (Longident.Lident name);
                       desc; kind = Id_value; unique_use = uu;
+                      staticity = proj_staticity mode;
                       mode = Value.disallow_right mode }}
       in
       let eta_mode, _ = Value.newvar_below (alloc_as_value marg) in
@@ -10067,6 +10178,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               args @ [Nolabel, Arg (eta_var, arg_sort)],
               Nontail,
               Alloc.proj_comonadic Areality (Alloc.disallow_right mret),
+              Yielding.disallow_right Yielding.yielding,
               None)}
         in
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
@@ -10089,6 +10201,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                 { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
               ret_sort;
               alloc_mode;
+              yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
         }
@@ -10129,7 +10242,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg) =
   match arg with
-  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_arg; sort_arg }) ->
+  | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
@@ -10141,9 +10254,10 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
              (type_option(newvar Predef.option_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
-      (lbl, Arg (arg, mode_arg, sort_arg), None)
+      (lbl, Arg (arg, mode_arg, sort_arg), None,
+       ~mode_fun:(Mode.alloc_as_value mode_fun))
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
-                     mode_arg; wrapped_in_some; sort_arg }) ->
+                     mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
         mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
@@ -10198,17 +10312,23 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
           {arg with exp_type = instance arg.exp_type}, sch
         end
       in
-      (lbl, Arg (arg, mode_arg, sort_arg), sch)
-  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label; _ }) ->
+      ( lbl, Arg (arg, mode_arg, sort_arg), sch,
+        ~mode_fun:(Mode.alloc_as_value mode_fun))
+  | Arg (Eliminated_optional_arg { ty_arg; sort_arg; expected_label;
+                                   mode_fun; _ }) ->
       (match expected_label with
       | Optional _ ->
           let arg = type_option_none env (instance ty_arg) Location.none in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl,
+           Arg (arg, Mode.Value.legacy, sort_arg),
+           None, ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Position _ ->
           let arg = src_pos (Location.ghostify funct.exp_loc) [] env in
-          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None)
+          (lbl, Arg (arg, Mode.Value.legacy, sort_arg), None,
+           ~mode_fun:(Mode.alloc_as_value mode_fun))
       | Labelled _ | Nolabel -> assert false)
-  | Omitted _ as arg -> (lbl, arg, None)
+  | Omitted { mode_fun; _ } as arg ->
+      (lbl, arg, None, ~mode_fun:(Mode.alloc_as_value mode_fun))
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
@@ -10238,7 +10358,8 @@ and type_application env app_loc expected_mode position_and_mode
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
       check_partial_application ~statement:false exp;
       ([Nolabel, Arg (exp, arg_sort), None],
-       ty_ret, ret_mode, position_and_mode)
+       ty_ret, ret_mode, position_and_mode,
+       Yielding.disallow_right Yielding.yielding)
   | _ ->
     (* See Note [Type-checking applications] for an overview *)
       let ty = funct.exp_type in
@@ -10259,7 +10380,7 @@ and type_application env app_loc expected_mode position_and_mode
            true)
         end
       in
-      let ty_ret, mode_ret, args, position_and_mode =
+      let ty_ret, mode_ret, args, position_and_mode, ap_yielding =
         with_local_level_generalize_structure_if_principal begin fun () ->
           (* Consider for example the application
                [f n]
@@ -10287,6 +10408,25 @@ and type_application env app_loc expected_mode position_and_mode
                   ~position_and_mode ~partial_app arg)
               untyped_args
           in
+          (* The application can never perform a free effect if the function and
+             all of its arguments are unyielding. *)
+          let ap_yielding =
+            Mode.Value.proj_comonadic Yielding
+              (Mode.Value.join
+                 (funct_mode
+                  :: List.concat_map
+                       (fun (_, arg, _, ~mode_fun) ->
+                          mode_fun ::
+                          (match arg with
+                            | Arg (_, mode_arg, _) -> [mode_arg]
+                            | Omitted _ -> [] ))
+                       args))
+          in
+          let args =
+            List.map (fun (lbl, arg, sch, ~mode_fun:_) ->
+              (lbl, arg, sch))
+              args
+          in
           (* example: type-check [n] and generate [None] for [?opt].
              [args] becomes [(Label "a", Omitted bar);
                              (Optional "opt", Arg None);
@@ -10301,10 +10441,10 @@ and type_application env app_loc expected_mode position_and_mode
              [args] becomes [(Label "a", Omitted ());
                              (Optional "opt", Arg None);
                              (Nolabel, Arg n)] *)
-          ty_ret, mode_ret, args, position_and_mode
+          ty_ret, mode_ret, args, position_and_mode, ap_yielding
         end
       in
-      args, ty_ret, mode_ret, position_and_mode
+      args, ty_ret, mode_ret, position_and_mode, ap_yielding
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
@@ -11709,11 +11849,30 @@ and type_n_ary_function
         Zero_alloc.create_const zero_alloc
     in
     let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
+    (* [yielding] records whether *fully applying* this function can perform a
+       free effect: the closure may yield if it closes over a yielding value
+       (its own mode), or if any argument it is given is yielding (the
+       parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
+       this, since the wrapper is exactly a full application. *)
+    let param_alloc_modes =
+      List.map (fun (p : function_param) -> p.fp_mode.mode_modes) params
+    in
+    (* A [function | ...] body takes an extra implicit parameter that is not in
+       [params]; if that argument is yielding then the closure is yielding. *)
+    let param_alloc_modes =
+      match body with
+      | Tfunction_body _ -> param_alloc_modes
+      | Tfunction_cases fc -> fc.fc_arg_mode :: param_alloc_modes
+    in
+    let yielding =
+      Alloc.proj_comonadic Yielding
+        (Alloc.join (Alloc.disallow_right fun_alloc_mode :: param_alloc_modes))
+    in
     re
       { exp_desc =
           Texp_function
             { params; body; ret_sort;
-              alloc_mode; ret_mode;
+              alloc_mode; ret_mode; yielding;
               zero_alloc
             };
         exp_loc = loc;
@@ -12926,6 +13085,23 @@ let report_error ~loc env =
          will happen during pattern matching:@ the field may be read@ \
          zero, one or several times depending on the patterns around it."
         quoted_longident lid
+  | Atomic_in_functional_update l ->
+      Location.errorf ~loc
+        "Functional updates that implicitly read atomic fields (here %a)@ \
+         are forbidden. @{<hint>Hint@}: if you intend to copy the value@ \
+         of an atomic field, do so explicitly:@ %a"
+        Style.inline_code l
+        Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
+  | Mixed_record_atomic_access lid ->
+      Location.errorf ~loc
+        "Accessing atomic fields (here %a) of mixed records is not yet@ \
+         supported."
+        quoted_longident lid
+  | Mixed_record_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a with mixed record fields (here %a) is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
@@ -13298,9 +13474,16 @@ let report_error ~loc env =
          automatically if omitted. It cannot be passed with '?'.@]"
       Style.inline_code label
       Style.inline_code "[%call_pos]"
-  | Unsupported_stack_allocation category ->
-    Location.errorf ~loc "@[Stack allocating %a is unsupported yet.@]"
-      print_unsupported_stack_allocation category
+  | Always_heap_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not yet supported;@ \
+         they are currently always heap allocated.@]"
+      print_always_heap_allocation category
+  | Always_static_allocation category ->
+    Location.errorf ~loc
+      "@[Stack allocating %a is not supported;@ \
+         they are not allocated at runtime. @]"
+      print_always_static_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->

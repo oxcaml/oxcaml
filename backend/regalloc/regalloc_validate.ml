@@ -14,7 +14,7 @@
 (* CR-soon xclerc for xclerc: try to enable warning 4. *)
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 include Cfg_intf.S
 
 module Location : sig

@@ -43,7 +43,8 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
     Proto_die.create ~parent:(Some compilation_unit_proto_die) ~tag:Subprogram
       ~attribute_values:
         [ DAH.create_name demangled_name;
-          DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
+          DAH.create_linkage_name
+            ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
           DAH.create_external ~is_visible_externally:true ]
       ()
   in
@@ -63,7 +64,8 @@ let add_root state ~parent ~demangled_name fun_symbol ~location_attributes =
     match demangled_name with Some name -> [DAH.create_name name] | None -> []
   in
   let attributes =
-    [ DAH.create_linkage_name ~linkage_name:(Asm_symbol.encode fun_symbol);
+    [ DAH.create_linkage_name
+        ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
       DAH.create_external ~is_visible_externally:true ]
     @ name @ location_attributes
   in
@@ -154,7 +156,7 @@ let find state ~compilation_unit_proto_die (dbg : Debuginfo.t) =
   DS.Debug.log "found comp unit %a\n%!"
     (Format_doc.compat Compilation_unit.print)
     dbg_comp_unit;
-  let this_comp_unit = Compilation_unit.get_current_exn () in
+  let this_comp_unit = Current_unit.get_cu_exn () in
   if Compilation_unit.equal dbg_comp_unit this_comp_unit
   then (
     DS.Debug.log "looking in function_abstract_instances for %a\n%!"

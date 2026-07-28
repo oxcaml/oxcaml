@@ -64,6 +64,8 @@
   atomic.mli
   backoff.ml
   backoff.mli
+  dynamic.ml
+  dynamic.mli
   effect.ml
   effect.mli
   bigarray.ml
@@ -237,6 +239,9 @@
   .stdlib.objs/byte/stdlib__Backoff.cmsi
   .stdlib.objs/byte/stdlib__Backoff.cmt
   .stdlib.objs/byte/stdlib__Backoff.cmti
+  .stdlib.objs/byte/stdlib__Dynamic.cmi
+  .stdlib.objs/byte/stdlib__Dynamic.cmt
+  .stdlib.objs/byte/stdlib__Dynamic.cmti
   .stdlib.objs/byte/stdlib__Effect.cmi
   .stdlib.objs/byte/stdlib__Effect.cms
   .stdlib.objs/byte/stdlib__Effect.cmsi
@@ -666,6 +671,7 @@
   .stdlib.objs/native/stdlib__Dynarray.cmx
   .stdlib.objs/native/stdlib__Atomic.cmx
   .stdlib.objs/native/stdlib__Backoff.cmx
+  .stdlib.objs/native/stdlib__Dynamic.cmx
   .stdlib.objs/native/stdlib__Effect.cmx
   .stdlib.objs/native/stdlib__Either.cmx
   .stdlib.objs/native/stdlib__In_channel.cmx

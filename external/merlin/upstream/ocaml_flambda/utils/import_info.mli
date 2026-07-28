@@ -49,6 +49,8 @@ val has_name : t -> name:CU.Name.t -> bool
 
 val dummy : t
 
+val print : Format_doc.formatter -> t -> unit
+
 (** The preferred API to use for interface imports. An interface import might be
     a parameter, in which case it has a CRC but no [CU.t] (since a [CU.t] is for
     an implementation). *)

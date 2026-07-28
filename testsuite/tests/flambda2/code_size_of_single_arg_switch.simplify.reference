@@ -2,31 +2,31 @@ let code switch_converted_to_lookup_table_0 deleted in
 let code switch_converted_to_lookup_table'_1 deleted in
 let code switch_converted_to_affine_2 deleted in
 let code switch_converted_to_affine'_3 deleted in
-let $camlCode_size_of_single_arg_switch__switch_block40 =
+let $camlCode_size_of_single_arg_switch__switch_block46 =
   Value_array [|1;
   2;
   4|]
 in
 let code loopify(never) size(2) newer_version_of(switch_converted_to_lookup_table_0)
       switch_converted_to_lookup_table_0_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let arg =
-    %array_load ($camlCode_size_of_single_arg_switch__switch_block40, x)
+    %array_load ($camlCode_size_of_single_arg_switch__switch_block46, x)
   in
   cont k (arg)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_4 =
   closure switch_converted_to_lookup_table_0_1
-    @switch_converted_to_lookup_table
+    @switch_converted_to_lookup_table &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(switch_converted_to_lookup_table'_1)
       switch_converted_to_lookup_table'_1_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(switch_converted_to_lookup_table_0_1)
+  apply direct(switch_converted_to_lookup_table_0_1 &my_alloc_region)
     ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_4
      : _ -> imm tagged)
       (x)
@@ -34,11 +34,11 @@ let code loopify(never) size(4) newer_version_of(switch_converted_to_lookup_tabl
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_5 =
   closure switch_converted_to_lookup_table'_1_1
-    @switch_converted_to_lookup_table'
+    @switch_converted_to_lookup_table' &toplevel.alloc_region
 in
 let code loopify(never) size(7) newer_version_of(switch_converted_to_affine_2)
       switch_converted_to_affine_2_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let scaled_arg = %int_barith.mul (x, 1) in
@@ -47,13 +47,14 @@ let code loopify(never) size(7) newer_version_of(switch_converted_to_affine_2)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_affine_6 =
   closure switch_converted_to_affine_2_1 @switch_converted_to_affine
+    &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(switch_converted_to_affine'_3)
       switch_converted_to_affine'_3_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(switch_converted_to_affine_2_1)
+  apply direct(switch_converted_to_affine_2_1 &my_alloc_region)
     ($camlCode_size_of_single_arg_switch__switch_converted_to_affine_6
      : _ -> imm tagged)
       (x)
@@ -61,6 +62,7 @@ let code loopify(never) size(4) newer_version_of(switch_converted_to_affine'_3)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_7 =
   closure switch_converted_to_affine'_3_1 @switch_converted_to_affine'
+    &toplevel.alloc_region
 in
 let $camlCode_size_of_single_arg_switch =
   Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_4,
