@@ -1501,6 +1501,19 @@ external my_id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
 val prim_value_captured : int -> int = <fun>
 |}]
 
+external not_listed : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+let (f @ noalloc_strict) (x : int) = not_listed x
+[%%expect{|
+external not_listed : ('a [@local_opt]) -> ('a [@local_opt]) = "%opaque"
+Line 2, characters 37-47:
+2 | let (f @ noalloc_strict) (x : int) = not_listed x
+                                         ^^^^^^^^^^
+Error: The value "not_listed" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 25-49
+         which is expected to be "noalloc_strict".
+|}]
+
 (* [!] does not allocate, but referencing the value is conservatively
    treated as [alloc]. *)
 let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
