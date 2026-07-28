@@ -206,22 +206,17 @@ let flambda_to_flambda0 : type m.
         if Flambda_features.enable_reaper ()
         then (
           let flambda, free_names, all_code, slot_offsets, final_typing_env =
+            (* CR mvellacott: make it more clear what we're profiling *)
             Profile.record_call ~accumulate:true "reaper" (fun () ->
-                (* These two branches are exactly the same but spelt
-                   differently. In the future, LTO support will split pre- and
-                   post- traverse work between separate processes. *)
                 if Flambda_features.support_lto ()
                 then (
-                  let deps, traverse_rebuild =
+                  (* CR mvellacott: store these in the CMR *)
+                  let _deps, _traverse_rebuild =
                     Flambda2_reaper.Reaper.Staged.traverse flambda
                   in
                   Flambda2_reaper.Cmr_format.save
                     ~filename:(prefixname ^ ".cmr") "Hello, cmr!";
-                  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
-                  let unit_metadata = Flambda_unit.metadata flambda in
-                  Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-                    ~traverse_rebuild ~solved_dep ~machine_width ~cmx_loader
-                    ~all_code ~final_typing_env)
+                  flambda, free_names, all_code, slot_offsets, final_typing_env)
                 else
                   Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
                     ~all_code ~final_typing_env flambda)
