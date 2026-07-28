@@ -4,7 +4,8 @@ let _ = f_start ()
 (* External functions for creating SIMD vectors *)
 external int64x2_of_int64s : int64_u -> int64_u -> int64x2#
   = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
-external int32x4_of_int32s : int32_u -> int32_u -> int32_u -> int32_u -> int32x4#
+external int32x4_of_int32s
+  : int32_u -> int32_u -> int32_u -> int32_u -> int32x4#
   = "" "vec128_of_int32s" [@@noalloc] [@@unboxed]
 external float64x2_of_floats : float# -> float# -> float64x2#
   = "" "vec128_of_doubles" [@@noalloc] [@@unboxed]

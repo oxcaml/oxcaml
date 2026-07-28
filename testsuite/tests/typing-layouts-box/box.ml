@@ -7,20 +7,14 @@
    expands to the boxed type during unification *)
 
 type t1 = float# box
-type t2 = int32# box
-type t3 = int64# box
-type t4 = nativeint# box
-type t5 = int# box
-type t6 = #(int64# * string) box
-type 'a t7 = 'a ref# box
+type t2 = int# box
+type t3 = #(float# * string) box
+type 'a t4 = 'a ref# box
 [%%expect{|
 type t1 = float
-type t2 = int32
-type t3 = int64
-type t4 = nativeint
-type t5 = int
-type t6 = int64# * string
-type 'a t7 = 'a ref
+type t2 = int
+type t3 = float# * string
+type 'a t4 = 'a ref
 |}]
 
 let g (x : float# box) : float# box = x;;
@@ -179,21 +173,21 @@ type abstract_type
 type boxed_abstract = abstract_type box
 |}]
 
-(* Test 11: float32# box = float32 *)
+(* Test 11: char# box = char *)
 
-type t_f32 = float32# box;;
+type t_char = char# box;;
 [%%expect{|
-type t_f32 = float32
+type t_char = char
 |}]
 
-let f_f32 (x : t_f32) : float32 = x;;
+let f_char (x : t_char) : char = x;;
 [%%expect{|
-val f_f32 : t_f32 -> float32 = <fun>
+val f_char : t_char -> char = <fun>
 |}]
 
-let g_f32 (x : float32) : float32# box = x;;
+let g_char (x : char) : char# box = x;;
 [%%expect{|
-val g_f32 : float32 -> float32 = <fun>
+val g_char : char -> char = <fun>
 |}]
 
 (* Test 12: Implicit unboxed records - t# box = t
@@ -256,7 +250,8 @@ let eq_ut (x : #(int * string) box) (y : ut box) = x = y;;
 val eq_ut : int * string -> ut box -> bool = <fun>
 |}]
 
-(* Test 14: Additional jkinds - bits32, bits64, word *)
+(* Test 14: Additional jkinds - bits32, bits64, word. The unboxed versions
+   of singleton mixed records have these layouts. *)
 
 let check_bits32 : type (a : bits32). a -> a box -> unit =
   fun _ _ -> ();;
@@ -264,11 +259,11 @@ let check_bits32 : type (a : bits32). a -> a box -> unit =
 val check_bits32 : ('a : bits32). 'a -> 'a box -> unit = <fun>
 |}]
 
-type ui32 = int32#
-let test_bits32 (u : ui32) (b : int32) = check_bits32 u b;;
+type r32 = { i32 : int32_u }
+let test_bits32 (u : r32#) (b : r32) = check_bits32 u b;;
 [%%expect{|
-type ui32 = int32#
-val test_bits32 : ui32 -> int32 -> unit = <fun>
+type r32 = { i32 : int32_u; }
+val test_bits32 : r32# -> r32 -> unit = <fun>
 |}]
 
 let check_bits64 : type (a : bits64). a -> a box -> unit =
@@ -277,11 +272,11 @@ let check_bits64 : type (a : bits64). a -> a box -> unit =
 val check_bits64 : ('a : bits64). 'a -> 'a box -> unit = <fun>
 |}]
 
-type ui64 = int64#
-let test_bits64 (u : ui64) (b : int64) = check_bits64 u b;;
+type r64 = { i64 : int64_u }
+let test_bits64 (u : r64#) (b : r64) = check_bits64 u b;;
 [%%expect{|
-type ui64 = int64#
-val test_bits64 : ui64 -> int64 -> unit = <fun>
+type r64 = { i64 : int64_u; }
+val test_bits64 : r64# -> r64 -> unit = <fun>
 |}]
 
 let check_word : type (a : word). a -> a box -> unit =
@@ -290,11 +285,11 @@ let check_word : type (a : word). a -> a box -> unit =
 val check_word : ('a : word). 'a -> 'a box -> unit = <fun>
 |}]
 
-type unat = nativeint#
-let test_word (u : unat) (b : nativeint) = check_word u b;;
+type rw = { n : nativeint_u }
+let test_word (u : rw#) (b : rw) = check_word u b;;
 [%%expect{|
-type unat = nativeint#
-val test_word : unat -> nativeint -> unit = <fun>
+type rw = { n : nativeint_u; }
+val test_word : rw# -> rw -> unit = <fun>
 |}]
 
 (* Test 15: Parameterized box type alias *)
@@ -353,26 +348,26 @@ Error: The value "x" has type "float# box" = "float"
        but an expression was expected of type "int"
 |}]
 
-let mismatch2 (x : int32# box) : int64 = x;;
+let mismatch2 (x : int# box) : int64 = x;;
 [%%expect{|
-Line 1, characters 41-42:
-1 | let mismatch2 (x : int32# box) : int64 = x;;
-                                             ^
-Error: The value "x" has type "int32# box" = "int32"
+Line 1, characters 39-40:
+1 | let mismatch2 (x : int# box) : int64 = x;;
+                                           ^
+Error: The value "x" has type "int# box" = "int"
        but an expression was expected of type "int64"
 |}]
 
 type uf1 = float#
-type uf2 = int64#
+type uf2 = int#
 let mismatch3 (x : uf1 box) : uf2 box = x;;
 [%%expect{|
 type uf1 = float#
-type uf2 = int64#
+type uf2 = int#
 Line 3, characters 40-41:
 3 | let mismatch3 (x : uf1 box) : uf2 box = x;;
                                             ^
 Error: The value "x" has type "uf1 box" = "float"
-       but an expression was expected of type "uf2 box" = "int64"
+       but an expression was expected of type "uf2 box" = "int"
 |}]
 
 (* Test 18: Type inference *)
@@ -399,18 +394,18 @@ val infer3 : ufl box -> float = <fun>
 (* Test 19: Distinct vs same underlying box types *)
 
 type t_float_box = float# box
-type t_int32_box = int32# box;;
+type t_int_box = int# box;;
 [%%expect{|
 type t_float_box = float
-type t_int32_box = int32
+type t_int_box = int
 |}]
 
-let distinct1 (x : t_float_box) (y : t_int32_box) = x = y;;
+let distinct1 (x : t_float_box) (y : t_int_box) = x = y;;
 [%%expect{|
-Line 1, characters 56-57:
-1 | let distinct1 (x : t_float_box) (y : t_int32_box) = x = y;;
-                                                            ^
-Error: The value "y" has type "t_int32_box" = "int32"
+Line 1, characters 54-55:
+1 | let distinct1 (x : t_float_box) (y : t_int_box) = x = y;;
+                                                          ^
+Error: The value "y" has type "t_int_box" = "int"
        but an expression was expected of type "t_float_box" = "float"
 |}]
 
@@ -619,14 +614,9 @@ let _ = f_box 5.;;
 - : float = 5.
 |}]
 
-let _ = f_box 42l;;
+let _ = f_box 'x';;
 [%%expect{|
-- : int32 = 42l
-|}]
-
-let _ = f_box 42L;;
-[%%expect{|
-- : int64 = 42L
+- : char = 'x'
 |}]
 
 (* int also has an unboxed version (int#) *)
@@ -642,6 +632,16 @@ Line 1, characters 14-21:
 1 | let _ = f_box "hello";;
                   ^^^^^^^
 Error: This constant has type "string" but an expression was expected of type
+         "'a box"
+|}]
+
+(* ... including int32, whose unboxed version was removed *)
+let _ = f_box 42l;;
+[%%expect{|
+Line 1, characters 14-17:
+1 | let _ = f_box 42l;;
+                  ^^^
+Error: The constant "42l" has type "int32" but an expression was expected of type
          "'a box"
 |}]
 
@@ -670,11 +670,11 @@ Error: Type "ab box" = "[ `A | `B ] box" is not a subtype of "a box" = "[ `A ] b
        The second variant type does not allow tag(s) "`B"
 |}]
 
-(* [int32# box] unifies with [int32] across a subtype coercion *)
-let coerce_unbox (x : [ `A of int32# box ]) =
-  (x :> [ `A of int32 | `B ]);;
+(* [float# box] unifies with [float] across a subtype coercion *)
+let coerce_unbox (x : [ `A of float# box ]) =
+  (x :> [ `A of float | `B ]);;
 [%%expect{|
-val coerce_unbox : [ `A of int32 ] -> [ `A of int32 | `B ] = <fun>
+val coerce_unbox : [ `A of float ] -> [ `A of float | `B ] = <fun>
 |}]
 
 (* Test 27: Recursive type declarations with box
@@ -1012,7 +1012,7 @@ module Inst_untagged_immediate : sig type t : untagged_immediate end
 module Inst_bits64 : sig
   type t : bits64
 end = struct
-  type t = int64#
+  type t = int64_u
 end
 [%%expect{|
 module Inst_bits64 : sig type t : bits64 end
@@ -1333,11 +1333,10 @@ Error: The definition of "s" contains a cycle:
 (* CR box jbachurski: This should probably complain about the cycle instead
    once we expand abbreviations when determining unboxed versions. *)
 type s1 = t2 box
-type s2 = s1 box
+and s2 = s1 box
 and t1 = s2#
 and t2 = t1#
 [%%expect{|
-type s1 = t2 box
 Line 4, characters 0-12:
 4 | and t2 = t1#
     ^^^^^^^^^^^^

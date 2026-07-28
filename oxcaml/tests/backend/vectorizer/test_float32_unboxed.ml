@@ -38,7 +38,8 @@ module Float32_u = struct
 end
 
 type t1 = { mutable d0 : float32_u ;
-            mutable d1: float32_u; mutable d2: float32_u; mutable d3: float32_u  }
+            mutable d1: float32_u; mutable d2: float32_u;
+            mutable d3: float32_u }
 
 (* Not vectorized because float32 fields are not adjacent in a record, they are padded
 to 64-bits. *)
