@@ -2394,8 +2394,10 @@ let quote_loc loc =
   | Loc_known { loc; scopes } ->
     Loc.wrap
       (Loc.known (of_location ~scopes loc) loc.loc_start.pos_fname
-         loc.loc_start.pos_lnum loc.loc_start.pos_cnum loc.loc_end.pos_lnum
-         loc.loc_end.pos_cnum)
+         loc.loc_start.pos_lnum
+         (loc.loc_start.pos_cnum - loc.loc_start.pos_bol)
+         loc.loc_end.pos_lnum
+         (loc.loc_end.pos_cnum - loc.loc_start.pos_bol))
 
 let quote_name loc str = Name.mk loc str |> Name.wrap
 
