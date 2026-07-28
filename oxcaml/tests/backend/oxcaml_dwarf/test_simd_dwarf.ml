@@ -2,18 +2,18 @@ let[@inline never] [@local never] f_start () = ()
 let _ = f_start ()
 
 (* External functions for creating SIMD vectors *)
-external int64x2_of_int64s : int64# -> int64# -> int64x2#
+external int64x2_of_int64s : int64_u -> int64_u -> int64x2#
   = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
-external int32x4_of_int32s : int32# -> int32# -> int32# -> int32# -> int32x4#
+external int32x4_of_int32s : int32_u -> int32_u -> int32_u -> int32_u -> int32x4#
   = "" "vec128_of_int32s" [@@noalloc] [@@unboxed]
 external float64x2_of_floats : float# -> float# -> float64x2#
   = "" "vec128_of_doubles" [@@noalloc] [@@unboxed]
 external float32x4_of_floats
-  : float32# -> float32# -> float32# -> float32# -> float32x4#
+  : float32_u -> float32_u -> float32_u -> float32_u -> float32x4#
   = "" "vec128_of_floats" [@@noalloc] [@@unboxed]
 external float16x8_of_floats
-  : float32# -> float32# -> float32# -> float32# ->
-    float32# -> float32# -> float32# -> float32# -> float16x8#
+  : float32_u -> float32_u -> float32_u -> float32_u ->
+    float32_u -> float32_u -> float32_u -> float32_u -> float16x8#
   = "" "vec128_of_float16s" [@@noalloc] [@@unboxed]
 
 external int64x2_of_int64s_boxed : int64 -> int64 -> int64x2

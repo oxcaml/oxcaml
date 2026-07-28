@@ -47,25 +47,25 @@ Error: The record field "x" is not atomic
 (* Module interface checking also works for atomic fields in mixed records. *)
 
 module Wrong1 = (struct
-  type t = { mutable x : int; y: int64# }
+  type t = { mutable x : int; y: int64_u }
 end : sig
   (* adding an 'atomic' attribute missing in the implementation: invalid. *)
-  type t = { mutable x : int [@atomic]; y: int64# }
+  type t = { mutable x : int [@atomic]; y: int64_u }
 end)
 [%%expect{|
 Lines 1-3, characters 17-3:
 1 | .................struct
-2 |   type t = { mutable x : int; y: int64# }
+2 |   type t = { mutable x : int; y: int64_u }
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = { mutable x : int; y : int64#; } end
+         sig type t = { mutable x : int; y : int64_u; } end
        is not included in
-         sig type t = { mutable x : int [@atomic]; y : int64#; } end
+         sig type t = { mutable x : int [@atomic]; y : int64_u; } end
        Type declarations do not match:
-         type t = { mutable x : int; y : int64#; }
+         type t = { mutable x : int; y : int64_u; }
        is not included in
-         type t = { mutable x : int [@atomic]; y : int64#; }
+         type t = { mutable x : int [@atomic]; y : int64_u; }
        Fields do not match:
          "mutable x : int;"
        is not the same as:
@@ -74,25 +74,25 @@ Error: Signature mismatch:
 |}];;
 
 module Wrong2 = (struct
-  type t = { mutable x : int [@atomic]; y: int64# }
+  type t = { mutable x : int [@atomic]; y: int64_u }
 end : sig
   (* removing an 'atomic' attribute present in the implementation: invalid. *)
-  type t = { mutable x : int; y: int64# }
+  type t = { mutable x : int; y: int64_u }
 end)
 [%%expect{|
 Lines 1-3, characters 17-3:
 1 | .................struct
-2 |   type t = { mutable x : int [@atomic]; y: int64# }
+2 |   type t = { mutable x : int [@atomic]; y: int64_u }
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = { mutable x : int [@atomic]; y : int64#; } end
+         sig type t = { mutable x : int [@atomic]; y : int64_u; } end
        is not included in
-         sig type t = { mutable x : int; y : int64#; } end
+         sig type t = { mutable x : int; y : int64_u; } end
        Type declarations do not match:
-         type t = { mutable x : int [@atomic]; y : int64#; }
+         type t = { mutable x : int [@atomic]; y : int64_u; }
        is not included in
-         type t = { mutable x : int; y : int64#; }
+         type t = { mutable x : int; y : int64_u; }
        Fields do not match:
          "mutable x : int [@atomic];"
        is not the same as:
@@ -101,17 +101,17 @@ Error: Signature mismatch:
 |}];;
 
 module Ok = (struct
-  type t = { mutable x : int [@atomic]; y: int64# }
+  type t = { mutable x : int [@atomic]; y: int64_u }
 end : sig
-  type t = { mutable x : int [@atomic]; y: int64# }
+  type t = { mutable x : int [@atomic]; y: int64_u }
 end)
 [%%expect{|
-module Ok : sig type t = { mutable x : int [@atomic]; y : int64#; } end
+module Ok : sig type t = { mutable x : int [@atomic]; y : int64_u; } end
 |}];;
 
 (* Pattern matching on atomic fields is not permitted in mixed blocks, either. *)
 module Pattern_matching = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
+  type t = { x : int64_u; mutable y : int [@atomic] }
 
   let forbidden { x; y } = x + y
 end
@@ -127,7 +127,7 @@ Error: Atomic fields (here "y") are forbidden in patterns,
 
 (* ... except for wildcards, to allow exhaustive record patterns. *)
 module Pattern_matching_wildcard = struct
-  type t = { x : int64#; mutable y : int [@atomic] }
+  type t = { x : int64_u; mutable y : int [@atomic] }
 
   [@@@warning "+missing-record-field-pattern"]
   let warning { x } = x
@@ -145,10 +145,10 @@ Warning 9 [missing-record-field-pattern]: the following labels are not bound
 
 module Pattern_matching_wildcard :
   sig
-    type t = { x : int64#; mutable y : int [@atomic]; }
-    val warning : t -> int64#
-    val allowed : t -> int64#
-    val also_allowed : t -> int64#
+    type t = { x : int64_u; mutable y : int [@atomic]; }
+    val warning : t -> int64_u
+    val allowed : t -> int64_u
+    val also_allowed : t -> int64_u
   end
 |}]
 
@@ -168,9 +168,9 @@ module Mixed_blocks_ok :
 |}]
 
 (* Test access of nonatomic fields in mixed record with atomic fields *)
-type t = { i : int64#; mutable a : int [@atomic]; mutable b : int }
+type t = { i : int64_u; mutable a : int [@atomic]; mutable b : int }
 [%%expect {|
-type t = { i : int64#; mutable a : int [@atomic]; mutable b : int; }
+type t = { i : int64_u; mutable a : int [@atomic]; mutable b : int; }
 |}]
 
 let ok_project (t : t) = t.b
@@ -220,7 +220,7 @@ Error: Atomic record fields must have layout value.
 
 (* We disallow functional updates that perform implicit loads of atomic fields. *)
 module Functional_update_error = struct
-  type t = { x : int64# ; mutable y : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic] }
 
   (* The update performs an implicit atomic load of y. Not allowed! *)
   let forbidden t = { t with x = #42L }
@@ -237,7 +237,7 @@ Error: Functional updates that implicitly read atomic fields (here "y")
 (* Updates that overwrite all of the old record's atomic fields are allowed. *)
 
 module Functional_update_ok = struct
-  type t = { x : int64# ; mutable y : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic] }
 
   (* The update performs no implicit atomic loads. Allowed! *)
   let allowed t = { t with y = 42 }
@@ -245,13 +245,13 @@ end
 [%%expect{|
 module Functional_update_ok :
   sig
-    type t = { x : int64#; mutable y : int [@atomic]; }
+    type t = { x : int64_u; mutable y : int [@atomic]; }
     val allowed : t -> t
   end
 |}]
 
 module Functional_update_copy_ok = struct
-  type t = { x : int64# ; mutable y : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic] }
 
   (* The update performs an explicit atomic load. Allowed! *)
   let allowed t = { t with y = t.y }
@@ -265,7 +265,7 @@ Error: Accessing atomic fields (here "y") of mixed records is not yet
 |}]
 
 module Functional_update_multi_error = struct
-  type t = { x : int64# ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic]; mutable z : int [@atomic] }
 
   let forbidden t = { t with y = 42 } (* implicit atomic load of z *)
 end
@@ -279,7 +279,7 @@ Error: Functional updates that implicitly read atomic fields (here "z")
 |}]
 
 module Functional_update_multi_ok = struct
-  type t = { x : int64# ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic]; mutable z : int [@atomic] }
 
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
@@ -287,7 +287,7 @@ end
 module Functional_update_multi_ok :
   sig
     type t = {
-      x : int64#;
+      x : int64_u;
       mutable y : int [@atomic];
       mutable z : int [@atomic];
     }
@@ -296,7 +296,7 @@ module Functional_update_multi_ok :
 |}]
 
 module Functional_update_multi_copy_ok = struct
-  type t = { x : int64# ; mutable y : int [@atomic]; mutable z : int [@atomic] }
+  type t = { x : int64_u ; mutable y : int [@atomic]; mutable z : int [@atomic] }
 
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end

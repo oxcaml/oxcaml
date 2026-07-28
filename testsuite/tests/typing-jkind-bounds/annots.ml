@@ -1058,11 +1058,11 @@ val f : ('a. 'a -> 'a) -> string * int = <fun>
 |}]
 
 let f (x : ('a : word mod external_ many aliased). 'a -> 'a) =
-  let native_int : nativeint# = assert false in
+  let native_int : nativeint_u = assert false in
   x native_int
 
 [%%expect {|
-val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint# = <fun>
+val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint_u = <fun>
 |}]
 
 let f (x : ('a : immediate). 'a -> 'a) = x "string"
@@ -1721,14 +1721,14 @@ type t = int as (_ : value)
 type t = int as (_ : immediate)
 type t = int as (_ : value mod global)
 type t = int as (_ : immediate mod global)
-type t = nativeint# as (_ : word mod external_ many aliased)
+type t = nativeint_u as (_ : word mod external_ many aliased)
 
 [%%expect {|
 type t = int
 type t = int
 type t = int
 type t = int
-type t = nativeint#
+type t = nativeint_u
 |}]
 
 (*********************************************************)

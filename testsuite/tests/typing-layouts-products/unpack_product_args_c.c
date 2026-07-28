@@ -13,7 +13,7 @@ value add_int_int_bytecode(value prod) {
   return Val_long(Long_val(Field(prod, 0)) + Long_val(Field(prod, 1)));
 }
 
-/* int64# * int64# */
+/* int64_u * int64_u */
 
 int64_t add_i64_i64_native(int64_t a, int64_t b) {
   return a + b;
@@ -39,7 +39,7 @@ value add_f64_f64_bytecode(value prod) {
   CAMLreturn(caml_copy_double(a + b));
 }
 
-/* int64# * int */
+/* int64_u * int */
 
 int64_t add_i64_int_native(int64_t a, value b) {
   return a + Long_val(b);
@@ -52,7 +52,7 @@ value add_i64_int_bytecode(value prod) {
   CAMLreturn(caml_copy_int64(a + b));
 }
 
-/* int * int64# */
+/* int * int64_u */
 
 int64_t add_int_i64_native(value a, int64_t b) {
   return Long_val(a) + b;
@@ -91,7 +91,7 @@ value add_int_f64_bytecode(value prod) {
   CAMLreturn(caml_copy_double((double)a + b));
 }
 
-/* int64# * float# */
+/* int64_u * float# */
 
 double add_i64_f64_native(int64_t a, double b) {
   return (double)a + b;
@@ -104,7 +104,7 @@ value add_i64_f64_bytecode(value prod) {
   CAMLreturn(caml_copy_double((double)a + b));
 }
 
-/* float# * int64# */
+/* float# * int64_u */
 
 double add_f64_i64_native(double a, int64_t b) {
   return a + (double)b;

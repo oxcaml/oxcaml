@@ -117,13 +117,12 @@ let f : ('a : float32). 'a -> 'a = fun x -> x;;
 val f : ('a : float32). 'a -> 'a = <fun>
 |}]
 
-type t = float32#;;
+type t = float32_u;;
 [%%expect{|
-Line 1, characters 9-17:
-1 | type t = float32#;;
-             ^^^^^^^^
-Error: Unbound type constructor "float32"
-Hint:              Did you mean "float"?
+Line 1, characters 9-18:
+1 | type t = float32_u;;
+             ^^^^^^^^^
+Error: Unbound type constructor "float32_u"
 |}];;
 
 let () = ignore #1.0s;;

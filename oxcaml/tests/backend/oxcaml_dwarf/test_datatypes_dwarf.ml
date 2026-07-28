@@ -55,7 +55,7 @@ let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 
 (* Unboxed variants *)
 type unboxed_variant_float = Simple of float# [@@unboxed]
-type unboxed_variant_int = Complex of int32# [@@unboxed]
+type unboxed_variant_int = Complex of int32_u [@@unboxed]
 
 let[@inline never] [@local never] f_unboxed_variant_float
     (x: unboxed_variant_float) = x
@@ -172,7 +172,7 @@ let _ = f_poly_bits32 #42l
 let _ = f_poly_bits32 (-#123l)
 
 (* Unboxed tuple field *)
-type t = { f : #(int64# * int); s : string; b : bool }
+type t = { f : #(int64_u * int); s : string; b : bool }
 
 let[@inline never] [@local never] f_unboxed_tuple_field (x: t) =
   let { f; s; b } = x in { f; s; b }

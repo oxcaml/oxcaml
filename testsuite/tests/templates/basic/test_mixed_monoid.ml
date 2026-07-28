@@ -89,7 +89,7 @@
 *)
 
 external to_float : float# -> float = "%float_of_float#"
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 
 module M_mixed =
   Unboxed_product_monoid_utils (Unboxed_product_monoid) (Mixed_monoid)

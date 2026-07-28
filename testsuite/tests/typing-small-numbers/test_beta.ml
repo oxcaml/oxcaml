@@ -100,14 +100,14 @@ Error: float32 literal patterns are not supported.
 
 (* Unboxed float32 *)
 
-let ignore (f : float32#) = ()
+let ignore (f : float32_u) = ()
 [%%expect{|
-val ignore : float32# -> unit = <fun>
+val ignore : float32_u -> unit = <fun>
 |}];;
 
-type t = float32#;;
+type t = float32_u;;
 [%%expect{|
-type t = float32#
+type t = float32_u
 |}];;
 
 let () = ignore #1.0s;;
