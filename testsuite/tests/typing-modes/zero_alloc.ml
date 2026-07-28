@@ -1116,20 +1116,20 @@ let (alloc_int_ref @ noalloc_strict) () = ( + )
 Line 1, characters 42-47:
 1 | let (alloc_int_ref @ noalloc_strict) () = ( + )
                                               ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 37-47,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 37-47
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_int_ref @ noalloc) () = ( + )
 [%%expect{|
 Line 1, characters 35-40:
 1 | let (alloc_int_ref @ noalloc) () = ( + )
                                        ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 30-40,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 30-40
+         which is expected to be "noalloc".
 |}]
 
 (* A partial application of [(+)] also allocates a closure. *)
@@ -1138,20 +1138,20 @@ let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
 Line 1, characters 53-58:
 1 | let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
                                                          ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 41-60,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 41-60
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
 [%%expect{|
 Line 1, characters 46-51:
 1 | let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
                                                   ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 34-53,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 34-53
+         which is expected to be "noalloc".
 |}]
 
 (* CR shsong: [( + )] is Prim_global, we do not have the corresponding
@@ -1165,20 +1165,20 @@ let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
 Line 1, characters 52-57:
 1 | let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
                                                         ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 39-62,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 39-62
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
 [%%expect{|
 Line 1, characters 45-50:
 1 | let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
                                                  ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 32-55,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 32-55
+         which is expected to be "noalloc".
 |}]
 
 let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
@@ -1186,20 +1186,20 @@ let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
 Line 1, characters 61-66:
 1 | let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
                                                                  ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 39-71,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 39-71
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
 [%%expect{|
 Line 1, characters 54-59:
 1 | let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
                                                           ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 32-64,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 32-64
+         which is expected to be "noalloc".
 |}]
 
 (* Primitive's mode is kept on aliasing, not modified by its fully-applied
@@ -1250,10 +1250,10 @@ let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
 Line 1, characters 67-72:
 1 | let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
                                                                        ^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 50-72,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 50-72
+         which is expected to be "noalloc_strict".
 |}]
 
 (* CR-soon shsong: revisit exception handling after implementing the
@@ -2442,8 +2442,8 @@ let (h @ noalloc_strict) (x : int) = M_partial.f x
 Line 1, characters 37-48:
 1 | let (h @ noalloc_strict) (x : int) = M_partial.f x
                                          ^^^^^^^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at line 1, characters 25-50,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+Error: The value "M_partial.f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 25-50
+         which is expected to be "noalloc_strict".
 |}]

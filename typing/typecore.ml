@@ -6519,14 +6519,14 @@ let prim_is_noalloc_when_fully_applied (prim : Primitive.description) =
 let relax_alloc (desc : Types.value_description) mode ~applied_arity =
   match desc.val_kind with
   | Val_prim prim ->
-    if prim_is_noalloc_when_fully_applied prim && applied_arity >= prim.prim_arity then
+    if prim_is_noalloc_when_fully_applied prim && applied_arity = prim.prim_arity then
       Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
     else mode
   | _ ->
     (* CR shsong: Another option here is to use [zero_alloc] even when [opt = true]. *)
     (* CR shsong: Only exempt check if fully applied!!! Otherwise there would be soundness issue. *)
     match Zero_alloc.get desc.val_zero_alloc with
-    | Check { strict; opt = false; arity; _ } | Assume { strict; arity; _ } when applied_arity >= arity ->
+    | Check { strict; opt = false; arity; _ } | Assume { strict; arity; _ } when applied_arity = arity ->
       let c =
         if strict then Allocation.Const.Noalloc_strict
         else Allocation.Const.Noalloc
@@ -6544,11 +6544,11 @@ let funct_relaxed_by_relax_alloc funct ~applied_arity =
      | Val_prim prim ->
        prim_is_noalloc_when_fully_applied prim
        && prim.prim_arity > 0
-       && applied_arity >= prim.prim_arity
+       && applied_arity = prim.prim_arity
      | _ ->
        (match Zero_alloc.get desc.val_zero_alloc with
         | Check { opt = false; arity; _ } | Assume { arity; _ } ->
-          applied_arity >= arity
+          applied_arity = arity
         | Check _ | Default_zero_alloc | Ignore_assert_all -> false))
   | _ -> false
 
