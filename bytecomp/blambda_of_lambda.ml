@@ -76,7 +76,6 @@ let caml_sys_const name =
     | Ostype_win32 -> "ostype_win32"
     | Ostype_cygwin -> "ostype_cygwin"
     | Backend_type -> "backend_type"
-    | Runtime5 -> "runtime5"
     | Arch_amd64 -> "arch_amd64"
     | Arch_arm64 -> "arch_arm64"
   in
