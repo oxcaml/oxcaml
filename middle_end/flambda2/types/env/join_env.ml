@@ -1332,6 +1332,8 @@ type t =
     bindings : Bindings_in_target_env.t
   }
 
+let create ~joined_envs ~bindings = { joined_envs; bindings }
+
 type n_way_join_type = t -> TG.t join_arg list -> TG.t Or_unknown.t * t
 
 let joined_env t index = Joined_envs.get_nth_joined_env t.joined_envs index
@@ -1916,7 +1918,9 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
           env_extension_for_inverse_relations,
           symbol_projections,
           bindings ) =
-      loop { joined_envs; bindings } equations_to_join
+      loop
+        (create ~joined_envs ~bindings)
+        equations_to_join
         (Name_in_target_env.from_source_env_map
            (Bindings_in_target_env.alias_types_in_target_env bindings))
         Name.Map.empty
@@ -2450,7 +2454,8 @@ let n_way_join_env_extension ~n_way_join_type ~meet_expanded_head t extensions :
       let ( equations,
             _env_extension_for_inverse_relations,
             { bindings = bindings_after_extension; _ } ) =
-        n_way_join_round ~n_way_join_type { joined_envs; bindings }
+        n_way_join_round ~n_way_join_type
+          (create ~joined_envs ~bindings)
           concrete_types_to_join alias_types_in_target_env Name.Map.empty
       in
       (* It is possible for the call to [add_env_extension] in
