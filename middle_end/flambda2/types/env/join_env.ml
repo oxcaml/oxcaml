@@ -1797,8 +1797,8 @@ module Analysis = struct
     let canonical_definitions_at_normal_mode =
       Variable_in_target_env.Map.filter_map
         (fun _name (simples, kind) ->
-          let exists_at_normal_name_mode_in_all_envs_it_is_defined_in =
-            Index.Map.for_all
+          match
+            Index.Map.mapi
               (fun env_id simple ->
                 let typing_env =
                   match Index.Map.find_opt env_id joined_envs with
@@ -1807,12 +1807,13 @@ module Analysis = struct
                     Misc.fatal_errorf "Join does not include environment %a"
                       Index.print env_id
                 in
-                TE.mem_simple ~min_name_mode:Name_mode.normal typing_env simple)
+                TE.get_canonical_simple_exn typing_env simple
+                  ~min_name_mode:Name_mode.normal
+                |> Simple_in_one_joined_env.create)
               (simples : Simples_in_joined_envs.t :> Simple.t Index.Map.t)
-          in
-          if exists_at_normal_name_mode_in_all_envs_it_is_defined_in
-          then Some (simples, kind)
-          else None)
+          with
+          | exception Not_found -> None
+          | simples_at_normal_mode -> Some (simples_at_normal_mode, kind))
         definitions_in_joined_envs
     in
     { definitions_in_joined_envs;
