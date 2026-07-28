@@ -1,3 +1,5 @@
+[@@@ocaml.warning "+a-40-41-42"]
+
 val run_z3 : string -> string
 
 val fmt_fact : Format.formatter -> string -> string list -> unit
@@ -23,6 +25,8 @@ module type Id_gen_S = sig
 
   val width : t -> int
 
+  val length : t -> int
+
   val key_of_id_exn : t -> int -> key
 end
 
@@ -42,15 +46,3 @@ val create_reg_id_gen : Cfg.t -> Reg_id_gen.t
 
 val z3_graph_of_cfg :
   Format.formatter -> cfg:Cfg.t -> id_gen:Label_id_gen.t -> unit
-
-val fmt_dom_code_begin : Format.formatter -> id_gen:Label_id_gen.t -> unit
-
-val fmt_dom_code_end : Format.formatter -> unit
-
-val fmt_liveness_code_begin :
-  Format.formatter -> Instruction_id_gen.t -> Reg_id_gen.t -> unit
-
-val fmt_liveness_code_end : Format.formatter -> unit
-
-val parse_doms :
-  id_gen:Label_id_gen.t -> entry_label:Label.t -> string -> Label.t Label.Tbl.t

@@ -66,8 +66,9 @@ end = struct
     if not (String.equal z3_output "unsat")
     then
       Misc.fatal_errorf
-        "validate_reachability: unreachable blocks found in cfg '%s'@.%a"
-        cfg.fun_name Printcfg.cfg cfg
+        "validate_reachability: unreachable blocks found in cfg '%s'. Z3 \
+         output:@.%s@.CFG:@.%a"
+        cfg.fun_name z3_output Printcfg.cfg cfg
 end
 
 module Eliminate_dead_code : sig

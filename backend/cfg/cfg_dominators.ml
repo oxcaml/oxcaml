@@ -147,11 +147,10 @@ end = struct
       (* CR-someday xclerc for xclerc: this fatals on an isolated unreachable
          cycle (a dead strongly-connected component in which every block has a
          predecessor inside the component), so no unvisited block then has an
-         empty predecessor set. Cfg_reducibility tolerates the analogous case;
-         consider a clearer diagnostic, or falling back to an arbitrary
-         unvisited block as the component root. Not known to occur today. Note
-         however, that if all dead block are deleted, this should not happen,
-         and we are guaranteed to have a tree rather than a forest. *)
+         empty predecessor set. The default now removes all unreachable blocks.
+         Once all callers guarantee this before dominator computation, the
+         pseudo-entry/component handling can be removed and the dominator forest
+         simplified to a single tree. *)
       Misc.fatal_error "did not find a block with no predecessors"
     with Found label -> label
 
@@ -445,49 +444,6 @@ let compute_dominator_forest : Cfg.t -> doms -> dominator_tree list =
   if debug then invariant_dominator_forest cfg doms res;
   res
 
-module Validator : sig
-  val validate_idom : Cfg.t -> doms -> unit
-end = struct
-  let debug_print_dom doms =
-    Label.Map.iter
-      (fun label immediate_dominator ->
-        Format.eprintf "%a -> %a@." Label.format label Label.format
-          immediate_dominator)
-      (Label.Tbl.to_map doms)
-
-  let calculate_idom (cfg : Cfg.t) : doms =
-    let buffer = Buffer.create 4096 in
-    let fmt = Format.formatter_of_buffer buffer in
-    let id_gen = Cfg_z3.create_label_id_gen cfg in
-    Cfg_z3.fmt_dom_code_begin fmt ~id_gen;
-    Cfg_z3.z3_graph_of_cfg fmt ~cfg ~id_gen;
-    Cfg_z3.fmt_dom_code_end fmt;
-    Format.pp_print_flush fmt ();
-    let z3_output = Buffer.contents buffer |> Cfg_z3.run_z3 in
-    Cfg_z3.parse_doms ~id_gen ~entry_label:cfg.entry_label z3_output
-
-  (* CR hwasilewski: add validators for the dominance frontier and forest. *)
-  let validate_idom (cfg : Cfg.t) (doms : doms) =
-    (* CR hwasilewski: Note: we assume that cfg has no dead code here. *)
-    let z3_doms = calculate_idom cfg in
-    let doms_equal =
-      Label.Map.equal Label.equal (Label.Tbl.to_map doms)
-        (Label.Tbl.to_map z3_doms)
-    in
-    if not doms_equal
-    then (
-      Format.eprintf "CFG dominators:@.";
-      debug_print_dom doms;
-      Format.eprintf "Z3 dominators:@.";
-      debug_print_dom z3_doms;
-      (* CR hwasilewski for xclerc: cannot import Printcfg here, it causes a
-         cyclic dependency. *)
-      Misc.fatal_errorf
-        "validate_idoms: Dominator validation failed: dominator calculated by \
-         Datalog does not agree with the Cfg_dominators, cfg '%s'"
-        cfg.fun_name)
-end
-
 let build : Cfg.t -> t =
  fun cfg ->
   let doms = compute_doms cfg in
@@ -496,7 +452,7 @@ let build : Cfg.t -> t =
   if !Oxcaml_flags.cfg_dominators_validate
   then
     Profile.record ~accumulate:true "validate_dominators"
-      (Validator.validate_idom cfg)
+      (Cfg_dominators_validate.validate_idom cfg)
       doms;
   { entry_label = cfg.entry_label; doms; dominance_frontiers; dominator_forest }
 
