@@ -11,7 +11,7 @@
  }
 *)
 
-external box_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
+external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 
 (* Homogeneous pairs *)
@@ -21,7 +21,7 @@ external add_int_int :
   "add_int_int_bytecode" "add_int_int_native"
 
 external add_i64_i64 :
-  (#(int64# * int64#) [@unpacked]) -> int64# =
+  (#(int64_u * int64_u) [@unpacked]) -> int64_u =
   "add_i64_i64_bytecode" "add_i64_i64_native"
 
 external add_f64_f64 :
@@ -40,14 +40,14 @@ let () =
   let result = add_f64_f64 #(#1.5, #2.5) in
   Printf.printf "add_f64_f64: %f\n" (box_float result)
 
-(* Heterogeneous pairs: all combinations of int, int64#, float# *)
+(* Heterogeneous pairs: all combinations of int, int64_u, float# *)
 
 external add_i64_int :
-  (#(int64# * int) [@unpacked]) -> int64# =
+  (#(int64_u * int) [@unpacked]) -> int64_u =
   "add_i64_int_bytecode" "add_i64_int_native"
 
 external add_int_i64 :
-  (#(int * int64#) [@unpacked]) -> int64# =
+  (#(int * int64_u) [@unpacked]) -> int64_u =
   "add_int_i64_bytecode" "add_int_i64_native"
 
 external add_f64_int :
@@ -59,11 +59,11 @@ external add_int_f64 :
   "add_int_f64_bytecode" "add_int_f64_native"
 
 external add_i64_f64 :
-  (#(int64# * float#) [@unpacked]) -> float# =
+  (#(int64_u * float#) [@unpacked]) -> float# =
   "add_i64_f64_bytecode" "add_i64_f64_native"
 
 external add_f64_i64 :
-  (#(float# * int64#) [@unpacked]) -> float# =
+  (#(float# * int64_u) [@unpacked]) -> float# =
   "add_f64_i64_bytecode" "add_f64_i64_native"
 
 let () =

@@ -19,9 +19,9 @@ type t_uniform1 = { x : int }
 type t_uniform2 = floatarray
 type t_uniform3 = int -> int
 
-type t_mixed0 = { x : int64# }
-type t_mixed1 = { x : string; y : int64# }
-type t_mixed2 = { x : string; y : string; z : int64# }
+type t_mixed0 = { x : int64_u }
+type t_mixed1 = { x : string; y : int64_u }
+type t_mixed2 = { x : string; y : string; z : int64_u }
 
 let run (type a) test_name (obj : a) =
   let obj = Obj.repr obj in

@@ -38,9 +38,9 @@ let to_option (type a : value) (type b : value) (t : (a, b) t) =
 val to_option : ('a, 'b) t -> ('a * 'b) option = <fun>
 |}]
 
-let is_yeah (t : (int64#, 'b) t) = match t with Yeah _ -> true | Nope -> false
+let is_yeah (t : (int64_u, 'b) t) = match t with Yeah _ -> true | Nope -> false
 [%%expect{|
-val is_yeah : ('b : any). (int64#, 'b) t -> bool = <fun>
+val is_yeah : ('b : any). (int64_u, 'b) t -> bool = <fun>
 |}]
 
 let is_yeah (type a : bits64) (type b : value) (t : (a, b) t) =
@@ -96,9 +96,9 @@ let yeah (type a : value) (type b : value) fst snd : (a, b) t =
 val yeah : 'a -> 'b -> ('a, 'b) t = <fun>
 |}]
 
-let yeah (fst : int64#) (snd : float32#) = Yeah { fst; snd }
+let yeah (fst : int64_u) (snd : float32_u) = Yeah { fst; snd }
 [%%expect{|
-val yeah : int64# -> float32# -> (int64#, float32#) t = <fun>
+val yeah : int64_u -> float32_u -> (int64_u, float32_u) t = <fun>
 |}]
 
 let yeah (type a : bits64) (type b : float32) (fst : a) (snd : b) =
@@ -121,7 +121,7 @@ val test_block_with_value : (int, int) t = Yeah {fst = 1; snd = 2}
 
 let test_block = Yeah { fst = #1L; snd = #2L }
 [%%expect {|
-val test_block : (int64#, int64#) t = Yeah {fst = <abstr>; snd = <abstr>}
+val test_block : (int64_u, int64_u) t = Yeah {fst = <abstr>; snd = <abstr>}
 |}]
 
 type ('a : any) any_list = Nil | Cons of { head : 'a; tail : 'a any_list }

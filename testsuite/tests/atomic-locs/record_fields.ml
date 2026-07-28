@@ -208,14 +208,14 @@ let project (t: int t) = t.f
 val project : int t -> int = <fun>
 |}];;
 
-let mixed_project (t: int64# t) = t.f
+let mixed_project (t: int64_u t) = t.f
 [%%expect{|
 (let
   (mixed_project =
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
   (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
-val mixed_project : int64# t -> int = <fun>
+val mixed_project : int64_u t -> int = <fun>
 |}];;
 
 let set (t: int t) = t.f <- 42
@@ -225,14 +225,14 @@ let set (t: int t) = t.f <- 42
 val set : int t -> unit = <fun>
 |}];;
 
-let mixed_set (t: int64# t) = t.f <- 42
+let mixed_set (t: int64_u t) = t.f <- 42
 [%%expect{|
 (let
   (mixed_set =
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
   (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
-val mixed_set : int64# t -> unit = <fun>
+val mixed_set : int64_u t -> unit = <fun>
 |}];;
 
 let loc (t: int t) = [%atomic.loc t.f]
@@ -242,11 +242,11 @@ let loc (t: int t) = [%atomic.loc t.f]
 val loc : int t -> int atomic_loc = <fun>
 |}];;
 
-let wrong_loc (t: int64# t) = [%atomic.loc t.f];
+let wrong_loc (t: int64_u t) = [%atomic.loc t.f];
 [%%expect{|
-Line 1, characters 30-47:
-1 | let wrong_loc (t: int64# t) = [%atomic.loc t.f];
-                                  ^^^^^^^^^^^^^^^^^
+Line 1, characters 31-48:
+1 | let wrong_loc (t: int64_u t) = [%atomic.loc t.f];
+                                   ^^^^^^^^^^^^^^^^^
 Error: Use of "[%atomic.loc]" with mixed record fields (here "f") is forbidden.
 |}];;
 
@@ -315,14 +315,14 @@ let project (t: int t) = match t with A r -> r.f
 val project : int t -> int = <fun>
 |}];;
 
-let mixed_project (t: int64# t) = match t with A r -> r.f
+let mixed_project (t: int64_u t) = match t with A r -> r.f
 [%%expect{|
 (let
   (mixed_project =
      (function {nlocal = 0} t : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
   (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
-val mixed_project : int64# t -> int = <fun>
+val mixed_project : int64_u t -> int = <fun>
 |}];;
 
 let set (t: int t) = match t with A r -> r.f <- 42
@@ -332,14 +332,14 @@ let set (t: int t) = match t with A r -> r.f <- 42
 val set : int t -> unit = <fun>
 |}];;
 
-let mixed_set (t: int64# t) = match t with A r -> r.f <- 42
+let mixed_set (t: int64_u t) = match t with A r -> r.f <- 42
 [%%expect{|
 (let
   (mixed_set =
      (function {nlocal = 0} t : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
   (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
-val mixed_set : int64# t -> unit = <fun>
+val mixed_set : int64_u t -> unit = <fun>
 |}];;
 
 let ok_loc (t: int t) = match t with A r -> [%atomic.loc r.f]
@@ -349,11 +349,11 @@ let ok_loc (t: int t) = match t with A r -> [%atomic.loc r.f]
 val ok_loc : int t -> int atomic_loc = <fun>
 |}];;
 
-let wrong_loc (t: int64# t) = match t with A r -> [%atomic.loc r.f]
+let wrong_loc (t: int64_u t) = match t with A r -> [%atomic.loc r.f]
 [%%expect{|
-Line 1, characters 50-67:
-1 | let wrong_loc (t: int64# t) = match t with A r -> [%atomic.loc r.f]
-                                                      ^^^^^^^^^^^^^^^^^
+Line 1, characters 51-68:
+1 | let wrong_loc (t: int64_u t) = match t with A r -> [%atomic.loc r.f]
+                                                       ^^^^^^^^^^^^^^^^^
 Error: Use of "[%atomic.loc]" with mixed record fields (here "f") is forbidden.
 |}];;
 
@@ -912,13 +912,13 @@ Error: Atomic record fields must have layout value.
 |}]
 
 module Non_value_atomic_single_bits32 = struct
-  type t = { mutable f : int32# [@atomic] }
+  type t = { mutable f : int32_u [@atomic] }
 end
 
 [%%expect{|
-Line 2, characters 13-41:
-2 |   type t = { mutable f : int32# [@atomic] }
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 13-42:
+2 |   type t = { mutable f : int32_u [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
 

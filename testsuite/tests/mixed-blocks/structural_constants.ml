@@ -12,7 +12,7 @@ type v =
   | B of string * float#
   | C of string * float# * int
   | D of string
-  | E of int * int32# * int64# * nativeint#
+  | E of int * int32_u * int64_u * nativeint_u
 
 let r1           = { x1 = "x1"; y1 = #1.0 }
 let create_r1 () = { x1 = "x1"; y1 = #1.0 }

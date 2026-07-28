@@ -120,7 +120,7 @@ let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_5) in
 cont done ($camlTOP5)
 |}]
 
-let match_naked_float32 (t : t) : float32# =
+let match_naked_float32 (t : t) : float32_u =
   match t with
   | A -> #5.0s
   | B -> #10.0s
@@ -155,7 +155,7 @@ let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_7) in
 cont done ($camlTOP6)
 |}]
 
-let match_naked_int32 (t : t) : int32# =
+let match_naked_int32 (t : t) : int32_u =
   match t with
   | A -> #5l
   | B -> #10l
@@ -185,7 +185,7 @@ let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_9) in
 cont done ($camlTOP7)
 |}]
 
-let match_naked_int64 (t : t) : int64# =
+let match_naked_int64 (t : t) : int64_u =
   match t with
   | A -> #5L
   | B -> #10L
@@ -215,7 +215,7 @@ let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_11) in
 cont done ($camlTOP8)
 |}]
 
-let match_naked_nativeint (t : t) : nativeint# =
+let match_naked_nativeint (t : t) : nativeint_u =
   match t with
   | A -> #5n
   | B -> #10n
