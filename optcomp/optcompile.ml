@@ -41,6 +41,9 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
+  val reaper_rebuild :
+    cmr_file:string -> output_prefix:string -> keep_symbol_tables:bool -> unit
+
   val link : ppf_dump:Format.formatter -> string list -> string -> unit
 
   val link_shared :
@@ -151,6 +154,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           main_module_block_repr : Lambda.module_representation;
           arg_descr : Lambda.arg_descr option
         }
+    | Reaper_rebuild of
+        { compile_from_reaped_flambda :
+            Optcomp_intf.compile_from_reaped_flambda;
+          cmr_file : string
+        }
 
   let starting_point_of_compiler_pass start_from =
     match (start_from : Clflags.Compiler_pass.t), Backend.emit with
@@ -196,6 +204,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Compiler_hooks.execute Compiler_hooks.Typed_tree_impl impl)
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
+    | Reaper_rebuild { compile_from_reaped_flambda; cmr_file } ->
+      (* Rebuild a reaped compilation unit. The output prefix should be
+         [foo.reaped]. *)
+      (* CR mvellacott: write the rebuilt unit's .cmx. *)
+      compile_from_reaped_flambda ~keep_symbol_tables ~cmr_file info
     | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
@@ -230,6 +243,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
 
+  let reaper_rebuild ~cmr_file ~output_prefix ~keep_symbol_tables =
+    match Backend.compile_from_reaped_flambda with
+    | Some compile_from_reaped_flambda ->
+      implementation_aux
+        ~start_from:(Reaper_rebuild { compile_from_reaped_flambda; cmr_file })
+        ~source_file:cmr_file ~output_prefix ~keep_symbol_tables
+        ~compilation_unit:Inferred_from_output_prefix
+    | None -> Misc.fatal_error "This backend does not support -reaper-rebuild"
+
   module Link = Optlink.Make (Backend)
 
   module Link_input = struct
@@ -260,7 +282,14 @@ let native unix
         machine_width:Target_system.Machine_width.t ->
         keep_symbol_tables:bool ->
         Lambda.program ->
-        Cmm.phrase list) =
+        Cmm.phrase list)
+    ~(reaped_flambda2_to_cmm :
+       ppf_dump:Format.formatter ->
+       prefixname:string ->
+       machine_width:Target_system.Machine_width.t ->
+       keep_symbol_tables:bool ->
+       cmr_filename:string ->
+       Cmm.phrase list) =
   (module Make (struct
     let backend = Compile_common.Native
 
@@ -306,6 +335,21 @@ let native unix
         ~pipeline:
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
+
+    let compile_from_reaped_flambda :
+        Optcomp_intf.compile_from_reaped_flambda option =
+      Some
+        (fun ~keep_symbol_tables ~cmr_file (info : Compile_common.info) ->
+          let machine_width = Target_system.Machine_width.Sixty_four in
+          (* CR mvellacott: the required globals should be read from the .cmx
+             rather than assumed empty. *)
+          Asmgen.compile_implementation_from_reaped_flambda unix
+            ~required_globals:Compilation_unit.Set.empty
+            ~sourcefile:(Some cmr_file)
+            ~prefixname:(Unit_info.prefix info.target)
+            ~ppf_dump:info.ppf_dump
+            (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
+               ~cmr_filename:cmr_file))
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 

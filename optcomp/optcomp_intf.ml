@@ -32,6 +32,10 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(** Rebuild a reaped compilation unit from its reaped Flambda data. *)
+type compile_from_reaped_flambda =
+  keep_symbol_tables:bool -> cmr_file:string -> Compile_common.info -> unit
+
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
       string append, and removed by Filename.strip_extension *)
@@ -88,6 +92,8 @@ module type Backend = sig
     unit
 
   val emit : emit option
+
+  val compile_from_reaped_flambda : compile_from_reaped_flambda option
 
   (** This function is side-effect free. *)
   val support_files_for_eval : unit -> string list

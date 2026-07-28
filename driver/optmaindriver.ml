@@ -83,7 +83,7 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      Optcompile.native unix ~flambda2 ~reaped_flambda2_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -174,17 +174,9 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
       List.iter
         (fun file -> Printf.printf "other rebuild input: %s\n" file)
         inputs;
-      (* CR mvellacott: once we're actually doing compilation here, it
-         probably makes sense to thread this through Optcompiler.native.
-         (Also, we're currently not doing anything with the Cmm we get.) *)
-      let prefixname = Compenv.output_prefix cmr_file in
-      let machine_width = Target_system.Machine_width.Sixty_four in
-      Compmisc.with_ppf_dump ~file_prefix:prefixname (fun ppf_dump ->
-        let (_ : Cmm.phrase list) =
-          reaped_flambda2_to_cmm ~ppf_dump ~prefixname ~machine_width
-            ~keep_symbol_tables:false ~cmr_filename:cmr_file
-        in
-        ());
+      Compiler.reaper_rebuild ~cmr_file
+        ~output_prefix:(Compenv.output_prefix cmr_file ^ ".reaped")
+        ~keep_symbol_tables:false;
       Warnings.check_fatal ();
     end
     else if !reaper_solve then begin
