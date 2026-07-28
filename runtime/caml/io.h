@@ -109,7 +109,6 @@ CAMLextern unsigned char caml_getch(struct channel *);
 CAMLextern uint32_t caml_getword (struct channel *);
 CAMLextern int caml_getblock (struct channel *, char *, intnat);
 CAMLextern intnat caml_really_getblock (struct channel *, char *, intnat);
-CAMLextern intnat caml_input_scan_line (struct channel *);
 
 /* Extract a struct channel * from the heap object representing it */
 

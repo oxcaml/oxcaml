@@ -43,6 +43,23 @@ static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 
 
 
+/* returns number of elements (either fields or floats) */
+/* [ 'a array -> int ] */
+CAMLexport mlsize_t caml_array_length(value array)
+{
+#ifdef FLAT_FLOAT_ARRAY
+  if (Tag_val(array) == Double_array_tag)
+    return Wosize_val(array) / Double_wosize;
+  else
+#endif
+    return Wosize_val(array);
+}
+
+CAMLexport int caml_is_double_array(value array)
+{
+  return (Tag_val(array) == Double_array_tag);
+}
+
 /* Note: the OCaml types on the following primitives will work both with
    and without the -no-flat-float-array configure-time option. If you
    respect them, your C code should work in both configurations.

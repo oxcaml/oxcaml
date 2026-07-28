@@ -51,6 +51,133 @@
    in runtime/io.c. */
 static char dummy_buff[1];
 
+#ifndef SEEK_SET
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+#endif
+#if defined(_WIN32)
+#define lseek _lseeki64
+#endif
+
+/* Channel positioning and line scanning.  Only the primitives below
+   (and external C bindings) use these; the buffered-I/O engine itself
+   is in runtime/io.c. */
+
+CAMLexport file_offset caml_channel_size(struct channel *channel)
+{
+  file_offset here, end;
+  int fd;
+
+  caml_channel_check_pending(channel);
+  /* We extract data from [channel] before dropping the OCaml lock, in case
+     someone else touches the block. */
+  fd = channel->fd;
+  here = channel->flags & CHANNEL_TEXT_MODE ? -1 : channel->offset;
+  caml_enter_blocking_section_no_pending();
+  if (here == -1) {
+    here = lseek(fd, 0, SEEK_CUR);
+    if (here == -1) goto error;
+  }
+  end = lseek(fd, 0, SEEK_END);
+  if (end == -1) goto error;
+  if (lseek(fd, here, SEEK_SET) != here) goto error;
+  caml_leave_blocking_section();
+  return end;
+ error:
+  caml_leave_blocking_section();
+  caml_sys_error(NO_ARG);
+}
+
+CAMLexport void caml_seek_out(struct channel *channel, file_offset dest)
+{
+  file_offset res;
+  caml_flush(channel);
+  caml_enter_blocking_section_no_pending();
+  res = lseek(channel->fd, dest, SEEK_SET);
+  if (res < 0 || res != dest) {
+    caml_leave_blocking_section();
+    caml_sys_error(NO_ARG);
+  }
+  caml_leave_blocking_section();
+  channel->offset = dest;
+}
+
+CAMLexport file_offset caml_pos_out(struct channel *channel)
+{
+  return channel->offset + (file_offset)(channel->curr - channel->buff);
+}
+
+CAMLexport void caml_seek_in(struct channel *channel, file_offset dest)
+{
+  file_offset res;
+  if (dest >= channel->offset - (channel->max - channel->buff)
+      && dest <= channel->offset
+      && (channel->flags & CHANNEL_TEXT_MODE) == 0) {
+    channel->curr = channel->max - (channel->offset - dest);
+  } else {
+    caml_enter_blocking_section_no_pending();
+    res = lseek(channel->fd, dest, SEEK_SET);
+    if (res < 0 || res != dest) {
+      caml_leave_blocking_section();
+      caml_sys_error(NO_ARG);
+    }
+    caml_leave_blocking_section();
+    channel->offset = dest;
+    channel->curr = channel->max = channel->buff;
+  }
+}
+
+CAMLexport file_offset caml_pos_in(struct channel *channel)
+{
+  return channel->offset - (file_offset)(channel->max - channel->curr);
+}
+
+intnat caml_input_scan_line(struct channel *channel)
+{
+  char * p;
+  int n;
+ again:
+  caml_channel_check_pending(channel);
+  p = channel->curr;
+  do {
+    if (p >= channel->max) {
+      /* No more characters available in the buffer */
+      if (channel->curr > channel->buff) {
+        /* Try to make some room in the buffer by shifting the unread
+           portion at the beginning */
+        memmove(channel->buff, channel->curr, channel->max - channel->curr);
+        n = channel->curr - channel->buff;
+        channel->curr -= n;
+        channel->max -= n;
+        p -= n;
+      }
+      if (channel->max >= channel->end) {
+        /* Buffer is full, no room to read more characters from the input.
+           Return the number of characters in the buffer, with negative
+           sign to indicate that no newline was encountered. */
+        return -(channel->max - channel->curr);
+      }
+      /* Fill the buffer as much as possible */
+      n = caml_read_fd(channel->fd, channel->flags,
+                       channel->max, channel->end - channel->max);
+      if (n == -1) {
+        if (errno == EINTR) goto again; else caml_sys_io_error(NO_ARG);
+      }
+      else if (n == 0) {
+        /* End-of-file encountered. Return the number of characters in the
+           buffer, with negative sign since we haven't encountered
+           a newline. */
+        return -(channel->max - channel->curr);
+      }
+      channel->offset += n;
+      channel->max += n;
+    }
+  } while (*p++ != '\n');
+  /* Found a newline. Return the length of the line, newline included. */
+  return (p - channel->curr);
+}
+
 CAMLprim value caml_ml_open_descriptor_in_with_flags(int fd, int flags)
 {
   struct channel * chan = caml_open_descriptor_in(fd);

@@ -1083,7 +1083,6 @@ runtime_COMMON_C_SOURCES = \
   addrmap \
   afl \
   alloc \
-  array \
   backtrace \
   bigarray \
   callback \

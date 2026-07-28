@@ -141,9 +141,11 @@ static struct ev_info *process_debug_events(code_t code_start,
   mlsize_t j;
   struct ev_info *events;
 
-  /* Compute the size of the required event buffer. */
+  /* Compute the size of the required event buffer.  [events_heap] is
+     an array of lists, never a flat float array, so [Wosize_val] is
+     its length. */
   *num_events = 0;
-  for (mlsize_t i = 0; i < caml_array_length(events_heap); i++)
+  for (mlsize_t i = 0; i < Wosize_val(events_heap); i++)
     for (l = Field(events_heap, i); l != Val_int(0); l = Field(l, 1))
       (*num_events)++;
 
@@ -155,7 +157,7 @@ static struct ev_info *process_debug_events(code_t code_start,
     caml_fatal_error ("caml_add_debug_info: out of memory");
 
   j = 0;
-  for (mlsize_t i = 0; i < caml_array_length(events_heap); i++) {
+  for (mlsize_t i = 0; i < Wosize_val(events_heap); i++) {
     for (l = Field(events_heap, i); l != Val_int(0); l = Field(l, 1)) {
       ev = Field(l, 0);
 
