@@ -471,10 +471,10 @@ let check_float32u_pair ~(init : #(float32_u * float32_u)) ~element_size =
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     if n = 0 then
-      Block_checks.check_empty_array_is_uniform ~array_type:"float32#_pair" (Obj.repr x)
+      Block_checks.check_empty_array_is_uniform ~array_type:"float32_u_pair" (Obj.repr x)
     else
       (* Non-empty arrays with no scannable fields are mixed blocks *)
-      Block_checks.check_mixed_block_scannable_size ~array_type:"float32#_pair" (Obj.repr x) 0
+      Block_checks.check_mixed_block_scannable_size ~array_type:"float32_u_pair" (Obj.repr x) 0
   in
   List.iter check_one array_sizes_to_check
 
@@ -496,7 +496,7 @@ let check_int32u_pair ~(init : #(int32_u * int32_u)) ~element_size =
     (* All unboxed product arrays use tag 0, which matches empty array tag *)
     assert (tag = unboxed_product_array_tag);
     (* This product has no scannable fields (only check non-empty arrays) *)
-    if n > 0 then Block_checks.check_mixed_block_scannable_size ~array_type:"int32#_pair" (Obj.repr x) 0
+    if n > 0 then Block_checks.check_mixed_block_scannable_size ~array_type:"int32_u_pair" (Obj.repr x) 0
   in
   List.iter check_one array_sizes_to_check
 
