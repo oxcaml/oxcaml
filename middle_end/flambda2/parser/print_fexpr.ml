@@ -645,7 +645,9 @@ let loopify_attribute ppf (loopify : loopify_attribute) =
 let loopify_attribute_opt ~space ppf l =
   pp_option ~space loopify_attribute ppf l
 
-let code_size ppf code_size = Format.fprintf ppf "%d" code_size
+let code_size ppf ({ size; nested_size } : code_size) =
+  Format.fprintf ppf "%d" size;
+  if nested_size <> 0 then Format.fprintf ppf "[%d]" nested_size
 
 let or_blank f ppf ob =
   match ob with None -> Format.pp_print_string ppf "_" | Some a -> f ppf a

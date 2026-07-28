@@ -32,7 +32,7 @@ and code rec loopify(never) size(26) newer_version_of(even_1)
       apply direct(odd_2_1 &my_alloc_region)
         odd ~ depth my_depth -> succ my_depth (int_sub) -> k * k1
 in
-let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
+let code inline(always) loopify(never) size(169[52]) newer_version_of(parity_is_0)
       parity_is_0_1 (p : imm tagged, n : imm tagged, k : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =

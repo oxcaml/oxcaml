@@ -44,7 +44,7 @@ let $camlUnroll4__first_const = Block 0 () in
      where k3 =
        apply &my_alloc_region inlined(hint) k (0) -> k1 * k2
  in
- let code inline(always) size(93)
+ let code inline(always) size(31[62])
        parity_is_0 (p : imm tagged, n : imm tagged, k : val)
          my_closure &my_alloc_region my_depth
          -> k1 * k2 =

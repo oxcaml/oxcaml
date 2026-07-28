@@ -1042,7 +1042,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                          (s1, s2, 0)
                          -> k * k1)))
 in
-let code loopify(never) size(1411) newer_version_of(sort_uniq_4)
+let code loopify(never) size(55[1356]) newer_version_of(sort_uniq_4)
       sort_uniq_4_1
         (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -1141,7 +1141,7 @@ and code rec loopify(never) size(5) newer_version_of(sort_10)
       (n, l)
       -> k * k1
 in
-let code loopify(never) size(98) newer_version_of(foo_9)
+let code loopify(never) size(16[82]) newer_version_of(foo_9)
       foo_9_1 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
         -> k * k1

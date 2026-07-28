@@ -118,7 +118,7 @@ in
 let $camlPhantom__is_true_7 =
   closure is_true_1_1 @is_true &toplevel.alloc_region
 in
-let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
+let code inline(always) loopify(never) size(43[133]) newer_version_of(Make_0)
       Make_0_1 (F : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
   apply ccall noalloc
     ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
@@ -233,7 +233,7 @@ let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
            let Pmakeblock = %block.[`0`].my_alloc_region (0, lvl) in
            cont k (Pmakeblock))
 in
-let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
+let code inline(always) loopify(never) size(43[133]) newer_version_of(Make2_5)
       Make2_5_1 (F : val)
         my_closure &my_alloc_region my_depth
         -> k * k1

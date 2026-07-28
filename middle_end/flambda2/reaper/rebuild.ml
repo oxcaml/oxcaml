@@ -1822,33 +1822,32 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
     in
-    let size_of_defining_expr =
-      Cost_metrics.size
-        (Cost_metrics.set_of_closures
-           ~find_code_characteristics:(fun code_id ->
-             let code_metadata =
-               if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-               then
-                 match Code_id.Map.find code_id res.all_code with
-                 | exception Not_found ->
-                   Misc.fatal_errorf
-                     "When rebuilding set of closures %a, code_id %a not found \
-                      in [all_code]"
-                     Set_of_closures.print set_of_closures Code_id.print code_id
-                 | code -> Code.code_metadata code
-               else env.get_code_metadata code_id
-             in
-             { cost_metrics = Code_metadata.cost_metrics code_metadata;
-               params_arity =
-                 Flambda_arity.num_params
-                   (Code_metadata.params_arity code_metadata)
-             })
-           set_of_closures)
+    let cost_metrics_of_defining_expr =
+      Cost_metrics.set_of_closures
+        ~find_code_characteristics:(fun code_id ->
+          let code_metadata =
+            if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+            then
+              match Code_id.Map.find code_id res.all_code with
+              | exception Not_found ->
+                Misc.fatal_errorf
+                  "When rebuilding set of closures %a, code_id %a not found in \
+                   [all_code]"
+                  Set_of_closures.print set_of_closures Code_id.print code_id
+              | code -> Code.code_metadata code
+            else env.get_code_metadata code_id
+          in
+          { cost_metrics = Code_metadata.cost_metrics code_metadata;
+            params_arity =
+              Flambda_arity.num_params
+                (Code_metadata.params_arity code_metadata)
+          })
+        set_of_closures
     in
     let expr =
-      RE.create_let bound_pattern
+      RE.create_let_set_of_closures bound_pattern
         (Named.create_set_of_closures ~alloc_mode set_of_closures)
-        ~size_of_defining_expr ~body:hole
+        ~cost_metrics_of_defining_expr ~body:hole
     in
     expr, res
 
@@ -2258,7 +2257,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       Code_metadata.with_result_types result_types code_metadata
   in
   let update_size code_metadata (body : RE.t) =
-    let cost_metrics = Cost_metrics.from_size body.code_size in
+    let cost_metrics = body.cost_metrics in
     Code_metadata.with_inlining_decision
       (Function_decl_inlining_decision.make_decision
          ~inlining_arguments:(Code_metadata.inlining_arguments code_metadata)

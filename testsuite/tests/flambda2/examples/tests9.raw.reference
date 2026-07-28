@@ -1502,7 +1502,7 @@
                           (s1, s2, 0)
                           -> k1 * k2)))
  in
- let code size(1692)
+ let code size(62[1630])
        sort_uniq_4 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure &my_alloc_region my_depth
          -> k1 * k2
@@ -1635,7 +1635,7 @@
            (n, l)
            -> k1 * k2
  in
- let code size(119)
+ let code size(16[103])
        foo_9 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure &my_alloc_region my_depth
          -> k1 * k2

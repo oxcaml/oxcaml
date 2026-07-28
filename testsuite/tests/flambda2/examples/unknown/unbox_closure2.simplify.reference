@@ -21,7 +21,7 @@ let code inline(always) loopify(never) size(11) newer_version_of(bar2_1)
   let int_mul_1 = %int_barith.mul (int_mul, y) in
   cont k (int_mul_1)
 in
-let code loopify(never) size(64) newer_version_of(foobar_0)
+let code loopify(never) size(49[15]) newer_version_of(foobar_0)
       foobar_0_1 (b : imm tagged, x : imm tagged, z : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

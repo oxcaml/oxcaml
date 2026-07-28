@@ -195,13 +195,15 @@ module Context = struct
       |> Table.create
     in
     Format.fprintf ppf
-      "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a@]@,\
+      "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a (%a nested)@]@,\
        @,\
        @[<h>Benefits@ of@ inlining@ this@ call:@;\
        @]@,\
        @[<h>%a@]@]@,\
        @,"
-      Code_size.print (Cost_metrics.size c) Table.print table
+      Code_size.print (Cost_metrics.size c) Code_size.print
+      (Cost_metrics.nested_size c)
+      Table.print table
 
   let print ppf
       { args;

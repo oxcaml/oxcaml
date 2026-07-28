@@ -16,25 +16,32 @@
 type continuation_handler =
   { handler : Flambda.Continuation_handler.t;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
 type continuation_handlers =
   { handlers : Flambda.Continuation_handler.t Continuation.Lmap.t;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
 type t =
   { expr : Flambda.expr;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
 val create_let :
   Bound_pattern.t ->
   Flambda.named ->
   size_of_defining_expr:Code_size.t ->
+  body:t ->
+  t
+
+val create_let_set_of_closures :
+  Bound_pattern.t ->
+  Flambda.named ->
+  cost_metrics_of_defining_expr:Cost_metrics.t ->
   body:t ->
   t
 

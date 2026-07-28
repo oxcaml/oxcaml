@@ -497,8 +497,12 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               body
             })
       in
-      let code_size =
-        Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
+      let code_size : Fexpr.code_size =
+        let cost_metrics = Code.cost_metrics code in
+        { size = Cost_metrics.size cost_metrics |> Code_size.to_int;
+          nested_size =
+            Cost_metrics.nested_size cost_metrics |> Code_size.to_int
+        }
       in
       let result_mode : Fexpr.alloc_mode_for_assignments =
         match Code.result_mode code with

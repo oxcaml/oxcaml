@@ -15,7 +15,7 @@ let $camlTests8__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    cont k1 (x)
  in
- let code size(21)
+ let code size(19[2])
        `fn[tests8.ml:20,12--80]_1` (param : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
@@ -37,7 +37,7 @@ let $camlTests8__first_const = Block 0 () in
      (map_foo : _ -> [ 0 | 0 of val * val ])
        (`fn[tests8.ml:20,49--61]`, `fn[tests8.ml:20,62--77]`, 0)
        -> k1 * k2
- and code rec size(65)
+ and code rec size(44[21])
        map_foo_0 (f : val, seq : val, param : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2

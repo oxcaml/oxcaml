@@ -410,7 +410,10 @@ and code =
     result_mode : alloc_mode_for_assignments
   }
 
-and code_size = int
+and code_size =
+  { size : int;
+    nested_size : int
+  }
 
 and params_and_body =
   { params : kinded_parameter list;

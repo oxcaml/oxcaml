@@ -25,7 +25,7 @@ let $`camlTests8__fn[tests8.ml:20,62--77]_5` =
 in
 let $camlTests8__map_foo_4 =
   closure map_foo_0_1 @map_foo &toplevel.alloc_region
-and code rec loopify(never) size(44) newer_version_of(map_foo_0)
+and code rec loopify(never) size(40[4]) newer_version_of(map_foo_0)
       map_foo_0_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

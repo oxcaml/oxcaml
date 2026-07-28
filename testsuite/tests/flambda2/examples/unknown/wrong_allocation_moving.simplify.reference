@@ -11,7 +11,7 @@ let code loopify(never) size(2) newer_version_of(`fn[wrong_allocation_moving.ml:
   in
   cont k (y)
 in
-let code loopify(never) size(57) newer_version_of(f_0)
+let code loopify(never) size(55[2]) newer_version_of(f_0)
       f_0_1 (x : float boxed, foo : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =

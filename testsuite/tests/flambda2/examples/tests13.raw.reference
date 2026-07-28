@@ -14,7 +14,7 @@ let $camlTests13__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    cont k1 (x)
  in
- let code size(26)
+ let code size(24[2])
        `fn[tests13.ml:27,2--118]_1` (param : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2 =
@@ -39,7 +39,7 @@ let $camlTests13__first_const = Block 0 () in
        (`fn[tests13.ml:30,31--43]`, `fn[tests13.ml:30,44--59]`, 0)
        -> k1 * k2
  in
- let code inline(always) size(36)
+ let code inline(always) size(10[26])
        bar_0 (i : imm tagged, map_foo : val)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
@@ -60,7 +60,7 @@ let $camlTests13__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    cont k1 (0)
  in
- let code rec size(72)
+ let code rec size(71[1])
        map_foo_4 (f : val, seq : val, param : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2

@@ -16,7 +16,7 @@ let code loopify(never) size(7) newer_version_of(`fn[unbox_closure.ml:12,12--25]
   let int_add_1 = %int_barith.add (int_add, z) in
   cont k (int_add_1)
 in
-let code loopify(never) size(18) newer_version_of(bar_1)
+let code loopify(never) size(11[7]) newer_version_of(bar_1)
       bar_1_1 (y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -30,7 +30,7 @@ let code loopify(never) size(18) newer_version_of(bar_1)
   in
   cont k (`fn[unbox_closure.ml:12,12--25]`)
 in
-let code loopify(never) size(53) newer_version_of(foobar_0)
+let code loopify(never) size(35[18]) newer_version_of(foobar_0)
       foobar_0_1 (b : imm tagged, x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

@@ -20,7 +20,15 @@ val zero : t
 
 val from_size : Code_size.t -> t
 
+val from_size_and_nested_size : Code_size.t -> nested_size:Code_size.t -> t
+
+val without_nested : t -> t
+
 val size : t -> Code_size.t
+
+val nested_size : t -> Code_size.t
+
+val size_with_nested : t -> Code_size.t
 
 val removed : t -> Removed_operations.t
 

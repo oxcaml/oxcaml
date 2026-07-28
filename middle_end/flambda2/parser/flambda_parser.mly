@@ -971,7 +971,9 @@ code_id:
 ;
 
 code_size:
-  | i = plain_int { i }
+  | size = plain_int { { size; nested_size = 0 } }
+  | size = plain_int; LBRACK; nested_size = plain_int; RBRACK
+    { { size; nested_size } }
 
 function_slot:
   | v = variable { v }

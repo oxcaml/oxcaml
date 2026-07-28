@@ -16,22 +16,23 @@
 type continuation_handler =
   { handler : Flambda.Continuation_handler.t;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
 type continuation_handlers =
   { handlers : Flambda.Continuation_handler.t Continuation.Lmap.t;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
 type t =
   { expr : Flambda.Expr.t;
     free_names : Name_occurrences.t;
-    code_size : Code_size.t
+    cost_metrics : Cost_metrics.t
   }
 
-let create_let bound_pattern defining_expr ~size_of_defining_expr ~body =
+let create_let0 bound_pattern defining_expr ~cost_metrics_of_defining_expr ~body
+    =
   let free_names =
     Name_occurrences.diff
       (Name_occurrences.union
@@ -43,13 +44,23 @@ let create_let bound_pattern defining_expr ~size_of_defining_expr ~body =
     Flambda.Let_expr.create bound_pattern defining_expr ~body:body.expr
       ~free_names_of_body:(Known body.free_names)
   in
-  let code_size =
+  let cost_metrics =
     if Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
-    then body.code_size
-    else Code_size.( + ) body.code_size size_of_defining_expr
+    then body.cost_metrics
+    else Cost_metrics.( + ) body.cost_metrics cost_metrics_of_defining_expr
   in
   let expr = Flambda.Expr.create_let let_expr in
-  { expr; free_names; code_size }
+  { expr; free_names; cost_metrics }
+
+let create_let bound_pattern defining_expr ~size_of_defining_expr ~body =
+  create_let0 bound_pattern defining_expr
+    ~cost_metrics_of_defining_expr:
+      (Cost_metrics.from_size size_of_defining_expr)
+    ~body
+
+let create_let_set_of_closures bound_pattern defining_expr
+    ~cost_metrics_of_defining_expr ~body =
+  create_let0 bound_pattern defining_expr ~cost_metrics_of_defining_expr ~body
 
 let create_continuation_handler bound_parameters ~handler ~is_exn_handler
     ~is_cold =
@@ -57,24 +68,26 @@ let create_continuation_handler bound_parameters ~handler ~is_exn_handler
     Name_occurrences.diff handler.free_names
       ~without:(Bound_parameters.free_names bound_parameters)
   in
-  let code_size = handler.code_size in
+  let cost_metrics = handler.cost_metrics in
   let handler =
     Flambda.Continuation_handler.create bound_parameters ~handler:handler.expr
       ~free_names_of_handler:(Known handler.free_names) ~is_exn_handler ~is_cold
   in
-  { handler; free_names; code_size }
+  { handler; free_names; cost_metrics }
 
 let create_continuation_handlers handlers =
-  let (code_size, free_names), handlers =
+  let (cost_metrics, free_names), handlers =
     Continuation.Lmap.fold_left_map
-      (fun (code_size, free_names) _cont (handler : continuation_handler) ->
-        let code_size = Code_size.( + ) code_size handler.code_size in
+      (fun (cost_metrics, free_names) _cont (handler : continuation_handler) ->
+        let cost_metrics =
+          Cost_metrics.( + ) cost_metrics handler.cost_metrics
+        in
         let free_names = Name_occurrences.union free_names handler.free_names in
-        (code_size, free_names), handler.handler)
-      (Code_size.zero, Name_occurrences.empty)
+        (cost_metrics, free_names), handler.handler)
+      (Cost_metrics.zero, Name_occurrences.empty)
       handlers
   in
-  { handlers; free_names; code_size }
+  { handlers; free_names; cost_metrics }
 
 let create_non_recursive_let_cont cont (cont_handler : continuation_handler)
     ~body =
@@ -87,8 +100,10 @@ let create_non_recursive_let_cont cont (cont_handler : continuation_handler)
       (Name_occurrences.remove_continuation body.free_names ~continuation:cont)
       cont_handler.free_names
   in
-  let code_size = Code_size.( + ) body.code_size cont_handler.code_size in
-  { expr; free_names; code_size }
+  let cost_metrics =
+    Cost_metrics.( + ) body.cost_metrics cont_handler.cost_metrics
+  in
+  { expr; free_names; cost_metrics }
 
 let create_recursive_let_cont ~invariant_params handlers0 ~body =
   let handlers = create_continuation_handlers handlers0 in
@@ -110,7 +125,10 @@ let create_recursive_let_cont ~invariant_params handlers0 ~body =
         Name_occurrences.remove_continuation free_names ~continuation:cont)
       handlers0 free_names
   in
-  let code_size = Code_size.( + ) body.code_size handlers.code_size in
-  { expr; free_names; code_size }
+  let cost_metrics =
+    Cost_metrics.( + ) body.cost_metrics handlers.cost_metrics
+  in
+  { expr; free_names; cost_metrics }
 
-let from_expr ~expr ~free_names ~code_size = { expr; free_names; code_size }
+let from_expr ~expr ~free_names ~code_size =
+  { expr; free_names; cost_metrics = Cost_metrics.from_size code_size }

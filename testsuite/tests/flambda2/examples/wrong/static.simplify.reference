@@ -24,7 +24,7 @@ let code loopify(never) size(10) newer_version_of(h_2)
       let int_add_1 = %int_barith.add (int_add, apply_result) in
       cont k (int_add_1)
 in
-let code loopify(never) size(58) newer_version_of(f_0)
+let code loopify(never) size(36[22]) newer_version_of(f_0)
       f_0_1 (x : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
         -> k * k1

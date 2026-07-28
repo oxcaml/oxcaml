@@ -35,7 +35,7 @@ let make_decision0 ~inlining_arguments:args ~inline ~stub ~cost_metrics:metrics
           ( Inlining_arguments.large_function_size args |> Code_size.of_int,
             Inlining_arguments.small_function_size args |> Code_size.of_int )
       in
-      let size = Cost_metrics.size metrics in
+      let size = Cost_metrics.size_with_nested metrics in
       let is_small = Code_size.( <= ) size small_size in
       let is_large = Code_size.( <= ) large_size size in
       let is_recursive =

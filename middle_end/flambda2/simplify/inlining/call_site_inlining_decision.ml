@@ -123,29 +123,29 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
-  let cost_metrics_of_lifted_constants =
-    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
-    then
-      (* If we are not at toplevel, there might still be lifted constants to be
-         placed in the accumulator whose size must be taken into account for
-         speculative inlining. *)
-      let lifted_constants = UA.lifted_constants uacc in
-      (* CR-someday bclement: Ideally we would simply call
-         [place_lifted_constants] in [after_rebuild] above so that we can share
-         the code with the non-speculative inlining code path; however, that
-         function expects to be called at toplevel and there could be unintended
-         consequences -- notably regarding the validity of the used value slots.
+  if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+  then
+    (* If we are not at toplevel, there might still be lifted constants to be
+       placed in the accumulator whose size must be taken into account for
+       speculative inlining. *)
+    let lifted_constants = UA.lifted_constants uacc in
+    (* CR-someday bclement: Ideally we would simply call
+       [place_lifted_constants] in [after_rebuild] above so that we can share
+       the code with the non-speculative inlining code path; however, that
+       function expects to be called at toplevel and there could be unintended
+       consequences -- notably regarding the validity of the used value slots.
 
-         At the time of writing, this means that we incorrectly:
+       At the time of writing, this means that we incorrectly:
 
-         - Ignore the size of the symbol projections created during speculative
-         inlining;
+       - Ignore the size of the symbol projections created during speculative
+       inlining;
 
-         - Count the size of unused value slots of lifted sets of closures
-         created during speculative inlining (but again, it is not clear that it
-         is always possible to compute a correct set of "used value slots" at
-         the time we are doing speculative inlining, because some value slots
-         could be used later in the compilation unit). *)
+       - Count the size of unused value slots of lifted sets of closures created
+       during speculative inlining (but again, it is not clear that it is always
+       possible to compute a correct set of "used value slots" at the time we
+       are doing speculative inlining, because some value slots could be used
+       later in the compilation unit). *)
+    let cost_metrics_of_lifted_constants =
       Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
         ~f:(fun cost_metrics lifted_constant ->
           List.fold_left
@@ -155,9 +155,20 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
                    (Lifted_constant.Definition.defining_expr definition)))
             cost_metrics
             (Lifted_constant.definitions lifted_constant))
-    else Cost_metrics.zero
-  in
-  Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
+    in
+    (* The nested cost metrics have been included in the cost metrics of lifted
+       constants; skip them. They would be ignored anyway by
+       [Cost_metrics.evaluate]. *)
+    Cost_metrics.without_nested
+      (Cost_metrics.( + ) (UA.cost_metrics uacc)
+         cost_metrics_of_lifted_constants)
+  else
+    (* The nested cost metrics are ignored by [Cost_metrics.evaluate]; merge
+       them into the non-nested size. *)
+    let cost_metrics = UA.cost_metrics uacc in
+    Cost_metrics.notify_added
+      ~code_size:(Cost_metrics.nested_size cost_metrics)
+      (Cost_metrics.without_nested cost_metrics)
 
 let argument_types_useful dacc apply =
   if
@@ -181,9 +192,9 @@ let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
     code_or_metadata
     |> Code_or_metadata.code_metadata
     |> Code_metadata.cost_metrics
-    |> Cost_metrics.size
+    |> Cost_metrics.size_with_nested
   in
-  let inlined_code_size = Cost_metrics.size cost_metrics in
+  let inlined_code_size = Cost_metrics.size_with_nested cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
 let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr

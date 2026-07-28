@@ -39,7 +39,7 @@ let code loopify(never) size(7) newer_version_of(`fn[tests11.ml:23,2--70]_1`)
 in
 let $camlTests11__map_foo_8 =
   closure map_foo_4_1 @map_foo &toplevel.alloc_region
-and code rec loopify(never) size(69) newer_version_of(map_foo_4)
+and code rec loopify(never) size(61[8]) newer_version_of(map_foo_4)
       map_foo_4_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

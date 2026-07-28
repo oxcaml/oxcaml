@@ -38,7 +38,7 @@ let code loopify(never) size(7) newer_version_of(`fn[tests12.ml:25,2--70]_1`)
        0)
       -> k * k1
 in
-let code inline(always) loopify(never) size(16) newer_version_of(bar_0)
+let code inline(always) loopify(never) size(9[7]) newer_version_of(bar_0)
       bar_0_1 (map_foo : val)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -53,7 +53,7 @@ in
 let $camlTests12__bar_5 = closure bar_0_1 @bar &toplevel.alloc_region in
 let $camlTests12__map_foo_8 =
   closure map_foo_4_1 @map_foo &toplevel.alloc_region
-and code rec loopify(never) size(75) newer_version_of(map_foo_4)
+and code rec loopify(never) size(67[8]) newer_version_of(map_foo_4)
       map_foo_4_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

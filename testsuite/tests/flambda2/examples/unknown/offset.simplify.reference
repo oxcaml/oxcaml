@@ -68,7 +68,7 @@ let code rec loopify(never) size(39) newer_version_of(h_4)
            in
            cont k (int_add))
 in
-let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
+let code inline(always) loopify(never) size(26[75]) newer_version_of(inline_0)
       inline_0_1 (a : imm tagged, b : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
