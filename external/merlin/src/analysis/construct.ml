@@ -580,7 +580,7 @@ module Gen = struct
                 []
             in
             [ ast ]
-          with Typemod.Error _ ->
+          with Typemod.Error.In_context _ ->
             let name = Ident.name (Path.head path) in
             raise (Modtype_not_found (Modtype, name))
           end

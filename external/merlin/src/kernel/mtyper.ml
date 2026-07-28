@@ -23,7 +23,6 @@ type ('p, 't) item =
     part_stamp : int;
     part_uid : int;
     part_env : Env.t;
-    part_rev_sg : Types.signature_item list;
     part_errors : exn list;
     part_checks : Typecore.delayed_check list;
     part_warnings : Warnings.state;
@@ -105,10 +104,10 @@ let compatible_prefix_rev result_items tree_items =
   in
   aux [] (result_items, tree_items)
 
-let[@tail_mod_cons] rec type_structure config caught env index sg = function
+let[@tail_mod_cons] rec type_structure config caught env index = function
   | parsetree_item :: rest ->
-    let items, sg', part_env =
-      Typemod.merlin_type_structure env sg [ parsetree_item ]
+    let items, _, _, _, _, part_env =
+      Typemod.type_structure env [ parsetree_item ]
     in
     let part_index =
       lazy (!index_items (Lazy.force index) config (`Impl items.str_items))
@@ -116,12 +115,10 @@ let[@tail_mod_cons] rec type_structure config caught env index sg = function
     let typedtree_items =
       (items.Typedtree.str_items, items.Typedtree.str_type)
     in
-    let part_rev_sg = List.rev_append sg' sg in
     let item =
       { parsetree_item;
         typedtree_items;
         part_env;
-        part_rev_sg;
         part_snapshot = Btype.snapshot ();
         part_stamp = Ident.get_currentstamp ();
         part_uid = Shape.Uid.get_current_stamp ();
@@ -131,10 +128,10 @@ let[@tail_mod_cons] rec type_structure config caught env index sg = function
         part_index
       }
     in
-    item :: type_structure config caught part_env part_index part_rev_sg rest
+    item :: type_structure config caught part_env part_index rest
   | [] -> []
 
-let[@tail_mod_cons] rec type_signature config caught env index sg psg_modalities
+let[@tail_mod_cons] rec type_signature config caught env index psg_modalities
     psg_loc = function
   | parsetree_item :: rest ->
     let { Typedtree.sig_final_env = part_env;
@@ -143,11 +140,10 @@ let[@tail_mod_cons] rec type_signature config caught env index sg psg_modalities
           sig_modalities = _;
           sig_sloc = _
         } =
-      Typemod.merlin_transl_signature env sg
+      Typemod.transl_signature env
         (Ast_helper.Sg.mk ~loc:psg_loc ~modalities:psg_modalities
            [ parsetree_item ])
     in
-    let part_rev_sg = List.rev_append sig_type sg in
     let part_index =
       lazy (!index_items (Lazy.force index) config (`Intf sig_items))
     in
@@ -155,7 +151,6 @@ let[@tail_mod_cons] rec type_signature config caught env index sg psg_modalities
       { parsetree_item;
         typedtree_items = (sig_items, sig_type);
         part_env;
-        part_rev_sg;
         part_snapshot = Btype.snapshot ();
         part_stamp = Ident.get_currentstamp ();
         part_uid = Shape.Uid.get_current_stamp ();
@@ -166,8 +161,8 @@ let[@tail_mod_cons] rec type_signature config caught env index sg psg_modalities
       }
     in
     item
-    :: type_signature config caught part_env part_index part_rev_sg
-         psg_modalities psg_loc rest
+    :: type_signature config caught part_env part_index psg_modalities psg_loc
+         rest
   | [] -> []
 
 let type_implementation config caught parsetree =
@@ -179,11 +174,10 @@ let type_implementation config caught parsetree =
     | Some (Implementation_items items) -> compatible_prefix_rev items parsetree
     | Some (Interface_items _) | None -> ([], parsetree, Miss)
   in
-  let env', sg', snap', stamp', uid_stamp', warn', index' =
+  let env', snap', stamp', uid_stamp', warn', index' =
     match rev_prefix with
     | [] ->
       ( env,
-        [],
         snapshot,
         ident_stamp,
         uid_stamp,
@@ -193,7 +187,6 @@ let type_implementation config caught parsetree =
       caught := x.part_errors;
       Typecore.delayed_checks := x.part_checks;
       ( x.part_env,
-        x.part_rev_sg,
         x.part_snapshot,
         x.part_stamp,
         x.part_uid,
@@ -205,7 +198,7 @@ let type_implementation config caught parsetree =
   Env.cleanup_functor_caches ~stamp:stamp';
   Env.cleanup_usage_tables ~stamp:uid_stamp';
   Shape.Uid.restore_stamp uid_stamp';
-  let suffix = type_structure config caught env' index' sg' parsetree_suffix in
+  let suffix = type_structure config caught env' index' parsetree_suffix in
   let value = Implementation_items (List.rev_append rev_prefix suffix) in
   ( return_and_cache { env; snapshot; ident_stamp; uid_stamp; value },
     cache_stats )
@@ -230,11 +223,10 @@ let type_interface config caught (parsetree : Parsetree.signature) =
     | Some (Interface_items _) | Some (Implementation_items _) | None ->
       ([], parsetree.psg_items, Miss)
   in
-  let env', sg', snap', stamp', uid_stamp', warn', index' =
+  let env', snap', stamp', uid_stamp', warn', index' =
     match rev_prefix with
     | [] ->
       ( env,
-        [],
         snapshot,
         ident_stamp,
         uid_stamp,
@@ -244,7 +236,6 @@ let type_interface config caught (parsetree : Parsetree.signature) =
       caught := x.part_errors;
       Typecore.delayed_checks := x.part_checks;
       ( x.part_env,
-        x.part_rev_sg,
         x.part_snapshot,
         x.part_stamp,
         x.part_uid,
@@ -257,7 +248,7 @@ let type_interface config caught (parsetree : Parsetree.signature) =
   Env.cleanup_usage_tables ~stamp:uid_stamp';
   Shape.Uid.restore_stamp uid_stamp';
   let suffix =
-    type_signature config caught env' index' sg' parsetree.psg_modalities
+    type_signature config caught env' index' parsetree.psg_modalities
       parsetree.psg_loc parsetree_suffix
   in
   (* transl an empty signature to get the sig_modalities and sig_sloc *)
@@ -268,7 +259,7 @@ let type_interface config caught (parsetree : Parsetree.signature) =
          sig_sloc
        }
         : Typedtree.signature) =
-    Typemod.merlin_transl_signature Env.empty []
+    Typemod.transl_signature Env.empty
       (Ast_helper.Sg.mk ~modalities:parsetree.psg_modalities
          ~loc:parsetree.psg_loc [])
   in
