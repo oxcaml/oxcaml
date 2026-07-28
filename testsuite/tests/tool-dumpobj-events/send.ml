@@ -6,9 +6,7 @@
  check-program-output;
 *)
 
-(* Like test.ml, but for method sends. Objects need CamlinternalOO, so
-   this program links the stdlib; send.run filters the dump down to this
-   file's events. *)
+(* Like test.ml, but for method sends. *)
 
 let o = object
   method m x = x + 1
