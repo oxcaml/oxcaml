@@ -33,17 +33,17 @@ type used_slots =
   }
 
 let[@inline] function_slot_is_used ~used_function_slots v =
-  if Compilation_unit.is_current (Function_slot.get_compilation_unit v)
+  if Current_unit.is_current (Function_slot.get_compilation_unit v)
   then Function_slot.Set.mem v used_function_slots
   else true
 
 let[@inline] unboxed_slot_is_used ~used_unboxed_slots v =
-  if Compilation_unit.is_current (Value_slot.get_compilation_unit v)
+  if Current_unit.is_current (Value_slot.get_compilation_unit v)
   then Value_slot.Set.mem v used_unboxed_slots
   else true
 
 let[@inline] value_slot_is_used ~used_value_slots v =
-  if Compilation_unit.is_current (Value_slot.get_compilation_unit v)
+  if Current_unit.is_current (Value_slot.get_compilation_unit v)
   then Value_slot.Set.mem v used_value_slots
   else true
 
@@ -724,8 +724,7 @@ end = struct
   let create_function_slot set state get_code_metadata function_slot
       (code_id : Function_declarations.code_id_in_function_declaration) =
     if
-      Compilation_unit.is_current
-        (Function_slot.get_compilation_unit function_slot)
+      Current_unit.is_current (Function_slot.get_compilation_unit function_slot)
     then (
       let size =
         match code_id with
@@ -769,7 +768,7 @@ end = struct
         s
 
   let create_unboxed_slot set state value_slot size =
-    if Compilation_unit.is_current (Value_slot.get_compilation_unit value_slot)
+    if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
     then (
       let s = create_slot ~size (Unboxed_slot value_slot) Unassigned in
       add_unboxed_slot state value_slot s;
@@ -806,7 +805,7 @@ end = struct
         s
 
   let create_value_slot set state value_slot =
-    if Compilation_unit.is_current (Value_slot.get_compilation_unit value_slot)
+    if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
     then (
       let s =
         create_slot ~size:1 (Scannable_value_slot value_slot) Unassigned
@@ -1091,7 +1090,7 @@ end = struct
       Function_slot.Set.filter
         (fun function_slot ->
           if
-            Compilation_unit.is_current
+            Current_unit.is_current
               (Function_slot.get_compilation_unit function_slot)
           then (
             match find_function_slot state function_slot with
@@ -1108,8 +1107,7 @@ end = struct
       Value_slot.Set.filter
         (fun value_slot ->
           if
-            Compilation_unit.is_current
-              (Value_slot.get_compilation_unit value_slot)
+            Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
           then
             (* a value slot appears in a set of closures iff it has a slot *)
             match

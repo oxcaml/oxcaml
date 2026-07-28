@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
 open X86_ast
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (** Type for the result of applying a peephole rewrite rule *)
 type rule_result =

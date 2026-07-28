@@ -527,7 +527,7 @@ and desc =
   | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
+  | Variant of (t * Layout.t option) complex_constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -574,7 +574,7 @@ and 'a complex_constructor_argument =
     field_value : 'a
   }
 
-and constructor_representation = mixed_product_shape
+and constructor_representation = Layout.t option array
 
 and mixed_product_shape = Layout.t array
 
@@ -604,7 +604,7 @@ let equal_complex_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
-  Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
+  Misc.Stdlib.Array.equal (Option.equal Layout.equal) kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
@@ -648,7 +648,7 @@ let rec equal_desc0 d1 d2 =
   | Variant c1, Variant c2 ->
     List.equal
          (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
-           equal t1 t2 && Layout.equal l1 l2))
+           equal t1 t2 && Option.equal Layout.equal l1 l2))
          c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
     String.equal c1.name c2.name

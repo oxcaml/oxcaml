@@ -180,14 +180,14 @@ let atomic_op = function
 let phantom_defining_expr ppf defining_expr =
   match defining_expr with
   | Cphantom_const_int i -> Targetint.print ppf i
-  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym
+  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym.sym_name
   | Cphantom_var var -> V.print ppf var
   | Cphantom_offset_var { var; offset_in_words } ->
     Format.fprintf ppf "%a+(%d)" V.print var offset_in_words
   | Cphantom_read_field { var; field } ->
     Format.fprintf ppf "%a[%d]" V.print var field
   | Cphantom_read_symbol_field { sym; field } ->
-    Format.fprintf ppf "%s[%d]" sym field
+    Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
     List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
@@ -275,8 +275,8 @@ let operation d = function
   | Csubi -> "-"
   | Cmuli -> "*"
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
-  | Cdivi -> "/"
-  | Cmodi -> "mod"
+  | Cdivi { signed } -> "/" ^ if signed then "" else "u"
+  | Cmodi { signed } -> "mod" ^ if signed then "" else "u"
   | Caddi128 -> "+128"
   | Csubi128 -> "-128"
   | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"

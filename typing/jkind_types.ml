@@ -351,6 +351,8 @@ module Sort = struct
 
     let is_cmi_var { id; _ } = id < 0
 
+    let is_root { contents; _ } = Option.is_none contents
+
     (* Map var ids to smaller numbers for more consistent printing. *)
     let next_id = ref 1
 

@@ -186,7 +186,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
-  | Duplicate_block _ | Duplicate_array _ | Obj_dup ->
+  | Duplicate_block _ | Duplicate_array _ | Obj_dup _ ->
     use_prim' (Extern "caml_obj_dup")
   | Is_int _ -> use_prim' IsInt
   | Is_null ->
@@ -314,8 +314,8 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Peek _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Make_lazy tag ->
-    let tag = Flambda_primitive.Lazy_block_tag.to_tag tag in
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
+    let tag = Flambda_primitive.Lazy_block_tag.to_tag lazy_tag in
     let expr, env, res =
       To_jsir_shared.block ~env ~res ~tag ~mut:Mutable ~fields:[x]
     in
@@ -388,8 +388,10 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Add -> "add"
       | Sub -> "sub"
       | Mul -> "mul"
-      | Div -> "div"
-      | Mod -> "mod"
+      | Div Signed -> "div"
+      | Div Unsigned -> "unsigned_div"
+      | Mod Signed -> "mod"
+      | Mod Unsigned -> "unsigned_mod"
       | And -> "and"
       | Or -> "or"
       | Xor -> "xor"

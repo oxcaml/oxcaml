@@ -196,11 +196,11 @@ let create_scope () =
 
 let wrap_end_def f = Misc.try_finally f ~always:end_def
 
-let mark_toplevel_in_quotations env =
+let mark_persistent_in_quotations env =
   let scope = !current_level in
   (* Create a new scope to make sure we only capture what came before *)
   let _ = create_scope () in
-  Env.mark_toplevel_in_quotations ~scope env
+  Env.mark_persistent_in_quotations ~scope env
 
 (* [with_local_level_gen] handles both the scoping structure of levels
    and automatic generalization through pools (cf. btype.ml) *)
@@ -479,7 +479,7 @@ let without_assume_injective uenv f =
   | Pattern r -> f (Pattern { r with assume_injective = false })
 
 (* In type checking, we only use [decr_stage] when we observe a spliced type.
-   [Env.enter_splice] only fails when the splice would be top-level. Hence,
+   [Env.enter_splice] only fails when the splice would be initial-stage. Hence,
    no legitimate errors will ever be raised there and we can omit the [loc].
 
    For sanity, we have an extra assertion here. It fails when we [decr_stage]
@@ -515,7 +515,7 @@ let iter_type_expr_with_stages f env ty =
    The right way to address this is to track the stage in errors. With that
    done, this function can be removed, and some GADT-related errors improve.
    This is tracked by ticket 6726. *)
-let contains_toplevel_splice stage ty =
+let contains_initial_stage_splice stage ty =
   let visited = ref TypeSet.empty in
   let rec loop acc ty =
     if TypeSet.mem ty !visited then false else begin
@@ -2419,11 +2419,11 @@ let try_expand_safe env ty =
    [t = <[t' qeval^n]>^m] for natural [n], integer [m] and type expression [t'].
    If [n > 0], then [t'] is irreducible, and has to be one of the following:
    * Type variable,
-   * Type constructor that is not top-level,
+   * Type constructor that is not persistent,
    * Quote-kinded type. *)
 
 (* Perform one of the following head-position beta reductions via rewrites:
-   * Reduce a quoted-eval through a concrete (top-level) type constructor.
+   * Reduce a quoted-eval through a concrete (persistent) type constructor.
    * Cancel a quote-splice pair.
    * Simplify a [Tbox] over a type with a unboxed version. *)
 let rec try_reduce_once env t =
@@ -2455,8 +2455,8 @@ let rec try_reduce_once env t =
   | _ -> raise Cannot_expand
 
 and try_reduce_quote_eval env t =
-  let path_must_be_toplevel env path =
-    if not (Env.path_is_toplevel_in_quotations env path) then
+  let path_must_be_persistent env path =
+    if not (Env.path_is_persistent_in_quotations env path) then
       raise Cannot_expand
   in
   let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
@@ -2479,7 +2479,7 @@ and try_reduce_quote_eval env t =
     Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
   (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
   | Tconstr (p, tl, a) ->
-    path_must_be_toplevel env p;
+    path_must_be_persistent env p;
     Tconstr (p, List.map new_quote_eval_ty tl, a)
   (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
   | Tobject (t, ct) ->
@@ -2488,7 +2488,7 @@ and try_reduce_quote_eval env t =
          will [raise Cannot_expand]. [Cannot_expand] propagates to here
          so the [Tobject] does not reduce at all.
          Alternatively, the object type has a private row type given by
-         a [Tconstr], in which case we will reduce if it is top-level.
+         a [Tconstr], in which case we will reduce if it is persistent.
        - If the object type is closed, its final element is a [Tnil] and
          the entire [Tobject] will reduce just fine. *)
     (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
@@ -2498,7 +2498,7 @@ and try_reduce_quote_eval env t =
       ref (
         Option.map
           (fun (p, tl) ->
-            path_must_be_toplevel env p;
+            path_must_be_persistent env p;
             p, List.map new_quote_eval_ty tl)
           !ct))
   (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
@@ -2549,7 +2549,7 @@ and try_reduce_quote_eval env t =
   (*  [<[ module S with type typ = t ]> eval]
       ==> [module S with type typ = <[t]> eval] *)
   | Tpackage { pack_path; pack_cstrs } ->
-    path_must_be_toplevel env pack_path;
+    path_must_be_persistent env pack_path;
     Tpackage { pack_path;
                pack_cstrs =
                  List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs }
@@ -4052,12 +4052,12 @@ let rec has_cached_expansion p abbrev =
    but still might be nice. *)
 
 let expand_type env ty =
-  (* If the type contains top-level splices, then we enter some far-away future
-     stage where all splices are valid. *)
-  (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
+  (* If the type contains initial-stage splices, then we enter some future stage
+     where all splices are valid. *)
+  (* CR metaprogramming jbachurski: Remove [contains_initial_stage_splice] and
      track the stage in errors so we don't need this. *)
   let env =
-    if contains_toplevel_splice (Env.stage env :> int) ty
+    if contains_initial_stage_splice (Env.stage env :> int) ty
     then Env.enter_future env
     else env
   in
@@ -6287,18 +6287,27 @@ let cross_right_alloc env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing
 
+(* The locality axis of the return mode of an arrow cannot cross modes,
+   because a local-returning function might allocate in the caller's region,
+   and this info must be preserved. The [_ret] variants below cross modes on
+   all axes except locality and are to be used on return modes. *)
+
+let cross_left_alloc_ret env ?modalities ty mode =
+  let mode' = cross_left_alloc env ?modalities ty mode in
+  Alloc.join
+    [mode';
+     Alloc.min_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+
+let cross_right_alloc_ret env ?modalities ty mode =
+  let mode' = cross_right_alloc env ?modalities ty mode in
+  Alloc.meet
+    [mode';
+     Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+
 let submode_with_cross env ~is_ret ty l r =
-  let r' = cross_right_alloc env ty r in
   let r' =
-    if is_ret then
-      (* the locality axis of the return mode cannot cross modes, because a
-         local-returning function might allocate in the caller's region, and
-         this info must be preserved. *)
-      Alloc.meet
-        [r';
-         Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality r)]
-    else
-      r'
+    if is_ret then cross_right_alloc_ret env ty r
+    else cross_right_alloc env ty r
   in
   Alloc.submode l r'
 
@@ -7472,10 +7481,6 @@ let build_submode_neg m =
   let c = if changed then Changed else Unchanged in
   m', c
 
-let build_submode posi m =
-  if posi then build_submode_pos (Alloc.allow_left m)
-  else build_submode_neg (Alloc.allow_right m)
-
 let rec build_subtype env (visited : transient_expr list)
     (loops : (int * type_expr) list) posi level t =
   match get_desc t with
@@ -7513,7 +7518,16 @@ let rec build_subtype env (visited : transient_expr list)
         end else a, Unchanged
       in
       let (r', c4) =
-        if level > 2 then build_submode posi r else r, Unchanged
+        if level > 2 then begin
+          (* As for the argument mode above, pick the smaller type. *)
+          if posi then begin
+            let r = cross_right_alloc_ret env t2' r in
+            build_submode_pos r
+          end else begin
+            let r = cross_left_alloc_ret env t2 r in
+            build_submode_neg r
+          end
+        end else r, Unchanged
       in
       let c = max_change c1 (max_change c2 (max_change c3 c4)) in
       if c > Unchanged
@@ -7763,9 +7777,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
             cstrs
         in
         let a2 = cross_left_alloc env t2 a2 in
-         subtype_alloc_mode env trace a2 a1;
-        (* RHS mode of arrow types indicates allocation in the parent region
-           and is not subject to mode crossing *)
+        subtype_alloc_mode env trace a2 a1;
+        let r2 = cross_right_alloc_ret env u2 r2 in
         subtype_alloc_mode env trace r1 r2;
         subtype_rec
           env

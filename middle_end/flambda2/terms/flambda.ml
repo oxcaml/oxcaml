@@ -597,8 +597,8 @@ and print_continuation_handler (recursive : Recursive.t) invariant_params ppf k
 
 and print_function_params_and_body ppf t =
   let print ~return_continuation ~exn_continuation params ~body ~my_closure
-      ~is_my_closure_used:_ ~my_region ~my_ghost_region ~my_depth
-      ~free_names_of_body:_ =
+      ~is_my_closure_used:_ ~my_alloc_region ~my_region ~my_ghost_region
+      ~my_depth ~free_names_of_body:_ =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
@@ -607,10 +607,12 @@ and print_function_params_and_body ppf t =
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
        1>@<1>\u{3008}%a@<1>\u{3009}@<1>\u{300a}%a@<1>\u{300b}\u{27c5}%t%a%t\u{27c6}@ \
-       \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t %t.%t@]@ %a))@]"
+       \u{27c5}%t%a%t\u{27c6}@ \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t %t.%t@]@ \
+       %a))@]"
       Flambda_colours.lambda Flambda_colours.pop Continuation.print
       return_continuation Continuation.print exn_continuation
-      Flambda_colours.parameter
+      Flambda_colours.parameter Variable.print my_alloc_region
+      Flambda_colours.pop Flambda_colours.parameter
       (Format.pp_print_option Variable.print)
       my_region Flambda_colours.pop Flambda_colours.parameter
       (Format.pp_print_option Variable.print)
@@ -628,7 +630,9 @@ and print_function_params_and_body ppf t =
         ~return_continuation:(BFF.return_continuation bff)
         ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
         ~my_closure:(BFF.my_closure bff)
-        ~is_my_closure_used:t.is_my_closure_used ~my_region:(BFF.my_region bff)
+        ~is_my_closure_used:t.is_my_closure_used
+        ~my_alloc_region:(BFF.my_alloc_region bff)
+        ~my_region:(BFF.my_region bff)
         ~my_ghost_region:(BFF.my_ghost_region bff) ~my_depth:(BFF.my_depth bff)
         ~free_names_of_body:free_names)
 

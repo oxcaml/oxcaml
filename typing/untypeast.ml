@@ -123,7 +123,8 @@ let rec extract_letop_patterns n pat =
 
 let constant = function
   | Const_char c -> Const.char c
-  | Const_untagged_char c -> Const.mk (Pconst_untagged_char c)
+  | Const_untagged_char c ->
+      Const.mk (Pconst_untagged_char (Char.chr (c land 0xff)))
   | Const_string (s,loc,d) -> Const.string ?quotation_delimiter:d ~loc s
   | Const_int i -> Const.integer (Int.to_string i)
   | Const_int8 i -> Const.integer ~suffix:'s' (Int.to_string i)
@@ -703,7 +704,7 @@ let expression sub exp =
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
-    | Texp_atomic_loc (exp, _, lid, _label, _) ->
+    | Texp_atomic_loc { record = exp; lid; _ } ->
         Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
                         PStr [ Str.eval ~loc
                                  (Exp.field ~loc

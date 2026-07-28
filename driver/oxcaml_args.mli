@@ -100,6 +100,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -208,6 +209,7 @@ module type Debugging_options = sig
   val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit

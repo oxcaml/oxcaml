@@ -629,9 +629,13 @@ let expr sub x =
           newval = sub.expr sub newval;
           record_repres; record_sorts; modality; label;
         }
-    | Texp_atomic_loc (exp, sort, lid, ld, alloc_mode) ->
-        Texp_atomic_loc
-          (sub.expr sub exp, sort, map_loc_lid sub lid, ld, alloc_mode)
+    | Texp_atomic_loc { record; record_sort; record_repres; lid; label;
+                        alloc_mode; } ->
+        Texp_atomic_loc {
+          record = sub.expr sub record;
+          lid = map_loc_lid sub lid;
+          record_sort; record_repres; label; alloc_mode;
+        }
     | Texp_array (amut, sort, list, alloc_mode) ->
         Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
     | Texp_idx (ba, uas) ->

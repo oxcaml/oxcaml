@@ -291,9 +291,28 @@ type coeffects =
   | No_coeffects
   | Has_coeffects
 
+type is_global =
+  | Global
+  | Local
+
+let equal_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> true
+  | Local, Global | Global, Local -> false
+
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
+let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  String.equal left_sym_name right_sym_name
+  && equal_is_global left_sym_global right_sym_global
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
-  | Cphantom_const_symbol of string
+  | Cphantom_const_symbol of symbol
   | Cphantom_var of Backend_var.t
   | Cphantom_offset_var of
       { var : Backend_var.t;
@@ -304,7 +323,7 @@ type phantom_defining_expr =
         field : int
       }
   | Cphantom_read_symbol_field of
-      { sym : string;
+      { sym : symbol;
         field : int
       }
   | Cphantom_block of
@@ -515,25 +534,6 @@ type alloc_dbginfo = alloc_dbginfo_item list
 let equal_alloc_dbginfo left right =
   List.equal equal_alloc_dbginfo_item left right
 
-type is_global =
-  | Global
-  | Local
-
-let equal_is_global g g' =
-  match g, g' with
-  | Local, Local | Global, Global -> true
-  | Local, Global | Global, Local -> false
-
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
-
-let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
-    { sym_name = right_sym_name; sym_global = right_sym_global } =
-  String.equal left_sym_name right_sym_name
-  && equal_is_global left_sym_global right_sym_global
-
 type operation =
   | Capply of
       { result_type : machtype;
@@ -561,8 +561,8 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
@@ -777,11 +777,11 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128 | Csubi128
-        | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cpopcnt | Caddv
-        | Cadda | Cpackf32 | Copaque | Cbeginregion | Cendregion | Cdls_get
-        | Ctls_get | Cdomain_index | Cpoll | Cpause | Capply _ | Cextcall _
-        | Cload _
+      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+        | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
+        | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _ | Catomic _
         | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -811,7 +811,7 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
     | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
+        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause

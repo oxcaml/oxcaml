@@ -2981,7 +2981,30 @@ let check_recmodule_inclusion env bindings =
       in
       List.map check_inclusion bindings
     end
-  in check_incl true (List.length bindings) env Subst.identity
+  in
+  (* [n_max = List.length bindings] is taken from the upstream compiler.
+     It's still insufficient to check some cases, but we stop there. *)
+  let n_max = List.length bindings in
+  let check depth = check_incl true depth env Subst.identity in
+  let attempt depth =
+    if depth >= n_max
+    then None
+    else
+      match check depth with
+      | result -> Some result
+      | exception (Out_of_memory | Stack_overflow | Sys.Break as exn) ->
+        raise exn
+      (* Fall back to a more exhaustive check on compiler errors. *)
+      | exception _ -> None
+  in
+  (* Attempt depths 1 and 2 first to save on compilation time
+     in the successful case. *)
+  match attempt 1 with
+  | Some result -> result
+  | None ->
+  match attempt 2 with
+  | Some result -> result
+  | None -> check n_max
 
 (* Helper for unpack *)
 
@@ -4424,8 +4447,8 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
                       Argument_for_non_parameter (arg_module, arg_filename)));
       let modes =
         Includecore.Specific
-          ((Env.mode_unit ~staticity:actual_staticity, None),
-           Env.mode_unit ~staticity:arg_staticity)
+          ((Persistent_env.mode_pers_mod actual_staticity, None),
+           Persistent_env.mode_pers_mod arg_staticity)
       in
       let coercion =
         Includemod.compunit_as_argument
@@ -4465,7 +4488,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
+        mode (Persistent_env.mode_pers_mod Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4547,7 +4570,8 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
-                  ((mode, None), Env.mode_unit ~staticity))
+                  ((mode, None),
+                   Persistent_env.mode_pers_mod staticity))
                 sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
@@ -4587,7 +4611,9 @@ let type_implementation target modulename initial_env ast =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
             let modes =
-              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              let mode =
+                Persistent_env.mode_pers_mod Dynamic
+              in
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
@@ -4777,7 +4803,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
       let modes =
-        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
       Includemod.compunit initial_env ~mark:true

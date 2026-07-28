@@ -21,7 +21,7 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-40-41-42"]
 
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -191,8 +191,8 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
+  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val

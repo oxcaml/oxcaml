@@ -140,6 +140,11 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
 (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
@@ -153,15 +158,14 @@ type t =
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
-  | Modal_axis_specified_twice of {
-      axis : string;
-      overriden_by : string;
-    }                                       (* 213 *)
+  (* 213 was [Modal_axis_specified_twice], now subsumed by
+     [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
   | Lpoly_in_letrec                         (* 218 *)
   | Useless_valpoly                         (* 219 *)
+  | Redundant_modality                      (* 220 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

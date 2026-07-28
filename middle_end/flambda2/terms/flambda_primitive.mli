@@ -413,13 +413,17 @@ type unary_primitive =
         mut : Mutability.t;
         field : Target_ocaml_int.t
       }
-  | Duplicate_block of { kind : Duplicate_block_kind.t }
+  | Duplicate_block of
+      { kind : Duplicate_block_kind.t;
+        alloc_region : Variable.t
+      }
       (** [Duplicate_block] may not be used to change the tag or the mutability
           of a block. *)
   | Duplicate_array of
       { kind : Duplicate_array_kind.t;
         source_mutability : Mutability.t;
-        destination_mutability : Mutability.t
+        destination_mutability : Mutability.t;
+        alloc_region : Variable.t
       }
   | Is_int of { variant_only : bool }
   | Is_null
@@ -487,7 +491,8 @@ type unary_primitive =
       *)
   | End_try_region of { ghost : bool }
       (** Corresponding delimiter for [Begin_try_region]. *)
-  | Obj_dup  (** Corresponds to [Obj.dup]; see the documentation in obj.mli. *)
+  | Obj_dup of { alloc_region : Variable.t }
+      (** Corresponds to [Obj.dup]; see the documentation in obj.mli. *)
   | Get_header
       (** Get the header of a block. This primitive is invalid if provided with
           an immediate value. It should also not be used to read tags above
@@ -497,7 +502,10 @@ type unary_primitive =
           Tag reads that are allowed to be lazy tags (by the type system) should
           always go through caml_obj_tag, which is opaque to the compiler. *)
   | Peek of Flambda_kind.Standard_int_or_float.t
-  | Make_lazy of Lazy_block_tag.t
+  | Make_lazy of
+      { lazy_tag : Lazy_block_tag.t;
+        alloc_region : Variable.t
+      }
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"
@@ -511,8 +519,8 @@ type binary_int_arith_op =
   | Add
   | Sub
   | Mul
-  | Div
-  | Mod
+  | Div of Scalar.Signedness.t
+  | Mod of Scalar.Signedness.t
   | And
   | Or
   | Xor

@@ -197,6 +197,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed cu -> Cmx_not_guaranteed cu
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -222,6 +223,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed cu -> Cmx_not_guaranteed cu
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -249,6 +251,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
+        | Cmx_not_guaranteed cu -> Cmx_not_guaranteed cu
         | Branching -> Branching
         | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
         | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
@@ -4925,6 +4928,14 @@ module Report = struct
       | None -> print_bug () ppf)
     | Always_dynamic x ->
       Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Cmx_not_guaranteed (Some cu) ->
+      Fmt.fprintf ppf
+        "%a is neither a core library nor the current library, and only those \
+         can currently be static"
+        Misc.Style.inline_code
+        (Compilation_unit.name_as_string cu)
+    | Cmx_not_guaranteed None ->
+      Fmt.fprintf ppf "parameter modules are always dynamic"
     | Branching -> Fmt.fprintf ppf "it has branches"
     | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
     | Escape_region reg ->

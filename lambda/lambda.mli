@@ -169,11 +169,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -554,7 +554,7 @@ and layout =
   | Punboxed_vector of unboxed_vector
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Ident.t
+  | Psplicevar of Slambdaident.t
 
 and block_shape =
   | All_value
@@ -578,7 +578,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
+  | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -655,6 +655,11 @@ and raise_kind =
 val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
+
+val join_value_kind : value_kind -> value_kind -> value_kind
+
+(** Join of two layouts, must be of the same kind. *)
+val join_layout : layout -> layout -> layout
 
 val equal_layout : layout -> layout -> bool
 
@@ -946,6 +951,10 @@ type lambda =
   | Lexclave of lambda
   (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
+  (* [Lkindtemplate] should only exist in the tlambda stage. *)
+  | Lkindtemplate of lkindtemplate
+  (* [Lkindinstantiate] should only exist in the tlambda stage. *)
+  | Lkindinstantiate of lkindinstantiate
 
 and slambda =
   | SLlayout of layout
@@ -973,7 +982,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1002,6 +1011,23 @@ and lfunction = private
     ret_mode: locality_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
+  }
+
+and lkindtemplate =
+  { ktmpl_params: Slambdaident.t list;
+    ktmpl_return: layout;
+    ktmpl_body: lambda;
+    ktmpl_mode: locality_mode;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_loc: scoped_location;
+  }
+
+and lkindinstantiate =
+  { kinst_func: lambda;
+    kinst_args: layout list;
+    kinst_result_layout: layout;
+    kinst_mode: locality_mode;
+    kinst_loc: scoped_location;
   }
 
 and lambda_while =
@@ -1190,6 +1216,7 @@ val layout_poly_variant : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
+val layout_template_env : layout
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
@@ -1547,10 +1574,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-type error =
-  | Slambda_unsupported of string
-
-val error : ?loc:Location.t -> error -> 'a
-
-val fatal_error_unevaluated_splice_var : Ident.t -> 'a
+val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

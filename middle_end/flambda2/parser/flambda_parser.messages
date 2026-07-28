@@ -2,68 +2,13 @@
 # burden of a messages file for a large grammar is ... substantial. As of this
 # writing, there should be 175 messages in this file.
 
-flambda_unit: KWD_APPLY SYMBOL LPAREN RPAREN KWD_WITH
-##
-## Ends in an error in state: 584.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple simple_args
-##
 
-Expected -> followed by a continuation.
-Example of an application:
-  apply f (arg1 arg2) -> cont * exn_cont
 
-flambda_unit: KWD_APPLY SYMBOL MINUSGREATER IDENT KWD_WITH
-##
-## Ends in an error in state: 586.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation
-##
 
-Expected * followed by an exception continuation.
-Example of an application:
-  apply f (arg1 arg2) -> cont * exn_cont
-
-flambda_unit: KWD_APPLY SYMBOL MINUSGREATER KWD_WITH
-##
-## Ends in an error in state: 585.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER
-##
-
-Expected a continuation.
-Example of an application:
-  apply f (arg1 arg2) -> cont * exn_cont
-
-flambda_unit: KWD_APPLY SYMBOL KWD_WITH
-##
-## Ends in an error in state: 583.
-##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
-## simple -> simple . TILDE coercion [ TILDE MINUSGREATER LPAREN ]
-##
-## The known suffix of the stack is as follows:
-## call_kind option(inlined) option(inlining_state) simple
-##
-
-Expected an argument list in parentheses, or -> followed by a continuation.
-Examples of applications:
-  apply f -> cont * exn_cont
-  apply f () -> cont * exn_cont
-  apply f (arg1 arg2) -> cont * exn_cont
 
 flambda_unit: KWD_APPLY KWD_WITH
 ##
-## Ends in an error in state: 505.
+## Ends in an error in state: 514.
 ##
 ## atomic_expr -> KWD_APPLY . apply_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -78,7 +23,7 @@ Example of an application:
 
 flambda_unit: KWD_CONT IDENT LPAREN SYMBOL KWD_WITH
 ##
-## Ends in an error in state: 213.
+## Ends in an error in state: 217.
 ##
 ## separated_nonempty_list(COMMA,simple) -> simple . [ RPAREN ]
 ## separated_nonempty_list(COMMA,simple) -> simple . COMMA separated_nonempty_list(COMMA,simple) [ RPAREN ]
@@ -92,7 +37,7 @@ Expected a simple value (a symbol, variable, or literal).
 
 flambda_unit: KWD_CONT IDENT LPAREN KWD_WITH
 ##
-## Ends in an error in state: 212.
+## Ends in an error in state: 216.
 ##
 ## simple_args -> LPAREN . loption(separated_nonempty_list(COMMA,simple)) RPAREN [ RPAREN PIPE MINUSGREATER KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -109,7 +54,7 @@ Examples of continuation calls:
 
 flambda_unit: KWD_CONT IDENT KWD_VAL
 ##
-## Ends in an error in state: 487.
+## Ends in an error in state: 496.
 ##
 ## apply_cont_expr -> continuation . option(trap_action) simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -125,7 +70,7 @@ Examples of continuation calls:
 
 flambda_unit: KWD_CONT KWD_WITH
 ##
-## Ends in an error in state: 482.
+## Ends in an error in state: 491.
 ##
 ## atomic_expr -> KWD_CONT . apply_cont_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -151,7 +96,7 @@ Example of a continuation call:
 
 flambda_unit: KWD_LET KWD_CODE IDENT KWD_WITH
 ##
-## Ends in an error in state: 187.
+## Ends in an error in state: 191.
 ##
 ## deleted_code -> KWD_CODE code_id . KWD_DELETED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -171,7 +116,7 @@ Examples of argument lists:
 
 flambda_unit: KWD_LET KWD_CODE KWD_REC KWD_HCF
 ##
-## Ends in an error in state: 144.
+## Ends in an error in state: 148.
 ##
 ## code_header -> KWD_CODE recursive . option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -183,7 +128,7 @@ Expected a code id.
 
 flambda_unit: KWD_LET KWD_CODE KWD_WITH
 ##
-## Ends in an error in state: 142.
+## Ends in an error in state: 146.
 ##
 ## code_header -> KWD_CODE . recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ## deleted_code -> KWD_CODE . code_id KWD_DELETED [ KWD_WITH KWD_IN KWD_AND ]
@@ -201,58 +146,13 @@ Examples of code definitions:
 
 
 
-flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT KWD_AND KWD_WITH
-##
-## Ends in an error in state: 223.
-##
-## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding KWD_AND . separated_nonempty_list(KWD_AND,symbol_binding) [ KWD_WITH KWD_IN ]
-##
-## The known suffix of the stack is as follows:
-## symbol_binding KWD_AND
-##
 
-Expected "code" or "symbol".
-
-flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT KWD_END
-##
-## Ends in an error in state: 222.
-##
-## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding . [ KWD_WITH KWD_IN ]
-## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding . KWD_AND separated_nonempty_list(KWD_AND,symbol_binding) [ KWD_WITH KWD_IN ]
-##
-## The known suffix of the stack is as follows:
-## symbol_binding
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 112, spurious reduction of production function_slot_opt ->
-## In state 116, spurious reduction of production alloc_mode_for_allocations_opt ->
-## In state 121, spurious reduction of production fun_decl -> KWD_CLOSURE code_id function_slot_opt alloc_mode_for_allocations_opt
-## In state 122, spurious reduction of production static_closure_binding -> symbol EQUAL fun_decl
-## In state 442, spurious reduction of production symbol_binding -> static_closure_binding
-##
-
-Expected "and", "with", or "in".
-
-flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN KWD_WITH
-##
-## Ends in an error in state: 478.
-##
-## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
-##
-## The known suffix of the stack is as follows:
-## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN
-##
-
-Expected an expression.
 
 flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT KWD_VAL
 ##
 ## Ends in an error in state: 112.
 ##
-## fun_decl -> KWD_CLOSURE code_id . function_slot_opt alloc_mode_for_allocations_opt [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## fun_decl -> KWD_CLOSURE code_id . function_slot_opt alloc_mode_for_allocations [ KWD_WITH KWD_IN KWD_END KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CLOSURE code_id
@@ -262,7 +162,7 @@ Expected "with", "in", "end", or "and".
 
 flambda_unit: KWD_LET SYMBOL EQUAL KWD_WITH
 ##
-## Ends in an error in state: 225.
+## Ends in an error in state: 229.
 ##
 ## static_closure_binding -> symbol EQUAL . fun_decl [ KWD_WITH KWD_IN KWD_AND ]
 ## static_data_binding -> symbol EQUAL . static_data [ KWD_WITH KWD_IN KWD_AND ]
@@ -279,7 +179,7 @@ Example of a block expression:
 
 flambda_unit: KWD_LET SYMBOL KWD_WITH
 ##
-## Ends in an error in state: 224.
+## Ends in an error in state: 228.
 ##
 ## static_closure_binding -> symbol . EQUAL fun_decl [ KWD_WITH KWD_IN KWD_AND ]
 ## static_data_binding -> symbol . EQUAL static_data [ KWD_WITH KWD_IN KWD_AND ]
@@ -296,7 +196,7 @@ Example of a block expression:
 
 flambda_unit: KWD_LET KWD_WITH
 ##
-## Ends in an error in state: 475.
+## Ends in an error in state: 484.
 ##
 ## let_expr(expr) -> KWD_LET . let_(expr) [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ## let_symbol(expr) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
@@ -313,7 +213,7 @@ Examples of let expressions:
 
 flambda_unit: KWD_SWITCH SYMBOL KWD_WITH
 ##
-## Ends in an error in state: 659.
+## Ends in an error in state: 674.
 ##
 ## flambda_unit -> module_ . EOF [ # ]
 ##
@@ -326,11 +226,11 @@ flambda_unit: KWD_SWITCH SYMBOL KWD_WITH
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 80, spurious reduction of production option(PIPE) ->
 ## In state 103, spurious reduction of production loption(separated_nonempty_list(PIPE,switch_case)) ->
-## In state 656, spurious reduction of production switch -> option(PIPE) loption(separated_nonempty_list(PIPE,switch_case))
+## In state 671, spurious reduction of production switch -> option(PIPE) loption(separated_nonempty_list(PIPE,switch_case))
 ## In state 102, spurious reduction of production inlined_expr -> KWD_SWITCH simple switch
-## In state 630, spurious reduction of production inner_expr -> inlined_expr
-## In state 595, spurious reduction of production expr -> inner_expr
-## In state 662, spurious reduction of production module_ -> expr
+## In state 645, spurious reduction of production inner_expr -> inlined_expr
+## In state 610, spurious reduction of production expr -> inner_expr
+## In state 677, spurious reduction of production module_ -> expr
 ##
 
 Expected one or more switch cases, separated by semicolons, surrounded by {}.
@@ -348,6 +248,58 @@ flambda_unit: KWD_WITH
 ##
 
 Expected an expression.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -879,7 +831,7 @@ flambda_unit: KWD_SWITCH KWD_POISON DOT KWD_ANY TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT DOT
+flambda_unit: KWD_SWITCH KWD_POISON DOT LBRACK INT KWD_OF KWD_FLOAT DOT
 ##
 ## Ends in an error in state: 58.
 ##
@@ -899,7 +851,7 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT DOT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT STAR TILDE
+flambda_unit: KWD_SWITCH KWD_POISON DOT LBRACK INT KWD_OF KWD_FLOAT STAR TILDE
 ##
 ## Ends in an error in state: 59.
 ##
@@ -1189,7 +1141,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE TILDE
 ##
 ## Ends in an error in state: 110.
 ##
-## fun_decl -> KWD_CLOSURE . code_id function_slot_opt alloc_mode_for_allocations_opt [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## fun_decl -> KWD_CLOSURE . code_id function_slot_opt alloc_mode_for_allocations [ KWD_WITH KWD_IN KWD_END KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CLOSURE
@@ -1201,7 +1153,7 @@ flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AT TILDE
 ##
 ## Ends in an error in state: 113.
 ##
-## function_slot_opt -> AT . function_slot [ RPAREN KWD_WITH KWD_IN KWD_END KWD_AND AMP ]
+## function_slot_opt -> AT . function_slot [ AMP ]
 ##
 ## The known suffix of the stack is as follows:
 ## AT
@@ -1213,7 +1165,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AT IDENT TILDE
 ##
 ## Ends in an error in state: 116.
 ##
-## fun_decl -> KWD_CLOSURE code_id function_slot_opt . alloc_mode_for_allocations_opt [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## fun_decl -> KWD_CLOSURE code_id function_slot_opt . alloc_mode_for_allocations [ KWD_WITH KWD_IN KWD_END KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CLOSURE code_id function_slot_opt
@@ -1225,7 +1177,8 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP TILDE
 ##
 ## Ends in an error in state: 117.
 ##
-## alloc_mode_for_allocations_opt -> AMP . region [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## alloc_mode_for_allocations -> AMP . region [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## alloc_mode_for_allocations -> AMP . region AMP region [ KWD_WITH KWD_IN KWD_END KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## AMP
@@ -1233,9 +1186,58 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN
+flambda_unit: KWD_APPLY AMP KWD_TOPLEVEL TILDE
+##
+## Ends in an error in state: 118.
+##
+## region -> KWD_TOPLEVEL . DOT IDENT [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_WITH KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED KWD_IN KWD_END KWD_AND INT IDENT FLOAT AMP ]
+##
+## The known suffix of the stack is as follows:
+## KWD_TOPLEVEL
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP KWD_TOPLEVEL DOT TILDE
+##
+## Ends in an error in state: 119.
+##
+## region -> KWD_TOPLEVEL DOT . IDENT [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_WITH KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED KWD_IN KWD_END KWD_AND INT IDENT FLOAT AMP ]
+##
+## The known suffix of the stack is as follows:
+## KWD_TOPLEVEL DOT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP IDENT TILDE
+##
+## Ends in an error in state: 122.
+##
+## alloc_mode_for_allocations -> AMP region . [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+## alloc_mode_for_allocations -> AMP region . AMP region [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## AMP region
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP IDENT AMP TILDE
 ##
 ## Ends in an error in state: 123.
+##
+## alloc_mode_for_allocations -> AMP region AMP . region [ KWD_WITH KWD_IN KWD_END KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## AMP region AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT AMP IDENT KWD_IN
+##
+## Ends in an error in state: 127.
 ##
 ## separated_nonempty_list(KWD_AND,static_closure_binding) -> static_closure_binding . [ KWD_WITH KWD_END ]
 ## separated_nonempty_list(KWD_AND,static_closure_binding) -> static_closure_binding . KWD_AND separated_nonempty_list(KWD_AND,static_closure_binding) [ KWD_WITH KWD_END ]
@@ -1247,17 +1249,16 @@ flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 112, spurious reduction of production function_slot_opt ->
-## In state 116, spurious reduction of production alloc_mode_for_allocations_opt ->
-## In state 121, spurious reduction of production fun_decl -> KWD_CLOSURE code_id function_slot_opt alloc_mode_for_allocations_opt
-## In state 122, spurious reduction of production static_closure_binding -> symbol EQUAL fun_decl
+## In state 122, spurious reduction of production alloc_mode_for_allocations -> AMP region
+## In state 125, spurious reduction of production fun_decl -> KWD_CLOSURE code_id function_slot_opt alloc_mode_for_allocations
+## In state 126, spurious reduction of production static_closure_binding -> symbol EQUAL fun_decl
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_AND TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT AMP IDENT KWD_AND TILDE
 ##
-## Ends in an error in state: 124.
+## Ends in an error in state: 128.
 ##
 ## separated_nonempty_list(KWD_AND,static_closure_binding) -> static_closure_binding KWD_AND . separated_nonempty_list(KWD_AND,static_closure_binding) [ KWD_WITH KWD_END ]
 ##
@@ -1269,7 +1270,7 @@ flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_AND
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH TILDE
 ##
-## Ends in an error in state: 127.
+## Ends in an error in state: 131.
 ##
 ## with_value_slots_opt -> KWD_WITH . LBRACE loption(separated_nonempty_list(SEMICOLON,value_slot)) RBRACE [ KWD_IN KWD_END ]
 ##
@@ -1281,7 +1282,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE TILDE
 ##
-## Ends in an error in state: 128.
+## Ends in an error in state: 132.
 ##
 ## with_value_slots_opt -> KWD_WITH LBRACE . loption(separated_nonempty_list(SEMICOLON,value_slot)) RBRACE [ KWD_IN KWD_END ]
 ##
@@ -1293,7 +1294,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT TILDE
 ##
-## Ends in an error in state: 130.
+## Ends in an error in state: 134.
 ##
 ## value_slot -> value_slot_for_projection . EQUAL simple [ SEMICOLON RBRACE ]
 ##
@@ -1305,7 +1306,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL TILDE
 ##
-## Ends in an error in state: 131.
+## Ends in an error in state: 135.
 ##
 ## value_slot -> value_slot_for_projection EQUAL . simple [ SEMICOLON RBRACE ]
 ##
@@ -1317,7 +1318,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SYMBOL
 ##
-## Ends in an error in state: 132.
+## Ends in an error in state: 136.
 ##
 ## simple -> simple . TILDE coercion [ TILDE SEMICOLON RBRACE ]
 ## value_slot -> value_slot_for_projection EQUAL simple . [ SEMICOLON RBRACE ]
@@ -1330,7 +1331,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SYMBOL
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SEMICOLON TILDE
 ##
-## Ends in an error in state: 135.
+## Ends in an error in state: 139.
 ##
 ## separated_nonempty_list(SEMICOLON,value_slot) -> value_slot SEMICOLON . separated_nonempty_list(SEMICOLON,value_slot) [ RBRACE ]
 ##
@@ -1340,9 +1341,9 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SEMICOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT AMP IDENT KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 140.
+## Ends in an error in state: 144.
 ##
 ## static_set_of_closures -> KWD_SET_OF_CLOSURES separated_nonempty_list(KWD_AND,static_closure_binding) with_value_slots_opt . KWD_END [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1354,7 +1355,7 @@ flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_WIT
 
 flambda_unit: KWD_LET KWD_CODE KWD_UNROLL TILDE
 ##
-## Ends in an error in state: 145.
+## Ends in an error in state: 149.
 ##
 ## inline -> KWD_UNROLL . LPAREN plain_int RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1366,7 +1367,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_UNROLL TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN TILDE
 ##
-## Ends in an error in state: 146.
+## Ends in an error in state: 150.
 ##
 ## inline -> KWD_UNROLL LPAREN . plain_int RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1378,7 +1379,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN INT TILDE
 ##
-## Ends in an error in state: 147.
+## Ends in an error in state: 151.
 ##
 ## inline -> KWD_UNROLL LPAREN plain_int . RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1390,7 +1391,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN INT TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE TILDE
 ##
-## Ends in an error in state: 149.
+## Ends in an error in state: 153.
 ##
 ## inline -> KWD_INLINE . LPAREN KWD_ALWAYS RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ## inline -> KWD_INLINE . LPAREN KWD_AVAILABLE RPAREN [ KWD_SIZE KWD_LOOPIFY ]
@@ -1405,7 +1406,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN TILDE
 ##
-## Ends in an error in state: 150.
+## Ends in an error in state: 154.
 ##
 ## inline -> KWD_INLINE LPAREN . KWD_ALWAYS RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ## inline -> KWD_INLINE LPAREN . KWD_AVAILABLE RPAREN [ KWD_SIZE KWD_LOOPIFY ]
@@ -1420,7 +1421,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_NEVER TILDE
 ##
-## Ends in an error in state: 151.
+## Ends in an error in state: 155.
 ##
 ## inline -> KWD_INLINE LPAREN KWD_NEVER . RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1432,7 +1433,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_NEVER TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_DEFAULT TILDE
 ##
-## Ends in an error in state: 153.
+## Ends in an error in state: 157.
 ##
 ## inline -> KWD_INLINE LPAREN KWD_DEFAULT . RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1444,7 +1445,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_DEFAULT TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_AVAILABLE TILDE
 ##
-## Ends in an error in state: 155.
+## Ends in an error in state: 159.
 ##
 ## inline -> KWD_INLINE LPAREN KWD_AVAILABLE . RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1456,7 +1457,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_AVAILABLE TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS TILDE
 ##
-## Ends in an error in state: 157.
+## Ends in an error in state: 161.
 ##
 ## inline -> KWD_INLINE LPAREN KWD_ALWAYS . RPAREN [ KWD_SIZE KWD_LOOPIFY ]
 ##
@@ -1468,7 +1469,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS RPAREN TILDE
 ##
-## Ends in an error in state: 159.
+## Ends in an error in state: 163.
 ##
 ## code_header -> KWD_CODE recursive option(inline) . loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1480,7 +1481,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS RPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY TILDE
 ##
-## Ends in an error in state: 160.
+## Ends in an error in state: 164.
 ##
 ## loopify_opt -> KWD_LOOPIFY . LPAREN loopify RPAREN [ KWD_SIZE ]
 ##
@@ -1492,7 +1493,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN TILDE
 ##
-## Ends in an error in state: 161.
+## Ends in an error in state: 165.
 ##
 ## loopify_opt -> KWD_LOOPIFY LPAREN . loopify RPAREN [ KWD_SIZE ]
 ##
@@ -1504,7 +1505,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_DEFAULT TILDE
 ##
-## Ends in an error in state: 164.
+## Ends in an error in state: 168.
 ##
 ## loopify -> KWD_DEFAULT . KWD_TAILREC [ RPAREN ]
 ## loopify -> KWD_DEFAULT . [ RPAREN ]
@@ -1517,7 +1518,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_DEFAULT TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS TILDE
 ##
-## Ends in an error in state: 167.
+## Ends in an error in state: 171.
 ##
 ## loopify_opt -> KWD_LOOPIFY LPAREN loopify . RPAREN [ KWD_SIZE ]
 ##
@@ -1529,7 +1530,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS RPAREN TILDE
 ##
-## Ends in an error in state: 169.
+## Ends in an error in state: 173.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt . KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1541,7 +1542,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS RPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE TILDE
 ##
-## Ends in an error in state: 170.
+## Ends in an error in state: 174.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE . LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1553,7 +1554,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN TILDE
 ##
-## Ends in an error in state: 171.
+## Ends in an error in state: 175.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN . code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1565,7 +1566,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT TILDE
 ##
-## Ends in an error in state: 173.
+## Ends in an error in state: 177.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size . RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1577,7 +1578,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN TILDE
 ##
-## Ends in an error in state: 174.
+## Ends in an error in state: 178.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN . option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1589,7 +1590,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF TILDE
 ##
-## Ends in an error in state: 175.
+## Ends in an error in state: 179.
 ##
 ## newer_version_of -> KWD_NEWER_VERSION_OF . LPAREN code_id RPAREN [ KWD_TUPLED KWD_STUB IDENT ]
 ##
@@ -1601,7 +1602,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF T
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN TILDE
 ##
-## Ends in an error in state: 176.
+## Ends in an error in state: 180.
 ##
 ## newer_version_of -> KWD_NEWER_VERSION_OF LPAREN . code_id RPAREN [ KWD_TUPLED KWD_STUB IDENT ]
 ##
@@ -1613,7 +1614,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF L
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT TILDE
 ##
-## Ends in an error in state: 177.
+## Ends in an error in state: 181.
 ##
 ## newer_version_of -> KWD_NEWER_VERSION_OF LPAREN code_id . RPAREN [ KWD_TUPLED KWD_STUB IDENT ]
 ##
@@ -1625,7 +1626,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF L
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT RPAREN TILDE
 ##
-## Ends in an error in state: 179.
+## Ends in an error in state: 183.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) . boption(KWD_TUPLED) boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1637,7 +1638,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF L
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_TUPLED TILDE
 ##
-## Ends in an error in state: 181.
+## Ends in an error in state: 185.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) . boption(KWD_STUB) code_id [ LPAREN IDENT ]
 ##
@@ -1649,7 +1650,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_TUPLED TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_STUB TILDE
 ##
-## Ends in an error in state: 183.
+## Ends in an error in state: 187.
 ##
 ## code_header -> KWD_CODE recursive option(inline) loopify_opt KWD_SIZE LPAREN code_size RPAREN option(newer_version_of) boption(KWD_TUPLED) boption(KWD_STUB) . code_id [ LPAREN IDENT ]
 ##
@@ -1661,7 +1662,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_STUB TILDE
 
 flambda_unit: KWD_LET IDENT TILDE
 ##
-## Ends in an error in state: 189.
+## Ends in an error in state: 193.
 ##
 ## let_binding -> variable . EQUAL named [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1673,7 +1674,7 @@ flambda_unit: KWD_LET IDENT TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL TILDE
 ##
-## Ends in an error in state: 190.
+## Ends in an error in state: 194.
 ##
 ## let_binding -> variable EQUAL . named [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1685,7 +1686,7 @@ flambda_unit: KWD_LET IDENT EQUAL TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM TILDE
 ##
-## Ends in an error in state: 191.
+## Ends in an error in state: 195.
 ##
 ## prim_op -> PRIM . list(pair(DOT,prim_param)) [ LPAREN KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1697,7 +1698,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT TILDE
 ##
-## Ends in an error in state: 192.
+## Ends in an error in state: 196.
 ##
 ## list(pair(DOT,prim_param)) -> DOT . prim_param list(pair(DOT,prim_param)) [ LPAREN KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1709,7 +1710,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK TILDE
 ##
-## Ends in an error in state: 193.
+## Ends in an error in state: 197.
 ##
 ## prim_param -> LBRACK . separated_nonempty_list(COMMA,prim_param) RBRACK [ RBRACK LPAREN KWD_WITH KWD_IN KWD_AND DOT COMMA ]
 ##
@@ -1721,7 +1722,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT TILDE
 ##
-## Ends in an error in state: 198.
+## Ends in an error in state: 202.
 ##
 ## prim_param -> prim_param_val . [ RBRACK LPAREN KWD_WITH KWD_IN KWD_AND DOT COMMA ]
 ## prim_param -> prim_param_val . LBRACK separated_nonempty_list(COMMA,prim_param) RBRACK [ RBRACK LPAREN KWD_WITH KWD_IN KWD_AND DOT COMMA ]
@@ -1734,7 +1735,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK TILDE
 ##
-## Ends in an error in state: 199.
+## Ends in an error in state: 203.
 ##
 ## prim_param -> prim_param_val LBRACK . separated_nonempty_list(COMMA,prim_param) RBRACK [ RBRACK LPAREN KWD_WITH KWD_IN KWD_AND DOT COMMA ]
 ##
@@ -1746,7 +1747,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT LPAREN
 ##
-## Ends in an error in state: 202.
+## Ends in an error in state: 206.
 ##
 ## separated_nonempty_list(COMMA,prim_param) -> prim_param . [ RBRACK ]
 ## separated_nonempty_list(COMMA,prim_param) -> prim_param . COMMA separated_nonempty_list(COMMA,prim_param) [ RBRACK ]
@@ -1758,14 +1759,14 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT LPAREN
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 198, spurious reduction of production prim_param -> prim_param_val
+## In state 202, spurious reduction of production prim_param -> prim_param_val
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT COMMA TILDE
 ##
-## Ends in an error in state: 203.
+## Ends in an error in state: 207.
 ##
 ## separated_nonempty_list(COMMA,prim_param) -> prim_param COMMA . separated_nonempty_list(COMMA,prim_param) [ RBRACK ]
 ##
@@ -1777,7 +1778,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT COMMA TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT RBRACK
 ##
-## Ends in an error in state: 205.
+## Ends in an error in state: 209.
 ##
 ## list(pair(DOT,prim_param)) -> DOT prim_param . list(pair(DOT,prim_param)) [ LPAREN KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1788,14 +1789,14 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT RBRACK
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 198, spurious reduction of production prim_param -> prim_param_val
+## In state 202, spurious reduction of production prim_param -> prim_param_val
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO TILDE
 ##
-## Ends in an error in state: 208.
+## Ends in an error in state: 212.
 ##
 ## named -> KWD_REC_INFO . rec_info_atom [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1807,7 +1808,7 @@ flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL FLOAT SYMBOL
 ##
-## Ends in an error in state: 210.
+## Ends in an error in state: 214.
 ##
 ## named -> simple . [ KWD_WITH KWD_IN KWD_AND ]
 ## simple -> simple . TILDE coercion [ TILDE KWD_WITH KWD_IN KWD_AND ]
@@ -1818,9 +1819,9 @@ flambda_unit: KWD_LET IDENT EQUAL FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COMMA TILDE
+flambda_unit: KWD_CONT IDENT LPAREN FLOAT COMMA TILDE
 ##
-## Ends in an error in state: 214.
+## Ends in an error in state: 218.
 ##
 ## separated_nonempty_list(COMMA,simple) -> simple COMMA . separated_nonempty_list(COMMA,simple) [ RPAREN ]
 ##
@@ -1830,9 +1831,34 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COMMA TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY TILDE
+flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED RPAREN
+##
+## Ends in an error in state: 226.
+##
+## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding . [ KWD_WITH KWD_IN ]
+## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding . KWD_AND separated_nonempty_list(KWD_AND,symbol_binding) [ KWD_WITH KWD_IN ]
+##
+## The known suffix of the stack is as follows:
+## symbol_binding
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_AND TILDE
 ##
 ## Ends in an error in state: 227.
+##
+## separated_nonempty_list(KWD_AND,symbol_binding) -> symbol_binding KWD_AND . separated_nonempty_list(KWD_AND,symbol_binding) [ KWD_WITH KWD_IN ]
+##
+## The known suffix of the stack is as follows:
+## symbol_binding KWD_AND
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY TILDE
+##
+## Ends in an error in state: 231.
 ##
 ## static_data -> STATIC_CONST_VEC512_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(vec512))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1844,7 +1870,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 228.
+## Ends in an error in state: 232.
 ##
 ## static_data -> STATIC_CONST_VEC512_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(vec512))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -1856,7 +1882,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 TILDE
 ##
-## Ends in an error in state: 229.
+## Ends in an error in state: 233.
 ##
 ## vec512 -> KWD_VEC512 . LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1868,7 +1894,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK TILDE
 ##
-## Ends in an error in state: 230.
+## Ends in an error in state: 234.
 ##
 ## vec512 -> KWD_VEC512 LBRACK . INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1880,7 +1906,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT TILDE
 ##
-## Ends in an error in state: 231.
+## Ends in an error in state: 235.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT . COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1892,7 +1918,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON TILDE
 ##
-## Ends in an error in state: 232.
+## Ends in an error in state: 236.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON . INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1904,7 +1930,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT TILDE
 ##
-## Ends in an error in state: 233.
+## Ends in an error in state: 237.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT . COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1916,7 +1942,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 234.
+## Ends in an error in state: 238.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON . INT COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1928,7 +1954,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 235.
+## Ends in an error in state: 239.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT . COLON INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1940,7 +1966,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 236.
+## Ends in an error in state: 240.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON . INT COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1952,7 +1978,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 237.
+## Ends in an error in state: 241.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT . COLON INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1964,7 +1990,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 238.
+## Ends in an error in state: 242.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON . INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1976,7 +2002,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 239.
+## Ends in an error in state: 243.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT . COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -1988,7 +2014,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 240.
+## Ends in an error in state: 244.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON . INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2000,7 +2026,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 241.
+## Ends in an error in state: 245.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT . COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2012,7 +2038,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 242.
+## Ends in an error in state: 246.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON . INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2024,7 +2050,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 243.
+## Ends in an error in state: 247.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT . COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2036,7 +2062,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 244.
+## Ends in an error in state: 248.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON . INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2048,7 +2074,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 245.
+## Ends in an error in state: 249.
 ##
 ## vec512 -> KWD_VEC512 LBRACK INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT COLON INT . RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2060,7 +2086,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE KWD_VEC5
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE IDENT TILDE
 ##
-## Ends in an error in state: 250.
+## Ends in an error in state: 254.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec512)) -> or_variable(vec512) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(vec512)) -> or_variable(vec512) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(vec512)) [ RBRACKPIPE ]
@@ -2073,7 +2099,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE IDENT TI
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE IDENT SEMICOLON TILDE
 ##
-## Ends in an error in state: 251.
+## Ends in an error in state: 255.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec512)) -> or_variable(vec512) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(vec512)) [ RBRACKPIPE ]
 ##
@@ -2085,7 +2111,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC512_ARRAY LBRACKPIPE IDENT SE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY TILDE
 ##
-## Ends in an error in state: 255.
+## Ends in an error in state: 259.
 ##
 ## static_data -> STATIC_CONST_VEC256_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(vec256))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2097,7 +2123,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 256.
+## Ends in an error in state: 260.
 ##
 ## static_data -> STATIC_CONST_VEC256_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(vec256))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2109,7 +2135,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 TILDE
 ##
-## Ends in an error in state: 257.
+## Ends in an error in state: 261.
 ##
 ## vec256 -> KWD_VEC256 . LBRACK INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2121,7 +2147,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK TILDE
 ##
-## Ends in an error in state: 258.
+## Ends in an error in state: 262.
 ##
 ## vec256 -> KWD_VEC256 LBRACK . INT COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2133,7 +2159,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT TILDE
 ##
-## Ends in an error in state: 259.
+## Ends in an error in state: 263.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT . COLON INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2145,7 +2171,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON TILDE
 ##
-## Ends in an error in state: 260.
+## Ends in an error in state: 264.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON . INT COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2157,7 +2183,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON INT TILDE
 ##
-## Ends in an error in state: 261.
+## Ends in an error in state: 265.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON INT . COLON INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2169,7 +2195,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 262.
+## Ends in an error in state: 266.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON INT COLON . INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2181,7 +2207,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 263.
+## Ends in an error in state: 267.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON INT COLON INT . COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2193,7 +2219,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON INT COLON INT COLON TILDE
 ##
-## Ends in an error in state: 264.
+## Ends in an error in state: 268.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON INT COLON INT COLON . INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2205,7 +2231,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC256 LBRACK INT COLON INT COLON INT COLON INT TILDE
 ##
-## Ends in an error in state: 265.
+## Ends in an error in state: 269.
 ##
 ## vec256 -> KWD_VEC256 LBRACK INT COLON INT COLON INT COLON INT . RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2217,7 +2243,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE KWD_VEC2
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE IDENT TILDE
 ##
-## Ends in an error in state: 270.
+## Ends in an error in state: 274.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec256)) -> or_variable(vec256) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(vec256)) -> or_variable(vec256) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(vec256)) [ RBRACKPIPE ]
@@ -2230,7 +2256,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE IDENT TI
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE IDENT SEMICOLON TILDE
 ##
-## Ends in an error in state: 271.
+## Ends in an error in state: 275.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec256)) -> or_variable(vec256) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(vec256)) [ RBRACKPIPE ]
 ##
@@ -2242,7 +2268,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC256_ARRAY LBRACKPIPE IDENT SE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY TILDE
 ##
-## Ends in an error in state: 275.
+## Ends in an error in state: 279.
 ##
 ## static_data -> STATIC_CONST_VEC128_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(vec128))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2254,7 +2280,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 276.
+## Ends in an error in state: 280.
 ##
 ## static_data -> STATIC_CONST_VEC128_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(vec128))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2266,7 +2292,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC128 TILDE
 ##
-## Ends in an error in state: 277.
+## Ends in an error in state: 281.
 ##
 ## vec128 -> KWD_VEC128 . LBRACK INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2278,7 +2304,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC1
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC128 LBRACK TILDE
 ##
-## Ends in an error in state: 278.
+## Ends in an error in state: 282.
 ##
 ## vec128 -> KWD_VEC128 LBRACK . INT COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2290,7 +2316,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC1
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC128 LBRACK INT TILDE
 ##
-## Ends in an error in state: 279.
+## Ends in an error in state: 283.
 ##
 ## vec128 -> KWD_VEC128 LBRACK INT . COLON INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2302,7 +2328,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC1
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC128 LBRACK INT COLON TILDE
 ##
-## Ends in an error in state: 280.
+## Ends in an error in state: 284.
 ##
 ## vec128 -> KWD_VEC128 LBRACK INT COLON . INT RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2314,7 +2340,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC1
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC128 LBRACK INT COLON INT TILDE
 ##
-## Ends in an error in state: 281.
+## Ends in an error in state: 285.
 ##
 ## vec128 -> KWD_VEC128 LBRACK INT COLON INT . RBRACK [ SEMICOLON RBRACKPIPE ]
 ##
@@ -2326,7 +2352,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE KWD_VEC1
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE IDENT TILDE
 ##
-## Ends in an error in state: 286.
+## Ends in an error in state: 290.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec128)) -> or_variable(vec128) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(vec128)) -> or_variable(vec128) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(vec128)) [ RBRACKPIPE ]
@@ -2339,7 +2365,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE IDENT TI
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE IDENT SEMICOLON TILDE
 ##
-## Ends in an error in state: 287.
+## Ends in an error in state: 291.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(vec128)) -> or_variable(vec128) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(vec128)) [ RBRACKPIPE ]
 ##
@@ -2351,7 +2377,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VEC128_ARRAY LBRACKPIPE IDENT SE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY TILDE
 ##
-## Ends in an error in state: 291.
+## Ends in an error in state: 295.
 ##
 ## static_data -> STATIC_CONST_VALUE_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,field_of_block)) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2363,7 +2389,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 292.
+## Ends in an error in state: 296.
 ##
 ## static_data -> STATIC_CONST_VALUE_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,field_of_block)) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2375,7 +2401,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE FLOAT TILDE
 ##
-## Ends in an error in state: 298.
+## Ends in an error in state: 302.
 ##
 ## separated_nonempty_list(SEMICOLON,field_of_block) -> field_of_block . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,field_of_block) -> field_of_block . SEMICOLON separated_nonempty_list(SEMICOLON,field_of_block) [ RBRACKPIPE ]
@@ -2388,7 +2414,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE FLOAT TIL
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE FLOAT SEMICOLON TILDE
 ##
-## Ends in an error in state: 299.
+## Ends in an error in state: 303.
 ##
 ## separated_nonempty_list(SEMICOLON,field_of_block) -> field_of_block SEMICOLON . separated_nonempty_list(SEMICOLON,field_of_block) [ RBRACKPIPE ]
 ##
@@ -2400,7 +2426,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE FLOAT SEM
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY TILDE
 ##
-## Ends in an error in state: 302.
+## Ends in an error in state: 306.
 ##
 ## static_data -> STATIC_CONST_NATIVEINT_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(nativeint))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2412,7 +2438,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 303.
+## Ends in an error in state: 307.
 ##
 ## static_data -> STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(nativeint))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2424,7 +2450,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 307.
+## Ends in an error in state: 311.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(nativeint)) -> or_variable(nativeint) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(nativeint)) -> or_variable(nativeint) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(nativeint)) [ RBRACKPIPE ]
@@ -2437,7 +2463,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE INT T
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 308.
+## Ends in an error in state: 312.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(nativeint)) -> or_variable(nativeint) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(nativeint)) [ RBRACKPIPE ]
 ##
@@ -2449,7 +2475,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_NATIVEINT_ARRAY LBRACKPIPE INT S
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY TILDE
 ##
-## Ends in an error in state: 313.
+## Ends in an error in state: 317.
 ##
 ## static_data -> STATIC_CONST_INT_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(targetint))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2461,7 +2487,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 314.
+## Ends in an error in state: 318.
 ##
 ## static_data -> STATIC_CONST_INT_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(targetint))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2473,7 +2499,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 319.
+## Ends in an error in state: 323.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(targetint)) -> or_variable(targetint) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(targetint)) -> or_variable(targetint) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(targetint)) [ RBRACKPIPE ]
@@ -2486,7 +2512,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 320.
+## Ends in an error in state: 324.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(targetint)) -> or_variable(targetint) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(targetint)) [ RBRACKPIPE ]
 ##
@@ -2498,7 +2524,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT_ARRAY LBRACKPIPE INT SEMICOL
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY TILDE
 ##
-## Ends in an error in state: 324.
+## Ends in an error in state: 328.
 ##
 ## static_data -> STATIC_CONST_INT8_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(int8))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2510,7 +2536,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 325.
+## Ends in an error in state: 329.
 ##
 ## static_data -> STATIC_CONST_INT8_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(int8))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2522,7 +2548,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 329.
+## Ends in an error in state: 333.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int8)) -> or_variable(int8) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(int8)) -> or_variable(int8) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(int8)) [ RBRACKPIPE ]
@@ -2535,7 +2561,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 330.
+## Ends in an error in state: 334.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int8)) -> or_variable(int8) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(int8)) [ RBRACKPIPE ]
 ##
@@ -2547,7 +2573,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT8_ARRAY LBRACKPIPE INT SEMICO
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY TILDE
 ##
-## Ends in an error in state: 335.
+## Ends in an error in state: 339.
 ##
 ## static_data -> STATIC_CONST_INT64_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(int64))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2559,7 +2585,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 336.
+## Ends in an error in state: 340.
 ##
 ## static_data -> STATIC_CONST_INT64_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(int64))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2571,7 +2597,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 340.
+## Ends in an error in state: 344.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int64)) -> or_variable(int64) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(int64)) -> or_variable(int64) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(int64)) [ RBRACKPIPE ]
@@ -2584,7 +2610,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 341.
+## Ends in an error in state: 345.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int64)) -> or_variable(int64) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(int64)) [ RBRACKPIPE ]
 ##
@@ -2596,7 +2622,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT64_ARRAY LBRACKPIPE INT SEMIC
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY TILDE
 ##
-## Ends in an error in state: 346.
+## Ends in an error in state: 350.
 ##
 ## static_data -> STATIC_CONST_INT32_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(int32))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2608,7 +2634,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 347.
+## Ends in an error in state: 351.
 ##
 ## static_data -> STATIC_CONST_INT32_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(int32))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2620,7 +2646,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 351.
+## Ends in an error in state: 355.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int32)) -> or_variable(int32) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(int32)) -> or_variable(int32) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(int32)) [ RBRACKPIPE ]
@@ -2633,7 +2659,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 352.
+## Ends in an error in state: 356.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int32)) -> or_variable(int32) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(int32)) [ RBRACKPIPE ]
 ##
@@ -2645,7 +2671,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT32_ARRAY LBRACKPIPE INT SEMIC
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY TILDE
 ##
-## Ends in an error in state: 357.
+## Ends in an error in state: 361.
 ##
 ## static_data -> STATIC_CONST_INT16_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(int16))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2657,7 +2683,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 358.
+## Ends in an error in state: 362.
 ##
 ## static_data -> STATIC_CONST_INT16_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(int16))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2669,7 +2695,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE INT TILDE
 ##
-## Ends in an error in state: 362.
+## Ends in an error in state: 366.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int16)) -> or_variable(int16) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(int16)) -> or_variable(int16) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(int16)) [ RBRACKPIPE ]
@@ -2682,7 +2708,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE INT SEMICOLON TILDE
 ##
-## Ends in an error in state: 363.
+## Ends in an error in state: 367.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(int16)) -> or_variable(int16) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(int16)) [ RBRACKPIPE ]
 ##
@@ -2694,7 +2720,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_INT16_ARRAY LBRACKPIPE INT SEMIC
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK TILDE
 ##
-## Ends in an error in state: 368.
+## Ends in an error in state: 372.
 ##
 ## static_data -> STATIC_CONST_FLOAT_BLOCK . LPAREN loption(separated_nonempty_list(COMMA,or_variable(float))) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2706,7 +2732,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN TILDE
 ##
-## Ends in an error in state: 369.
+## Ends in an error in state: 373.
 ##
 ## static_data -> STATIC_CONST_FLOAT_BLOCK LPAREN . loption(separated_nonempty_list(COMMA,or_variable(float))) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2718,7 +2744,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN FLOAT TILDE
 ##
-## Ends in an error in state: 373.
+## Ends in an error in state: 377.
 ##
 ## separated_nonempty_list(COMMA,or_variable(float)) -> or_variable(float) . [ RPAREN ]
 ## separated_nonempty_list(COMMA,or_variable(float)) -> or_variable(float) . COMMA separated_nonempty_list(COMMA,or_variable(float)) [ RPAREN ]
@@ -2731,7 +2757,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN FLOAT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN FLOAT COMMA TILDE
 ##
-## Ends in an error in state: 374.
+## Ends in an error in state: 378.
 ##
 ## separated_nonempty_list(COMMA,or_variable(float)) -> or_variable(float) COMMA . separated_nonempty_list(COMMA,or_variable(float)) [ RPAREN ]
 ##
@@ -2743,7 +2769,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN FLOAT COMMA T
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY TILDE
 ##
-## Ends in an error in state: 379.
+## Ends in an error in state: 383.
 ##
 ## static_data -> STATIC_CONST_FLOAT_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(float))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2755,7 +2781,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 380.
+## Ends in an error in state: 384.
 ##
 ## static_data -> STATIC_CONST_FLOAT_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(float))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2767,7 +2793,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE FLOAT TILDE
 ##
-## Ends in an error in state: 382.
+## Ends in an error in state: 386.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(float)) -> or_variable(float) . [ RBRACKPIPE ]
 ## separated_nonempty_list(SEMICOLON,or_variable(float)) -> or_variable(float) . SEMICOLON separated_nonempty_list(SEMICOLON,or_variable(float)) [ RBRACKPIPE ]
@@ -2780,7 +2806,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE FLOAT T
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE FLOAT SEMICOLON TILDE
 ##
-## Ends in an error in state: 383.
+## Ends in an error in state: 387.
 ##
 ## separated_nonempty_list(SEMICOLON,or_variable(float)) -> or_variable(float) SEMICOLON . separated_nonempty_list(SEMICOLON,or_variable(float)) [ RBRACKPIPE ]
 ##
@@ -2792,7 +2818,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE FLOAT S
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY TILDE
 ##
-## Ends in an error in state: 387.
+## Ends in an error in state: 391.
 ##
 ## static_data -> STATIC_CONST_FLOAT32_ARRAY . LBRACKPIPE loption(separated_nonempty_list(SEMICOLON,or_variable(float))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2804,7 +2830,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE TILDE
 ##
-## Ends in an error in state: 388.
+## Ends in an error in state: 392.
 ##
 ## static_data -> STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE . loption(separated_nonempty_list(SEMICOLON,or_variable(float))) RBRACKPIPE [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2816,7 +2842,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT32_ARRAY LBRACKPIPE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_EMPTY_ARRAY TILDE
 ##
-## Ends in an error in state: 391.
+## Ends in an error in state: 395.
 ##
 ## static_data -> STATIC_CONST_EMPTY_ARRAY . empty_array_kind [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2828,7 +2854,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_EMPTY_ARRAY TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK TILDE
 ##
-## Ends in an error in state: 404.
+## Ends in an error in state: 408.
 ##
 ## static_data -> STATIC_CONST_BLOCK . mutability tag LPAREN loption(separated_nonempty_list(COMMA,field_of_block)) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2840,7 +2866,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK KWD_IMMUTABLE_UNIQUE TILDE
 ##
-## Ends in an error in state: 407.
+## Ends in an error in state: 411.
 ##
 ## static_data -> STATIC_CONST_BLOCK mutability . tag LPAREN loption(separated_nonempty_list(COMMA,field_of_block)) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2852,7 +2878,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK KWD_IMMUTABLE_UNIQUE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT TILDE
 ##
-## Ends in an error in state: 408.
+## Ends in an error in state: 412.
 ##
 ## static_data -> STATIC_CONST_BLOCK mutability tag . LPAREN loption(separated_nonempty_list(COMMA,field_of_block)) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2864,7 +2890,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN TILDE
 ##
-## Ends in an error in state: 409.
+## Ends in an error in state: 413.
 ##
 ## static_data -> STATIC_CONST_BLOCK mutability tag LPAREN . loption(separated_nonempty_list(COMMA,field_of_block)) RPAREN [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2876,7 +2902,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN FLOAT TILDE
 ##
-## Ends in an error in state: 413.
+## Ends in an error in state: 417.
 ##
 ## separated_nonempty_list(COMMA,field_of_block) -> field_of_block . [ RPAREN ]
 ## separated_nonempty_list(COMMA,field_of_block) -> field_of_block . COMMA separated_nonempty_list(COMMA,field_of_block) [ RPAREN ]
@@ -2889,7 +2915,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN FLOAT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN FLOAT COMMA TILDE
 ##
-## Ends in an error in state: 414.
+## Ends in an error in state: 418.
 ##
 ## separated_nonempty_list(COMMA,field_of_block) -> field_of_block COMMA . separated_nonempty_list(COMMA,field_of_block) [ RPAREN ]
 ##
@@ -2901,7 +2927,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN FLOAT COMMA TIL
 
 flambda_unit: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
 ##
-## Ends in an error in state: 416.
+## Ends in an error in state: 420.
 ##
 ## static_data -> KWD_MUTABLE . STRING [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2913,7 +2939,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT TILDE
 ##
-## Ends in an error in state: 420.
+## Ends in an error in state: 424.
 ##
 ## static_data -> variable . COLON static_data_kind [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2925,7 +2951,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON TILDE
 ##
-## Ends in an error in state: 421.
+## Ends in an error in state: 425.
 ##
 ## static_data -> variable COLON . static_data_kind [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2937,7 +2963,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC512 TILDE
 ##
-## Ends in an error in state: 422.
+## Ends in an error in state: 426.
 ##
 ## static_data_kind -> KWD_VEC512 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2949,7 +2975,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC512 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC256 TILDE
 ##
-## Ends in an error in state: 424.
+## Ends in an error in state: 428.
 ##
 ## static_data_kind -> KWD_VEC256 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2961,7 +2987,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC256 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC128 TILDE
 ##
-## Ends in an error in state: 426.
+## Ends in an error in state: 430.
 ##
 ## static_data_kind -> KWD_VEC128 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2973,7 +2999,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_VEC128 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_NATIVEINT TILDE
 ##
-## Ends in an error in state: 428.
+## Ends in an error in state: 432.
 ##
 ## static_data_kind -> KWD_NATIVEINT . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2985,7 +3011,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_NATIVEINT TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT64 TILDE
 ##
-## Ends in an error in state: 430.
+## Ends in an error in state: 434.
 ##
 ## static_data_kind -> KWD_INT64 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -2997,7 +3023,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT64 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT32 TILDE
 ##
-## Ends in an error in state: 432.
+## Ends in an error in state: 436.
 ##
 ## static_data_kind -> KWD_INT32 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -3009,7 +3035,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT32 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT32 TILDE
 ##
-## Ends in an error in state: 434.
+## Ends in an error in state: 438.
 ##
 ## static_data_kind -> KWD_FLOAT32 . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -3021,7 +3047,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT32 TILDE
 
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT TILDE
 ##
-## Ends in an error in state: 436.
+## Ends in an error in state: 440.
 ##
 ## static_data_kind -> KWD_FLOAT . KWD_BOXED [ KWD_WITH KWD_IN KWD_AND ]
 ##
@@ -3033,9 +3059,9 @@ flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
 ##
-## Ends in an error in state: 445.
+## Ends in an error in state: 449.
 ##
-## code -> code_header . kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header . kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header
@@ -3045,7 +3071,7 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDE
 ##
-## Ends in an error in state: 446.
+## Ends in an error in state: 450.
 ##
 ## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EQUAL EOF ]
 ##
@@ -3057,7 +3083,7 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDE
 ##
-## Ends in an error in state: 447.
+## Ends in an error in state: 451.
 ##
 ## kinded_variable -> variable . kind_with_subkind_opt [ RPAREN COMMA ]
 ##
@@ -3069,7 +3095,7 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDE
 ##
-## Ends in an error in state: 448.
+## Ends in an error in state: 452.
 ##
 ## kind_with_subkind_opt -> COLON . kind_with_subkind [ RPAREN COMMA ]
 ##
@@ -3081,7 +3107,7 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_FLOAT STAR
 ##
-## Ends in an error in state: 453.
+## Ends in an error in state: 457.
 ##
 ## separated_nonempty_list(COMMA,kinded_variable) -> kinded_variable . [ RPAREN ]
 ## separated_nonempty_list(COMMA,kinded_variable) -> kinded_variable . COMMA separated_nonempty_list(COMMA,kinded_variable) [ RPAREN ]
@@ -3095,15 +3121,15 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_FLOAT STAR
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 46, spurious reduction of production naked_number_kind -> KWD_FLOAT
 ## In state 56, spurious reduction of production kind_with_subkind -> naked_number_kind
-## In state 449, spurious reduction of production kind_with_subkind_opt -> COLON kind_with_subkind
-## In state 450, spurious reduction of production kinded_variable -> variable kind_with_subkind_opt
+## In state 453, spurious reduction of production kind_with_subkind_opt -> COLON kind_with_subkind
+## In state 454, spurious reduction of production kinded_variable -> variable kind_with_subkind_opt
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDE
 ##
-## Ends in an error in state: 454.
+## Ends in an error in state: 458.
 ##
 ## separated_nonempty_list(COMMA,kinded_variable) -> kinded_variable COMMA . separated_nonempty_list(COMMA,kinded_variable) [ RPAREN ]
 ##
@@ -3115,9 +3141,9 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDE
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT RPAREN TILDE
 ##
-## Ends in an error in state: 456.
+## Ends in an error in state: 460.
 ##
-## code -> code_header kinded_args . variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args . variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args
@@ -3127,9 +3153,9 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT RPA
 
 flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
 ##
-## Ends in an error in state: 457.
+## Ends in an error in state: 461.
 ##
-## code -> code_header kinded_args variable . variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable . alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## code_header kinded_args variable
@@ -3137,69 +3163,119 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP TILDE
 ##
-## Ends in an error in state: 458.
+## Ends in an error in state: 462.
 ##
-## code -> code_header kinded_args variable variable . variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## alloc_mode_for_function_params -> AMP . variable [ IDENT ]
+## alloc_mode_for_function_params -> AMP . variable AMP variable AMP variable [ IDENT ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable
+## AMP
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT TILDE
-##
-## Ends in an error in state: 459.
-##
-## code -> code_header kinded_args variable variable variable . variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
-##
-## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT TILDE
-##
-## Ends in an error in state: 460.
-##
-## code -> code_header kinded_args variable variable variable variable . MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
-##
-## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER TILDE
-##
-## Ends in an error in state: 461.
-##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER . continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
-##
-## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT TILDE
 ##
 ## Ends in an error in state: 463.
 ##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER continuation_id . exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## alloc_mode_for_function_params -> AMP variable . [ IDENT ]
+## alloc_mode_for_function_params -> AMP variable . AMP variable AMP variable [ IDENT ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER continuation_id
+## AMP variable
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT AMP TILDE
 ##
 ## Ends in an error in state: 464.
+##
+## alloc_mode_for_function_params -> AMP variable AMP . variable AMP variable [ IDENT ]
+##
+## The known suffix of the stack is as follows:
+## AMP variable AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT AMP IDENT TILDE
+##
+## Ends in an error in state: 465.
+##
+## alloc_mode_for_function_params -> AMP variable AMP variable . AMP variable [ IDENT ]
+##
+## The known suffix of the stack is as follows:
+## AMP variable AMP variable
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT AMP IDENT AMP TILDE
+##
+## Ends in an error in state: 466.
+##
+## alloc_mode_for_function_params -> AMP variable AMP variable AMP . variable [ IDENT ]
+##
+## The known suffix of the stack is as follows:
+## AMP variable AMP variable AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT AMP IDENT AMP IDENT TILDE
+##
+## Ends in an error in state: 468.
+##
+## code -> code_header kinded_args variable alloc_mode_for_function_params . variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## code_header kinded_args variable alloc_mode_for_function_params
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT TILDE
+##
+## Ends in an error in state: 469.
+##
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable . MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## code_header kinded_args variable alloc_mode_for_function_params variable
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER TILDE
+##
+## Ends in an error in state: 470.
+##
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER . continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT TILDE
+##
+## Ends in an error in state: 472.
+##
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id . exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+##
+## The known suffix of the stack is as follows:
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR TILDE
+##
+## Ends in an error in state: 473.
 ##
 ## exn_continuation_id -> STAR . continuation_id [ KWD_LOCAL EQUAL COLON ]
 ##
@@ -3209,21 +3285,21 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDEN
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT TILDE
 ##
-## Ends in an error in state: 466.
+## Ends in an error in state: 475.
 ##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id . return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id . return_arity boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON TILDE
 ##
-## Ends in an error in state: 467.
+## Ends in an error in state: 476.
 ##
 ## return_arity -> COLON . kinds_with_subkinds [ KWD_LOCAL EQUAL ]
 ##
@@ -3233,14 +3309,14 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDEN
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON KWD_FLOAT RPAREN
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON KWD_FLOAT RPAREN
 ##
-## Ends in an error in state: 471.
+## Ends in an error in state: 480.
 ##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity . boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity . boption(KWD_LOCAL) EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity
 ##
 ## WARNING: This example involves spurious reductions.
 ## This implies that, although the LR(1) items shown above provide an
@@ -3249,39 +3325,39 @@ flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDEN
 ## In state 46, spurious reduction of production naked_number_kind -> KWD_FLOAT
 ## In state 56, spurious reduction of production kind_with_subkind -> naked_number_kind
 ## In state 58, spurious reduction of production separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind
-## In state 469, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
-## In state 470, spurious reduction of production return_arity -> COLON kinds_with_subkinds
+## In state 478, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
+## In state 479, spurious reduction of production return_arity -> COLON kinds_with_subkinds
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_LOCAL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_LOCAL TILDE
 ##
-## Ends in an error in state: 473.
+## Ends in an error in state: 482.
 ##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) . EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) . EQUAL expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL)
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL)
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT EQUAL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT AMP IDENT IDENT MINUSGREATER IDENT STAR IDENT EQUAL TILDE
 ##
-## Ends in an error in state: 474.
+## Ends in an error in state: 483.
 ##
-## code -> code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL . expr [ KWD_WITH KWD_IN KWD_AND ]
+## code -> code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL . expr [ KWD_WITH KWD_IN KWD_AND ]
 ##
 ## The known suffix of the stack is as follows:
-## code_header kinded_args variable variable variable variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL
+## code_header kinded_args variable alloc_mode_for_function_params variable MINUSGREATER continuation_id exn_continuation_id return_arity boption(KWD_LOCAL) EQUAL
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 477.
+## Ends in an error in state: 486.
 ##
 ## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
@@ -3291,9 +3367,21 @@ flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
+flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDE
+##
+## Ends in an error in state: 487.
+##
+## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
+##
+## The known suffix of the stack is as follows:
+## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
 flambda_unit: KWD_INVALID TILDE
 ##
-## Ends in an error in state: 479.
+## Ends in an error in state: 488.
 ##
 ## atomic_expr -> KWD_INVALID . STRING [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3305,7 +3393,7 @@ flambda_unit: KWD_INVALID TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_PUSH TILDE
 ##
-## Ends in an error in state: 488.
+## Ends in an error in state: 497.
 ##
 ## trap_action -> KWD_PUSH . LPAREN continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3317,7 +3405,7 @@ flambda_unit: KWD_CONT IDENT KWD_PUSH TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN TILDE
 ##
-## Ends in an error in state: 489.
+## Ends in an error in state: 498.
 ##
 ## trap_action -> KWD_PUSH LPAREN . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3329,7 +3417,7 @@ flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN IDENT TILDE
 ##
-## Ends in an error in state: 490.
+## Ends in an error in state: 499.
 ##
 ## trap_action -> KWD_PUSH LPAREN continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3341,7 +3429,7 @@ flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN IDENT TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_POP TILDE
 ##
-## Ends in an error in state: 492.
+## Ends in an error in state: 501.
 ##
 ## trap_action -> KWD_POP . LPAREN option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3353,7 +3441,7 @@ flambda_unit: KWD_CONT IDENT KWD_POP TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_POP LPAREN TILDE
 ##
-## Ends in an error in state: 493.
+## Ends in an error in state: 502.
 ##
 ## trap_action -> KWD_POP LPAREN . option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3365,7 +3453,7 @@ flambda_unit: KWD_CONT IDENT KWD_POP LPAREN TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_POP LPAREN KWD_NOTRACE TILDE
 ##
-## Ends in an error in state: 498.
+## Ends in an error in state: 507.
 ##
 ## trap_action -> KWD_POP LPAREN option(raise_kind) . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3377,7 +3465,7 @@ flambda_unit: KWD_CONT IDENT KWD_POP LPAREN KWD_NOTRACE TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT TILDE
 ##
-## Ends in an error in state: 499.
+## Ends in an error in state: 508.
 ##
 ## trap_action -> KWD_POP LPAREN option(raise_kind) continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3389,7 +3477,7 @@ flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT TILDE
 
 flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT RPAREN TILDE
 ##
-## Ends in an error in state: 502.
+## Ends in an error in state: 511.
 ##
 ## apply_cont_expr -> continuation option(trap_action) . simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3401,9 +3489,9 @@ flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT RPAREN TILDE
 
 flambda_unit: KWD_APPLY KWD_MCALL TILDE
 ##
-## Ends in an error in state: 506.
+## Ends in an error in state: 515.
 ##
-## call_kind -> KWD_MCALL . LPAREN method_kind simple RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_MCALL . LPAREN method_kind simple RPAREN AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_MCALL
@@ -3413,9 +3501,9 @@ flambda_unit: KWD_APPLY KWD_MCALL TILDE
 
 flambda_unit: KWD_APPLY KWD_MCALL LPAREN TILDE
 ##
-## Ends in an error in state: 507.
+## Ends in an error in state: 516.
 ##
-## call_kind -> KWD_MCALL LPAREN . method_kind simple RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_MCALL LPAREN . method_kind simple RPAREN AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_MCALL LPAREN
@@ -3425,9 +3513,9 @@ flambda_unit: KWD_APPLY KWD_MCALL LPAREN TILDE
 
 flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED TILDE
 ##
-## Ends in an error in state: 511.
+## Ends in an error in state: 520.
 ##
-## call_kind -> KWD_MCALL LPAREN method_kind . simple RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_MCALL LPAREN method_kind . simple RPAREN AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_MCALL LPAREN method_kind
@@ -3437,9 +3525,9 @@ flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED TILDE
 
 flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT SYMBOL
 ##
-## Ends in an error in state: 512.
+## Ends in an error in state: 521.
 ##
-## call_kind -> KWD_MCALL LPAREN method_kind simple . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_MCALL LPAREN method_kind simple . RPAREN AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ## simple -> simple . TILDE coercion [ TILDE RPAREN ]
 ##
 ## The known suffix of the stack is as follows:
@@ -3448,11 +3536,35 @@ flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
+flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT RPAREN TILDE
+##
+## Ends in an error in state: 522.
+##
+## call_kind -> KWD_MCALL LPAREN method_kind simple RPAREN . AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## KWD_MCALL LPAREN method_kind simple RPAREN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY KWD_MCALL LPAREN KWD_CACHED FLOAT RPAREN AMP TILDE
+##
+## Ends in an error in state: 523.
+##
+## call_kind -> KWD_MCALL LPAREN method_kind simple RPAREN AMP . region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## KWD_MCALL LPAREN method_kind simple RPAREN AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
 flambda_unit: KWD_APPLY KWD_DIRECT TILDE
 ##
-## Ends in an error in state: 514.
+## Ends in an error in state: 525.
 ##
-## call_kind -> KWD_DIRECT . LPAREN code_id function_slot_opt alloc_mode_for_applications_opt RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_DIRECT . LPAREN code_id function_slot_opt alloc_mode_for_applications RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DIRECT
@@ -3462,9 +3574,9 @@ flambda_unit: KWD_APPLY KWD_DIRECT TILDE
 
 flambda_unit: KWD_APPLY KWD_DIRECT LPAREN TILDE
 ##
-## Ends in an error in state: 515.
+## Ends in an error in state: 526.
 ##
-## call_kind -> KWD_DIRECT LPAREN . code_id function_slot_opt alloc_mode_for_applications_opt RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_DIRECT LPAREN . code_id function_slot_opt alloc_mode_for_applications RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DIRECT LPAREN
@@ -3474,9 +3586,9 @@ flambda_unit: KWD_APPLY KWD_DIRECT LPAREN TILDE
 
 flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT TILDE
 ##
-## Ends in an error in state: 516.
+## Ends in an error in state: 527.
 ##
-## call_kind -> KWD_DIRECT LPAREN code_id . function_slot_opt alloc_mode_for_applications_opt RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_DIRECT LPAREN code_id . function_slot_opt alloc_mode_for_applications RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DIRECT LPAREN code_id
@@ -3486,9 +3598,9 @@ flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT TILDE
 
 flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AT IDENT TILDE
 ##
-## Ends in an error in state: 517.
+## Ends in an error in state: 528.
 ##
-## call_kind -> KWD_DIRECT LPAREN code_id function_slot_opt . alloc_mode_for_applications_opt RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_DIRECT LPAREN code_id function_slot_opt . alloc_mode_for_applications RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DIRECT LPAREN code_id function_slot_opt
@@ -3498,9 +3610,10 @@ flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AT IDENT TILDE
 
 flambda_unit: KWD_APPLY AMP TILDE
 ##
-## Ends in an error in state: 518.
+## Ends in an error in state: 529.
 ##
-## alloc_mode_for_applications_opt -> AMP . region AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP . region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP . region AMP region AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## AMP
@@ -3510,9 +3623,10 @@ flambda_unit: KWD_APPLY AMP TILDE
 
 flambda_unit: KWD_APPLY AMP IDENT TILDE
 ##
-## Ends in an error in state: 519.
+## Ends in an error in state: 530.
 ##
-## alloc_mode_for_applications_opt -> AMP region . AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP region . [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP region . AMP region AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## AMP region
@@ -3522,9 +3636,9 @@ flambda_unit: KWD_APPLY AMP IDENT TILDE
 
 flambda_unit: KWD_APPLY AMP IDENT AMP TILDE
 ##
-## Ends in an error in state: 520.
+## Ends in an error in state: 531.
 ##
-## alloc_mode_for_applications_opt -> AMP region AMP . region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP region AMP . region AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## AMP region AMP
@@ -3532,23 +3646,53 @@ flambda_unit: KWD_APPLY AMP IDENT AMP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AMP IDENT AMP IDENT TILDE
+flambda_unit: KWD_APPLY AMP IDENT AMP IDENT TILDE
 ##
-## Ends in an error in state: 522.
+## Ends in an error in state: 532.
 ##
-## call_kind -> KWD_DIRECT LPAREN code_id function_slot_opt alloc_mode_for_applications_opt . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## alloc_mode_for_applications -> AMP region AMP region . AMP region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
-## KWD_DIRECT LPAREN code_id function_slot_opt alloc_mode_for_applications_opt
+## AMP region AMP region
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP IDENT AMP IDENT AMP TILDE
+##
+## Ends in an error in state: 533.
+##
+## alloc_mode_for_applications -> AMP region AMP region AMP . region [ SYMBOL RPAREN MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## AMP region AMP region AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AMP IDENT SYMBOL
+##
+## Ends in an error in state: 535.
+##
+## call_kind -> KWD_DIRECT LPAREN code_id function_slot_opt alloc_mode_for_applications . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## KWD_DIRECT LPAREN code_id function_slot_opt alloc_mode_for_applications
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 530, spurious reduction of production alloc_mode_for_applications -> AMP region
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_APPLY KWD_CCALL TILDE
 ##
-## Ends in an error in state: 524.
+## Ends in an error in state: 537.
 ##
-## call_kind -> KWD_CCALL . boption(KWD_NOALLOC) [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+## call_kind -> KWD_CCALL . boption(KWD_NOALLOC) AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CCALL
@@ -3558,7 +3702,31 @@ flambda_unit: KWD_APPLY KWD_CCALL TILDE
 
 flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 ##
-## Ends in an error in state: 527.
+## Ends in an error in state: 539.
+##
+## call_kind -> KWD_CCALL boption(KWD_NOALLOC) . AMP region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## KWD_CCALL boption(KWD_NOALLOC)
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY KWD_CCALL AMP TILDE
+##
+## Ends in an error in state: 540.
+##
+## call_kind -> KWD_CCALL boption(KWD_NOALLOC) AMP . region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
+##
+## The known suffix of the stack is as follows:
+## KWD_CCALL boption(KWD_NOALLOC) AMP
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP IDENT RPAREN
+##
+## Ends in an error in state: 542.
 ##
 ## apply_expr -> call_kind . option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## apply_expr -> call_kind . option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
@@ -3567,12 +3735,19 @@ flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 ## The known suffix of the stack is as follows:
 ## call_kind
 ##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 530, spurious reduction of production alloc_mode_for_applications -> AMP region
+## In state 606, spurious reduction of production call_kind -> alloc_mode_for_applications
+##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_UNROLL TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_UNROLL TILDE
 ##
-## Ends in an error in state: 528.
+## Ends in an error in state: 543.
 ##
 ## inlined -> KWD_UNROLL . LPAREN plain_int RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3582,9 +3757,9 @@ flambda_unit: KWD_APPLY KWD_UNROLL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_UNROLL LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_UNROLL LPAREN TILDE
 ##
-## Ends in an error in state: 529.
+## Ends in an error in state: 544.
 ##
 ## inlined -> KWD_UNROLL LPAREN . plain_int RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3594,9 +3769,9 @@ flambda_unit: KWD_APPLY KWD_UNROLL LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_UNROLL LPAREN INT TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_UNROLL LPAREN INT TILDE
 ##
-## Ends in an error in state: 530.
+## Ends in an error in state: 545.
 ##
 ## inlined -> KWD_UNROLL LPAREN plain_int . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3606,9 +3781,9 @@ flambda_unit: KWD_APPLY KWD_UNROLL LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED TILDE
 ##
-## Ends in an error in state: 532.
+## Ends in an error in state: 547.
 ##
 ## inlined -> KWD_INLINED . LPAREN KWD_ALWAYS RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ## inlined -> KWD_INLINED . LPAREN KWD_HINT RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
@@ -3621,9 +3796,9 @@ flambda_unit: KWD_APPLY KWD_INLINED TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN TILDE
 ##
-## Ends in an error in state: 533.
+## Ends in an error in state: 548.
 ##
 ## inlined -> KWD_INLINED LPAREN . KWD_ALWAYS RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ## inlined -> KWD_INLINED LPAREN . KWD_HINT RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
@@ -3636,9 +3811,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_NEVER TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN KWD_NEVER TILDE
 ##
-## Ends in an error in state: 534.
+## Ends in an error in state: 549.
 ##
 ## inlined -> KWD_INLINED LPAREN KWD_NEVER . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3648,9 +3823,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_NEVER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_HINT TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN KWD_HINT TILDE
 ##
-## Ends in an error in state: 536.
+## Ends in an error in state: 551.
 ##
 ## inlined -> KWD_INLINED LPAREN KWD_HINT . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3660,9 +3835,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_HINT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_DEFAULT TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN KWD_DEFAULT TILDE
 ##
-## Ends in an error in state: 538.
+## Ends in an error in state: 553.
 ##
 ## inlined -> KWD_INLINED LPAREN KWD_DEFAULT . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3672,9 +3847,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_DEFAULT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN KWD_ALWAYS TILDE
 ##
-## Ends in an error in state: 540.
+## Ends in an error in state: 555.
 ##
 ## inlined -> KWD_INLINED LPAREN KWD_ALWAYS . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL KWD_INLINING_STATE INT IDENT FLOAT ]
 ##
@@ -3684,9 +3859,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
 ##
-## Ends in an error in state: 542.
+## Ends in an error in state: 557.
 ##
 ## apply_expr -> call_kind option(inlined) . option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## apply_expr -> call_kind option(inlined) . option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
@@ -3698,9 +3873,9 @@ flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE TILDE
 ##
-## Ends in an error in state: 543.
+## Ends in an error in state: 558.
 ##
 ## inlining_state -> KWD_INLINING_STATE . LPAREN inlining_state_depth RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL INT IDENT FLOAT ]
 ##
@@ -3710,9 +3885,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN TILDE
 ##
-## Ends in an error in state: 544.
+## Ends in an error in state: 559.
 ##
 ## inlining_state -> KWD_INLINING_STATE LPAREN . inlining_state_depth RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL INT IDENT FLOAT ]
 ##
@@ -3722,9 +3897,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
 ##
-## Ends in an error in state: 545.
+## Ends in an error in state: 560.
 ##
 ## inlining_state_depth -> KWD_DEPTH . LPAREN plain_int RPAREN [ RPAREN ]
 ##
@@ -3734,9 +3909,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
 ##
-## Ends in an error in state: 546.
+## Ends in an error in state: 561.
 ##
 ## inlining_state_depth -> KWD_DEPTH LPAREN . plain_int RPAREN [ RPAREN ]
 ##
@@ -3746,9 +3921,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
 ##
-## Ends in an error in state: 547.
+## Ends in an error in state: 562.
 ##
 ## inlining_state_depth -> KWD_DEPTH LPAREN plain_int . RPAREN [ RPAREN ]
 ##
@@ -3758,9 +3933,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN TILDE
 ##
-## Ends in an error in state: 549.
+## Ends in an error in state: 564.
 ##
 ## inlining_state -> KWD_INLINING_STATE LPAREN inlining_state_depth . RPAREN [ SYMBOL MINUSGREATER LPAREN KWD_POISON KWD_NULL INT IDENT FLOAT ]
 ##
@@ -3770,9 +3945,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN TI
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN RPAREN TILDE
 ##
-## Ends in an error in state: 551.
+## Ends in an error in state: 566.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## apply_expr -> call_kind option(inlined) option(inlining_state) . simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
@@ -3784,9 +3959,9 @@ flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN RP
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN TILDE
 ##
-## Ends in an error in state: 552.
+## Ends in an error in state: 567.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN . simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## simple_args -> LPAREN . loption(separated_nonempty_list(COMMA,simple)) RPAREN [ MINUSGREATER ]
@@ -3797,9 +3972,9 @@ flambda_unit: KWD_APPLY LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT SYMBOL
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT SYMBOL
 ##
-## Ends in an error in state: 553.
+## Ends in an error in state: 568.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple . COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## separated_nonempty_list(COMMA,simple) -> simple . [ RPAREN ]
@@ -3812,9 +3987,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON TILDE
 ##
-## Ends in an error in state: 554.
+## Ends in an error in state: 569.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON . blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3824,9 +3999,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT RPAREN
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT RPAREN
 ##
-## Ends in an error in state: 557.
+## Ends in an error in state: 572.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) . MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3840,15 +4015,15 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT RPAREN
 ## In state 46, spurious reduction of production naked_number_kind -> KWD_FLOAT
 ## In state 56, spurious reduction of production kind_with_subkind -> naked_number_kind
 ## In state 58, spurious reduction of production separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind
-## In state 469, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
-## In state 556, spurious reduction of production blank_or(kinds_with_subkinds) -> kinds_with_subkinds
+## In state 478, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
+## In state 571, spurious reduction of production blank_or(kinds_with_subkinds) -> kinds_with_subkinds
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
 ##
-## Ends in an error in state: 558.
+## Ends in an error in state: 573.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER . kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3858,9 +4033,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RBRACK
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RBRACK
 ##
-## Ends in an error in state: 559.
+## Ends in an error in state: 574.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds . RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3874,14 +4049,14 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RBRA
 ## In state 46, spurious reduction of production naked_number_kind -> KWD_FLOAT
 ## In state 56, spurious reduction of production kind_with_subkind -> naked_number_kind
 ## In state 58, spurious reduction of production separated_nonempty_list(STAR,kind_with_subkind) -> kind_with_subkind
-## In state 469, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
+## In state 478, spurious reduction of production kinds_with_subkinds -> separated_nonempty_list(STAR,kind_with_subkind)
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN TILDE
 ##
-## Ends in an error in state: 560.
+## Ends in an error in state: 575.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3891,9 +4066,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN LPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN LPAREN RPAREN TILDE
 ##
-## Ends in an error in state: 561.
+## Ends in an error in state: 576.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3903,9 +4078,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER TILDE
 ##
-## Ends in an error in state: 562.
+## Ends in an error in state: 577.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3915,9 +4090,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER IDENT TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER IDENT TILDE
 ##
-## Ends in an error in state: 564.
+## Ends in an error in state: 579.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3927,9 +4102,9 @@ flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR TILDE
 ##
-## Ends in an error in state: 565.
+## Ends in an error in state: 580.
 ##
 ## exn_continuation -> STAR . continuation loption(exn_extra_args) [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3939,9 +4114,9 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR IDENT TILDE
 ##
-## Ends in an error in state: 566.
+## Ends in an error in state: 581.
 ##
 ## exn_continuation -> STAR continuation . loption(exn_extra_args) [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3951,9 +4126,9 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR IDENT LPAREN TILDE
 ##
-## Ends in an error in state: 567.
+## Ends in an error in state: 582.
 ##
 ## exn_extra_args -> LPAREN . separated_nonempty_list(COMMA,exn_extra_arg) RPAREN [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -3963,9 +4138,9 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
 ##
-## Ends in an error in state: 568.
+## Ends in an error in state: 583.
 ##
 ## exn_extra_arg -> simple . kind_with_subkind [ RPAREN COMMA ]
 ## simple -> simple . TILDE coercion [ TILDE LBRACK KWD_VEC512 KWD_VEC256 KWD_VEC128 KWD_VAL KWD_REGION KWD_REC_INFO KWD_PRODUCT KWD_NATIVEINT KWD_INT8 KWD_INT64 KWD_INT32 KWD_INT16 KWD_INT KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY ]
@@ -3976,9 +4151,9 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT STAR
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT STAR
 ##
-## Ends in an error in state: 572.
+## Ends in an error in state: 587.
 ##
 ## separated_nonempty_list(COMMA,exn_extra_arg) -> exn_extra_arg . [ RPAREN ]
 ## separated_nonempty_list(COMMA,exn_extra_arg) -> exn_extra_arg . COMMA separated_nonempty_list(COMMA,exn_extra_arg) [ RPAREN ]
@@ -3992,14 +4167,14 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT STA
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 46, spurious reduction of production naked_number_kind -> KWD_FLOAT
 ## In state 56, spurious reduction of production kind_with_subkind -> naked_number_kind
-## In state 569, spurious reduction of production exn_extra_arg -> simple kind_with_subkind
+## In state 584, spurious reduction of production exn_extra_arg -> simple kind_with_subkind
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT COMMA TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT COMMA TILDE
 ##
-## Ends in an error in state: 573.
+## Ends in an error in state: 588.
 ##
 ## separated_nonempty_list(COMMA,exn_extra_arg) -> exn_extra_arg COMMA . separated_nonempty_list(COMMA,exn_extra_arg) [ RPAREN ]
 ##
@@ -4009,9 +4184,9 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT COM
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY LPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY AMP IDENT LPAREN RPAREN TILDE
 ##
-## Ends in an error in state: 579.
+## Ends in an error in state: 594.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4021,9 +4196,9 @@ flambda_unit: KWD_APPLY LPAREN RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER TILDE
 ##
-## Ends in an error in state: 580.
+## Ends in an error in state: 595.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4033,9 +4208,9 @@ flambda_unit: KWD_APPLY MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY MINUSGREATER IDENT TILDE
+flambda_unit: KWD_APPLY AMP IDENT MINUSGREATER IDENT TILDE
 ##
-## Ends in an error in state: 581.
+## Ends in an error in state: 596.
 ##
 ## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4045,9 +4220,58 @@ flambda_unit: KWD_APPLY MINUSGREATER IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
+flambda_unit: KWD_APPLY AMP IDENT FLOAT SYMBOL
+##
+## Ends in an error in state: 598.
+##
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## simple -> simple . TILDE coercion [ TILDE MINUSGREATER LPAREN ]
+##
+## The known suffix of the stack is as follows:
+## call_kind option(inlined) option(inlining_state) simple
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP IDENT FLOAT LPAREN RPAREN TILDE
+##
+## Ends in an error in state: 599.
+##
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+##
+## The known suffix of the stack is as follows:
+## call_kind option(inlined) option(inlining_state) simple simple_args
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP IDENT FLOAT MINUSGREATER TILDE
+##
+## Ends in an error in state: 600.
+##
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+##
+## The known suffix of the stack is as follows:
+## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+flambda_unit: KWD_APPLY AMP IDENT FLOAT MINUSGREATER IDENT TILDE
+##
+## Ends in an error in state: 601.
+##
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+##
+## The known suffix of the stack is as follows:
+## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
 flambda_unit: KWD_HCF KWD_ANDWHERE
 ##
-## Ends in an error in state: 595.
+## Ends in an error in state: 610.
 ##
 ## expr -> inner_expr . [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ## where_expr -> inner_expr . KWD_WHERE cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
@@ -4060,7 +4284,7 @@ flambda_unit: KWD_HCF KWD_ANDWHERE
 
 flambda_unit: KWD_HCF KWD_WHERE TILDE
 ##
-## Ends in an error in state: 596.
+## Ends in an error in state: 611.
 ##
 ## where_expr -> inner_expr KWD_WHERE . cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
@@ -4072,7 +4296,7 @@ flambda_unit: KWD_HCF KWD_WHERE TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC TILDE
 ##
-## Ends in an error in state: 597.
+## Ends in an error in state: 612.
 ##
 ## cont_recursive -> KWD_REC . kinded_args [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EOF ]
 ##
@@ -4084,7 +4308,7 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDE
 ##
-## Ends in an error in state: 599.
+## Ends in an error in state: 614.
 ##
 ## where_expr -> inner_expr KWD_WHERE cont_recursive . loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
@@ -4096,7 +4320,7 @@ flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT TILDE
 ##
-## Ends in an error in state: 602.
+## Ends in an error in state: 617.
 ##
 ## continuation_binding -> continuation_id . continuation_sort kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4108,7 +4332,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDE
 ##
-## Ends in an error in state: 605.
+## Ends in an error in state: 620.
 ##
 ## continuation_binding -> continuation_id continuation_sort . kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4120,7 +4344,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDE
 ##
-## Ends in an error in state: 606.
+## Ends in an error in state: 621.
 ##
 ## continuation_binding -> continuation_id continuation_sort kinded_args . EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4132,7 +4356,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL TILDE
 ##
-## Ends in an error in state: 607.
+## Ends in an error in state: 622.
 ##
 ## continuation_binding -> continuation_id continuation_sort kinded_args EQUAL . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4144,7 +4368,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDE
 ##
-## Ends in an error in state: 608.
+## Ends in an error in state: 623.
 ##
 ## let_expr(continuation_body) -> KWD_LET . let_(continuation_body) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## let_symbol(continuation_body) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
@@ -4157,7 +4381,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 610.
+## Ends in an error in state: 625.
 ##
 ## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4169,7 +4393,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED K
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDE
 ##
-## Ends in an error in state: 611.
+## Ends in an error in state: 626.
 ##
 ## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4181,7 +4405,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED K
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 618.
+## Ends in an error in state: 633.
 ##
 ## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4193,7 +4417,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_WITH LB
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 ##
-## Ends in an error in state: 619.
+## Ends in an error in state: 634.
 ##
 ## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4203,9 +4427,9 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_IN TILD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET IDENT EQUAL KWD_CLOSURE IDENT KWD_END
+flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO INT KWD_END
 ##
-## Ends in an error in state: 621.
+## Ends in an error in state: 636.
 ##
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding . [ KWD_WITH KWD_IN ]
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding . KWD_AND separated_nonempty_list(KWD_AND,let_binding) [ KWD_WITH KWD_IN ]
@@ -4213,22 +4437,12 @@ flambda_unit: KWD_LET IDENT EQUAL KWD_CLOSURE IDENT KWD_END
 ## The known suffix of the stack is as follows:
 ## let_binding
 ##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 112, spurious reduction of production function_slot_opt ->
-## In state 116, spurious reduction of production alloc_mode_for_allocations_opt ->
-## In state 121, spurious reduction of production fun_decl -> KWD_CLOSURE code_id function_slot_opt alloc_mode_for_allocations_opt
-## In state 221, spurious reduction of production named -> fun_decl
-## In state 220, spurious reduction of production let_binding -> variable EQUAL named
-##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_AND TILDE
 ##
-## Ends in an error in state: 622.
+## Ends in an error in state: 637.
 ##
 ## separated_nonempty_list(KWD_AND,let_binding) -> let_binding KWD_AND . separated_nonempty_list(KWD_AND,let_binding) [ KWD_WITH KWD_IN ]
 ##
@@ -4240,7 +4454,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_AND TILDE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF PIPE
 ##
-## Ends in an error in state: 627.
+## Ends in an error in state: 642.
 ##
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . KWD_ANDWHERE separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
@@ -4253,7 +4467,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF PIPE
 
 flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDE
 ##
-## Ends in an error in state: 628.
+## Ends in an error in state: 643.
 ##
 ## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding KWD_ANDWHERE . separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
@@ -4265,7 +4479,7 @@ flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 633.
+## Ends in an error in state: 648.
 ##
 ## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
@@ -4277,7 +4491,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 
 flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 ##
-## Ends in an error in state: 634.
+## Ends in an error in state: 649.
 ##
 ## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
@@ -4289,7 +4503,7 @@ flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 639.
+## Ends in an error in state: 654.
 ##
 ## let_symbol(atomic_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN atomic_body [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4301,7 +4515,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET KWD_CODE IDENT KWD_DELET
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDE
 ##
-## Ends in an error in state: 640.
+## Ends in an error in state: 655.
 ##
 ## let_symbol(atomic_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . atomic_body [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4313,7 +4527,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET KWD_CODE IDENT KWD_DELET
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 ##
-## Ends in an error in state: 646.
+## Ends in an error in state: 661.
 ##
 ## let_(atomic_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN atomic_body [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4325,7 +4539,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET IDENT EQUAL PRIM KWD_WIT
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 ##
-## Ends in an error in state: 647.
+## Ends in an error in state: 662.
 ##
 ## let_(atomic_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . atomic_body [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4337,7 +4551,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_LET IDENT EQUAL PRIM KWD_IN 
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_HCF TILDE
 ##
-## Ends in an error in state: 652.
+## Ends in an error in state: 667.
 ##
 ## separated_nonempty_list(PIPE,switch_case) -> switch_case . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## separated_nonempty_list(PIPE,switch_case) -> switch_case . PIPE separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
@@ -4350,7 +4564,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER KWD_HCF TILDE
 
 flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER IDENT PIPE TILDE
 ##
-## Ends in an error in state: 653.
+## Ends in an error in state: 668.
 ##
 ## separated_nonempty_list(PIPE,switch_case) -> switch_case PIPE . separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4362,7 +4576,7 @@ flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER IDENT PIPE TILDE
 
 flambda_unit: LPAREN KWD_HCF KWD_WITH
 ##
-## Ends in an error in state: 657.
+## Ends in an error in state: 672.
 ##
 ## atomic_expr -> LPAREN expr . RPAREN [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
@@ -4373,7 +4587,7 @@ flambda_unit: LPAREN KWD_HCF KWD_WITH
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 595, spurious reduction of production expr -> inner_expr
+## In state 610, spurious reduction of production expr -> inner_expr
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>

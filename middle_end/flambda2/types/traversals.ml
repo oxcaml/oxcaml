@@ -926,7 +926,7 @@ struct
                     not
                       (Compilation_unit.equal
                          (Variable.compilation_unit variable)
-                         (Compilation_unit.get_current_exn ()))
+                         (Current_unit.get_cu_exn ()))
                   then variable
                   else
                     let canonical_var, acc =
@@ -955,7 +955,7 @@ struct
               not
                 (Compilation_unit.equal
                    (Name.compilation_unit name)
-                   (Compilation_unit.get_current_exn ()))
+                   (Current_unit.get_cu_exn ()))
             then canonical, acc
             else
               let canonical_name, acc =

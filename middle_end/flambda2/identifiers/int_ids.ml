@@ -489,7 +489,7 @@ module Variable = struct
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Compilation_unit.get_current_exn ();
+      { compilation_unit = Current_unit.get_cu_exn ();
         name;
         name_stamp;
         kind;
@@ -507,7 +507,7 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Compilation_unit.get_current_exn ())
+      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -876,12 +876,12 @@ module Code_id = struct
     Table.add !grand_table_of_code_ids data
 
   let rename t =
-    create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
+    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
 
-  let is_imported t = not (Compilation_unit.is_current (get_compilation_unit t))
+  let is_imported t = not (Current_unit.is_current (get_compilation_unit t))
 
   module T0 = struct
     let compare = Id.compare

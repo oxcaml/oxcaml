@@ -409,16 +409,21 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
   in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
   let startup_obj = Filename.temp_file "camlstartup" ext_obj in
-  let ml_objfiles =
+  let bundled_cm_obj =
     if not uses_eval
-    then ml_objfiles
+    then None
     else
       match
         Cm_bundle.make_bundled_cm_file unix ~ppf_dump ~quoted_cmi ~quoted_cmx
           ~named_startup_file ~output_name
       with
       | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
-      | bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
+      | bundled_cm_obj -> Some bundled_cm_obj
+  in
+  let ml_objfiles =
+    match bundled_cm_obj with
+    | None -> ml_objfiles
+    | Some bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
   in
   Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
@@ -474,6 +479,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     (fun () -> call_linker ?dissector_args ml_objfiles startup_obj output_name)
     ~always:(fun () ->
       remove_file startup_obj;
+      Option.iter remove_file bundled_cm_obj;
       cleanup_dissector_temp_dir ())
 
 let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns

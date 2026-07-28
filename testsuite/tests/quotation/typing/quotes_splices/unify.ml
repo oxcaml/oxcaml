@@ -56,7 +56,7 @@ module NonInst1 : sig type 'a t type 'a t' end
 module Inst2 : sig type t end
 module NonInst2 : sig type 'a t end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 
 (** [unify]ing a variable under quotes/splices -- flexibility checks **)
@@ -65,7 +65,7 @@ module NonInst2 : sig type 'a t end
 (* Note that [generalize] type schemes have their quantified variables
    normalised to stage 0 (i.e. all of these would become ['a -> 'a]).
    This means in all tests with directly quoted variables we will eventually
-   remove the quotes, as we cannot have top-level splices.
+   remove the quotes, as we cannot have initial-stage splices.
    However, unification should happen before this. *)
 
 (* <['a]> ~ unit *)

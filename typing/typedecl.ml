@@ -152,7 +152,6 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
-  | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats
@@ -555,13 +554,15 @@ let set_private_row env loc p decl =
   in
   set_type_desc rv (Tconstr (p, decl.type_params, ref Mnil))
 
-(* Makes sure a type is representable. When called with a type variable, will
-   lower [any] to a sort variable if [allow_unboxed = true], and to [value]
-   if [allow_unboxed = false]. *)
-let constrain_to_representable ~why env loc kloc typ =
+(* Makes sure a type is representable, returning its sort. *)
+let representable_sort ~why env loc kloc typ =
   match Ctype.type_sort ~why ~fixed:false env typ with
-  | Ok _ -> ()
+  | Ok sort -> sort
   | Error err -> raise (Error (loc,Jkind_sort {env; kloc; typ; err}))
+
+(* Makes sure a type is representable. *)
+let constrain_to_representable ~why env loc kloc typ =
+  ignore (representable_sort ~why env loc kloc typ : Jkind.sort)
 
 let check_no_repr cty =
   match cty.ptyp_desc with
@@ -1372,12 +1373,6 @@ let gets_unboxed_version decl =
   match decl.type_kind with
   | Type_abstract _ | Type_open | Type_record_unboxed_product _
   | Type_variant _ -> false
-  | Type_record (_, Record_variable, _) ->
-    (* As of this writing (2025-11-14), it's not possible to have
-       [Record_variable] as the representation for a record that doesn't get an
-       unboxed version. Please enjoy convincing yourself that this is true
-       (you'll want to consult [update_record_kind]). *)
-    true
   | Type_record (lbls, repr, _) -> record_gets_unboxed_version lbls repr
 
 let derive_unboxed_version env path_in_group_has_unboxed_version decl =
@@ -2051,8 +2046,7 @@ let mixed_block_element env ty jkind =
   let unboxed_element = Element_repr.classify env ty jkind in
   Option.map Element_repr.to_shape_element unboxed_element
 
-(* Atomic fields must have layout value and must not appear in mixed blocks
-   (records that have any non-value field). *)
+(* Atomic fields must have layout value. *)
 let check_atomic_fields reprs lbls =
   let is_value (repr : Element_repr.t option) =
     match repr with
@@ -2063,17 +2057,7 @@ let check_atomic_fields reprs lbls =
     (fun repr (lbl : Types.label_declaration) ->
        if Types.is_atomic lbl.ld_mutable && not (is_value repr) then
          raise (Error (lbl.ld_loc, Non_value_atomic_field)))
-    reprs lbls;
-  let has_non_value = List.exists (fun r -> not (is_value r)) reprs in
-  if has_non_value then
-    match
-      List.find_opt
-        (fun (lbl : Types.label_declaration) -> Types.is_atomic lbl.ld_mutable)
-        lbls
-    with
-    | Some (lbl : Types.label_declaration) ->
-      raise (Error (lbl.ld_loc, Atomic_field_in_mixed_block))
-    | None -> ()
+    reprs lbls
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
@@ -2136,9 +2120,7 @@ let compute_record_repr
     ~represent_as_float_array
     ~flatten_floats
   =
-  (* Reject atomic fields with a non-value layout or in mixed blocks. After
-     this, atomic_fields:true should imply Record_boxed (value-only or
-     atomic-float) *)
+  (* Reject atomic fields with a non-value layout. *)
   check_atomic_fields (List.map fst reprs) (List.map fst lbls);
   let mixed_record () =
     let shape =
@@ -2204,12 +2186,12 @@ let compute_record_repr
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
   *)
-  | ~values:true, ~voids:true, ~atomic_fields:false, ..
-  | ~floats:true, ~voids:true, ~atomic_fields:false, ..
-  | ~floats:true, ~float64s:true, ~atomic_fields:false, ..
-  | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
-  | ~values:true, ~float64s:true, ~atomic_fields:false, ..
-  | ~non_float64_unboxed_fields:true, ~atomic_fields:false, .. ->
+  | ~values:true, ~voids:true, ..
+  | ~floats:true, ~voids:true, ..
+  | ~floats:true, ~float64s:true, ..
+  | ~float64s:true, ~voids:true, ..
+  | ~values:true, ~float64s:true, ..
+  | ~non_float64_unboxed_fields:true, .. ->
     mixed_record ()
   (* value-only records are stored as boxed records, including records whose
      declared types have fields of kind [any] *)
@@ -2230,12 +2212,6 @@ let compute_record_repr
     if warn && floats && not values
     then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
     Ok Record_boxed
-  (* Any remaining atomic-bearing shape should have been rejected by
-     [check_atomic_fields] above. *)
-  | ~atomic_fields:true, .. ->
-    Misc.fatal_error
-      "Typedecl.compute_record_repr: atomic field should have been \
-       rejected by check_atomic_fields"
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:_, ~atomic_fields:_, ~first_any:None, ..
@@ -2427,12 +2403,12 @@ let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
       "Typedecl.update_record_kind: unexpected variant representation"
 
 (* Given a record with a variable representation, but updated labels, compute
-   the updated sorts and representation *)
+   the updated representation *)
 let update_record_kind (type rep) env loc (form : rep record_form)
       ~(old_repres : rep) lbls ~warn :
-    _ * (rep, _) Result.t =
+    (rep, _) Result.t =
   let types = List.map snd lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let _sorts, jkinds = update_label_sorts env loc types ~form in
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     match form, old_repres with
@@ -2467,7 +2443,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
         Misc.fatal_error
           "Typedecl.update_record_kind: representation already determined"
   in
-  sorts, rep
+  rep
 
 let update_record_representation
       (type rep) ~why ~old_repres
@@ -2477,11 +2453,15 @@ let update_record_representation
     | Legacy -> Record { unboxed = false }
     | Unboxed_product -> Record_unboxed_product
   in
-  List.iter
-    (fun (_lbl, ld_type) ->
-       constrain_to_representable ~why env loc kloc ld_type)
-    lbls_and_types;
-  let sorts, rep =
+  (* We want to allow exactly one side effect here: force the type to be
+     representable, returning its sort from this function. Thus we get the
+     sort here rather than inside the snapshot/backtrack region below. *)
+  let sorts =
+    List.map
+      (fun (_lbl, ld_type) -> representable_sort ~why env loc kloc ld_type)
+      lbls_and_types
+  in
+  let rep =
     let warn =
       (* Only warn during initial typechecking rather than when updating at
          use sites, so that we only warn once and honour suppressed warnings *)
@@ -2499,13 +2479,7 @@ let update_record_representation
     Btype.backtrack snap;
     ans
   in
-  match rep with
-  | Ok rep ->
-    begin match Misc.Stdlib.List.some_if_all_elements_are_some sorts with
-    | Some sorts -> Ok (sorts, rep)
-    | None -> Misc.fatal_error "missing sort for representable field"
-    end
-  | Error _ as e -> e
+  Result.map (fun rep -> sorts, rep) rep
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
@@ -2554,8 +2528,8 @@ let rec update_decl_jkind env dpath decl =
             cstrs
         in
         begin match
-          Jkind.apply_modality_l modality jkind
-          |> Jkind.apply_or_null_l env
+          Jkind.for_or_null_variant env ~payload_type:ty ~modality
+            ~payload_jkind:jkind
         with
         | Ok type_jkind ->
           let type_jkind =
@@ -5949,9 +5923,6 @@ let report_error ~loc = function
         (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
         ~sub:[Location.msg "@[<hv>@[@{<hint>Hint@}: all argument types must \
                             mode-cross for rebinding to succeed."]
-  | Atomic_field_in_mixed_block ->
-    Location.errorf ~loc
-      "Atomic record fields are not permitted in mixed blocks."
   | Non_value_atomic_field ->
     Location.errorf ~loc
       "Atomic record fields must have layout value."

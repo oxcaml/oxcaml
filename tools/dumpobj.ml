@@ -394,8 +394,12 @@ let op_shapes = [
   (* CR ocaml 5 effects:
   BACKPORT
   opPERFORM, Nothing;
-  opRESUME, Nothing;
-  opRESUMETERM, Uint;
+  opCONTINUE, Nothing;
+  opCONTINUETERM, Uint;
+  opDISCONTINUE, Nothing;
+  opDISCONTINUETERM, Uint;
+  opDISCONTINUE_WITH_BACKTRACE, Nothing;
+  opDISCONTINUE_WITH_BACKTRACETERM, Uint;
   opREPERFORMTERM, Uint;
   *)
   opSTOP, Nothing;

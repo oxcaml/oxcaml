@@ -498,7 +498,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
   let block_sym =
     let var = Variable.create "switch_block" K.value in
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string (Variable.unique_name var))
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
