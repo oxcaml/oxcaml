@@ -1512,14 +1512,14 @@ module Ast = struct
     | Int32 n -> pp fmt "%ldl" n
     | Int64 n -> pp fmt "%LdL" n
     | Nativeint n -> pp fmt "%ndn" n
-    | UntaggedInt n -> pp fmt "#%dm" n
-    | UntaggedInt8 n -> pp fmt "#%ds" n
-    | UntaggedInt16 n -> pp fmt "#%dS" n
-    | UnboxedFloat s -> pp fmt "#%s" s
-    | UnboxedFloat32 s -> pp fmt "#%ss" s
-    | UnboxedInt32 n -> pp fmt "#%ldl" n
-    | UnboxedInt64 n -> pp fmt "#%LdL" n
-    | UnboxedNativeint n -> pp fmt "#%ndn" n
+    | UntaggedInt n -> pp fmt "%a" hash_prefix (Format.sprintf "%dm" n)
+    | UntaggedInt8 n -> pp fmt "%a" hash_prefix (Format.sprintf "%ds" n)
+    | UntaggedInt16 n -> pp fmt "%a" hash_prefix (Format.sprintf "%dS" n)
+    | UnboxedFloat s -> pp fmt "%a" hash_prefix (Format.sprintf "%s" s)
+    | UnboxedFloat32 s -> pp fmt "%a" hash_prefix (Format.sprintf "%ss" s)
+    | UnboxedInt32 n -> pp fmt "%a" hash_prefix (Format.sprintf "%ldl" n)
+    | UnboxedInt64 n -> pp fmt "%a" hash_prefix (Format.sprintf "%LdL" n)
+    | UnboxedNativeint n -> pp fmt "%a" hash_prefix (Format.sprintf "%ndn" n)
 
   and print_bool fmt = function
     | false -> pp fmt "false"
@@ -1553,6 +1553,11 @@ module Ast = struct
     | UnboxedInt64 n -> n < 0L
     | UnboxedNativeint n -> n < 0n
     | Char _ | UntaggedChar _ | String _ -> false
+
+  and hash_prefix fmt s =
+    if s.[0] = '-'
+    then pp fmt "-#%s" (String.sub s 1 (String.length s - 1))
+    else pp fmt "#%s" s
 
   and print_pat_with_parens env fmt pat =
     match pat with
