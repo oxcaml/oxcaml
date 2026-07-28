@@ -150,6 +150,26 @@ let oo_add_class id =
   classes := id :: !classes;
   (!top_env, !cache_required)
 
+let layout_of_shared_const id =
+  Hashtbl.fold
+    (fun c const_id acc ->
+       if Ident.same id const_id
+       then Some (Lambda.structured_constant_layout c)
+       else acc)
+    consts None
+
+let layout_of_ident id =
+  if List.exists (Ident.same id) !classes
+  then Some Lambda.layout_class
+  else
+    match layout_of_shared_const id with
+    | Some _ as layout -> layout
+    | None ->
+      match !method_cache with
+      | Lvar cache_id when Ident.same id cache_id ->
+        Some (Lambda.layout_array Pgenarray)
+      | _ -> None
+
 let oo_wrap_gen env req f x =
   if !wrapping then
     if !cache_required then f x else
