@@ -5,42 +5,6 @@
  expect.opt;
 *)
 
-(* Demo outline:
-  1. [zero_alloc] backend check (background) (3 testing programs)
-    - A program, that does not allocate, pass zero_alloc check
-    - However, if modify the program to allocate, (e.g., add a tuple),
-      it does not pass the check
-    - Add a optmimization that makes the tuple to be boxed
-  2. [zero_alloc] is too restrictive when handling higher-order
-    function arguments
-    - Define a function List.iter (should be the same as List.iter),
-      that takes a function as argument and call the function in
-      its body. Show that the [zero_alloc] check failes on this function.
-  3. Introduce our Allocation mode axis (add some explanation in the comment)
-    (Purpose of this part: intuitively demonstrate how Allocation mode axis
-    can solve limtiation of [zero_alloc])
-    - Copy the same function, show that it can be anntoated as [noalloc_strict]
-    - Call the function with a function argument that is [noalloc_strict]
-    - Call the function with a function argument that is [alloc]
-  4. Describe property guaranteed by Allocation mode axis more comprehensively
-    In comment, say "a noalloc function does not allocate when it is called with
-    noalloc arguments (including both full and partial application) or simply
-    referenced without any arguments".
-    - Function capture a alloc function cannot be noalloc
-    - Special case: primitives (NOTE: t)
-    - Noalloc function forces all inner allocation to be local (show an example
-      that tries to return a tuple, but failed; and then another example that
-      allows to return the tuple with [exclave_])
-    - Multi-argument function must makes all inner closures to be local (closure
-      allocation is a special kind of allocation) (show an example that cannot
-      return partially applied result)
-*)
-
-(* Caveat: each phrase is its own compilation unit, so a call to a function
-   defined in an *earlier* phrase looks like an indirect call to the checker.
-   To exercise interprocedural behaviour, define caller and callee together
-   inside one phrase (see [Assume] below). *)
-
 (* To prevent some default constraints on top-level functions, every test
   is wrapped in module Test. *)
 
@@ -146,24 +110,8 @@ Error: called function may allocate (indirect call)
 (* Part 3: the Allocation mode axis                                     *)
 (* ==================================================================== *)
 
-(* The allocation axis moves the question into the type system, where it can
-   be conditional on the argument.  A value's mode on this axis records
-   whether calling it may allocate: [noalloc_strict < alloc], with
-   [noalloc_strict] the stronger (more permissive to use) end.
-
-   A function whose parameter is at [noalloc_strict] may call that parameter
-   from inside its own [noalloc_strict] body, and the obligation is
-   discharged at each call site instead of at the definition -- exactly the
-   conditional statement the backend check could not make.
-
-   [iter] itself cannot be used here: a [noalloc_strict] function may not
-   refer to itself recursively yet, because the recursive closure is [alloc]
-   (see the CR at the top).  So the demonstration uses the same shape
-   without the recursion. *)
-
-
-(* To prevent top-level functions forced to be alloc, I will wrap every test in
-  module Test.*)
+(* Comonadic axis: noalloc_strict < noalloc < alloc
+   For now we do not distinguish [noalloc_strict] and [noalloc]. *)
 
 module Test = struct
   let rec (iter @ noalloc_strict) f l =
@@ -200,7 +148,6 @@ module Test :
 |}]
 
 (* Call iter with alloc arguments *)
-
 module Test = struct
   let rec (iter @ noalloc_strict) f l =
     match l with
