@@ -86,6 +86,7 @@
 
 module K = Flambda_kind
 module TG = Type_grammar
+module MTC = More_type_creators
 module TE = Typing_env
 module ME = Meet_env
 module TEE = Typing_env_extension
@@ -1717,7 +1718,31 @@ let define_or_eliminate_variables_and_add_equations ~meet_expanded_head env
           kind Name_mode.in_types)
       env.bindings source_env
   in
+  let names_in_inverse_relations =
+    Variable.Map.fold
+      (fun var relations names_in_inverse_relations ->
+        TG.Relation.Map.fold
+          (fun _ names names_in_inverse_relations ->
+            Name.Set.union names names_in_inverse_relations)
+          relations
+          (Name.Set.add (Name.var var) names_in_inverse_relations))
+      inverse_relations Name.Set.empty
+  in
   let equations = (env.types_in_target_env :> TG.t Name.Map.t) in
+  let free_vars_in_equations =
+    Name.Map.fold
+      (fun _ ty free_names_in_equations ->
+        Name_occurrences.with_only_variables (TG.free_names ty)
+        |> Name_occurrences.union free_names_in_equations)
+      equations Name_occurrences.empty
+  in
+  let unique_occurence_is_in_equations var =
+    (not (Name.Set.mem (Name.var var) names_in_inverse_relations))
+    &&
+    match Name_occurrences.count_variable free_vars_in_equations var with
+    | Zero | One -> true
+    | More_than_one -> false
+  in
   let definitions = env.definitions_in_joined_envs in
   let target_env, to_expand, equations, inverse_relations, definitions =
     Bindings_in_target_env.fold_existential_variables
@@ -1730,17 +1755,38 @@ let define_or_eliminate_variables_and_add_equations ~meet_expanded_head env
         let var = (var :> Variable.t) in
         match Variable_in_target_env.Set.choose_opt aliases_of_var with
         | None ->
-          (* This includes existential variables that have no other aliases, and
-             imported variables. *)
-          let target_env =
-            ME.add_variable_definition target_env var kind Name_mode.in_types
-          in
-          target_env, to_expand, equations, inverse_relations, definitions
+          (* Project out variables with a single occurrence. This is important
+             to cut out the size of the resulting environments.
+
+             If the variable appears anywhere in the [inverse_relations] map, we
+             don't remove it: it means that it is the result of a primitive
+             (%is_int, %is_null, %get_tag, ...) that we are likely to later do a
+             switch on, and we need the variable to exist in the analysis for
+             the match-in-match transform. *)
+          if unique_occurence_is_in_equations var
+          then
+            let ty, equations =
+              match Name.Map.find (Name.var var) equations with
+              | exception Not_found -> MTC.unknown kind, equations
+              | ty -> ty, Name.Map.remove (Name.var var) equations
+            in
+            let to_expand = Variable.Map.add var ty to_expand in
+            let definitions =
+              Variable_in_target_env.Map.remove
+                (Variable_in_target_env.create var)
+                definitions
+            in
+            target_env, to_expand, equations, inverse_relations, definitions
+          else
+            let target_env =
+              ME.add_variable_definition target_env var kind Name_mode.in_types
+            in
+            target_env, to_expand, equations, inverse_relations, definitions
         | Some canon_var ->
           let demoted_aliases =
             Variable_in_target_env.Set.remove canon_var aliases_of_var
           in
-          let canon_var = (var :> Variable.t) in
+          let canon_var = (canon_var :> Variable.t) in
           let definitions =
             move_definition definitions ~from:var ~to_:canon_var
           in
