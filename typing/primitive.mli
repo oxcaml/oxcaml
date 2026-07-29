@@ -46,6 +46,8 @@ type native_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
+  | Unextended_bits8
+  | Unextended_bits16
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
@@ -156,6 +158,8 @@ type wrong_repr_error =
   | Expected_value_prim
   | Product_return
   | Unpacked_product_return
+  | Unextended_return
+  | Small_int_arg
   | Repr_mismatch
 
 type error =

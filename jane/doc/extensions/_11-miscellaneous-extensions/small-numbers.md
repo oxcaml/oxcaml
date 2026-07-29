@@ -139,21 +139,48 @@ operations, and results are sign-extended after every operation. The peephole
 optimizer can remove some unnecessary sign-extensions, but there is still a
 noticeable performance decrease compared to C.
 
-### C ABI
+### C ABI {#small-int-c-abi}
 
-Both tagged and untagged `int8`s and `int16`s may be passed to C stubs.
+Both tagged and untagged `int8`s and `int16`s may be passed to C stubs, though
+parameters of layout `bits8` and `bits16` (such as `int8#`) are banned by
+default. Small int parameters should be sign/zero-extended to 32 bits
+before being passed to C stubs.
 
 ```ocaml
+external sign_extend_int16 : int16# -> int32# = "%int32#_of_int16#"
+external sign_extend_int8 : int8# -> int32# = "%int32#_of_int8#"
+
 external int16_stub : (int16[@unboxed]) -> (int16[@unboxed]) =
   "tagged_int16_stub" "untagged_int16_stub"
 
-external int16_hash_stub : int16# -> int16# =
+external int16_hash_stub : int32# -> int16# =
   "tagged_int16_stub" "untagged_int16_stub"
+
+let int16_hash_stub (x : int16#) : int16# =
+  int16_hash_stub (sign_extend_int16 x)
 
 external int8_stub : (int8[@unboxed]) -> (int8[@unboxed]) =
   "tagged_int8_stub" "untagged_int8_stub"
 
-external int8_hash_stub : int8# -> int8# =
+external int8_hash_stub : int32# -> int8# =
+  "tagged_int8_stub" "untagged_int8_stub"
+
+let int8_hash_stub (x : int8#) : int8# =
+  int8_hash_stub (sign_extend_int8 x)
+```
+
+Parameters of layout `bits8` and `bits16` are banned since Clang expects such
+parameters to be sign/zero-extended to 32 bits. OxCaml's calling convention will
+soon match that of System V and GCC, which treats all the upper bits as garbage.
+If you are absolutely sure your C function does not use the upper bits, you may
+use the `[@unsafe_unextended]` attribute to pass `bits8` and `bits16`
+parameters.
+
+```ocaml
+external int16_hash_stub : (int16#[@unsafe_unextended]) -> int16# =
+  "tagged_int16_stub" "untagged_int16_stub"
+
+external int8_hash_stub : (int8#[@unsafe_unextended]) -> int8# =
   "tagged_int8_stub" "untagged_int8_stub"
 ```
 
@@ -208,7 +235,15 @@ like `int8# array`s.
 
 Untagged chars may be passed to C stubs:
 ```ocaml
-external char_hash_stub : char# -> char# =
+external char_hash_stub : (char[@untagged]) -> char# =
+  "tagged_char_stub" "untagged_char_stub"
+```
+
+For reasons discussed in the [Small Int C ABI](#small-int-c-abi) section,
+`char#` parameters are not recommended, but are possible with
+`[@unsafe_unextended]`:
+```ocaml
+external char_hash_stub : (char#[@unsafe_unextended]) -> char# =
   "tagged_char_stub" "untagged_char_stub"
 ```
 

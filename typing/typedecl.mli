@@ -128,7 +128,7 @@ val update_record_representation:
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
