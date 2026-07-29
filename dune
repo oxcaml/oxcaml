@@ -667,6 +667,7 @@
   cfg_liveness
   cfg_validation_facts
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse

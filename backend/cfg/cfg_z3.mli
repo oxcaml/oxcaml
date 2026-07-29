@@ -6,4 +6,8 @@
 
 val run_z3 : string -> string
 
+(** Runs a Z3 validation reproducer and reports whether it independently
+    reproduces the internal validator failure. *)
+val run_validation_fallback : string -> string
+
 val fmt_fact : Format.formatter -> string -> string list -> unit
