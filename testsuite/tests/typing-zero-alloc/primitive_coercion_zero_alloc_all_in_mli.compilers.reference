@@ -1,7 +1,7 @@
 File "primitive_coercion_zero_alloc_all_in_mli.mli", line 5, characters 0-35:
-Error: Annotation check for zero_alloc failed on function Primitive_coercion_zero_alloc_all_in_mli.(partial) (camlPrimitive_coercion_zero_alloc_all_in_mli__fn[primitive_coercion_zero_alloc_all_in_mli.ml:10,0--55]_0_0_code).
+Error: Annotation check for zero_alloc failed on function Primitive_coercion_zero_alloc_all_in_mli.(partial) (camlPrimitive_coercion_zero_alloc_all_in_mli__fn_0_0).
 
-File "primitive_coercion_zero_alloc_all_in_mli.ml", line 10, characters 0-55:
-10 | external add32 : int32 -> int32 -> int32 = "%int32_add" (* Should error *)
+File "primitive_coercion_zero_alloc_all_in_mli.ml", line 11, characters 0-55:
+11 | external add32 : int32 -> int32 -> int32 = "%int32_add" (* Should error *)
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: allocation of 24 bytes for boxed_int32

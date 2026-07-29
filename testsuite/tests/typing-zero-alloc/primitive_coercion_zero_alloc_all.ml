@@ -1,5 +1,6 @@
 (* TEST
  setup-ocamlopt.opt-build-env;
+ flags = "-flambda2-expert-shorten-symbol-names";
  ocamlopt_opt_exit_status = "2";
  ocamlopt.opt;
  check-ocamlopt.opt-output;
