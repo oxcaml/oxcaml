@@ -885,7 +885,15 @@ struct
     | Identity ->
       let expanded = Expand_head.expand_head env ty in
       let expanded, acc = rewrite_expanded_head env acc abs expanded in
-      ET.to_type expanded, acc
+      (* Make sure to prefer alias type over singleton types, as this allows
+         more reification in the downstream compilation units. *)
+      let ty = ET.to_type expanded in
+      let ty =
+        match TG.must_be_singleton ty with
+        | None -> ty
+        | Some const -> TG.alias_type_of (TG.kind ty) (Simple.const const)
+      in
+      ty, acc
     | Rewrite (pattern, expr) -> (
       try
         let sigma, acc = match_pattern pattern env ty acc in
