@@ -200,7 +200,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
+  | Tpat_constraint of core_type option * Mode.Alloc.Const.t modes
         (** P : T          { pat_desc = P
                            ; pat_extra = (Tpat_constraint T, _, _) :: ... }
          *)

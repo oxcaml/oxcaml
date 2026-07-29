@@ -337,7 +337,7 @@ let pat_extra sub = function
   | Tpat_open (path,lid,env) ->
       Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
   | Tpat_constraint (ct, ma) ->
-    Tpat_constraint (sub.typ sub ct, sub.modes sub ma)
+    Tpat_constraint (Option.map (sub.typ sub) ct, sub.modes sub ma)
   | Tpat_inspected_type (Label_disambiguation _) as d -> d
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) as d -> d
   | Tpat_inspected_type (Module_pack _) as d -> d

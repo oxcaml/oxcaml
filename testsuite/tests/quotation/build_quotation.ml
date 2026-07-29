@@ -1411,7 +1411,8 @@ Error: Annotating types with kinds
 (* Pattern constraints *)
 <[ let (x @ unique portable) = "abc" in x ]>
 [%%expect {|
-- : <[string]> expr = <[let x = ("abc" : _ @ unique portable) in x]>
+- : <[string]> expr =
+<[let x : _ @ unique portable = ("abc" : _ @ unique portable) in x]>
 |}];;
 
 (* Expression constraints *)
@@ -1426,7 +1427,7 @@ Error: Annotating types with kinds
 - : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
 |}];;
 
-(* Function definitions *)
+(* Function definitions -- without type annotation *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
@@ -1437,7 +1438,7 @@ Error: Annotating types with kinds
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
 <[
-  let f =
+  let f : _ @ unique portable =
   (fun (x : _ @ local unique) -> (x : _ @ local unique) :
     _ @ unique portable)
   in f
@@ -1452,24 +1453,74 @@ Error: Annotating types with kinds
 
 <[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
 [%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[let rec f = (fun (x : _ @ local unique) -> x : _ @ unique portable) in f]>
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[
-  let rec f =
-  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
-    _ @ unique portable)
-  in f
-]>
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
+<[ let rec (f @ unique portable)
+              (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ let local_ f x = x in f "abc" ]>
 [%%expect {|
-- : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
+- : <[string]> expr =
+<[let f : _ @ local = (fun x -> (x : _ @ local) : _ @ local) in f "abc"]>
+|}];;
+
+(* Function definitions -- with type annotations *)
+<[ let f (x : _ @ local unique) = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let f = (fun (x : _ @ local unique) -> x) in f]>
+|}];;
+
+<[ let f (x : string @ local unique) = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[let f = (fun (x : string @ local unique) -> x) in f]>
+|}];;
+
+<[ let f (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local unique]> expr =
+<[
+  let f =
+  (fun (x : string @ local unique) -> ((x : string) : _ @ local unique)) in
+  f
+]>
+|}];;
+
+<[ fun (x : _ @ local unique) -> x ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[fun (x : _ @ local unique) -> x]>
+|}];;
+
+<[ fun (x : string @ local unique) -> x ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[fun (x : string @ local unique) -> x]>
+|}];;
+
+<[ fun x @ local unique -> x ]>
+[%%expect {|
+- : <[$('a) @ unique -> $('a) @ local unique]> expr =
+<[fun x -> (x : _ @ local unique)]>
 |}];;
 
 (* Function types *)

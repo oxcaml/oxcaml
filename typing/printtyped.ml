@@ -567,7 +567,7 @@ and pattern_extra i ppf (extra_pat, loc, attrs) =
   | Tpat_constraint (cty, m) ->
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
-     core_type i ppf cty;
+     option i core_type ppf cty;
      alloc_modes i ppf m;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;

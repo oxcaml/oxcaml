@@ -1807,10 +1807,10 @@ let rec build_as_type_and_mode (env : Env.t) p ~mode =
 
 and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
   | [] -> build_as_type_aux env p ~mode
-  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack |
+  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack | Tpat_constraint (None, _) |
       Tpat_inspected_type _), _, _) :: rest ->
       build_as_type_and_mode_extra env p rest ~mode
-  | (Tpat_constraint ({ctyp_type = ty; _}, _), _, _) :: rest ->
+  | (Tpat_constraint (Some {ctyp_type = ty; _}, _), _, _) :: rest ->
       (* If the type constraint is ground, then this is the best type
          we can return, so just return an instance (cf. #12313) *)
       if closed_type_expr ty then instance ty, mode else
@@ -3968,25 +3968,26 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
-      begin match sty with
-      | Some sty ->
-        let type_modes = Typemode.transl_alloc_mode ms in
-        let cty, ty, expected_ty' =
-          solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
-            expected_ty
-        in
-        let p =
-          type_pat ~alloc_mode tps category sp_constrained expected_ty' sort
-        in
-        let extra =
-          Tpat_constraint (cty, type_modes),
-          loc,
-          sp_constrained.ppat_attributes
-        in
-        { p with pat_type = ty; pat_extra = extra::p.pat_extra }
-      | None ->
+      let type_modes = Typemode.transl_alloc_mode ms in
+      let cty, ty, expected_ty =
+        match sty with
+        | Some sty ->
+          let cty, ty, expected_ty' =
+            solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
+              expected_ty
+          in
+          Some cty, Some ty, expected_ty'
+        | None ->
+          None, None, expected_ty
+      in
+      let p =
         type_pat ~alloc_mode tps category sp_constrained expected_ty sort
-      end
+      in
+      let pat_type = match ty with Some ty -> ty | None -> p.pat_type in
+      let extra =
+        Tpat_constraint (cty, type_modes), loc, sp_constrained.ppat_attributes
+      in
+      { p with pat_type; pat_extra = extra :: p.pat_extra }
   | Ppat_type lid ->
       Env.check_no_open_quotations sp.ppat_loc !!penv
         (Env.Tconst_pat_qt lid.txt);
@@ -5904,7 +5905,7 @@ let check_partial_application ~statement exp =
 let pattern_needs_partial_application_check p =
   let rec check : type a. a general_pattern -> bool = fun p ->
     not (List.exists
-          (function (Tpat_constraint (_, _), _, _) -> true | _ -> false)
+          (function (Tpat_constraint (Some _, _), _, _) -> true | _ -> false)
           p.pat_extra) &&
     match p.pat_desc with
     | Tpat_any -> true
@@ -9493,27 +9494,27 @@ and type_function
       in
       match body with
       | Pfunction_body body ->
+          let body_loc = body.pexp_loc in
           let body =
             match ret_type_constraint with
             | None -> type_expect env expected_mode body (mk_expected ty_expected)
             | Some constraint_ ->
-            let body_loc = body.pexp_loc in
-            let body, exp_type, exp_extra =
-              type_constraint_expect (expression_constraint body)
-                env expected_mode body_loc ~loc_arg:body_loc
-                type_mode.mode_modes constraint_ ty_expected
-            in
-            let texp_mode =
-              match type_mode.mode_desc with
-              | [] -> []
-              | _ :: _ ->
-                [ (Texp_mode type_mode, body_loc, []) ]
-            in
-            { body with
-                exp_extra =
-                  texp_mode @ (exp_extra, body_loc, []) :: body.exp_extra;
-                exp_type;
-            }
+              let body, exp_type, exp_extra =
+                type_constraint_expect (expression_constraint body)
+                  env expected_mode body_loc ~loc_arg:body_loc
+                  type_mode.mode_modes constraint_ ty_expected
+              in
+              { body with
+                  exp_extra = (exp_extra, body_loc, []) :: body.exp_extra;
+                  exp_type;
+              }
+          in
+          let body =
+            match type_mode.mode_desc with
+            | [] -> body
+            | _ :: _ ->
+              let extra = Texp_mode type_mode, body_loc, [] in
+              { body with exp_extra = extra :: body.exp_extra }
           in
           body.exp_type, Tfunction_body body, None, None
       | Pfunction_cases (cases, _, attributes) ->

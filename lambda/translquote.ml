@@ -2556,8 +2556,6 @@ let constrain_pat_with_type loc typ pat =
 let maybe_constrain_pat_with_type loc typ exp =
   match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
 
-let any_modes modes = not (List.is_empty modes.mode_desc)
-
 let assert_no_modes modes =
   List.iter
     (fun mode ->
@@ -2579,6 +2577,17 @@ let assert_no_jkinds jkind =
            position."
           Location.print_loc pjka_loc)
     jkind
+
+(* wildcard annotations *)
+let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind)
+
+let newcorevar env loc =
+  { ctyp_desc = Ttyp_var (None, None);
+    ctyp_type = newvar ();
+    ctyp_env = env;
+    ctyp_loc = to_location loc;
+    ctyp_attributes = []
+  }
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
    Used for annotating the results of type inspections in quotes. *)
@@ -2720,6 +2729,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint (ty, ms) ->
+    let ty = Option.value ~default:(newcorevar env loc) ty in
     Pat.constraint_ loc pat_lam
       (quote_core_type ~scopes ty)
       (quote_modes loc ms)
@@ -3150,15 +3160,6 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
   in
   let idents = pat_bound_idents pat in
   let pat_quoted = quote_value_pattern ~scopes pat in
-  let pat_quoted =
-    if any_modes param.fp_mode
-    then
-      Pat.constraint_ loc pat_quoted
-        (Type.var loc None |> Type.wrap)
-        (quote_modes loc param.fp_mode)
-      |> Pat.wrap
-    else pat_quoted
-  in
   let fun_ =
     if is_module pat
     then
@@ -3204,19 +3205,6 @@ and quote_function ~scopes ~transl stage loc fn extras =
       match fn.body with
       | Tfunction_body exp ->
         let exp_quoted = quote_expression ~scopes ~transl stage exp in
-        let exp_quoted =
-          if any_modes fn.ret_mode
-          then
-            Exp.mk loc
-              (quote_modes loc fn.ret_mode
-              |> Type_constraint.constraint_ loc (Type.var loc None |> Type.wrap)
-              |> Type_constraint.wrap
-              |> Exp_desc.constraint_ loc exp_quoted
-              |> Exp_desc.wrap)
-              []
-            |> Exp.wrap
-          else exp_quoted
-        in
         Function.body loc exp_quoted None
       | Tfunction_cases cases ->
         (* This case should be impossible, since there is no syntax for
@@ -3398,16 +3386,6 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
          (type_constraint_of_ambiguity loc env ambiguity)
   | Texp_inspected_type (Polymorphic_parameter poly_param) ->
     (* unused dummy for [core_type.ctyp_type] *)
-    let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-    (* wildcard annotation *)
-    let newcorevar () =
-      { ctyp_desc = Ttyp_var (None, None);
-        ctyp_type = newvar ();
-        ctyp_env = env;
-        ctyp_loc = to_location loc;
-        ctyp_attributes = []
-      }
-    in
     let cty =
       match poly_param with
       | Method (met, ty) ->
@@ -3433,7 +3411,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     (match sch with
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
-                    | None -> newcorevar ()),
+                    | None -> newcorevar env loc),
                     Typemode.transl_alloc_mode [],
                     spine,
                     Typemode.transl_alloc_mode [] );
@@ -3442,7 +3420,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
               ctyp_loc = to_location loc;
               ctyp_attributes = []
             })
-          params (newcorevar ())
+          params (newcorevar env loc)
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
       (Type_constraint.constraint_ loc
@@ -3515,7 +3493,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
                   (* CR-soon metaprogramming jbachurski: Support modes on
                      recursive let bindings after refactoring this mess. *)
                   assert_no_modes ms;
-                  Some ct
+                  ct
                 | [] -> None
                 | _ ->
                   fatal_errorf
