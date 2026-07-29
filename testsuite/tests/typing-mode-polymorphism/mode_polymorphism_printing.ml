@@ -503,8 +503,8 @@ Error: Signature mismatch:
        is not included in
          val illegal : t -> t @ portable
        The type
-         "t @ [< 'm & 'm & 'm & 'm > nonportable stateful dynamic] ->
-         t @ [> 'm | 'm | 'm | 'm | nonportable stateful dynamic]"
+         "t @ [< 'm > nonportable stateful dynamic] ->
+         t @ [> 'm | nonportable stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
 |}]
 

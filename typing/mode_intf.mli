@@ -834,6 +834,12 @@ module type S = sig
         ('a1, 'b, 'l1 * 'r1) morph ->
         ('a0, 'a1) Misc.is_eq
 
+      val compare_morph :
+        'b obj ->
+        ('a0, 'b, 'l0 * 'r0) morph ->
+        ('a1, 'b, 'l1 * 'r1) morph ->
+        int
+
       val left_adjoint :
         'b obj -> ('a, 'b, 'l * allowed) morph -> ('b, 'a, left_only) morph
 
