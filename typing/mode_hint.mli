@@ -87,6 +87,9 @@ type containing =
   | Array of modality
   | Constructor of string * modality
   | Structure of structure_item * modality
+  | First_class_modality of modality
+      (** The [(t @@ m)] type wrapper, which contains its payload in the same
+          way a one-field unboxed record does. *)
 (* Some structure items (such as classes) don't have modalities. We gloss over
      for simplicity. *)
 

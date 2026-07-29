@@ -5,10 +5,16 @@
 
 (* First-class modalities: [(t @@ m)] as a type.
 
-   This file covers what exists without automatic introduction/elimination:
-   syntax, printing, unification (invariant), signature inclusion (which
-   accepts a type crossing at least as much as expected), mode crossing, and
-   the validation inherited from the other [@@] positions. *)
+   This file covers syntax, printing, unification (invariant), signature
+   inclusion (which accepts a type crossing at least as much as expected),
+   mode crossing, and the validation inherited from the other [@@] positions.
+
+   Stage 4 added automatic unpacking, which changed several cases here. The
+   pattern is always the same: a top-level wrapper on an ACTUAL type now
+   unpacks, so a test that wanted to observe the wrapper itself has to keep it
+   out of top-level actual position -- either under a type constructor, or
+   behind the explicit-source form of [:>]. Each such case says so. The
+   unpacking rule itself is tested in [first_class_modality_unpack.ml]. *)
 
 type t
 [%%expect{|
@@ -34,26 +40,32 @@ Warning 220 [redundant-modality]: This modality is redundant.
 type v = int
 |}]
 
+(* The result type is the UNPACKED one: [@@ m] is a boundary annotation, not a
+   sticky property, so inference does not re-assert it. *)
 let f (x : (int @@ portable)) = x
 [%%expect{|
-val f : (int @@ portable) -> (int @@ portable) = <fun>
+val f : (int @@ portable) -> int = <fun>
 |}]
 
 (* Mode crossing: the wrapper crosses according to its modality, so a
    [nonportable] one is usable at [portable]. *)
 let cross (x : (t @@ portable) @ nonportable) = (x : _ @ portable)
 [%%expect{|
-val cross : (t @@ portable) -> (t @@ portable) = <fun>
+val cross : (t @@ portable) -> t = <fun>
 |}]
 
-(* Unification is invariant in the modality: differing bounds do not unify. *)
-let mismatch (x : (t @@ portable)) = (x : (t @@ global))
+(* Unification is invariant in the modality: differing bounds do not unify.
+   Tested under [list], because at top level the wrapper would unpack on both
+   sides and the two [t]s would then unify happily -- which says nothing about
+   invariance. *)
+let mismatch (x : (t @@ portable) list) = (x : (t @@ global) list)
 [%%expect{|
-Line 1, characters 38-39:
-1 | let mismatch (x : (t @@ portable)) = (x : (t @@ global))
-                                          ^
-Error: The value "x" has type "(t @@ portable)"
-       but an expression was expected of type "(t @@ global)"
+Line 1, characters 43-44:
+1 | let mismatch (x : (t @@ portable) list) = (x : (t @@ global) list)
+                                               ^
+Error: The value "x" has type "(t @@ portable) list"
+       but an expression was expected of type "(t @@ global) list"
+       Type "(t @@ portable)" is not compatible with type "(t @@ global)"
 |}]
 
 (* Signature inclusion, unlike unification, accepts an implementation that
@@ -156,17 +168,25 @@ Error: Signature mismatch:
 (* Coercion [:>] may weaken a modality. Unlike unification (invariant) and
    like inclusion, it accepts a source that crosses at least as much as the
    target. [subtype_rec] handles contravariance by swapping its arguments, so
-   the flip in argument position is automatic. *)
-let weaken (x : (t @@ portable global)) = (x :> (t @@ portable))
+   the flip in argument position is automatic.
+
+   These use the EXPLICIT-SOURCE form. With an implicit source the coercion
+   sees the type of an expression, and a top-level wrapper on an expression
+   now unpacks, so [(x :> ...)] would be coercing a bare [t] and would tell us
+   nothing about the modality. The explicit source is an expected-type
+   position, which packs, so the wrapper survives to be coerced. *)
+let weaken (x : (t @@ portable global)) =
+  (x : (t @@ portable global) :> (t @@ portable))
 [%%expect{|
 val weaken : (t @@ global portable) -> (t @@ portable) = <fun>
 |}]
 
-let strengthen (x : (t @@ portable)) = (x :> (t @@ portable global))
+let strengthen (x : (t @@ portable)) =
+  (x : (t @@ portable) :> (t @@ portable global))
 [%%expect{|
-Line 1, characters 39-68:
-1 | let strengthen (x : (t @@ portable)) = (x :> (t @@ portable global))
-                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-49:
+2 |   (x : (t @@ portable) :> (t @@ portable global))
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(t @@ portable)" is not a subtype of "(t @@ global portable)"
 |}]
 
@@ -268,11 +288,12 @@ Error: Type "t -> unit" is not a subtype of "t @ local -> unit"
    [meet (portable, global)], below the target's) but is rejected, because the
    comparison looks only at the outer bounds. Pinned so that a future
    normalisation change is forced to revisit it. *)
-let nested_incomplete (x : ((t @@ portable) @@ global)) = (x :> (t @@ portable))
+let nested_incomplete (x : ((t @@ portable) @@ global)) =
+  (x : ((t @@ portable) @@ global) :> (t @@ portable))
 [%%expect{|
-Line 1, characters 58-80:
-1 | let nested_incomplete (x : ((t @@ portable) @@ global)) = (x :> (t @@ portable))
-                                                              ^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-54:
+2 |   (x : ((t @@ portable) @@ global) :> (t @@ portable))
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "((t @@ portable) @@ global)" is not a subtype of "(t @@ portable)"
 |}]
 
@@ -282,7 +303,8 @@ type abbrev = (t @@ portable)
 type abbrev = (t @@ portable)
 |}]
 
-let via_abbrev (x : (t @@ portable global)) = (x :> abbrev)
+let via_abbrev (x : (t @@ portable global)) =
+  (x : (t @@ portable global) :> abbrev)
 [%%expect{|
 val via_abbrev : (t @@ global portable) -> abbrev = <fun>
 |}]
@@ -303,7 +325,10 @@ let no_launder_global (x : (t @@ portable) @ local) = ((x :> t) : t @ global)
 Line 1, characters 56-57:
 1 | let no_launder_global (x : (t @@ portable) @ local) = ((x :> t) : t @ global)
                                                             ^
-Error: This value is "local" to the parent region but is expected to be "global".
+Error: This value is "local" to the parent region
+         because it is the payload of a first-class modality
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
 |}]
 
 let no_launder_portable (x : (t @@ global) @ nonportable) =
@@ -312,7 +337,10 @@ let no_launder_portable (x : (t @@ global) @ nonportable) =
 Line 2, characters 4-5:
 2 |   ((x :> t) : t @ portable)
         ^
-Error: This value is "nonportable" but is expected to be "portable".
+Error: This value is "nonportable"
+         because it is the payload of a first-class modality
+         which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
 |}]
 
 (* ... whereas matching the axis is accepted, so the sentinels above are
@@ -323,21 +351,25 @@ val launder_ok_global : (t @@ global) @ local -> t = <fun>
 |}]
 
 (* Coercion with an implicit source must be ground -- a pre-existing OCaml
-   restriction, not specific to modalities. A ground source is fine... *)
-let implicit_ground (x : (t list @@ portable)) = (x :> t list)
+   restriction, not specific to modalities. The wrapper is inside a tuple so
+   that the implicit source still has one to forget: at top level it would
+   unpack before [:>] saw it, and the pair below would stop discriminating.
+   A ground source is fine... *)
+let implicit_ground (x : ((t @@ portable) * t)) = (x :> (t * t))
 [%%expect{|
-val implicit_ground : (t list @@ portable) -> t list = <fun>
+val implicit_ground : (t @@ portable) * t -> t * t = <fun>
 |}]
 
 (* ... but a non-ground one needs the explicit-source form. *)
-let implicit_nonground (x : ('a list @@ portable)) = (x :> 'a list)
+let implicit_nonground (x : ((t @@ portable) * 'a)) = (x :> (t * 'a))
 [%%expect{|
-Line 1, characters 54-55:
-1 | let implicit_nonground (x : ('a list @@ portable)) = (x :> 'a list)
-                                                          ^
-Error: This expression cannot be coerced to type ""'a list""; it has type
-         "('a list @@ portable)"
-       but is here used with type "'a list"
+Line 1, characters 55-56:
+1 | let implicit_nonground (x : ((t @@ portable) * 'a)) = (x :> (t * 'a))
+                                                           ^
+Error: This expression cannot be coerced to type ""t * 'a""; it has type
+         "(t @@ portable) * 'a"
+       but is here used with type "t * 'a"
+       Type "(t @@ portable)" is not compatible with type "t"
 |}]
 
 let explicit_source (x : ('a list @@ portable)) =
@@ -359,11 +391,12 @@ let priv_forget (x : priv) = (x :> t)
 val priv_forget : priv -> t = <fun>
 |}]
 
-let priv_target (x : (t @@ portable global)) = (x :> priv)
+let priv_target (x : (t @@ portable global)) =
+  (x : (t @@ portable global) :> priv)
 [%%expect{|
-Line 1, characters 47-58:
-1 | let priv_target (x : (t @@ portable global)) = (x :> priv)
-                                                   ^^^^^^^^^^^
+Line 2, characters 2-38:
+2 |   (x : (t @@ portable global) :> priv)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(t @@ global portable)" is not a subtype of "priv"
 |}]
 
@@ -418,10 +451,10 @@ type r = { old_field : t @@ portable; new_field : (t @@ portable); }
 |}]
 
 (* Toplevel value printing goes through [genprintval], which is one of the
-   sites Stage 3 changed from a fatal error to a look-through. [Obj.magic] is
-   the only way to obtain a value of this type before Stage 4 adds automatic
-   introduction. *)
-let x : (int @@ portable) = Obj.magic 5
+   sites Stage 3 changed from a fatal error to a look-through. This used
+   [Obj.magic] before Stage 4, which was then the only way to obtain a value
+   of this type; automatic introduction now supplies one directly. *)
+let x : (int @@ portable) = 5
 [%%expect{|
 val x : (int @@ portable) @@ stateless = 5
 |}]
@@ -433,13 +466,12 @@ type nested = ((int @@ portable) @@ contended)
 type nested = ((int @@ portable) @@ contended)
 |}]
 
-(* Without automatic introduction, a bare value does not acquire a modality;
-   this is what Stage 4 will change. *)
-let no_auto_intro : (int @@ portable) = 1
+(* Automatic introduction (Stage 4): a bare value acquires the modality, being
+   checked at the modality applied to the expected mode. This case was written
+   as an error, under the name [no_auto_intro], when unpacking did not exist.
+   Both directions of the rule are exercised in
+   [first_class_modality_unpack.ml]. *)
+let auto_intro : (int @@ portable) = 1
 [%%expect{|
-Line 1, characters 40-41:
-1 | let no_auto_intro : (int @@ portable) = 1
-                                            ^
-Error: The constant "1" has type "int" but an expression was expected of type
-         "(int @@ portable)"
+val auto_intro : (int @@ portable) @@ stateless = 1
 |}]

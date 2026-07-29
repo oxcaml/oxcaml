@@ -89,3 +89,7 @@ val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
 (** The mod-bounds of [t @@ m], given [m]. Externality is set to [max], i.e. no
     externality claim; see [modality_of_mod_bounds] for the inverse. *)
 val mod_bounds_of_modality : Mode.Modality.Const.t -> Jkind.Mod_bounds.t
+
+(** The inverse of [mod_bounds_of_modality]. Only meaningful on the mod-bounds
+    of a surface [Tmod]; the externality of the argument is ignored. *)
+val modality_of_mod_bounds : Jkind.Mod_bounds.t -> Mode.Modality.Const.t
