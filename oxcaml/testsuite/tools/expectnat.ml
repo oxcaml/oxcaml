@@ -41,7 +41,7 @@ let () =
     Some Flambda2.register_compilation_unit_callback;
   Expectcommon.run
     ~read_anonymous_arg
-    ~extra_args:Options.list
+    ~extra_args:(Arch.command_line_options @ Options.list)
     ~extra_init:(fun () ->
       Clflags.native_code := true;
       Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler)

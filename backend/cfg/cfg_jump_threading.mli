@@ -5,12 +5,16 @@
     allocation.
 
     Two related transformations driven by reaching definitions on virtual
-    registers:
+    registers. In both cases the definition of a tested register is searched for
+    up the dominator tree, looking through moves:
 
-    - {b Intra-block fold}: when a block ends in [Truth_test r] and [r] was set
-      by an [Icomp]/[Icompf] earlier in the block (without its inputs being
-      overwritten in between), rewrite the [Truth_test] as the corresponding
-      [Int_test]/[Float_test] so the comparison flows directly into the branch.
+    - {b Comparison fold}: when a block ends in [Truth_test r] and [r] was set
+      by an [Icomp]/[Icompf] in the block or in a dominating block (without its
+      inputs being overwritten in between), rewrite the [Truth_test] as the
+      corresponding [Int_test]/[Float_test] so the comparison flows directly
+      into the branch. This extends the live ranges of the comparison inputs
+      from the defining instruction to the branch, possibly across intervening
+      blocks.
     - {b Jump threading through an empty merge block}: when a block ends in
       [Always B] with [B] an empty merge block ending in a test, evaluate [B]'s
       test using definitions reaching from this block; if the test resolves to a

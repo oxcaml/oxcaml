@@ -177,3 +177,184 @@ complex_branching_on_two_comparisons:
   movq  (%rbx), %rdi
   jmp   *%rdi
 |}]
+
+let fold_float_compare_into_branch (z : int) (x : float) (y : float) f g =
+  let b = (z = 0) && x < y in
+  if b then f () else g ()
+[%%expect_asm X86_64{|
+fold_float_compare_into_branch:
+  movq  %rbx, %rcx
+  movq  %rdx, %rbx
+  cmpq  $1, %rax
+  jne   .L0
+  vmovsd (%rdi), %xmm0
+  vmovsd (%rcx), %xmm1
+  vcomisd %xmm1, %xmm0
+  jbe   .L0
+  movl  $1, %eax
+  movq  (%rsi), %rdi
+  movq  %rsi, %rbx
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+(* Jump threading resolves the [Switch] to a direct jump for a predecessor
+   where the switched-on value is a constant. *)
+let switch_on_merged_constant x (t : unit -> int) f g =
+  let i = if x = 3 then 4 else x in
+  match i with
+  | 0 | 5 | 3 -> f ()
+  | _ -> g ()
+[%%expect_asm X86_64{|
+switch_on_merged_constant:
+  movq  %rdi, %rbx
+  cmpq  $7, %rax
+  je    .L0
+  movq  %rax, %rdi
+  sarq  $1, %rdi
+  cmpq  $11, %rax
+  ja    .L0
+  leaq  <hidden PC-relative offset>(%rip), %rax
+  movslq (%rax,%rdi,4), %rdx
+  addq  %rdx, %rax
+  jmp   *%rax
+.L0:
+  movl  $1, %eax
+  movq  (%rsi), %rdi
+  movq  %rsi, %rbx
+  jmp   *%rdi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+(* Jump threading folds the unsigned range check of the pattern match for both
+   predecessors of the merge block. *)
+let range_check_on_merged_constant b f g =
+  let i = if b then 2 else 5 in
+  match i with
+  | 0 | 1 | 2 -> f ()
+  | _ -> g ()
+[%%expect_asm X86_64{|
+range_check_on_merged_constant:
+  cmpq  $1, %rax
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L0:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+(* Jump threading folds the parity test of [Obj.is_int] for the predecessor
+   that binds an immediate; the other predecessor binds a symbol, which is not
+   folded. *)
+let parity_test_on_merged_constant b f g =
+  let x = if b then Obj.repr 1 else Obj.repr "foo" in
+  if Obj.is_int x then f () else g ()
+[%%expect_asm X86_64{|
+parity_test_on_merged_constant:
+  movq  %rbx, %rsi
+  movq  %rdi, %rbx
+  cmpq  $1, %rax
+  jne   .L0
+  movq  <hidden PC-relative offset>(%rip), %rax
+  testb $1, %al
+  je    .L1
+.L0:
+  movl  $1, %eax
+  movq  (%rsi), %rdi
+  movq  %rsi, %rbx
+  jmp   *%rdi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+let fold_two_float_compares_into_branch (x : float) (y : float) f g =
+  let b = x < 0.5 || y < 0.5 in
+  if b then f () else g ()
+[%%expect_asm X86_64{|
+fold_two_float_compares_into_branch:
+  movq  %rbx, %rdx
+  movq  %rsi, %rbx
+  vmovsd <hidden PC-relative offset>(%rip), %xmm0
+  vmovsd (%rax), %xmm1
+  vcomisd %xmm1, %xmm0
+  ja    .L0
+  vmovsd (%rdx), %xmm1
+  vcomisd %xmm1, %xmm0
+  jbe   .L1
+.L0:
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L1:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+(* CR ttebbi: The float comparison is not folded, even though both
+   predecessors forward a constant into it: on the [nan] predecessor [x < 1.0]
+   is unordered and hence statically false, while on the [0.5] predecessor it
+   is statically true. Jump threading only tracks integer constants. *)
+let float_compare_on_merged_constant b f g =
+  let x = if b then Float.nan else 0.5 in
+  if x < 1.0 then f () else g ()
+[%%expect_asm X86_64{|
+float_compare_on_merged_constant:
+  movq  %rbx, %rsi
+  movq  %rdi, %rbx
+  cmpq  $1, %rax
+  jne   .L0
+  vmovsd <hidden PC-relative offset>(%rip), %xmm0
+  jmp   .L1
+.L0:
+  vmovsd <hidden PC-relative offset>(%rip), %xmm0
+.L1:
+  vmovsd <hidden PC-relative offset>(%rip), %xmm1
+  vcomisd %xmm0, %xmm1
+  jbe   .L2
+  movl  $1, %eax
+  movq  (%rsi), %rdi
+  movq  %rsi, %rbx
+  jmp   *%rdi
+.L2:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+(* [Float.is_nan x] is [x <> x], whose folded [Float_test] has to send the
+   unordered case to the [true] arm. *)
+let fold_is_nan_into_branch (z : int) (x : float) f g =
+  let b = z = 0 && Float.is_nan x in
+  if b then f () else g ()
+[%%expect_asm X86_64{|
+fold_is_nan_into_branch:
+  movq  %rbx, %rdx
+  movq  %rsi, %rbx
+  cmpq  $1, %rax
+  jne   .L0
+  vmovsd (%rdx), %xmm0
+  vucomisd %xmm0, %xmm0
+  jnp   .L0
+  movl  $1, %eax
+  movq  (%rdi), %rsi
+  movq  %rdi, %rbx
+  jmp   *%rsi
+.L0:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]

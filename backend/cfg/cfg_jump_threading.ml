@@ -11,18 +11,39 @@ type fold_result =
         arg : Reg.t array
       }
 
-let apply_fold (block : C.basic_block) (result : fold_result option) : bool =
+(* [source] is the terminator that was evaluated to produce [result]; the new
+   terminator performs (a folded version of) its test, so it inherits its debug
+   info. When threading through an empty block, [source] is the successor's
+   terminator rather than [block]'s. *)
+let apply_fold (block : C.basic_block) ~(source : C.terminator C.instruction)
+    (result : fold_result option) : bool =
   match result with
   | None -> false
   | Some result ->
     let new_terminator =
       match result with
       | Goto target ->
-        { block.terminator with desc = C.Always target; arg = [||]; res = [||] }
-      | Replace { desc; arg } -> { block.terminator with desc; arg; res = [||] }
+        Cfg.make_instruction_from_copy source ~desc:(C.Always target)
+          ~id:block.terminator.id ~arg:[||] ~res:[||] ()
+      | Replace { desc; arg } ->
+        Cfg.make_instruction_from_copy source ~desc ~id:block.terminator.id ~arg
+          ~res:[||] ()
     in
     block.terminator <- new_terminator;
     true
+
+(* Bounds the number of blocks visited by a single [find_reaching_def] query, so
+   that the pass stays linear even on pathological CFGs. *)
+let max_visited_blocks = 100
+
+(* Reusing the arguments of a reaching definition at the use point extends their
+   live ranges from the defining instruction to the use, possibly across
+   allocation points, polls or calls. This must not be done for [Addr]
+   registers, which are not allowed to be live across a GC point. *)
+let may_extend_live_range (reg : Reg.t) =
+  match reg.typ with
+  | Int | Val | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2 -> true
+  | Addr -> false
 
 (** [find_reaching_def reg block dominators cfg] searches for the definition of
     [reg] visible at the end of [block]'s body (right before its terminator)
@@ -37,12 +58,21 @@ let apply_fold (block : C.basic_block) (result : fold_result option) : bool =
     encounter [target = src], the search continues for [src]. A register is
     considered clobbered if it has been written to between the candidate
     definition and the use point. The function returns the defining instruction
-    only when none of its arguments has been clobbered after it, so that the
-    arguments can still be used at the use point. *)
+    only when none of its arguments has been clobbered after it and all of them
+    may have their live range extended, so that the arguments can still be used
+    at the use point.
+
+    Each query visits at most [max_visited_blocks] blocks and gives up when the
+    bound is reached. *)
 let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
     ~(cfg_with_infos : Cfg_with_infos.t) : C.basic C.instruction option =
   let dominators = Cfg_with_infos.dominators cfg_with_infos in
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let budget = ref max_visited_blocks in
+  let within_budget () =
+    decr budget;
+    !budget >= 0
+  in
   let clobbered = ref Reg.Set.empty in
   let add_to_clobbered arr =
     clobbered := Array.fold_right Reg.Set.add arr !clobbered
@@ -50,7 +80,8 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
   (* For a non-dominator, we cannot find a definition, but we might have to
      invalidate one. *)
   let visit_non_dominator (b : C.basic_block) ~reg =
-    (not (Array.exists (Reg.same reg) b.terminator.res))
+    within_budget ()
+    && (not (Array.exists (Reg.same reg) b.terminator.res))
     &&
     (add_to_clobbered b.terminator.res;
      DLL.for_all b.body ~f:(fun (instr : C.basic C.instruction) ->
@@ -91,7 +122,7 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
       add_to_clobbered instr.res;
       if Array.length instr.res >= 1 && Reg.same reg instr.res.(0)
       then
-        begin match[@ocaml.warning "-4"] instr.desc with
+        match[@ocaml.warning "-4"] instr.desc with
         | Op Move
           when Array.length instr.arg = 1
                && Array.length instr.res = 1
@@ -100,10 +131,17 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
           walk ~block ~pos:(DLL.prev cell) ~reg:instr.arg.(0)
         | _ ->
           let inputs_safe =
-            Array.for_all (fun a -> not (Reg.Set.mem a !clobbered)) instr.arg
+            Array.for_all
+              (fun a ->
+                (* [clobbered] only tracks explicit writes to [res]; preassigned
+                   registers can additionally be clobbered implicitly, e.g. by
+                   calls. *)
+                (not (Reg.is_preassigned a))
+                && (not (Reg.Set.mem a !clobbered))
+                && may_extend_live_range a)
+              instr.arg
           in
           if inputs_safe then Some instr else None
-        end
       else if Array.exists (Reg.same reg) instr.res
       then None
       else walk ~block ~pos:(DLL.prev cell) ~reg
@@ -113,7 +151,8 @@ let find_reaching_def ~(reg : Reg.t) ~(block : C.basic_block)
       | Some idom_label ->
         let idom_block = Cfg.get_block_exn cfg idom_label in
         if
-          (not (visit_non_dominating_predecessors ~from_block:block ~reg))
+          (not (within_budget ()))
+          || (not (visit_non_dominating_predecessors ~from_block:block ~reg))
           || Array.exists (Reg.same reg) idom_block.terminator.res
         then None
         else (
@@ -215,22 +254,20 @@ let process_block ~(is_loop_header : Label.t -> bool)
   (* 1. Fold the block's own terminator. *)
   let reduce_terminator () =
     evaluate_terminator ~block block.terminator ~cfg_with_infos
-    |> apply_fold block
+    |> apply_fold block ~source:block.terminator
   in
   (* 2. Thread through an empty merge successor when safe. *)
   let rec skip_successor () =
     match[@ocaml.warning "-4"] block.terminator.desc with
-    | Always successor_label
-      when (not (Label.equal block.start cfg.entry_label))
-           && (cfg.allowed_to_be_irreducible
-              || not (is_loop_header successor_label)) ->
+    (* The loop header check is necessary to preserve reducibility. *)
+    | Always successor_label when not (is_loop_header successor_label) ->
       let successor_block = C.get_block_exn cfg successor_label in
       if not (DLL.is_empty successor_block.body)
       then false
       else
         let changed =
           evaluate_terminator ~block successor_block.terminator ~cfg_with_infos
-          |> apply_fold block
+          |> apply_fold block ~source:successor_block.terminator
         in
         if changed then skip_successor () |> ignore;
         changed
@@ -241,7 +278,14 @@ let process_block ~(is_loop_header : Label.t -> bool)
   folded_own || folded_successor
 
 let run cfg_with_infos =
-  if not !Oxcaml_flags.cfg_jump_threading
+  if
+    (not !Oxcaml_flags.cfg_jump_threading)
+    (* Under [-no-cfg-eliminate-dead-trap-handlers], [Eliminate_dead_code]
+       treats trap handlers as entry points. Folding away the only ordinary
+       entry into a loop whose trap handler re-enters it would then leave behind
+       an unreachable strongly-connected component in which every block has a
+       predecessor, which [Cfg_dominators] rejects. *)
+    || not !Oxcaml_flags.cfg_eliminate_dead_trap_handlers
   then cfg_with_infos
   else
     let cfg =
