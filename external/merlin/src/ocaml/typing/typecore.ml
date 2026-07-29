@@ -8253,6 +8253,7 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, met) ->
+      let obj = type_exp env mode_object e in
       let suspended () =
         submode ~loc ~env Mode.Value.legacy expected_mode;
         let pm = position_and_mode env expected_mode sexp in
@@ -8295,7 +8296,7 @@ and type_expect_
       begin
         try suspended ()
         with Error.In_context
-            (_, _, Undefined_method (obj, _, _)) when
+            (_, _, Undefined_method (_obj, _, _)) when
             !Clflags.typing_recovery ->
             rue {
               exp_desc = Texp_send(obj, Tmeth_name met.txt, Default);
