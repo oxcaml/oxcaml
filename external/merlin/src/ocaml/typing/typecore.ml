@@ -7655,7 +7655,7 @@ and type_expect_
          expression context. *)
     begin try delayed ()
     with exn when !Clflags.typing_recovery
-               && Typing_recovery.is_recoverable exn ->
+                && Typing_recovery.is_recoverable exn ->
       re {
         exp_desc = Texp_record {
             fields = [||]; representation = Record_boxed;
