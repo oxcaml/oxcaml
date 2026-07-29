@@ -233,7 +233,7 @@ let process_block ~(is_loop_header : Label.t -> bool)
           |> apply_fold block
         in
         if changed then skip_successor () |> ignore;
-        true
+        changed
     | _ -> false
   in
   let folded_own = reduce_terminator () in
