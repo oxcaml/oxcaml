@@ -593,7 +593,20 @@ Test M.4 : that construct will work on holes in an overwrite expression
   > let _ = overwrite_ (1, 2) with (_, 3)
   > EOF
 
-TODO: fix this
   $ $MERLIN single construct -position 1:32 \
   > -filename M4.ml < M4.ml | jq .value
-  "Construct only works on holes."
+  [
+    {
+      "start": {
+        "line": 1,
+        "col": 32
+      },
+      "end": {
+        "line": 1,
+        "col": 33
+      }
+    },
+    [
+      "0"
+    ]
+  ]
