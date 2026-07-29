@@ -26,7 +26,7 @@ type direct_to_cmm =
 (** The one true way to get from Lambda to Cmm. *)
 type pipeline = Direct_to_cmm of direct_to_cmm
 
-(** A callback to generate Cmm for a program. NB the program source is not an
+(** A callback to generate Cmm for a program. Note the program source is not an
     argument, so this should be a closure capturing it. *)
 type cmm_generator =
   ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
