@@ -14,7 +14,8 @@ type t
 val build : Cfg.t -> t
 
 (** [immediate_dominator doms label] returns the immediate dominator of [label],
-    or [None] for the entry block and for unreachable blocks. *)
+    or [None] if [label] is the root of its dominator tree (the entry block,
+    or the pseudo-entry of an unreachable component). *)
 val immediate_dominator : t -> Label.t -> Label.t option
 
 (** [is_dominating doms x y] is [true] iff [x] is dominating [y] according to
