@@ -28,8 +28,6 @@ open Btype
 open Ctype
 open Mode
 
-let raise_error = Msupport.raise_error
-
 type comprehension_type =
   | List_comprehension
   | Array_comprehension of mutability
@@ -4792,7 +4790,7 @@ let force_delayed_checks () =
   let w_old = Warnings.backup () in
   List.iter
     (fun (f, w) -> Warnings.restore w;
-      try f () with exn -> Msupport.raise_error exn)
+      try f () with exn -> Typing_recovery.log_or_raise exn)
     (List.rev !delayed_checks);
   Warnings.restore w_old;
   reset_delayed_checks ();
@@ -10757,7 +10755,7 @@ and type_application env app_loc expected_mode position_and_mode
               app_loc ty_ret mode_ret args
           in
           (try check_curried_application_complete ~env ~app_loc untyped_args
-          with exn -> raise_error exn);
+          with exn -> Typing_recovery.log_or_raise exn);
           (* example:
              [ty_ret] becomes [a:bar -> unit]
              [args] becomes [(Label "a", Omitted ());

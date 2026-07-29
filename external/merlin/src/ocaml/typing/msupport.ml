@@ -26,157 +26,25 @@
 
    )* }}} *)
 
-open Std
-
-module RawTypeHash = Hashtbl.Make (Types.TransientTypeOps)
-
-let errors : (exn list ref * unit RawTypeHash.t) option ref = ref None
-
-let monitor_errors' = ref (ref false)
-let monitor_errors () =
-  if !(!monitor_errors') then monitor_errors' := ref false;
-  !monitor_errors'
-
-let raise_error ?(ignore_unify = false) exn =
-  !monitor_errors' := true;
-  match !errors with
-  | Some (l, _) ->
-    begin match exn with
-    | Ctype.Unify _ when ignore_unify -> ()
-    | Ctype.Unify _ | Failure _ ->
-      Logger.log ~section:"Typing_aux.raise_error"
-        ~title:(Printexc.exn_slot_name exn) "%a" Logger.fmt (fun fmt ->
-          Printexc.record_backtrace true;
-          Format.pp_print_string fmt (Printexc.get_backtrace ()))
-    | exn -> l := exn :: !l
-    end
-  | None -> raise exn
-
-let () =
-  Msupport_parsing.msupport_raise_error := raise_error;
-  Env.msupport_raise_error := raise_error
-
-exception Resume
-
-let resume_raise exn =
-  raise_error exn;
-  raise Resume
-
-let catch_errors warnings caught f =
+let catch_errors_with_warning warnings errors callback =
   let warnings' = Warnings.backup () in
-  let errors' = !errors in
   Warnings.restore warnings;
-  errors := Some (caught, RawTypeHash.create 3);
-  Misc.try_finally f ~always:(fun () ->
-      errors := errors';
-      Warnings.restore warnings')
+  Typing_recovery.catch_errors errors (fun () ->
+      Misc.try_finally ~always:(fun () -> Warnings.restore warnings') callback)
 
-let uncatch_errors f = let_ref errors None f
-
-let erroneous_type_register te =
-  let te = Types.Transient_expr.coerce te in
-  match !errors with
-  | Some (_, h) -> RawTypeHash.replace h te ()
-  | None -> ()
-
-let erroneous_type_check te =
-  let te = Types.Transient_expr.coerce te in
-  match !errors with
-  | Some (_, h) -> RawTypeHash.mem h te
-  | _ -> false
-
-let rec erroneous_expr_check e =
-  erroneous_type_check e.Typedtree.exp_type
-  ||
-  match e.Typedtree.exp_desc with
-  | Typedtree.Texp_ident { path; _ } when Ident.name (Path.head path) = "_" ->
-    true
-  | Typedtree.Texp_apply (e', _, _, _, _) -> erroneous_expr_check e'
-  | _ -> false
-
-exception Warning of Location.t * string
-
-let prerr_warning loc w =
-  match !errors with
-  | None -> () (*Location.print_warning loc Format.err_formatter w*)
-  | Some (l, _) -> (
-    let ppf, to_string = Format.to_string () in
-    Location.print_warning loc ppf w;
-    match to_string () with
-    | "" -> ()
-    | s -> l := Warning (loc, s) :: !l)
-
-let prerr_alert loc w =
-  match !errors with
-  | None -> () (*Location.print_warning loc Format.err_formatter w*)
-  | Some (l, _) -> (
-    let ppf, to_string = Format.to_string () in
-    Location.print_alert loc ppf w;
-    match to_string () with
-    | "" -> ()
-    | s -> l := Warning (loc, s) :: !l)
+let () = Msupport_parsing.msupport_raise_error := Typing_recovery.log_or_raise
 
 let () =
-  Location.register_error_of_exn (function
-    | Warning (loc, str) ->
-      Some (Location.error ~loc ~source:Location.Warning str)
-    | _ -> None)
+  Typing_recovery.register_recoverable (function
+    | ( Misc.Fatal_error _
+      | Persistent_env.Error _
+      | Typemod.Error_forward _
+      | Magic_numbers.Cmi.Error _ ) as exn ->
+      (* Some specific error handling that can't be supported at the
+           compiler level.
 
-let () = Location.prerr_warning_ref := prerr_warning
-
-let () = Location.prerr_alert_ref := prerr_alert
-
-let flush_saved_types () =
-  match Cmt_format.get_saved_types () with
-  | [] -> []
-  | parts ->
-    Cmt_format.set_saved_types [];
-    let open Ast_helper in
-    let pexp = Exp.constant (Saved_parts.store parts) in
-    let pstr = Str.eval pexp in
-    [ Attr.mk Saved_parts.attribute (Parsetree.PStr [ pstr ]) ]
-
-let rec get_saved_types_from_attributes = function
-  | [] -> []
-  | attr :: attrs ->
-    let attr, str = Ast_helper.Attr.as_tuple attr in
-    if attr = Saved_parts.attribute then
-      let open Parsetree in
-      begin match str with
-      | PStr
-          ({ pstr_desc = Pstr_eval ({ pexp_desc = Pexp_constant key; _ }, _);
-             _
-           }
-          :: _) -> Saved_parts.find key
-      | _ -> []
-      end
-    else get_saved_types_from_attributes attrs
-
-let with_warning_attribute ?warning_attribute f =
-  match warning_attribute with
-  | None -> f ()
-  | Some attr -> Builtin_attributes.warning_scope attr f
-
-let with_saved_types ?warning_attribute ?save_part f =
-  let saved_types = Cmt_format.get_saved_types () in
-  Cmt_format.set_saved_types [];
-  try
-    let result = with_warning_attribute ?warning_attribute f in
-    begin match save_part with
-    | None -> ()
-    | Some f -> Cmt_format.set_saved_types (f result :: saved_types)
-    end;
-    result
-  with exn ->
-    let saved_types' = Cmt_format.get_saved_types () in
-    Cmt_format.set_saved_types (saved_types' @ saved_types);
-    reraise exn
-
-let incorrect_attribute =
-  Ast_helper.Attr.mk (Location.mknoloc "merlin.incorrect") (Parsetree.PStr [])
-
-let recovery_attributes attrs =
-  let attrs' = incorrect_attribute :: flush_saved_types () in
-  match attrs with
-  | [] -> attrs'
-  | attrs -> attrs' @ attrs
+           This was previously handled by [Typemod.initial_env]
+        *)
+      Typing_recovery.log_or_raise exn;
+      true
+    | _ -> false)

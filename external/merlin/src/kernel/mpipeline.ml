@@ -373,7 +373,9 @@ let process ?state ?(pp_time = ref 0.0) ?(reader_time = ref 0.0)
            reader
          in
          let caught = ref [] in
-         Msupport.catch_errors Mconfig.(config.ocaml.warnings) caught
+         Msupport.catch_errors_with_warning
+           Mconfig.(config.ocaml.warnings)
+           caught
          @@ fun () ->
          let cache_disabling =
            Option.map reader_cache_disabling ~f:(fun _ ->

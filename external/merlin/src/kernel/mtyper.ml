@@ -287,7 +287,8 @@ let run config parsetree =
     Load_path.(init ~auto_include:no_auto_include ~visible ~hidden);
     List.iter ~f:Env.register_parameter parameters);
   let caught = ref [] in
-  Msupport.catch_errors Mconfig.(config.ocaml.warnings) caught @@ fun () ->
+  Msupport.catch_errors_with_warning Mconfig.(config.ocaml.warnings) caught
+  @@ fun () ->
   Typecore.reset_delayed_checks ();
   let cached_result, cache_stat =
     match parsetree with
@@ -325,7 +326,7 @@ let get_errors t =
   in
   let caught = ref errors in
   Typecore.delayed_checks := checks;
-  Msupport.catch_errors
+  Msupport.catch_errors_with_warning
     Mconfig.(t.config.ocaml.warnings)
     caught Typecore.force_delayed_checks;
   Typecore.reset_delayed_checks ();
