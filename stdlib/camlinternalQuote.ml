@@ -2193,7 +2193,6 @@ module Constant = struct
   let unboxed_int64 i = Ast.UnboxedInt64 i
 
   let unboxed_nativeint i = Ast.UnboxedNativeint i
-
 end
 
 module Binding_error = struct

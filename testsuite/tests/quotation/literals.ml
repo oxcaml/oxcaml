@@ -1,6 +1,6 @@
 (* TEST
  flags = "-extension runtime_metaprogramming -extension small_numbers";
- expect;
+ { expect; expect.opt; }
 *)
 
 #syntax quotations on
