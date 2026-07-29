@@ -132,6 +132,10 @@ val cmo_magic_number: string
 val cma_magic_number: string
 (** Magic number for archive files *)
 
+(* CR mvellacott: replace this with a ltosol magic number. *)
+val cmr_magic_number: string
+(** Magic number for reaper intermediate data *)
+
 val cmx_magic_number: string
 (** Magic number for compilation unit descriptions *)
 

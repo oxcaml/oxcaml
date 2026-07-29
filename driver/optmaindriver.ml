@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -83,7 +83,7 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      Optcompile.native unix ~flambda2 ~reaped_flambda2_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -161,7 +161,7 @@ let main unix argv ppf ~flambda2 =
       (* CR mvellacott: change validation: should take one .ltosol and many
          .cmx files (potentially other files too?). *)
       let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
-      let cmr_file, inputs = match
+      let cmr_file, (_other_inputs : string list) = match
         List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
       with
         | [cmr_file], inputs -> cmr_file, inputs
@@ -171,11 +171,9 @@ let main unix argv ppf ~flambda2 =
              %d: [%s])"
             (List.length cmr_files) (String.concat ", " cmr_files)
       in
-      (* CR mvellacott: implement this *)
-      Printf.printf "rebuilding from cmr: %s\n" cmr_file;
-      List.iter
-        (fun file -> Printf.printf "other rebuild input: %s\n" file)
-        inputs;
+      Compiler.reaper_rebuild ~cmr_file
+        ~output_prefix:(Compenv.output_prefix cmr_file ^ ".reaped")
+        ~keep_symbol_tables:false;
       Warnings.check_fatal ();
     end
     else if !reaper_solve then begin

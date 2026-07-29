@@ -2,10 +2,12 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*           Damien Doligez, projet Moscova, INRIA Rocquencourt           *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                   Miriam Vellacott, Jane Street Europe                 *)
 (*                                                                        *)
-(*   Copyright 2000 Institut National de Recherche en Informatique et     *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -13,27 +15,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* [main argv ppf] runs the compiler with arguments [argv], printing any
-   errors encountered to [ppf], and returns the exit code.
+(* CR mvellacott: (long term) get rid of CMR files, and put the data in CMX instead *)
+(* CR mvellacott: (short term) store actually useful data in CMR files *)
+type t = string
 
-   NB: Due to internal state in the compiler, calling [main] twice during
-   the same process is unsupported. *)
-val main
-   : (module Compiler_owee.Unix_intf.S)
-  -> string array
-  -> Format.formatter
-  -> flambda2:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    keep_symbol_tables:bool ->
-    Lambda.program ->
-    Cmm.phrase list)
-  -> reaped_flambda2_to_cmm:(
-    ppf_dump:Format.formatter ->
-    prefixname:string ->
-    machine_width:Target_system.Machine_width.t ->
-    keep_symbol_tables:bool ->
-    cmr_filename:string ->
-    Cmm.phrase list)
-  -> int
+type error =
+  | Wrong_format of string
+  | Wrong_version of string
+  | Corrupted of string
+  | Marshal_failed of string
+
+exception Error of error
+
+val save : filename:string -> t -> unit
+
+val restore : filename:string -> t

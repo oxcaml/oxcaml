@@ -34,6 +34,8 @@ let exec_magic_number = {magic|@EXEC_MAGIC_NUMBER@|magic}
 and cmi_magic_number = {magic|@CMI_MAGIC_NUMBER@|magic}
 and cmo_magic_number = {magic|@CMO_MAGIC_NUMBER@|magic}
 and cma_magic_number = {magic|@CMA_MAGIC_NUMBER@|magic}
+(* CR mvellacott: replace CMR magic number with LTOSOL magic number *)
+and cmr_magic_number = {magic|@CMR_MAGIC_NUMBER@|magic}
 and cmx_magic_number = {magic|@CMX_MAGIC_NUMBER@|magic}
 and cmxa_magic_number = {magic|@CMXA_MAGIC_NUMBER@|magic}
 and ast_impl_magic_number = {magic|@AST_IMPL_MAGIC_NUMBER@|magic}
