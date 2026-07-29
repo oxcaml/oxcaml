@@ -970,7 +970,7 @@ and record_representation =
      until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
-  | Record_variable
+  | Record_undetermined
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
      [any]. The actual representation is decided at construction sites. *)
@@ -978,8 +978,8 @@ and record_representation =
 and record_unboxed_product_representation =
   | Record_unboxed_product
   | Record_unboxed_product_variable
-  (* Counterpart of [Record_variable] for unboxed product records that have at
-     least one field of layout [any]. *)
+  (* Counterpart of [Record_undetermined] for unboxed product records that
+     have at least one field of layout [any]. *)
 
 and variant_representation =
   | Variant_unboxed
@@ -1006,7 +1006,7 @@ and cstr_layout =
   | Cstr_layout_variable
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
-     typedecl time. Counterpart of [Record_variable] for variants. *)
+     typedecl time. Counterpart of [Record_undetermined] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
@@ -1020,7 +1020,7 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
-  | Constructor_variable
+  | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
 

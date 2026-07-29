@@ -1350,7 +1350,7 @@ let record_has_float_boxed = function
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
-  | Record_variable ->
+  | Record_undetermined ->
     fatal_error "record_has_float_boxed: unexpected variable representation"
 
 let record_has_atomic_field lbls =
@@ -1363,7 +1363,7 @@ let record_gets_unboxed_version lbls repr =
   match repr with
   | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
-  | Record_boxed | Record_variable -> true
+  | Record_boxed | Record_undetermined -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
@@ -2370,7 +2370,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     sorts, rep, jkind
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
-          | Record_ufloat | Record_unboxed | Record_variable)
+          | Record_ufloat | Record_unboxed | Record_undetermined)
     ->
     (* These are never created by [transl_declaration], so they will only
        appear here when updating later for dealing with [any]. Since none of
@@ -2415,7 +2415,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
   let reprs, repr_summary = compute_repr_summary env lbls jkinds in
   let rep : (rep, _) Result.t =
     match form, old_repres with
-    | Legacy, Record_variable ->
+    | Legacy, Record_undetermined ->
       (* CR layouts: improve the readability of this match *)
       let { values; floats; atomic_floats; float64s;
               non_float64_unboxed_fields; atomic_fields; voids;
@@ -2434,7 +2434,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
       | Error _ -> ()
       end;
       rep
-    | Legacy, Record_inlined (tag, Constructor_variable, vrep) ->
+    | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
       update_record_inlined_kind env loc lbls jkinds tag vrep
     | Unboxed_product, _ ->
       (match repr_summary.first_any with
@@ -2664,7 +2664,7 @@ let rec update_decl_jkind env dpath decl =
         | Ok rep -> rep
         | Error _ ->
           assert_any_args_support decl.type_loc;
-          Record_variable
+          Record_undetermined
       in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
