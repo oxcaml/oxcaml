@@ -113,9 +113,24 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode_r = Mode.Locality.r
+type alloc_mode_r
 
-type alloc_mode_l = Mode.Locality.l
+val create_alloc_mode_r : Mode.Locality.r -> alloc_mode_r
+
+val alloc_mode_r_zap_to_ceil : alloc_mode_r -> Mode.Locality.Const.t
+
+val alloc_mode_r_submode_err :
+  Mode.Hint.pinpoint -> Mode.Locality.l -> alloc_mode_r -> unit
+
+val print_alloc_mode_r : Format.formatter -> alloc_mode_r -> unit
+
+type alloc_mode_l
+
+val create_alloc_mode_l : Mode.Locality.l -> alloc_mode_l
+
+val alloc_mode_l_zap_to_floor : alloc_mode_l -> Mode.Locality.Const.t
+
+val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
 
 type return_mode
 
