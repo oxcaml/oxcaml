@@ -302,4 +302,9 @@ let run cfg_with_layout =
   Simplify_terminator.run (Cfg_with_layout.cfg cfg_with_layout);
   Eliminate_dead_code.run cfg_with_layout |> acc;
   Cfg_with_layout.remove_blocks cfg_with_layout !dead_labels;
+  if !Oxcaml_flags.cfg_eliminate_dead_code_validate
+  then
+    Profile.record ~accumulate:true "validate_reachability"
+      Cfg_reachability_validate.validate_reachability
+      (Cfg_with_layout.cfg cfg_with_layout);
   cfg_with_layout
