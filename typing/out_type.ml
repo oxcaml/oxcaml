@@ -15,6 +15,9 @@
 
 (* Compute a spanning tree representation of types *)
 
+module Std_map = Map
+module Std_set = Set
+
 open Misc
 open Ctype
 open Longident
@@ -1081,13 +1084,138 @@ end = struct
     let hash (K (_, v)) = Desc.Var.Head.hash v
   end)
 
-  module VarPairTbl = Hashtbl.Make (struct
+  module VarPairMap = Std_map.Make (struct
     type t = boxedvar * boxedvar
-    let equal (K (_, v1), K (_, v1')) (K (_, v2), K (_, v2')) =
-      Desc.Var.Head.equal v1 v2 && Desc.Var.Head.equal v1' v2'
-    let hash (K (_, v), K (_, v')) =
-      Hashtbl.hash (Desc.Var.Head.hash v, Desc.Var.Head.hash v')
+    let compare (K (_, v1), K (_, v1')) (K (_, v2), K (_, v2')) =
+      match Int.compare v1.desc_id v2.desc_id with
+      | 0 -> Int.compare v1'.desc_id v2'.desc_id
+      | c -> c
   end)
+
+  type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
+  type monadic_morph =
+    (Alloc.Monadic.Const.t, Alloc.Monadic.Const.t) morphl
+  type comonadic_morph =
+    (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t)
+      morphl
+  type closing_over_morph =
+    (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
+
+  module Paths = struct
+    module Monadic_path_set = Std_set.Make (struct
+      type t = monadic_morph
+      let compare m1 m2 = C.compare_morph Alloc.obj_monadic m1 m2
+    end)
+
+    module Comonadic_path_set = Std_set.Make (struct
+      type t = comonadic_morph
+      let compare m1 m2 = C.compare_morph Alloc.obj_comonadic m1 m2
+    end)
+
+    module Closing_over_path_set = Std_set.Make (struct
+      type t = closing_over_morph
+      let compare m1 m2 = C.compare_morph Alloc.obj_comonadic m1 m2
+    end)
+
+    type ('s, 'd) table =
+      | Monadic : (Alloc.Monadic.Const.t, Alloc.Monadic.Const.t) table
+          (** Tracks all paths from a visible monadic mode
+          variable to another. A path is defined as follows:
+            let [(v, f)] and [(u, h)] be two visible monadic
+            morphvars, such that [v] can reach [u] by following
+            vlowers. Let [g] be one such composition of vlower
+            functions. By
+            transitivity, we know the following to be true: [g u <= v].
+
+            A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
+            where [h'] is the left adjoint of [h] *)
+      | Comonadic : (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t) table
+          (** Tracks all paths from a visible comonadic mode
+          variable to another. See description of
+          [Monadic] for a definition of a path *)
+      | Closing_over : (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) table
+          (** Tracks all paths from a visible comonadic mode
+          variable to visible monadic mode variable. Since
+          the path goes from a comonadic to a monadic mode,
+          it will have to go through a "monadic to comonadic"
+          morphism. These paths will correspond to a closing
+          over relation between two mode variables
+
+          See description of [Monadic] for a definition of
+          a path *)
+
+    type t =
+      { mutable monadic : Monadic_path_set.t VarPairMap.t;
+        mutable comonadic : Comonadic_path_set.t VarPairMap.t;
+        mutable closing_over : Closing_over_path_set.t VarPairMap.t
+      }
+
+    let create () =
+      { monadic = VarPairMap.empty;
+        comonadic = VarPairMap.empty;
+        closing_over = VarPairMap.empty
+      }
+
+    let reset t =
+      t.monadic <- VarPairMap.empty;
+      t.comonadic <- VarPairMap.empty;
+      t.closing_over <- VarPairMap.empty
+
+    let src_obj : type s d. (s, d) table -> s C.obj =
+      function
+      | Monadic -> Alloc.obj_monadic
+      | Comonadic -> Alloc.obj_comonadic
+      | Closing_over -> Alloc.obj_monadic
+
+    let dst_obj : type s d. (s, d) table -> d C.obj =
+      function
+      | Monadic -> Alloc.obj_monadic
+      | Comonadic -> Alloc.obj_comonadic
+      | Closing_over -> Alloc.obj_comonadic
+
+    let add : type s d.
+        t -> (s, d) table -> boxedvar * boxedvar -> (s, d) morphl -> unit =
+      fun t table key path ->
+      match table with
+      | Monadic ->
+        let set =
+          match VarPairMap.find_opt key t.monadic with
+          | None -> Monadic_path_set.singleton path
+          | Some set -> Monadic_path_set.add path set
+        in
+        t.monadic <- VarPairMap.add key set t.monadic
+      | Comonadic ->
+        let set =
+          match VarPairMap.find_opt key t.comonadic with
+          | None -> Comonadic_path_set.singleton path
+          | Some set -> Comonadic_path_set.add path set
+        in
+        t.comonadic <- VarPairMap.add key set t.comonadic
+      | Closing_over ->
+        let set =
+          match VarPairMap.find_opt key t.closing_over with
+          | None -> Closing_over_path_set.singleton path
+          | Some set -> Closing_over_path_set.add path set
+        in
+        t.closing_over <- VarPairMap.add key set t.closing_over
+
+    let find : type s d.
+        t -> (s, d) table -> boxedvar * boxedvar -> ((s, d) morphl) list =
+      fun t table key ->
+      match table with
+      | Monadic ->
+        (match VarPairMap.find_opt key t.monadic with
+         | None -> []
+         | Some set -> Monadic_path_set.elements set)
+      | Comonadic ->
+        (match VarPairMap.find_opt key t.comonadic with
+         | None -> []
+         | Some set -> Comonadic_path_set.elements set)
+      | Closing_over ->
+        (match VarPairMap.find_opt key t.closing_over with
+         | None -> []
+         | Some set -> Closing_over_path_set.elements set)
+  end
 
   (** Tracks the mapping of monadic and comonadic mode
   descriptions visible in the type *)
@@ -1099,35 +1227,7 @@ end = struct
   list (for fast visibility checking) *)
   let visible_vars = VarTbl.create 17
 
-  (** Tracks all paths from a visible monadic mode
-  variable to another. A path is defined as follows:
-    let [(v, f)] and [(u, h)] be two visible monadic
-    morphvars, such that [v] can reach [u] by following
-    vlowers. Let [g] be one such composition of vlower
-    functions. By
-    transitivity, we know the following to be true: [g u <= v].
-
-    A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
-    where [h'] is the left adjoint of [h]
-  *)
-  let visible_monadic_paths_tbl = VarPairTbl.create 17
-
-  (** Tracks all paths from a visible comonadic mode
-  variable to another. See description of
-  [visible_monadic_paths_tbl] for a definition of a
-  path *)
-  let visible_comonadic_paths_tbl = VarPairTbl.create 17
-
-  (** Tracks all paths from a visible comonadic mode
-  variable to visible monadic mode variable. Since
-  the path goes from a comonadic to a monadic mode,
-  it will have to go through a "monadic to comonadic"
-  morphism. These paths will correspond to a closing
-  over relation between two mode variables
-
-  See description of [visible_monadic_paths_tbl] for
-  a definition of a path *)
-  let visible_closing_over_paths_tbl = VarPairTbl.create 17
+  let visible_paths = Paths.create ()
 
   (** counter used to generate names for polymorphic mode variables *)
   let modename_counter = ref 0
@@ -1149,9 +1249,7 @@ end = struct
     aliased_visible_pairs := [];
     printed_aliased_visible_pairs := [];
     modenames := [];
-    VarPairTbl.reset visible_monadic_paths_tbl;
-    VarPairTbl.reset visible_comonadic_paths_tbl;
-    VarPairTbl.reset visible_closing_over_paths_tbl;
+    Paths.reset visible_paths;
     VarTbl.reset visible_vars;
     modename_counter := 0
 
@@ -1273,42 +1371,30 @@ end = struct
 
   exception Cannot_unwrap
 
-  (* Find the [b -> Monadic] morphism associated with
-    some visible variable [v] of object type [b] *)
-  let find_monadic_morph_opt : type b. b C.obj -> b Desc.Var.Head.t
-      -> ((b, Alloc.Monadic.Const.t, (allowed * allowed)) C.morph) option =
-    fun obj v ->
-      let find_match { monadic } =
-        match monadic with
-        | Desc.Amodevar (Amorphvar (u, f)) ->
-            if not (Desc.Var.Head.equal v u) then None else begin
-              let obj' = C.src Alloc.obj_monadic f in
-                match C.equal_obj obj obj' with
-                | Is_eq ->
-                  let (f : ((b, Alloc.Monadic.Const.t,
-                    (allowed * allowed)) C.morph)) = f in
-                  if Desc.Var.Head.equal v u then Some f else None
-                | Is_not_eq -> raise Cannot_unwrap
-            end
-        | Desc.Amode _ -> None
+  (* Find the [b -> Paths.src_obj table] morphism
+    associated with some visible variable [v] of object
+    type [b] *)
+  let find_visible_morph_opt : type b s d.
+      (s, d) Paths.table -> b C.obj -> b Desc.Var.Head.t
+      -> ((b, s, (allowed * allowed)) C.morph) option =
+    fun table obj v ->
+      let sobj = Paths.src_obj table in
+      let desc_of_pair (pair : visible_pair)
+          : (s, (allowed * allowed)) Desc.t =
+        match table with
+        | Paths.Monadic -> pair.monadic
+        | Paths.Comonadic -> pair.comonadic
+        | Paths.Closing_over -> pair.monadic
       in
-      List.find_map find_match !visible_pairs
-
-  (* Find the [b -> Comonadic] morphism associated with
-    some visible variable [v] of object type [b] *)
-  let find_comonadic_morph_opt : type b. b C.obj -> b Desc.Var.Head.t
-      -> ((b, Alloc.Comonadic.Const.t, (allowed * allowed)) C.morph) option =
-    fun obj v ->
-      let find_match { comonadic } =
-        match comonadic with
+      let find_match pair =
+        match desc_of_pair pair with
         | Desc.Amodevar (Amorphvar (u, f)) ->
             if not (Desc.Var.Head.equal v u) then None else begin
-              let obj' = C.src Alloc.obj_comonadic f in
+              let obj' = C.src sobj f in
                 match C.equal_obj obj obj' with
                 | Is_eq ->
-                  let (f : ((b, Alloc.Comonadic.Const.t,
-                    (allowed * allowed)) C.morph)) = f in
-                  if Desc.Var.Head.equal v u then Some f else None
+                  let (f : ((b, s, (allowed * allowed)) C.morph)) = f in
+                  Some f
                 | Is_not_eq -> raise Cannot_unwrap
             end
         | Desc.Amode _ -> None
@@ -1318,18 +1404,6 @@ end = struct
   let visible : type b. b C.obj -> b Desc.Var.Head.t -> bool =
     fun obj v ->
       VarTbl.mem visible_vars (K (obj, v))
-
-  let remove_duplicate_paths : boxedpath list -> boxedpath list =
-    fun paths ->
-      let sort (P (fdst, v, f)) (P (gdst, u, g)) =
-        match C.equal_obj fdst gdst with
-        | Is_not_eq -> 1
-        | Is_eq ->
-          match C.equal_morph fdst f g with
-          | Is_not_eq -> 1
-          | Is_eq -> Int.compare v.desc_id u.desc_id
-      in
-      List.sort_uniq sort paths
 
   (* Find all direct paths (via vlowers) from some
     variable [v] to all other reachable visible variables
@@ -1369,9 +1443,7 @@ end = struct
                   | Is_not_eq -> raise Cannot_unwrap) wpaths)
               end) v.desc_vlower
             in
-            (* TODO: we might want to remove duplicates here *)
             let paths = List.flatten paths in
-            let paths = remove_duplicate_paths paths in
             VarTbl.add memoized (K (dst,v)) paths;
             paths
           end
@@ -1384,35 +1456,30 @@ end = struct
       find_paths ~memoized ~visited true dst v
 
   (** [find_path_from_description] constructs all morphisms
-    from one visible mode variable to another, and applies
-    an iterator [iter] on them.
-    The [find_morph_opt] parameter takes a variable as
+    from one visible mode variable to another, and records
+    them in the [table] of [visible_paths].
+    [find_visible_morph_opt table] takes a variable as
     input, and returns its associated morphism. The final
     morphism is constructed as follows:
       - let the parameter [desc] be a morphvar
         description [(v, f)]
       - let g be vlower path from [v] to some [u].
         (recall g : [u.obj] -> [v.obj])
-      - let [find_morph_opt u] = Some [h]
-    [find_path_from_description] runs [iter] on
+      - let [find_visible_morph_opt table u] = Some [h]
+    [find_path_from_description] records
     ([v], [u]) and [fgh'] where [h'] is the left
     adjoint of [h].
 
-    See [visible_monadic_paths_tbl] for an explanation
+    See [Paths.Monadic] for an explanation
     why this is the morphism we want *)
-  type 'b find_morph_opt =
-    { f : 'a. 'a C.obj
-          -> 'a Desc.Var.Head.t
-          -> (('a, 'b, (allowed * allowed)) C.morph) option; } [@@unboxed]
   let find_path_from_description :
-      type a b. memoized:memoized
-      -> a C.obj
-      -> b C.obj
-      -> (a, (allowed * allowed)) Desc.t
-      -> b find_morph_opt
-      -> (boxedvar * boxedvar -> (b, a, (allowed * disallowed)) C.morph -> unit)
+      type s d. memoized:memoized
+      -> (d, (allowed * allowed)) Desc.t
+      -> (s, d) Paths.table
       -> unit =
-    fun ~memoized dst bobj desc find_morph_opt iter ->
+    fun ~memoized desc table ->
+      let dst = Paths.dst_obj table in
+      let bobj = Paths.src_obj table in
       match desc with
       | Amode _ -> ()
       | Amodevar (Amorphvar (v, f)) ->
@@ -1428,8 +1495,8 @@ end = struct
                 let h' = C.left_adjoint bobj h in
                 let fg = C.compose dst (C.disallow_right f) g in
                 let fgh' = C.compose dst fg h' in
-                iter (v, (K (gsrc, u))) fgh'
-              ) (find_morph_opt.f gsrc u)
+                Paths.add visible_paths table (v, (K (gsrc, u))) fgh'
+              ) (find_visible_morph_opt table gsrc u)
             | Is_not_eq -> raise Cannot_unwrap
           ) paths
 
@@ -1443,30 +1510,10 @@ end = struct
     let memoized = VarTbl.create 17 in
     List.iter
       (fun { monadic; comonadic } ->
-        find_path_from_description ~memoized
-          Alloc.obj_monadic Alloc.obj_monadic monadic
-          { f = find_monadic_morph_opt }
-          (VarPairTbl.add visible_monadic_paths_tbl);
-        find_path_from_description ~memoized
-          Alloc.obj_comonadic Alloc.obj_comonadic
-          comonadic
-          { f = find_comonadic_morph_opt }
-          (VarPairTbl.add visible_comonadic_paths_tbl);
-        find_path_from_description ~memoized
-          Alloc.obj_comonadic Alloc.obj_monadic
-          comonadic
-          { f = find_monadic_morph_opt }
-          (VarPairTbl.add visible_closing_over_paths_tbl)
+        find_path_from_description ~memoized monadic Paths.Monadic;
+        find_path_from_description ~memoized comonadic Paths.Comonadic;
+        find_path_from_description ~memoized comonadic Paths.Closing_over
       ) !visible_pairs
-
-  type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
-  type monadic_morph =
-    (Alloc.Monadic.Const.t, Alloc.Monadic.Const.t) morphl
-  type comonadic_morph =
-    (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t)
-      morphl
-  type closing_over_morph =
-    (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
 
   type simple_edge =
     { via :
@@ -1558,12 +1605,12 @@ end = struct
         C.apply dst f v.desc_lower
 
   let construct_morphs :
-      type a. a C.obj
+      type a. (a, a) Paths.table
         -> (a, (allowed * allowed)) Desc.t
         -> (a, (allowed * allowed)) Desc.t
-        -> (boxedvar * boxedvar -> ((a, a) morphl) list)
         -> ((a, a) morphl) list =
-    fun dst src_descr target_descr get_descr_from_vars ->
+    fun table src_descr target_descr ->
+      let dst = Paths.dst_obj table in
       match src_descr, target_descr with
       | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
         let vobj = C.src dst f in
@@ -1572,7 +1619,7 @@ end = struct
         let r = C.apply dst g u.desc_lower in
         if C.le dst l r
         then [C.id]
-        else get_descr_from_vars (K (vobj, v), K (uobj, u))
+        else Paths.find visible_paths table (K (vobj, v), K (uobj, u))
       | _, _ ->
         let l = dupper_lr dst src_descr in
         let r = dlower_lr dst target_descr in
@@ -1589,17 +1636,14 @@ end = struct
     | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
       let vobj = C.src Alloc.obj_comonadic f in
       let uobj = C.src Alloc.obj_monadic g in
-        VarPairTbl.find_all visible_closing_over_paths_tbl
-        (K (vobj, v), K (uobj, u))
+        Paths.find visible_paths Paths.Closing_over (K (vobj, v), K (uobj, u))
     | _, _ -> []
 
   let construct_monadic_morphs src_descr target_descr =
-    construct_morphs Alloc.obj_monadic src_descr target_descr
-      (VarPairTbl.find_all visible_monadic_paths_tbl)
+    construct_morphs Paths.Monadic src_descr target_descr
 
   let construct_comonadic_morphs src_descr target_descr =
-    construct_morphs Alloc.obj_comonadic src_descr target_descr
-      (VarPairTbl.find_all visible_comonadic_paths_tbl)
+    construct_morphs Paths.Comonadic src_descr target_descr
 
   (* Tests whether the relation between two descriptions can be decided by
   their bounds. If the following is true for two parts of a mode variable pair,
