@@ -5047,8 +5047,7 @@ module Report = struct
          value"
     | Stack_expression ->
       Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
-    | Allocated_on_heap ->
-      Fmt.pp_print_string ppf "it is allocated on the heap"
+    | Allocated_on_heap -> Fmt.pp_print_string ppf "it is allocated on the heap"
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }

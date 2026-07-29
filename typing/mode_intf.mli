@@ -402,8 +402,8 @@ module type S = sig
           fully-constrained modes. *)
       val check_const_conservative : ('l * 'r) t -> Const.t option
 
-      (** Returns the upper bound of the given mode. Unlike the lower bound,
-          it is precise. See [get_ceil] in [solver_intf.mli]. *)
+      (** Returns the upper bound of the given mode. Unlike the lower bound, it
+          is precise. See [get_ceil] in [solver_intf.mli]. *)
       val get_ceil : ('l * allowed) t -> Const.t
     end
   end
@@ -591,8 +591,8 @@ module type S = sig
     val alloc : lr
 
     module Guts : sig
-      (** Returns the upper bound of the given mode. Unlike the lower bound,
-          it is precise. See [get_ceil] in [solver_intf.mli]. *)
+      (** Returns the upper bound of the given mode. Unlike the lower bound, it
+          is precise. See [get_ceil] in [solver_intf.mli]. *)
       val get_ceil : ('l * allowed) t -> Const.t
     end
   end
