@@ -1191,15 +1191,13 @@ let has_poly_constraint spat =
   | _ -> false
 
 (** Mode cross a right monadic mode fragment *)
-let alloc_monadic_mode_cross_to_min env ty monadic =
+let alloc_monadic_mode_cross_to_min (crossing : Crossing.t) monadic =
   let monadic = Alloc.Monadic.disallow_left monadic in
-  let crossing = crossing_of_ty env ty in
   Crossing.Monadic.apply_right_alloc crossing.monadic monadic
 
 (** Mode cross a left comonadic mode fragment *)
-let alloc_comonadic_mode_cross_to_max env ty comonadic =
+let alloc_comonadic_mode_cross_to_max (crossing : Crossing.t) comonadic =
   let comonadic = Alloc.Comonadic.disallow_right comonadic in
-  let crossing = crossing_of_ty env ty in
   Crossing.Comonadic.apply_left_alloc crossing.comonadic comonadic
 
 (** Mode cross a right mode *)
@@ -6385,8 +6383,10 @@ let split_function_ty
       end
     end
   in
-  let env_mode, _ = Alloc.newvar_above arg_mode in
-  let arg_value_mode = alloc_to_value_l2r env_mode in
+  let env_monadic, _ = Alloc.Monadic.newvar_above arg_mode.monadic in
+  let arg_value_mode =
+    alloc_to_value_l2r { arg_mode with monadic = env_monadic }
+  in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
@@ -6399,7 +6399,7 @@ let split_function_ty
   { filtered_arrow; arg_sort; ret_sort;
     alloc_mode; closure_mode=closure_mode.comonadic; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
-    really_poly; env_mode=(Alloc.Monadic.disallow_left env_mode.monadic)
+    really_poly; env_mode=(Alloc.Monadic.disallow_left env_monadic)
   }
 
 type type_function_result_param =
@@ -9540,12 +9540,13 @@ and type_function
                      uses the [arg_mode.comonadic] as a left mode, and
                      [arg_mode.monadic] as a right mode, hence they need to be
                      mode-crossed differently. *)
+                  let crossing = crossing_of_ty env ty_arg in
                   let arg_mode =
-                    alloc_comonadic_mode_cross_to_max env ty_arg
+                    alloc_comonadic_mode_cross_to_max crossing
                       arg_mode.comonadic
                   in
                   let env_mode =
-                    alloc_monadic_mode_cross_to_min env ty_arg env_mode
+                    alloc_monadic_mode_cross_to_min crossing env_mode
                   in
                   let cls_details : Mode.Hint.closure_details =
                     { closure = (loc, Function);
