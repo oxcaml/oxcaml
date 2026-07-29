@@ -320,7 +320,7 @@ let traverse_block_like_static_const denv acc symbol
   | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
   | Immutable_nativeint_array _ | Immutable_vec128_array _
   | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-  | Mutable_string _ | Immutable_string _ ->
+  | Immutable_string _ ->
     Acc.add_alias acc ~to_:name
       ~from:(Code_id_or_name.name (Env.all_constants denv))
 

@@ -155,8 +155,6 @@ val create_immutable_value_array :
 
 val create_empty_array : Are_rebuilding_terms.t -> Empty_array_kind.t -> t
 
-val create_mutable_string : Are_rebuilding_terms.t -> initial_value:string -> t
-
 val create_immutable_string : Are_rebuilding_terms.t -> string -> t
 
 val map_set_of_closures :

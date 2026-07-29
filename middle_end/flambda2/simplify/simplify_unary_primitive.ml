@@ -273,9 +273,14 @@ let simplify_string_length dacc ~original_term ~arg:_ ~arg_ty:str_ty ~result_var
     if String_info.Set.is_empty str_infos
     then SPR.create_invalid dacc
     else
+      let machine_width = DE.machine_width (DA.denv dacc) in
       let lengths =
-        String_info.Set.elements str_infos
-        |> List.map String_info.size |> Target_ocaml_int.Set.of_list
+        String_info.Set.fold
+          (fun str lengths ->
+            Target_ocaml_int.Set.add
+              (Target_ocaml_int.of_int machine_width (String.length str))
+              lengths)
+          str_infos Target_ocaml_int.Set.empty
       in
       let ty = T.these_naked_immediates lengths in
       let dacc = DA.add_variable dacc result_var ty in

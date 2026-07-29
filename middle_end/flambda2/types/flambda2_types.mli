@@ -588,11 +588,7 @@ val variant :
   Alloc_mode.For_types.t ->
   t
 
-val this_immutable_string :
-  string -> machine_width:Target_system.Machine_width.t -> t
-
-val mutable_string :
-  size:int -> machine_width:Target_system.Machine_width.t -> t
+val this_immutable_string : string -> t
 
 val exactly_this_closure :
   Function_slot.t ->

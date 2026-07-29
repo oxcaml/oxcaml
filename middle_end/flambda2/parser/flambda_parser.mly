@@ -869,7 +869,6 @@ static_data:
     RBRACKPIPE
     { Immutable_vec512_array is }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
-  | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }
 ;
 

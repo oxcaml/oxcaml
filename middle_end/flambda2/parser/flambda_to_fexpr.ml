@@ -308,7 +308,6 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Immutable_vec512_array elements ->
     Immutable_vec512_array (List.map (or_variable vec512 env) elements)
   | Empty_array array_kind -> Empty_array array_kind
-  | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s
 
 let inlining_state (is : Inlining_state.t) : Fexpr.inlining_state option =
