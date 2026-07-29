@@ -672,3 +672,48 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
+
+(* References: [:=] goes through [%setfield0_of_1], which is a
+   layout-polymorphic primitive, not record modification as already tested
+*)
+
+let () =
+  test ~expect_caml_modifies:0
+    (fun () ->
+      let r = ref 1 in
+      r := 2;
+      ignore (Sys.opaque_identity r))
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref "a" in
+      r := "b";
+      ignore (Sys.opaque_identity r))
+
+(* Check both [:=] and [<-] and make sure they agree *)
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref #(#1L, "a", true) in
+      r := #(#2L, "b", false);
+      ignore (Sys.opaque_identity r))
+
+let () =
+  test ~expect_caml_modifies:1
+    (fun () ->
+      let r = ref #(#1L, "a", true) in
+      r.contents <- #(#2L, "b", false);
+      ignore (Sys.opaque_identity r))
+
+(* Contents of unknown type must still be treated as pointers, including the
+   components of an unboxed product *)
+let () =
+  let[@inline never] set (type a : value & value) (r : a ref) (x : a) =
+    r := x
+  in
+  test ~expect_caml_modifies:2
+    (fun () ->
+      let r = ref #(1, 2) in
+      set r #(3, 4);
+      ignore (Sys.opaque_identity r))

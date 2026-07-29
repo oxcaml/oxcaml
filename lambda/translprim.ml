@@ -1714,6 +1714,26 @@ let layout_of_ty_for_idx_set env loc ty =
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
 
+(* Compute the mixed-block shape element for a type, or [None] if the type's
+   jkind gives no usable shape. *)
+let mixed_block_element_of_ty env loc ty =
+  let jkind = Ctype.type_jkind env ty in
+  Typedecl.mixed_block_element env ty jkind
+  |> Option.map (transl_mixed_block_element env loc ty)
+
+(* A shape element computed from a type never contains [Float_boxed], which
+   arises only from a record declaration's [@@flatten_floats], so it can be
+   converted to any mode parameter. *)
+let rec mixed_block_element_with_any_mode
+  : unit Lambda.mixed_block_element -> _ Lambda.mixed_block_element = function
+  | Value vk -> Value vk
+  | Product elts -> Product (Array.map mixed_block_element_with_any_mode elts)
+  | Float_boxed () ->
+    Misc.fatal_error
+      "Translprim.mixed_block_element_with_any_mode: unexpected [Float_boxed]"
+  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Word | Untagged_immediate | Splice_variable _ ) as elt -> elt
+
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
@@ -1744,6 +1764,22 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
+  | Primitive (Psetmixedfield ([0], [| _ |], init), arity), [_; p2] -> begin
+      match mixed_block_element_of_ty env (to_location loc) p2 with
+      | None -> None
+      | Some elt ->
+        Some (Primitive (Psetmixedfield ([0], [| elt |], init), arity))
+    end
+  | Primitive (Pmixedfield ([0], [| _ |], sem), arity), _ -> begin
+      match is_function_type env ty with
+      | None -> None
+      | Some (_p1, rhs) ->
+        match mixed_block_element_of_ty env (to_location loc) rhs with
+        | None -> None
+        | Some elt ->
+          let elt = mixed_block_element_with_any_mode elt in
+          Some (Primitive (Pmixedfield ([0], [| elt |], sem), arity))
+    end
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =
@@ -1970,9 +2006,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     let ak =
       Typeopt.array_type_kind ~elt_ty:None env loc array_ty
     in
-    let jkind = Ctype.type_jkind env elt_ty in
-    let mbe = Typedecl.mixed_block_element env elt_ty jkind in
-    let mbe = Option.map (transl_mixed_block_element env loc elt_ty) mbe in
+    let mbe = mixed_block_element_of_ty env loc elt_ty in
     begin match mbe with
     | Some mbe when not (Lambda.will_be_reordered mbe) ->
       Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
