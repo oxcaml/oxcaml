@@ -6376,7 +6376,11 @@ let split_function_ty
       end
     end
   in
-  let env_monadic, _ = Alloc.Monadic.newvar_above arg_mode.monadic in
+  let env_monadic =
+    if is_final_val_param
+    then arg_mode.monadic
+    else fst (Alloc.Monadic.newvar_above arg_mode.monadic)
+  in
   let arg_value_mode =
     alloc_to_value_l2r { arg_mode with monadic = env_monadic }
   in
