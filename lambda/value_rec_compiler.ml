@@ -353,7 +353,8 @@ let compute_static_size lam =
         | Record_dummy _ ->
             Misc.fatal_error
               "size_of_primitive: unexpected dummy representation"
-        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+        | Record_undetermined
+        | Record_inlined (_, Constructor_undetermined, _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
         end

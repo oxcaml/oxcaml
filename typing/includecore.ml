@@ -1083,9 +1083,9 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | Record_variable, Record_variable -> None
-        | Record_variable, _ -> Some (Fixed_representation Second)
-        | _, Record_variable -> Some (Fixed_representation First)
+        | Record_undetermined, Record_undetermined -> None
+        | Record_undetermined, _ -> Some (Fixed_representation Second)
+        | _, Record_undetermined -> Some (Fixed_representation First)
 
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))

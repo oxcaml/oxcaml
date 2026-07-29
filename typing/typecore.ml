@@ -1344,13 +1344,13 @@ let check_atomic_loc ~loc ~env record_repres label lid =
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
   (* We should know constructor representation at this point. *)
-  | Record_inlined (_, Constructor_variable, _)
+  | Record_inlined (_, Constructor_undetermined, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
   | Record_float | Record_ufloat
   (* We should know record representation at this point. *)
-  | Record_dummy _ | Record_variable ->
+  | Record_dummy _ | Record_undetermined ->
       Misc.fatal_error "check_atomic_loc: unexpected record representation"
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
@@ -1969,13 +1969,15 @@ and build_as_type_aux (env : Env.t) p ~mode =
 let is_variable_repres : type rep. rep record_form -> rep -> bool =
   fun form rep ->
     match form, rep with
-    | Legacy, (Record_variable | Record_inlined (_, Constructor_variable, _)) ->
+    | Legacy,
+      (Record_undetermined | Record_inlined (_, Constructor_undetermined, _))
+      ->
       true
     | Unboxed_product, Record_unboxed_product_variable -> true
     | _ -> false
 
 (* Returns [None] when the representation cannot be determined from the
-   declaration alone (i.e. [Record_variable] /
+   declaration alone (i.e. [Record_undetermined] /
    [Record_unboxed_product_variable]); otherwise [Some rep]. *)
 let determined_lbl_repres (type rep) (form : rep record_form)
       (rep : rep) : rep option =
@@ -2881,7 +2883,7 @@ module Label = NameChoice (struct
   let in_env lbl =
     match lbl.lbl_repres with
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
-    | Record_mixed _ | Record_dummy _ | Record_variable -> true
+    | Record_mixed _ | Record_dummy _ | Record_undetermined -> true
     | Record_inlined _ -> false
 end)
 
@@ -3145,7 +3147,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | Some sorts -> Ok (shape, sorts)
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
-  | Constructor_variable ->
+  | Constructor_undetermined ->
       begin match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->
@@ -6762,7 +6764,7 @@ and type_expect_
             -> false
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-          | Record_variable
+          | Record_undetermined
             -> true
           | Record_dummy _ ->
             Misc.fatal_error "type_expect: dummy record representation"
@@ -8935,7 +8937,7 @@ and type_block_access env expected_base_ty principal
       raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
     (match label.lbl_repres with
-     | Record_boxed | Record_variable -> ()
+     | Record_boxed | Record_undetermined -> ()
      | Record_mixed shape ->
        if Array.exists (function Float_boxed -> true | _ -> false) shape then
          bad_record_error "[@@flatten_floats]"
