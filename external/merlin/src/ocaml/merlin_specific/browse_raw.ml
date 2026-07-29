@@ -756,10 +756,10 @@ let of_attribute (attr : attribute) =
   let name = attr.attr_name.txt in
   (* There are a number of attributes that start with "merlin." that either modify Merlin
      behavior (ex: merlin.loc, merlin.hide, merlin.focus) or deal with the type-checker's
-     error recovery (ex: merlin.incorrect). Including these attributes in the browse tree
+     error recovery (ex: ocaml.incorrect). Including these attributes in the browse tree
      causes Merlin to sometimes choose an incorrect node. These attributes are also
      uninteresting - in practice they don't appear in user-written code. *)
-  match String.is_prefixed name ~by:"merlin." with
+  match String.is_prefixed name ~by:"merlin." || name = "ocaml.incorrect" with
   | true -> id_fold
   | false -> app (Attribute attr)
 
