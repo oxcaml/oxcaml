@@ -9047,7 +9047,12 @@ and type_expect_
           exp_type = ty_expected_explained.ty;
           exp_attributes = sexp.pexp_attributes;
           exp_env = env }
-      | _ -> Error.log_and_raise loc env Unexpected_hole;
+      | _ ->
+        { exp_desc = Texp_typed_hole;
+          exp_loc = loc; exp_extra = [];
+          exp_type = instance ty_expected;
+          exp_attributes = sexp.pexp_attributes;
+          exp_env = env }
       end
 
 and type_block_access env expected_base_ty principal
