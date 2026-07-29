@@ -292,14 +292,14 @@ let rec fracture_lam lambda : slambda =
   | Lassign (id, lam) ->
     let value = fracture_dynamic lam in
     create_dynamic (if lam == value then lambda else Lassign (id, value))
-  | Lsend (kind, met, obj, args, pos, mode, loc, layout) ->
+  | Lsend (kind, met, obj, args, pos, mode, loc, layout, yielding) ->
     let fmet = fracture_dynamic met in
     let fobj = fracture_dynamic obj in
     let fargs = fracture_dynamic_list args in
     create_dynamic
       (if fmet == met && fobj == obj && fargs == args
        then lambda
-       else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout))
+       else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout, yielding))
   | Levent (lam, ev) ->
     slet_local "body" lam (fun body_c body_r ->
         SLhalves

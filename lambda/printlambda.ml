@@ -1418,13 +1418,19 @@ let rec lam ppf = function
        lam for_to lam for_body
   | Lassign(id, expr) ->
       fprintf ppf "@[<2>(assign@ %a@ %a)@]" Ident.print id lam expr
-  | Lsend (k, met, obj, largs, pos, reg, _, _) ->
+  | Lsend (k, met, obj, largs, pos, reg, _, _, yielding) ->
       let args ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let kind =
         if k = Self then "self" else if k = Cached then "cache" else "" in
       let form = apply_kind "send" pos reg in
-      fprintf ppf "@[<2>(%s%s@ %a@ %a%a)@]" form kind lam obj lam met args largs
+      let marker =
+        match yielding with
+        | May_yield -> "[yielding]"
+        | Unyielding -> ""
+      in
+      fprintf ppf "@[<2>(%s%s%s@ %a@ %a%a)@]" form kind marker
+        lam obj lam met args largs
   | Levent(expr, ev) ->
       let kind =
        match ev.lev_kind with
