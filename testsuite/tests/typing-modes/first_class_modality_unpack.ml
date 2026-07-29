@@ -166,6 +166,21 @@ let elim_via_annot (x : (t @@ portable) @ nonportable) = (x : t @ portable)
 val elim_via_annot : (t @@ portable) -> t = <fun>
 |}]
 
+(* SENTINEL for the interaction between the two annotation positions.
+   [let w : (t @@ m) = e in ...] desugars to a constraint on BOTH the pattern
+   and the expression, so the expected-side hook (firing on the pattern's
+   type) meets the expression's own re-stated annotation. If the hook is
+   allowed to fire on a node that carries its own type, the wrapper and the
+   stripped expectation fail to unify and this stops compiling with
+   "this expression has type (t @@ portable) but an expression was expected of
+   type t". Keep this passing. *)
+let annotated_binding (y : t @ portable) =
+  let w : (t @@ portable) = y in
+  w
+[%%expect{|
+val annotated_binding : t @ portable -> t = <fun>
+|}]
+
 (* Cross-axis sentinels: unpacking must not hand out a mode on an axis the
    modality says nothing about. *)
 let cross_axis_bad (e : (t @@ portable) @ local) = (e : t @ global)
