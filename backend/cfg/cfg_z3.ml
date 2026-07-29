@@ -23,6 +23,13 @@ let run_z3 code =
       ret code output;
   output
 
+let run_validation_fallback code =
+  match run_z3 code |> String.trim with
+  | "unsat" -> "Z3 accepted the compiler result; internal Datalog failed"
+  | "sat" -> "Z3 also rejected the compiler result"
+  | output -> Format.sprintf "unexpected Z3 output: %S" output
+  | exception exn -> Format.sprintf "Z3 raised: %s" (Printexc.to_string exn)
+
 let fmt_fact fmt relation arguments =
   let fmt_argument fmt argument = Format.fprintf fmt " %s" argument in
   Format.fprintf fmt "(rule (%s%a))@." relation

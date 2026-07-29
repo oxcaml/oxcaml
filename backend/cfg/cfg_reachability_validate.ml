@@ -129,13 +129,7 @@ module Z3 = struct
 end
 
 let fallback cfg internal_failure z3_code =
-  let z3_result =
-    match Cfg_z3.run_z3 z3_code |> String.trim with
-    | "unsat" -> "Z3 accepted the compiler result; internal Datalog failed"
-    | "sat" -> "Z3 also rejected the compiler result"
-    | output -> Format.sprintf "unexpected Z3 output: %S" output
-    | exception exn -> Format.sprintf "Z3 raised: %s" (Printexc.to_string exn)
-  in
+  let z3_result = Cfg_z3.run_validation_fallback z3_code in
   Misc.fatal_errorf
     "validate_reachability: internal Datalog failed for CFG %S.@.%s@.%s@.Z3 \
      reproducer:@.%s@.CFG:@.%a"
