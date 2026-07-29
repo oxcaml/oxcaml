@@ -9614,7 +9614,7 @@ and type_function
       let param_yielding =
         Alloc.proj_comonadic Yielding (Alloc.disallow_right arg_mode)
       in
-      let arg_mode =
+      let arg_locality =
         Alloc.disallow_right arg_mode
         |> Alloc.proj_comonadic Areality
         |> Typedtree.create_alloc_mode_l
@@ -9632,7 +9632,7 @@ and type_function
               fp_sort = arg_sort;
               fp_mode =
                 { mode_annots with
-                  mode_modes = arg_mode };
+                  mode_modes = arg_locality };
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
