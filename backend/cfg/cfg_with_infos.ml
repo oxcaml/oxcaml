@@ -11,7 +11,13 @@ let liveness_analysis : Cfg_with_layout.t -> liveness =
   match
     Cfg_liveness.Liveness.run cfg ~init ~map:Cfg_liveness.Liveness.Instr ()
   with
-  | Ok liveness -> liveness
+  | Ok liveness ->
+    if !Oxcaml_flags.cfg_liveness_validate
+    then
+      Profile.record ~accumulate:true "validate_liveness"
+        (Cfg_liveness_validate.validate_liveness cfg)
+        liveness;
+    liveness
   | Aborted _ -> .
   | Max_iterations_reached ->
     Misc.fatal_errorf "Unable to compute liveness from CFG for function %s@."
