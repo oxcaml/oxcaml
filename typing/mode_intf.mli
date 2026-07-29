@@ -589,6 +589,12 @@ module type S = sig
     val noalloc : lr
 
     val alloc : lr
+
+    module Guts : sig
+      (** Returns the upper bound of the given mode. Unlike the lower bound,
+          it is precise. See [get_ceil] in [solver_intf.mli]. *)
+      val get_ceil : ('l * allowed) t -> Const.t
+    end
   end
 
   type 'a comonadic_with =

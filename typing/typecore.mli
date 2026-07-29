@@ -186,9 +186,18 @@ val reset_allocations: unit -> unit
 
     Must be called before anything that zaps the mode of a structure item (in
     particular the modality zapping done while building the inferred
-    signature), since the allocation axis of those modes is only settled
+    signature), since the allocation axis of those modes is only raised
     here. *)
 val constrain_closures: unit -> unit
+
+(** For every allocation registered while type-checking the current structure
+    that is enclosed by a closure required not to allocate, demand that it is
+    stack-allocated, and forget it.
+
+    Must be called before anything that defaults the areality of arrow types:
+    once the enclosing function's return mode has been defaulted to [global],
+    the demand can no longer be satisfied. *)
+val constrain_allocations: unit -> unit
 
 (** Settle the areality of every allocation registered while type-checking the
     current structure, pushing each to the highest (i.e. most stack-like) mode

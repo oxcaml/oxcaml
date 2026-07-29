@@ -5964,6 +5964,10 @@ module Allocation = struct
   let legacy = of_const Const.legacy
 
   let zap_to_legacy = zap_to_ceil
+
+  module Guts = struct
+    let get_ceil m = Guts.get_ceil m
+  end
 end
 
 module type Areality = sig

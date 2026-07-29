@@ -4152,6 +4152,9 @@ let type_toplevel_phrase env sig_acc s =
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
+  (* Demand stack allocation where a [noalloc] closure requires it. This has
+     to happen before the arrow modes below are defaulted to [global]. *)
+  Typecore.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
   Typecore.optimise_allocations ();
@@ -4205,6 +4208,9 @@ let type_module_type_of env smod =
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
+  (* Demand stack allocation where a [noalloc] closure requires it. This has
+     to happen before [check_nongen_modtype] below defaults the arrow modes. *)
+  Typecore.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
   (* Settle what is already known about the allocation axis: this zap runs
@@ -4482,7 +4488,10 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
-        (* CR shsong: Need to determine the order of calling the following two things. *)
+        (* Demand stack allocation where a [noalloc] closure requires it,
+           before the arrow modes are defaulted; then settle again afterwards,
+           so that the modality zap below reads a correct floor. *)
+        Typecore.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
         Typecore.constrain_closures ();
         let zap_modality =
@@ -4548,6 +4557,10 @@ let type_implementation target modulename initial_env ast =
           in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
+          (* Demand stack allocation where a [noalloc] closure requires it.
+             This has to happen before the inclusion check below pins the
+             arrow modes against the interface. *)
+          Typecore.constrain_allocations ();
           let arg_type_from_cmi = Env.implemented_parameter global_name in
           if not (Option.equal Global_module.Parameter_name.equal
                     arg_type arg_type_from_cmi) then
@@ -4596,6 +4609,10 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
+          (* Demand stack allocation where a [noalloc] closure requires it.
+             This has to happen before [check_nongen_signature] below defaults
+             the arrow modes. *)
+          Typecore.constrain_allocations ();
           let coercion, shape =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)

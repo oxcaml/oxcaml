@@ -810,13 +810,12 @@ let allocations : allocation list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-(* Register [alloc_mode] for locality optimisation only. There is no enclosing
-   closure to constrain, so [closure_mode] is [max]. *)
+(* Register [alloc_mode] for locality optimisation only. No enclosing closure
+   is constrained, hence the empty [closures]. *)
 let register_mode_for_optimisation ~loc alloc_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
   let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations :=
-    {alloc_mode; closure_mode = Allocation.max; pp} :: !allocations
+  allocations := {alloc_mode; closures = []; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc alloc_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
@@ -868,8 +867,6 @@ let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
 let heap_allocated = Allocation.of_const ~hint:Allocated_on_heap Alloc
 
 let constrain_closures () =
-  (* CR-soon shsong: We may also need to check ceiling for allocation mode
-     axis for closure_mode. *)
   let heap, pending =
     (* Visited in registration (i.e. source) order, so that the first
        offending allocation is the one reported. *)
@@ -889,6 +886,27 @@ let constrain_closures () =
     (fun {closure_mode; pp; _} ->
       Allocation.submode_err pp heap_allocated closure_mode)
     heap
+
+let constrain_allocations () =
+  let local, pending =
+    (* Visited in registration (i.e. source) order, so that the first
+       offending allocation is the one reported. *)
+    List.rev !allocations
+    |> List.partition (fun {closure_mode; _} ->
+      match Allocation.Guts.get_ceil closure_mode with
+      (* Some enclosing closure is required not to allocate, so the
+         allocation has to be on the stack. *)
+      | Noalloc | Noalloc_strict -> true
+      (* No enclosing closure needs it on the stack; leave it to
+         [optimise_allocations]. *)
+      | Alloc -> false)
+  in
+  allocations := List.rev pending;
+  List.iter
+    (fun {alloc_mode; pp; _} ->
+      Locality.submode_err pp Locality.local
+        (Alloc.proj_comonadic Areality alloc_mode))
+    local
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
