@@ -446,10 +446,6 @@ type expected_mode =
     field and [mode]: this field being [true] while [mode] being [global] is
     sensible, but not very useful as it will fail all expressions. *)
 
-    alloc_annot : Allocation.Const.t option;
-    (** [Some c] iff the function was directly annotated with the allocation
-    mode [c] on its binding (e.g. [let (f @ noalloc) x = ...]). *)
-
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -532,7 +528,6 @@ let mode_default mode =
   { position = RNontail;
     mode = Value.disallow_left mode;
     strictly_local = false;
-    alloc_annot = None;
     tuple_modes = None }
 
 let mode_legacy = mode_default Value.legacy
@@ -650,9 +645,6 @@ let mode_strictly_local expected_mode =
   { expected_mode
     with strictly_local = true
   }
-
-let mode_alloc_annot expected_mode alloc_annot =
-  { expected_mode with alloc_annot }
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -803,20 +795,34 @@ let dynamic_pat_mode pat_mode =
   in
   {pat_mode with mode}
 
-let allocations : Alloc.r list ref = Local_store.s_ref []
+type allocation =
+  { alloc_mode : Alloc.r;
+    (** The mode of the allocation. *)
+    closure_mode : Allocation.lr;
+    (** A mode below the allocation mode of every closure enclosing the
+        allocation. Constraining it to [alloc] forces all of them to be
+        [alloc]. *)
+    pp : Hint.pinpoint
+    (** Points at the allocation, for error messages. *)
+  }
+
+let allocations : allocation list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_mode_for_optimisation alloc_mode =
+(* Register [alloc_mode] for locality optimisation only. There is no enclosing
+   closure to constrain, so [closure_mode] is [max]. *)
+let register_mode_for_optimisation ~loc alloc_mode =
+  let pp : Hint.pinpoint = (loc, Allocation) in
   let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := alloc_mode :: !allocations
+  allocations :=
+    {alloc_mode; closure_mode = Allocation.max; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc alloc_mode =
-  let min_mode =
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
-  in
-  Value.submode_err (loc, Allocation) min_mode (alloc_as_value alloc_mode);
-  register_mode_for_optimisation alloc_mode
+  let pp : Hint.pinpoint = (loc, Allocation) in
+  let closure_mode = Env.walk_locks_for_allocation ~env pp in
+  let alloc_mode = Alloc.disallow_left alloc_mode in
+  allocations := {alloc_mode; closure_mode; pp} :: !allocations
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -858,6 +864,32 @@ let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   in
   alloc_mode, mode_default mode
 
+(** The allocation mode forced on the closures enclosing a heap allocation. *)
+let heap_allocated = Allocation.of_const ~hint:Allocated_on_heap Alloc
+
+let constrain_closures () =
+  (* CR-soon shsong: We may also need to check ceiling for allocation mode
+     axis for closure_mode. *)
+  let heap, pending =
+    (* Visited in registration (i.e. source) order, so that the first
+       offending allocation is the one reported. *)
+    List.rev !allocations
+    |> List.partition (fun {alloc_mode; _} ->
+      match
+        Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
+      with
+      (* The allocation cannot be made local, so it is on the heap. *)
+      | Global -> true
+      (* The allocation may still end up on the stack; leave it to
+         [optimise_allocations]. *)
+      | Local -> false)
+  in
+  allocations := List.rev pending;
+  List.iter
+    (fun {closure_mode; pp; _} ->
+      Allocation.submode_err pp heap_allocated closure_mode)
+    heap
+
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
   example, pushing an allocation to [contended] is useful to the middle-end.
@@ -865,12 +897,19 @@ let optimise_allocations () =
   Therefore, here we only optimise allocation for stack/heap. Proper solutions:
   - Remove [Contention] axis from [Alloc].
   - Add it back when middle-end can really utilize this information. *)
+  (* Allocations are visited in registration (i.e. source) order, so that the
+     first offending allocation is the one reported. *)
+  let allocations = List.rev !allocations in
+  (* Reset first: the loop below can raise. *)
+  reset_allocations ();
   List.iter
-    (fun mode ->
-      Locality.zap_to_ceil (Alloc.proj_comonadic Areality mode)
-      |> ignore)
-    !allocations;
-  reset_allocations ()
+    (fun {alloc_mode; closure_mode; pp} ->
+      match Locality.zap_to_ceil (Alloc.proj_comonadic Areality alloc_mode)
+      with
+      | Local -> ()
+      | Global ->
+        Allocation.submode_err pp heap_allocated closure_mode)
+    allocations
 
 (** We keep this state which is passed as an optional argument throughout
     the typechecker. It goes through the following life-cycle:
@@ -6256,15 +6295,6 @@ let split_function_ty
     | false -> env
     | true ->
         let env =
-          match expected_mode.alloc_annot with
-          | Some Noalloc ->
-            Env.add_closure_noalloc_lock Hint.Noalloc (loc, Function) env
-          | Some Noalloc_strict ->
-            Env.add_closure_noalloc_lock Hint.Noalloc_strict (loc, Function)
-              env
-          | Some Alloc | None -> env
-        in
-        let env =
           Env.add_closure_lock
             (loc, Function)
             closed_over_mode.comonadic
@@ -6444,10 +6474,6 @@ let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
       in
       Some env_alloc_mode, mode_default exp_mode
     else None, exp_mode
-  in
-  let exp_mode =
-    mode_alloc_annot exp_mode
-      ((mode_annots_from_pat spat).mode_modes.allocation)
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
@@ -9129,7 +9155,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_mode_for_optimisation
+           register_mode_for_optimisation ~loc:lid.loc
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
@@ -11670,13 +11696,9 @@ and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
     let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in
     submode ~loc ~env ~reason:Other (Value.of_const min) expected_mode;
     let expected_mode = mode_coerce (Value.of_const max) expected_mode in
-    let expected_mode =
-      match modes.areality with
-      | Some Local -> mode_strictly_local expected_mode
-      | _ -> expected_mode
-    in
-    let expected_mode = mode_alloc_annot expected_mode modes.allocation in
-    expected_mode
+    match modes.areality with
+    | Some Local -> mode_strictly_local expected_mode
+    | _ -> expected_mode
 
 and type_n_ary_function
       ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
