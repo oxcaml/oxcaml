@@ -46,7 +46,7 @@
         }
       },
       [
-        "_"
+        "struct  end"
       ]
     ],
     "notifications": []
