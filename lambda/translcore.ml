@@ -377,8 +377,13 @@ let rec iter_exn_names f pat =
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      let zero_alloc =
+        match Zero_alloc.get desc.val_zero_alloc with
+        | Check c -> Some c
+        | Default_zero_alloc | Ignore_assert_all | Assume _ -> None
+      in
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
-        ~zero_alloc:(Zero_alloc.get desc.val_zero_alloc) (Some path)
+        ~zero_alloc (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
