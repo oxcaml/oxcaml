@@ -4780,6 +4780,7 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
              ai_coercion_from_primary = coercion;
            }
 
+(* In Merlin catching errors is done at the Mtyper level
 let collect_recovery_errors unit exn_list =
   let error_list =
     List.fold_right (fun exn set ->
@@ -4795,6 +4796,7 @@ let collect_recovery_errors unit exn_list =
   raise
     (Errors (Location.in_file
                (Unit_info.raw_source_file unit), error_list))
+*)
 
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
@@ -4826,13 +4828,16 @@ let type_implementation target modulename initial_env ast =
       let delayed () = type_structure initial_env ast
       in
       let (str, sg, mode, names, shape, finalenv) =
+        (*
         if !Clflags.typing_recovery then
           let caught = ref [] in
           let result = Typing_recovery.catch_errors caught delayed
           in match !caught with
           | [] -> result
           | exn_list -> collect_recovery_errors target exn_list
-        else delayed ()
+        else
+        *)
+        delayed ()
       in
       With_regionality.submode_err (Location.in_file sourcefile, Structure)
         mode (Persistent_env.mode_pers_mod Dynamic);
@@ -5056,6 +5061,7 @@ let type_interface target modulename env ast =
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
   let sg =
+    (*
     if !Clflags.typing_recovery then
       let caught = ref [] in
       let result =
@@ -5065,7 +5071,8 @@ let type_interface target modulename env ast =
       | [] -> result
       | exn_list -> collect_recovery_errors target exn_list
     else
-      transl_signature ~interface_toplevel:true env ast
+    *)
+    transl_signature env ast
   in
   let arg_type =
     !Clflags.as_argument_for
