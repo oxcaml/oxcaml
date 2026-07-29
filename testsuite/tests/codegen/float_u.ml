@@ -295,13 +295,11 @@ let min_unchecked (a : Float_u.t) (b : Float_u.t) =
 ;;
 [%%expect_asm X86_64{|
 min_unchecked:
-  vmovapd %xmm0, %xmm2
-  vmovapd %xmm1, %xmm0
-  vcomisd %xmm2, %xmm0
+  vcomisd %xmm0, %xmm1
   jbe   .L0
-  vmovapd %xmm2, %xmm0
   ret
 .L0:
+  vmovapd %xmm1, %xmm0
   ret
 |}]
 
