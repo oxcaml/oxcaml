@@ -41,8 +41,6 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
-  (* Rebuild a reaped compilation unit. The output prefix should come with
-     [.reaped] appended. *)
   val reaper_rebuild :
     cmr_file:string -> output_prefix:string -> keep_symbol_tables:bool -> unit
 

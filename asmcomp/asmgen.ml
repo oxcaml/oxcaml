@@ -694,7 +694,7 @@ type direct_to_cmm =
 
 type pipeline = Direct_to_cmm of direct_to_cmm
 
-type make_cmm =
+type cmm_generator =
   ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
 
 let asm_filename output_prefix =
@@ -703,7 +703,7 @@ let asm_filename output_prefix =
   else Filename.temp_file "camlasm" ext_asm
 
 let compile_implementation_from_cmm unix ?toplevel ~required_globals ~sourcefile
-    ~prefixname ~ppf_dump make_cmm =
+    ~prefixname ~ppf_dump (make_cmm : cmm_generator) =
   compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)

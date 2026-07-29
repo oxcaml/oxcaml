@@ -26,8 +26,9 @@ type direct_to_cmm =
 (** The one true way to get from Lambda to Cmm. *)
 type pipeline = Direct_to_cmm of direct_to_cmm
 
-(** The type of converters producing Cmm from a reaped compilation unit. *)
-type make_cmm =
+(** A callback to generate Cmm for a program. NB the program source is not an
+    argument, so this should be a closure capturing it. *)
+type cmm_generator =
   ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
 
 (** Compile an implementation from Lambda using the given middle end. *)
@@ -42,7 +43,7 @@ val compile_implementation :
   unit
 
 (** Compile an implementation from the Cmm phrases produced by the given
-    converter, e.g. when rebuilding a reaped compilation unit. *)
+    callback, e.g. when rebuilding a reaped compilation unit. *)
 val compile_implementation_from_cmm :
   (module Compiler_owee.Unix_intf.S) ->
   ?toplevel:(string -> bool) ->
@@ -50,7 +51,7 @@ val compile_implementation_from_cmm :
   sourcefile:string option ->
   prefixname:string ->
   ppf_dump:Format.formatter ->
-  make_cmm ->
+  cmm_generator ->
   unit
 
 (** [compile_implementation_linear] reads Linear IR from [progname] file
