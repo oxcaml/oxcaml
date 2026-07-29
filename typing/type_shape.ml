@@ -291,8 +291,9 @@ module Type_shape = struct
             Option.value shape ~default:unknown_shape_any
             (* CR sspies: We could ask the environment here for extra layout
                information about the type. *)
-          | Tmod _ ->
-            Misc.fatal_error "Type_shape.of_type_expr: unexpected Tmod"
+          | Tmod (type_expr, _) ->
+            (* Transparent wrapper: the shape is that of the payload. *)
+            of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->

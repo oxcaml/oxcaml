@@ -2658,8 +2658,10 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-  | Tmod _ ->
-    Misc.fatal_error "Ctype.extract_concrete_typedecl: unexpected Tmod"
+  (* Deliberately opaque: looking through would allow record/variant
+     operations on [t @@ m] while dropping the modality from the mode, which
+     is only sound once elimination is implemented. Revisit in Stage 4. *)
+  | Tmod _ -> Has_no_typedecl
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
@@ -5092,6 +5094,8 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tmod (t1, b1), Tmod (t2, b2)) when Jkind0.Mod_bounds.equal b1 b2 ->
+      unify uenv t1 t2
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -6310,6 +6314,8 @@ let crossing_of_ty env ?modalities ty =
   | None -> crossing
   | Some m -> Crossing.modality m crossing
 
+let mod_bounds_le b1 b2 = Jkind0.Mod_bounds.(equal (meet b1 b2) b1)
+
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> Value.disallow_right |> Crossing.apply_left crossing
@@ -6471,6 +6477,21 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tmod (u1, b1), Tmod (u2, b2)) ->
+              (* Q1: inclusion accepts a type crossing at least as much as the
+                 one expected. Smaller mod-bounds mean more crossing. The
+                 direction must follow [variance], as in [moregen_alloc_mode]:
+                 in a contravariant position the implementation must accept
+                 everything the signature promises, so the ordering flips. *)
+              let ok =
+                match variance with
+                | Invariant -> Jkind0.Mod_bounds.equal b1 b2
+                | Covariant -> mod_bounds_le b1 b2
+                | Contravariant -> mod_bounds_le b2 b1
+                | Bivariant -> true
+              in
+              if not ok then raise_unexplained_for Moregen;
+              moregen inst_nongen variance type_pairs env u1 u2
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -6984,6 +7005,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst
                 (incr_stage env) ~do_jkind_check t1 t2
+          | (Tmod (u1, b1), Tmod (u2, b2)) ->
+              if not (Jkind0.Mod_bounds.equal b1 b2)
+              then raise_unexplained_for Equality;
+              eqtype rename type_pairs subst env ~do_jkind_check u1 u2
           | (Tbox t1, Tbox t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
@@ -7923,6 +7948,42 @@ let rec subtype_rec env trace t1 t2 cstrs =
            (Subtype.Diff {got = t1; expected = t2} :: trace)
            t1 t2
            cstrs
+    (* A coercion may weaken a first-class modality: [t @@ m1 :> t @@ m2] when
+       [m1] crosses at least as much as [m2]. Unlike [moregen], [subtype_rec]
+       handles contravariance by swapping its arguments (see the [Tarrow] arm),
+       so no variance dispatch is needed here: every recursive call preserves
+       the "got on the left" invariant. If the bounds are not ordered this
+       falls through to the default arm, which defers to unification and is
+       invariant, so the coercion is rejected.
+
+       Both this arm and the forgetting arm below rely on subtyping being
+       crossing-monotone: [t1 <: t2] must imply that [t1] crosses at least as
+       much as [t2]. That holds today (widening only ever removes crossing),
+       but it is an obligation on any future subtyping rule, not something
+       enforced here.
+
+       Incompleteness: the comparison uses only the outer bounds, while the
+       effective crossing is [meet (crossing of payload) bounds]. So a sound
+       coercion between nested wrappers such as
+       [((t @@ m1) @@ m2) :> (t @@ m1)] is rejected. That is consistent with
+       nested wrappers not normalising; revisit together. *)
+    | (Tmod (u1, b1), Tmod (u2, b2)) when mod_bounds_le b1 b2 ->
+         subtype_rec
+           env
+           (Subtype.Diff {got = u1; expected = u2} :: trace)
+           u1 u2
+           cstrs
+    (* Forgetting a modality is always safe: it only discards the ability to
+       cross. The reverse ([t :> t @@ m]) must NOT be allowed, as it would
+       claim a crossing the value does not have; it falls through below.
+
+       This step deliberately does NOT push a [Subtype.Diff]. Unwrapping is
+       transparent, so a failure whose real cause is on the target side should
+       still be reported against the original pair; pushing a diff here made
+       such errors blame the payload instead. *)
+    | (Tmod (u1, _), _)
+      when not (match get_desc t2 with Tmod _ -> true | _ -> false) ->
+         subtype_rec env trace u1 t2 cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

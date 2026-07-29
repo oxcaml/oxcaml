@@ -1327,6 +1327,24 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
+  | Ptyp_modality (t, modalities) ->
+      Language_extension.assert_enabled ~loc Mode Language_extension.Alpha;
+      let cty = transl_type env ~policy ~row_context mode t in
+      let modalities =
+        Typemode.transl_modalities ~maturity:Language_extension.Stable Immutable
+          modalities
+      in
+      let m = modalities.moda_modalities in
+      (* An identity modality is erased: [(t @@ <identity>)] denotes [t]. This
+         keeps [Tmod] nodes out of types where they would carry no information
+         and would only obstruct unification. *)
+      let ty =
+        if Mode.Modality.Const.is_id m
+        then cty.ctyp_type
+        else
+          newty (Tmod (cty.ctyp_type, Typemode.mod_bounds_of_modality m))
+      in
+      ctyp (Ttyp_modality (cty, modalities)) ty
   | Ptyp_quote t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));

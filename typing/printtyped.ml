@@ -435,6 +435,10 @@ let rec core_type i ppf x =
       core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
+  | Ttyp_modality (ct, m) ->
+      line i ppf "Ttyp_modality\n";
+      core_type i ppf ct;
+      modalities i ppf m
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =

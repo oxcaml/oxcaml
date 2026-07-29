@@ -879,6 +879,7 @@ and core_type_desc =
   | Ttyp_repr of string list * core_type
   | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
+  | Ttyp_modality of core_type * modalities
   | Ttyp_call_pos
 
 and package_type = {

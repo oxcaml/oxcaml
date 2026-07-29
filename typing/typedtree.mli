@@ -1298,6 +1298,10 @@ and core_type_desc =
           A variable in [vars] may have no associated location if it is freshly
           created during type inference for [val poly_] value descriptions. *)
   | Ttyp_of_kind of Parsetree.jkind_annotation
+  | Ttyp_modality of core_type * modalities
+      (** [Ttyp_modality (ty, m)] represents [(ty @@ m)], a first-class
+          modality. Translation erases an identity modality, so this node
+          always carries a non-identity one. *)
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
           argument ([lbl:[%call_pos] -> ...]). *)

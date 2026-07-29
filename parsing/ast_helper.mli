@@ -99,6 +99,8 @@ module Typ :
     val newlayout:
       ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
+    val modality:
+      ?loc:loc -> ?attrs:attrs -> core_type -> modalities -> core_type
 
     val force_poly: core_type -> core_type
 

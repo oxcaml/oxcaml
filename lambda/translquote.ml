@@ -2820,7 +2820,11 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
-        | Tmod _ -> fatal_errorf "Translquote: unexpected Tmod"
+        | Tmod _ ->
+          (* Reachable now that [t @@ m] is surface syntax, but quoting one is
+             not supported, as for [Trepr] and [Ttyp_of_kind]. *)
+          fatal_errorf "Translquote [at %a]: no support for Tmod"
+            Location.print_loc_in_lowercase loc
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields
@@ -3202,6 +3206,9 @@ and quote_core_type ~scopes ty =
       Location.print_loc (to_location loc)
   | Ttyp_of_kind _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_of_kind not implemented."
+      Location.print_loc (to_location loc)
+  | Ttyp_modality _ ->
+    fatal_errorf "Translquote [at %a]: Ttyp_modality not implemented."
       Location.print_loc (to_location loc)
   | Ttyp_call_pos -> Type.wrap Type.call_pos
 

@@ -1087,6 +1087,8 @@ let typ sub x =
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
+    | Ttyp_modality (ct, m) ->
+        Ttyp_modality (sub.typ sub ct, sub.modalities sub m)
   in
   let ctyp_attributes = sub.attributes sub x.ctyp_attributes in
   {x with ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes}

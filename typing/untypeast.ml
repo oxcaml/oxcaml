@@ -1150,6 +1150,8 @@ let core_type sub ct =
     | Ttyp_newlayout (list, ct) ->
         Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
+    | Ttyp_modality (ct, m) ->
+        Ptyp_modality (sub.typ sub ct, Typemode.untransl_modalities m)
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
   in

@@ -4912,6 +4912,12 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { type_ }
+  (* A first-class modality. Only allowed in this delimited position, so that
+     the existing [@@] positions (val, record field, constructor argument,
+     include, jkind with-bound) are untouched: the parenthesis decides which
+     rule applies before [@@] is ever read. *)
+  | LPAREN type_ = core_type ATAT modalities = modalities RPAREN
+      { mktyp ~loc:$sloc (Ptyp_modality (type_, modalities)) }
   | LPAREN MODULE ext_attrs = ext_attributes package_type = package_type_ RPAREN
       { mktyp_attrs ~loc:$sloc (Ptyp_package package_type) ext_attrs }
   | mktyp(

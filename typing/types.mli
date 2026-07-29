@@ -193,10 +193,19 @@ and type_desc =
   (** [Tmod (t, bounds)] ==> [t @@ bounds]
       The type [t] with its mode crossing bounded by [bounds]. This is a
       transparent wrapper: it constrains mode crossing only, and erases at
-      runtime. The unboxing and kind-computation paths look through it to [t],
-      as they do for [Tpoly]; generic structural traversals rebuild it; the
-      leaf consumers that classify a type's runtime representation raise,
-      since a [Tmod] is not expected to reach them. *)
+      runtime.
+
+      Two kinds of node share this constructor. Surface nodes come from the
+      first-class modality syntax [(t @@ m)] and always have [externality =
+      max]; the with-bounds engine also manufactures nodes during GADT payload
+      projection, and those may carry a non-max externality.
+
+      Because surface [Tmod]s reach the back end, every consumer must handle
+      them: the unboxing and kind-computation paths look through to [t], as
+      they do for [Tpoly]; generic structural traversals rebuild it; and the
+      leaf consumers that classify a runtime representation look through it
+      too (the [scrape_ty] functions strip it, so most of them never see one).
+      Do not reintroduce a [fatal_error] on this constructor. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
