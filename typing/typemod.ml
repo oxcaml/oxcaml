@@ -116,7 +116,11 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   mode
 
 let register_allocation ~env ~loc ~desc : Alloc.lr * Value.lr =
-  let min_mode = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
+  let closure_mode =
+    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
+  in
+  Allocation.submode_err (loc, desc)
+    (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode;
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -126,7 +130,6 @@ let register_allocation ~env ~loc ~desc : Alloc.lr * Value.lr =
   let closed_over_mode =
     alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
   in
-  Value.submode_err (loc, desc) min_mode closed_over_mode;
   alloc_mode, closed_over_mode
 
 open Typedtree
@@ -2220,6 +2223,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
         in
+        (* Settle what is already known about the allocation axis: this zap
+           runs while type-checking, so the axis would otherwise be read at a
+           floor that [Typecore.optimise_allocations] has not raised yet. *)
+        Typecore.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
         in
@@ -4200,6 +4207,12 @@ let type_module_type_of env smod =
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
+  (* Settle what is already known about the allocation axis: this zap runs
+     while type-checking, so the axis would otherwise be read at a floor that
+     [Typecore.optimise_allocations] has not raised yet. [check_nongen_modtype]
+     above has just defaulted the arrow modes reachable from [mty], so the
+     areality of allocations surfacing in [mty] is known by now. *)
+  Typecore.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4469,7 +4482,9 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
+        (* CR shsong: Need to determine the order of calling the following two things. *)
         remove_mode_and_jkind_variables finalenv sg;
+        Typecore.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         in
@@ -4560,6 +4575,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
+          Typecore.constrain_closures ();
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4591,7 +4607,9 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
                 sg "(inferred signature)" simple_sg shape)
           in
+          (* CR shsong: Think about the order of the following two things. *)
           check_nongen_signature finalenv simple_sg;
+          Typecore.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
                inclusion check, so we zap to identity if mode extension is

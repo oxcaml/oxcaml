@@ -59,10 +59,6 @@ type always_dynamic =
   | Application
   | Try_with
 
-type noalloc =
-  | Noalloc
-  | Noalloc_strict
-
 type legacy =
   | Compilation_unit
   | Toplevel
@@ -122,9 +118,7 @@ type 'd const =
   | Lazy_forced : (disallowed * 'r) neg const
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
-  | Allocated_in_noalloc_closure :
-      noalloc * pinpoint
-      -> ('l * disallowed) pos const
+  | Allocated_on_heap : ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
