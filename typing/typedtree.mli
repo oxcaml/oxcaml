@@ -1158,7 +1158,7 @@ and primitive_coercion =
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     (** As the [Mode.Yielding.l] in [Id_prim]. *)
-    pc_zero_alloc: Zero_alloc.const;
+    pc_zero_alloc: Zero_alloc.check option;
     pc_env: Env.t;
     pc_loc : Location.t;
   }

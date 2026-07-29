@@ -221,12 +221,12 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
-  let prim_coercion_zero_alloc : Zero_alloc.const =
+  let prim_coercion_zero_alloc : Zero_alloc.check option =
     match vd1.val_kind, vd2.val_kind, Zero_alloc.get vd2.val_zero_alloc with
-    | Val_prim p1, Val_reg _, Check c when c.arity = p1.prim_arity -> Check c
+    | Val_prim p1, Val_reg _, Check c when c.arity = p1.prim_arity -> Some c
     | _, _, _ ->
       match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
-      | Ok () -> Default_zero_alloc
+      | Ok () -> None
       | Error e -> raise (Dont_match (Zero_alloc e))
   in
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
