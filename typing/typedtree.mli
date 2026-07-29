@@ -520,8 +520,9 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : return_mode modes;
-        (* Mode where the function allocates, ie local for a function of
-           type 'a -> local_ 'b, and heap for a function of type 'a -> 'b *)
+        (* Whether the function may return a value allocated in its caller's
+           region: [local] for ['a -> 'b @ local], [global] for ['a -> 'b].
+           Becomes [Lambda.return_mode] via [Translmode.transl_ret_mode]. *)
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode_r;
         (* Mode at which the closure is allocated *)

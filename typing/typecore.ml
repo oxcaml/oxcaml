@@ -6493,8 +6493,9 @@ type type_function_result =
     params_contain_gadt: contains_gadt;
     (* The alloc mode of the "rest of the function". None only for recursive
        calls to [type_function] when there are no parameters left. This needs to
-       be a left mode for the construction of the [fp_curry] field of the outer
-       function.
+       carry the full [Alloc] closure mode, against which the curry constraints
+       are checked, together with the locality component stored as [fp_curry]'s
+       [partial_mode].
     *)
     fun_alloc_mode: fun_alloc_mode option;
     (* Information about the return of the function. None only for
