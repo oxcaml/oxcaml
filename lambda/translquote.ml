@@ -2220,8 +2220,6 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let ( let+ ) f x = Option.map x f
-
 let module_for_path_opt loc env path =
   Env.add_required_global_for_quote path env;
   let rec go path =
@@ -2238,8 +2236,9 @@ let module_for_path_opt loc env path =
             Ident.name id |> Identifier.Module.toplevel_module loc))
       |> Identifier.Module.wrap |> Option.some
     | Path.Pdot (p, s) ->
-      let+ m = go p in
-      Identifier.Module.dot loc m s |> Identifier.Module.wrap
+      go p
+      |> Option.map (fun m ->
+          Identifier.Module.dot loc m s |> Identifier.Module.wrap)
     | _ -> None
   in
   go path
@@ -2248,16 +2247,16 @@ let module_type_for_path_opt loc env = function
   | Path.Pident id ->
     Module_type.of_string loc (Ident.name id) |> Module_type.wrap |> Option.some
   | Path.Pdot (p, s) ->
-    let+ m = module_for_path_opt loc env p in
-    Module_type.ident loc
-      (Identifier.Module_type.dot loc m s |> Identifier.Module_type.wrap)
-    |> Module_type.wrap
+    module_for_path_opt loc env p
+    |> Option.map (fun m ->
+        Module_type.ident loc
+          (Identifier.Module_type.dot loc m s |> Identifier.Module_type.wrap)
+        |> Module_type.wrap)
   | _ -> None
 
 let type_for_path_opt loc env = function
   | Path.Pident id ->
-    let+ t =
-      match Hashtbl.find_opt vars_env.env_tys id with
+    (match Hashtbl.find_opt vars_env.env_tys id with
       | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
       | None ->
         (* CR-someday jbachurski: I am fairly sure we can retire this check as
@@ -2269,18 +2268,18 @@ let type_for_path_opt loc env = function
             (fun (name', _) -> String.equal name name')
             Predef.builtin_type_constrs
         then Some (Identifier.Type.builtin loc name)
-        else None
-    in
-    Identifier.Type.wrap t
+        else None)
+    |> Option.map Identifier.Type.wrap
   | Path.Pdot (p, s) ->
-    let+ m = module_for_path_opt loc env p in
-    Identifier.Type.dot loc m s |> Identifier.Type.wrap
+    module_for_path_opt loc env p
+    |> Option.map (fun m -> Identifier.Type.dot loc m s |> Identifier.Type.wrap)
   | _ -> None
 
 let value_for_path_opt loc env = function
   | Path.Pdot (p, s) ->
-    let+ m = module_for_path_opt loc env p in
-    Identifier.Value.dot loc m s |> Identifier.Value.wrap
+    module_for_path_opt loc env p
+    |> Option.map (fun m ->
+        Identifier.Value.dot loc m s |> Identifier.Value.wrap)
   | _ -> None
 
 let try_path kind path_for_kind_opt loc env path =
