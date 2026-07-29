@@ -316,6 +316,10 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
+  | Sixtyfour
+    (* 64-bit integer whose accesses do not follow OCaml alignment (e.g.
+       [Bytes.set_int64], [Bigarray] int64); must not use ordered
+       (release/acquire) accesses, which require natural alignment on Arm. *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)

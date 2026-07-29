@@ -176,6 +176,8 @@ let mem_label base ~(reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc) ?offset
 
 let mem base = Ast.DSL.mem ~base
 
+let mem_offset_unscaled base offset = Ast.DSL.mem_offset_unscaled ~base ~offset
+
 (* See .mli for why this returns [`X] and not [`X | `SP]. *)
 let gp_reg_of_reg r : [`GP of [`X]] Ast.Reg.t =
   let index = reg_index r in
