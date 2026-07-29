@@ -345,7 +345,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
         { self_param
           with fp_curry = More_args
             { partial_mode =
-              Mode.Locality.disallow_right Mode.Locality.legacy }
+              create_alloc_mode_l
+                (Mode.Locality.disallow_right Mode.Locality.legacy) }
         }
       in
       let return_sort =
@@ -3115,7 +3116,8 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
                   fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode =
-                    Mode.Locality.disallow_right Mode.Locality.legacy;
+                    create_alloc_mode_l
+                      (Mode.Locality.disallow_right Mode.Locality.legacy);
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;
                 }))
