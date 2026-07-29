@@ -13,3 +13,17 @@ module Graph : sig
 
   val create : Cfg.t -> t
 end
+
+module Liveness : sig
+  type t =
+    { next : (InstructionId.t * InstructionId.t) list;
+      exn_next : (InstructionId.t * InstructionId.t) list;
+      args : (InstructionId.t * Reg.t) list;
+      results : (InstructionId.t * Reg.t) list;
+      not_removable : InstructionId.t list;
+      tailcall_self : InstructionId.t list;
+      exn_bucket : Reg.t
+    }
+
+  val create : Cfg.t -> t
+end

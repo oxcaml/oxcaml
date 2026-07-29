@@ -191,9 +191,13 @@ let mk_cfg_dominators_validate f =
   ("-cfg-dominators-validate", Arg.Unit f, " Validate CFG dominators")
 
 let mk_no_cfg_dominators_validate f =
-  ( "-no-cfg-dominators-validate",
-    Arg.Unit f,
-    " Do not validate CFG dominators" )
+  ("-no-cfg-dominators-validate", Arg.Unit f, " Do not validate CFG dominators")
+
+let mk_cfg_liveness_validate f =
+  ("-cfg-liveness-validate", Arg.Unit f, " Validate CFG liveness")
+
+let mk_no_cfg_liveness_validate f =
+  ("-no-cfg-liveness-validate", Arg.Unit f, " Do not validate CFG liveness")
 
 let mk_cfg_prologue_validate f =
   ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
@@ -1358,6 +1362,8 @@ module type Oxcaml_options = sig
   val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_dominators_validate : unit -> unit
   val no_cfg_dominators_validate : unit -> unit
+  val cfg_liveness_validate : unit -> unit
+  val no_cfg_liveness_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -1560,6 +1566,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_cfg_eliminate_dead_code_validate;
       mk_cfg_dominators_validate F.cfg_dominators_validate;
       mk_no_cfg_dominators_validate F.no_cfg_dominators_validate;
+      mk_cfg_liveness_validate F.cfg_liveness_validate;
+      mk_no_cfg_liveness_validate F.no_cfg_liveness_validate;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
@@ -1928,6 +1936,8 @@ module Oxcaml_options_impl = struct
 
   let cfg_dominators_validate = set' Oxcaml_flags.cfg_dominators_validate
   let no_cfg_dominators_validate = clear' Oxcaml_flags.cfg_dominators_validate
+  let cfg_liveness_validate = set' Oxcaml_flags.cfg_liveness_validate
+  let no_cfg_liveness_validate = clear' Oxcaml_flags.cfg_liveness_validate
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
@@ -2506,6 +2516,7 @@ module Extra_params = struct
     | "cfg-eliminate-dead-code-validate" ->
         set' Oxcaml_flags.cfg_eliminate_dead_code_validate
     | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
+    | "cfg-liveness-validate" -> set' Oxcaml_flags.cfg_liveness_validate
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers

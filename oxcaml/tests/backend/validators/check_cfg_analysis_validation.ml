@@ -20,11 +20,19 @@ let make_cfg blocks =
       fun_ret_type = Cmm.typ_int
     }
 
+let validate_liveness cfg_with_infos =
+  Misc.protect_refs
+    [R (Oxcaml_flags.cfg_liveness_validate, true)]
+    (fun () ->
+      ignore (Cfg_with_infos.liveness cfg_with_infos : Cfg_with_infos.liveness))
+
 let validate cfg_with_infos =
   Misc.protect_refs
-    [R (Oxcaml_flags.cfg_dominators_validate, true)]
+    [ R (Oxcaml_flags.cfg_liveness_validate, true);
+      R (Oxcaml_flags.cfg_dominators_validate, true) ]
     (fun () ->
       let cfg = Cfg_with_infos.cfg cfg_with_infos in
+      ignore (Cfg_with_infos.liveness cfg_with_infos : Cfg_with_infos.liveness);
       ignore (Cfg_dominators.build cfg : Cfg_dominators.t);
       Cfg_reachability_validate.validate_reachability cfg)
 
@@ -87,6 +95,26 @@ let test_reachable () =
       block successor (terminator ~arg:[| int.(0) |] Return) ]
   |> Cfg_with_infos.cfg |> Cfg_reachability_validate.validate_reachability
 
+let test_dead_pure_and_impure () =
+  let body : Basic.t list =
+    [ { id = make_id ();
+        desc = Op (Intop Iadd);
+        arg = [| int.(0); int.(1) |];
+        res = [| int.(2) |]
+      };
+      { id = make_id (); desc = Op Opaque; arg = [| int.(3) |]; res = [||] } ]
+  in
+  make_cfg [block ~body entry_label (terminator ~arg:[| int.(0) |] Return)]
+  |> validate
+
+let test_exception_handler () =
+  let handler = new_label 12 in
+  make_cfg
+    [ block ~exn:handler entry_label
+        (terminator ~arg:[| int.(0) |] (Raise Raise_regular));
+      block handler (terminator ~arg:[| Proc.loc_exn_bucket |] Return) ]
+  |> validate
+
 let expect_fatal f =
   let fmt = Format.err_formatter in
   Format.pp_print_flush fmt ();
@@ -127,10 +155,21 @@ let test_unreachable () =
       Cfg_reachability_validate.validate_reachability
         (Cfg_with_infos.cfg cfg_with_infos))
 
+let test_tailcall_self () =
+  make_cfg
+    [ block entry_label
+        (terminator
+           ~arg:[| int.(0); int.(1) |]
+           (Tailcall_self { destination = entry_label })) ]
+  |> validate_liveness
+
 let () =
   test_diamond ();
   test_nested_loops ();
   test_irreducible ();
   test_reachable ();
   test_incorrect_dominators ();
-  test_unreachable ()
+  test_dead_pure_and_impure ();
+  test_exception_handler ();
+  test_unreachable ();
+  test_tailcall_self ()

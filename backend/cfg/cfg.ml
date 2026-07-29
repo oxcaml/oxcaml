@@ -311,6 +311,29 @@ let fold_body_instructions t ~f ~init =
   let helper _ block acc = DLL.fold_left block.body ~f ~init:acc in
   fold_blocks t ~f:helper ~init
 
+let iter_instructions cfg ~instruction ~terminator =
+  iter_blocks
+    ~f:(fun _label block ->
+      DLL.iter block.body ~f:instruction;
+      terminator block.terminator)
+    cfg
+
+type instruction_iterator = { f : 'a. 'a instruction -> unit } [@@unboxed]
+
+let iter_all_instructions cfg { f } =
+  iter_blocks
+    ~f:(fun _label block ->
+      DLL.iter block.body ~f;
+      f block.terminator)
+    cfg
+
+type 'a instruction_folder = { f : 'b. 'a -> 'b instruction -> 'a } [@@unboxed]
+
+let fold_all_instructions cfg ~f ~init =
+  fold_blocks cfg ~init ~f:(fun _label block acc ->
+      let acc = DLL.fold_left block.body ~f:f.f ~init:acc in
+      f.f acc block.terminator)
+
 let register_predecessors_for_all_blocks (t : t) =
   Label.Tbl.iter
     (fun label block ->

@@ -666,6 +666,7 @@
   cfg_deadcode
   cfg_liveness
   cfg_validation_facts
+  cfg_liveness_validate
   cfg_dominators
   cfg_dominators_validate
   cfg_loop_infos

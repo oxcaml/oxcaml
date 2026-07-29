@@ -216,6 +216,20 @@ val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
 val fold_body_instructions :
   t -> f:('a -> basic instruction -> 'a) -> init:'a -> 'a
 
+val iter_instructions :
+  t ->
+  instruction:(basic instruction -> unit) ->
+  terminator:(terminator instruction -> unit) ->
+  unit
+
+type instruction_iterator = { f : 'a. 'a instruction -> unit } [@@unboxed]
+
+val iter_all_instructions : t -> instruction_iterator -> unit
+
+type 'a instruction_folder = { f : 'b. 'a -> 'b instruction -> 'a } [@@unboxed]
+
+val fold_all_instructions : t -> f:'a instruction_folder -> init:'a -> 'a
+
 (* CR-soon xclerc for xclerc: [register_predecessors_for_all_blocks] only adds
    blocks to the predecessor sets, and does not clear the sets beforehand. This
    looks like a mistake; at the very least a named boolean parameter should be
