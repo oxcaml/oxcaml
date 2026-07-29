@@ -326,7 +326,7 @@ let alloc_modes_opt i ppf ms =
 
 let alloc_modes_var i ppf ms =
   let print_alloc_modes_var i ppf m =
-    line i ppf "%a\n" (Format_doc.compat (Mode.Locality.print ())) m
+    line i ppf "%a\n" print_alloc_mode_l m
   in
   modes ~pr:print_alloc_modes_var i ppf ms
 
@@ -610,7 +610,7 @@ and function_body i ppf (body : function_body) =
         fmt_partiality fc_partial
         fmt_location fc_loc;
       let i = i+1 in
-      locality_mode i ppf fc_arg_mode;
+      alloc_mode_l i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes i ppf fc_attributes;
       List.iter (fun e -> expression_extra i ppf (e, fc_loc, [])) fc_exp_extra;
@@ -654,11 +654,12 @@ and expression_extra i ppf (extra, loc, attrs) =
       type_inspection (i+1) ppf ti
 
 and alloc_mode i ppf (m : alloc_mode_r) =
-  line i ppf "alloc_mode %a\n"
-    (Format_doc.compat (Mode.Locality.print ()))
-    m
+  line i ppf "alloc_mode %a\n" print_alloc_mode_r m
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
+
+and alloc_mode_l i ppf (m : alloc_mode_l) =
+  line i ppf "locality_mode %a\n" print_alloc_mode_l m
 
 and locality_mode : type l r. _ -> _ -> (l * r) Mode.Locality.t -> _ =
  fun i ppf m ->

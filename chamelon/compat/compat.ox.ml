@@ -35,9 +35,11 @@ let dummy_value_mode = Value.disallow_right Value.legacy
 
 let dummy_scannable_sort = Jkind.Sort.scannable
 
-let dummy_alloc_mode_r = Locality.disallow_left Locality.legacy
+let dummy_alloc_mode_r =
+  create_alloc_mode_r (Locality.disallow_left Locality.legacy)
 
-let dummy_alloc_mode_l = Locality.disallow_right Locality.legacy
+let dummy_alloc_mode_l =
+  create_alloc_mode_l (Locality.disallow_right Locality.legacy)
 
 let dummy_return_mode =
   create_return_mode (Locality.disallow_right Locality.legacy)

@@ -573,6 +573,19 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     Amode (a, hint, hint)
 
+  let check_level_morphvar : type a l r. (a, l * r) morphvar -> int -> bool =
+   fun (Amorphvar (v, _, _)) i -> v.level = i
+
+  let check_const_or_level_0 : type a l r. (a, l * r) mode -> bool =
+   fun m ->
+    match m with
+    | Amode _ -> true
+    | Amodevar mv -> check_level_morphvar mv 0
+    | Amodemeet (_, _, mvs) ->
+      VarMap.for_all (fun _ mv -> check_level_morphvar mv 0) mvs
+    | Amodejoin (_, _, mvs) ->
+      VarMap.for_all (fun _ mv -> check_level_morphvar mv 0) mvs
+
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
     Amorphvar

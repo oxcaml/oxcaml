@@ -1406,9 +1406,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                     else begin
                       let mode_closure =
                         Mode.Locality.disallow_left Mode.Locality.legacy
+                        |> Typedtree.create_alloc_mode_r
                       in
                       let mode_arg =
                         Mode.Locality.disallow_right Mode.Locality.legacy
+                        |> Typedtree.create_alloc_mode_l
                       in
                       let mode_ret =
                         Mode.Locality.disallow_right Mode.Locality.legacy
