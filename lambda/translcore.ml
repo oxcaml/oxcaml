@@ -197,8 +197,9 @@ let maybe_region get_layout lam =
   let rec remove_tail_markers_and_exclave = function
     | Lapply ({ap_region_close = Rc_close_at_apply} as ap) ->
        Lapply ({ap with ap_region_close = Rc_normal})
-    | Lsend (k, lmet, lobj, largs, Rc_close_at_apply, mode, loc, layout) ->
-       Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout)
+    | Lsend (k, lmet, lobj, largs, Rc_close_at_apply, mode, loc, layout,
+             yielding) ->
+       Lsend (k, lmet, lobj, largs, Rc_normal, mode, loc, layout, yielding)
     | Lregion _ as lam -> lam
     | Lexclave lam -> lam
     | Lsplice _ ->
@@ -894,7 +895,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                           \ present for float field read")
               shape
           in
-          Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
+          if Types.is_atomic lbl.lbl_mut then
+            (* Patomic_load_mixed_field doesn't care about locality mode;
+               [@@flatten_floats] doesn't accept records with atomic fields. *)
+            let shape = strip_locality_mode shape in
+            Some
+              (Patomic_load_mixed_field { index = lbl.lbl_pos; shape }, [targ])
+          else
+            Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
@@ -1008,8 +1016,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let shape = Lambda.transl_mixed_product_shape shape in
           (* Update the shape with details for the modified field. *)
           shape.(lbl.lbl_pos) <- field_shape;
-          Psetmixedfield([lbl.lbl_pos], shape, mode),
-          [arg_lambda; newval_lambda]
+          if Types.is_atomic lbl.lbl_mut then
+            (Patomic_set_mixed_field { index = lbl.lbl_pos; shape },
+            [arg_lambda; newval_lambda])
+          else
+            (Psetmixedfield([lbl.lbl_pos], shape, mode),
+            [arg_lambda; newval_lambda])
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"
@@ -1161,12 +1173,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match met with
         | Tmeth_val id ->
             let obj = transl_exp ~scopes Lambda.layout_object expr in
-            Lsend (Self, Lvar id, obj, [], pos, mode, loc, layout)
+            Lsend (Self, Lvar id, obj, [], pos, mode, loc, layout, Unyielding)
         | Tmeth_name nm ->
             let obj = transl_exp ~scopes Lambda.layout_object expr in
             let (tag, cache) = Translobj.meth obj nm in
             let kind = if cache = [] then Public else Cached in
-            Lsend (kind, tag, obj, cache, pos, mode, loc, layout)
+            Lsend (kind, tag, obj, cache, pos, mode, loc, layout, Unyielding)
         | Tmeth_ancestor(meth, path_self) ->
             let self = transl_value_path loc e.exp_env path_self in
             Lapply {ap_loc = loc;
@@ -1174,9 +1186,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     ap_args = [self];
                     ap_result_layout = layout;
                     ap_mode = mode;
-                    (* Object code can never close over a yielding value (see
-                       the OO tests in yielding_lambda.ml), so calling an
-                       ancestor method cannot yield *)
+                    (* Object code can never close over a yielding value, so
+                       calling an ancestor method cannot yield *)
                     ap_yielding = Unyielding;
                     ap_region_close = pos;
                     ap_probe = None;
@@ -1198,8 +1209,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ap_region_close=pos;
         ap_mode=alloc_heap;
         (* [new] runs the object's initialization, but object code can never
-           close over a yielding value (see the OO tests in
-           yielding_lambda.ml), so it cannot yield *)
+           close over a yielding value, so it cannot yield *)
         ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
@@ -1639,23 +1649,29 @@ and transl_apply ~scopes
   =
   let lapply funct args loc pos mode result_layout =
     match funct, pos with
-    | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _), _ ->
-        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout)
-    | Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _), _ ->
-        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
-    | Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _),
+    | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
+        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
+    | Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _, sy), _ ->
+        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
+    | Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _, sy),
       (Rc_normal | Rc_nontail) ->
-        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _), _), _ ->
-        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout)
+      Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _), _ ->
+        Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _), _), _ ->
-        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+      Lsend(Cached, lmet, lobj, ([_; _] as largs), _, _, _, _, sy), _), _ ->
+        Lsend(Cached, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Levent(
-      Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _), _),
+      Lsend(k, lmet, lobj, largs, (Rc_normal | Rc_nontail), _, _, _, sy), _),
       (Rc_normal | Rc_nontail) ->
-        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout)
+        Lsend(k, lmet, lobj, largs @ args, pos, mode, loc, result_layout,
+              join_yielding_kind sy yielding)
     | Lapply ({ ap_region_close = (Rc_normal | Rc_nontail) } as ap),
       (Rc_normal | Rc_nontail) ->
         (* The merged application applies more arguments through the

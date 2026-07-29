@@ -855,10 +855,18 @@ let primitive ppf = function
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_load_field_imm"
         | Pointer -> fprintf ppf "atomic_load_field_ptr")
+  | Patomic_load_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_load_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_set_field_imm"
         | Pointer -> fprintf ppf "atomic_set_field_ptr")
+  | Patomic_set_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_set_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_exchange_field_imm"
@@ -1059,10 +1067,12 @@ let name_of_primitive = function
       (match immediate_or_pointer with
         | Immediate -> "atomic_load_field_imm"
         | Pointer -> "atomic_load_field_ptr")
+  | Patomic_load_mixed_field _ -> "atomic_load_mixed_field"
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_set_field_imm"
         | Pointer -> "atomic_set_field_ptr")
+  | Patomic_set_mixed_field _ -> "atomic_set_mixed_field"
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_exchange_field_imm"
@@ -1418,13 +1428,19 @@ let rec lam ppf = function
        lam for_to lam for_body
   | Lassign(id, expr) ->
       fprintf ppf "@[<2>(assign@ %a@ %a)@]" Ident.print id lam expr
-  | Lsend (k, met, obj, largs, pos, reg, _, _) ->
+  | Lsend (k, met, obj, largs, pos, reg, _, _, yielding) ->
       let args ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let kind =
         if k = Self then "self" else if k = Cached then "cache" else "" in
       let form = apply_kind "send" pos reg in
-      fprintf ppf "@[<2>(%s%s@ %a@ %a%a)@]" form kind lam obj lam met args largs
+      let marker =
+        match yielding with
+        | May_yield -> "[yielding]"
+        | Unyielding -> ""
+      in
+      fprintf ppf "@[<2>(%s%s%s@ %a@ %a%a)@]" form kind marker
+        lam obj lam met args largs
   | Levent(expr, ev) ->
       let kind =
        match ev.lev_kind with

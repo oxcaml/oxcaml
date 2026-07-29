@@ -282,11 +282,13 @@ and eval_lam_shallow env lam =
     if new_layout == old_layout
     then lam
     else Lifthenelse (cond, iftrue, iffalse, new_layout)
-  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout) ->
+  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout, yielding)
+    ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then lam
-    else Lsend (kind, met, obj, args, region_close, mode, loc, new_layout)
+    else
+      Lsend (kind, met, obj, args, region_close, mode, loc, new_layout, yielding)
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
@@ -495,7 +497,8 @@ and eval_prim env prim =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
+  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
@@ -585,7 +588,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
-  | Lsend (_, _, _, _, _, _, _, layout) ->
+  | Lsend (_, _, _, _, _, _, _, layout, _) ->
     assert_layout_contains_no_splices layout
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout

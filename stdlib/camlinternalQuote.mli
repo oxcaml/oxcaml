@@ -87,11 +87,21 @@ module Constant : sig
 
   val char : char -> t
 
+  val untagged_char : int -> t
+
   val string : string -> string option -> t
 
   val float : string -> t
 
   val float32 : string -> t
+
+  val unboxed_float : string -> t
+
+  val unboxed_float32 : string -> t
+
+  val int8 : int -> t
+
+  val int16 : int -> t
 
   val int32 : int32 -> t
 
@@ -99,9 +109,11 @@ module Constant : sig
 
   val nativeint : nativeint -> t
 
-  val unboxed_float : string -> t
+  val untagged_int : int -> t
 
-  val unboxed_float32 : string -> t
+  val untagged_int8 : int -> t
+
+  val untagged_int16 : int -> t
 
   val unboxed_int32 : int32 -> t
 

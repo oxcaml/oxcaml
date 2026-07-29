@@ -393,9 +393,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
      considered with a set of inlining arguments coherent with the one used to
      compile the current file when inlining. *)
   let inlining_arguments =
-    Inlining_arguments.meet
-      (Code.inlining_arguments code)
-      inlining_arguments_from_denv
+    Inlining_arguments.combine ~from_env:inlining_arguments_from_denv
+      ~from_metadata:(Code.inlining_arguments code)
   in
   let result_arity = Code.result_arity code in
   let return_cont_params =

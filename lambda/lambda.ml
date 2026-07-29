@@ -373,7 +373,15 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_compare_exchange_field of
     {immediate_or_pointer : immediate_or_pointer}
@@ -1100,6 +1108,7 @@ type lambda =
   | Lsend of
       meth_kind * lambda * lambda * lambda list
       * region_close * locality_mode * scoped_location * layout
+      * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -1242,7 +1251,7 @@ let rec try_to_find_location lam =
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _, _)
   | Levent (_, { lev_loc = loc; _ })
   | Lsplice (loc, _) ->
     loc
@@ -1700,8 +1709,9 @@ let make_key e =
         Lsequence (tr_rec env e1,tr_rec env e2)
     | Lassign (x,e) ->
         Lassign (x,tr_rec env e)
-    | Lsend (m,e1,e2,es,pos,mo,_loc,layout) ->
-        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
+    | Lsend (m,e1,e2,es,pos,mo,_loc,layout,yielding) ->
+        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,
+               layout,yielding)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
@@ -1804,7 +1814,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f for_from; f for_to; f for_body
   | Lassign(_, e) ->
       f e
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       List.iter f (met::obj::args)
   | Levent (e, _evt) ->
       tail e
@@ -1897,7 +1907,7 @@ let rec free_variables = function
            (Ident.Set.remove for_id (free_variables for_body)))
   | Lassign(id, e) ->
       Ident.Set.add id (free_variables e)
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       free_variables_list
         (Ident.Set.union (free_variables met) (free_variables obj))
         args
@@ -2226,9 +2236,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         assert (not (Ident.Map.mem id s));
         let id = try Ident.Map.find id l with Not_found -> id in
         Lassign(id, subst s l e)
-    | Lsend (k, met, obj, args, pos, mode, loc, layout) ->
+    | Lsend (k, met, obj, args, pos, mode, loc, layout, yielding) ->
         Lsend (k, subst s l met, subst s l obj, subst_list s l args,
-               pos, mode, loc, layout)
+               pos, mode, loc, layout, yielding)
     | Levent (lam, evt) ->
         let old_env = evt.lev_env in
         let env_updates =
@@ -2507,13 +2517,13 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lassign (v, old_e) ->
       let new_e = f old_e in
       if old_e == new_e then lam else Lassign (v, new_e)
-  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout) ->
+  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout, yielding) ->
       let new_m = f old_m in
       let new_o = f old_o in
       let new_el = Misc.Stdlib.List.map_sharing f old_el in
       if old_m == new_m && old_o == new_o && old_el == new_el
       then lam
-      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout)
+      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout, yielding)
   | Levent (old_l, ev) ->
       let new_l = tail old_l in
       if old_l == new_l then lam else Levent (new_l, ev)
@@ -2800,7 +2810,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     Some alloc_heap
   | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
+  | Patomic_load_mixed_field _
   | Patomic_set_field _
+  | Patomic_set_mixed_field _
   | Patomic_exchange_field _
   | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _
@@ -2993,7 +3005,8 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3088,6 +3101,28 @@ let extern_repr_involves_unboxed_products extern_repr =
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+
+let strip_locality_mode shape =
+  let rec strip_elt elt =
+    match elt with
+    | Float_boxed _ -> Float_boxed ()
+    | Product elts -> Product (Array.map strip_elt elts)
+    | Value vk -> Value vk
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Mask -> Mask
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Splice_variable id -> Splice_variable id
+  in
+  Array.map strip_elt shape
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -3451,7 +3486,9 @@ let primitive_result_layout (p : primitive) =
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
     layout_any_value
-  | Patomic_set_field _ -> layout_unit
+  | Patomic_load_mixed_field { index ; shape } ->
+    layout_of_mixed_block_shape shape ~path:[index]
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
   | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_exchange_field { immediate_or_pointer = Pointer } ->
@@ -3559,7 +3596,7 @@ let may_allocate_in_region lam =
 
     | Lapply {ap_mode=Alloc_local}
     | Lkindinstantiate {kinst_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Alloc_local,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with

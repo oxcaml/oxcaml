@@ -112,6 +112,10 @@ module Layout : sig
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
+
+    (** Whether the layout mentions a genvar anywhere (including inside a
+        product). *)
+    val has_genvar : t -> bool
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t

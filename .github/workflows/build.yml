@@ -215,14 +215,14 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml testsuite/tests/flambda2/simplify/*'
             sysdeps: gdb
 
           - name: reaper with local value slots
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/simplify/*'
             sysdeps: gdb
 
           # Same as for the reaper, some tests rely on being able to enable or disable
@@ -297,7 +297,7 @@ jobs:
         run: |
           disable_testcases="${{matrix.disable_testcases}}"
           if [ -n "$disable_testcases" ]; then
-            rm -fv $disable_testcases
+            rm -rfv $disable_testcases
           fi
 
       - name: Install custom OxCaml LLVM
