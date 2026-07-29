@@ -5300,10 +5300,15 @@ let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
   Cop
     (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
 
-let atomic_exchange_extcall ~dbg block ~field ~new_value =
+let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
+  match mode with
+  | Modify_heap -> base_name
+  | Modify_maybe_stack -> base_name ^ "_local"
+
+let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5315,15 +5320,15 @@ let atomic_exchange_extcall ~dbg block ~field ~new_value =
       [block; field; new_value],
       dbg )
 
-let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field ~new_value =
+let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
+    block ~field ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Exchange; size = Word } in
     if Proc.operation_supported op
     then Cop (op, [new_value; field_address_computed block field dbg], dbg)
-    else atomic_exchange_extcall ~dbg block ~field ~new_value
-  | Pointer -> atomic_exchange_extcall ~dbg block ~field ~new_value
+    else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+  | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
   let i = if untag then decr_int i dbg else i in
@@ -5376,10 +5381,11 @@ let atomic_lxor_field ~dbg atomic ~field i =
     atomic ~field i
   |> return_unit dbg
 
-let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
+    =
   Cop
     ( Cextcall
-        { func = "caml_atomic_cas_field";
+        { func = atomic_extcall_name "caml_atomic_cas_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5392,7 +5398,7 @@ let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
-    block ~field ~old_value ~new_value =
+    ~mode block ~field ~old_value ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Compare_set; size = Word } in
@@ -5405,14 +5411,17 @@ let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
              [old_value; new_value; field_address_computed block field dbg],
              dbg ))
         (fun a2 -> tag_int a2 dbg)
-    else atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
 
-let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+    ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_compare_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_compare_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5425,7 +5434,7 @@ let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_exchange_field ~dbg
-    (imm_or_ptr : Lambda.immediate_or_pointer) block ~field ~old_value
+    (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block ~field ~old_value
     ~new_value =
   match imm_or_ptr with
   | Immediate ->
@@ -5434,9 +5443,12 @@ let atomic_compare_exchange_field ~dbg
     then
       Cop
         (op, [old_value; new_value; field_address_computed block field dbg], dbg)
-    else atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+      ~new_value
 
 let pack_small_ints_into_word ~bits int_list dbg =
   if bits * List.length int_list > arch_bits

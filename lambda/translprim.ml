@@ -2172,14 +2172,17 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
         first, rest
   in
   let prim =
+    (* These primitives take their target at mode [local]; it may be
+       stack-allocated. *)
+    let mode = modify_maybe_stack in
     match op with
     | Load -> Patomic_load_field { immediate_or_pointer }
-    | Set -> Patomic_set_field { immediate_or_pointer }
-    | Exchange -> Patomic_exchange_field { immediate_or_pointer }
+    | Set -> Patomic_set_field { immediate_or_pointer; mode }
+    | Exchange -> Patomic_exchange_field { immediate_or_pointer; mode }
     | Compare_exchange ->
-      Patomic_compare_exchange_field { immediate_or_pointer }
+      Patomic_compare_exchange_field { immediate_or_pointer; mode }
     | Compare_and_set ->
-      Patomic_compare_set_field { immediate_or_pointer }
+      Patomic_compare_set_field { immediate_or_pointer; mode }
     | Fetch_add -> Patomic_fetch_add_field
     | Add -> Patomic_add_field
     | Sub -> Patomic_sub_field

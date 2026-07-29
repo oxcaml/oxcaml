@@ -1885,7 +1885,7 @@ let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
     let field_kind = P.Block_access_field_kind.from_kind full_kind in
     let field = tagged_field_index_of_offset ~machine_width offset in
     let new_value = List.hd new_values in
-    [Ternary (Atomic_set_field field_kind, ptr, field, new_value)]
+    [Ternary (Atomic_set_field (field_kind, mode), ptr, field, new_value)]
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
@@ -3311,46 +3311,54 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ Binary
         (Atomic_load_field field_kind, atomic, H.Simple (Simple.const_int imm))
     ]
-  | Patomic_set_field { immediate_or_pointer }, [[atomic]; [field]; [new_value]]
-    ->
+  | ( Patomic_set_field { immediate_or_pointer; mode },
+      [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
-        ( Atomic_set_field (convert_block_access_field_kind immediate_or_pointer),
+        ( Atomic_set_field
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           new_value ) ]
-  | Patomic_set_mixed_field { index; shape }, [[atomic]; [new_value]] ->
+  | Patomic_set_mixed_field { index; shape; mode }, [[atomic]; [new_value]] ->
     let imm, field_kind =
       mixed_field_index_and_kind ~machine_width
         ~prim_name:"Patomic_set_mixed_field" index shape
     in
     [ Ternary
-        ( Atomic_set_field field_kind,
+        ( Atomic_set_field
+            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
           atomic,
           H.Simple (Simple.const_int imm),
           new_value ) ]
-  | ( Patomic_exchange_field { immediate_or_pointer },
+  | ( Patomic_exchange_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
         ( Atomic_exchange_field
-            (convert_block_access_field_kind immediate_or_pointer),
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           new_value ) ]
-  | ( Patomic_compare_exchange_field { immediate_or_pointer },
+  | ( Patomic_compare_exchange_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [comparison_value]; [new_value]] ) ->
     let access_kind = convert_block_access_field_kind immediate_or_pointer in
     [ Quaternary
         ( Atomic_compare_exchange_field
-            { atomic_kind = access_kind; args_kind = access_kind },
+            { atomic_kind = access_kind;
+              args_kind = access_kind;
+              mode = Alloc_mode.For_assignments.from_lambda mode
+            },
           atomic,
           field,
           comparison_value,
           new_value ) ]
-  | ( Patomic_compare_set_field { immediate_or_pointer },
+  | ( Patomic_compare_set_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [old_value]; [new_value]] ) ->
     [ Quaternary
         ( Atomic_compare_and_set_field
-            (convert_block_access_field_kind immediate_or_pointer),
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           old_value,

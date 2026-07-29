@@ -1218,6 +1218,7 @@ val atomic_load_field :
 val atomic_exchange_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
   expression ->
   field:expression ->
   new_value:expression ->
@@ -1244,6 +1245,7 @@ val atomic_lxor_field :
 val atomic_compare_and_set_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
   expression ->
   field:expression ->
   old_value:expression ->
@@ -1253,6 +1255,7 @@ val atomic_compare_and_set_field :
 val atomic_compare_exchange_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
   expression ->
   field:expression ->
   old_value:expression ->

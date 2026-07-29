@@ -1220,8 +1220,9 @@ let array_set =
 
 let atomic_exchange_field =
   D.(
-    ternary "%atomic_exchange_field" ~params:block_access_field_kind (fun _ a ->
-        P.Atomic_exchange_field a))
+    ternary "%atomic_exchange_field"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_exchange_field (a, mode)))
 
 let atomic_field_int_arith =
   D.(
@@ -1230,8 +1231,9 @@ let atomic_field_int_arith =
 
 let atomic_set_field =
   D.(
-    ternary "%atomic_set_field" ~params:block_access_field_kind (fun _ a ->
-        P.Atomic_set_field a))
+    ternary "%atomic_set_field"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_set_field (a, mode)))
 
 let bigarray_set =
   D.(
@@ -1264,15 +1266,17 @@ let write_offset =
 (* Quaternaries *)
 let atomic_compare_and_set_field =
   D.(
-    quaternary "%atomic_compare_and_set_field" ~params:block_access_field_kind
-      (fun _ a -> P.Atomic_compare_and_set_field a))
+    quaternary "%atomic_compare_and_set_field"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_compare_and_set_field (a, mode)))
 
 let atomic_compare_exchange_field =
   D.(
     quaternary "%atomic_compare_exchange_field"
-      ~params:(param2 block_access_field_kind block_access_field_kind)
-      (fun _ (atomic_kind, args_kind) ->
-        P.Atomic_compare_exchange_field { atomic_kind; args_kind }))
+      ~params:
+        (param3 block_access_field_kind block_access_field_kind
+           alloc_mode_for_assignments) (fun _ (atomic_kind, args_kind, mode) ->
+        P.Atomic_compare_exchange_field { atomic_kind; args_kind; mode }))
 
 (* Variadics *)
 let begin_region =
@@ -1397,9 +1401,9 @@ module OfFlambda = struct
   let ternop env (op : P.ternary_primitive) =
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
-    | Atomic_exchange_field a -> atomic_exchange_field env a
+    | Atomic_exchange_field (a, mode) -> atomic_exchange_field env (a, mode)
     | Atomic_field_int_arith o -> atomic_field_int_arith env o
-    | Atomic_set_field a -> atomic_set_field env a
+    | Atomic_set_field (a, mode) -> atomic_set_field env (a, mode)
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset (wok, kind, alloc_mode) ->
@@ -1407,9 +1411,10 @@ module OfFlambda = struct
 
   let quaternop env (op : P.quaternary_primitive) =
     match op with
-    | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
-    | Atomic_compare_exchange_field { atomic_kind; args_kind } ->
-      atomic_compare_exchange_field env (atomic_kind, args_kind)
+    | Atomic_compare_and_set_field (a, mode) ->
+      atomic_compare_and_set_field env (a, mode)
+    | Atomic_compare_exchange_field { atomic_kind; args_kind; mode } ->
+      atomic_compare_exchange_field env (atomic_kind, args_kind, mode)
 
   let varop env (op : P.variadic_primitive) =
     match op with
