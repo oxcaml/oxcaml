@@ -150,7 +150,8 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
    contains a map from registers to known values after the instructions have
    been executed. Currently only tracks constant values, moves between
    registers, basic integer arithmetic, and basic float64 arithmetic over known
-   values. *)
+   values. Deletes moves deemed to be useless given the information in
+   `known_values`. *)
 let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
@@ -233,7 +234,9 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
   in
   if !Oxcaml_flags.cfg_value_propagation_flow
   then infer_known_values_from_predecessor ();
-  Dll.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+  Dll.iter_cell block.body
+    ~f:(fun (cell : Cfg.basic Cfg.instruction Dll.cell) ->
+      let instr = Dll.value cell in
       let apply_int_op op right_opt =
         let result_opt =
           match find_opt instr.arg.(0) with
@@ -262,7 +265,26 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         remove_destroyed instr
       in
       match instr.desc with
-      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_int c) ->
+        begin match find_opt instr.res.(0) with
+        | Some (Const_int c') ->
+          (* Deleting the move makes the (unchanged) `live` fields an
+             under-approximation of actual liveness: the destination register
+             now carries its value from the previous write of the constant,
+             across instructions whose `live` sets do not mention it. This is
+             safe for the current consumers of `live`: the register is an
+             integer register holding a compile-time integer constant, so
+             omitting it from the frame descriptors of the GC points it now
+             crosses is harmless (its value is never a heap pointer), and its
+             liveness cannot change the decision to save SIMD registers at such
+             points. Extending the deletion to other kinds of constants requires
+             revisiting this reasoning. *)
+          if Nativeint.equal c c'
+          then Dll.delete_curr cell
+          else replace instr.res.(0) (Const_int c)
+        | Some (Const_float32 _ | Const_float _) | None ->
+          replace instr.res.(0) (Const_int c)
+        end
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
@@ -450,20 +472,18 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
   | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
-let block_known_values (cfg : Cfg.t) (block : C.basic_block)
-    ~(is_after_regalloc : bool) ~(allowed_to_be_irreducible : bool) : bool =
-  if
-    !Oxcaml_flags.cfg_value_propagation
-    && is_after_regalloc && allowed_to_be_irreducible
-  then (
-    let known_values = collect_known_values cfg block in
+let block_known_values (block : C.basic_block)
+    ~(known_values : known_value Reg.UsingLocEquality.Tbl.t option)
+    ~(allowed_to_be_irreducible : bool) : bool =
+  match known_values with
+  | Some known_values when allowed_to_be_irreducible -> (
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
       block.terminator
         <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
       true)
-  else false
+  | Some _ | None -> false
 
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
@@ -479,6 +499,15 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
    this terminator? *)
 let block (cfg : C.t) (block : C.basic_block) : bool =
   let is_after_regalloc = cfg.register_locations_are_set in
+  (* Note: in addition to collecting the known values, the call to
+     [collect_known_values] deletes the constant moves made redundant by the
+     collected values; it is hence performed whatever the shape of the
+     terminator is. *)
+  let known_values =
+    if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
+    then Some (collect_known_values cfg block)
+    else None
+  in
   match block.terminator.desc with
   | Always successor_label ->
     (* If we have a jump to an empty block whose terminator is a condition, we
@@ -488,21 +517,18 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     if Dll.is_empty successor_block.body
     then
       (* CR-soon xclerc for xclerc: this logic is similar to the one of
-         `block_known_values`, except for the guard and whether one or two
-         blocks are involved. *)
+         `block_known_values`, except for whether one or two blocks are
+         involved. *)
       let new_successor =
         (* The graph may become irreducible if the successor block is the header
            block of a loop. Indeed, if we shortcircuit that block, it means we
            are jumping "inside" the loop directly, which in turn means the loop
            is no longer natural. This is acceptable if we are past the last use
            of the loop information. *)
-        if
-          !Oxcaml_flags.cfg_value_propagation
-          && is_after_regalloc && cfg.allowed_to_be_irreducible
-        then
-          let known_values = collect_known_values cfg block in
+        match known_values with
+        | Some known_values when cfg.allowed_to_be_irreducible ->
           evaluate_terminator known_values successor_block.terminator
-        else None
+        | Some _ | None -> None
       in
       match new_successor with
       | Some succ ->
@@ -551,11 +577,11 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
         <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
       false)
     else
-      block_known_values cfg block ~is_after_regalloc
+      block_known_values block ~known_values
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
   | Switch labels ->
     let shortcircuit =
-      block_known_values cfg block ~is_after_regalloc
+      block_known_values block ~known_values
         ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
     in
     if shortcircuit
