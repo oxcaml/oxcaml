@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension simd_alpha -extension runtime_metaprogramming -extension small_numbers -extension layouts";
+ flags = "-extension simd_alpha -extension runtime_metaprogramming -extension small_numbers -extension layouts -nopervasives";
  expect;
 *)
 
@@ -274,68 +274,68 @@ Error: Unbound type constructor "my_type"
 
 (* Exceptions *)
 
-<[ raise (Match_failure ("", 0, 0)) ]>
+<[ Stdlib.raise (Match_failure ("", 0, 0)) ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Match_failure ("", 0, 0))]>
+- : 'a expr = <[Stdlib.raise (Match_failure ("", 0, 0))]>
 |}];;
-<[ raise Out_of_memory ]>
+<[ Stdlib.raise Out_of_memory ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.Out_of_memory]>
+- : 'a expr = <[Stdlib.raise Out_of_memory]>
 |}];;
-<[ raise Out_of_fibers ]> (* not re-exported by [Stdlib] *)
+<[ Stdlib.raise Out_of_fibers ]> (* not re-exported by [Stdlib] *)
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Out_of_fibers]>
 |}];;
-<[ raise (Invalid_argument "") ]>
+<[ Stdlib.raise (Invalid_argument "") ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Invalid_argument "")]>
+- : 'a expr = <[Stdlib.raise (Invalid_argument "")]>
 |}];;
-<[ raise (Failure "") ]>
+<[ Stdlib.raise (Failure "") ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Failure "")]>
+- : 'a expr = <[Stdlib.raise (Failure "")]>
 |}];;
-<[ raise Not_found ]>
+<[ Stdlib.raise Not_found ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.Not_found]>
+- : 'a expr = <[Stdlib.raise Not_found]>
 |}];;
-<[ raise (Sys_error "") ]>
+<[ Stdlib.raise (Sys_error "") ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Sys_error "")]>
+- : 'a expr = <[Stdlib.raise (Sys_error "")]>
 |}];;
-<[ raise End_of_file ]>
+<[ Stdlib.raise End_of_file ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.End_of_file]>
+- : 'a expr = <[Stdlib.raise End_of_file]>
 |}];;
-<[ raise Division_by_zero ]>
+<[ Stdlib.raise Division_by_zero ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.Division_by_zero]>
+- : 'a expr = <[Stdlib.raise Division_by_zero]>
 |}];;
-<[ raise Stack_overflow ]>
+<[ Stdlib.raise Stack_overflow ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.Stack_overflow]>
+- : 'a expr = <[Stdlib.raise Stack_overflow]>
 |}];;
-<[ raise Sys_blocked_io ]>
+<[ Stdlib.raise Sys_blocked_io ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise Stdlib.Sys_blocked_io]>
+- : 'a expr = <[Stdlib.raise Sys_blocked_io]>
 |}];;
-<[ raise (Assert_failure ("", 0, 0)) ]>
+<[ Stdlib.raise (Assert_failure ("", 0, 0)) ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Assert_failure ("", 0, 0))]>
+- : 'a expr = <[Stdlib.raise (Assert_failure ("", 0, 0))]>
 |}];;
-<[ raise (Undefined_recursive_module ("", 0, 0)) ]>
+<[ Stdlib.raise (Undefined_recursive_module ("", 0, 0)) ]>
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (Stdlib.Undefined_recursive_module ("", 0, 0))]>
+- : 'a expr = <[Stdlib.raise (Undefined_recursive_module ("", 0, 0))]>
 |}];;
-<[ raise Continuation_already_taken ]> (* not re-exported by [Stdlib] *)
+<[ Stdlib.raise Continuation_already_taken ]> (* not re-exported by [Stdlib] *)
 [%%expect {|
 - : 'a expr = <[Stdlib.raise Continuation_already_taken]>
 |}];;
 
-<[ raise My_exception ]> (* sanity check *)
+<[ Stdlib.raise My_exception ]> (* sanity check *)
 [%%expect {|
-Line 1, characters 9-21:
-1 | <[ raise My_exception ]> (* sanity check *)
-             ^^^^^^^^^^^^
+Line 1, characters 16-28:
+1 | <[ Stdlib.raise My_exception ]> (* sanity check *)
+                    ^^^^^^^^^^^^
 Error: This variant expression is expected to have type "exn"
        There is no constructor "My_exception" within type "exn"
 |}];;
@@ -397,26 +397,28 @@ let e = <[ fun (x : int) -> x ]> in <[ fun (type int) () -> $e ]>
 - : <[unit -> int -> int]> expr = <[fun (type int) () -> fun (x : int) -> x]>
 |}];;
 (* Exception *)
-let e = <[ raise Exit ]> in <[ let exception Exit in $e ]>
+let e = <[ Stdlib.raise (Failure "") ]> in
+<[ let exception Failure of string in $e ]>
 [%%expect {|
-- : 'a expr = <[let exception Exit in Stdlib.raise Stdlib.Exit]>
+- : 'a expr = <[let exception Failure in Stdlib.raise (Failure "")]>
 |}];;
 (* We can avoid the following two bugs by banning [let exception],
    but they seem unlikely enough. *)
 (* CR jbachurski: This is wrong -- the inner [Exit] should refer to the
    global [Stdlib], not the argument. *)
-<[ fun (module Stdlib : S) -> raise Exit ]>
+let e = Stdlib.Obj.magic_many <[ Stdlib.raise (Failure "") ]> in
+<[ fun (module Stdlib : S) -> $e ]>
 [%%expect {|
 - : <[(module S) -> $('a)]> expr =
 <[
   fun (((module Stdlib) : (module S)) : (module S)) ->
-    Stdlib.raise Stdlib.Exit
+    Stdlib.raise (Failure "")
 ]>
 |}];;
 (* CR jbachurski: This is wrong -- the inner exn should refer to the
    global [Stdlib], not the extension.
    Note [Continuation_already_taken] is not re-exported by [Stdlib] (bug?). *)
-let e = <[ raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
+let e = <[ Stdlib.raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
 [%%expect {|
 - : 'a expr =
 <[
