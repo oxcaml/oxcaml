@@ -11564,7 +11564,8 @@ and type_application env app_loc expected_mode position_and_mode
             type_omitted_parameters_and_build_result_type expected_mode env
               app_loc ty_ret mode_ret args
           in
-          check_curried_application_complete ~env ~app_loc untyped_args;
+          (try check_curried_application_complete ~env ~app_loc untyped_args
+          with exn -> Typing_recovery.log_or_raise exn);
           (* example:
              [ty_ret] becomes [a:bar -> unit]
              [args] becomes [(Label "a", Omitted ());
