@@ -1243,9 +1243,9 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
       |> Flambda_arity.create_singletons)
   else
     let inlining_state =
-      Inlining_state.meet
-        (DE.get_inlining_state (DA.denv dacc))
-        (Apply.inlining_state apply)
+      Inlining_state.combine
+        ~from_env:(DE.get_inlining_state (DA.denv dacc))
+        ~from_metadata:(Apply.inlining_state apply)
     in
     let apply =
       Apply.create ~callee:simplified_callee

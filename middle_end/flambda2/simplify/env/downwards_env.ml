@@ -651,9 +651,15 @@ let add_inlined_debuginfo t dbg =
 
 let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let arguments =
-    Inlining_state.arguments t.inlining_state
-    |> Inlining_arguments.meet (Code.inlining_arguments called_code)
-    |> Inlining_arguments.meet (Apply.inlining_arguments apply)
+    let arguments = Inlining_state.arguments t.inlining_state in
+    (* CR ncourant: why do we combine with [called_code]'s inlining arguments,
+       when we don't do that for regular apply_exprs? *)
+    let arguments =
+      Inlining_arguments.combine ~from_env:arguments
+        ~from_metadata:(Code.inlining_arguments called_code)
+    in
+    Inlining_arguments.combine ~from_env:arguments
+      ~from_metadata:(Apply.inlining_arguments apply)
   in
   let inlining_state =
     (* The depth limit for [@inline always] and [@inlined always] is really to
