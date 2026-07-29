@@ -12590,15 +12590,25 @@ and type_send env loc explanation e met =
   in
   (obj,meth,typ)
 
+(* In Merlin, typing recovery can produce ill-typed trees (e.g. an overwrite
+   hole whose source has no trackable path) that violate invariants asserted by
+   the uniqueness analysis. Genuine uniqueness violations are raised as
+   [Uniqueness_analysis.Error] and still propagate. *)
+let guard_uniqueness_analysis f =
+  try f () with
+  | Assert_failure _ | Misc.Fatal_error _ -> ()
+
 let maybe_check_uniqueness_exp exp =
   if Language_extension.is_at_least Unique
        Language_extension.maturity_of_unique_for_drf then
-    Uniqueness_analysis.check_uniqueness_exp exp
+    guard_uniqueness_analysis (fun () ->
+      Uniqueness_analysis.check_uniqueness_exp exp)
 
 let maybe_check_uniqueness_value_bindings vbl =
   if Language_extension.is_at_least Unique
        Language_extension.maturity_of_unique_for_drf then
-    Uniqueness_analysis.check_uniqueness_value_bindings vbl
+    guard_uniqueness_analysis (fun () ->
+      Uniqueness_analysis.check_uniqueness_value_bindings vbl)
 
 (* Typing of toplevel bindings *)
 
