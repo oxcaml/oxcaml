@@ -577,6 +577,7 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
+    "-typing-recovery";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
