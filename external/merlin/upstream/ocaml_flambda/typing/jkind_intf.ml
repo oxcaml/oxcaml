@@ -51,6 +51,7 @@ module type Sort = sig
     | Vec128  (** Unboxed 128-bit simd vectors *)
     | Vec256  (** Unboxed 256-bit simd vectors *)
     | Vec512  (** Unboxed 512-bit simd vectors *)
+    | Mask  (** Unboxed 64-bit AVX512 mask registers *)
 
   (** A sort variable that can be unified during type-checking. *)
   type var
@@ -98,6 +99,8 @@ module type Sort = sig
     val vec256 : t
 
     val vec512 : t
+
+    val mask : t
 
     module Debug_printers : sig
       val t : Format.formatter -> t -> unit
@@ -172,6 +175,9 @@ module type Sort = sig
     (** Checks whether a [var] satisfies the properties that hold for variables
         saved to a cmi. *)
     val is_cmi_var : var -> bool
+
+    (** Checks whether a [var] is "repr'd" - that is, it has no contents. *)
+    val is_root : var -> bool
 
     (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
         physical equality of [var]s. *)

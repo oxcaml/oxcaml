@@ -87,6 +87,8 @@ let compute_variance env visited vari ty =
           with Not_found ->
             List.iter (compute_variance_rec env unknown) tl
         end
+    | Tmod _ ->
+        Misc.fatal_error "compute_variance_rec: unexpected Tmod"
     | Tobject (ty, _) ->
         compute_same ty
     | Tquote ty ->

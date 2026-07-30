@@ -39,8 +39,43 @@ val array_kind_of_elt :
 val array_kind : Typedtree.expression -> Lambda.array_kind
 val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
 
+<<<<<<< Merlin:liam-merlin-5.4.0-ox4
+||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
+(* These translate a type system sort to a lambda layout.  The function [layout]
+   gives a more precise result---this should only be used when the kind is
+   needed for compilation but the precise Lambda.layout isn't needed for
+=======
+(* Find the layout of an ident in the given environment. Returns [None] if the
+   ident refers to a primitive. *)
+val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
+
+(* These translate a type system sort to a lambda layout.  The function [layout]
+   gives a more precise result---this should only be used when the kind is
+   needed for compilation but the precise Lambda.layout isn't needed for
+>>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
+<<<<<<< Merlin:liam-merlin-5.4.0-ox4
+||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
+val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
+val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
+
+(* Given a function type and the sort of its return type, compute the layout of
+   its return type. *)
+val function_return_layout :
+=======
+val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
+val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
+
+(* Like [layout], but falls back to the sort when the type does not determine a
+   value kind (e.g. has jkind [any]) *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type and the sort of its return type, compute the layout of
+   its return type. *)
+val function_return_layout :
+>>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
