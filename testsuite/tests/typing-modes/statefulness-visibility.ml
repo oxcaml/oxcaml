@@ -35,7 +35,7 @@ Error: This value is "read"
 
 let foo (x @ write uncontended) a = x.a <- a
 [%%expect{|
-val foo : 'a myref @ uncontended write -> 'a -> unit = <fun>
+val foo : 'a myref @ write uncontended -> 'a -> unit = <fun>
 |}]
 
 let foo (x @ immutable uncontended) a = x.a <- a
@@ -50,7 +50,7 @@ Error: This value is "immutable"
 
 let foo (x @ read uncontended) = x.a
 [%%expect{|
-val foo : 'a myref @ uncontended read -> 'a @ uncontended read = <fun>
+val foo : 'a myref @ read uncontended -> 'a @ read uncontended = <fun>
 |}]
 
 let foo (x @ write uncontended) = x.a
@@ -75,19 +75,19 @@ Error: This value is "immutable"
 
 let foo (x @ read uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended read -> 'a -> 'a myref @ uncontended read =
+val foo : 'a myref @ read uncontended -> 'a -> 'a myref @ read uncontended =
   <fun>
 |}]
 
 let foo (x @ write uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended write -> 'a -> 'a myref @ uncontended write =
+val foo : 'a myref @ write uncontended -> 'a -> 'a myref @ write uncontended =
   <fun>
 |}]
 
 let foo (x @ immutable uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended immutable -> 'a -> 'a myref @ immutable =
+val foo : 'a myref @ immutable uncontended -> 'a -> 'a myref @ immutable =
   <fun>
 |}]
 
@@ -304,7 +304,7 @@ Error: This value is "corrupted"
 
 let foo (x @ read uncontended) = x.contents
 [%%expect{|
-val foo : 'a ref @ uncontended read -> 'a @ uncontended read = <fun>
+val foo : 'a ref @ read uncontended -> 'a @ read uncontended = <fun>
 |}]
 
 let foo (x @ read_write) = x.contents
@@ -958,7 +958,7 @@ Error: This value is "corruptible" but is expected to be "shareable".
 
 let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ shareable writing -> 'a @ shareable = <fun>
+val succeeds : 'a @ writing shareable -> 'a @ shareable = <fun>
 |}]
 
 (* [stateful] => [nonportable] *)
@@ -973,7 +973,7 @@ Error: This value is "shareable" but is expected to be "portable".
 
 let succeeds : 'a @ reading portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable reading -> 'a @ portable = <fun>
+val succeeds : 'a @ reading portable -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ writing -> 'a @ portable = fun x -> x
@@ -986,7 +986,7 @@ Error: This value is "corruptible" but is expected to be "portable".
 
 let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable writing -> 'a @ portable = <fun>
+val succeeds : 'a @ writing portable -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ stateful -> 'a @ portable = fun x -> x
@@ -1070,7 +1070,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ contended read -> 'b) -> 'b = <fun>
+val override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [write] => [corrupted] *)
@@ -1099,7 +1099,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ contended write -> 'b) -> 'b = <fun>
+val override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [read_write] doesn't change the default. *)
@@ -1269,7 +1269,7 @@ Error: This value is "contended"
 let baz (x : int ref) @ reading immutable uncontended = lazy (x.contents)
 
 [%%expect{|
-val baz : int ref -> int lazy_t @ uncontended reading immutable = <fun>
+val baz : int ref -> int lazy_t @ reading immutable uncontended = <fun>
 |}]
 
 let () =
@@ -1283,7 +1283,7 @@ let () =
 let zab () @ immutable uncontended = lazy (ref 5)
 
 [%%expect{|
-val zab : unit -> int ref lazy_t @ uncontended immutable = <fun>
+val zab : unit -> int ref lazy_t @ immutable uncontended = <fun>
 |}]
 
 (* Forcing an [immutable] lazy returns an [immutable] value. *)
@@ -1306,7 +1306,7 @@ Error: This value is "immutable"
 let zag () @ read uncontended = lazy (ref 42)
 
 [%%expect{|
-val zag : unit -> int ref lazy_t @ uncontended read = <fun>
+val zag : unit -> int ref lazy_t @ read uncontended = <fun>
 |}]
 
 let () =
@@ -1328,7 +1328,7 @@ Error: This value is "read"
 let zig () @ write uncontended = lazy (ref 42)
 
 [%%expect{|
-val zig : unit -> int ref lazy_t @ uncontended write = <fun>
+val zig : unit -> int ref lazy_t @ write uncontended = <fun>
 |}]
 
 let () =

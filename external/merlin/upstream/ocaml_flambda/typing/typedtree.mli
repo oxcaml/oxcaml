@@ -151,7 +151,11 @@ type label_ambiguity =
 
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  (** Label (e.g. record field or variant constructor) disambiguation *)
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+  (** Polymorphic parameter uses (e.g. polymorphic object method) *)
+  | Module_pack : Types.type_expr -> [< `pat | `exp ] type_inspection
+  (** Package types (first-class modules) *)
 
 and _ poly_param =
   | Param : Types.type_expr -> [ `pat ] poly_param
@@ -619,9 +623,14 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
-  | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * Data_types.label_description *
-      alloc_mode
+  | Texp_atomic_loc of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      alloc_mode : alloc_mode;
+    }
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;

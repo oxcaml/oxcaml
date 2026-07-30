@@ -162,7 +162,7 @@ type attribute_kind =
 
 let string_of_kind = function
   | Inlined -> "[@inlined]"
-  | Unrolled -> "[@unrolled]]"
+  | Unrolled -> "[@unrolled]"
 
 let inlined_attribute_on_partial_application_msg kind =
   string_of_kind kind ^ " attributes may not be used on partial applications"

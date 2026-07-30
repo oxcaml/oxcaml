@@ -228,7 +228,7 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
     in
     Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
 
@@ -301,13 +301,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
-  | Lapply { ap_func; ap_args; ap_region_close } ->
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
     Apply
       { func = comp_expr ap_func;
         args = List.map comp_expr ap_args;
-        nontail = is_nontail ap_region_close
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
       }
-  | Lsend (kind, met, obj, args, rc, _, _, _) ->
+  | Lsend (kind, met, obj, args, rc, _, _, _, yielding) ->
     Send
       { method_kind =
           (match (kind : Lambda.meth_kind) with
@@ -317,7 +318,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         met = comp_expr met;
         obj = comp_expr obj;
         args = List.map comp_expr args;
-        nontail = is_nontail rc
+        nontail = is_nontail rc;
+        yielding
       }
   | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
@@ -446,7 +448,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punspecializedarray_ref _ ->
         Misc.fatal_error
           "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
-      | Punboxedvectorarray_ref _ -> simd_is_not_supported ()
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref ->
+        simd_is_not_supported ()
       | _ ->
         let primitive : Blambda.primitive =
           match ref_kind, index_kind with
@@ -473,7 +476,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 ),
               Ptagged_int_index ) ->
             if unsafe then Getvectitem else Ccall "caml_array_get_addr"
-          | (Punspecializedarray_ref _ | Punboxedvectorarray_ref _), _ ->
+          | ( ( Punspecializedarray_ref _ | Punboxedvectorarray_ref _
+              | Punboxedmaskarray_ref ),
+              _ ) ->
             (* Handled by the outer match. *)
             assert false
         in
@@ -491,7 +496,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punspecializedarray_set _ ->
         Misc.fatal_error
           "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
-      | Punboxedvectorarray_set _ -> simd_is_not_supported ()
+      | Punboxedvectorarray_set _ | Punboxedmaskarray_set ->
+        simd_is_not_supported ()
       | _ -> (
         let primitive : Blambda.primitive =
           match set_kind, index_kind with
@@ -518,7 +524,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
                 ),
               Ptagged_int_index ) ->
             if unsafe then Setvectitem else Ccall "caml_array_set_addr"
-          | (Punspecializedarray_set _ | Punboxedvectorarray_set _), _ ->
+          | ( ( Punspecializedarray_set _ | Punboxedvectorarray_set _
+              | Punboxedmaskarray_set ),
+              _ ) ->
             (* Handled by the outer match. *)
             assert false
         in
@@ -591,6 +599,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
           variadic Makefloatblock
         | Punboxedvectorarray _ -> simd_is_not_supported ()
+        | Punboxedmaskarray -> simd_is_not_supported ()
         | Pgenarray -> (
           let block = variadic (Makeblock { tag = 0 }) in
           match args with
@@ -638,6 +647,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Punboxedoruntaggedintarray Unboxed_nativeint ->
             Lconst (Const_base (Const_nativeint 0n))
           | Punboxedvectorarray _ -> raise Not_found
+          | Punboxedmaskarray -> raise Not_found
           | Pgcignorableproductarray ignorables ->
             let rec convert_ignorable
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
@@ -711,7 +721,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             }
         | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
         | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
-        | Punboxedvectorarray _ ->
+        | Punboxedvectorarray _ | Punboxedmaskarray ->
           unary (Ccall "caml_obj_dup")
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
@@ -954,7 +964,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
     | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
     | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
@@ -1012,6 +1040,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          arrays epic for out plan to deal with it. *)
       match kind with
       | Punboxedvectorarray _ -> simd_is_not_supported ()
+      | Punboxedmaskarray -> simd_is_not_supported ()
       | (Pgcscannableproductarray _ | Pgcignorableproductarray _) as kind ->
         (* In bytecode, [caml_array_make n init] makes every slot point to the
            same [init] block. For unboxed products (boxed in bytecode), we must
@@ -1035,8 +1064,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
              ~offset:(tagged_immediate 0)
              ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
              ~elt:(element_of_array_kind kind))
+      | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> (
+        (* These kinds are flat [Double_array_tag] arrays even under
+           [-no-flat-float-array], so [caml_array_make] must not be used. *)
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_floatarray_make")
+        | Alloc_local -> binary (Ccall "caml_floatarray_make_local"))
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
-      | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _ -> (
+      | Punboxedoruntaggedintarray _
+      | Punboxedfloatarray Unboxed_float32 -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
         | Alloc_local -> binary (Ccall "caml_array_make_local"))
@@ -1046,6 +1082,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
+      | Punboxedmaskarray_set -> simd_is_not_supported ()
       | (Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _) as
         set_kind ->
         (* [caml_array_blit] is a shallow copy: each blitted slot of [dst]
@@ -1400,7 +1437,12 @@ let thunkify_compilation_unit_initialization ~thunk_name blam =
             free_variables = Ident.Set.empty
           };
       body =
-        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
     }
 
 let blambda_of_lambda ~compilation_unit x =

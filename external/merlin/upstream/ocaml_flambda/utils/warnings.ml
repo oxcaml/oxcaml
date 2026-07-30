@@ -136,6 +136,11 @@ type t =
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
   (* Oxcaml specific warnings: numbers should go down from 199 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
   | Ignored_kind_modifier of string * string list (* 184 *)
@@ -150,15 +155,14 @@ type t =
   | Unboxing_impossible                     (* 210 *)
   | Mod_by_top of string                    (* 211 *)
   (* 212 taken *)
-  | Modal_axis_specified_twice of
-    { axis : string;
-      overriden_by : string;
-    }                                       (* 213 *)
+  (* 213 was [Modal_axis_specified_twice], now subsumed by
+     [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
   | Lpoly_in_letrec                         (* 218 *)
   | Useless_valpoly                         (* 219 *)
+  | Redundant_modality                      (* 220 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -240,6 +244,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
+  | Imprecise_kind_annotation _ -> 181
   | Untagged_external_small_int_return -> 182
   | Redundant_kind_modifier _ -> 183
   | Ignored_kind_modifier _ -> 184
@@ -254,12 +259,12 @@ let number = function
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
   | Mod_by_top _ -> 211
-  | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
   | Lpoly_in_letrec -> 218
   | Useless_valpoly -> 219
+  | Redundant_modality -> 220
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -615,6 +620,10 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
+  { number = 181;
+    names = ["imprecise-kind-annotation"];
+    description = "A kind annotation is less precise than the inferred kind.";
+    since = since 5 2 };
   { number = 182;
     names = ["untagged-external-small-int-return"];
     description = "An external declaration returns an (int8[@untagged]) or \
@@ -688,6 +697,10 @@ let descriptions = [
     names = ["use-during-borrowing"];
     description = "Use of a value during an active borrow.";
     since = since 5 3 };
+  { number = 220;
+    names = ["redundant-modality"];
+    description = "Modality is redundant with the default.";
+    since = since 5 2 };
 ]
 
 let name_to_number =
@@ -1022,7 +1035,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-183..184"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1456,6 +1469,12 @@ let message = function
         Style.inline_code name
   | Unused_kind_declaration s ->
       msg "unused kind %a." Style.inline_code s
+  | Imprecise_kind_annotation { name; annotated; inferred } ->
+      msg
+        "The type variable `%s'@ \
+         was annotated with kind `%s'@ \
+         but was inferred to have kind `%s'."
+        name annotated inferred
   | Zero_alloc_all_hidden_arrow s ->
       msg "The type of this item is an@ alias of a function type,@ \
            but the %a attribute for@ this signature does not apply to it@ \
@@ -1477,8 +1496,7 @@ let message = function
   | Mod_by_top modifier ->
       msg "%s is the top-most modifier.@ \
            Modifying by a top element is a no-op." modifier
-  | Modal_axis_specified_twice {axis; overriden_by} ->
-      msg "This %s is overridden by %s later." axis overriden_by
+  (* 213 was [Modal_axis_specified_twice] *)
   | Atomic_float_record_boxed ->
       msg "This record contains atomic float fields,@ \
            which prevents the float record optimization.@ \
@@ -1496,6 +1514,8 @@ let message = function
   | Useless_valpoly ->
       msg "This value description has no layout-polymorphic type variables,@ \
       so \"poly_\" has no effect. Consider using a regular \"val\" instead."
+  | Redundant_modality ->
+      msg "This modality is redundant."
 ;;
 
 let nerrors = ref 0

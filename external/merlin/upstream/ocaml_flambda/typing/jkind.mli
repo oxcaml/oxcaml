@@ -299,6 +299,7 @@ module Const : sig
      as uses of them for unused abstract kind warnings. *)
   val of_annotation :
     ?use_abstract_jkinds:bool ->
+    ?warn:bool ->
     context:('l * allowed) History.annotation_context ->
     Env.t ->
     Parsetree.jkind_annotation ->
@@ -429,9 +430,13 @@ val of_sort_univar :
   'd Types.jkind
 
 (* [use_abstract_jkinds] controls whether references to other kinds here count
-   as uses of them for unused abstract kind warnings. *)
+   as uses of them for unused abstract kind warnings.
+
+   [warn] (default: true) controls whether redundant/ignored kind modifier
+   warnings are emitted. *)
 val of_annotation :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:('l * allowed) History.annotation_context ->
   Env.t ->
   Parsetree.jkind_annotation ->
@@ -461,6 +466,7 @@ val of_annotation_option_default :
     as uses of them for unused abstract kind warnings. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:History.annotation_context_l ->
   transl_type:(Parsetree.core_type -> Types.type_expr) ->
   Env.t ->
@@ -468,8 +474,10 @@ val of_type_decl :
   (Types.jkind_l * Parsetree.jkind_annotation option) option
 
 (** Find a jkind from a type declaration in the same way as [of_type_decl], but
-    avoiding translating types in with-bounds. Overapproximates kinds containing
-    with-bounds as [any].
+    avoiding translating types in with-bounds. Over-approximates each
+    [with]-bound by raising the bounds of its base to top, keeping the layout
+    precise (except in the case of a truly-abstract kind, which is approximated
+    as [any]).
 
     Returns the jkind (at quality [Not_best]). *)
 val of_type_decl_overapproximate_unknown :

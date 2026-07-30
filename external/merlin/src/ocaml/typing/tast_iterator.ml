@@ -291,6 +291,7 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_constraint (ct, ma) -> sub.typ sub ct; sub.modes sub ma
   | Tpat_inspected_type (Label_disambiguation _) -> ()
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) -> ()
+  | Tpat_inspected_type (Module_pack _) -> ()
 
 let pat
   : type k . iterator -> k general_pattern -> unit
@@ -346,6 +347,7 @@ let extra sub = function
   | Texp_inspected_type (Label_disambiguation _) -> ()
   | Texp_inspected_type (Polymorphic_parameter (Method _)) -> ()
   | Texp_inspected_type (Polymorphic_parameter (Arrow _)) -> ()
+  | Texp_inspected_type (Module_pack _) -> ()
 
 let function_param sub { fp_loc; fp_kind; fp_newtypes; fp_mode; _ } =
   sub.location sub fp_loc;
@@ -472,7 +474,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
           | Texp_comp_when exp ->
             sub.expr sub exp)
         comp_clauses
-  | Texp_atomic_loc (exp, _, lid, _, _) ->
+  | Texp_atomic_loc { record = exp; lid; _ } ->
       iter_loc_lid sub lid;
       sub.expr sub exp
   | Texp_ifthenelse (exp1, exp2, expo) ->

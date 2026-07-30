@@ -1,0 +1,70 @@
+let code ret_local_1 deleted in
+let code loopify(never) size(13) stub
+      ret_local_1_1 (param : imm tagged)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : float boxed local =
+  (let ret_local_unboxed =
+     %project_function_slot.[ret_local].[ret_local_unboxed] (my_closure)
+   in
+   apply &my_alloc_region &my_region &my_ghost_region
+     (ret_local_unboxed : imm tagged -> float) (param) -> k2 * k1)
+    where k2 (unboxed_return : float) =
+      let boxed_return =
+        %box_num.`float`.my_alloc_region.`local`[my_region] (unboxed_return)
+      in
+      cont k (boxed_return)
+in
+let code ret_heap_3 deleted in
+let code loopify(never) size(13) stub
+      ret_heap_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  (let ret_heap_unboxed =
+     %project_function_slot.[ret_heap].[ret_heap_unboxed] (my_closure)
+   in
+   apply &my_alloc_region
+     (ret_heap_unboxed : imm tagged -> float) (param) -> k2 * k1)
+    where k2 (unboxed_return : float) =
+      let boxed_return = %box_num.`float`.my_alloc_region (unboxed_return) in
+      cont k (boxed_return)
+in
+let $camlUnboxable_local_returning__immstring81 = "ok" in
+let code loopify(never) size(1) newer_version_of(ret_local_1)
+      ret_local_1_2 (param : imm tagged)
+        my_unboxed_closure &my_alloc_region &my_region &my_ghost_region
+          my_depth
+        -> unboxed_return * k
+        : float local =
+  cont unboxed_return (0x1p+0)
+in
+let $camlUnboxable_local_returning__ret_local_4 =
+  closure ret_local_1_1 @ret_local &toplevel.alloc_region
+and $camlUnboxable_local_returning__ret_local_unboxed_5 =
+  closure ret_local_1_2 @ret_local_unboxed &toplevel.alloc_region
+in
+let code loopify(never) size(1) newer_version_of(ret_heap_3)
+      ret_heap_3_2 (param : imm tagged)
+        my_unboxed_closure &my_alloc_region my_depth
+        -> unboxed_return * k
+        : float =
+  cont unboxed_return (0x1p+1)
+in
+let $camlUnboxable_local_returning__ret_heap_6 =
+  closure ret_heap_3_1 @ret_heap &toplevel.alloc_region
+and $camlUnboxable_local_returning__ret_heap_unboxed_7 =
+  closure ret_heap_3_2 @ret_heap_unboxed &toplevel.alloc_region
+in
+apply direct(print_endline_47 &toplevel.alloc_region) inlined(never)
+  ($Stdlib.camlStdlib__print_endline_138 : _ -> imm tagged)
+    ($camlUnboxable_local_returning__immstring81)
+    -> k1 * error
+  where k1 (param : imm tagged) =
+    cont k
+  where k =
+    let $camlUnboxable_local_returning =
+      Block 0 ($camlUnboxable_local_returning__ret_local_4,
+               $camlUnboxable_local_returning__ret_heap_6)
+    in
+    cont done ($camlUnboxable_local_returning)

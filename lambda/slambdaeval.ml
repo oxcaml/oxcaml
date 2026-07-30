@@ -241,7 +241,7 @@ end = struct
   let symbol_arg_of_value_kind_non_null = function
     | Pintval -> "immediate"
     | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
-    | Pboxedvectorval _ ->
+    | Pboxedvectorval _ | Pboxedmaskval ->
       "value"
 
   let rec symbol_arg_of_value_kind { raw_kind; nullable } =
@@ -279,6 +279,7 @@ end = struct
       symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
     | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
+    | Punboxed_mask -> "mask"
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
 
@@ -477,6 +478,7 @@ and eval_lam_shallow ctx env lam =
         ap_result_layout = old_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding;
         ap_loc;
         ap_tailcall;
         ap_inlined;
@@ -493,6 +495,7 @@ and eval_lam_shallow ctx env lam =
           ap_result_layout = new_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
@@ -557,11 +560,13 @@ and eval_lam_shallow ctx env lam =
     if new_layout == old_layout
     then lam
     else Lifthenelse (cond, iftrue, iffalse, new_layout)
-  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout) ->
+  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout, yielding)
+    ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then lam
-    else Lsend (kind, met, obj, args, region_close, mode, loc, new_layout)
+    else
+      Lsend (kind, met, obj, args, region_close, mode, loc, new_layout, yielding)
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
@@ -637,7 +642,7 @@ and eval_mixed_block_element :
     in
     if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
 and eval_layout env layout =
@@ -649,7 +654,7 @@ and eval_layout env layout =
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Pbottom ->
+  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
     layout
 
 and eval_lfunction_shallow env
@@ -772,7 +777,8 @@ and eval_prim env prim =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
+  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
@@ -792,7 +798,7 @@ exception Found_a_splice
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
     ()
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
@@ -801,7 +807,7 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
     Array.iter assert_mixed_block_element_contains_no_splices elements
@@ -862,7 +868,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
-  | Lsend (_, _, _, _, _, _, _, layout) ->
+  | Lsend (_, _, _, _, _, _, _, layout, _) ->
     assert_layout_contains_no_splices layout
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout

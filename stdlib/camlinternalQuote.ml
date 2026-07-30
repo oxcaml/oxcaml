@@ -1013,69 +1013,7 @@ module Identifier = struct
 
     let var v l = mk (TVar (v, l))
 
-    let int = TBuiltin "int" |> mk
-
-    let char = TBuiltin "char" |> mk
-
-    let string = TBuiltin "string" |> mk
-
-    let bytes = TBuiltin "bytes" |> mk
-
-    let float = TBuiltin "float" |> mk
-
-    let float32 = TBuiltin "float32" |> mk
-
-    let bool = TBuiltin "bool" |> mk
-
-    let unit = TBuiltin "unit" |> mk
-
-    let exn = TBuiltin "exn" |> mk
-
-    let array = TBuiltin "array" |> mk
-
-    let iarray = TBuiltin "iarray" |> mk
-
-    let list = TBuiltin "list" |> mk
-
-    let option = TBuiltin "option" |> mk
-
-    let nativeint = TBuiltin "nativeint" |> mk
-
-    let int32 = TBuiltin "int32" |> mk
-
-    let int64 = TBuiltin "int64" |> mk
-
-    let lazy_t = TBuiltin "lazy_t" |> mk
-
-    let extension_constructor = TBuiltin "extension_constructor" |> mk
-
-    let floatarray = TBuiltin "floatarray" |> mk
-
-    let lexing_position = TBuiltin "lexing_position" |> mk
-
-    let expr = TBuiltin "expr" |> mk
-
-    let eval = TBuiltin "eval" |> mk
-
-    let unboxed_float = TBuiltin "float#" |> mk
-
-    let unboxed_nativeint = TBuiltin "nativeint#" |> mk
-
-    let unboxed_int32 = TBuiltin "int32#" |> mk
-
-    let unboxed_int64 = TBuiltin "int64#" |> mk
-
-    let int8x16 = TBuiltin "int8x16" |> mk
-
-    let int16x8 = TBuiltin "int16x8" |> mk
-
-    let int32x4 = TBuiltin "int32x4" |> mk
-
-    let int64x2 = TBuiltin "int64x2" |> mk
-
-    let float32x4 = TBuiltin "float32x4" |> mk
-
-    let float64x2 = TBuiltin "float64x2" |> mk
+    let builtin name = TBuiltin name |> mk
   end
 
   module Module_type = struct
@@ -1099,45 +1037,7 @@ module Identifier = struct
       let+ t = t in
       CDot (t, s)
 
-    let false_ = CBuiltin "false" |> mk
-
-    let true_ = CBuiltin "true" |> mk
-
-    let void = CBuiltin "()" |> mk
-
-    let nil = CBuiltin "[]" |> mk
-
-    let cons = CBuiltin "::" |> mk
-
-    let none = CBuiltin "None" |> mk
-
-    let some = CBuiltin "Some" |> mk
-
-    let match_failure = CBuiltin "Match_failure" |> mk
-
-    let out_of_memory = CBuiltin "Out_of_memory" |> mk
-
-    let out_of_fibers = CBuiltin "Out_of_fibers" |> mk
-
-    let invalid_argument = CBuiltin "Invalid_argument" |> mk
-
-    let failure = CBuiltin "Failure" |> mk
-
-    let not_found = CBuiltin "Not_found" |> mk
-
-    let sys_error = CBuiltin "Sys_error" |> mk
-
-    let end_of_file = CBuiltin "End_of_file" |> mk
-
-    let division_by_zero = CBuiltin "Division_by_zero" |> mk
-
-    let stack_overflow = CBuiltin "Stack_overflow" |> mk
-
-    let sys_blocked_io = CBuiltin "Sys_blocked_io" |> mk
-
-    let assert_failure = CBuiltin "Assert_failure" |> mk
-
-    let undefined_recursive_module = CBuiltin "Undefined_recursive_module" |> mk
+    let builtin name = CBuiltin name |> mk
   end
 
   module Field = struct
@@ -1170,15 +1070,21 @@ end
 module Ast = struct
   type constant =
     | Int of int
-    | Int32 of int32
-    | Int64 of int64
-    | Nativeint of nativeint
     | Char of char
+    | UntaggedChar of int
     | String of string * string option
     | Float of string
     | Float32 of string
     | UnboxedFloat of string
     | UnboxedFloat32 of string
+    | Int8 of int
+    | Int16 of int
+    | Int32 of int32
+    | Int64 of int64
+    | Nativeint of nativeint
+    | UntaggedInt of int
+    | UntaggedInt8 of int
+    | UntaggedInt16 of int
     | UnboxedInt32 of int32
     | UnboxedInt64 of int64
     | UnboxedNativeint of nativeint
@@ -1494,20 +1400,26 @@ module Ast = struct
   and print_const fmt = function
     | Int n -> pp fmt "%d" n
     | Char c -> pp fmt "%C" c
+    | UntaggedChar n -> pp fmt "#%C" (Char.chr (n land 0xff))
     | String (s, id_opt) -> (
       match id_opt with
       | None -> pp fmt "%S" s
       | Some id -> pp fmt "{%s|%s|%s}" id s id)
     | Float s -> pp fmt "%s" s
     | Float32 s -> pp fmt "%ss" s
+    | Int8 n -> pp fmt "%ds" n
+    | Int16 n -> pp fmt "%dS" n
     | Int32 n -> pp fmt "%ldl" n
     | Int64 n -> pp fmt "%LdL" n
     | Nativeint n -> pp fmt "%ndn" n
-    | UnboxedFloat s -> pp fmt "#%s" s
-    | UnboxedFloat32 s -> pp fmt "#%ss" s
-    | UnboxedInt32 n -> pp fmt "#%ldl" n
-    | UnboxedInt64 n -> pp fmt "#%LdL" n
-    | UnboxedNativeint n -> pp fmt "#%ndn" n
+    | UntaggedInt n -> pp fmt "%a" hash_prefix (Format.sprintf "%dm" n)
+    | UntaggedInt8 n -> pp fmt "%a" hash_prefix (Format.sprintf "%ds" n)
+    | UntaggedInt16 n -> pp fmt "%a" hash_prefix (Format.sprintf "%dS" n)
+    | UnboxedFloat s -> pp fmt "%a" hash_prefix (Format.sprintf "%s" s)
+    | UnboxedFloat32 s -> pp fmt "%a" hash_prefix (Format.sprintf "%ss" s)
+    | UnboxedInt32 n -> pp fmt "%a" hash_prefix (Format.sprintf "%ldl" n)
+    | UnboxedInt64 n -> pp fmt "%a" hash_prefix (Format.sprintf "%LdL" n)
+    | UnboxedNativeint n -> pp fmt "%a" hash_prefix (Format.sprintf "%ndn" n)
 
   and print_bool fmt = function
     | false -> pp fmt "false"
@@ -1530,7 +1442,8 @@ module Ast = struct
 
   (* Used to check whether the expression should be parenthesised *)
   and is_negative_const = function
-    | Int n -> n < 0
+    | Int n | Int8 n | Int16 n
+    | UntaggedInt n | UntaggedInt8 n | UntaggedInt16 n -> n < 0
     | Int32 n -> n < 0l
     | Int64 n -> n < 0L
     | Nativeint n -> n < 0n
@@ -1539,7 +1452,12 @@ module Ast = struct
     | UnboxedInt32 n -> n < 0l
     | UnboxedInt64 n -> n < 0L
     | UnboxedNativeint n -> n < 0n
-    | Char _ | String _ -> false
+    | Char _ | UntaggedChar _ | String _ -> false
+
+  and hash_prefix fmt s =
+    if s.[0] = '-'
+    then pp fmt "-#%s" (String.sub s 1 (String.length s - 1))
+    else pp fmt "#%s" s
 
   and print_pat_with_parens env fmt pat =
     match pat with
@@ -2142,11 +2060,21 @@ module Constant = struct
 
   let char c = Ast.Char c
 
+  let untagged_char i = Ast.UntaggedChar i
+
   let string s id = Ast.String (s, id)
 
   let float f = Ast.Float f
 
   let float32 f = Ast.Float32 f
+
+  let unboxed_float f = Ast.UnboxedFloat f
+
+  let unboxed_float32 f = Ast.UnboxedFloat32 f
+
+  let int8 i = Ast.Int8 i
+
+  let int16 i = Ast.Int16 i
 
   let int32 i = Ast.Int32 i
 
@@ -2154,15 +2082,17 @@ module Constant = struct
 
   let nativeint i = Ast.Nativeint i
 
+  let untagged_int i = Ast.UntaggedInt i
+
+  let untagged_int8 i = Ast.UntaggedInt8 i
+
+  let untagged_int16 i = Ast.UntaggedInt16 i
+
   let unboxed_int32 i = Ast.UnboxedInt32 i
 
   let unboxed_int64 i = Ast.UnboxedInt64 i
 
   let unboxed_nativeint i = Ast.UnboxedNativeint i
-
-  let unboxed_float f = Ast.UnboxedFloat f
-
-  let unboxed_float32 f = Ast.UnboxedFloat32 f
 end
 
 module Binding_error = struct

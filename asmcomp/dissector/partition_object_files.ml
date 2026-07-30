@@ -61,7 +61,7 @@ let default_partition_size =
    cross-partition references. *)
 let must_be_in_main entry =
   match MOF.File_size.origin entry with
-  | OCaml -> false
+  | OCaml _ -> false
   | Startup | Cached_genfns -> true
 
 let log fmt =

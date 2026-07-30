@@ -31,6 +31,7 @@ val transl_apply: scopes:scopes
                   -> ?specialised:specialise_attribute
                   -> ?position:region_close
                   -> ?mode:locality_mode
+                  -> ?yielding:yielding_kind
                   -> result_layout:Lambda.layout
                   -> lambda
                   -> (arg_label * apply_arg) list
@@ -52,7 +53,7 @@ type error =
   | Illegal_void_record_field
   | Illegal_product_record_field of Jkind.Sort.Const.t
   | Void_sort of Types.type_expr
-  | Unboxed_vector_in_array_comprehension
+  | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible

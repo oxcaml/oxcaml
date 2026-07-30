@@ -332,8 +332,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
-      | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
+      | Base
+          ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+          | Vec256 | Vec512 | Mask | Word | Untagged_immediate ) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
@@ -429,7 +430,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 tree_of_lazy depth obj ty_arg
 
               | Tconstr (path, [_], _)
-                when Path.same path Predef.path_code ->
+                when Path.same path Predef.path_expr ->
                 Oval_code (O.obj obj : CamlinternalQuote.Code.t)
 
               | _ ->
@@ -490,7 +491,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 Oval_stuff "<box>"
               | ty -> tree_of_val depth obj ty
               end
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _
+          | Tmod _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -808,8 +810,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate
-                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-                        | Product _ ->
+                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
+                        | Word | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")

@@ -110,6 +110,18 @@ type region_close =
     tail call because the outer region needs to end there.)
 *)
 
+(** Whether an application might perform a free effect (i.e. an effect
+    handled in the parent stack). [Unyielding] means the applied
+    function and all of its arguments were at mode [unyielding], so the
+    call can never perform a free effect. Only meaningful for bytecode
+    (it is recorded in debug events for consumers such as js_of_ocaml);
+    native backends ignore it. *)
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+val join_yielding_kind : yielding_kind -> yielding_kind -> yielding_kind
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Phys_equal : sig
@@ -365,7 +377,17 @@ type primitive =
   (* Atomic operations. Note that these operations must not be used on fields of
      all-float blocks. *)
   | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_load_mixed_field of {
+    index : int;
+    (** The field being accessed. Like [Pmixedfield]'s path, this is an index
+        into [shape] -- not a field index. *)
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
   | Patomic_compare_exchange_field of
     { immediate_or_pointer : immediate_or_pointer }
@@ -438,6 +460,7 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
@@ -447,6 +470,7 @@ and array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
@@ -475,6 +499,7 @@ and array_ref_kind =
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
+  | Punboxedmaskarray_ref
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
@@ -492,6 +517,7 @@ and array_set_kind =
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
+  | Punboxedmaskarray_set
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
@@ -543,6 +569,7 @@ and value_kind_non_null =
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
+  | Pboxedmaskval
 
 (* Because we check for and error on void in the translation to lambda, we don't
    need a constructor for it here. *)
@@ -552,6 +579,7 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Slambdaident.t
@@ -575,6 +603,7 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
@@ -683,6 +712,9 @@ val layout_of_extern_repr : extern_repr -> layout
 val element_layout_of_array_kind : array_kind -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
+
+val strip_locality_mode :
+  mixed_block_shape_with_locality_mode -> mixed_block_shape
 
 type structured_constant =
     Const_base of constant
@@ -943,6 +975,7 @@ type lambda =
   | Lassign of Ident.t * lambda
   | Lsend of meth_kind * lambda * lambda * lambda list
              * region_close * locality_mode * scoped_location * layout
+             * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -1011,6 +1044,11 @@ and lfunction = private
     ret_mode: locality_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
+    yielding: yielding_kind;
+    (** [Unyielding] if fully applying the closure can never perform a free
+        effect (it neither closes over nor is passed any yielding value).
+        Only set precisely by [Translcore]; other construction sites
+        conservatively default to [May_yield]. *)
   }
 
 and lkindtemplate =
@@ -1051,6 +1089,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
@@ -1222,7 +1261,9 @@ val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
 val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
+val layout_boxed_mask : layout
 val layout_tupled_vector : boxed_vector -> layout
+val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the field of a tuple *)
@@ -1289,6 +1330,10 @@ val lfunction' :
   mode:locality_mode ->
   ret_mode:locality_mode ->
   lfunction
+
+(* Set the yielding mode of a closure (defaults to [May_yield] from the
+   smart constructors). [Translcore] uses this to record the precise mode. *)
+val lfunction_with_yielding : yielding_kind -> lfunction -> lfunction
 
 
 val iter_head_constructor: (lambda -> unit) -> lambda -> unit

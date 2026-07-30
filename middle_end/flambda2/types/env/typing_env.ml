@@ -1237,7 +1237,7 @@ end = struct
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
           | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-          | Boxed_nativeint _ | String _ | Array _ ->
+          | Boxed_mask _ | Boxed_nativeint _ | String _ | Array _ ->
             value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
@@ -1324,7 +1324,7 @@ end = struct
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _ ->
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in
