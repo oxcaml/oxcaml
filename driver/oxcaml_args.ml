@@ -754,8 +754,18 @@ let mk_no_simplify_stubs f =
   ( "-flambda2-no-simplify-stubs",
     Arg.Unit f,
     Printf.sprintf
-      " Prevent the simplification of stub functions%s (Flambda2 only)"
-      (format_not_default Flambda2.Default.simplify_stubs) )
+      " Prevent the simplification of stub functions (Flambda2 only)" )
+
+let mk_stubs_forward_inlining f =
+  ( "-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf " Forward inlining information on stubs (Flambda2 only)" )
+
+let mk_no_stubs_forward_inlining f =
+  ( "-no-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not forward inlining information on stubs (Flambda2 only)" )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -1419,6 +1429,8 @@ module type Oxcaml_options = sig
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
   val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1620,6 +1632,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
       mk_no_simplify_stubs F.no_simplify_stubs;
+      mk_stubs_forward_inlining F.stubs_forward_inlining;
+      mk_no_stubs_forward_inlining F.no_stubs_forward_inlining;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -2107,6 +2121,8 @@ module Oxcaml_options_impl = struct
 
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
+  let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
+  let no_stubs_forward_inlining = clear' Clflags.stubs_forward_inlining
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2748,6 +2764,7 @@ module Extra_params = struct
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
+    | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

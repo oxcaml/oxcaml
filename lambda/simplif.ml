@@ -911,7 +911,9 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
                which ignores [ap_yielding]. *)
             ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
-            ap_inlined = Default_inlined;
+            ap_inlined =
+              if !Clflags.stubs_forward_inlining
+              then Forward_inlined else Default_inlined;
             ap_specialised = Default_specialise;
             ap_probe=None;
           }

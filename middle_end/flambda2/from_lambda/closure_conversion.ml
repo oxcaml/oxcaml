@@ -2386,6 +2386,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              args_arity) ]
   in
   let make_body cont =
+    let inlined : Inlined_attribute.t =
+      if !Clflags.stubs_forward_inlining
+      then Forward_inlined
+      else Default_inlined
+    in
     let main_application =
       Apply_expr.create
         ~callee:(Some (Simple.var main_closure))
@@ -2398,7 +2403,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
+        Debuginfo.none ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
@@ -3453,7 +3458,10 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         args_arity = arity;
         continuation = return_continuation;
         exn_continuation;
-        inlined = Lambda.Default_inlined;
+        inlined =
+          (if !Clflags.stubs_forward_inlining
+           then Lambda.Forward_inlined
+           else Lambda.Default_inlined);
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;

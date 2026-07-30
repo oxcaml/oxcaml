@@ -1647,7 +1647,7 @@ and transl_apply ~scopes
       ~result_layout
       lam sargs loc
   =
-  let lapply funct args loc pos mode result_layout =
+  let lapply ?(inlined = inlined) funct args loc pos mode result_layout =
     match funct, pos with
     | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
         Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
@@ -1717,7 +1717,7 @@ and transl_apply ~scopes
        will occur exactly when all the arguments up to this parameter
        have been received.
   *)
-  let rec build_apply lam args loc pos ap_mode result_layout = function
+  let rec build_apply ~inlined lam args loc pos ap_mode result_layout = function
     | Omitted { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret } :: l ->
         (* Out-of-order partial application; we will need to build a closure *)
         assert (pos = Rc_normal);
@@ -1759,8 +1759,14 @@ and transl_apply ~scopes
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
+          let inlined =
+            match inlined with
+            | Default_inlined when !Clflags.stubs_forward_inlining ->
+              Forward_inlined
+            | _ -> inlined
+          in
           let body =
-            build_apply handle [Lvar id_arg] loc Rc_normal ret_mode
+            build_apply ~inlined handle [Lvar id_arg] loc Rc_normal ret_mode
               result_layout l
           in
           let nlocal =
@@ -1787,9 +1793,9 @@ and transl_apply ~scopes
           Llet(Strict, layout, id, Lambda.debug_uid_none, lam, body))
           !defs body
     | Arg (arg, _) :: l ->
-        build_apply lam (arg :: args) loc pos ap_mode result_layout l
+        build_apply ~inlined lam (arg :: args) loc pos ap_mode result_layout l
     | [] ->
-        lapply lam (List.rev args) loc pos ap_mode result_layout
+        lapply ~inlined lam (List.rev args) loc pos ap_mode result_layout
   in
   let args =
     List.map
@@ -1802,7 +1808,7 @@ and transl_apply ~scopes
            Arg (transl_exp ~scopes layout exp, layout))
       sargs
   in
-  build_apply lam [] loc position mode result_layout args
+  build_apply ~inlined lam [] loc position mode result_layout args
 
 (* There are two cases in function translation:
     - [Tupled]. It takes a tupled argument, and we can flatten it.
