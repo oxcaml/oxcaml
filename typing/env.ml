@@ -3805,8 +3805,8 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
 let walk_locks_with_mode_constraint ~env pp ~mode =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
-  walk_locks ~errors:true ~env ~pp
-      (Mode.Value.disallow_right mode) None locks
+  ignore (walk_locks ~errors:true ~env ~pp
+      (Mode.Value.disallow_right mode) None locks)
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -3814,7 +3814,7 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
     effect handlers) that force enclosing functions to be nonportable and
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
-  ignore (walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy)
+  walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy
 
 (** Registers a use of an allocation, constraining every enclosing closure lock.
 
@@ -3826,8 +3826,8 @@ let walk_locks_for_legacy_construct ~env pp =
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
   let closure_mode = Mode.Allocation.newvar () in
-  ignore (walk_locks_with_mode_constraint ~env pp
-    ~mode:(Mode.Value.min_with_comonadic Allocation closure_mode));
+  walk_locks_with_mode_constraint ~env pp
+    ~mode:(Mode.Value.min_with_comonadic Allocation closure_mode);
   closure_mode
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
