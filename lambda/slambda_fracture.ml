@@ -359,6 +359,8 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_block;
               attributes = default_param_attribute;
+              (* The env parameter can be local because we immediately
+                 destructure it. *)
               mode = alloc_local
             }
           in
@@ -388,7 +390,10 @@ let rec fracture_lam lambda : slambda =
                 lfunction
                   ~kind:(Curried { nlocal = 1 })
                   ~params:[closure_param] ~return:ktmpl_return ~body
-                  ~attr:default_function_attribute ~loc:ktmpl_loc
+                  ~attr:default_function_attribute
+                  ~loc:ktmpl_loc
+                    (* This closure has no free variables and will always be
+                     statically allocated. alloc_heap is an safe choice. *)
                   ~mode:alloc_heap ~ret_mode:ktmpl_ret_mode
             })
     in
