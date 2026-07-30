@@ -102,6 +102,12 @@ val create_boxed_vec512 :
   Vector_types.Vec512.Bit_pattern.t Or_variable.t ->
   t
 
+val create_boxed_mask :
+  Are_rebuilding_terms.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Vector_types.Mask.Bit_pattern.t Or_variable.t ->
+  t
+
 val create_immutable_float_block :
   Are_rebuilding_terms.t ->
   Numeric_types.Float_by_bit_pattern.t Or_variable.t list ->
@@ -148,6 +154,11 @@ val create_immutable_vec256_array :
 val create_immutable_vec512_array :
   Are_rebuilding_terms.t ->
   Vector_types.Vec512.Bit_pattern.t Or_variable.t list ->
+  t
+
+val create_immutable_mask_array :
+  Are_rebuilding_terms.t ->
+  Vector_types.Mask.Bit_pattern.t Or_variable.t list ->
   t
 
 val create_immutable_value_array :

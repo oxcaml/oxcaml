@@ -175,6 +175,7 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
@@ -282,6 +283,9 @@ let size_component : machtype_component -> int = function
   | Vec512 ->
     assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
     Arch.size_vec512
+  | Mask ->
+    assert (Int.equal Arch.size_int 8);
+    Arch.size_int
 
 let size_machtype mty =
   let size = ref 0 in
@@ -302,6 +306,7 @@ let size_expr env exp =
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
+    | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (

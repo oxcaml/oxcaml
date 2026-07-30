@@ -287,6 +287,7 @@ module Predef = struct
       | Unboxed_int32
       | Unboxed_int16
       | Unboxed_int8
+      | Unboxed_mask
       | Unboxed_simd of simd_vec_split
 
     type t =
@@ -303,6 +304,7 @@ module Predef = struct
       | Int32
       | Int64
       | Lazy_t
+      | Mask
       | Nativeint
       | String
       | Simd of simd_vec_split
@@ -365,6 +367,7 @@ module Predef = struct
       | Unboxed_int32 -> "int32"
       | Unboxed_int16 -> "int16"
       | Unboxed_int8 -> "int8"
+      | Unboxed_mask -> "mask"
       | Unboxed_simd s -> simd_vec_split_to_string s
 
     let to_string : t -> string = function
@@ -381,6 +384,7 @@ module Predef = struct
       | Int32 -> "int32"
       | Int64 -> "int64"
       | Lazy_t -> "lazy_t"
+      | Mask -> "mask"
       | Nativeint -> "nativeint"
       | String -> "string"
       | Simd s -> simd_vec_split_to_string s
@@ -423,13 +427,14 @@ module Predef = struct
       | Unboxed_int32 -> Bits32
       | Unboxed_int16 -> Bits16
       | Unboxed_int8 -> Bits8
+      | Unboxed_mask -> Mask
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_base_layout : t -> base_layout =
       function
       | Array | Bytes | Char | Extension_constructor | Float | Float32
-      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-      | String | Simd _ | Exception ->
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+      | Nativeint | String | Simd _ | Exception ->
         Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
@@ -472,11 +477,12 @@ module Predef = struct
       | Unboxed_int64, Unboxed_int64
       | Unboxed_int32, Unboxed_int32
       | Unboxed_int16, Unboxed_int16
-      | Unboxed_int8, Unboxed_int8 -> true
+      | Unboxed_int8, Unboxed_int8
+      | Unboxed_mask, Unboxed_mask -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
         | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
-        | Unboxed_simd _), _ -> false
+        | Unboxed_mask | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -493,14 +499,15 @@ module Predef = struct
       | Int32, Int32
       | Int64, Int64
       | Lazy_t, Lazy_t
+      | Mask, Mask
       | Nativeint, Nativeint
       | String, String -> true
       | Simd s1, Simd s2 -> equal_simd_vec_split s1 s2
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
       | (Array | Bytes | Char | Extension_constructor | Float | Float32
-        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-        | String | Simd _ | Exception | Unboxed _), _ -> false
+        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+        | Nativeint | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 type var = Ident.t

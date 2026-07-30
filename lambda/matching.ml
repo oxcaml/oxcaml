@@ -2143,7 +2143,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+      | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in

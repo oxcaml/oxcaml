@@ -123,7 +123,8 @@ let flat_suffix_element =
         "imm", Naked_immediate;
         "vec128", Naked_vec128;
         "vec256", Naked_vec256;
-        "vec512", Naked_vec512 ]
+        "vec512", Naked_vec512;
+        "mask", Naked_mask ]
 
 let mixed_block_shape =
   let open D in
@@ -357,7 +358,8 @@ let boxable_number =
         "nativeint", Naked_nativeint;
         "vec128", Naked_vec128;
         "vec256", Naked_vec256;
-        "vec512", Naked_vec512 ]
+        "vec512", Naked_vec512;
+        "mask", Naked_mask ]
 
 let array_kind =
   let open D in
@@ -377,6 +379,7 @@ let array_kind =
         let| vec128 = flag_case "vec128" Naked_vec128s in
         let| vec256 = flag_case "vec256" Naked_vec256s in
         let| vec512 = flag_case "vec512" Naked_vec512s in
+        let| mask = flag_case "mask" Naked_masks in
         let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
         let| product = list ak, fun _ aks -> Unboxed_product aks in
         return_either (function
@@ -393,6 +396,7 @@ let array_kind =
           | Naked_vec128s -> vec128 ()
           | Naked_vec256s -> vec256 ()
           | Naked_vec512s -> vec512 ()
+          | Naked_masks -> mask ()
           | Gc_ignorable_values -> gc_ign ()
           | Unboxed_product aks -> product aks))
   in
@@ -465,6 +469,10 @@ let duplicate_array_kind =
     ( labeled "vec512" (option target_ocaml_int),
       fun _ length -> Naked_vec512s { length } )
   in
+  let| mask =
+    ( labeled "mask" (option target_ocaml_int),
+      fun _ length -> Naked_masks { length } )
+  in
   return_either (function
     | Immediates -> imm ()
     | Values -> values ()
@@ -478,7 +486,8 @@ let duplicate_array_kind =
     | Naked_nativeints { length } -> nativeint length
     | Naked_vec128s { length } -> vec128 length
     | Naked_vec256s { length } -> vec256 length
-    | Naked_vec512s { length } -> vec512 length)
+    | Naked_vec512s { length } -> vec512 length
+    | Naked_masks { length } -> mask length)
 
 let bigarray_kind =
   D.(
@@ -538,6 +547,7 @@ let kind =
            "vec128", K.naked_vec128;
            "vec256", K.naked_vec256;
            "vec512", K.naked_vec512;
+           "mask", K.naked_mask;
            "region", K.region;
            "rec_info", K.rec_info ])
 
@@ -562,6 +572,7 @@ let kind_with_subkind =
         let| boxed_vec128 = flag_case "boxed_vec128" Boxed_vec128 in
         let| boxed_vec256 = flag_case "boxed_vec256" Boxed_vec256 in
         let| boxed_vec512 = flag_case "boxed_vec512" Boxed_vec512 in
+        let| boxed_mask = flag_case "boxed_mask" Boxed_mask in
         let| value_array = flag_case "value_array" Value_array in
         let| imm_array = flag_case "imm_array" Immediate_array in
         let| float_array = flag_case "float_array" Float_array in
@@ -596,6 +607,9 @@ let kind_with_subkind =
         let| unboxed_vec512_array =
           flag_case "unboxed_vec512_array" Unboxed_vec512_array
         in
+        let| unboxed_mask_array =
+          flag_case "unboxed_mask_array" Unboxed_mask_array
+        in
         let| unboxed_product_array =
           flag_case "unboxed_product_array" Unboxed_product_array
         in
@@ -629,6 +643,7 @@ let kind_with_subkind =
           | Boxed_vec128 -> boxed_vec128 ()
           | Boxed_vec256 -> boxed_vec256 ()
           | Boxed_vec512 -> boxed_vec512 ()
+          | Boxed_mask -> boxed_mask ()
           | Tagged_immediate -> tagged_imm ()
           | Float_array -> float_array ()
           | Immediate_array -> imm_array ()
@@ -644,6 +659,7 @@ let kind_with_subkind =
           | Unboxed_vec128_array -> unboxed_vec128_array ()
           | Unboxed_vec256_array -> unboxed_vec256_array ()
           | Unboxed_vec512_array -> unboxed_vec512_array ()
+          | Unboxed_mask_array -> unboxed_mask_array ()
           | Unboxed_product_array -> unboxed_product_array ()
           | Float_block { num_fields } -> float_block num_fields
           | Variant { consts; non_consts } -> variant (consts, non_consts))
@@ -663,6 +679,7 @@ let kind_with_subkind =
       let| naked_vec128 = flag_case "vec128" K.With_subkind.naked_vec128 in
       let| naked_vec256 = flag_case "vec256" K.With_subkind.naked_vec256 in
       let| naked_vec512 = flag_case "vec512" K.With_subkind.naked_vec512 in
+      let| naked_mask = flag_case "mask" K.With_subkind.naked_mask in
       let| value =
         param2_case non_null_value_subkind nullable ~decode:(fun _ sk n ->
             K.With_subkind.create K.value sk n)
@@ -684,6 +701,7 @@ let kind_with_subkind =
           | Naked_number K.Naked_number_kind.Naked_vec128 -> naked_vec128 ()
           | Naked_number K.Naked_number_kind.Naked_vec256 -> naked_vec256 ()
           | Naked_number K.Naked_number_kind.Naked_vec512 -> naked_vec512 ()
+          | Naked_number K.Naked_number_kind.Naked_mask -> naked_mask ()
           | Value ->
             value
               ( K.With_subkind.non_null_value_subkind full_kind,
@@ -963,7 +981,8 @@ let array_load =
         "nativeint", Naked_nativeints;
         "vec128", Naked_vec128s;
         "vec256", Naked_vec256s;
-        "vec512", Naked_vec512s ]
+        "vec512", Naked_vec512s;
+        "mask", Naked_masks ]
   in
   binary "%array_load"
     ~params:
@@ -989,6 +1008,7 @@ let array_load =
                | Naked_vec128s -> Naked_vec128s
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
+               | Naked_masks -> Naked_masks
                | Unboxed_product _ ->
                  Misc.fatal_error "missing product array load kind")
            in
@@ -1000,7 +1020,7 @@ let array_load =
              | Immediates | Gc_ignorable_values | Values | Naked_floats
              | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
              | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-             | Naked_vec256s | Naked_vec512s ->
+             | Naked_vec256s | Naked_vec512s | Naked_masks ->
                None
            in
            k, lk, m))
@@ -1135,6 +1155,7 @@ let array_set =
     let| vec128 = flag_case "vec128" Naked_vec128s in
     let| vec256 = flag_case "vec256" Naked_vec256s in
     let| vec512 = flag_case "vec512" Naked_vec512s in
+    let| mask = flag_case "mask" Naked_masks in
     let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
     return_either (function
       | Immediates -> imm ()
@@ -1150,6 +1171,7 @@ let array_set =
       | Naked_vec128s -> vec128 ()
       | Naked_vec256s -> vec256 ()
       | Naked_vec512s -> vec512 ()
+      | Naked_masks -> mask ()
       | Gc_ignorable_values -> gc_ign ())
   in
   ternary "%array_set"
@@ -1178,6 +1200,7 @@ let array_set =
                | Naked_vec128s -> Naked_vec128s
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
+               | Naked_masks -> Naked_masks
                | Unboxed_product _ ->
                  Misc.fatal_error "Missing product array set kind")
            in
@@ -1189,7 +1212,7 @@ let array_set =
              | Immediates | Gc_ignorable_values | Values | Naked_floats
              | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
              | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-             | Naked_vec256s | Naked_vec512s ->
+             | Naked_vec256s | Naked_vec512s | Naked_masks ->
                None
            in
            k, sk))

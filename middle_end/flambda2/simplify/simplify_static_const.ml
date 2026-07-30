@@ -202,6 +202,18 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
         ~machine_width:(DE.machine_width (DA.denv dacc))
         or_var,
       dacc )
+  | Boxed_mask or_var ->
+    let or_var, ty =
+      simplify_or_variable dacc
+        (fun f -> T.this_boxed_mask f Alloc_mode.For_types.heap)
+        or_var K.value
+    in
+    let dacc = bind_result_sym ty in
+    ( Rebuilt_static_const.create_boxed_mask
+        (DA.are_rebuilding_terms dacc)
+        ~machine_width:(DE.machine_width (DA.denv dacc))
+        or_var,
+      dacc )
   | Immutable_float_block fields ->
     let fields_with_tys =
       List.map
@@ -250,6 +262,9 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
   | Immutable_vec512_array fields ->
     rebuild_naked_number_array dacc ~bind_result_sym KS.naked_vec512
       T.this_naked_vec512 RSC.create_immutable_vec512_array ~fields
+  | Immutable_mask_array fields ->
+    rebuild_naked_number_array dacc ~bind_result_sym KS.naked_mask
+      T.this_naked_mask RSC.create_immutable_mask_array ~fields
   | Immutable_value_array fields ->
     let fields_with_tys =
       List.map

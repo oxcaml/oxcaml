@@ -189,6 +189,7 @@ module Predef : sig
     | Unboxed_int32
     | Unboxed_int16
     | Unboxed_int8
+    | Unboxed_mask
     | Unboxed_simd of simd_vec_split
 
   type t =
@@ -205,6 +206,7 @@ module Predef : sig
     | Int32
     | Int64
     | Lazy_t
+    | Mask
     | Nativeint
     | String
     | Simd of simd_vec_split

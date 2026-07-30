@@ -75,6 +75,7 @@ let keyword_table =
     "let", KWD_LET;
     "local", KWD_LOCAL;
     "loopify", KWD_LOOPIFY;
+    "mask", KWD_MASK;
     "mutable", KWD_MUTABLE;
     "nativeint", KWD_NATIVEINT;
     "never", KWD_NEVER;
