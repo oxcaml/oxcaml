@@ -326,14 +326,15 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
-(** Registers a use of an allocation, constraining every enclosing closure lock.
+(** Registers a use of an allocation at the given pinpoint.
 
-    Returns a fresh mode variable on the allocation axis that is below the
-    allocation mode of every enclosing closure. The caller constrains it to
-    [alloc] if the allocation ends up on the heap, which then forces every
-    enclosing closure to be [alloc]. *)
+    Returns the allocation mode of every enclosing closure, each paired with
+    the pinpoint of that closure. The list is ordered from the innermost
+    closure to the outermost one, so that error messages blame the closure
+    nearest to the allocation. Constraining one of those modes to [alloc]
+    forces the corresponding closure to be [alloc]. *)
 val walk_locks_for_allocation :
-  env:t -> Mode.Hint.pinpoint -> Mode.Allocation.lr
+  env:t -> Mode.Hint.pinpoint -> (Mode.Hint.pinpoint * Mode.Allocation.r) list
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->

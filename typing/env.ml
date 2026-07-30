@@ -3816,19 +3816,35 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
 let walk_locks_for_legacy_construct ~env pp =
   walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy
 
-(** Registers a use of an allocation, constraining every enclosing closure lock.
+(** Registers a use of an allocation at [pp].
 
-    Returns a fresh mode variable on the allocation axis that is below the
-    allocation mode of every enclosing closure. The caller constrains it to
-    [alloc] if the allocation ends up on the heap, which then forces every
-    enclosing closure to be [alloc]. *)
+    Returns the allocation mode of every enclosing closure, each paired with
+    the pinpoint of that closure and hinted as enclosing [pp]. The list is
+    ordered from the innermost closure to the outermost one, so that error
+    messages blame the closure nearest to the allocation.
+
+    Constraining one of those modes to [alloc] forces the corresponding
+    closure to be [alloc]. *)
 (* CR shsong: currently it only considers noalloc_strict and alloc,
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
-  let closure_mode = Mode.Allocation.newvar () in
-  walk_locks_with_mode_constraint ~env pp
-    ~mode:(Mode.Value.min_with_comonadic Allocation closure_mode);
-  closure_mode
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  List.fold_left
+    (fun acc lock ->
+      match lock with
+      | Closure_lock (closure, comonadic) ->
+          let comonadic =
+            Mode.Value.Comonadic.apply_hint
+              (Is_closed_by (Comonadic, {closure; closed = pp}))
+              comonadic
+          in
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+      (* A [Const_closure_lock] is at a constant mode which is always [alloc]
+         on the allocation axis, so there is nothing to constrain. *)
+      | Region_lock | Const_closure_lock _ | Exclave_lock
+      | Unboxed_lock -> acc
+    ) [] locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
