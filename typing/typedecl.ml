@@ -1943,6 +1943,10 @@ module Element_repr = struct
     | Float_element
     | Value_element of Jkind_types.Scannable_axes.t
     | Void
+    | Addressable of t
+    (* [Addressable] does not (yet) change the representation of the element;
+       it is recorded in the shape but all representation decisions look
+       through it. *)
     (* This type technically permits [Float_element] to appear in an unboxed
        product, but we never generate that and make no attempt to apply the
        float record optimization to records of unboxed products of floats. Kinds
@@ -1957,6 +1961,7 @@ module Element_repr = struct
       Scannable Jkind_types.Scannable_axes.value_axes
     | Value_element sa -> Scannable sa
     | Void -> Void
+    | Addressable t -> Addressable (of_t t)
     and of_unboxed_element : unboxed_element -> mixed_block_element = function
       | Float64 -> Float64
       | Float32 -> Float32
@@ -2001,9 +2006,8 @@ module Element_repr = struct
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
-      (* Addressability does not change how a layout is represented within a
-         block. *)
-      | Addressable layout -> layout_to_t layout
+      | Addressable layout ->
+        Option.map (fun t -> Addressable t) (layout_to_t layout)
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
@@ -2011,8 +2015,13 @@ module Element_repr = struct
 
   let mixed_product_shape_known loc ts kind =
     let mixed =
-      List.exists
-        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
+      let rec is_mixed_element : t -> bool = function
+        | Unboxed_element _ | Void -> true
+        | Value_element _ | Float_element -> false
+        (* [Addressable] does not change the representation choice *)
+        | Addressable t -> is_mixed_element t
+      in
+      List.exists (fun (t, _) -> is_mixed_element t) ts
     in
     if not mixed then `Not_mixed else begin
       let shape =
@@ -2057,7 +2066,8 @@ let check_atomic_fields reprs lbls =
   let is_value (repr : Element_repr.t option) =
     match repr with
     | Some (Value_element _ | Float_element) -> true
-    | Some (Unboxed_element _ | Void) | None -> false
+    (* A normalized kind is never a value under [addressable] *)
+    | Some (Unboxed_element _ | Void | Addressable _) | None -> false
   in
   List.iter2
     (fun repr (lbl : Types.label_declaration) ->
@@ -2153,19 +2163,25 @@ let compute_record_repr
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
       ~first_any:None, ..  ->
     if flatten_floats then
+      let rec of_repr (repr : Element_repr.t) : Types.mixed_block_element =
+        match repr with
+        | Float_element -> Float_boxed
+        | Unboxed_element Float64 -> Float64
+        | Void -> Void
+        | Addressable repr -> Addressable (of_repr repr)
+        | Unboxed_element (Float32
+                          | Bits8 | Bits16 | Bits32 | Bits64
+                          | Vec128 | Vec256 | Vec512 | Mask | Word
+                          | Untagged_immediate | Product _)
+        | Value_element _ ->
+            Misc.fatal_error "Expected only floats and float64s"
+      in
       let shape =
         List.map
           (fun ((repr : Element_repr.t option), _lbl) ->
             match repr with
-            | Some Float_element -> Float_boxed
-            | Some (Unboxed_element Float64) -> Float64
-            | Some Void -> Void
-            | Some (Unboxed_element (Float32
-                                    | Bits8 | Bits16 | Bits32 | Bits64
-                                    | Vec128 | Vec256 | Vec512 | Mask | Word
-                                    | Untagged_immediate | Product _))
-            | Some Value_element _ | None ->
-                Misc.fatal_error "Expected only floats and float64s")
+            | Some repr -> of_repr repr
+            | None -> Misc.fatal_error "Expected only floats and float64s")
           reprs
         |> Array.of_list
       in
@@ -2268,19 +2284,24 @@ let compute_repr_summary env lbls jkinds =
         match repr with
         | None -> add_any lbl.Types.ld_id
         | Some repr -> begin
-          match repr with
-          | Float_element ->
-              repr_summary.floats <- true;
-              if Types.is_atomic lbl.Types.ld_mutable
-              then repr_summary.atomic_floats <- true;
-          | Unboxed_element Float64 -> repr_summary.float64s <- true
-          | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                            | Vec128 | Vec256 | Vec512 | Mask | Word
-                            | Untagged_immediate | Product _ ) ->
-              repr_summary.non_float64_unboxed_fields <- true
-          | Value_element _ -> repr_summary.values <- true
-          | Void ->
-              repr_summary.voids <- true
+          let rec summarize (repr : Element_repr.t) =
+            match repr with
+            | Float_element ->
+                repr_summary.floats <- true;
+                if Types.is_atomic lbl.Types.ld_mutable
+                then repr_summary.atomic_floats <- true;
+            | Unboxed_element Float64 -> repr_summary.float64s <- true
+            | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                              | Vec128 | Vec256 | Vec512 | Mask | Word
+                              | Untagged_immediate | Product _ ) ->
+                repr_summary.non_float64_unboxed_fields <- true
+            | Value_element _ -> repr_summary.values <- true
+            | Void ->
+                repr_summary.voids <- true
+            (* [Addressable] does not change the representation choice *)
+            | Addressable repr -> summarize repr
+          in
+          summarize repr
           end)
     reprs lbls;
   reprs, repr_summary

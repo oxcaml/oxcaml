@@ -931,6 +931,12 @@ and mixed_block_element =
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Addressable of mixed_block_element
+  (* An element whose kind is made addressable. This does not (yet) change how
+     the element is stored in the block, and is erased when converting to
+     [Lambda.mixed_block_element]; it is recorded here so that representation
+     checks distinguish it, as it will change the representation once
+     [inherit] fields exist. *)
 
 and mixed_product_shape = mixed_block_element array
 

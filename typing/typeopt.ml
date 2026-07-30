@@ -915,6 +915,11 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     in
     num_nodes_visited, Product kinds
   | Void -> num_nodes_visited, Product [||]
+  (* Addressability does not (yet) change how an element is stored in the
+     block, so it is erased here. *)
+  | Addressable field ->
+    value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
+      field ty
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =

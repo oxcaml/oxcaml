@@ -793,12 +793,17 @@ let rec expression : Typedtree.expression -> term_judg =
            (match shape with
             | Constructor_uniform_value -> Guard
             | Constructor_mixed mixed_shape ->
-                (match mixed_shape.(i) with
-                 | Scannable _ | Float_boxed -> Guard
-                 | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-                 | Void | Product _ ->
-                   Dereference)
+                let rec arg_mode_of_element
+                    : Types.mixed_block_element -> _ = function
+                  | Scannable _ | Float_boxed -> Guard
+                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+                  | Vec128 | Vec256 | Vec512 | Mask | Word
+                  | Untagged_immediate
+                  | Void | Product _ ->
+                    Dereference
+                  | Addressable e -> arg_mode_of_element e
+                in
+                arg_mode_of_element mixed_shape.(i)
             | Constructor_variable ->
                 Misc.fatal_error
                   "value_rec_check: variable constructor representation")
@@ -824,12 +829,16 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_inlined (_, Constructor_mixed mixed_shape, _)
           | Record_mixed mixed_shape ->
-            (match mixed_shape.(i) with
-             | Scannable _ | Float_boxed -> Guard
-             | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-             | Void | Product _ ->
-               Dereference)
+            let rec field_mode_of_element
+                : Types.mixed_block_element -> _ = function
+              | Scannable _ | Float_boxed -> Guard
+              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+              | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+              | Void | Product _ ->
+                Dereference
+              | Addressable e -> field_mode_of_element e
+            in
+            field_mode_of_element mixed_shape.(i)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
           | Record_inlined (_, Constructor_variable, _)

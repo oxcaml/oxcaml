@@ -238,8 +238,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
-  (* Addressability does not change how a sort is represented *)
-  | Addressable ly -> layout_to_types_layout ly
+  | Addressable ly -> Addressable (layout_to_types_layout ly)
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
     : RS.Runtime_layout.t =

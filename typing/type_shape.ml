@@ -414,6 +414,7 @@ module Type_decl_shape = struct
     | Types.Product args ->
       Layout.product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
+    | Types.Addressable e -> Layout.addressable (mixed_block_shape_to_layout e)
 
   let of_complex_constructor type_subst name
       (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
@@ -452,10 +453,7 @@ module Type_decl_shape = struct
             (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
               let ly2 = mixed_block_shape_to_layout mix_shape in
               match ly with
-              (* Compare modulo addressability, which the runtime
-                 representation of the constructor erases. *)
-              | Some ly
-                when not (Layout.equal (Layout.erase_addressable ly) ly2) ->
+              | Some ly when not (Layout.equal ly ly2) ->
                 if !Clflags.dwarf_pedantic
                 then
                   Misc.fatal_errorf_doc

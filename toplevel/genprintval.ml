@@ -806,7 +806,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       nest tree_of_val (depth - 1) fld ty_arg
                   | Outval_record_mixed_block shape ->
                       let fld =
-                        match shape.(pos) with
+                        let rec of_element
+                            : Types.mixed_block_element -> _ = function
                         | Scannable _ -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
@@ -816,6 +817,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")
+                        | Addressable e -> of_element e
+                        in
+                        of_element shape.(pos)
                       in
                       match fld with
                       | `Continue fld ->
