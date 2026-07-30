@@ -339,7 +339,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
       ~native_name:name
       ~native_repr_args:
-        ([Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable)]
+        ([Primitive.Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable]
         @
         match init with
         | None -> []
@@ -349,7 +349,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
         ( (match mode with
           | Alloc_heap -> Prim_global
           | Alloc_local -> Prim_local),
-          L.Same_as_ocaml_repr (Base Scannable) )
+          L.Same_as_ocaml_repr Jkind.Sort.Const.scannable )
       ~is_layout_poly:false
   in
   L.Lprim
@@ -377,12 +377,12 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
     ~c_builtin:false ~effects:Arbitrary_effects ~coeffects:Has_coeffects
     ~native_name:name
     ~native_repr_args:
-      [ Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-        Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-        Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
+      [ Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+        Prim_local, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+        Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable ]
     ~native_repr_res:
       ( (match mode with Alloc_heap -> Prim_global | Alloc_local -> Prim_local),
-        L.Same_as_ocaml_repr (Base Scannable) )
+        L.Same_as_ocaml_repr Jkind.Sort.Const.scannable )
     ~is_layout_poly:false
 
 let makearray_dynamic_non_scannable_unboxed_product env
@@ -551,7 +551,8 @@ let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
     ( env,
       Transformed
         (makearray_dynamic_singleton "" mode ~length
-           ~init:(Some (Same_as_ocaml_repr (Base Scannable), L.Lvar init))
+           ~init:
+             (Some (Same_as_ocaml_repr Jkind.Sort.Const.scannable, L.Lvar init))
            loc) )
   | Punboxedfloatarray Unboxed_float32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
@@ -811,12 +812,14 @@ let arrayblit_runtime env args loc =
       ~coeffects:Has_coeffects ~native_name:name
       ~native_repr_args:
         [ (* The arrays might be local *)
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_local, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable);
-          Primitive.Prim_global, L.Same_as_ocaml_repr (Base Scannable) ]
-      ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Scannable))
+          Primitive.Prim_local, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+          Primitive.Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+          Primitive.Prim_local, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+          Primitive.Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable;
+          Primitive.Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable
+        ]
+      ~native_repr_res:
+        (Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.scannable)
       ~is_layout_poly:false
   in
   env, Primitive (L.Pccall external_call_desc, args, loc)
@@ -840,8 +843,8 @@ let cast_vec128_to_vec256 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
     ~native_name:"caml_vec256_low_of_vec128"
-    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr (Base Vec128)]
-    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
+    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec256)
     ~is_layout_poly:false
 
 (* Only used on amd64. *)
@@ -849,8 +852,8 @@ let cast_vec256_to_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
     ~native_name:"caml_vec256_low_to_vec128"
-    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr (Base Vec256)]
-    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec128))
+    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec256]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128)
     ~is_layout_poly:false
 
 (* Only used on amd64. *)
@@ -859,10 +862,10 @@ let vec256_insert_vec128 =
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
     ~native_name:"caml_avx_vec256_insert_128"
     ~native_repr_args:
-      [ Prim_global, L.Same_as_ocaml_repr (Base Bits64);
-        Prim_global, L.Same_as_ocaml_repr (Base Vec256);
-        Prim_global, L.Same_as_ocaml_repr (Base Vec128) ]
-    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
+      [ Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.bits64;
+        Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec256;
+        Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128 ]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec256)
     ~is_layout_poly:false
 
 (* Only used on amd64. *)
@@ -871,9 +874,9 @@ let vec256_extract_vec128 =
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
     ~native_name:"caml_avx_vec256_extract_128"
     ~native_repr_args:
-      [ Prim_global, L.Same_as_ocaml_repr (Base Bits64);
-        Prim_global, L.Same_as_ocaml_repr (Base Vec256) ]
-    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec128))
+      [ Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.bits64;
+        Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec256 ]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128)
     ~is_layout_poly:false
 
 let offset ~loc ~idx ~index_kind n =
@@ -1414,7 +1417,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
               (L.layout_tupled_vector Boxed_vec256)
           in
           (* Tell flambda2 not to unbox the components *)
-          let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
+          let ext = mode, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128 in
           [ ext, boxed_vec256_field ~loc 0 (Lvar arg_id);
             ext, boxed_vec256_field ~loc 1 (Lvar arg_id) ]
         (* vec256# as #(vec128# * vec128#) => vec128#, vec128# *)
@@ -1422,7 +1425,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           let arg_id =
             rebind_arg arg (L.layout_unboxed_tupled_vector Unboxed_vec256)
           in
-          let ext = mode, L.Same_as_ocaml_repr (Base Vec128) in
+          let ext = mode, L.Same_as_ocaml_repr Jkind.Sort.Const.vec128 in
           [ ext, unboxed_vec256_field ~loc 0 (Lvar arg_id);
             ext, unboxed_vec256_field ~loc 1 (Lvar arg_id) ]
         | _ -> [(mode, repr), arg]
@@ -1451,7 +1454,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     | mode, Unboxed_vector Boxed_vec256 ->
       let repr_res =
         (* Tell flambda2 not to box the components *)
-        mode, L.Same_as_ocaml_repr (Product [Base Vec128; Base Vec128])
+        mode, L.Same_as_ocaml_repr Jkind.Sort.Const.(product [vec128; vec128])
       in
       let res = Ident.create_local "res" in
       let res_duid = Lambda.debug_uid_none in
@@ -1472,7 +1475,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     (* #(vec128# * vec128#) -> vec256# as #(vec128# * vec128#) *)
     | mode, Same_as_ocaml_repr (Base Vec256) ->
       let repr_res =
-        mode, L.Same_as_ocaml_repr (Product [Base Vec128; Base Vec128])
+        mode, L.Same_as_ocaml_repr Jkind.Sort.Const.(product [vec128; vec128])
       in
       Transformed (make_ccall repr_res)
     | repr_res -> Transformed (make_ccall repr_res))

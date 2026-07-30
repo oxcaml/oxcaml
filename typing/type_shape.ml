@@ -196,7 +196,7 @@ module Type_shape = struct
     let open Shape in
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
-      Shape.at_layout (Shape.unknown_type ()) (Base Scannable)
+      Shape.at_layout (Shape.unknown_type ()) Shape.Layout.scannable
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -331,26 +331,26 @@ module Type_decl_shape = struct
     (* CR layouts-scannable: We forget about the stored scannable axes when
        converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
        a place to put them. See the CR on [Layout] at the top of this file. *)
-    | Types.Scannable _ -> Layout.Base Scannable
+    | Types.Scannable _ -> Layout.of_base Scannable
     | Types.Float_boxed ->
-      Layout.Base Float64
+      Layout.of_base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
          contrary to the name.*)
-    | Types.Float64 -> Layout.Base Float64
-    | Types.Float32 -> Layout.Base Float32
-    | Types.Bits8 -> Layout.Base Bits8
-    | Types.Bits16 -> Layout.Base Bits16
-    | Types.Bits32 -> Layout.Base Bits32
-    | Types.Untagged_immediate -> Layout.Base Untagged_immediate
-    | Types.Bits64 -> Layout.Base Bits64
-    | Types.Vec128 -> Layout.Base Vec128
-    | Types.Vec256 -> Layout.Base Vec256
-    | Types.Vec512 -> Layout.Base Vec512
-    | Types.Mask -> Layout.Base Mask
-    | Types.Word -> Layout.Base Word
-    | Types.Void -> Layout.Base Void
+    | Types.Float64 -> Layout.of_base Float64
+    | Types.Float32 -> Layout.of_base Float32
+    | Types.Bits8 -> Layout.of_base Bits8
+    | Types.Bits16 -> Layout.of_base Bits16
+    | Types.Bits32 -> Layout.of_base Bits32
+    | Types.Untagged_immediate -> Layout.of_base Untagged_immediate
+    | Types.Bits64 -> Layout.of_base Bits64
+    | Types.Vec128 -> Layout.of_base Vec128
+    | Types.Vec256 -> Layout.of_base Vec256
+    | Types.Vec512 -> Layout.of_base Vec512
+    | Types.Mask -> Layout.of_base Mask
+    | Types.Word -> Layout.of_base Word
+    | Types.Void -> Layout.of_base Void
     | Types.Product args ->
-      Layout.Product
+      Layout.product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
   let of_complex_constructor type_subst name
@@ -411,15 +411,15 @@ module Type_decl_shape = struct
                 match ly with
                 | Some ly
                   when not
-                         (Layout.equal ly (Base Scannable)
-                         || Layout.equal ly (Base Void)) ->
+                         (Layout.equal ly Layout.scannable
+                         || Layout.equal ly Layout.void) ->
                   if !Clflags.dwarf_pedantic
                   then
                     Misc.fatal_errorf_doc
                       "Type_shape: variant constructor with mismatched layout, \
                        has %a but expected value or void."
                       Layout.format ly
-                  else Layout.some (Base Scannable)
+                  else Layout.some Layout.scannable
                 | _ -> ly)
               args
           in

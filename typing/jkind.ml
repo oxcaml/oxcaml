@@ -122,9 +122,9 @@ module Layout = struct
       match s with
       | Base b -> Static.of_base b sa
       | Product consts ->
-        Product (List.map (fun s -> of_sort_const s sa) consts)
-      | Univar uv -> Univar uv
-      | Genvar v -> Genvar v
+        product (List.map (fun s -> of_sort_const s sa) consts)
+      | Univar uv -> univar uv
+      | Genvar v -> genvar v
 
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
@@ -406,10 +406,10 @@ module Layout = struct
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
-    | Any sa -> Any sa
+    | Any sa -> Const.any sa
     | Sort (s, sa) ->
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
-    | Product p -> Product (List.map default_to_scannable_and_get p)
+    | Product p -> Const.product (List.map default_to_scannable_and_get p)
 
   let format ppf layout =
     let pp_string_list ppf lst =
@@ -2084,7 +2084,7 @@ module Const = struct
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
-    { base = Layout (Layout.Const.Product (List.rev layouts));
+    { base = Layout (Layout.Const.product (List.rev layouts));
       mod_bounds;
       with_bounds
     }
@@ -2200,7 +2200,7 @@ module Const = struct
               (* However, we can't raise the mod-bounds of a truly-abstract
                  [Kconstr] because its mod-bounds can be further narrowed by
                  substitution. Instead, we approximate the layout as [any]. *)
-              Layout (Layout.Const.Any sa)
+              Layout (Layout.Const.any sa)
           in
           { base;
             mod_bounds = Mod_bounds.max;

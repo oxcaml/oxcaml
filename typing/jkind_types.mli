@@ -148,7 +148,7 @@ module Layout : sig
     | Any of Scannable_axes.t
 
   module Const : sig
-    type t =
+    type t = private
       | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
@@ -159,6 +159,14 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+
+    val any : Scannable_axes.t -> t
+
+    val product : t list -> t
+
+    val univar : Sort.univar -> t
+
+    val genvar : Sort.var -> t
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
