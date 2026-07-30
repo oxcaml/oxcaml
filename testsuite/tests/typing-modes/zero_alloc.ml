@@ -423,8 +423,8 @@ Line 1, characters 41-59:
 1 | let (alloc_record @ noalloc_strict) () = { x = 1.; y = 2. }
                                              ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 36-59
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 36-59,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_record @ noalloc) () = { x = 1.; y = 2. }
@@ -433,8 +433,8 @@ Line 1, characters 34-52:
 1 | let (alloc_record @ noalloc) () = { x = 1.; y = 2. }
                                       ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 29-52
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 29-52,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -456,8 +456,8 @@ Line 1, characters 49-55:
 1 | let (alloc_variant @ noalloc_strict) (a : int) = Just a
                                                      ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 37-55
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 37-55,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_variant @ noalloc) (a : int) = Just a
@@ -466,8 +466,8 @@ Line 1, characters 42-48:
 1 | let (alloc_variant @ noalloc) (a : int) = Just a
                                               ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 30-48
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 30-48,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -488,8 +488,8 @@ Line 1, characters 46-49:
 1 | let (alloc_list @ noalloc_strict) (a : int) = [a]
                                                   ^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-49
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-49,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_list @ noalloc) (a : int) = [a]
@@ -498,8 +498,8 @@ Line 1, characters 39-42:
 1 | let (alloc_list @ noalloc) (a : int) = [a]
                                            ^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 27-42
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 27-42,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -520,8 +520,8 @@ Line 1, characters 47-54:
 1 | let (alloc_array @ noalloc_strict) (a : int) = [| a |]
                                                    ^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 35-54
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 35-54,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_array @ noalloc) (a : int) = [| a |]
@@ -530,8 +530,8 @@ Line 1, characters 40-47:
 1 | let (alloc_array @ noalloc) (a : int) = [| a |]
                                             ^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 28-47
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 28-47,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -559,8 +559,8 @@ Line 1, characters 53-59:
 1 | let (alloc_polyvariant @ noalloc_strict) (a : int) = `Tag a
                                                          ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 41-59
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 41-59,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_polyvariant @ noalloc) (a : int) = `Tag a
@@ -569,8 +569,8 @@ Line 1, characters 46-52:
 1 | let (alloc_polyvariant @ noalloc) (a : int) = `Tag a
                                                   ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-52
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-52,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -616,8 +616,8 @@ Line 3, characters 37-38:
 3 |   let (g @ noalloc_strict) () = f ~a:1 () in
                                          ^
 Error: The allocation is "local"
-         because it is inside the function at line 3, characters 27-41
-         which is required not to allocate.
+         because it is allocated inside the function at line 3, characters 27-41,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -638,8 +638,8 @@ Line 3, characters 37-38:
 3 |   let (g @ noalloc_strict) () = f ~a:1 () in
                                          ^
 Error: The allocation is "local"
-         because it is inside the function at line 3, characters 27-41
-         which is required not to allocate.
+         because it is allocated inside the function at line 3, characters 27-41,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -651,8 +651,8 @@ Line 1, characters 49-60:
 1 | let (alloc_closure @ noalloc_strict) (a : int) = fun () -> a
                                                      ^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 37-60
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 37-60,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -665,8 +665,8 @@ Line 1, characters 42-53:
 1 | let (alloc_closure @ noalloc) (a : int) = fun () -> a
                                               ^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 30-53
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 30-53,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -691,8 +691,8 @@ Line 1, characters 60-63:
 1 | let (alloc_float_boxing @ noalloc_strict) (r : record_t5) = r.x
                                                                 ^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 42-63
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 42-63,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_float_boxing @ noalloc) (r : record_t5) = r.x
@@ -701,8 +701,8 @@ Line 1, characters 53-56:
 1 | let (alloc_float_boxing @ noalloc) (r : record_t5) = r.x
                                                          ^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 35-56
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 35-56,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -725,8 +725,8 @@ Line 1, characters 40-46:
 1 | let (alloc_tuple @ noalloc_strict) () = (1, 2)
                                             ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 35-46
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 35-46,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_tuple @ noalloc) () = (1, 2)
@@ -735,8 +735,8 @@ Line 1, characters 33-39:
 1 | let (alloc_tuple @ noalloc) () = (1, 2)
                                      ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 28-39
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 28-39,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -823,8 +823,8 @@ Line 3, characters 7-8:
 3 |   f ~a:1 2
            ^
 Error: The allocation is "local"
-         because it is inside the function at lines 2-3, characters 6-10
-         which is required not to allocate.
+         because it is allocated inside the function at lines 2-3, characters 6-10,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -856,8 +856,8 @@ Line 3, characters 4-12:
 3 |     (h ~y:1)
         ^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 2-3, characters 41-12
-         which is required not to allocate.
+         because it is allocated inside the function at lines 2-3, characters 41-12,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -885,8 +885,8 @@ Line 1, characters 54-60:
 1 | let (alloc_lazy @ noalloc_strict) (a : int) = let _ = lazy a in ()
                                                           ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-66
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-66,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_lazy @ noalloc) (a : int) =  let _ = lazy a in ()
@@ -895,8 +895,8 @@ Line 1, characters 48-54:
 1 | let (alloc_lazy @ noalloc) (a : int) =  let _ = lazy a in ()
                                                     ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 27-60
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 27-60,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -906,8 +906,8 @@ Line 1, characters 48-56:
 1 | let (alloc_lazy @ noalloc) (a : int) = exclave_ (lazy a)
                                                     ^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 27-56
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 27-56,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -919,8 +919,8 @@ Line 2, characters 10-33:
 2 |   let _ = object method m = 1 end in ()
               ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 36-39
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 36-39,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_object @ noalloc) () =
@@ -930,8 +930,8 @@ Line 2, characters 10-33:
 2 |   let _ = object method m = 1 end in ()
               ^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 29-39
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 29-39,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -941,8 +941,8 @@ Line 1, characters 50-75:
 1 | let (stack_object @ noalloc_strict) () = exclave_ (object method m = 1 end)
                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 36-75
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 36-75,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -955,8 +955,8 @@ Line 2, characters 10-30:
 2 |   let _ = object val x = 0 end in ()
               ^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 43-36
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 43-36,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -967,8 +967,8 @@ Line 2, characters 10-30:
 2 |   let _ = object val x = 0 end in ()
               ^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 36-36
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 36-36,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -978,8 +978,8 @@ Line 1, characters 57-77:
 1 | let (obj_no_alloc_method @ noalloc_strict) () = exclave_ object val x = 0 end
                                                              ^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 43-77
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 43-77,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1001,8 +1001,8 @@ Line 6, characters 16-27:
 6 |         let _ = {< y = 1 >} in ()
                     ^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 5-6, characters 45-33
-         which is required not to allocate.
+         because it is allocated inside the function at lines 5-6, characters 45-33,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1129,8 +1129,8 @@ Line 1, characters 42-47:
 1 | let (alloc_int_ref @ noalloc_strict) () = ( + )
                                               ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 37-47
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 37-47,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_int_ref @ noalloc) () = ( + )
@@ -1139,8 +1139,8 @@ Line 1, characters 35-40:
 1 | let (alloc_int_ref @ noalloc) () = ( + )
                                        ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 30-40
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 30-40,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1151,8 +1151,8 @@ Line 1, characters 53-58:
 1 | let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
                                                          ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 41-60
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 41-60,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
@@ -1161,8 +1161,8 @@ Line 1, characters 46-51:
 1 | let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
                                                   ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-53
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-53,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1178,8 +1178,8 @@ Line 1, characters 52-57:
 1 | let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
                                                         ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 39-62
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 39-62,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
@@ -1188,8 +1188,8 @@ Line 1, characters 45-50:
 1 | let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
                                                  ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 32-55
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 32-55,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1199,8 +1199,8 @@ Line 1, characters 61-66:
 1 | let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
                                                                  ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 39-71
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 39-71,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
@@ -1209,8 +1209,8 @@ Line 1, characters 54-59:
 1 | let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
                                                           ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 32-64
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 32-64,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1275,8 +1275,8 @@ Line 1, characters 67-72:
 1 | let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
                                                                        ^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 50-72
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 50-72,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1301,8 +1301,8 @@ Line 1, characters 54-63:
 1 | let (alloc_exception @ noalloc_strict) (a : string) = Failure a
                                                           ^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 39-63
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 39-63,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_exception @ noalloc) (a : string) = Failure a
@@ -1311,8 +1311,8 @@ Line 1, characters 47-56:
 1 | let (alloc_exception @ noalloc) (a : string) = Failure a
                                                    ^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 32-56
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 32-56,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1339,8 +1339,8 @@ Line 2, characters 2-20:
 2 |   [%atomic.loc r.af]
       ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 40-20
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 40-20,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_atomic_loc @ noalloc) (r : atomic_record) =
@@ -1350,8 +1350,8 @@ Line 2, characters 2-20:
 2 |   [%atomic.loc r.af]
       ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-2, characters 33-20
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-2, characters 33-20,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1379,8 +1379,8 @@ Line 4, characters 16-19:
 4 |   let _ = apply opt in ()
                     ^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 2-4, characters 6-25
-         which is required not to allocate.
+         because it is allocated inside the function at lines 2-4, characters 6-25,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_fun_coerce @ noalloc)
@@ -1392,8 +1392,8 @@ Line 4, characters 16-19:
 4 |   let _ = apply opt in ()
                     ^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 2-4, characters 6-25
-         which is required not to allocate.
+         because it is allocated inside the function at lines 2-4, characters 6-25,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1404,8 +1404,8 @@ Line 1, characters 61-82:
 1 | let (alloc_list_comprehension @ noalloc_strict) () = let _ = [ x for x = 1 to 10 ] in ()
                                                                  ^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 48-88
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 48-88,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_list_comprehension @ noalloc) () = let _ = [ x for x = 1 to 10 ] in ()
@@ -1414,8 +1414,8 @@ Line 1, characters 54-75:
 1 | let (alloc_list_comprehension @ noalloc) () = let _ = [ x for x = 1 to 10 ] in ()
                                                           ^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 41-81
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 41-81,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1425,8 +1425,8 @@ Line 1, characters 57-78:
 1 | let (stack_comprehension @ noalloc_strict) () = exclave_ [ x for x = 1 to 10 ]
                                                              ^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 43-78
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 43-78,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1629,8 +1629,8 @@ Line 1, characters 58-62:
 1 | let (use_format @ noalloc_strict) () : (_, _, _) format = "%d"
                                                               ^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-62
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-62,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1658,8 +1658,8 @@ Lines 13-15, characters 27-5:
 14 |     let (h @ noalloc_strict) () = Just a in
 15 |     h
 Error: The allocation is "local"
-         because it is inside the function at lines 12-17, characters 34-3
-         which is required not to allocate.
+         because it is allocated inside the function at lines 12-17, characters 34-3,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1680,8 +1680,8 @@ Lines 2-4, characters 20-5:
 3 |     let (h @ noalloc) () = Just a in
 4 |     h
 Error: The allocation is "local"
-         because it is inside the function at lines 1-6, characters 26-3
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-6, characters 26-3,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1702,8 +1702,8 @@ Line 3, characters 10-21:
 3 |     let h () = Just a in
               ^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 2-4, characters 27-5
-         which is required not to allocate.
+         because it is allocated inside the function at lines 2-4, characters 27-5,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1723,8 +1723,8 @@ Line 3, characters 34-40:
 3 |     let (h @ noalloc_strict) () = Just a in
                                       ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 3, characters 29-40
-         which is required not to allocate.
+         because it is allocated inside the function at line 3, characters 29-40,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1745,8 +1745,8 @@ Line 1, characters 38-48:
 1 | let (f_explicit @ noalloc_strict) x = fun y -> x
                                           ^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 34-48
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 34-48,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1770,8 +1770,8 @@ Line 1, characters 31-41:
 1 | let (f_explicit @ noalloc) x = fun y -> x
                                    ^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 27-41
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 27-41,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1792,8 +1792,8 @@ Line 1, characters 46-58:
 1 | let f_explicit: _ @ noalloc_strict = fun x -> (fun y -> x)
                                                   ^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 37-58
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 37-58,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1812,8 +1812,8 @@ Line 1, characters 27-39:
 1 | let f_explicit = (fun x -> (fun y -> x) : (int -> int -> int) @ noalloc_strict)
                                ^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 18-39
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 18-39,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1828,8 +1828,8 @@ Line 1, characters 27-39:
 1 | let f_explicit = (fun x -> (fun y -> x) : _ @ noalloc_strict)
                                ^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 18-39
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 18-39,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -1923,8 +1923,8 @@ Line 1, characters 42-48:
 1 | let (f_body_alloc @ noalloc_strict) x y = (x, y)
                                               ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 36-48
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 36-48,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -1941,8 +1941,8 @@ Line 8, characters 64-70:
 8 | let (f : int -> (int -> int) @ global) @ noalloc_strict = fun x y -> x
                                                                     ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 8, characters 58-70
-         which is required not to allocate.
+         because it is allocated inside the function at line 8, characters 58-70,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -2043,8 +2043,8 @@ Line 2, characters 10-21:
 2 |   let h = fun () -> x in
               ^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-3, characters 29-6
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-3, characters 29-6,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -2061,8 +2061,8 @@ Line 3, characters 47-60:
 3 |   let (g_arg @ noalloc_strict) (x : int) = use (fun () -> x) in
                                                    ^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 3, characters 31-60
-         which is required not to allocate.
+         because it is allocated inside the function at line 3, characters 31-60,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -2219,8 +2219,8 @@ Line 2, characters 34-54:
 2 |     let (f @ noalloc_strict) () = { x = 3.0; y = 4.0 }
                                       ^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 2, characters 29-54
-         which is required not to allocate.
+         because it is allocated inside the function at line 2, characters 29-54,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -2308,8 +2308,8 @@ Line 2, characters 30-58:
 2 |   let (whitewashed @ alloc) = fun () -> { x = 1.; y = 2. } in
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-3, characters 35-16
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-3, characters 35-16,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global"
          because it is an allocation
          which is expected to be "local" to the parent region or "global"
@@ -2327,8 +2327,8 @@ Line 3, characters 41-59:
 3 |  (escape_hatch <- stack_ Some (fun () -> { x = 1.; y = 2. })) [@zero_alloc];
                                              ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-6, characters 36-17
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-6, characters 36-17,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -2343,8 +2343,8 @@ Line 3, characters 41-59:
 3 |  (escape_hatch <- stack_ Some (fun () -> { x = 1.; y = 2. })) [@zero_alloc];
                                              ^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at lines 1-6, characters 35-17
-         which is required not to allocate.
+         because it is allocated inside the function at lines 1-6, characters 35-17,
+         which is "noalloc" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
@@ -2377,8 +2377,8 @@ Line 1, characters 44-50:
 1 | let (lz_in_fn @ noalloc_strict) (x : int) = lazy x
                                                 ^^^^^^
 Error: The allocation is "local"
-         because it is inside the function at line 1, characters 32-50
-         which is required not to allocate.
+         because it is allocated inside the function at line 1, characters 32-50,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
 
