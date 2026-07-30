@@ -270,11 +270,12 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   in
   let compilation_unit = program.compilation_unit in
   let module_initializer = program.code in
-  (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
-     it happens exactly when -Oclassic is in effect, which we don't know at CLI
-     processing time because there may be an [@@@flambda_oclassic] or
-     [@@@flambda_o3] attribute. *)
-  if Flambda_features.classic_mode () then Clflags.use_linscan := true;
+  (* Make sure -linscan is enabled in classic mode and at -Oclassic. Doing this
+     here to be sure it happens exactly when -Oclassic is in effect, which we
+     don't know at CLI processing time because there may be an
+     [@@@flambda_oclassic] or [@@@flambda_o3] attribute. *)
+  if Flambda_features.classic_mode () || Flambda_features.oclassic_opt_level ()
+  then Clflags.use_linscan := true;
   Misc.Style.setup (Flambda_features.colour ());
   (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
      the length of arrays will need fixing, I don't think it only applies to the

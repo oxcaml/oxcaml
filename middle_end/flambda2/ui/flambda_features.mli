@@ -26,11 +26,19 @@ type any_mode = Mode : _ mode -> any_mode
 
 val classic_mode : unit -> bool
 
+(** Whether the [-Oclassic] optimization-level preset is in effect (which,
+    unlike [classic_mode], may use Simplify). *)
+val oclassic_opt_level : unit -> bool
+
 val mode : unit -> any_mode
 
 val join_points : unit -> bool
 
 val unbox_along_intra_function_control_flow : unit -> bool
+
+val mutable_unboxing : unit -> bool
+
+val loopify : unit -> bool
 
 val backend_cse_at_toplevel : unit -> bool
 

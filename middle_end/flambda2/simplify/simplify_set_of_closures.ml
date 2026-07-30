@@ -485,7 +485,10 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       Always_loopify
     | Never_loopify -> Never_loopify
     | Already_loopified -> Already_loopified
-    | Default_loopify_and_tailrec -> Already_loopified
+    | Default_loopify_and_tailrec ->
+      if Flambda_features.loopify ()
+      then Already_loopified
+      else Default_loopify_and_tailrec
     | Default_loopify_and_not_tailrec -> Never_loopify
   in
   let code_const, new_code =

@@ -85,63 +85,93 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
       (* Dead variable analysis *)
       let dead_variable_result = Data_flow_graph.required_names deps in
-      (* Aliases analysis *)
-      let dom_graph =
-        Dominator_graph.create map ~return_continuation ~exn_continuation
-          ~required_names:dead_variable_result.required_names
-      in
-      let aliases = Dominator_graph.dominator_analysis dom_graph in
-      let aliases_kind = Dominator_graph.aliases_kind dom_graph aliases in
-      if Flambda_features.dump_flow ()
-      then
-        print_graph ~print_name ~lazy_ppf:dominator_graph_ppf ~graph:dom_graph
-          ~print:(Dominator_graph.Dot.print ~doms:aliases);
-      (* control flow graph *)
-      let control = Control_flow_graph.create ~dummy_toplevel_cont t in
-      let reference_analysis =
-        Mutable_unboxing.create ~machine_width ~dom:aliases ~dom_graph
-          ~source_info:t ~control_flow_graph:control
-          ~required_names:dead_variable_result.required_names
-          ~return_continuation ~exn_continuation
-      in
-      let pp_node = Mutable_unboxing.pp_node reference_analysis in
-      let reference_result, unboxed_blocks =
-        Mutable_unboxing.make_result reference_analysis
-      in
-      let continuation_parameters =
-        Control_flow_graph.compute_continuation_extra_args_for_aliases
-          ~speculative ~source_info:t aliases control
-          ~required_names:dead_variable_result.required_names ~unboxed_blocks
-      in
-      if Flambda_features.dump_flow ()
-      then
-        print_graph ~print_name ~lazy_ppf:control_flow_graph_ppf ~graph:control
-          ~print:
-            (Control_flow_graph.Dot.print ~df:t ~return_continuation
-               ~exn_continuation ~continuation_parameters ~pp_node);
-      let required_names_after_ref_reference_analysis =
-        (* CR pchambart/gbury: this is an overapproximation of actually used new
-           parameters. We might want to filter this using another round of
-           dead_analysis *)
-        Continuation.Map.fold
-          (fun _cont epa required_names ->
-            let params =
-              Bound_parameters.var_set
-                (Continuation_extra_params_and_args.extra_params epa)
-            in
-            Name.Set.union required_names (Name.set_of_var_set params))
-          reference_result.T.Mutable_unboxing_result.additional_epa
-          dead_variable_result.required_names
-      in
       let result =
-        T.Flow_result.
-          { data_flow_result =
-              { dead_variable_result with
-                required_names = required_names_after_ref_reference_analysis
-              };
-            aliases_result = { aliases_kind; continuation_parameters };
-            mutable_unboxing_result = reference_result
-          }
+        if not (Flambda_features.mutable_unboxing ())
+        then
+          (* Only the dead variable analysis is required by the upwards pass;
+             skip the aliases analysis and mutable unboxing, returning trivial
+             results for them. *)
+          let continuation_parameters =
+            Continuation.Map.map
+              (fun (_ : T.Continuation_info.t) ->
+                T.Continuation_param_aliases.
+                  { removed_aliased_params_and_extra_params = Variable.Set.empty;
+                    lets_to_introduce = Variable.Lmap.empty;
+                    extra_args_for_aliases = Variable.Set.empty;
+                    recursive_continuation_wrapper = No_wrapper
+                  })
+              map
+          in
+          T.Flow_result.
+            { data_flow_result = dead_variable_result;
+              aliases_result =
+                { aliases_kind = Variable.Map.empty; continuation_parameters };
+              mutable_unboxing_result =
+                { did_unbox_a_mutable_block = false;
+                  additional_epa = Continuation.Map.empty;
+                  let_rewrites = Named_rewrite_id.Map.empty
+                }
+            }
+        else
+          (* Aliases analysis *)
+          let dom_graph =
+            Dominator_graph.create map ~return_continuation ~exn_continuation
+              ~required_names:dead_variable_result.required_names
+          in
+          let aliases = Dominator_graph.dominator_analysis dom_graph in
+          let aliases_kind = Dominator_graph.aliases_kind dom_graph aliases in
+          if Flambda_features.dump_flow ()
+          then
+            print_graph ~print_name ~lazy_ppf:dominator_graph_ppf
+              ~graph:dom_graph
+              ~print:(Dominator_graph.Dot.print ~doms:aliases);
+          (* control flow graph *)
+          let control = Control_flow_graph.create ~dummy_toplevel_cont t in
+          let reference_analysis =
+            Mutable_unboxing.create ~machine_width ~dom:aliases ~dom_graph
+              ~source_info:t ~control_flow_graph:control
+              ~required_names:dead_variable_result.required_names
+              ~return_continuation ~exn_continuation
+          in
+          let pp_node = Mutable_unboxing.pp_node reference_analysis in
+          let reference_result, unboxed_blocks =
+            Mutable_unboxing.make_result reference_analysis
+          in
+          let continuation_parameters =
+            Control_flow_graph.compute_continuation_extra_args_for_aliases
+              ~speculative ~source_info:t aliases control
+              ~required_names:dead_variable_result.required_names
+              ~unboxed_blocks
+          in
+          if Flambda_features.dump_flow ()
+          then
+            print_graph ~print_name ~lazy_ppf:control_flow_graph_ppf
+              ~graph:control
+              ~print:
+                (Control_flow_graph.Dot.print ~df:t ~return_continuation
+                   ~exn_continuation ~continuation_parameters ~pp_node);
+          let required_names_after_ref_reference_analysis =
+            (* CR pchambart/gbury: this is an overapproximation of actually used
+               new parameters. We might want to filter this using another round
+               of dead_analysis *)
+            Continuation.Map.fold
+              (fun _cont epa required_names ->
+                let params =
+                  Bound_parameters.var_set
+                    (Continuation_extra_params_and_args.extra_params epa)
+                in
+                Name.Set.union required_names (Name.set_of_var_set params))
+              reference_result.T.Mutable_unboxing_result.additional_epa
+              dead_variable_result.required_names
+          in
+          T.Flow_result.
+            { data_flow_result =
+                { dead_variable_result with
+                  required_names = required_names_after_ref_reference_analysis
+                };
+              aliases_result = { aliases_kind; continuation_parameters };
+              mutable_unboxing_result = reference_result
+            }
       in
       if Flambda_features.dump_flow ()
       then Format.eprintf "/// result@\n%a@\n@." T.Flow_result.print result;

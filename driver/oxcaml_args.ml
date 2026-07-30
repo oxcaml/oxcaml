@@ -601,6 +601,37 @@ let mk_no_flambda2_join_points f =
       \     zero or one incoming edge(s)%s (Flambda 2 only)"
       (format_not_default Flambda2.Default.join_points) )
 
+let mk_flambda2_mutable_unboxing f =
+  ( "-flambda2-mutable-unboxing",
+    Arg.Unit f,
+    Printf.sprintf
+      " Enable mutable unboxing and the propagation of\n\
+      \     aliases across continuations%s (Flambda 2 only)"
+      (format_default Flambda2.Default.mutable_unboxing) )
+
+let mk_no_flambda2_mutable_unboxing f =
+  ( "-no-flambda2-mutable-unboxing",
+    Arg.Unit f,
+    Printf.sprintf
+      " Disable mutable unboxing and the propagation of\n\
+      \     aliases across continuations%s (Flambda 2 only)"
+      (format_not_default Flambda2.Default.mutable_unboxing) )
+
+let mk_flambda2_loopify f =
+  ( "-flambda2-loopify",
+    Arg.Unit f,
+    Printf.sprintf
+      " Loopify tail-recursive functions by default%s\n     (Flambda 2 only)"
+      (format_default Flambda2.Default.loopify) )
+
+let mk_no_flambda2_loopify f =
+  ( "-no-flambda2-loopify",
+    Arg.Unit f,
+    Printf.sprintf
+      " Only loopify functions bearing a [@loop] attribute%s\n\
+      \     (Flambda 2 only)"
+      (format_not_default Flambda2.Default.loopify) )
+
 let mk_flambda2_unbox_along_intra_function_control_flow f =
   ( "-flambda2-unbox-along-intra-function-control-flow",
     Arg.Unit f,
@@ -1372,6 +1403,10 @@ module type Oxcaml_options = sig
   val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
+  val flambda2_mutable_unboxing : unit -> unit
+  val no_flambda2_mutable_unboxing : unit -> unit
+  val flambda2_loopify : unit -> unit
+  val no_flambda2_loopify : unit -> unit
   val flambda2_result_types_functors_only : unit -> unit
   val flambda2_result_types_all_functions : unit -> unit
   val no_flambda2_result_types : unit -> unit
@@ -1564,6 +1599,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_debug_flags F.reaper_debug_flags;
       mk_flambda2_join_points F.flambda2_join_points;
       mk_no_flambda2_join_points F.no_flambda2_join_points;
+      mk_flambda2_mutable_unboxing F.flambda2_mutable_unboxing;
+      mk_no_flambda2_mutable_unboxing F.no_flambda2_mutable_unboxing;
+      mk_flambda2_loopify F.flambda2_loopify;
+      mk_no_flambda2_loopify F.no_flambda2_loopify;
       mk_flambda2_result_types_functors_only
         F.flambda2_result_types_functors_only;
       mk_flambda2_result_types_all_functions
@@ -1991,6 +2030,10 @@ module Oxcaml_options_impl = struct
 
   let flambda2_join_points = set Flambda2.join_points
   let no_flambda2_join_points = clear Flambda2.join_points
+  let flambda2_mutable_unboxing = set Flambda2.mutable_unboxing
+  let no_flambda2_mutable_unboxing = clear Flambda2.mutable_unboxing
+  let flambda2_loopify = set Flambda2.loopify
+  let no_flambda2_loopify = clear Flambda2.loopify
 
   let flambda2_result_types_functors_only () =
     Flambda2.function_result_types :=
@@ -2544,6 +2587,8 @@ module Extra_params = struct
           String.split_on_char ',' v @ !Oxcaml_flags.Flambda2.reaper_debug_flags;
         true
     | "flambda2-join-points" -> set Flambda2.join_points
+    | "flambda2-mutable-unboxing" -> set Flambda2.mutable_unboxing
+    | "flambda2-loopify" -> set Flambda2.loopify
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with
         | "never" ->

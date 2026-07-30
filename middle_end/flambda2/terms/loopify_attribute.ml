@@ -29,7 +29,8 @@ let print ppf = function
     Format.fprintf ppf "Default_loopify_and_not_tailrec"
 
 let should_loopify = function
-  | Always_loopify | Default_loopify_and_tailrec -> true
+  | Always_loopify -> true
+  | Default_loopify_and_tailrec -> Flambda_features.loopify ()
   | Never_loopify | Already_loopified | Default_loopify_and_not_tailrec -> false
 
 let was_loopified = function

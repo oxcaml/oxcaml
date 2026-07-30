@@ -181,6 +181,8 @@ module Flambda2 = struct
     let classic_mode = false
     let join_points = false
     let unbox_along_intra_function_control_flow = true
+    let mutable_unboxing = true
+    let loopify = true
     let backend_cse_at_toplevel = false
     let cse_depth = 2
     let join_depth = 5
@@ -201,6 +203,8 @@ module Flambda2 = struct
     classic_mode : bool;
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
+    mutable_unboxing : bool;
+    loopify : bool;
     backend_cse_at_toplevel : bool;
     cse_depth : int;
     join_depth : int;
@@ -221,6 +225,8 @@ module Flambda2 = struct
     classic_mode = Default.classic_mode;
     join_points = Default.join_points;
     unbox_along_intra_function_control_flow = Default.unbox_along_intra_function_control_flow;
+    mutable_unboxing = Default.mutable_unboxing;
+    loopify = Default.loopify;
     backend_cse_at_toplevel = Default.backend_cse_at_toplevel;
     cse_depth = Default.cse_depth;
     join_depth = Default.join_depth;
@@ -240,7 +246,8 @@ module Flambda2 = struct
 
   let oclassic = {
     default with
-
+    mutable_unboxing = false;
+    loopify = false;
     backend_cse_at_toplevel = false;
   }
 
@@ -269,6 +276,8 @@ module Flambda2 = struct
   let classic_mode = ref Default
   let join_points = ref Default
   let unbox_along_intra_function_control_flow = ref Default
+  let mutable_unboxing = ref Default
+  let loopify = ref Default
   let backend_cse_at_toplevel = ref Default
   let cse_depth = ref Default
   let join_depth = ref Default
@@ -346,7 +355,7 @@ module Flambda2 = struct
     let oclassic = {
       default with
       max_unboxing_depth = 0;
-      max_function_simplify_run = 1;
+      max_function_simplify_run = 0;
       fallback_inlining_heuristic = true;
       shorten_symbol_names = true;
     }

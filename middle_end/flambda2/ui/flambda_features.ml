@@ -35,6 +35,11 @@ let classic_mode () =
   !Oxcaml_flags.Flambda2.classic_mode
   |> with_default ~f:(fun d -> d.classic_mode)
 
+let oclassic_opt_level () =
+  match !Oxcaml_flags.opt_level with
+  | Set Oclassic -> true
+  | Set (O2 | O3 | O4) | Default -> false
+
 let mode () = if classic_mode () then Mode Classic else Mode Normal
 
 let join_points () =
@@ -43,6 +48,13 @@ let join_points () =
 let unbox_along_intra_function_control_flow () =
   !Oxcaml_flags.Flambda2.unbox_along_intra_function_control_flow
   |> with_default ~f:(fun d -> d.unbox_along_intra_function_control_flow)
+
+let mutable_unboxing () =
+  !Oxcaml_flags.Flambda2.mutable_unboxing
+  |> with_default ~f:(fun d -> d.mutable_unboxing)
+
+let loopify () =
+  !Oxcaml_flags.Flambda2.loopify |> with_default ~f:(fun d -> d.loopify)
 
 let backend_cse_at_toplevel () =
   !Oxcaml_flags.Flambda2.backend_cse_at_toplevel
