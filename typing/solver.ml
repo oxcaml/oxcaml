@@ -1357,10 +1357,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let generalize_structure_v : type a.
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
-    (* if the following does not hold: current_level < u.level
+    (* if the following does not hold:
+        current_level < u.level || u.level = generic_level
       [generalize_topology] and [update_level] do nothing. We check it here to optimize
       away the subsequent checks *)
-    if u.level <= current_level
+    if u.level <= current_level || u.level = generic_level
     then ()
     else begin
       (* we optimize away vlower and vuppers if bounds are tight *)
