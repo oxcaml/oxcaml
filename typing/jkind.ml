@@ -4214,7 +4214,10 @@ let fully_expand_aliases env ({ jkind; _ } as jk) =
 
 let has_layout_any env jkind =
   match extract_layout env jkind with
-  | Ok (Any _) -> true
+  (* [any addressable] is treated like [any]: it is an unrepresentable top
+     layout (of the addressable kinds) under which a sort variable can be
+     created. *)
+  | Ok (Any _) | Ok (Addressable (Any _)) -> true
   | Ok _ -> false
   | Error _ -> false
 

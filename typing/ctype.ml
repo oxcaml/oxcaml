@@ -2079,7 +2079,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind sa =
+  let get_jkind ~addressable jkind sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -2087,7 +2087,13 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
+    let layout : _ Jkind.Layout.t =
+      (* A variable at [any addressable] gets the shared sort variable,
+         additionally constrained to be addressable. *)
+      let layout = Jkind.Layout.Sort (sort, sa) in
+      if addressable then Addressable layout else layout
+    in
+    let jkind = Jkind.set_layout jkind layout in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -2102,13 +2108,19 @@ let instance_prim_layout env (desc : Primitive.description) ty =
           match Jkind.extract_layout env jkind with
           | Ok (Any sa) ->
             For_copy.redirect_desc copy_scope ty
-              (Tvar {r with jkind = get_jkind jkind sa})
+              (Tvar {r with jkind = get_jkind ~addressable:false jkind sa})
+          | Ok (Addressable (Any sa)) ->
+            For_copy.redirect_desc copy_scope ty
+              (Tvar {r with jkind = get_jkind ~addressable:true jkind sa})
           | _ -> ())
         | Tunivar ({ jkind; _ } as r) -> (
           match Jkind.extract_layout env jkind with
           | Ok (Any sa) ->
             For_copy.redirect_desc copy_scope ty
-              (Tunivar {r with jkind = get_jkind jkind sa})
+              (Tunivar {r with jkind = get_jkind ~addressable:false jkind sa})
+          | Ok (Addressable (Any sa)) ->
+            For_copy.redirect_desc copy_scope ty
+              (Tunivar {r with jkind = get_jkind ~addressable:true jkind sa})
           | _ -> ())
         | _ -> ()
         end;
