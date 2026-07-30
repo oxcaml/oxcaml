@@ -84,9 +84,11 @@ type t =
     instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
 
-(* CR-someday xclerc for xclerc: the magic `8` value is the priority giving the
-   best results on the compiler distribution. *)
-let same_phi_class_prio = 8
+(* CR-someday xclerc for xclerc: the magic `8` default value is the priority
+   giving the best results on the compiler distribution. It is currently a
+   parameter only to make testing / benchmarking easy. *)
+let same_phi_class_prio : int Lazy.t =
+  Regalloc_utils.int_of_param ~default:8 "IRC_SAME_PHI_CLASS_PRIO"
 
 let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int =
  fun state instr ->
@@ -104,7 +106,7 @@ let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int =
         Regalloc_affinity.priority state.affinity ~temp:dst ~phys_reg
       | Unknown, Unknown ->
         if Regalloc_affinity.same_phi_class state.affinity src dst
-        then same_phi_class_prio
+        then Lazy.force same_phi_class_prio
         else 0
       | _ -> 0)
     | _ -> 0
