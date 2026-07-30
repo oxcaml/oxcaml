@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension simd_beta -extension runtime_metaprogramming -extension small_numbers -extension layouts -nopervasives";
+ flags = "-extension simd_alpha -extension runtime_metaprogramming -extension small_numbers -extension layouts -nopervasives";
  expect;
 *)
 
