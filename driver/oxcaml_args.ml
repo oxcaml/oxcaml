@@ -246,6 +246,18 @@ let mk_no_cfg_value_propagation_flow f =
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
 
+let mk_cfg_value_propagation_dataflow f =
+  ( "-cfg-value-propagation-dataflow",
+    Arg.Unit f,
+    " Use a dataflow analysis to propagate values across blocks to simplify CFG"
+  )
+
+let mk_no_cfg_value_propagation_dataflow f =
+  ( "-no-cfg-value-propagation-dataflow",
+    Arg.Unit f,
+    " Do not use a dataflow analysis to propagate values across blocks to \
+     simplify CFG" )
+
 let mk_experimental_optimizations f =
   ( "-experimental-optimizations",
     Arg.Unit f,
@@ -1353,6 +1365,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_value_propagation_dataflow : unit -> unit
+  val no_cfg_value_propagation_dataflow : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
@@ -1548,6 +1562,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_cfg_value_propagation_dataflow F.cfg_value_propagation_dataflow;
+      mk_no_cfg_value_propagation_dataflow F.no_cfg_value_propagation_dataflow;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
@@ -1913,6 +1929,12 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
+  let cfg_value_propagation_dataflow =
+    set' Oxcaml_flags.cfg_value_propagation_dataflow
+
+  let no_cfg_value_propagation_dataflow =
+    clear' Oxcaml_flags.cfg_value_propagation_dataflow
+
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
@@ -1925,7 +1947,8 @@ module Oxcaml_options_impl = struct
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
+    cfg_value_propagation_flow ();
+    cfg_value_propagation_dataflow ()
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2489,6 +2512,8 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "cfg-value-propagation-dataflow" ->
+        set' Oxcaml_flags.cfg_value_propagation_dataflow
     | "experimental-optimizations" ->
         if Compenv.check_bool ppf name v then
           Oxcaml_options_impl.experimental_optimizations ();

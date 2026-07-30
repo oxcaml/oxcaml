@@ -28,6 +28,7 @@
 open! Int_replace_polymorphic_compare
 module C = Cfg
 module Dll = Doubly_linked_list
+module Loc_map = Reg.UsingLocEquality.Map
 
 (* Convert simple [Switch] to branches. *)
 let simplify_switch (block : C.basic_block) labels =
@@ -89,13 +90,15 @@ type known_value =
   | Const_float32 of int32
   | Const_float of int64
 
-module Nativeint_tbl = Hashtbl.Make (struct
-  type t = nativeint
-
-  let equal = Nativeint.equal
-
-  let hash = Hashtbl.hash
-end)
+let equal_known_value (left : known_value) (right : known_value) : bool =
+  match left, right with
+  | Const_int left, Const_int right -> Nativeint.equal left right
+  | Const_float32 left, Const_float32 right -> Int32.equal left right
+  | Const_float left, Const_float right -> Int64.equal left right
+  | Const_int _, (Const_float32 _ | Const_float _)
+  | Const_float32 _, (Const_int _ | Const_float _)
+  | Const_float _, (Const_int _ | Const_float32 _) ->
+    false
 
 (* Tells whether the materialization of a constant is expensive enough that
    replacing it with a register-to-register move is worthwhile. Constants that
@@ -163,67 +166,278 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
   in
   find arr (Array.length arr - 1) f None
 
+(* Removes from `known_values` the entries corresponding to the registers
+   destroyed by the passed instruction. *)
+let remove_destroyed_at_basic (known_values : known_value Loc_map.t)
+    (instr : Cfg.basic Cfg.instruction) : known_value Loc_map.t =
+  Array.fold_left
+    (fun known_values reg -> Loc_map.remove reg known_values)
+    known_values
+    (Proc.destroyed_at_basic instr.desc)
+
+(* Returns the known values after the execution of the passed (basic)
+   instruction, given the known values before it. Currently only tracks constant
+   values, moves between registers, basic integer arithmetic, and basic float64
+   arithmetic over known values. *)
+let interpret_basic (known_values : known_value Loc_map.t)
+    (instr : Cfg.basic Cfg.instruction) : known_value Loc_map.t =
+  let replace (reg : Reg.t) (value : known_value)
+      (known_values : known_value Loc_map.t) =
+    match reg.loc with
+    | Unknown ->
+      Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+    | Stack (Domainstate _) ->
+      (* The domain state is also read and written by the runtime system and by
+         callees (it contains e.g. the extra-parameters area): do not track
+         values written to it. *)
+      Loc_map.remove reg known_values
+    | Stack (Local _ | Incoming _ | Outgoing _) | Reg _ ->
+      Loc_map.add reg value known_values
+  in
+  let apply_int_op op right_opt =
+    let result_opt =
+      match Loc_map.find_opt instr.arg.(0) known_values with
+      | Some (Const_int left) -> (
+        match right_opt with
+        | Some right -> eval_int_op op left right
+        | None -> None)
+      | Some (Const_float32 _ | Const_float _) | None -> None
+    in
+    let known_values =
+      match result_opt with
+      | Some result -> replace instr.res.(0) (Const_int result) known_values
+      | None -> Loc_map.remove instr.res.(0) known_values
+    in
+    remove_destroyed_at_basic known_values instr
+  in
+  let apply_float_op op right_opt =
+    let result_opt =
+      match Loc_map.find_opt instr.arg.(0) known_values with
+      | Some (Const_float left_bits) ->
+        let left = Int64.float_of_bits left_bits in
+        Option.map Int64.bits_of_float (eval_float_op op left right_opt)
+      | Some (Const_int _ | Const_float32 _) | None -> None
+    in
+    let known_values =
+      match result_opt with
+      | Some bits -> replace instr.res.(0) (Const_float bits) known_values
+      | None -> Loc_map.remove instr.res.(0) known_values
+    in
+    remove_destroyed_at_basic known_values instr
+  in
+  match instr.desc with
+  | Op (Const_int c) -> replace instr.res.(0) (Const_int c) known_values
+  | Op (Const_float32 c) ->
+    if !Oxcaml_flags.cfg_value_propagation_float
+    then replace instr.res.(0) (Const_float32 c) known_values
+    else known_values
+  | Op (Const_float c) ->
+    if !Oxcaml_flags.cfg_value_propagation_float
+    then replace instr.res.(0) (Const_float c) known_values
+    else known_values
+  | Op Move -> (
+    (* CR xclerc for xclerc: double check the "magic" / conversions behind moves
+       in `Emit` will not result in invalid tracking here. *)
+    match Loc_map.find_opt instr.arg.(0) known_values with
+    | Some value
+      when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ ->
+      replace instr.res.(0) value known_values
+    | Some _ | None -> Loc_map.remove instr.res.(0) known_values)
+  | Op (Intop_imm (op, imm)) -> apply_int_op op (Some (Nativeint.of_int imm))
+  | Op (Intop op) ->
+    let right_opt =
+      if Operation.is_unary_integer_operation op
+      then None
+      else
+        match Loc_map.find_opt instr.arg.(1) known_values with
+        | Some (Const_int v) -> Some v
+        | Some (Const_float32 _ | Const_float _) | None -> None
+    in
+    apply_int_op op right_opt
+  | Op (Floatop (Float64, op)) ->
+    if !Oxcaml_flags.cfg_value_propagation_float
+    then
+      let right_opt =
+        match (op : Operation.float_operation) with
+        | Inegf | Iabsf -> None
+        | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
+          match Loc_map.find_opt instr.arg.(1) known_values with
+          | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
+          | Some (Const_int _ | Const_float32 _) | None -> None)
+      in
+      apply_float_op op right_opt
+    else
+      let known_values =
+        Array.fold_left
+          (fun known_values reg -> Loc_map.remove reg known_values)
+          known_values instr.res
+      in
+      remove_destroyed_at_basic known_values instr
+  | Op (Stackoffset _) | Pushtrap _ | Poptrap _ ->
+    (* The stack pointer changes: the addresses of the outgoing slots move. *)
+    let known_values =
+      Loc_map.filter
+        (fun (reg : Reg.t) (_ : known_value) ->
+          match reg.loc with
+          | Stack (Outgoing _) -> false
+          | Stack (Local _ | Incoming _ | Domainstate _) | Reg _ | Unknown ->
+            true)
+        known_values
+    in
+    let known_values =
+      Array.fold_left
+        (fun known_values reg -> Loc_map.remove reg known_values)
+        known_values instr.res
+    in
+    remove_destroyed_at_basic known_values instr
+  | Op
+      ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Const_mask _ | Load _ | Store _ | Int128op _
+      | Intop_atomic _
+      | Floatop (Float32, _)
+      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+      | Opaque | Begin_region | End_region | Specific _ | Name_for_debugger _
+      | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
+  | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
+    let known_values =
+      Array.fold_left
+        (fun known_values reg -> Loc_map.remove reg known_values)
+        known_values instr.res
+    in
+    remove_destroyed_at_basic known_values instr
+
+(* Returns the known values after the execution of the passed terminator, along
+   its normal successor edges, given the known values before it. Note that this
+   function is only useful when values are propagated across blocks: the
+   registers written or destroyed by the terminator (e.g. by a call) must then
+   be forgotten. *)
+let interpret_terminator (known_values : known_value Loc_map.t)
+    (term : Cfg.terminator Cfg.instruction) : known_value Loc_map.t =
+  let known_values =
+    (* The callee is allowed to write to its incoming argument area, which is
+       the caller's outgoing area, and both callees and the runtime system use
+       the domain state: forget the values in the corresponding slots when
+       control is transferred to other code. (The values in `Local` and
+       `Incoming` slots cannot be written by other code.) *)
+    match term.desc with
+    | Call _ | Call_no_return _ | Prim _ | Invalid _ | Tailcall_self _
+    | Tailcall_func _ ->
+      Loc_map.filter
+        (fun (reg : Reg.t) (_ : known_value) ->
+          match reg.loc with
+          | Stack (Outgoing _ | Domainstate _) -> false
+          | Stack (Local _ | Incoming _) | Reg _ | Unknown -> true)
+        known_values
+    | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+    | Int_test _ | Switch _ | Return | Raise _ ->
+      known_values
+  in
+  let known_values =
+    Array.fold_left
+      (fun known_values reg -> Loc_map.remove reg known_values)
+      known_values term.res
+  in
+  Array.fold_left
+    (fun known_values reg -> Loc_map.remove reg known_values)
+    known_values
+    (Proc.destroyed_at_terminator term.desc)
+
+module Dataflow = struct
+  module Domain = struct
+    (* The analysis is a "must" analysis: a value is known at a program point
+       only if it is known on all paths leading to that point. [join] is
+       accordingly the intersection of the known-value maps (keeping only the
+       bindings present on both sides with equal values), with [Unreachable] (no
+       known path yet) as its identity. Ascending chains are bounded since a
+       reachable state can only lose bindings. *)
+    type t =
+      | Unreachable
+      | Reachable of known_value Loc_map.t
+
+    let bot = Unreachable
+
+    let join (left : t) (right : t) : t =
+      match left, right with
+      | Unreachable, other | other, Unreachable -> other
+      | Reachable left, Reachable right ->
+        Reachable
+          (Loc_map.merge
+             (fun _reg left right ->
+               match left, right with
+               | Some left, Some right when equal_known_value left right ->
+                 Some left
+               | (Some _ | None), (Some _ | None) -> None)
+             left right)
+
+    let less_equal (left : t) (right : t) : bool =
+      (* `left <= right` iff `join left right = right`, i.e. iff every binding
+         of `right` is also a binding of `left`. *)
+      match left, right with
+      | Unreachable, (Unreachable | Reachable _) -> true
+      | Reachable _, Unreachable -> false
+      | Reachable left, Reachable right ->
+        Loc_map.for_all
+          (fun reg right_value ->
+            match Loc_map.find_opt reg left with
+            | Some left_value -> equal_known_value left_value right_value
+            | None -> false)
+          right
+  end
+
+  module Transfer = struct
+    type domain = Domain.t
+
+    type context = unit
+
+    type image =
+      { normal : domain;
+        exceptional : domain
+      }
+
+    let basic (domain : domain) (instr : Cfg.basic Cfg.instruction) () : domain
+        =
+      match domain with
+      | Unreachable -> Domain.Unreachable
+      | Reachable known_values ->
+        Domain.Reachable (interpret_basic known_values instr)
+
+    let terminator (domain : domain) (term : Cfg.terminator Cfg.instruction) ()
+        : image =
+      match domain with
+      | Unreachable ->
+        { normal = Domain.Unreachable; exceptional = Domain.Unreachable }
+      | Reachable known_values ->
+        (* No known values are propagated to exception handlers. *)
+        { normal = Domain.Reachable (interpret_terminator known_values term);
+          exceptional = Domain.Reachable Loc_map.empty
+        }
+  end
+
+  include Cfg_dataflow.Forward (Domain) (Transfer)
+end
+
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
-   been executed. Currently only tracks constant values, moves between
-   registers, basic integer arithmetic, and basic float64 arithmetic over known
-   values. Deletes moves deemed to be useless given the information in
-   `known_values`, and rewrites the materialization of a constant into a
-   register-to-register move when the constant is statically known to be already
-   available in another register. *)
-let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
-    known_value Reg.UsingLocEquality.Tbl.t =
-  let known_values = Reg.UsingLocEquality.Tbl.create 17 in
-  (* Reverse map of the `Const_int` entries of `known_values`: from a constant
-     to the registers currently known to hold it. The two tables are kept in
-     sync; `regs_holding_int` is used to rewrite the materialization of a
-     constant into a register-to-register move when the constant is already
-     available in another register. *)
-  let regs_holding_int : Reg.t list Nativeint_tbl.t = Nativeint_tbl.create 17 in
-  let forget_value (reg : Reg.t) (value : known_value) =
-    match value with
-    | Const_int c ->
-      begin match Nativeint_tbl.find_opt regs_holding_int c with
-      | None -> ()
-      | Some regs ->
-        begin match
-          List.filter (fun (r : Reg.t) -> not (Reg.same_loc r reg)) regs
-        with
-        | [] -> Nativeint_tbl.remove regs_holding_int c
-        | regs -> Nativeint_tbl.replace regs_holding_int c regs
-        end
-      end
-    | Const_float32 _ | Const_float _ -> ()
-  in
-  let record_value (reg : Reg.t) (value : known_value) =
-    match value with
-    | Const_int c ->
-      let regs =
-        match Nativeint_tbl.find_opt regs_holding_int c with
-        | None -> []
-        | Some regs -> regs
-      in
-      Nativeint_tbl.replace regs_holding_int c (reg :: regs)
-    | Const_float32 _ | Const_float _ -> ()
-  in
-  let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
-  let replace reg value =
-    if not (Reg.is_unknown reg)
-    then begin
-      (match find_opt reg with
-      | Some old_value -> forget_value reg old_value
-      | None -> ());
-      record_value reg value;
-      Reg.UsingLocEquality.Tbl.replace known_values reg value
-    end
-    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
-  in
-  let remove reg =
-    match find_opt reg with
-    | None -> ()
-    | Some old_value ->
-      forget_value reg old_value;
-      Reg.UsingLocEquality.Tbl.remove known_values reg
+   been executed, starting from the `init` values at the beginning of the block
+   (`init` is only non-empty when values are propagated across blocks by the
+   dataflow analysis above). Deletes moves deemed to be useless given the
+   information in `known_values`, and rewrites the materialization of a constant
+   into a register-to-register move when the constant is statically known to be
+   already available in another register. *)
+let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block)
+    ~(init : known_value Loc_map.t) : known_value Loc_map.t =
+  let known_values = ref init in
+  let replace (reg : Reg.t) value =
+    match reg.loc with
+    | Unknown ->
+      Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+    | Stack (Domainstate _) ->
+      (* Consistently with `interpret_basic`, values in the domain state are not
+         tracked (it is also read and written by the runtime system and by
+         callees). *)
+      known_values := Loc_map.remove reg !known_values
+    | Stack (Local _ | Incoming _ | Outgoing _) | Reg _ ->
+      known_values := Loc_map.add reg value !known_values
   in
   (* Deletes the instruction in [cell] if all it does is write [value] to [dst]
      while [dst] is already known to contain [value]; returns whether the
@@ -241,7 +455,7 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       (dst : Reg.t) (value : known_value) : bool =
     match value with
     | Const_int c ->
-      begin match find_opt dst with
+      begin match Loc_map.find_opt dst !known_values with
       | Some (Const_int c') when Nativeint.equal c c' ->
         Dll.delete_curr cell;
         true
@@ -249,33 +463,29 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       end
     | Const_float32 _ | Const_float _ -> false
   in
-  let remove_destroyed (instr : Cfg.basic Cfg.instruction) =
-    let destroyed_regs = Proc.destroyed_at_basic instr.desc in
-    Reg.UsingLocEquality.Tbl.filter_map_inplace
-      (fun reg known_value ->
-        let is_destroyed =
-          Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
-        in
-        if is_destroyed
-        then begin
-          forget_value reg known_value;
-          None
-        end
-        else Some known_value)
-      known_values
-  in
+  (* Looks for a hardware register, other than [dst] and with the same machtype
+     component, statically known to hold the constant [c]; such a register can
+     be used as the source of a move instead of materializing [c] into [dst].
+     The linear scan of the map is acceptable because it only runs for the
+     materializations of expensive constants, which are rare. *)
+  (* CR-soon xclerc for xclerc: double check the complexity change (from the
+     reverse-map lookup of the previous commit to a linear scan of the known
+     values) is not problematic, e.g. on functions with many known values and
+     many materializations of expensive constants. *)
   let find_move_source (c : nativeint) ~(dst : Reg.t) : Reg.t option =
     if is_expensive_constant c && Reg.is_reg dst
     then
-      match Nativeint_tbl.find_opt regs_holding_int c with
-      | None -> None
-      | Some regs ->
-        List.find_opt
-          (fun (reg : Reg.t) ->
-            Reg.is_reg reg
-            && (not (Reg.same_loc reg dst))
-            && Cmm.equal_machtype_component reg.typ dst.typ)
-          regs
+      Loc_map.fold
+        (fun (reg : Reg.t) (value : known_value) acc ->
+          match acc, value with
+          | Some _, (Const_int _ | Const_float32 _ | Const_float _) -> acc
+          | None, Const_int c'
+            when Nativeint.equal c c' && Reg.is_reg reg
+                 && (not (Reg.same_loc reg dst))
+                 && Cmm.equal_machtype_component reg.typ dst.typ ->
+            Some reg
+          | None, (Const_int _ | Const_float32 _ | Const_float _) -> None)
+        !known_values None
     else None
   in
   let infer_known_values_from_predecessor () =
@@ -343,121 +553,52 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
   Dll.iter_cell block.body
     ~f:(fun (cell : Cfg.basic Cfg.instruction Dll.cell) ->
       let instr = Dll.value cell in
-      let apply_int_op op right_opt =
-        let result_opt =
-          match find_opt instr.arg.(0) with
-          | Some (Const_int left) -> (
-            match right_opt with
-            | Some right -> eval_int_op op left right
-            | None -> None)
-          | Some (Const_float32 _ | Const_float _) | None -> None
-        in
-        (match result_opt with
-        | Some result -> replace instr.res.(0) (Const_int result)
-        | None -> remove instr.res.(0));
-        remove_destroyed instr
-      in
-      let apply_float_op op right_opt =
-        let result_opt =
-          match find_opt instr.arg.(0) with
-          | Some (Const_float left_bits) ->
-            let left = Int64.float_of_bits left_bits in
-            Option.map Int64.bits_of_float (eval_float_op op left right_opt)
-          | Some (Const_int _ | Const_float32 _) | None -> None
-        in
-        (match result_opt with
-        | Some bits -> replace instr.res.(0) (Const_float bits)
-        | None -> remove instr.res.(0));
-        remove_destroyed instr
-      in
-      match instr.desc with
-      | Op (Const_int c) ->
-        if not (delete_if_redundant cell instr.res.(0) (Const_int c))
-        then
-          begin match find_move_source c ~dst:instr.res.(0) with
-          | Some src ->
-            (* The constant is expensive to materialize but is already available
-               in `src`: rewrite the materialization into a register-to-register
-               move. As for the deletion performed by `delete_if_redundant`, the
-               (unchanged) `live` fields become an under-approximation of actual
-               liveness (`src` now carries its value to this new use across
-               instructions whose `live` sets may not mention it), which is safe
-               for the same reasons, `src` being an integer register holding a
-               compile-time integer constant. *)
-            Dll.set_value cell
-              { instr with desc = Cfg.Op Move; arg = [| src |] };
-            replace instr.res.(0) (Const_int c)
-          | None -> replace instr.res.(0) (Const_int c)
+      let deleted =
+        begin[@ocaml.warning "-4"] match instr.desc with
+        | Op (Const_int c) ->
+          if delete_if_redundant cell instr.res.(0) (Const_int c)
+          then true
+          else begin
+            begin match find_move_source c ~dst:instr.res.(0) with
+            | Some src ->
+              (* The constant is expensive to materialize but is already
+                 available in `src`: rewrite the materialization into a
+                 register-to-register move. As for the deletion performed by
+                 `delete_if_redundant`, the (unchanged) `live` fields become an
+                 under-approximation of actual liveness (`src` now carries its
+                 value to this new use across instructions whose `live` sets may
+                 not mention it), which is safe for the same reasons, `src`
+                 being an integer register holding a compile-time integer
+                 constant. *)
+              Dll.set_value cell
+                { instr with desc = Cfg.Op Move; arg = [| src |] }
+            | None -> ()
+            end;
+            false
           end
-      | Op (Const_float32 c) ->
-        if !Oxcaml_flags.cfg_value_propagation_float
-        then replace instr.res.(0) (Const_float32 c)
-      | Op (Const_float c) ->
-        if !Oxcaml_flags.cfg_value_propagation_float
-        then replace instr.res.(0) (Const_float c)
-      | Op Move -> (
-        (* CR xclerc for xclerc: double check the "magic" / conversions behind
-           moves in `Emit` will not result in invalid tracking here. *)
-        match find_opt instr.arg.(0) with
-        | Some value
-          when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
-          ->
-          if not (delete_if_redundant cell instr.res.(0) value)
-          then replace instr.res.(0) value
-        | Some _ | None -> remove instr.res.(0))
-      | Op (Intop_imm (op, imm)) ->
-        apply_int_op op (Some (Nativeint.of_int imm))
-      | Op (Intop op) ->
-        let right_opt =
-          if Operation.is_unary_integer_operation op
-          then None
-          else
-            match find_opt instr.arg.(1) with
-            | Some (Const_int v) -> Some v
-            | Some (Const_float32 _ | Const_float _) | None -> None
-        in
-        apply_int_op op right_opt
-      | Op (Floatop (Float64, op)) ->
-        if !Oxcaml_flags.cfg_value_propagation_float
-        then
-          let right_opt =
-            match (op : Operation.float_operation) with
-            | Inegf | Iabsf -> None
-            | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
-              match find_opt instr.arg.(1) with
-              | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
-              | Some (Const_int _ | Const_float32 _) | None -> None)
-          in
-          apply_float_op op right_opt
-        else begin
-          Array.iter remove instr.res;
-          remove_destroyed instr
+        | Op Move ->
+          begin match Loc_map.find_opt instr.arg.(0) !known_values with
+          | Some value
+            when Cmm.equal_machtype_component instr.res.(0).typ
+                   instr.arg.(0).typ ->
+            delete_if_redundant cell instr.res.(0) value
+          | Some (Const_int _ | Const_float32 _ | Const_float _) | None -> false
+          end
+        | _ -> false
         end
-      | Op
-          ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
-          | Int128op _ | Intop_atomic _
-          | Floatop (Float32, _)
-          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-          | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index )
-      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
-      | Stack_check _ ->
-        Array.iter remove instr.res;
-        remove_destroyed instr);
-  known_values
+      in
+      if not deleted
+      then known_values := interpret_basic !known_values (Dll.value cell));
+  !known_values
 
 (* Compute the destination of a terminator, using [known_values] to determine
    the values of some registers, returning [None] if the destination is not
    statically known. *)
-let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
+let evaluate_terminator (known_values : known_value Loc_map.t)
     (term : Cfg.terminator Cfg.instruction) : Label.t option =
   let[@inline] get_known_value ~(arg_idx : int) : known_value option =
     if arg_idx >= 0 && arg_idx < Array.length term.arg
-    then
-      Reg.UsingLocEquality.Tbl.find_opt known_values
-        (Array.unsafe_get term.arg arg_idx)
+    then Loc_map.find_opt (Array.unsafe_get term.arg arg_idx) known_values
     else
       Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
         InstructionId.format term.id
@@ -576,7 +717,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     None
 
 let block_known_values (block : C.basic_block)
-    ~(known_values : known_value Reg.UsingLocEquality.Tbl.t option)
+    ~(known_values : known_value Loc_map.t option)
     ~(allowed_to_be_irreducible : bool) : bool =
   match known_values with
   | Some known_values when allowed_to_be_irreducible -> (
@@ -600,7 +741,8 @@ let block_known_values (block : C.basic_block)
    order. Also, for linear to cfg and back will be harder to generate exactly
    the same layout. Also, how do we map execution counts about branches onto
    this terminator? *)
-let block (cfg : C.t) (block : C.basic_block) : bool =
+let block_with_initial_values (cfg : C.t) (block : C.basic_block)
+    ~(init : known_value Loc_map.t) : bool =
   let is_after_regalloc = cfg.register_locations_are_set in
   (* Note: in addition to collecting the known values, the call to
      [collect_known_values] deletes the constant moves made redundant by the
@@ -608,7 +750,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
      terminator is. *)
   let known_values =
     if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
-    then Some (collect_known_values cfg block)
+    then Some (collect_known_values cfg block ~init)
     else None
   in
   match block.terminator.desc with
@@ -696,10 +838,50 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
   | Call _ | Prim _ | Invalid _ ->
     false
 
-let run cfg =
+let block (cfg : C.t) (block : C.basic_block) : bool =
+  block_with_initial_values cfg block ~init:Loc_map.empty
+
+let run (cfg : C.t) =
+  (* When enabled, the dataflow analysis computes the known values at the start
+     of every block, instead of every block starting from an empty state. The
+     transformations applied while iterating over the blocks below cannot
+     invalidate the computed states: deleting a redundant constant move does not
+     change the value held by any register at any point, and rewriting a
+     terminator only removes control-flow edges, making the states conservative.
+     Copying the terminator of an empty successor into a block adds edges, but
+     is also covered: the copying block's end state is a superset of the empty
+     successor's start state (the latter being an intersection over a set of
+     paths that includes the former), and the transfer functions are monotone,
+     so the states along the new edges are supersets of the states along the
+     paths through the empty successor and the facts recorded at the new targets
+     remain true. *)
+  let dataflow_values =
+    if
+      !Oxcaml_flags.cfg_value_propagation
+      && !Oxcaml_flags.cfg_value_propagation_dataflow
+      && cfg.register_locations_are_set
+    then
+      match
+        Dataflow.run cfg ~init:(Dataflow.Domain.Reachable Loc_map.empty)
+          ~handlers_are_entry_points:true ()
+      with
+      | Result.Ok values -> Some values
+      | Result.Error () ->
+        Misc.fatal_error
+          "Simplify_terminator.run: forward analysis did not reach a fix-point"
+    else None
+  in
   let registration_needed =
     C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
-        let shortcircuit = block cfg b in
+        let init =
+          match dataflow_values with
+          | None -> Loc_map.empty
+          | Some values -> (
+            match Label.Tbl.find_opt values b.start with
+            | Some (Dataflow.Domain.Reachable known_values) -> known_values
+            | Some Dataflow.Domain.Unreachable | None -> Loc_map.empty)
+        in
+        let shortcircuit = block_with_initial_values cfg b ~init in
         registration_needed || shortcircuit)
   in
   if registration_needed
