@@ -35,6 +35,7 @@ utils/doubly_linked_list.ml* merlin-exclude
 utils/file_sections.ml* merlin-exclude
 utils/linkage_name.ml* merlin-exclude
 utils/lru.ml* merlin-exclude
+utils/opt_fuel.ml* merlin-exclude
 utils/priority_queue.ml* merlin-exclude
 utils/profile_counters_functions.ml* merlin-exclude
 utils/runtimetags.ml* merlin-exclude
