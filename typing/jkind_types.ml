@@ -165,6 +165,14 @@ module Sort = struct
       | Univar of univar
       | Genvar of var
 
+    let of_base b = Base b
+
+    let product cs = Product cs
+
+    let univar uv = Univar uv
+
+    let genvar v = Genvar v
+
     let rec equal c1 c2 =
       match c1, c2 with
       | Base b1, Base b2 -> equal_base b1 b2
@@ -1063,6 +1071,14 @@ module Layout = struct
       | Product of t list
       | Univar of Sort.univar
       | Genvar of Sort.var
+
+    let any sa = Any sa
+
+    let product cs = Product cs
+
+    let univar uv = Univar uv
+
+    let genvar v = Genvar v
 
     let max = Any Scannable_axes.max
 

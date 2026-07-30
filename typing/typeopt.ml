@@ -1391,7 +1391,7 @@ let lazy_val_requires_forward env loc ty =
       Jkind_types.Scannable_axes.max
   in
   let classify_product _ layouts =
-    let layout = Jkind_types.Layout.Const.Product layouts in
+    let layout = Jkind_types.Layout.Const.product layouts in
     raise (Error (loc, Unsupported_product_in_lazy layout))
   in
   match classify ~classify_product env ty layout with
