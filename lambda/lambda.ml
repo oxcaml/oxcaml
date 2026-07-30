@@ -1177,8 +1177,9 @@ and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_return: layout;
     ktmpl_body: lambda;
-    ktmpl_mode: locality_mode;
+    ktmpl_ret_mode: locality_mode;
     ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
   }
 
@@ -2374,7 +2375,8 @@ let shallow_map ~tail ~non_tail:f lam =
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
   | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
-                    ktmpl_mode; ktmpl_env = old_env; ktmpl_loc } ->
+                    ktmpl_ret_mode; ktmpl_env = old_env; ktmpl_env_mode;
+                    ktmpl_loc } ->
       let new_body = f old_body in
       let env_changed = ref false in
       let new_env =
@@ -2392,8 +2394,9 @@ let shallow_map ~tail ~non_tail:f lam =
           ktmpl_params;
           ktmpl_return;
           ktmpl_body = new_body;
-          ktmpl_mode;
+          ktmpl_ret_mode;
           ktmpl_env = new_env;
+          ktmpl_env_mode;
           ktmpl_loc;
         }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
@@ -3597,8 +3600,10 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_mode=Alloc_local} ->
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap} ->
+      ()
+    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_env_mode=Alloc_local}
+      ->
       raise Exit
 
     | Lapply {ap_mode=Alloc_local}
