@@ -117,7 +117,15 @@ let compute_closure_types_inside_functions ~denv ~all_sets_of_closures
                            (Code_metadata.stub
                               (Code_or_metadata.code_metadata code_or_metadata))
                     then
-                      Code_id.Map.find old_code_id old_to_new_code_ids_all_sets
+                      match
+                        Code_id.Map.find_or_null old_code_id
+                          old_to_new_code_ids_all_sets
+                      with
+                      | This new_code_id -> new_code_id
+                      | Null ->
+                        (* In classic-inlining mode, code is simplified in
+                           place, under its original code ID. *)
+                        old_code_id
                     else old_code_id
                   in
                   let rec_info =
@@ -326,7 +334,11 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
       ~denv_inside_functions ~value_slot_types_all_sets
   in
   let old_to_new_code_ids_all_sets =
-    compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures
+    (* When inlining is performed during closure conversion, the code of each
+       function is simplified in place, keeping the original code ID. *)
+    if Flambda_features.classic_inlining ()
+    then Code_id.Map.empty
+    else compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures
   in
   let ( closure_bound_names_inside_functions_all_sets,
         closure_types_inside_functions_all_sets ) =

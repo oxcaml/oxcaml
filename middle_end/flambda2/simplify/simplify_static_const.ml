@@ -371,21 +371,27 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
      additional info we could make more accurate decisions on which value slots
      can be removed. *)
   let dacc =
-    let old_code_ids =
-      Code_id.Map.fold
-        (fun code_id code old_code_ids ->
-          if Code.stub code
-          then old_code_ids
-          else
-            match Code.newer_version_of code with
-            | None ->
-              if Code_id.is_imported code_id
-              then old_code_ids
-              else Code_id.Set.add code_id old_code_ids
-            | Some _ -> old_code_ids)
-        all_code Code_id.Set.empty
-    in
-    DA.add_code_ids_never_simplified dacc ~old_code_ids
+    if Flambda_features.classic_inlining ()
+    then
+      (* In this case the code is simplified in place, under its original code
+         ID, so there are no non-simplified code IDs to track. *)
+      dacc
+    else
+      let old_code_ids =
+        Code_id.Map.fold
+          (fun code_id code old_code_ids ->
+            if Code.stub code
+            then old_code_ids
+            else
+              match Code.newer_version_of code with
+              | None ->
+                if Code_id.is_imported code_id
+                then old_code_ids
+                else Code_id.Set.add code_id old_code_ids
+              | Some _ -> old_code_ids)
+          all_code Code_id.Set.empty
+      in
+      DA.add_code_ids_never_simplified dacc ~old_code_ids
   in
   let bound_static', static_consts', dacc =
     Static_const_group.match_against_bound_static static_consts bound_static
@@ -418,9 +424,16 @@ let simplify_static_consts dacc (bound_static : Bound_static.t) static_consts
         let dacc =
           DA.map_denv dacc ~f:(fun denv -> DE.define_code denv ~code_id ~code)
         in
-        ( Bound_static.Pattern.code code_id :: bound_static,
-          static_const :: static_consts,
-          dacc ))
+        if (not (Code.stub code)) && Flambda_features.classic_inlining ()
+        then
+          (* The code will be simplified in place and rebound under the same
+             code ID when the corresponding set of closures is simplified, so
+             the original binding must not be emitted here. *)
+          bound_static, static_consts, dacc
+        else
+          ( Bound_static.Pattern.code code_id :: bound_static,
+            static_const :: static_consts,
+            dacc ))
       ~deleted_code:(fun acc _code_id -> acc)
       ~set_of_closures:(fun acc ~closure_symbols:_ _ -> acc)
       ~block_like:(fun

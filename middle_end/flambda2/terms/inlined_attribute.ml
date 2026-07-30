@@ -44,7 +44,7 @@ module Use_info = struct
       Some
         ("the optimizer did not know what function was being applied"
         ^
-        if Flambda_features.classic_mode ()
+        if Flambda_features.classic_inlining ()
         then " (is it marked [@inline never]?)"
         else "")
     | Jsir_inlining_disabled ->

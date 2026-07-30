@@ -279,6 +279,11 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       let inlined : Inlined_attribute.t =
         if erase_attribute
         then Default_inlined
+        else if Flambda_features.classic_inlining ()
+        then
+          (* Keep the use info assigned during closure conversion, where the
+             inlining was performed. *)
+          Apply.inlined apply
         else
           Inlined_attribute.with_use_info (Apply.inlined apply)
             Unused_because_of_call_site_decision
