@@ -1437,8 +1437,13 @@ module Ast = struct
 
   (* Used to check whether the expression should be parenthesised *)
   and is_negative_const = function
-    | Int n | Int8 n | Int16 n
-    | UntaggedInt n | UntaggedInt8 n | UntaggedInt16 n -> n < 0
+    | Int n
+    | Int8 n
+    | Int16 n
+    | UntaggedInt n
+    | UntaggedInt8 n
+    | UntaggedInt16 n ->
+      n < 0
     | Int32 n -> n < 0l
     | Int64 n -> n < 0L
     | Nativeint n -> n < 0n
