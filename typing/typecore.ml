@@ -629,20 +629,39 @@ let modality_hint ~loc : Mode.Hint.is_contained_by =
    unaccounted for is an annotation reaching a type through unification with a
    LATER expression, e.g. [fun y -> ignore (y : (t @@ portable)); y]; see the
    report. *)
+(* Expand manifest aliases far enough to see a wrapper, WITHOUT consulting
+   local (GADT) equations.
+
+   Refusing to expand at all whenever the environment holds a local equation
+   is unsound, not merely conservative: a public alias for [(t @@ aliased)]
+   can be forgotten by [:>], which does expand, while the mode side never
+   applies the modality -- yielding a [unique] value from an [aliased] one.
+   Conversely, expanding through a local equation would make unpacking depend
+   on non-principal information. Stopping at locally abstract types avoids
+   both: a globally manifest alias always unpacks, and one revealed only by a
+   local equation never does, in either mode. *)
+let rec expand_head_for_modality env ty =
+  match get_desc ty with
+  | Tconstr (path, _, _) -> (
+    match Env.find_type path env with
+    | { type_is_newtype = true; _ } -> ty
+    | { type_manifest = Some _; type_private = Public; _ } -> (
+      match try_expand_safe env ty with
+      | expanded -> expand_head_for_modality env expanded
+      | exception Cannot_expand -> ty)
+    | _ | (exception Not_found) -> ty)
+  | _ -> ty
+
 let unpack_modality ~loc:_ env ty =
   let found payload bounds =
     Some (Typemode.modality_of_mod_bounds bounds, payload)
   in
   match get_desc ty with
   | Tmod (payload, bounds) -> found payload bounds
-  | Tconstr _ when not (Env.has_local_constraints env) ->
-      (* An abbreviation may stand for a wrapper. The expansion is skipped in
-         the presence of local (GADT) equations, where expanding the head can
-         capture an equation that is about to go out of scope; an abbreviation
-         of a wrapper then simply does not unpack. *)
-      (match get_desc (expand_head env ty) with
-       | Tmod (payload, bounds) -> found payload bounds
-       | _ -> None)
+  | Tconstr _ -> (
+    match get_desc (expand_head_for_modality env ty) with
+    | Tmod (payload, bounds) -> found payload bounds
+    | _ -> None)
   | _ -> None
 
 (* Expected side: the payload is checked at the modality applied to the
