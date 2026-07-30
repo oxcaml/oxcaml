@@ -174,7 +174,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
+  | Tpat_constraint of core_type option * Mode.Alloc.Const.t modes
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
   | Tpat_unpack

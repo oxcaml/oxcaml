@@ -181,7 +181,8 @@ and blambda =
         met : blambda;
         obj : blambda;
         args : blambda list;
-        nontail : bool
+        nontail : bool;
+        yielding : Lambda.yielding_kind
       }
   | Context_switch of context_switch * blambda list
   | Ifthenelse of

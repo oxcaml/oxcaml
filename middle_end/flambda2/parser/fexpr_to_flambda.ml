@@ -653,8 +653,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const
             (SC.immutable_mask_array (List.map (or_variable mask env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
-        | Mutable_string { initial_value = s } ->
-          static_const (SC.mutable_string ~initial_value:s)
         | Immutable_string s -> static_const (SC.immutable_string s))
       | Set_of_closures { bindings; elements } ->
         let fun_decls =

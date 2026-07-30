@@ -280,7 +280,7 @@ let pat_extra sub (e, loc, attrs) =
   | Tpat_type (_, lid) -> iter_loc_lid sub lid
   | Tpat_unpack -> ()
   | Tpat_open (_, lid, env) -> iter_loc_lid sub lid; sub.env sub env
-  | Tpat_constraint (ct, ma) -> sub.typ sub ct; sub.modes sub ma
+  | Tpat_constraint (ct, ma) -> Option.iter (sub.typ sub) ct; sub.modes sub ma
   | Tpat_inspected_type (Label_disambiguation _) -> ()
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) -> ()
   | Tpat_inspected_type (Module_pack _) -> ()

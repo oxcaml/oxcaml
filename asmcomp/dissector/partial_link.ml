@@ -56,10 +56,23 @@ let () =
 
 let write_response_file ~filename files =
   let oc = open_out filename in
+  (* The linker tokenizes the response file like a shell: whitespace separates
+     arguments, and quotes and backslashes are special. Filenames can contain
+     such characters (unit names may contain '), so they are quoted with
+     [Filename.quote], as [Ccomp.build_response_file] does. *)
+  (* The -u flags must precede the files: the linker only extracts an archive
+     member if its symbol is undefined when the archive is scanned, and it never
+     rescans an archive. *)
   List.iter
     (fun entry ->
-      output_string oc (MOF.File_size.filename entry);
-      output_char oc '\n')
+      List.iter
+        (fun symbol ->
+          Printf.fprintf oc "-u %s\n" (Asm_targets.Asm_symbol.encode symbol))
+        (MOF.File_size.required_symbols entry))
+    files;
+  List.iter
+    (fun entry ->
+      Printf.fprintf oc "%s\n" (Filename.quote (MOF.File_size.filename entry)))
     files;
   close_out oc
 
@@ -130,8 +143,7 @@ end = struct
       ~partition_index ~response_file ~output_file =
     (* Config.native_pack_linker is something like "ld -r -o " *)
     let cmd =
-      Printf.sprintf "%s%s --whole-archive @%s --no-whole-archive"
-        Config.native_pack_linker
+      Printf.sprintf "%s%s @%s" Config.native_pack_linker
         (Filename.quote output_file)
         (Filename.quote response_file)
     in

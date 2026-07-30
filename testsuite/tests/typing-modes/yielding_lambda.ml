@@ -1028,3 +1028,102 @@ module Gf :
            (apply[yielding] (field_imm 1 M) 0)))))
   0)
 |}]
+
+(* Object code can never close over a yielding value, so a send may yield
+   only via its arguments. *)
+let o = object
+  method m x = x + 1
+  method uses (_ : Yielding.t @ yielding) = 0
+end
+[%%expect{|
+(let
+  (shared =a (opaque [0: #"uses" #"m"])
+   o =
+     (let
+       (class =?
+          (opaque (apply (field_imm 15 (global CamlinternalOO!)) shared))
+        obj_init =
+          (let
+            (ids =?
+               (opaque
+                 (apply (field_imm 7 (global CamlinternalOO!)) class shared))
+             uses =o? (field_mut 0 ids)
+             m =o? (field_mut 1 ids))
+            (seq
+              (opaque
+                (apply (field_imm 10 (global CamlinternalOO!)) class
+                  (opaque
+                    (makeblock 0 m
+                      (function {nlocal = 0} self-8 x[value<int>] : int
+                        (%int_add x 1))
+                      uses (function {nlocal = 0} self-8 param : int 0)))))
+              (function {nlocal = 0} env
+                (opaque
+                  (apply (field_imm 23 (global CamlinternalOO!)) 0 class))))))
+       (seq (opaque (apply (field_imm 16 (global CamlinternalOO!)) class))
+         (opaque (apply obj_init 0)))))
+  (apply (field_imm 1 (global Toploop!)) "o" o))
+val o : < m : int -> int; uses : Yielding.t @ yielding -> int > = <obj>
+|}]
+
+let bare = o#m
+let applied = o#m 3
+[%%expect{|
+(let (o =? (apply (field_imm 0 (global Toploop!)) "o") bare = (send o 109))
+  (apply (field_imm 1 (global Toploop!)) "bare" bare))
+val bare : int -> int = <fun>
+(let
+  (o =? (apply (field_imm 0 (global Toploop!)) "o")
+   applied =[value<int>] (send o 109 3))
+  (apply (field_imm 1 (global Toploop!)) "applied" applied))
+val applied : int = 4
+|}]
+
+(* Passing a yielding argument makes the send yielding *)
+let (_ : int) = Yielding.with_ (fun y -> o#uses y)
+[%%expect{|
+(let
+  (o =? (apply (field_imm 0 (global Toploop!)) "o")
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296"))
+  (apply (field_imm 0 Yielding)
+    (function {nlocal = 0} y : int (send[yielding] o -844262836 y))))
+- : int = 0
+|}]
+
+(* A send to self may be optimized into a CamlinternalOO builtin method,
+   in which case no send remains *)
+class c2 = object (self)
+  method m x = x + 1
+  method call_m = self#m 4
+end
+[%%expect{|
+(let
+  (shared =a (opaque [0: #"m" #"call_m"])
+   c2 =?
+     (let
+       (c2_init =
+          (function {nlocal = 0} class?
+            (let
+              (ids =?
+                 (opaque
+                   (apply (field_imm 7 (global CamlinternalOO!)) class
+                     shared))
+               m =o? (field_mut 0 ids)
+               call_m =o? (field_mut 1 ids))
+              (seq
+                (opaque
+                  (apply (field_imm 10 (global CamlinternalOO!)) class
+                    (opaque
+                      (makeblock 0 m
+                        (function {nlocal = 0} self-9 x[value<int>] : int
+                          (%int_add x 1))
+                        call_m 16 m 4))))
+                (function {nlocal = 0} env self?
+                  (opaque
+                    (apply (field_imm 23 (global CamlinternalOO!)) self
+                      class)))))))
+       (opaque
+         (apply (field_imm 18 (global CamlinternalOO!)) shared c2_init))))
+  (apply (field_imm 1 (global Toploop!)) "c2/928" c2))
+class c2 : object method call_m : int method m : int -> int end
+|}]

@@ -48,12 +48,12 @@ let stub_depth t = t.stub_depth
 let is_depth_exceeded t =
   t.depth >= Inlining_arguments.max_inlining_depth t.arguments
 
-let meet t1 t2 =
-  (* XXX is this depth calculation wrong? doesn't seem like a meet Or maybe this
-     should be renamed to "combine" or something *)
-  { depth = t1.depth + t2.depth;
-    stub_depth = t1.stub_depth + t2.stub_depth;
-    arguments = Inlining_arguments.meet t1.arguments t2.arguments
+let combine ~from_env ~from_metadata =
+  { depth = from_env.depth + from_metadata.depth;
+    stub_depth = from_env.stub_depth + from_metadata.stub_depth;
+    arguments =
+      Inlining_arguments.combine ~from_env:from_env.arguments
+        ~from_metadata:from_metadata.arguments
   }
 
 let equal t1 t2 =

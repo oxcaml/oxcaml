@@ -259,7 +259,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_access of Longident.t
   | Mixed_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -1328,43 +1327,22 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-(* Does this record representation permit atomic field usage? *)
-let allows_atomic_field_usage = function
-  | Record_boxed -> true
-  | Record_inlined (_tag, ctor_repres, _variant_repres) -> (
-      match ctor_repres with
-      | Constructor_uniform_value -> true
-      | Constructor_mixed _ -> false
-      (* At this point, we should know the constructor representation. *)
-      | Constructor_variable -> false)
-  (* Reads/writes of atomic record fields are currently only supported for
-     labels whose logical offset matches the physical field position. To support
-     mixed records, we will add atomic primitives to lambda that consider mixed
-     block field reordering. *)
-  | Record_mixed _ -> false
-  (* The remaining cases should be unreachable. *)
-  (* [@@unboxed] already prohibits mutable (and therefore atomic) fields. *)
+let check_atomic_loc ~loc ~env record_repres mutability lid =
+  if not (Types.is_atomic mutability) then
+    raise (Error (loc, env, Label_not_atomic lid));
+  match record_repres with
+  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
+  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
+      raise (Error (loc, env, Mixed_record_atomic_loc lid))
+  (* We should know constructor representation at this point. *)
+  | Record_inlined (_, Constructor_variable, _)
+  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
-  (* [@atomic] fields disable the float record optimization. *)
+  (* [@atomic] fields disable float record optimization. *)
   | Record_float | Record_ufloat
-  (* At this point, we should know the record representation. *)
+  (* We should know record representation at this point. *)
   | Record_dummy _ | Record_variable ->
-      false
-
-(* CR-soon jkerrigan: simplify after we allow access of atomic fields in mixed
-   records. *)
-type atomic_field_use = Access | Loc
-
-(* Raises if we try to use an atomic field from a mixed record. *)
-let check_atomic_field_usage ~usage ~loc ~env record_repres mutability lid =
-  if Types.is_atomic mutability && not (allows_atomic_field_usage record_repres)
-  then
-    let err =
-      match usage with
-      | Access -> Mixed_record_atomic_access lid
-      | Loc -> Mixed_record_atomic_loc lid
-    in
-    raise (Error (loc, env, err))
+      Misc.fatal_error "check_atomic_loc: unexpected record representation"
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -1829,10 +1807,10 @@ let rec build_as_type_and_mode (env : Env.t) p ~mode =
 
 and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
   | [] -> build_as_type_aux env p ~mode
-  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack |
+  | ((Tpat_type _ | Tpat_open _ | Tpat_unpack | Tpat_constraint (None, _) |
       Tpat_inspected_type _), _, _) :: rest ->
       build_as_type_and_mode_extra env p rest ~mode
-  | (Tpat_constraint ({ctyp_type = ty; _}, _), _, _) :: rest ->
+  | (Tpat_constraint (Some {ctyp_type = ty; _}, _), _, _) :: rest ->
       (* If the type constraint is ground, then this is the best type
          we can return, so just return an instance (cf. #12313) *)
       if closed_type_expr ty then instance ty, mode else
@@ -3990,25 +3968,26 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
-      begin match sty with
-      | Some sty ->
-        let type_modes = Typemode.transl_alloc_mode ms in
-        let cty, ty, expected_ty' =
-          solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
-            expected_ty
-        in
-        let p =
-          type_pat ~alloc_mode tps category sp_constrained expected_ty' sort
-        in
-        let extra =
-          Tpat_constraint (cty, type_modes),
-          loc,
-          sp_constrained.ppat_attributes
-        in
-        { p with pat_type = ty; pat_extra = extra::p.pat_extra }
-      | None ->
+      let type_modes = Typemode.transl_alloc_mode ms in
+      let cty, ty, expected_ty =
+        match sty with
+        | Some sty ->
+          let cty, ty, expected_ty' =
+            solve_Ppat_constraint tps loc !!penv type_modes.mode_modes sty
+              expected_ty
+          in
+          Some cty, Some ty, expected_ty'
+        | None ->
+          None, None, expected_ty
+      in
+      let p =
         type_pat ~alloc_mode tps category sp_constrained expected_ty sort
-      end
+      in
+      let pat_type = match ty with Some ty -> ty | None -> p.pat_type in
+      let extra =
+        Tpat_constraint (cty, type_modes), loc, sp_constrained.ppat_attributes
+      in
+      { p with pat_type; pat_extra = extra :: p.pat_extra }
   | Ppat_type lid ->
       Env.check_no_open_quotations sp.ppat_loc !!penv
         (Env.Tconst_pat_qt lid.txt);
@@ -5926,7 +5905,7 @@ let check_partial_application ~statement exp =
 let pattern_needs_partial_application_check p =
   let rec check : type a. a general_pattern -> bool = fun p ->
     not (List.exists
-          (function (Tpat_constraint (_, _), _, _) -> true | _ -> false)
+          (function (Tpat_constraint (Some _, _), _, _) -> true | _ -> false)
           p.pat_extra) &&
     match p.pat_desc with
     | Tpat_any -> true
@@ -7521,8 +7500,6 @@ and type_expect_
       in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
-      check_atomic_field_usage ~usage:Access ~loc:record.exp_loc ~env
-        record_repres label.lbl_mut lid.txt;
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }
@@ -7652,8 +7629,6 @@ and type_expect_
           ~why:Field_assignment
           ~containing_type:ty_record
       in
-      check_atomic_field_usage ~usage:Access ~loc ~env record_repres
-        label.lbl_mut lid.txt;
       rue {
         exp_desc = Texp_setfield {
           record;
@@ -8557,11 +8532,8 @@ and type_expect_
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
           in
-          check_atomic_field_usage ~usage:Loc ~loc:record.exp_loc ~env
-            record_repres label.lbl_mut lid.txt;
           Env.mark_label_used Env.Projection label.lbl_uid;
-          if (not (Types.is_atomic label.lbl_mut))
-          then raise (Error (loc, env, Label_not_atomic lid.txt));
+          check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -8737,7 +8709,7 @@ and type_expect_
         |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
-      let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
+      let expr_ty = Predef.type_expr (newgenty (Tquote ty)) in
       with_explanation (fun () ->
         unify_exp_types loc env expr_ty (generic_instance ty_expected));
       (* If we are checking staged modes in the metaprogram,
@@ -8772,7 +8744,7 @@ and type_expect_
       if not magic_staged_modes then
         submode ~loc ~env ~reason:Other mode_splice expected_mode;
       let new_env = Env.enter_splice ~loc env in
-      let ty = Predef.type_code (newgenty (Tquote ty_expected)) in
+      let ty = Predef.type_expr (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
       re {
         exp_desc = Texp_antiquotation arg;
@@ -9522,27 +9494,27 @@ and type_function
       in
       match body with
       | Pfunction_body body ->
+          let body_loc = body.pexp_loc in
           let body =
             match ret_type_constraint with
             | None -> type_expect env expected_mode body (mk_expected ty_expected)
             | Some constraint_ ->
-            let body_loc = body.pexp_loc in
-            let body, exp_type, exp_extra =
-              type_constraint_expect (expression_constraint body)
-                env expected_mode body_loc ~loc_arg:body_loc
-                type_mode.mode_modes constraint_ ty_expected
-            in
-            let texp_mode =
-              match type_mode.mode_desc with
-              | [] -> []
-              | _ :: _ ->
-                [ (Texp_mode type_mode, body_loc, []) ]
-            in
-            { body with
-                exp_extra =
-                  texp_mode @ (exp_extra, body_loc, []) :: body.exp_extra;
-                exp_type;
-            }
+              let body, exp_type, exp_extra =
+                type_constraint_expect (expression_constraint body)
+                  env expected_mode body_loc ~loc_arg:body_loc
+                  type_mode.mode_modes constraint_ ty_expected
+              in
+              { body with
+                  exp_extra = (exp_extra, body_loc, []) :: body.exp_extra;
+                  exp_type;
+              }
+          in
+          let body =
+            match type_mode.mode_desc with
+            | [] -> body
+            | _ :: _ ->
+              let extra = Texp_mode type_mode, body_loc, [] in
+              { body with exp_extra = extra :: body.exp_extra }
           in
           body.exp_type, Tfunction_body body, None, None
       | Pfunction_cases (cases, _, attributes) ->
@@ -13092,11 +13064,6 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
-  | Mixed_record_atomic_access lid ->
-      Location.errorf ~loc
-        "Accessing atomic fields (here %a) of mixed records is not yet@ \
-         supported."
-        quoted_longident lid
   | Mixed_record_atomic_loc lid ->
       Location.errorf ~loc
         "Use of %a with mixed record fields (here %a) is forbidden."

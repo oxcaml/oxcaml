@@ -1731,7 +1731,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 
 let poly_ id = fun x -> x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
@@ -1758,8 +1758,8 @@ Warning 219: This value description has no layout-polymorphic type variables,
 module type S_poly =
   sig
     val f : 'a -> 'a
-    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
-    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
   end
 |}]
 
@@ -1806,5 +1806,5 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+module type S = sig val poly_ f : 'a -> 'b end
 |}]

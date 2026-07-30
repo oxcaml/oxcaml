@@ -308,7 +308,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         nontail = is_nontail ap_region_close;
         yielding = ap_yielding
       }
-  | Lsend (kind, met, obj, args, rc, _, _, _) ->
+  | Lsend (kind, met, obj, args, rc, _, _, _, yielding) ->
     Send
       { method_kind =
           (match (kind : Lambda.meth_kind) with
@@ -318,7 +318,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         met = comp_expr met;
         obj = comp_expr obj;
         args = List.map comp_expr args;
-        nontail = is_nontail rc
+        nontail = is_nontail rc;
+        yielding
       }
   | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
@@ -963,7 +964,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
     | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
     | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
