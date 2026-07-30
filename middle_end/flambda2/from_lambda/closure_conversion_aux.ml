@@ -464,7 +464,7 @@ module Acc = struct
       shareable_constants = Static_const.Map.empty;
       symbol_approximations = Symbol.Map.empty;
       approximation_for_external_symbol =
-        (if Flambda_features.classic_mode ()
+        (if Flambda_features.classic_inlining ()
          then approximation_loader cmx_loader
          else fun _symbol -> Value_approximation.Unknown Flambda_kind.value);
       code_in_reverse_order = [];

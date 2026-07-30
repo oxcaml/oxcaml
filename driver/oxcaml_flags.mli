@@ -142,6 +142,7 @@ module Flambda2 : sig
 
   module Default : sig
     val classic_mode : bool
+    val classic_inlining : bool
     val join_points : bool
     val unbox_along_intra_function_control_flow : bool
     val mutable_unboxing : bool
@@ -167,6 +168,7 @@ module Flambda2 : sig
 
   type flags = {
     classic_mode : bool;
+    classic_inlining : bool;
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
     mutable_unboxing : bool;
@@ -192,6 +194,7 @@ module Flambda2 : sig
   val function_result_types : function_result_types or_default ref
 
   val classic_mode : bool or_default ref
+  val classic_inlining : bool or_default ref
   val join_points : bool or_default ref
   val unbox_along_intra_function_control_flow : bool or_default ref
   val mutable_unboxing : bool or_default ref

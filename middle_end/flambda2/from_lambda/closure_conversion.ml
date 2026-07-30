@@ -1876,7 +1876,7 @@ let close_exact_or_unknown_apply acc env
       ~probe ~position
       ~relative_history:(Env.relative_history_from_scoped ~loc env)
   in
-  if Flambda_features.classic_mode ()
+  if Flambda_features.classic_inlining ()
   then
     if !Clflags.jsir
     then
@@ -2540,7 +2540,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   let main_approx =
     let code = Code_or_metadata.create main_code in
     let meta = Code_or_metadata.remember_only_metadata code in
-    if Flambda_features.classic_mode ()
+    if Flambda_features.classic_inlining ()
     then (
       Inlining_report.record_decision_at_function_definition ~absolute_history
         ~code_metadata:(Code_or_metadata.code_metadata meta)
@@ -2899,7 +2899,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     match Function_decl.kind decl with Curried _ -> false | Tupled -> true
   in
   let inlining_decision =
-    if Flambda_features.classic_mode ()
+    if Flambda_features.classic_inlining ()
     then Inlining.definition_inlining_decision inline cost_metrics
     else if stub
     then Function_decl_inlining_decision_type.Stub
@@ -2970,7 +2970,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let approx =
     let code = Code_or_metadata.create code in
     let meta = Code_or_metadata.remember_only_metadata code in
-    if Flambda_features.classic_mode ()
+    if Flambda_features.classic_inlining ()
     then (
       Inlining_report.record_decision_at_function_definition ~absolute_history
         ~code_metadata:(Code_or_metadata.code_metadata meta)

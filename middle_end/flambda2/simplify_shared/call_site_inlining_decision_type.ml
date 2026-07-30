@@ -52,6 +52,7 @@ type t =
         is_a_functor : bool
       }
   | Jsir_inlining_disabled
+  | Classic_inlining
 
 let [@ocamlformat "disable"] rec print ppf t =
   match t with
@@ -116,6 +117,7 @@ let [@ocamlformat "disable"] rec print ppf t =
       threshold
       is_a_functor
   | Jsir_inlining_disabled -> Format.fprintf ppf "Jsir_inlining_disabled"
+  | Classic_inlining -> Format.fprintf ppf "Classic_inlining"
 
 type can_inline =
   | Do_not_inline of { erase_attribute_if_ignored : bool }
@@ -158,6 +160,7 @@ let rec can_inline (t : t) : can_inline =
   | Replay_history_says_must_inline t' -> can_inline t'
   | Jsir_inlining_disabled ->
     Do_not_inline { erase_attribute_if_ignored = false }
+  | Classic_inlining -> Do_not_inline { erase_attribute_if_ignored = false }
 
 (* CR mshinwell/gbury: tidy up by using Format.pp_print_text *)
 let rec report_reason fmt t =
@@ -223,6 +226,10 @@ let rec report_reason fmt t =
   | Jsir_inlining_disabled ->
     Format.fprintf fmt
       "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
+  | Classic_inlining ->
+    Format.fprintf fmt
+      "inlining@ is@ performed@ during@ closure@ conversion,@ as@ in@ classic@ \
+       mode,@ and@ never@ during@ Simplify"
 
 let report fmt t =
   Format.fprintf fmt

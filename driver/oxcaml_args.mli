@@ -120,6 +120,8 @@ module type Oxcaml_options = sig
   val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
+  val flambda2_classic_inlining : unit -> unit
+  val no_flambda2_classic_inlining : unit -> unit
   val flambda2_mutable_unboxing : unit -> unit
   val no_flambda2_mutable_unboxing : unit -> unit
   val flambda2_loopify : unit -> unit

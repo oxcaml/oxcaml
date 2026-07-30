@@ -45,6 +45,7 @@ type t =
         is_a_functor : bool
       }
   | Jsir_inlining_disabled
+  | Classic_inlining
 
 val print : Format.formatter -> t -> unit
 

@@ -233,7 +233,7 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
         | Never_inlined_attribute | Attribute_always
         | Replay_history_says_must_inline _ | Begin_unrolling _
         | Continue_unrolling | Definition_says_inline _ | Jsir_inlining_disabled
-          ->
+        | Classic_inlining ->
           (* These can't be returned by the speculative inlining cases below. *)
           if Flambda_features.check_light_invariants ()
           then
@@ -406,4 +406,8 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
   if !Clflags.jsir
   then Jsir_inlining_disabled
+  else if Flambda_features.classic_inlining ()
+  then
+    (* Inlining was already performed during closure conversion. *)
+    Classic_inlining
   else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity

@@ -40,6 +40,11 @@ let oclassic_opt_level () =
   | Set Oclassic -> true
   | Set (O2 | O3 | O4) | Default -> false
 
+let classic_inlining () =
+  classic_mode ()
+  || !Oxcaml_flags.Flambda2.classic_inlining
+     |> with_default ~f:(fun d -> d.classic_inlining)
+
 let mode () = if classic_mode () then Mode Classic else Mode Normal
 
 let join_points () =

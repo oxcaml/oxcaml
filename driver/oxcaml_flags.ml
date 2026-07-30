@@ -179,6 +179,7 @@ module Flambda2 = struct
 
   module Default = struct
     let classic_mode = false
+    let classic_inlining = false
     let join_points = false
     let unbox_along_intra_function_control_flow = true
     let mutable_unboxing = true
@@ -201,6 +202,7 @@ module Flambda2 = struct
 
   type flags = {
     classic_mode : bool;
+    classic_inlining : bool;
     join_points : bool;
     unbox_along_intra_function_control_flow : bool;
     mutable_unboxing : bool;
@@ -223,6 +225,7 @@ module Flambda2 = struct
 
   let default = {
     classic_mode = Default.classic_mode;
+    classic_inlining = Default.classic_inlining;
     join_points = Default.join_points;
     unbox_along_intra_function_control_flow = Default.unbox_along_intra_function_control_flow;
     mutable_unboxing = Default.mutable_unboxing;
@@ -246,6 +249,7 @@ module Flambda2 = struct
 
   let oclassic = {
     default with
+    classic_inlining = true;
     mutable_unboxing = false;
     loopify = false;
     backend_cse_at_toplevel = false;
@@ -274,6 +278,7 @@ module Flambda2 = struct
     flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
 
   let classic_mode = ref Default
+  let classic_inlining = ref Default
   let join_points = ref Default
   let unbox_along_intra_function_control_flow = ref Default
   let mutable_unboxing = ref Default

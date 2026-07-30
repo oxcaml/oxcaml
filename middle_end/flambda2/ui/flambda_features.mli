@@ -30,6 +30,11 @@ val classic_mode : unit -> bool
     unlike [classic_mode], may use Simplify). *)
 val oclassic_opt_level : unit -> bool
 
+(** Whether inlining is performed during closure conversion, in the style of
+    classic mode. When this returns [true], Simplify never inlines. Implied by
+    [classic_mode]. *)
+val classic_inlining : unit -> bool
+
 val mode : unit -> any_mode
 
 val join_points : unit -> bool

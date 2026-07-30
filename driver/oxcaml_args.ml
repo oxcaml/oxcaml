@@ -601,6 +601,20 @@ let mk_no_flambda2_join_points f =
       \     zero or one incoming edge(s)%s (Flambda 2 only)"
       (format_not_default Flambda2.Default.join_points) )
 
+let mk_flambda2_classic_inlining f =
+  ( "-flambda2-classic-inlining",
+    Arg.Unit f,
+    Printf.sprintf
+      " Perform inlining during closure conversion, as in\n\
+      \     classic mode, and never during Simplify%s (Flambda 2 only)"
+      (format_default Flambda2.Default.classic_inlining) )
+
+let mk_no_flambda2_classic_inlining f =
+  ( "-no-flambda2-classic-inlining",
+    Arg.Unit f,
+    Printf.sprintf " Perform inlining during Simplify%s (Flambda 2 only)"
+      (format_not_default Flambda2.Default.classic_inlining) )
+
 let mk_flambda2_mutable_unboxing f =
   ( "-flambda2-mutable-unboxing",
     Arg.Unit f,
@@ -1403,6 +1417,8 @@ module type Oxcaml_options = sig
   val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
+  val flambda2_classic_inlining : unit -> unit
+  val no_flambda2_classic_inlining : unit -> unit
   val flambda2_mutable_unboxing : unit -> unit
   val no_flambda2_mutable_unboxing : unit -> unit
   val flambda2_loopify : unit -> unit
@@ -1599,6 +1615,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_debug_flags F.reaper_debug_flags;
       mk_flambda2_join_points F.flambda2_join_points;
       mk_no_flambda2_join_points F.no_flambda2_join_points;
+      mk_flambda2_classic_inlining F.flambda2_classic_inlining;
+      mk_no_flambda2_classic_inlining F.no_flambda2_classic_inlining;
       mk_flambda2_mutable_unboxing F.flambda2_mutable_unboxing;
       mk_no_flambda2_mutable_unboxing F.no_flambda2_mutable_unboxing;
       mk_flambda2_loopify F.flambda2_loopify;
@@ -2030,6 +2048,8 @@ module Oxcaml_options_impl = struct
 
   let flambda2_join_points = set Flambda2.join_points
   let no_flambda2_join_points = clear Flambda2.join_points
+  let flambda2_classic_inlining = set Flambda2.classic_inlining
+  let no_flambda2_classic_inlining = clear Flambda2.classic_inlining
   let flambda2_mutable_unboxing = set Flambda2.mutable_unboxing
   let no_flambda2_mutable_unboxing = clear Flambda2.mutable_unboxing
   let flambda2_loopify = set Flambda2.loopify
@@ -2587,6 +2607,7 @@ module Extra_params = struct
           String.split_on_char ',' v @ !Oxcaml_flags.Flambda2.reaper_debug_flags;
         true
     | "flambda2-join-points" -> set Flambda2.join_points
+    | "flambda2-classic-inlining" -> set Flambda2.classic_inlining
     | "flambda2-mutable-unboxing" -> set Flambda2.mutable_unboxing
     | "flambda2-loopify" -> set Flambda2.loopify
     | "flambda2-result-types" ->
