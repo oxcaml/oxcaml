@@ -365,8 +365,8 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
       newenv
     with
     | (Typetexp.Error.In_context _
-      | Magic_numbers.Cmi.Error _
-      | Env.Error.In_context _
+    | Magic_numbers.Cmi.Error _
+    | Env.Error.In_context _
       | Persistent_env.Error _) as exn when !Clflags.typing_recovery ->
         Typing_recovery.log_or_raise exn;
         env
@@ -2575,7 +2575,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
             let open Typeclass in
             [Sig_class_type(decl.clsty_ty_id, decl.clsty_ty_decl, rs,
                             Exported);
-             Sig_type(decl.clsty_obj_id, decl.clsty_obj_abbr, rs, Exported)]
+             Sig_type(decl.clsty_obj_id, decl.clsty_obj_abbr, rs, Exported);
+            ]
           ) classes []
           |> List.flatten
         in
@@ -3343,16 +3344,16 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             { arg with
               mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
             arg_shape
-          | Some smty ->
-              let mty = transl_modtype env smty in
-              wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
-                arg_shape (Tmodtype_explicit (mty, mode))
-        in
-        { md with
-          mod_loc = smod.pmod_loc;
-          mod_attributes = smod.pmod_attributes;
-        },
-        final_shape
+        | Some smty ->
+            let mty = transl_modtype env smty in
+            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
+              arg_shape (Tmodtype_explicit (mty, mode))
+      in
+      { md with
+        mod_loc = smod.pmod_loc;
+        mod_attributes = smod.pmod_attributes;
+      },
+      final_shape
       with exn when !Clflags.typing_recovery ->
         (* [merlin] For better Construct error messages we need to
             keep holes in the recovered typedtree *)
@@ -4487,6 +4488,7 @@ let () =
 
 
 (* Typecheck an implementation file *)
+
 (*
 let gen_annot target annots =
   let annot = Unit_info.annot target in
@@ -4740,9 +4742,9 @@ let type_implementation target modulename initial_env ast =
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
-          let shape = Shape_reduce.local_reduce Env.empty shape in
-          let annots = Cmt_format.Implementation str in
-          save_cmt_and_cms target annots initial_env None (Some shape);
+            let shape = Shape_reduce.local_reduce Env.empty shape in
+            let annots = Cmt_format.Implementation str in
+            save_cmt_and_cms target annots initial_env None (Some shape);
           { structure = str;
             coercion;
             shape;
@@ -4813,11 +4815,11 @@ let type_implementation target modulename initial_env ast =
       end
     )
     ~exceptionally:(fun () ->
-        let annots =
-          Cmt_format.Partial_implementation
-            (Array.of_list (Cmt_format.get_saved_types ()))
-        in
-        save_cmt_and_cms target annots initial_env None None
+          let annots =
+            Cmt_format.Partial_implementation
+              (Array.of_list (Cmt_format.get_saved_types ()))
+          in
+          save_cmt_and_cms target annots initial_env None None
       )
 
 let save_signature target modname tsg initial_env cmi =

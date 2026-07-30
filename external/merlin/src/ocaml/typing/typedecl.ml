@@ -968,10 +968,10 @@ let transl_declaration env sdecl (id, uid) =
   let tparams = make_params env path sdecl.ptype_params in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
-      (fun (sty, sty', loc) ->
-          transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
-          transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
-      sdecl.ptype_cstrs
+    (fun (sty, sty', loc) ->
+      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
+      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
+    sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
   let represent_as_float_array =
@@ -1070,7 +1070,7 @@ let transl_declaration env sdecl (id, uid) =
           Error.log_and_raise sdecl.ptype_loc (Non_abstract_reexport path)
       | Ptype_abstract ->
         Ttype_abstract, Type_abstract Definition,
-          Jkind.Builtin.value ~why:Default_type_jkind
+        Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
         if or_null then check_or_null_variant_shape sdecl scstrs;
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin

@@ -184,6 +184,7 @@ end
 module TyVarEnv : sig
   val reset : unit -> unit
   (* see mli file *)
+
   val is_in_scope : string -> bool
 
   val add :
@@ -1520,9 +1521,8 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-            (fun () ->
-               transl_type env ~policy ~row_context Alloc.Const.legacy
-                 (Ast_helper.Typ.force_poly ty1))
+            (fun () -> transl_type env ~policy ~row_context Alloc.Const.legacy
+                (Ast_helper.Typ.force_poly ty1))
         in
         begin
           match

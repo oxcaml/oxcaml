@@ -1223,9 +1223,9 @@ let classify_lazy_argument : Typedtree.expression ->
     | Texp_construct (_, {cstr_arity = 0}, _, _, _) ->
        `Constant_or_function
     | Texp_constant(Const_float _) ->
-      if Config.flat_float_array
-      then `Float_that_cannot_be_shortcut
-      else `Constant_or_function
+       if Config.flat_float_array
+       then `Float_that_cannot_be_shortcut
+       else `Constant_or_function
     | Texp_ident _ when lazy_val_requires_forward e.exp_env e.exp_loc e.exp_type ->
        `Identifier `Forward_value
     | Texp_ident _ ->

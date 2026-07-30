@@ -21,7 +21,6 @@ open Typetexp
 open Mode
 
 
-
 type 'a class_info = {
   cls_id : Ident.t;
   cls_id_loc : string loc;
