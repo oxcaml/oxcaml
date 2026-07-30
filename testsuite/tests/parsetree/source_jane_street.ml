@@ -1731,9 +1731,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 
 let poly_ id = fun x -> x
 [%%expect{|
->> Fatal error: No compilation unit set
-Uncaught exception: Misc.Fatal_error
-
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x

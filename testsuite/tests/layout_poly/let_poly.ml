@@ -484,9 +484,9 @@ let a, b, y =
   let #(a, b, y) = g #1.0 in
   to_nativeint a, to_nativeint b, to_float y
 [%%expect {|
->> Fatal error: Local allocation without a region
-Uncaught exception: Misc.Fatal_error
-
+val a : nativeint = 2n
+val b : nativeint = 2n
+val y : float = 1.
 |}]
 
 (* Nested lpoly functions *)

@@ -164,7 +164,7 @@ and Template_store : sig
 
   val add :
     t ->
-    cu:Compilation_unit.t ->
+    cu:Compilation_unit.t option ->
     name:Slambdaident.t option ->
     Types.closure ->
     id
@@ -211,11 +211,11 @@ end = struct
 
   let add t ~cu ~name closure =
     let id =
-      match name with
-      | Some name ->
-        Fmt.asprintf "%a_%s_%i" Compilation_unit.print cu
-          (Slambdaident.name name) !stamp
-      | None -> Fmt.asprintf "%a_%i" Compilation_unit.print cu !stamp
+      Fmt.asprintf "%a_%a_%i"
+        (Fmt.pp_print_option Compilation_unit.print)
+        cu
+        (Fmt.pp_print_option (Fmt.deprecated Slambdaident.print))
+        name !stamp
     in
     incr stamp;
     Misc.Stdlib.String.Tbl.add t.templates id closure;
@@ -443,7 +443,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     let closure =
       { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
-    let cu = Current_unit.get_cu_exn () in
+    let cu = Current_unit.get_cu () in
     let closure_id = Template_store.add ctx.store ~cu ~name closure in
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->

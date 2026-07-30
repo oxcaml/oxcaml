@@ -6,7 +6,5 @@
 (* Layout-poly values should print as <lpoly> in the toplevel. *)
 let poly_ id x = x
 [%%expect{|
->> Fatal error: No compilation unit set
-Uncaught exception: Misc.Fatal_error
-
+val poly_ id : 'a -> 'a = <lpoly>
 |}]

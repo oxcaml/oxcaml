@@ -149,9 +149,9 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: No compilation unit set
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : sig val poly_ f : 'a -> 'b -> unit end @ static) ->
+    sig val poly_ g : 'b -> unit end
 |}]
 
 (* don't work without eta-expansion *)
