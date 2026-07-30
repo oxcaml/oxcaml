@@ -218,7 +218,8 @@ module Layout : sig
     val is_definitely_addressable : t -> bool
 
     (** Normalizing constructor for [Addressable]: returns the argument
-        unchanged when it is definitely addressable. *)
+        unchanged when it is definitely addressable. All constants must be built
+        through this constructor. *)
     val addressable : t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.

@@ -3,11 +3,12 @@
  expect;
 *)
 
-(* Tests for the [addressable] kind operator. A kind [k addressable] is the
-   greatest subkind of [k] that is addressable: when boxed, all of its
-   information is stored in the data portion of a block. If [k] is already
-   addressable then [k addressable = k]; otherwise [k addressable] is a new
-   kind, incomparable with [k]. *)
+(* Tests for the [addressable] kind operator. [k addressable] classifies data
+   represented like [k] whose kind additionally promises that, when boxed,
+   all of its information is stored in the data portion of a block. If [k] is
+   already addressable then [k addressable = k], so every addressable kind is
+   a subkind of [any addressable]; otherwise [k addressable] is a new kind,
+   incomparable with [k]. *)
 
 (**** Acceptance and printing ****)
 

@@ -2218,8 +2218,9 @@ module Const = struct
                 (Layout.Const.set_root_scannable_axes layout (update_sa sa))
           }))
 
-  (* Apply the [addressable] kind operator: the result of [k addressable] is
-     the greatest kind that is a subkind of [k] and addressable. In
+  (* Apply the [addressable] kind operator: [k addressable] classifies data
+     represented like [k] whose kind additionally promises that, when boxed,
+     all of its information is stored in the data portion of a block. In
      particular, [k addressable = k] when [k] is already addressable. *)
   let apply_addressable (type l r) ?prior_annot ~warn ~loc env
       (context : (l * r) Context_with_transl.t) (t : (l * r) t) : (l * r) t =

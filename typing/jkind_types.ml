@@ -192,7 +192,9 @@ module Sort = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | Addressable c1, Addressable c2 -> equal c1 c2
+      | Addressable c1, Addressable c2 ->
+        (* Relies on constants not having redundant addressability wrappers. *)
+        equal c1 c2
       | (Base _ | Product _ | Univar _ | Genvar _ | Addressable _), _ -> false
 
     let format ppf c =
@@ -229,9 +231,10 @@ module Sort = struct
       | Univar _ | Genvar _ -> false
       | Addressable _ -> true
 
-    (* Normalizing constructor: [c addressable = c] when [c] is addressable.
-       Best-effort only; no operation may rely on [Addressable] never
-       wrapping an addressable sort. *)
+    (* Normalizing constructor: [c addressable = c] when [c] is addressable,
+       ensures that [Addressable] never wraps a definitely-addressable constant.
+       Operations such as [equal] rely on this. (For normal sorts, we don't keep
+       this invariant.) *)
     let addressable c = if is_definitely_addressable c then c else Addressable c
 
     let rec erase_addressable = function
@@ -1308,7 +1311,10 @@ module Layout = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | Addressable c1, Addressable c2 -> equal c1 c2
+      | Addressable c1, Addressable c2 ->
+        (* Relies on constants not having redundant [Addressable]s (see
+           [addressable]) *)
+        equal c1 c2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
         false
 
@@ -1343,9 +1349,7 @@ module Layout = struct
       | Any _ | Univar _ | Genvar _ -> false
       | Addressable _ -> true
 
-    (* Normalizing constructor: [c addressable = c] when [c] is addressable.
-       Best-effort only; no operation may rely on [Addressable] never
-       wrapping an addressable layout. *)
+    (* Normalizing constructor; no-op if [c] is already addressable *)
     let addressable c = if is_definitely_addressable c then c else Addressable c
 
     let rec get_root_scannable_axes t =

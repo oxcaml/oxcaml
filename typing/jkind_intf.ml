@@ -75,10 +75,14 @@ module type Sort = sig
               whose kind additionally promises that, when boxed, all of its
               information is stored in the data portion of a block.
               Addressability never changes how a sort is represented outside of
-              a block. When [t] is already addressable, [t addressable = t]; the
-              normalizing constructor [addressable] takes advantage of this, but
-              no operation may rely on [Addressable] never wrapping an
-              addressable sort. *)
+              a block. When [t] is already addressable, [t addressable = t].
+              Constants are normalized accordingly: they are built with the
+              [addressable] constructor below, which never wraps a
+              definitely-addressable constant, and structural operations such as
+              [equal] rely on this. The mutable sorts and layouts give no such
+              guarantee (a variable under an [Addressable] wrapper can later be
+              filled with an addressable sort), so operations on them must not
+              rely on the absence of redundant wrappers. *)
 
     val of_base : base -> t
 
@@ -98,7 +102,8 @@ module type Sort = sig
     val is_definitely_addressable : t -> bool
 
     (** Normalizing constructor for [Addressable]: returns the argument
-        unchanged when it is definitely addressable. *)
+        unchanged when it is definitely addressable. All constants must be built
+        through this constructor. *)
     val addressable : t -> t
 
     (** Deeply erase [Addressable] wrappers. The result classifies data with the
