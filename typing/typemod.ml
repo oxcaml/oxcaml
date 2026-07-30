@@ -2224,9 +2224,9 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
         in
-        (* Settle what is already known about the allocation axis: this zap
-           runs while type-checking, so the axis would otherwise be read at a
-           floor that [Typecore.optimise_allocations] has not raised yet. *)
+        (* Constrain the closure's Allocation mode axis if it closes over some
+           allocation that cannot be local, before zapping the modality to
+           floor. *)
         Typecore.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -4153,8 +4153,10 @@ let type_toplevel_phrase env sig_acc s =
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
-  (* Demand stack allocation where a [noalloc] closure requires it. This has
-     to happen before the arrow modes below are defaulted to [global]. *)
+  (* Constrain the allocation's Locality mode axis if it is closed by some
+     noalloc closure that does not allow heap allocations. This must precede
+     the defaulting of arrow modes, after which the demand can no longer be
+     satisfied. *)
   Typecore.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4209,16 +4211,15 @@ let type_module_type_of env smod =
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
-  (* Demand stack allocation where a [noalloc] closure requires it. This has
-     to happen before [check_nongen_modtype] below defaults the arrow modes. *)
+  (* Constrain the allocation's Locality mode axis if it is closed by some
+     noalloc closure that does not allow heap allocations. This must precede
+     the defaulting of arrow modes, after which the demand can no longer be
+     satisfied. *)
   Typecore.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
-  (* Settle what is already known about the allocation axis: this zap runs
-     while type-checking, so the axis would otherwise be read at a floor that
-     [Typecore.optimise_allocations] has not raised yet. [check_nongen_modtype]
-     above has just defaulted the arrow modes reachable from [mty], so the
-     areality of allocations surfacing in [mty] is known by now. *)
+  (* Constrain the closure's Allocation mode axis if it closes over some
+     allocation that cannot be local, before zapping the modality to floor. *)
   Typecore.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
@@ -4489,11 +4490,15 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
-        (* Demand stack allocation where a [noalloc] closure requires it,
-           before the arrow modes are defaulted; then settle again afterwards,
-           so that the modality zap below reads a correct floor. *)
+        (* Constrain the allocation's Locality mode axis if it is closed by
+           some noalloc closure that does not allow heap allocations. This must
+           precede the defaulting of arrow modes, after which the demand can no
+           longer be satisfied. *)
         Typecore.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
+        (* Constrain the closure's Allocation mode axis if it closes over some
+           allocation that cannot be local, before zapping the modality to
+           floor. *)
         Typecore.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
@@ -4558,16 +4563,17 @@ let type_implementation target modulename initial_env ast =
           in
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
-          (* Demand stack allocation where a [noalloc] closure requires it.
-             This has to happen before the inclusion check below pins the
-             arrow modes against the interface. *)
-          Typecore.constrain_allocations ();
           let arg_type_from_cmi = Env.implemented_parameter global_name in
           if not (Option.equal Global_module.Parameter_name.equal
                     arg_type arg_type_from_cmi) then
             error (Inconsistent_argument_types
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
+          (* Constrain the allocation's Locality mode axis if it is closed by
+             some noalloc closure that does not allow heap allocations. This
+             must precede the defaulting of arrow modes, after which the demand
+             can no longer be satisfied. *)
+          Typecore.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit
@@ -4589,7 +4595,6 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
-          Typecore.constrain_closures ();
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4610,10 +4615,6 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
-          (* Demand stack allocation where a [noalloc] closure requires it.
-             This has to happen before [check_nongen_signature] below defaults
-             the arrow modes. *)
-          Typecore.constrain_allocations ();
           let coercion, shape =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
@@ -4625,8 +4626,15 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
                 sg "(inferred signature)" simple_sg shape)
           in
-          (* CR shsong: Think about the order of the following two things. *)
+          (* Constrain the allocation's Locality mode axis if it is closed by
+             some noalloc closure that does not allow heap allocations. This
+             must precede the defaulting of arrow modes, after which the demand
+             can no longer be satisfied. *)
+          Typecore.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
+          (* Constrain the closure's Allocation mode axis if it closes over
+             some allocation that cannot be local, before zapping the modality
+             to floor. *)
           Typecore.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of

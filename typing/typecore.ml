@@ -888,10 +888,7 @@ let constrain_closures () =
       match
         Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
       with
-      (* The allocation cannot be made local, so it is on the heap. *)
       | Global -> true
-      (* The allocation may still end up on the stack; leave it to
-         [optimise_allocations]. *)
       | Local -> false)
   in
   allocations := pending;
@@ -905,11 +902,7 @@ let constrain_allocations () =
     !allocations
     |> List.partition_map (fun ({closures; _} as allocation) ->
       match enclosing_noalloc_closure closures with
-      (* Some enclosing closure is required not to allocate, so the
-         allocation has to be on the stack. *)
       | Some closure -> Left (allocation, closure)
-      (* No enclosing closure needs it on the stack; leave it to
-         [optimise_allocations]. *)
       | None -> Right allocation)
   in
   allocations := pending;
