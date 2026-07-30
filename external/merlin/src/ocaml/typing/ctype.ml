@@ -4123,22 +4123,10 @@ let rec has_cached_expansion p abbrev =
    but still might be nice. *)
 
 let expand_type env ty =
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-  (* If the type contains top-level splices, then we enter some far-away future
-     stage where all splices are valid. *)
-  (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
-     track the stage in errors so we don't need this. See ticket 6726. *)
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-  (* If the type contains top-level splices, then we enter some far-away future
-     stage where all splices are valid. *)
-  (* CR metaprogramming jbachurski: Remove [contains_toplevel_splice] and
-     track the stage in errors so we don't need this. *)
-=======
   (* If the type contains initial-stage splices, then we enter some future stage
      where all splices are valid. *)
   (* CR metaprogramming jbachurski: Remove [contains_initial_stage_splice] and
      track the stage in errors so we don't need this. *)
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
   let env =
     if contains_initial_stage_splice (Env.stage env :> int) ty
     then Env.enter_future env

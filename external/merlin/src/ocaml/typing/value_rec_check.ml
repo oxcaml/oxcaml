@@ -635,26 +635,12 @@ let array_mode exp =
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-  | Paddrarray | Pgcignorableaddrarray | Pintarray ->
+  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-  | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
-  | Lambda.Punboxedvectorarray _
-  | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
-    Dereference
-  | Lambda.Punspecializedarray ->
-=======
   | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
   | Lambda.Punboxedvectorarray _ | Lambda.Punboxedmaskarray
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
-    Dereference
-  | Lambda.Punspecializedarray ->
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
-  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-  | Punboxedvectorarray _
-  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Dereference
   | Lambda.Punspecializedarray ->
     Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"

@@ -1444,7 +1444,7 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
 
 let check_atomic_loc ~loc ~env record_repres mutability lid =
   if not (Types.is_atomic mutability) then
-    raise (Error (loc, env, Label_not_atomic lid));
+    raise (error (loc, env, Label_not_atomic lid));
   match record_repres with
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
@@ -8799,15 +8799,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-          if (not (Types.is_atomic label.lbl_mut))
-          then raise (error (loc, env, Label_not_atomic lid.txt));
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-          if (not (Types.is_atomic label.lbl_mut))
-          then raise (Error (loc, env, Label_not_atomic lid.txt));
-=======
           check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in

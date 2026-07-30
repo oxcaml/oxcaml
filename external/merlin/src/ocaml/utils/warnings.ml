@@ -759,20 +759,12 @@ type state =
   {
     active: bool array;
     error: bool array;
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-    alerts: (Std.String.Set.t * bool); (* false:set complement *)
-    alert_errors: (Std.String.Set.t * bool); (* false:set complement *)
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-    alerts: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-    alert_errors: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-=======
     alerts: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
     alert_errors: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
     alert_disable_watches: loc list Misc.Stdlib.String.Map.t;
     (* Locations of attributes that disabled a given alert and are in force in
        the current scope; used to detect alert-disabling attributes that never
        suppress anything (warning 221 [Unused_alert_disable]). *)
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
   }
 
 let current =
@@ -780,17 +772,9 @@ let current =
     {
       active = Array.make (last_warning_number + 1) true;
       error = Array.make (last_warning_number + 1) false;
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-      alerts = (Std.String.Set.empty, false);
-      alert_errors = (Std.String.Set.empty, true); (* all soft *)
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-      alerts = (Misc.Stdlib.String.Set.empty, false);
-      alert_errors = (Misc.Stdlib.String.Set.empty, true); (* all soft *)
-=======
       alerts = (Misc.Stdlib.String.Set.empty, false);
       alert_errors = (Misc.Stdlib.String.Set.empty, true); (* all soft *)
       alert_disable_watches = Misc.Stdlib.String.Map.empty;
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
     }
 
 let disabled = ref false
@@ -818,12 +802,12 @@ let is_error x =
 let alert_is_active {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alerts in
-  Std.String.Set.mem kind set = pos
+  Misc.Stdlib.String.Set.mem kind set = pos
 
 let alert_is_error {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alert_errors in
-  Std.String.Set.mem kind set = pos
+  Misc.Stdlib.String.Set.mem kind set = pos
 
 let with_state state f =
   let prev = backup () in
@@ -911,15 +895,15 @@ let set_alert ~error ~enable s =
   let upd =
     match s with
     | "all" ->
-        (Std.String.Set.empty, not enable)
+        (Misc.Stdlib.String.Set.empty, not enable)
     | s ->
         let (set, pos) =
           if error then (!current).alert_errors else (!current).alerts
         in
         let f =
           if enable = pos
-          then Std.String.Set.add
-          else Std.String.Set.remove
+          then Misc.Stdlib.String.Set.add
+          else Misc.Stdlib.String.Set.remove
         in
         (f s set, pos)
   in
@@ -1763,7 +1747,7 @@ let dump ?(verbose=false) () =
   in
   let alerts (set, enabled) =
     `Assoc
-      [ "alerts", Json.list Json.string (String.Set.elements set);
+      [ "alerts", Json.list Json.string (Misc.Stdlib.String.Set.elements set);
         "complement", Json.bool (not enabled) ]
   in
   `Assoc [

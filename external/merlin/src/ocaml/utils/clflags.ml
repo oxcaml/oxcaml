@@ -12,65 +12,6 @@ let hidden_include_dirs = ref []
 let include_paths_files = ref ([] : string list) (* -I-paths *)
 let hidden_include_paths_files = ref ([] : string list) (* -H-paths *)
 let fast                = ref false
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-
-(* Command-line parameters *)
-
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Float
-    let of_string = float_of_string
-  end
-end)
-
-type open_arg =
-=======
-
-(* Command-line parameters *)
-
-(* Stripped down version of Numbers, as its dependencies are a lot of code *)
-module Numbers = struct
-  module Int = struct
-    type t = int
-    module Map = Map.Make(Stdlib.Int)
-    let of_string = int_of_string
-  end
-  module Float = struct
-    type t = float
-    let of_string = float_of_string
-  end
-end
-
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = Numbers.Int
-
-  module Value = Numbers.Int
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = Numbers.Int
-
-  module Value = Numbers.Float
-end)
-
-type open_arg =
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
 let classic             = ref false
 let all_ppx             = ref []
 let principal           = ref false

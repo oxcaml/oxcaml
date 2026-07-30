@@ -1663,8 +1663,7 @@ val unboxed_label_sort :
 
 val unboxed_label_all_sorts:
   Data_types.unboxed_label_description -> record_sorts
-<<<<<<< Merlin:liam-merlin-5.4.0-ox4
-  -> Jkind.Sort.Const.t array
+  -> Jkind.sort array
 
 (** Whether an expression looks nice as the subject of a sentence in an error
     message. *)
@@ -1675,8 +1674,3 @@ val exp_is_nominal : expression -> bool
 
 val unpack_functor_me : module_expr -> functor_parameter * module_expr
 val unpack_functor_mty : module_type -> functor_parameter * module_type
-||||||| Compiler:8fea84a50042cd6c3e05c8ef54e4b6970b72c783
-  -> Jkind.Sort.Const.t array
-=======
-  -> Jkind.sort array
->>>>>>> Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
