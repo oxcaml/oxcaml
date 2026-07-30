@@ -703,8 +703,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%addint" -> binary (Integral (int, Add))
     | "%subint" -> binary (Integral (int, Sub))
     | "%mulint" -> binary (Integral (int, Mul))
-    | "%divint" -> binary (Integral (int, Div Safe))
-    | "%modint" -> binary (Integral (int, Mod Safe))
+    | "%divint" -> binary (Integral (int, Div (Safe, Signed)))
+    | "%modint" -> binary (Integral (int, Mod (Safe, Signed)))
     | "%andint" -> binary (Integral (int, And))
     | "%orint" -> binary (Integral (int, Or))
     | "%xorint" -> binary (Integral (int, Xor))
@@ -933,8 +933,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%nativeint_add" -> binary (Integral (nativeint, Add))
     | "%nativeint_sub" -> binary (Integral (nativeint, Sub))
     | "%nativeint_mul" -> binary (Integral (nativeint, Mul))
-    | "%nativeint_div" -> binary (Integral (nativeint, Div Safe))
-    | "%nativeint_mod" -> binary (Integral (nativeint, Mod Safe))
+    | "%nativeint_div" -> binary (Integral (nativeint, Div (Safe, Signed)))
+    | "%nativeint_mod" -> binary (Integral (nativeint, Mod (Safe, Signed)))
     | "%nativeint_and" -> binary (Integral (nativeint, And))
     | "%nativeint_or" -> binary (Integral (nativeint, Or))
     | "%nativeint_xor" -> binary (Integral (nativeint, Xor))
@@ -947,8 +947,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%int32_add" -> binary (Integral (int32, Add))
     | "%int32_sub" -> binary (Integral (int32, Sub))
     | "%int32_mul" -> binary (Integral (int32, Mul))
-    | "%int32_div" -> binary (Integral (int32, Div Safe))
-    | "%int32_mod" -> binary (Integral (int32, Mod Safe))
+    | "%int32_div" -> binary (Integral (int32, Div (Safe, Signed)))
+    | "%int32_mod" -> binary (Integral (int32, Mod (Safe, Signed)))
     | "%int32_and" -> binary (Integral (int32, And))
     | "%int32_or" -> binary (Integral (int32, Or))
     | "%int32_xor" -> binary (Integral (int32, Xor))
@@ -961,8 +961,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%int64_add" -> binary (Integral (int64, Add))
     | "%int64_sub" -> binary (Integral (int64, Sub))
     | "%int64_mul" -> binary (Integral (int64, Mul))
-    | "%int64_div" -> binary (Integral (int64, Div Safe))
-    | "%int64_mod" -> binary (Integral (int64, Mod Safe))
+    | "%int64_div" -> binary (Integral (int64, Div (Safe, Signed)))
+    | "%int64_mod" -> binary (Integral (int64, Mod (Safe, Signed)))
     | "%int64_and" -> binary (Integral (int64, And))
     | "%int64_or" -> binary (Integral (int64, Or))
     | "%int64_xor" -> binary (Integral (int64, Xor))
@@ -1144,13 +1144,13 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%with_stack" -> Primitive (Pwith_stack, 5)
-    | "%with_stack_bind" -> Primitive (Pwith_stack_bind, 7)
     | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
-    | "%with_stack_bind_preemptible" ->
-      Primitive (Pwith_stack_bind_preemptible, 8)
     | "%reperform" -> Primitive (Preperform, 3)
     | "%perform" -> Primitive (Pperform, 1)
-    | "%resume" -> Primitive (Presume, 3)
+    | "%continue" -> Primitive (Pcontinue, 2)
+    | "%discontinue" -> Primitive (Pdiscontinue, 2)
+    | "%discontinue_with_backtrace" ->
+      Primitive (Pdiscontinue_with_backtrace, 3)
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
     | "%domain_index" -> Primitive (Pdomain_index, 1)
@@ -2109,7 +2109,7 @@ let lambda_of_loc kind sloc =
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
-    let name = Compilation_unit.get_current () in
+    let name = Current_unit.get_cu () in
     let module_name =
       match name with
       | None -> "//"^filename^"//"
@@ -2228,7 +2228,7 @@ let add_exception_ident id =
 let remove_exception_ident id =
   Hashtbl.remove try_ids id
 
-let lambda_of_prim prim_name prim loc args arg_exps =
+let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   match prim, args with
   | Primitive (prim, arity), args when arity = List.length args ->
       Lprim(prim, args, loc)
@@ -2277,15 +2277,16 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
-      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
   | Send_self (pos, layout), [obj; meth] ->
-      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
       if !Clflags.native_code then
-        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout)
+        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout,
+              Unyielding)
       else
-        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout)
+        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout, Unyielding)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
   | Identity, [arg] -> arg
@@ -2305,6 +2306,9 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         ap_probe = None;
         ap_region_close = pos;
         ap_mode = alloc_heap;
+        (* [yielding] is the joined yielding mode of the application of the
+           [%apply] / [%revapply] primitive itself. *)
+        ap_yielding = yielding;
       }
   | Peek None, _ | Poke None, _ ->
       raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))
@@ -2398,7 +2402,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
-let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
+let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2421,7 +2425,9 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
           let arg_mode = to_locality arg in
-          let params, return = make_params ret_ty repr_args repr_res in
+          let params, return =
+            make_params ret_ty repr_args repr_res
+          in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
             (* The eta expansion is not actually visible at the source level,
@@ -2435,15 +2441,18 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
   let args = List.map (fun p -> Lvar p.name) params in
+  let yielding = transl_yielding_mode_l yielding in
   match params with
-  | [] -> lambda_of_prim p.prim_name prim loc args None
+  | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
   | _ ->
      let loc =
        Debuginfo.Scoped_location.map_scopes
          Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
-     let body = lambda_of_prim p.prim_name prim loc args None in
+     let body =
+       lambda_of_prim p.prim_name prim ~yielding loc args None
+     in
      let locality_mode = to_locality p.prim_native_repr_res in
      let () =
        (* CR mshinwell: Write a version of [primitive_may_allocate] that
@@ -2554,8 +2563,9 @@ let lambda_primitive_needs_event_after = function
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Preperform
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
@@ -2596,7 +2606,8 @@ let lambda_primitive_needs_event_after = function
   | Patomic_compare_set_field _ | Patomic_fetch_add_field
   | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
-  | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get
@@ -2624,7 +2635,7 @@ let primitive_needs_event_after = function
   | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
-    path exp args arg_exps pos =
+    ~yielding path exp args arg_exps pos =
   let prim =
     transl_primitive_common
       loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
@@ -2652,7 +2663,9 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
+  let lam =
+    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
+  in
   let lam =
     if primitive_needs_event_after prim then begin
       match exp with

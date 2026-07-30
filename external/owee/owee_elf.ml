@@ -2,16 +2,21 @@
 
 open Owee_buf
 
+let magic = "\x7fELF"
+
+let magic_matches buffer ~at =
+  buffer.{at + 0} = Char.code magic.[0]
+  && buffer.{at + 1} = Char.code magic.[1]
+  && buffer.{at + 2} = Char.code magic.[2]
+  && buffer.{at + 3} = Char.code magic.[3]
+
+let is_elf buffer =
+  size buffer >= String.length magic && magic_matches buffer ~at:0
+
 let read_magic t =
   ensure t 4 "Magic number truncated";
   let { buffer; position } = t in
-  let valid =
-    buffer.{position + 0} = 0x7f
-    && buffer.{position + 1} = Char.code 'E'
-    && buffer.{position + 2} = Char.code 'L'
-    && buffer.{position + 3} = Char.code 'F'
-  in
-  if not valid
+  if not (magic_matches buffer ~at:position)
   then
     invalid_format
       (Printf.sprintf "No ELF magic number (found %02x %02x %02x %02x)"
@@ -555,14 +560,23 @@ let find_symbol_table buf sections =
   | None -> None
   | Some symtab -> Some (Symbol_table.create [symtab])
 
-let iter_symbols ~symtab_body ~strtab_body ~f =
+type symbol = {
+  name : string;
+  st_info : int;
+  st_other : int;
+  st_shndx : Owee_elf_relocation.Section_index.t;
+  st_value : int64;
+  st_size : int64;
+}
+
+let read_symbols ~symtab_body ~strtab_body =
   let num_symbols = (size symtab_body) / Symbol_table.Symbol.struct_size in
-  for i = 0 to num_symbols - 1 do
+  Array.init num_symbols (fun i ->
     let sym_cursor = cursor symtab_body ~at:(i * Symbol_table.Symbol.struct_size) in
     let st_name_offset = Read.u32 sym_cursor in
     let st_info = Read.u8 sym_cursor in
     let st_other = Read.u8 sym_cursor in
-    let st_shndx = Read.u16 sym_cursor in
+    let st_shndx = Owee_elf_relocation.Section_index.of_int (Read.u16 sym_cursor) in
     let st_value = Read.u64 sym_cursor in
     let st_size = Read.u64 sym_cursor in
     let name =
@@ -574,8 +588,12 @@ let iter_symbols ~symtab_body ~strtab_body ~f =
         | Some s -> s
         | None -> ""
     in
-    f ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size
-  done
+    { name; st_info; st_other; st_shndx; st_value; st_size })
+
+let symbol_table_lookup symbols ~sym_index =
+  if sym_index >= 0 && sym_index < Array.length symbols
+  then Some symbols.(sym_index)
+  else None
 
 (* Extract section body as a string *)
 let section_body_string buf section =

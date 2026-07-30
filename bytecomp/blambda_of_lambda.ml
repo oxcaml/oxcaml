@@ -297,16 +297,18 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor exp
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
-  | Lapply { ap_func; ap_args; ap_region_close } ->
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
     Apply
       { func = comp_expr ap_func;
         args = List.map comp_expr ap_args;
-        nontail = is_nontail ap_region_close
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
       }
-  | Lsend (kind, met, obj, args, rc, _, _, _) ->
+  | Lsend (kind, met, obj, args, rc, _, _, _, yielding) ->
     Send
       { method_kind =
           (match (kind : Lambda.meth_kind) with
@@ -316,7 +318,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         met = comp_expr met;
         obj = comp_expr obj;
         args = List.map comp_expr args;
-        nontail = is_nontail rc
+        nontail = is_nontail rc;
+        yielding
       }
   | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
@@ -606,12 +609,12 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
             Prim (Ccall "caml_array_of_uniform_array", [block]))
         | Punspecializedarray ->
           Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
-    | Presume -> context_switch Resume ~arity:3
+    | Pcontinue -> context_switch Continue ~arity:2
+    | Pdiscontinue -> context_switch Discontinue ~arity:2
+    | Pdiscontinue_with_backtrace ->
+      context_switch Discontinue_with_backtrace ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
-    | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
     | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
-    | Pwith_stack_bind_preemptible ->
-      context_switch With_stack_bind_preemptible ~arity:8
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
@@ -961,7 +964,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
     | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
     | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
@@ -1043,8 +1064,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
              ~offset:(tagged_immediate 0)
              ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
              ~elt:(element_of_array_kind kind))
+      | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> (
+        (* These kinds are flat [Double_array_tag] arrays even under
+           [-no-flat-float-array], so [caml_array_make] must not be used. *)
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_floatarray_make")
+        | Alloc_local -> binary (Ccall "caml_floatarray_make_local"))
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
-      | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _ -> (
+      | Punboxedoruntaggedintarray _
+      | Punboxedfloatarray Unboxed_float32 -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
         | Alloc_local -> binary (Ccall "caml_array_make_local"))
@@ -1139,8 +1167,18 @@ and comp_binary_scalar_intrinsic : type a.
           | _ -> prim Subint)
         |> sign_extend taggable
       | Mul -> prim Mulint |> sign_extend taggable
-      | Div (Safe | Unsafe) -> prim Divint |> sign_extend taggable
-      | Mod (Safe | Unsafe) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_div",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_mod",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
       | And -> prim Andint
       | Or -> prim Orint
       | Xor -> prim Xorint)
@@ -1154,8 +1192,10 @@ and comp_binary_scalar_intrinsic : type a.
       | Add -> c "add"
       | Sub -> c "sub"
       | Mul -> c "mul"
-      | Div (Safe | Unsafe) -> c "div"
-      | Mod (Safe | Unsafe) -> c "mod"
+      | Div ((Safe | Unsafe), Signed) -> c "div"
+      | Mod ((Safe | Unsafe), Signed) -> c "mod"
+      | Div ((Safe | Unsafe), Unsigned) -> c "unsigned_div"
+      | Mod ((Safe | Unsafe), Unsigned) -> c "unsigned_mod"
       | And -> c "and"
       | Or -> c "or"
       | Xor -> c "xor"))
@@ -1397,7 +1437,12 @@ let thunkify_compilation_unit_initialization ~thunk_name blam =
             free_variables = Ident.Set.empty
           };
       body =
-        Apply { func = Var thunk; args = [Const Const_null]; nontail = false }
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
     }
 
 let blambda_of_lambda ~compilation_unit x =

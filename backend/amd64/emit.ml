@@ -55,6 +55,12 @@ let expect_asm_callbacks = ref []
 
 let asm_collected_for_expect_asm = ref []
 
+(* When set, [record_for_expect_asm] extends the captured body past the hot body
+   to the end of the function's emission, including the trailing out-of-line
+   code (GC jump pads, safety-error calls, the stack-realloc handler). Used by
+   the [%%expect_asm_full] variant. *)
+let expect_asm_whole_function = ref false
+
 let register_expect_asm_callback f =
   (* Reset label counter to make assembly more predictable. *)
   Label.reset ();
@@ -399,6 +405,7 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -417,16 +424,23 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.switch_to_section_raw
-        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      let name =
+        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+      in
+      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -848,7 +862,7 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
@@ -2373,16 +2387,22 @@ let emit_instr ~first ~last ~fallthrough i =
       I.movzx al (res i 0)
     end
   | Lop (Intop_imm (Icomp cmp, n)) ->
+    let emit_cmp () =
+      match cmp, n with
+      | (Ceq | Cne), 0 -> output_test_zero i.arg.(0)
+      | (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge), _ ->
+        I.cmp (int n) (arg i 0)
+    in
     if
       Reg.is_reg i.res.(0)
       && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
     then begin
       I.xor (res32 i 0) (res32 i 0);
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) (res8 i 0)
     end
     else begin
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) al;
       I.movzx al (res i 0)
     end
@@ -2393,9 +2413,12 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
-  | Lop (Intop (Idiv | Imod)) ->
+  | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
+    I.xor (Reg32 RDX) (Reg32 RDX);
+    I.div (arg i 1)
   | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
     I.adc (arg i 3) (res i 1)
@@ -2821,11 +2844,20 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
-    ~gc_jump_pads_end:(current_output_pos ());
+  let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
+  (* [record_for_expect_asm] runs after the trailing out-of-line code so the
+     [%%expect_asm_full] variant can include it (e.g. the stack-realloc
+     handler). For the plain variant the body still stops at [fun_body_end] and
+     the gc-pad range is unchanged, so its output is identical. *)
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start
+    ~fun_body_end:
+      (if !expect_asm_whole_function
+       then current_output_pos ()
+       else fun_body_end)
+    ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then
      let n = frame_size () - 8 - if fp then 8 else 0 in

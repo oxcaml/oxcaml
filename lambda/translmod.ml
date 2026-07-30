@@ -136,18 +136,20 @@ let rec apply_coercion loc strict restr arg =
                 loc)
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
-  | Tcoerce_functor(cc_arg, cc_res) ->
+  | Tcoerce_functor(cc_arg, cc_res, yielding) ->
       let param = Ident.create_local "funarg" in
       let param_duid = Lambda.debug_uid_none in
       let carg = apply_coercion loc Alias cc_arg (Lvar param) in
       apply_coercion_result loc strict arg
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
-        [carg] cc_res
-  | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort } ->
+        [carg] yielding cc_res
+  | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
+                        pc_yielding } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
+        ~yielding:pc_yielding
         None
   | Tcoerce_alias (env, path, cc) ->
       let lam = transl_module_path loc env path in
@@ -158,9 +160,9 @@ let rec apply_coercion loc strict restr arg =
 and apply_coercion_field loc get_field (pos, cc) =
   apply_coercion loc Alias cc (get_field pos)
 
-and apply_coercion_result loc strict funct params args cc_res =
+and apply_coercion_result loc strict funct params args yielding cc_res =
   match cc_res with
-  | Tcoerce_functor(cc_arg, cc_res) ->
+  | Tcoerce_functor(cc_arg, cc_res, level_yielding) ->
     let param = Ident.create_local "funarg" in
     let param_duid = Lambda.debug_uid_none in
     let arg = apply_coercion loc Alias cc_arg (Lvar param) in
@@ -170,7 +172,9 @@ and apply_coercion_result loc strict funct params args cc_res =
          layout = Lambda.layout_module;
          attributes = Lambda.default_param_attribute;
          mode = alloc_heap } :: params)
-      (arg :: args) cc_res
+      (arg :: args)
+      (Mode.Yielding.join [yielding; level_yielding])
+      cc_res
   | _ ->
       name_lambda strict funct Lambda.layout_functor
         (fun id ->
@@ -195,6 +199,10 @@ and apply_coercion_result loc strict funct params args cc_res =
                       ap_result_layout=Lambda.layout_module;
                       ap_region_close=Rc_normal;
                       ap_mode=alloc_heap;
+                      (* The stub fully applies the coerced functor, so the
+                         call yields if any traversed coercion level does. *)
+                      ap_yielding=
+                        Translmode.transl_yielding_mode_l yielding;
                       ap_tailcall=Default_tailcall;
                       ap_inlined=Default_inlined;
                       ap_specialised=Default_specialise;
@@ -264,9 +272,10 @@ let rec compose_coercions c1 c2 =
         ; pos_cc_list
         ; id_pos_list = ids1 @ ids2
         }
-  | (Tcoerce_functor(arg1, res1), Tcoerce_functor(arg2, res2)) ->
+  | (Tcoerce_functor(arg1, res1, y1), Tcoerce_functor(arg2, res2, y2)) ->
       Tcoerce_functor(compose_coercions arg2 arg1,
-                      compose_coercions res1 res2)
+                      compose_coercions res1 res2,
+                      Mode.Yielding.join [y1; y2])
   | (c1, Tcoerce_alias (env, path, c2)) ->
       Tcoerce_alias (env, path, compose_coercions c1 c2)
   | (_, _) ->
@@ -461,6 +470,9 @@ let eval_rec_bindings bindings cont =
              ap_args=[loc; shape];
              ap_region_close=Rc_normal;
              ap_mode=alloc_heap;
+             (* [init_mod] just allocates a placeholder module; it never runs
+                user code, so it can't yield *)
+             ap_yielding=Unyielding;
              ap_tailcall=Default_tailcall;
              ap_inlined=Default_inlined;
              ap_specialised=Default_specialise;
@@ -491,6 +503,9 @@ let eval_rec_bindings bindings cont =
           ap_args=[shape; Lvar id; rhs];
           ap_region_close=Rc_normal;
           ap_mode=alloc_heap;
+          (* [update_mod] backpatches the placeholder's fields without calling
+             them, so it can't yield *)
+          ap_yielding=Unyielding;
           ap_tailcall=Default_tailcall;
           ap_inlined=Default_inlined;
           ap_specialised=Default_specialise;
@@ -550,7 +565,7 @@ let merge_functors ~scopes mexp coercion root_path =
       let arg_coercion, res_coercion =
         match coercion with
         | Tcoerce_none -> Tcoerce_none, Tcoerce_none
-        | Tcoerce_functor (arg_coercion, res_coercion) ->
+        | Tcoerce_functor (arg_coercion, res_coercion, _) ->
           arg_coercion, res_coercion
         | _ -> fatal_error "Translmod.merge_functors: bad coercion"
       in
@@ -639,21 +654,22 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg) ->
+  | Tmod_apply(funct, arg, ccarg, yielding) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct translated_arg
-  | Tmod_apply_unit funct ->
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct lambda_unit
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding translated_arg
+  | Tmod_apply_unit (funct, yielding) ->
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding lambda_unit
   | Tmod_constraint(arg, _, _, ccarg) ->
       transl_module ~scopes (compose_coercions cc ccarg) rootpath arg
   | Tmod_unpack(arg, _) ->
       apply_coercion loc Strict cc
         (Translcore.transl_exp ~scopes Lambda.layout_module arg)
 
-and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
+and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding translated_arg =
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module funct
   in
+  let ap_yielding = Translmode.transl_yielding_mode_l yielding in
   oo_wrap mod_env true
     (apply_coercion loc Strict cc)
     (Lapply{
@@ -663,6 +679,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_result_layout = Lambda.layout_module;
        ap_region_close=Rc_normal;
        ap_mode=alloc_heap;
+       ap_yielding;
        ap_tailcall=Default_tailcall;
        ap_inlined=inlined_attribute;
        ap_specialised=Default_specialise;
@@ -723,6 +740,7 @@ and transl_structure ~scopes loc
                             loc p.pc_desc p.pc_env p.pc_type
                             ~poly_mode:p.pc_poly_mode
                             ~poly_sort:p.pc_poly_sort
+                            ~yielding:p.pc_yielding
                             None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
                     pos_cc_list, loc)
@@ -909,12 +927,12 @@ and transl_structure ~scopes loc
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor { input_coercion; input_repr } ->
+            | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
-                          input_coercion scopes loc ~input_repr
-            | Tincl_gen_functor { input_coercion; input_repr } ->
+                          input_coercion scopes loc ~input_repr ~yielding
+            | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:true modl
-                          input_coercion scopes loc ~input_repr
+                          input_coercion scopes loc ~input_repr ~yielding
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -968,7 +986,8 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr modl params scopes loc =
+and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
+      loc =
   let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
@@ -990,6 +1009,7 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = alloc_heap;
+    ap_yielding = Translmode.transl_yielding_mode_l yielding;
     ap_tailcall = Default_tailcall;
     ap_inlined = inlined_attribute;
     ap_specialised = Default_specialise;
@@ -1210,6 +1230,9 @@ let toploop_getvalue id =
     ap_result_layout = Lambda.layout_any_value;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    (* [Toploop.getvalue] is a table lookup; it never runs user code, so it
+       can't yield *)
+    ap_yielding=Unyielding;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
@@ -1232,6 +1255,9 @@ let toploop_setvalue id lam =
     ap_result_layout = Lambda.layout_unit;
     ap_region_close=Rc_normal;
     ap_mode=alloc_heap;
+    (* [Toploop.setvalue] stores [lam] in a table without calling it, so it
+       can't yield *)
+    ap_yielding=Unyielding;
     ap_tailcall=Default_tailcall;
     ap_inlined=Default_inlined;
     ap_specialised=Default_specialise;
@@ -1318,12 +1344,12 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr } ->
+        | Tincl_functor { input_coercion; input_repr; yielding } ->
             transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr
-        | Tincl_gen_functor { input_coercion; input_repr } ->
+              loc ~input_repr ~yielding
+        | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
             transl_include_functor ~generative:true modl input_coercion scopes
-              loc ~input_repr
+              loc ~input_repr ~yielding
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
@@ -1462,6 +1488,8 @@ let transl_instance_impl
       ap_tailcall = Default_tailcall;
       ap_specialised = Default_specialise;
       ap_mode = alloc_heap;
+      (* Instantiation of a parameterized module cannot perform effects *)
+      ap_yielding = Unyielding;
       ap_region_close = Rc_normal;
       ap_probe = None;
     }

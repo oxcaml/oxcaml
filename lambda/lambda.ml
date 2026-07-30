@@ -16,13 +16,6 @@
 open Misc
 open Asttypes
 
-type error =
-  | Slambda_unsupported of string
-
-exception Error of Location.t option * error
-
-let error ?loc err = raise (Error (loc, err))
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -133,6 +126,15 @@ type region_close =
   | Rc_nontail
   | Rc_close_at_apply
 
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+let join_yielding_kind a b =
+  match a, b with
+  | May_yield, _ | _, May_yield -> May_yield
+  | Unyielding, Unyielding -> Unyielding
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Scalar = Scalar
@@ -190,11 +192,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
   | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -371,7 +373,15 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_compare_exchange_field of
     {immediate_or_pointer : immediate_or_pointer}
@@ -459,7 +469,7 @@ and layout =
   | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Ident.t
+  | Psplicevar of Slambdaident.t
 
 and block_shape =
   | All_value
@@ -481,7 +491,7 @@ and 'a mixed_block_element =
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
+  | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -617,6 +627,11 @@ let equal_raise_kind left right =
   | Raise_notrace, Raise_notrace -> true
   | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
 
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf
+    "Splice variable %a should have been evaluated"
+    Slambdaident.print ident
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -686,7 +701,7 @@ and equal_mixed_block_element :
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
+  | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
      | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
@@ -704,6 +719,92 @@ and equal_constructor_shape x y =
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
+let join_nullable x y =
+  match x, y with
+  | Non_nullable, Non_nullable -> Non_nullable
+  | Nullable, _ | _, Nullable -> Nullable
+
+let rec join_value_kind_non_null x y =
+  if equal_value_kind_non_null x y then x
+  else
+    match x, y with
+    | Pvariant { consts = consts1; non_consts = non_consts1 },
+      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
+        match join_non_consts non_consts1 non_consts2 with
+        | Some non_consts ->
+            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+            Pvariant { consts; non_consts }
+        | None -> Pgenval
+      end
+    | _, _ -> Pgenval
+
+and join_constructor_shape shape1 shape2 =
+  match shape1, shape2 with
+  | Constructor_uniform fields1, Constructor_uniform fields2
+    when List.length fields1 = List.length fields2 ->
+      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      Option.map
+        (fun shape -> Constructor_mixed shape)
+        (join_mixed_block_shape shape1 shape2)
+  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+
+and join_mixed_block_shape shape1 shape2 =
+  if Array.length shape1 <> Array.length shape2 then None
+  else
+    Misc.Stdlib.Array.all_somes
+      (Array.map2 join_mixed_block_element shape1 shape2)
+
+and join_mixed_block_element (m1 : unit mixed_block_element)
+    (m2 : unit mixed_block_element) : unit mixed_block_element option =
+  match m1, m2 with
+  | Value v1, Value v2 -> Some (Value (join_value_kind v1 v2))
+  | Product es1, Product es2 when Array.length es1 = Array.length es2 ->
+      Option.map (fun es -> Product es) (join_mixed_block_shape es1 es2)
+  | Float_boxed (), Float_boxed () -> Some m1
+  | Float64, Float64
+  | Float32, Float32
+  | Bits8, Bits8
+  | Bits16, Bits16
+  | Bits32, Bits32
+  | Bits64, Bits64
+  | Vec128, Vec128
+  | Vec256, Vec256
+  | Vec512, Vec512
+  | Mask, Mask
+  | Word, Word
+  | Untagged_immediate, Untagged_immediate -> Some m1
+  | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
+      Some m1
+  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+      | Untagged_immediate | Product _ | Splice_variable _ ),
+      _ ) ->
+      None
+
+and join_non_consts non_consts1 non_consts2 =
+  let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
+  let rec merge l1 l2 =
+    match l1, l2 with
+    | [], l | l, [] -> Some l
+    | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
+        if tag1 < tag2 then
+          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+        else if tag2 < tag1 then
+          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+        else
+          match join_constructor_shape shape1 shape2 with
+          | Some shape ->
+              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
+          | None -> None
+  in
+  merge (sorted non_consts1) (sorted non_consts2)
+
+and join_value_kind x y =
+  { raw_kind = join_value_kind_non_null x.raw_kind y.raw_kind;
+    nullable = join_nullable x.nullable y.nullable;
+  }
+
 let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   match vks with
   | None -> All_value
@@ -714,7 +815,7 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
 let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
-  | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
+  | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
   | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     false
@@ -738,6 +839,30 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
+
+let rec join_layout x y =
+  match x, y with
+  | Pbottom, l | l, Pbottom -> l
+  | Ptop, _ | _, Ptop -> Ptop
+  | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Punboxed_product layouts1, Punboxed_product layouts2
+    when List.length layouts1 = List.length layouts2 ->
+      Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Punboxed_float f1, Punboxed_float f2
+    when Primitive.equal_unboxed_float f1 f2 ->
+      x
+  | Punboxed_or_untagged_integer i1, Punboxed_or_untagged_integer i2
+    when Primitive.equal_unboxed_or_untagged_integer i1 i2 ->
+      x
+  | Punboxed_vector v1, Punboxed_vector v2
+    when Primitive.equal_unboxed_vector v1 v2 ->
+      x
+  | Punboxed_mask, Punboxed_mask -> x
+  | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
+      _ ) ->
+      Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
@@ -983,11 +1108,14 @@ type lambda =
   | Lsend of
       meth_kind * lambda * lambda * lambda list
       * region_close * locality_mode * scoped_location * layout
+      * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Lkindtemplate of lkindtemplate
+  | Lkindinstantiate of lkindinstantiate
 
 and slambda =
   | SLlayout of layout
@@ -1014,7 +1142,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -1038,6 +1166,28 @@ and lfunction =
     loc: scoped_location;
     mode: locality_mode;
     ret_mode: locality_mode;
+    yielding: yielding_kind;
+    (* [Unyielding] if fully applying the closure can never perform a free
+       effect (it neither closes over nor is passed any yielding value).
+       Only set precisely by [Translcore]; other construction sites
+       conservatively default to [May_yield]. *)
+  }
+
+and lkindtemplate =
+  { ktmpl_params: Slambdaident.t list;
+    ktmpl_return: layout;
+    ktmpl_body: lambda;
+    ktmpl_mode: locality_mode;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_loc: scoped_location;
+  }
+
+and lkindinstantiate =
+  { kinst_func: lambda;
+    kinst_args: layout list;
+    kinst_result_layout: layout;
+    kinst_mode: locality_mode;
+    kinst_loc: scoped_location;
   }
 
 and lambda_while =
@@ -1061,6 +1211,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute;
@@ -1093,12 +1244,14 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
+  | Lkindtemplate { ktmpl_loc = loc; _ }
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
+  | Lkindinstantiate { kinst_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _, _)
   | Levent (_, { lev_loc = loc; _ })
   | Lsplice (loc, _) ->
     loc
@@ -1120,11 +1273,6 @@ let rec try_to_find_location lam =
 
 let try_to_find_debuginfo lam =
   Debuginfo.from_location (try_to_find_location lam)
-
-let fatal_error_unevaluated_splice_var ident =
-  Misc.fatal_errorf_doc
-    "Splice variable %a should have been evaluated"
-    Ident.doc_print ident
 
 let fatal_error_invalid_constructor lambda =
   let loc =
@@ -1156,6 +1304,8 @@ let fatal_error_invalid_constructor lambda =
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
+    | Lkindtemplate _ -> "Lkindtemplate"
+    | Lkindinstantiate _ -> "Lkindinstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1319,10 +1469,13 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      if is_local_mode ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
-  { kind; params; return; body; attr; loc; mode; ret_mode }
+  { kind; params; return; body; attr; loc; mode; ret_mode;
+    yielding = May_yield }
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
+
+let lfunction_with_yielding yielding (lf : lfunction) = { lf with yielding }
 
 let lambda_unit = Lconst const_unit
 
@@ -1371,6 +1524,7 @@ let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
+let layout_template_env = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
 let layout_unboxed_nativeint = Punboxed_or_untagged_integer Unboxed_nativeint
@@ -1514,20 +1668,25 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = tr_rec env inst.kinst_func;
+                                     kinst_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
     | Llet ((Strict | StrictOpt),_k,x,_x_duid,ex,Lvar v) when Ident.same v x ->
         tr_rec env ex
-    | Llet (str,k,x,x_duid,ex,e) ->
-     (* Because of side effects, keep other lets with normalized names *)
+    | Llet (str,k,x,_x_duid,ex,e) ->
+     (* Because of side effects, keep other lets with normalized names.
+        Debug uids are erased, like locations, so that they do not get in
+        the way of sharing. *)
         let ex = tr_rec env ex in
         let y = make_key x in
-        Llet (str,k,y,x_duid,ex,tr_rec (Ident.add x (Lvar y) env) e)
-    | Lmutlet (k,x,x_duid,ex,e) ->
+        Llet (str,k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lvar y) env) e)
+    | Lmutlet (k,x,_x_duid,ex,e) ->
         let ex = tr_rec env ex in
         let y = make_key x in
-        Lmutlet (k,y,x_duid,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
+        Lmutlet (k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
     | Lprim (p,es,_) ->
         Lprim (p,tr_recs env es, Loc_unknown)
     | Lswitch (e,sw,loc,kind) ->
@@ -1550,12 +1709,13 @@ let make_key e =
         Lsequence (tr_rec env e1,tr_rec env e2)
     | Lassign (x,e) ->
         Lassign (x,tr_rec env e)
-    | Lsend (m,e1,e2,es,pos,mo,_loc,layout) ->
-        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
+    | Lsend (m,e1,e2,es,pos,mo,_loc,layout,yielding) ->
+        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,
+               layout,yielding)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Lkindtemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1654,7 +1814,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f for_from; f for_to; f for_body
   | Lassign(_, e) ->
       f e
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       List.iter f (met::obj::args)
   | Levent (e, _evt) ->
       tail e
@@ -1664,6 +1824,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Lkindtemplate {ktmpl_body} ->
+      f ktmpl_body
+  | Lkindinstantiate {kinst_func} ->
+      f kinst_func
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1743,7 +1907,7 @@ let rec free_variables = function
            (Ident.Set.remove for_id (free_variables for_body)))
   | Lassign(id, e) ->
       Ident.Set.add id (free_variables e)
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       free_variables_list
         (Ident.Set.union (free_variables met) (free_variables obj))
         args
@@ -1757,6 +1921,12 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Lkindtemplate {ktmpl_env} ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        ktmpl_env Ident.Set.empty
+  | Lkindinstantiate {kinst_func = fn} ->
+      free_variables fn
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2008,8 +2178,18 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Lkindtemplate ({ktmpl_env} as ktmpl) ->
+        Lkindtemplate
+          { ktmpl with
+            ktmpl_env =
+              Ident.Map.map
+                (fun (lam, layout) -> (subst s l lam, layout))
+                ktmpl_env;
+          }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2056,9 +2236,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         assert (not (Ident.Map.mem id s));
         let id = try Ident.Map.find id l with Not_found -> id in
         Lassign(id, subst s l e)
-    | Lsend (k, met, obj, args, pos, mode, loc, layout) ->
+    | Lsend (k, met, obj, args, pos, mode, loc, layout, yielding) ->
         Lsend (k, subst s l met, subst s l obj, subst_list s l args,
-               pos, mode, loc, layout)
+               pos, mode, loc, layout, yielding)
     | Levent (lam, evt) ->
         let old_env = evt.lev_env in
         let env_updates =
@@ -2136,11 +2316,12 @@ let duplicate_function =
      Ident.Map.empty).subst_lfunction
 
 let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
-                      mode; ret_mode } as lfunction) =
+                      mode; ret_mode; yielding } as lfunction) =
   let new_body = f old_body in
   if old_body == new_body
   then lfunction
-  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode }
+  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
+         yielding }
 
 let shallow_map ~tail ~non_tail:f lam =
   match lam with
@@ -2149,8 +2330,8 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lconst _
   | Lsplice _ -> lam
   | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
-             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
-             ap_specialised; ap_probe } ->
+             ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
+             ap_inlined; ap_specialised; ap_probe } ->
       let new_func = f old_func in
       let new_args = Misc.Stdlib.List.map_sharing f old_args in
       if old_func == new_func && old_args == new_args
@@ -2162,15 +2343,52 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
           ap_specialised;
           ap_probe;
         }
+  | Lkindinstantiate { kinst_func = old_func; kinst_args; kinst_result_layout;
+                       kinst_mode; kinst_loc } ->
+      let new_func = f old_func in
+      if old_func == new_func
+      then lam
+      else
+        Lkindinstantiate {
+          kinst_func = new_func;
+          kinst_args;
+          kinst_result_layout;
+          kinst_mode;
+          kinst_loc;
+        }
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
+  | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
+                    ktmpl_mode; ktmpl_env = old_env; ktmpl_loc } ->
+      let new_body = f old_body in
+      let env_changed = ref false in
+      let new_env =
+        Ident.Map.map
+          (fun (old_lam, layout) ->
+            let new_lam = f old_lam in
+            env_changed := !env_changed || old_lam != new_lam;
+            (new_lam, layout))
+          old_env
+      in
+      if old_body == new_body && not !env_changed
+      then lam
+      else
+        Lkindtemplate {
+          ktmpl_params;
+          ktmpl_return;
+          ktmpl_body = new_body;
+          ktmpl_mode;
+          ktmpl_env = new_env;
+          ktmpl_loc;
+        }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in
       let new_e2 = tail old_e2 in
@@ -2299,13 +2517,13 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lassign (v, old_e) ->
       let new_e = f old_e in
       if old_e == new_e then lam else Lassign (v, new_e)
-  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout) ->
+  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout, yielding) ->
       let new_m = f old_m in
       let new_o = f old_o in
       let new_el = Misc.Stdlib.List.map_sharing f old_el in
       if old_m == new_m && old_o == new_o && old_el == new_el
       then lam
-      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout)
+      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout, yielding)
   | Levent (old_l, ev) ->
       let new_l = tail old_l in
       if old_l == new_l then lam else Levent (new_l, ev)
@@ -2584,14 +2802,17 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
   | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
+  | Patomic_load_mixed_field _
   | Patomic_set_field _
+  | Patomic_set_mixed_field _
   | Patomic_exchange_field _
   | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _
@@ -2784,9 +3005,11 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Pperform | Presume
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
@@ -2878,6 +3101,28 @@ let extern_repr_involves_unboxed_products extern_repr =
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+
+let strip_locality_mode shape =
+  let rec strip_elt elt =
+    match elt with
+    | Float_boxed _ -> Float_boxed ()
+    | Product elts -> Product (Array.map strip_elt elts)
+    | Value vk -> Value vk
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Mask -> Mask
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Splice_variable id -> Splice_variable id
+  in
+  Array.map strip_elt shape
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -3233,14 +3478,17 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Pwith_stack | Pwith_stack_bind | Pwith_stack_preemptible
-  | Pwith_stack_bind_preemptible | Presume | Pperform | Preperform ->
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
     layout_any_value
-  | Patomic_set_field _ -> layout_unit
+  | Patomic_load_mixed_field { index ; shape } ->
+    layout_of_mixed_block_shape shape ~path:[index]
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
   | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_exchange_field { immediate_or_pointer = Pointer } ->
@@ -3342,11 +3590,13 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_mode=Alloc_heap} -> ()
+    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_mode=Alloc_local} ->
+      raise Exit
 
     | Lapply {ap_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lkindinstantiate {kinst_mode=Alloc_local}
+    | Lsend (_,_,_,_,_,Alloc_local,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
@@ -3365,9 +3615,9 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
-      | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
+    | ( Lapply _  | Lkindinstantiate _ | Llet _ | Lmutlet _ | Lletrec _
+      | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
+      | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
@@ -3505,16 +3755,3 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
-
-let report_error ppf = function
-  | Slambda_unsupported where ->
-    Format_doc.fprintf ppf
-      "Static computation and layout polymorphism are not yet supported in %s."
-      where
-
-let () =
-  Location.register_error_of_exn (function
-    | Error (Some loc, err) ->
-      Some (Location.error_of_printer ~loc report_error err)
-    | Error (None, err) -> Some (Location.error_of_printer report_error err)
-    | _ -> None)

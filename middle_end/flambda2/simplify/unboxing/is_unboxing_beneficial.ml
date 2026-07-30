@@ -22,7 +22,13 @@ let is_unboxing_beneficial_for_epa (epa : Extra_param_and_args.t) =
   Apply_cont_rewrite_id.Map.exists
     (fun _ extra_arg ->
       match (extra_arg : EPA.Extra_arg.t) with
-      | Already_in_scope _ -> true
+      | Already_in_scope simple ->
+        Simple.pattern_match simple
+          ~name:(fun _ ~coercion:_ -> true)
+          ~const:(fun const ->
+            match Reg_width_const.is_poison const with
+            | Some _ -> false
+            | None -> true)
       | New_let_binding _ | New_let_binding_with_named_args _ -> false)
     epa.args
 

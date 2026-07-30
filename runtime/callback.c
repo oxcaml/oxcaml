@@ -21,6 +21,7 @@
 #include "caml/alloc.h"
 #include "caml/callback.h"
 #include "caml/codefrag.h"
+#include "caml/dynamic.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/memory.h"
@@ -61,6 +62,7 @@ Caml_inline value alloc_and_clear_stack_parent(caml_domain_state* domain_state)
   } else {
     value cont = caml_alloc_2(Cont_tag, Val_ptr(parent_stack), Val_long(0));
     Stack_parent(domain_state->current_stack) = NULL;
+    caml_dynamic_cache_flush(domain_state->dynamic_bindings);
     return cont;
   }
 }
@@ -72,6 +74,7 @@ Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
   if (Is_block(cont)) {
     struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
     Stack_parent(domain_state->current_stack) = parent_stack;
+    caml_dynamic_cache_flush(domain_state->dynamic_bindings);
   }
 }
 
@@ -574,7 +577,21 @@ CAMLexport void caml_iterate_named_values(caml_named_action f)
 
 CAMLprim value caml_with_async_exns(value body_callback)
 {
+  // Save and restore the current dynamic binding state so that local bindings
+  // are not leaked upon raising an async exception.
+  dynamic_table_s tbl;
+  if(!caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&Caml_state->current_stack->dyn)) {
+    caml_raise_out_of_memory();
+  }
+
+  // The saved table must be updated if its contents are promoted.
+  caml_dynamic_table_register_roots(&tbl);
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
+  caml_dynamic_table_unregister_roots(&tbl);
+
+  caml_dynamic_table_free(&Caml_state->current_stack->dyn);
+  Caml_state->current_stack->dyn = tbl;
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   /* raised as a normal exn, even if it was asynchronous */
   if (caml_result_is_exception(res)) {

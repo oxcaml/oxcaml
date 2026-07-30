@@ -7,7 +7,9 @@ type reg_class =
   | SIMD
       (** 128/256/512-bit SIMD registers. Different names are used when storing
           different sized values. *)
-  | MASK  (** AVX512 mask registers k1-k7. Note k0 is implicitly all ones. *)
+  | MASK
+      (** AVX512 mask registers k1-k7. While k0 is also a named register, it
+          cannot be used in masked operations, so we do not include it. *)
 
 type[@ocamlformat "disable"] _ phys_reg_classed =
   | RAX : [> `GPR] phys_reg_classed | RBX : [> `GPR] phys_reg_classed

@@ -17,7 +17,7 @@
 
 open! Int_replace_polymorphic_compare
 open X86_ast
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Section_name = X86_section.Section_name
 
 type system =
@@ -357,40 +357,46 @@ let assemble_file infile outfile =
 
 let asm_code = DLL.make_empty ()
 
-let asm_code_current_section = ref (DLL.make_empty ())
-
-let asm_code_by_section = Section_name.Tbl.create 100
-
-let delayed_sections = Section_name.Tbl.create 100
-
 (* Cannot use Emitaux directly here or there would be a circular dep *)
 let create_asm_file = ref true
 
-let directive dir =
-  if !create_asm_file then DLL.add_end asm_code dir;
-  match[@warning "-4"] dir with
-  | Directive
-      (Asm_targets.Asm_directives.Directive.Section (section, first_occurrence))
-    -> (
-    let details = Asm_targets.Asm_section.details section first_occurrence in
-    let name = Section_name.make details.names details.flags details.args in
-    let where =
-      if details.is_delayed then delayed_sections else asm_code_by_section
-    in
-    match Section_name.Tbl.find_opt where name with
-    | Some x -> asm_code_current_section := x
-    | None ->
-      let new_section = DLL.make_empty () in
-      asm_code_current_section := new_section;
-      Section_name.Tbl.add where name new_section)
-  | dir -> DLL.add_end !asm_code_current_section dir
+let directive dir = DLL.add_end asm_code dir
 
 let emit ins = directive (Ins ins)
 
-let reset_asm_code () =
-  DLL.clear asm_code;
-  asm_code_current_section := DLL.make_empty ();
-  Section_name.Tbl.clear asm_code_by_section
+let reset_asm_code () = DLL.clear asm_code
+
+(* The instructions are emitted as a single flat stream, [asm_code]; the
+   internal assembler consumes them grouped by section. [collect_sections] walks
+   the stream and groups the lines according to the [Section] directives, which
+   act as separators and do not appear in the result. *)
+let collect_sections ~is_delayed =
+  let sections = Section_name.Tbl.create 16 in
+  let current = ref None in
+  DLL.iter asm_code ~f:(fun line ->
+      match[@warning "-4"] line with
+      | Directive
+          (Asm_targets.Asm_directives.Directive.Section
+             (section, first_occurrence)) -> (
+        let details =
+          Asm_targets.Asm_section.details section first_occurrence
+        in
+        if not (Bool.equal details.is_delayed is_delayed)
+        then current := None
+        else
+          let name =
+            Section_name.make details.names details.flags details.args
+          in
+          match Section_name.Tbl.find_opt sections name with
+          | Some instrs -> current := Some instrs
+          | None ->
+            let instrs = DLL.make_empty () in
+            Section_name.Tbl.add sections name instrs;
+            current := Some instrs)
+      | dir -> !current |> Option.iter (fun instrs -> DLL.add_end instrs dir));
+  Section_name.Tbl.fold
+    (fun name instrs acc -> (name, instrs) :: acc)
+    sections []
 
 type output_pos = asm_line DLL.cell option (* None means the beginning *)
 
@@ -418,12 +424,10 @@ let generate_code asm =
   | None -> ());
   match !internal_assembler with
   | Some f ->
-    let get sections =
-      Section_name.Tbl.fold
-        (fun name instrs acc -> (name, instrs) :: acc)
-        sections []
-    in
-    let instrs = get asm_code_by_section in
-    let delayed () = get delayed_sections in
+    let instrs = collect_sections ~is_delayed:false in
+    (* The delayed sections (DWARF .debug_line and .debug_frames) are emitted
+       while [f] runs, after the main sections have been assembled, so they can
+       only be extracted from [asm_code] once [f] forces the thunk. *)
+    let delayed () = collect_sections ~is_delayed:true in
     binary_content := Some (f ~delayed instrs)
   | None -> binary_content := None

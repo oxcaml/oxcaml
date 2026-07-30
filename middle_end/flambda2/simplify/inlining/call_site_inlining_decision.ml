@@ -249,8 +249,9 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
               ~function_type
           in
           let inlining_args =
-            Apply.inlining_arguments apply
-            |> Inlining_arguments.meet (DE.inlining_arguments denv)
+            Inlining_arguments.combine
+              ~from_env:(DE.inlining_arguments denv)
+              ~from_metadata:(Apply.inlining_arguments apply)
           in
           let evaluated_to =
             Cost_metrics.evaluate ~args:inlining_args cost_metrics

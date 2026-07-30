@@ -1,0 +1,78 @@
+let $camlCross_function_cse_b__first_const = Block 0 () in
+(let code inline(always) size(7)
+       some_0 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of val ] =
+   let next_depth = rec_info (succ my_depth) in
+   let Pmakeblock = %block.[`0`].my_alloc_region (x) in
+   cont k1 (Pmakeblock)
+ in
+ let code size(19)
+       f_1 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let some = %project_value_slot.[f].[some] (my_closure) in
+   let a = %block.[`0`].my_alloc_region (x) in
+   apply direct(some_0 &my_alloc_region)
+     (some : _ -> [ 0 | 0 of val ]) (x) -> k3 * k2
+     where k3 (b : [ 0 | 0 of val ]) =
+       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+       cont k1 (Pmakeblock)
+ in
+ let code size(19)
+       g_2 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let some = %project_value_slot.[g].[some_1] (my_closure) in
+   apply direct(some_0 &my_alloc_region)
+     (some : _ -> [ 0 | 0 of val ]) (x) -> k3 * k2
+     where k3 (a : [ 0 | 0 of val ]) =
+       let b = %block.[`0`].my_alloc_region (x) in
+       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
+       cont k1 (Pmakeblock)
+ in
+ let code size(7)
+       f_classic_3 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let Pfield =
+     %block_load.[`1`] ($Cross_function_cse_a.camlCross_function_cse_a)
+   in
+   apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
+ in
+ let code size(7)
+       g_classic_4 (x)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   let Pfield =
+     %block_load.[`2`] ($Cross_function_cse_a.camlCross_function_cse_a)
+   in
+   apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
+ in
+ let some = closure some_0 @some &toplevel.alloc_region in
+ let f = closure f_1 @f &toplevel.alloc_region with { some = some } in
+ let g = closure g_2 @g &toplevel.alloc_region with { some_1 = some } in
+ let f_classic = closure f_classic_3 @f_classic &toplevel.alloc_region in
+ let g_classic = closure g_classic_4 @g_classic &toplevel.alloc_region in
+ let Pmakeblock = %block.[`0`].`toplevel` (some, f, g, f_classic, g_classic)
+ in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`5`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`5`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`5`].[`2`] (module_block) in
+    let field_3 = %block_load.tag[`0`].`size`[`5`].[`3`] (module_block) in
+    let field_4 = %block_load.tag[`0`].`size`[`5`].[`4`] (module_block) in
+    let $camlCross_function_cse_b =
+      Block 0 (field_0, field_1, field_2, field_3, field_4)
+    in
+    cont done ($camlCross_function_cse_b)

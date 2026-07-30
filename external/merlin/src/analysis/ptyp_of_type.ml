@@ -74,6 +74,9 @@ and core_type type_expr =
   | Tquote_eval ty ->
     let loc = Untypeast.lident_of_path Predef.path_eval |> Location.mknoloc in
     Typ.constr loc [ Typ.quote (core_type ty) ]
+  | Tbox ty ->
+    let loc = Untypeast.lident_of_path Predef.path_box |> Location.mknoloc in
+    Typ.constr loc [ core_type ty ]
   | Tobject (type_expr, _class_) ->
     let rec aux acc type_expr =
       match get_desc type_expr with
@@ -160,7 +163,7 @@ and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
       Option.map jkind_manifest ~f:(fun _ : Parsetree.jkind_annotation ->
           (* CR modes: this is terrible. Internal ticket 6599 *)
           { pjka_desc =
-              Pjk_abbreviation ({ txt = Lident "any"; loc = Location.none }, []);
+              Pjk_abbreviation { txt = Lident "any"; loc = Location.none };
             pjka_loc = Location.none
           });
     pjkind_attributes = jkind_attributes;

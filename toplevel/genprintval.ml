@@ -430,7 +430,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 tree_of_lazy depth obj ty_arg
 
               | Tconstr (path, [_], _)
-                when Path.same path Predef.path_code ->
+                when Path.same path Predef.path_expr ->
                 Oval_code (O.obj obj : CamlinternalQuote.Code.t)
 
               | _ ->
@@ -491,7 +491,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 Oval_stuff "<box>"
               | ty -> tree_of_val depth obj ty
               end
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _
+          | Tmod _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
