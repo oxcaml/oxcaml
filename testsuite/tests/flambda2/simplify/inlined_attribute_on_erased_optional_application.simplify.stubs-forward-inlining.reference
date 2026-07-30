@@ -1,0 +1,79 @@
+let code default_0 deleted in
+let code f_inner_2 deleted in
+let code loopify(never) size(27) stub
+      f_1 (`*opt*x` : [ 0 | 0 of val ], y : imm tagged, z : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `default` = %project_value_slot.[f].[`default`] (my_closure) in
+  let f_inner = %project_value_slot.[f].[f_inner] (my_closure) in
+  (let prim = %is_int (`*opt*x`) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       apply &my_alloc_region
+         (`default` : imm tagged -> imm tagged) (0) -> k2 * k1
+     where k3 =
+       let Pfield = %block_load.[`0`] (`*opt*x`) in
+       cont k2 (Pfield))
+    where k2 (x : imm tagged) =
+      apply &my_alloc_region inlined(forward)
+        (f_inner : imm tagged * imm tagged * imm tagged -> imm tagged)
+          (x, y, z)
+          -> k * k1
+in
+let code loopify(never) size(5) stub
+      partial_f_3 (param2 : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let f = %project_value_slot.[partial_f].[f] (my_closure) in
+  apply direct(f_1 &my_alloc_region) inlined(forward)
+    (f : _ -> imm tagged) (0, 0, param2) -> k * k1
+in
+let code loopify(never) size(1) newer_version_of(default_0)
+      default_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
+  cont k (x)
+in
+let $camlInlined_attribute_on_erased_optional_application__default_4 =
+  closure default_0_1 @`default` &toplevel.alloc_region
+in
+let code loopify(never) size(5) newer_version_of(f_inner_2)
+      f_inner_2_1 (x, y : imm tagged, z : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, y) in
+  let int_add_1 = %int_barith.add (int_add, z) in
+  cont k (int_add_1)
+in
+let $camlInlined_attribute_on_erased_optional_application__f_inner_5 =
+  closure f_inner_2_1 @f_inner &toplevel.alloc_region
+in
+let $camlInlined_attribute_on_erased_optional_application__f_6 =
+  closure f_1 @f &toplevel.alloc_region
+  with {
+    `default` =
+      $camlInlined_attribute_on_erased_optional_application__default_4;
+    f_inner =
+      $camlInlined_attribute_on_erased_optional_application__f_inner_5
+  }
+in
+let $camlInlined_attribute_on_erased_optional_application__partial_f_7 =
+  closure partial_f_3 @partial_f &toplevel.alloc_region
+  with { f = $camlInlined_attribute_on_erased_optional_application__f_6 }
+in
+apply direct(default_0_1 &toplevel.alloc_region)
+  ($camlInlined_attribute_on_erased_optional_application__default_4
+   : _ -> imm tagged)
+    (0)
+    -> k * error
+  where k (x : imm tagged) =
+    let $camlInlined_attribute_on_erased_optional_application =
+      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_4,
+               $camlInlined_attribute_on_erased_optional_application__f_6,
+               $camlInlined_attribute_on_erased_optional_application__partial_f_7,
+               x)
+    in
+    cont done ($camlInlined_attribute_on_erased_optional_application)
