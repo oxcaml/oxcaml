@@ -995,17 +995,17 @@ let prim_has_valid_reprs ~loc prim =
       ]
     | "%unsafe_get_ptr" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any
       ]
     | "%unsafe_get_ptr_imm" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any
       ]
     | "%unsafe_set_ptr" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
@@ -1080,7 +1080,7 @@ let prim_has_valid_reprs ~loc prim =
                Same_as_ocaml_repr C.vec256]
     | "%split_vec256" ->
       exactly [Same_as_ocaml_repr C.vec256;
-               Same_as_ocaml_repr (Product [C.vec128; C.vec128])]
+               Same_as_ocaml_repr (C.product [C.vec128; C.vec128])]
     | "%box_vec512" ->
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->

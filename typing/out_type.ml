@@ -2255,7 +2255,7 @@ let prepared_extension_constructor id ppf ext =
 let maybe_val_poly_shorthand lpoly_vars qtvs =
   let module Sort_const = Jkind.Sort.Const in
   let same_genvar a b =
-    Sort_const.equal (Sort_const.Genvar a) (Sort_const.Genvar b)
+    Sort_const.equal (Sort_const.genvar a) (Sort_const.genvar b)
   in
   let top_genvar (_, jkind) =
     match Jkind.get_layout !printing_env jkind with

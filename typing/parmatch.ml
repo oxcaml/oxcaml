@@ -962,7 +962,7 @@ end
 (* These sorts and reprs should never be used (so we make them unlikely to be
    accidentally correct) *)
 
-let fake_sort_const : Jkind.Sort.Const.t = Base Bits16
+let fake_sort_const : Jkind.Sort.Const.t = Jkind.Sort.Const.bits16
 
 let fake_cstr_repr : constructor_representation =
   Constructor_mixed [| Float32 |]

@@ -2718,7 +2718,7 @@ and transl_idx ~scopes loc _env ba uas =
         if Int.equal (Array.length sorts) 1 then
           sorts.(0)
         else
-          Jkind.Sort.Const.Product (Array.to_list sorts)
+          Jkind.Sort.Const.product (Array.to_list sorts)
       in
       let base_layout = layout_of_sort lbl.lbl_loc base_sort in
       let mbe = mixed_block_element_of_layout base_layout in

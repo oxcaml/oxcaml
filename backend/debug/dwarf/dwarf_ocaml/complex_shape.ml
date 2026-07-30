@@ -76,14 +76,14 @@ let hash { hash; _ } = hash
 let runtime t =
   let desc = Runtime t in
   let layout =
-    Layout.Base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
+    Layout.of_base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
   in
   { desc; layout; hash = Hashtbl.hash (hash_runtime, RS.hash t) }
 
 let unboxed_tuple args =
   let desc = Unboxed_product { components = args; kind = Unboxed_tuple } in
   { desc;
-    layout = Layout.Product (List.map to_layout args);
+    layout = Layout.product (List.map to_layout args);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -97,7 +97,7 @@ let record_unboxed args =
     Unboxed_product { components; kind = Unboxed_record field_names }
   in
   { desc;
-    layout = Layout.Product (List.map to_layout components);
+    layout = Layout.product (List.map to_layout components);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -107,7 +107,7 @@ let record_unboxed args =
 
 let void =
   let desc = Void in
-  { desc; layout = Layout.Base Sort.Void; hash = Hashtbl.hash hash_void }
+  { desc; layout = Layout.of_base Sort.Void; hash = Hashtbl.hash hash_void }
 
 let rec print fmt { desc } =
   match desc with
@@ -428,7 +428,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     let args =
       List.map
         (fun sh ->
-          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Scannable))
+          type_shape_to_complex_shape ~cache ~rec_env sh Layout.scannable)
         (* CR sspies: In the future, we cannot assume that these are always
            values. This means we may need to use
            [type_shape_to_complex_shape_exn] and catch the exception on the
@@ -527,7 +527,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
         f "unboxed tuple must have product layout, but got: %a" pp_layout
-          (Layout.Base b))
+          (Layout.of_base b))
   | Unboxed_tuple fields, Some (Product _ as type_layout) ->
     err_or_unknown_exn (fun f ->
         f
@@ -592,7 +592,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                 (fun arg ->
                   ( None,
                     type_shape_to_complex_shape ~cache ~rec_env arg
-                      (Layout.Base Scannable) ))
+                      Layout.scannable ))
                 pv_constr_args
             in
             (* Currently, all arguments here are values, but sooner or later
@@ -636,7 +636,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Record { fields; kind = Record_unboxed_product },
       Some ((Base _ | Product _) as ly) ) ->
     let layout_from_shapes =
-      Layout.Product (List.map (fun (_, _, _, ly) -> ly) fields)
+      Layout.product (List.map (fun (_, _, _, ly) -> ly) fields)
     in
     err_or_unknown_exn (fun f ->
         f "unboxed record expected to be of layout %a, but got: %a" pp_layout
@@ -780,7 +780,7 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
-        (Some (Layout.Base Scannable))
+        (Some Layout.scannable)
     in
     let elem_shape =
       match runtime_shape elem_shape with

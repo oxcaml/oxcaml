@@ -3230,8 +3230,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
           let jkind = (Env.find_type path env).type_jkind in
           let layout =
             match Jkind.get_layout env jkind with
-            | None ->
-              Jkind_types.Layout.Const.Any Jkind_types.Scannable_axes.max
+            | None -> Jkind_types.Layout.Const.max
             | Some l -> l
           in
           Contained (contained_parameters tyl layout), parents
