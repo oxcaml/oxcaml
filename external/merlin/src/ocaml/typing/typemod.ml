@@ -2666,8 +2666,7 @@ and transl_signature ?(interface_toplevel = false) env sig_acc
     | [] -> List.rev sig_items, List.rev sig_type, env
     | item :: srem -> begin
         match transl_sig_item env sig_type item with
-        | exception exn when
-            !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
+        | exception _exn when !Clflags.typing_recovery ->
             transl_sig env sig_items sig_type sig_type_include_functor srem
         | new_item, new_types, env ->
             transl_sig env
