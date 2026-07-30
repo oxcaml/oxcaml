@@ -398,7 +398,12 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
+      (** An abstract kind, meet-ed with the scannable axes and with the kind
+          operator applied. The operator cannot be pushed into the kind until
+          the path is expanded or substituted, so it is stored here in
+          pending form. *)
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;

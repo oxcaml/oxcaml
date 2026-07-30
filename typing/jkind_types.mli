@@ -139,6 +139,23 @@ module Sort : sig
   end
 end
 
+(** The kind operators that can be written on an abstract kind. An operator
+    applied to an unexpanded kind path cannot be pushed into its expansion, so
+    [Types.Kconstr] records it in this pending form; it is applied when the path
+    is expanded or substituted. [Id] is "no operator applied", not "not
+    addressable". *)
+module Kind_operator : sig
+  type t =
+    | Id
+    | Addressable
+
+  val equal : t -> t -> bool
+
+  (** Composition of operators. As [addressable] is idempotent, the order of
+      composition is irrelevant. *)
+  val compose : t -> t -> t
+end
+
 module Scannable_axes : sig
   type t =
     { nullability : Jkind_axis.Nullability.t;

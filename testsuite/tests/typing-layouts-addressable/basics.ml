@@ -689,15 +689,14 @@ Line 1, characters 15-25:
 Error: Unknown kind modifier addressabl
 |}]
 
+(* [addressable] on an abstract kind is recorded and applied when the kind is
+   expanded; see [abstract_kinds.ml] for more tests. *)
 kind_ k
 
 type t : k addressable
 [%%expect{|
 kind_ k
-Line 3, characters 11-22:
-3 | type t : k addressable
-               ^^^^^^^^^^^
-Error: The kind operator addressable cannot be applied to the abstract kind k.
+type t : k addressable
 |}]
 
 kind_ ka = value addressable

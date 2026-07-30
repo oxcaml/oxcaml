@@ -628,7 +628,6 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
-    | Addressable_on_abstract_kind of Path.t
 
   exception User_error of Location.t * t
 end
@@ -832,13 +831,13 @@ type jkind_context =
   }
 
 module Base = struct
+  let kconstr_strings p sa (op : Jkind_types.Kind_operator.t) =
+    let op_strs = match op with Id -> [] | Addressable -> ["addressable"] in
+    Path.name p :: (Scannable_axes.to_string_list sa @ op_strs)
+
   let to_string layout_to_string = function
     | Layout l -> layout_to_string l
-    | Kconstr (p, sa) -> (
-      match Scannable_axes.to_string_list sa with
-      | [] -> Path.name p
-      | _ :: _ as sa_strs ->
-        Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
+    | Kconstr (p, sa, op) -> String.concat " " (kconstr_strings p sa op)
 
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
@@ -846,12 +845,17 @@ module Base = struct
   let sub_expanded base1 base2 =
     match base1, base2 with
     | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
+    | Kconstr (k1, sa1, op1), Kconstr (k2, sa2, op2)
+      when Path.same k1 k2 && Jkind_types.Kind_operator.equal op1 op2 -> (
       match Scannable_axes.less_or_equal sa1 sa2 with
       | Equal -> Sub_result.Equal
       | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+    | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
+    (* [k addressable <= any addressable] for any abstract [k], as
+       [addressable] is monotonic and [k <= any]. *)
+    | ( Kconstr (_, sa_k, Addressable),
+        Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
       match Scannable_axes.less_or_equal sa_k sa_any with
       | Equal | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -866,29 +870,31 @@ module Base = struct
     | Kconstr _, Kconstr _ -> true
     | Kconstr _, Layout (Layout.Any _) -> true
     | Layout (Layout.Any _), Kconstr _ -> true
+    | Kconstr (_, _, Addressable), Layout (Layout.Addressable (Layout.Any _))
+    | Layout (Layout.Addressable (Layout.Any _)), Kconstr (_, _, Addressable) ->
+      true
     | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
 
   let map_layout ~f b =
-    match b with Layout l -> Layout (f l) | Kconstr (p, sa) -> Kconstr (p, sa)
+    match b with
+    | Layout l -> Layout (f l)
+    | Kconstr (p, sa, op) -> Kconstr (p, sa, op)
 
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
-    | Kconstr (p, sa) -> (
-      let sa_strs = Scannable_axes.to_string_list sa in
-      match sa_strs with
-      | [] -> Format.fprintf ppf "%s" (Path.name p)
-      | _ :: _ ->
-        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " sa_strs))
+    | Kconstr (p, sa, op) ->
+      Format.fprintf ppf "%s" (String.concat " " (kconstr_strings p sa op))
 
   let expand_once (type a) env (t : a jkind_base) :
       Layout.Const.t jkind_base option =
     match t with
     | Layout _ -> None
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind p env with
       | (exception Not_found) | { jkind_manifest = None; _ } -> None
       | { jkind_manifest = Some { base; _ }; _ } ->
+        let base = Jkind0.Base_and_axes.apply_operator base op in
         Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
@@ -921,16 +927,21 @@ module Base = struct
   let rec expand_until_comparable env t1 t2 =
     match t1, t2 with
     | Layout _, Layout _ -> Some (t1, t2)
-    | Kconstr (p1, _), Kconstr (p2, _) when Path.same p1 p2 -> Some (t1, t2)
+    | Kconstr (p1, _, _), Kconstr (p2, _, _) when Path.same p1 p2 ->
+      Some (t1, t2)
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | Some (t1, t2) -> expand_until_comparable env t1 t2
       | None -> (
         (* Stuck on an abstract [Kconstr] with no manifest. [sub_expanded] can
            still decide [Kconstr _, Layout (Any _)] via the stored [sa] upper
-           bound; other stuck cases fail. *)
+           bound (and similarly [k addressable] against [any addressable]);
+           other stuck cases fail. *)
         match t1, t2 with
-        | Kconstr _, Layout (Layout.Any _) -> Some (t1, t2)
+        | Kconstr _, Layout (Layout.Any _)
+        | ( Kconstr (_, _, Addressable),
+            Layout (Layout.Addressable (Layout.Any _)) ) ->
+          Some (t1, t2)
         | _ -> None))
 end
 
@@ -959,21 +970,23 @@ module Base_and_axes = struct
       (l * r) jkind_const_desc expand_result =
     match t.base with
     | Layout _ -> Not_expanded
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind p env with
       | exception Not_found -> Missing_cmi p
       | { jkind_manifest = None; _ } -> Not_expanded
       | { jkind_manifest = Some ({ with_bounds = No_with_bounds; _ } as jkind);
           _
         } ->
+        let base = apply_operator jkind.base op in
         let mod_bounds = Mod_bounds.meet t.mod_bounds jkind.mod_bounds in
         if
-          With_bounds.is_empty t.with_bounds
+          base == jkind.base
+          && With_bounds.is_empty t.with_bounds
           && Mod_bounds.equal mod_bounds jkind.mod_bounds
           &&
           let sa_won't_strengthen_jkind =
             match jkind.base with
-            | Kconstr (_, sa') -> Scannable_axes.le sa' sa
+            | Kconstr (_, sa', _) -> Scannable_axes.le sa' sa
             | Layout l -> (
               match Layout.Const.get_root_scannable_axes l with
               | None -> true
@@ -986,7 +999,7 @@ module Base_and_axes = struct
           Expanded jkind
         else
           Expanded
-            { base = meet_scannable_axes jkind.base sa;
+            { base = meet_scannable_axes base sa;
               mod_bounds;
               with_bounds = t.with_bounds
             })
@@ -1587,7 +1600,7 @@ module Jkind_desc = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
@@ -1627,9 +1640,10 @@ module Jkind_desc = struct
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
-    | Kconstr (p1, sa1), Kconstr (p2, sa2)
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
+           && Jkind_types.Kind_operator.equal op1 op2
            && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
@@ -1716,11 +1730,22 @@ module Jkind_desc = struct
       match Layout.intersection l1 l2 with
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
-    | Kconstr (p1, sa1), Kconstr (p2, sa2) when Path.same p1 p2 ->
-      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2))
-    | Kconstr (p, sa_k), Layout (Layout.Any sa_any)
-    | Layout (Layout.Any sa_any), Kconstr (p, sa_k) ->
-      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any))
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
+      when Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2 ->
+      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2, op1))
+    | Kconstr (p, sa_k, op), Layout (Layout.Any sa_any)
+    | Layout (Layout.Any sa_any), Kconstr (p, sa_k, op) ->
+      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any, op))
+    | ( Kconstr (p, sa_k, Addressable),
+        Layout (Layout.Addressable (Layout.Any sa_any)) )
+    | ( Layout (Layout.Addressable (Layout.Any sa_any)),
+        Kconstr (p, sa_k, Addressable) ) ->
+      (* [k addressable <= any addressable] for any abstract [k] *)
+      make_intersection
+        (Kconstr
+           ( p,
+             Scannable_axes.meet sa_k sa_any,
+             Jkind_types.Kind_operator.Addressable ))
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> Unknown
@@ -1732,12 +1757,18 @@ module Jkind_desc = struct
     | Some (t1, t2) -> (
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub l1 l2
-      | Kconstr (_, sa1), Kconstr (_, sa2) -> (
+      | Kconstr (_, sa1, op1), Kconstr (_, sa2, op2)
+        when Jkind_types.Kind_operator.equal op1 op2 -> (
         match Scannable_axes.less_or_equal sa1 sa2 with
         | Equal -> Sub_result.Equal
         | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+      | Kconstr _, Kconstr _ ->
+        (* [k addressable] and [k] are incomparable for an abstract [k]. *)
+        Sub_result.Not_le [Layout_disagreement]
+      | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
+      | ( Kconstr (_, sa_k, Addressable),
+          Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
         match Scannable_axes.less_or_equal sa_k sa_any with
         | Equal | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -1832,7 +1863,7 @@ module Const = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.Const.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
 
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
@@ -1843,13 +1874,15 @@ module Const = struct
    fun env t ->
     match t.base with
     | Layout l -> Ok l
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind_expansion p env with
       | exception Not_found -> Error p
       | jkind ->
-        (* Propagate the scannable axes upper bound. *)
+        (* Apply the pending operator and propagate the scannable axes upper
+           bound. *)
+        let base = Base_and_axes.apply_operator jkind.base op in
         let jkind =
-          { jkind with base = Base_and_axes.meet_scannable_axes jkind.base sa }
+          { jkind with base = Base_and_axes.meet_scannable_axes base sa }
         in
         get_layout_result env jkind)
 
@@ -1972,7 +2005,8 @@ module Const = struct
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
       let matching_layouts, operator_strs =
         match base_jkind.base, actual.base with
-        | Kconstr (p1, _), Kconstr (p2, _) -> Path.same p1 p2, []
+        | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
+          Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2, []
         | Layout l1, Layout l2 -> (
           if Layout.Const.equal_up_to_scannable_axes l1 l2
           then true, []
@@ -2207,7 +2241,7 @@ module Const = struct
       in
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
-      | Kconstr (p, sa) -> { t with base = Kconstr (p, update_sa sa) }
+      | Kconstr (p, sa, op) -> { t with base = Kconstr (p, update_sa sa, op) }
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
@@ -2222,8 +2256,7 @@ module Const = struct
      represented like [k] whose kind additionally promises that, when boxed,
      all of its information is stored in the data portion of a block. In
      particular, [k addressable = k] when [k] is already addressable. *)
-  let apply_addressable (type l r) ?prior_annot ~warn ~loc env
-      (context : (l * r) Context_with_transl.t) (t : (l * r) t) : (l * r) t =
+  let apply_addressable ?prior_annot ~warn ~loc env t =
     let t = Base_and_axes.fully_expand_aliases_const env t in
     match t.base with
     | Layout layout ->
@@ -2233,16 +2266,12 @@ module Const = struct
         warn_redundant_kind_modifier ~loc prior_annot
       | _ -> ());
       { t with base = Layout (Layout.Const.addressable layout) }
-    | Kconstr (p, sa) -> (
-      match context with
-      | Left_jkind (Overapproximate_to_top, _) ->
-        (* We cannot represent a kind operator applied to a truly-abstract
-           [Kconstr], so over-approximate its layout as [any addressable]. *)
-        { t with
-          base = Layout (Layout.Const.addressable (Layout.Const.any sa))
-        }
-      | Right_jkind _ | Left_jkind (Transl_type _, _) ->
-        raise ~loc (Addressable_on_abstract_kind p))
+    | Kconstr (p, sa, op) ->
+      (match op, prior_annot with
+      | Addressable, Some prior_annot when warn ->
+        warn_redundant_kind_modifier ~loc prior_annot
+      | (Id | Addressable), _ -> ());
+      { t with base = Kconstr (p, sa, Jkind_types.Kind_operator.Addressable) }
 
   let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
     if
@@ -2366,7 +2395,7 @@ module Const = struct
                   jkind
               | { txt = Addressable; loc } ->
                 apply_addressable ~prior_annot:(base, rev_axes) ~warn ~loc env
-                  context jkind
+                  jkind
             in
             jkind, name.txt :: rev_axes)
           (base_jkind, []) ops
@@ -2418,11 +2447,12 @@ module Const = struct
           let base =
             match expanded.base with
             | Layout _ as b -> b
-            | Kconstr (_, sa) ->
+            | Kconstr (_, sa, op) ->
               (* However, we can't raise the mod-bounds of a truly-abstract
                  [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as [any]. *)
-              Layout (Layout.Const.any sa)
+                 substitution. Instead, we approximate the layout as [any]
+                 (with the pending operator applied). *)
+              Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
           in
           { base;
             mod_bounds = Mod_bounds.max;
@@ -2810,11 +2840,15 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
   (* Don't use [fully_expand_aliases] to avoid computing anything on bounds *)
   match t.jkind.base with
   | Layout l -> Ok l
-  | Kconstr (p, sa) -> (
+  | Kconstr (p, sa, op) -> (
     match Env.find_jkind_expansion p env with
     | exception Not_found -> Error p
     | jkind ->
       Const.get_layout_result env jkind
+      |> Result.map (fun l ->
+          match (op : Jkind_types.Kind_operator.t) with
+          | Id -> l
+          | Addressable -> Layout.Const.addressable l)
       |> Result.map Layout.of_const
       |> Result.map (fun l -> Layout.meet_root_scannable_axes l sa))
 
@@ -4550,10 +4584,6 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
-  | Addressable_on_abstract_kind p ->
-    Location.errorf ~loc
-      "The kind operator addressable cannot be applied to the abstract kind %s."
-      (Path.name p)
 
 let () =
   Location.register_error_of_exn (function

@@ -1243,6 +1243,25 @@ module Sort = struct
   end
 end
 
+(* See the comment on this module in jkind_types.mli. *)
+module Kind_operator = struct
+  type t =
+    | Id
+    | Addressable
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Id, Id | Addressable, Addressable -> true
+    | (Id | Addressable), _ -> false
+
+  (* Composition of operators. As [addressable] is idempotent, the order of
+     composition is irrelevant. *)
+  let compose t1 t2 =
+    match t1, t2 with
+    | Id, t | t, Id -> t
+    | Addressable, Addressable -> Addressable
+end
+
 module Scannable_axes = struct
   open Jkind_axis
 
