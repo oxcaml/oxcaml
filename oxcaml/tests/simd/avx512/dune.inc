@@ -163,10 +163,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512.exe)
  (action
   (with-outputs-to
    arrays512.out
-   (run ./arrays512.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -198,10 +199,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_u.exe)
  (action
   (with-outputs-to
    arrays512_u.out
-   (run ./arrays512_u.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_u.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -233,10 +235,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_mask.exe)
  (action
   (with-outputs-to
    arrays512_mask.out
-   (run ./arrays512_mask.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_mask.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -462,10 +465,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_nodynlink.exe)
  (action
   (with-outputs-to
    arrays512_nodynlink.out
-   (run ./arrays512_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -507,10 +511,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_u_nodynlink.exe)
  (action
   (with-outputs-to
    arrays512_u_nodynlink.out
-   (run ./arrays512_u_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_u_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -552,10 +557,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_mask_nodynlink.exe)
  (action
   (with-outputs-to
    arrays512_mask_nodynlink.out
-   (run ./arrays512_mask_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_mask_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -781,10 +787,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_internal_assembler.exe)
  (action
   (with-outputs-to
    arrays512_internal_assembler.out
-   (run ./arrays512_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -826,10 +833,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_u_internal_assembler.exe)
  (action
   (with-outputs-to
    arrays512_u_internal_assembler.out
-   (run ./arrays512_u_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_u_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -871,10 +879,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe arrays512_mask_internal_assembler.exe)
  (action
   (with-outputs-to
    arrays512_mask_internal_assembler.out
-   (run ./arrays512_mask_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./arrays512_mask_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
