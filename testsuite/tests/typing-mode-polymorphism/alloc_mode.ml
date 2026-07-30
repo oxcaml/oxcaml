@@ -131,10 +131,6 @@ val foo :
 
   The following tests assert the locality of returned functions *)
 
-(* CR ageorges: the following two functions return local functions.
-  This will cause a crash if applied as global, (see [foo] below),
-  and is unsound *)
-
 let fst x = fun y -> x
 [%%expect{|
 (let

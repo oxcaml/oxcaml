@@ -18,8 +18,6 @@ let foo x = 42
 val foo : 'a @ 'n -> int @ 'm = <fun>
 |}]
 
-(* CR ageorges: Is there a way to explain the following? id is instantiated, but foo is
-  generalized with more bounds that necessary? *)
 let foo x = id x
 [%%expect{|
 val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
@@ -43,7 +41,6 @@ let foo =
 val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 |}]
 
-(* CR ageorges: make the printer aware of mode crossing/jkinds *)
 let foo a b = a + b
 [%%expect{|
 val foo : int @ 'n -> (int @ 'm -> int @ [> dynamic]) @ [> stateful] = <fun>
@@ -279,15 +276,12 @@ val foo :
 
 (* annotations *)
 
-(* CR ageorges: if a mode variable is fully determined (its bounds are equal) consider
-  printing it as a constant rather than variable *)
-let legacy_id (x @ global many aliased nonportable uncontended forkable unyielding stateful read_write dynamic) = x
+let legacy_id : 'a -> 'a = fun x -> x
 [%%expect{|
-val legacy_id :
-  'a @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
-  'a @ [> aliased nonportable stateful dynamic] = <fun>
+val legacy_id : 'a -> 'a = <fun>
 |}]
 
+(* CR mode-poly-printing: apply "X mode implies Y mode" logic to bounds *)
 let foo (x @ local) = x
 [%%expect{|
 val foo :
@@ -340,7 +334,6 @@ val foo :
   <fun>
 |}]
 
-(* CR ageorges: ideally we want to apply mode crossing reguardless of principality *)
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
@@ -473,7 +466,6 @@ module Foo :
   end
 |}]
 
-(* CR ageorges: remove duplicates in [< 'm & 'm] and [> 'm | 'm] *)
 module Foo : sig
   type t
 
