@@ -178,6 +178,13 @@ let get_unit comp_unit =
   (* If this fails, it likely means that someone didn't call
      [CU.which_cmx_file]. *)
   assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
+  (* CR lmaurer: Surely this should just compare [comp_unit] to
+     [current_unit.ui_unit], but doing so seems to break Closure. We should fix
+     that. *)
+  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
+  then
+    Misc.fatal_error
+      "get_unit: unable to get unit_info for current unit";
   let name = CU.to_global_name_without_prefix comp_unit in
   try
     Infos_table.find global_infos_table name
@@ -215,29 +222,13 @@ let get_unit comp_unit =
     infos
 
 let get_unit_export_info comp_unit =
-  (* CR lmaurer: Surely this should just compare [comp_unit] to
-    [current_unit.ui_unit], but doing so seems to break Closure. We should fix
-    that. *)
-  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
-  then
-    Misc.fatal_error
-      "get_unit_export_info: unable to get unit_info for current unit"
-  else Option.bind (get_unit comp_unit) get_export_info
+  Option.bind (get_unit comp_unit) get_export_info
 
 let get_static_data comp_unit =
-  assert (CU.can_access_cmx_file comp_unit ~accessed_by:current_unit.uib_unit);
-  if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
-  then
-    Misc.fatal_errorf_doc
-      "Compilenv.get_static_data: requested data of the current unit (%a)"
-      CU.print comp_unit
-  else begin
-    Option.map
-      (fun ui ->
-        Slambdaeval.CU_data.read
-          ui.ui_static_data ~sections:ui.ui_file_sections)
-      (get_unit comp_unit)
-  end
+  Option.map
+    (fun ui ->
+      Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
+    (get_unit comp_unit)
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
