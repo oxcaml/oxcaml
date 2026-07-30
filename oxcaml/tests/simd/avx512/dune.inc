@@ -19,10 +19,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512.exe)
  (action
   (with-outputs-to
    basic512.out
-   (run ./basic512.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -54,10 +55,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512_u.exe)
  (action
   (with-outputs-to
    basic512_u.out
-   (run ./basic512_u.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512_u.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -89,10 +91,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe callback512.exe)
  (action
   (with-outputs-to
    callback512.out
-   (run ./callback512.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./callback512.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -124,10 +127,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe consts512.exe)
  (action
   (with-outputs-to
    consts512.out
-   (run ./consts512.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./consts512.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -274,10 +278,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512_nodynlink.exe)
  (action
   (with-outputs-to
    basic512_nodynlink.out
-   (run ./basic512_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -319,10 +324,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512_u_nodynlink.exe)
  (action
   (with-outputs-to
    basic512_u_nodynlink.out
-   (run ./basic512_u_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512_u_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -364,10 +370,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe callback512_nodynlink.exe)
  (action
   (with-outputs-to
    callback512_nodynlink.out
-   (run ./callback512_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./callback512_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -409,10 +416,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe consts512_nodynlink.exe)
  (action
   (with-outputs-to
    consts512_nodynlink.out
-   (run ./consts512_nodynlink.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./consts512_nodynlink.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -589,10 +597,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512_internal_assembler.exe)
  (action
   (with-outputs-to
    basic512_internal_assembler.out
-   (run ./basic512_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -634,10 +643,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe basic512_u_internal_assembler.exe)
  (action
   (with-outputs-to
    basic512_u_internal_assembler.out
-   (run ./basic512_u_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./basic512_u_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -679,10 +689,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe callback512_internal_assembler.exe)
  (action
   (with-outputs-to
    callback512_internal_assembler.out
-   (run ./callback512_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./callback512_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
@@ -724,10 +735,11 @@
     (= %{context_name} "main")
     (= %{architecture} "amd64")
     (<> %{system} macosx)))
+ (deps avx512_available.exe consts512_internal_assembler.exe)
  (action
   (with-outputs-to
    consts512_internal_assembler.out
-   (run ./consts512_internal_assembler.exe))))
+   (run bash -c "if ./avx512_available.exe; then ./consts512_internal_assembler.exe; fi"))))
 
 (rule
  (alias runtest)
