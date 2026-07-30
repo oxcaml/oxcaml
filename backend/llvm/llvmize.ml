@@ -1103,6 +1103,7 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> extend Fpext ~from:T.float ~to_:T.double
+  | Word_mask -> not_implemented_basic ~msg:"load mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"load vector" i
@@ -1128,6 +1129,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> trunc Fptrunc T.float
+  | Word_mask -> not_implemented_basic ~msg:"store mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"store vector" i
@@ -1990,7 +1992,10 @@ let write_module_metadata t =
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;
-  F.pp_line t.ppf {|!llvm.module.flags = !{ !0 }|}
+  (* Tell LLVM's frametable printer which frame-descriptor layout this runtime
+     expects. 0 is the classic layout. *)
+  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }|};
+  F.pp_line t.ppf {|!llvm.module.flags = !{ !0, !1 }|}
 
 let write_llvmir_to_file t =
   (match t.sourcefile with

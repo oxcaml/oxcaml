@@ -127,6 +127,8 @@ val cached_generic_functions_path : string ref
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
+val dissector_max_linker_parallelism : Misc.Maybe_bounded.t ref
+
 val manual_module_init : bool ref
 
 val symbol_visibility_protected : bool ref
@@ -155,6 +157,7 @@ module Flambda2 : sig
     val reaper_unbox : bool
     val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
+    val simplify_stubs : bool
     val unicode : bool
     val kind_checks : bool
     val match_in_match : bool
@@ -178,6 +181,7 @@ module Flambda2 : sig
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
     match_in_match : bool;
@@ -200,6 +204,7 @@ module Flambda2 : sig
   val reaper_unbox : bool or_default ref
   val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
+  val simplify_stubs : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
   val match_in_match : bool or_default ref

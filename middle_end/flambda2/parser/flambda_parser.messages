@@ -2925,18 +2925,6 @@ flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN FLOAT COMMA TIL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
-##
-## Ends in an error in state: 420.
-##
-## static_data -> KWD_MUTABLE . STRING [ KWD_WITH KWD_IN KWD_AND ]
-##
-## The known suffix of the stack is as follows:
-## KWD_MUTABLE
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 flambda_unit: KWD_LET SYMBOL EQUAL IDENT TILDE
 ##
 ## Ends in an error in state: 424.

@@ -1736,6 +1736,7 @@ end = struct
       | Alloc_block_kind_vec128 -> pp "vec128"
       | Alloc_block_kind_vec256 -> pp "vec256"
       | Alloc_block_kind_vec512 -> pp "vec512"
+      | Alloc_block_kind_mask -> pp "mask"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1752,6 +1753,7 @@ end = struct
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
       | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
       | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
+      | Alloc_block_kind_mask_u_array -> pp "unboxed_mask_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let aloc = Debuginfo.to_location item.alloc_dbg in

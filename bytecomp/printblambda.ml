@@ -84,9 +84,12 @@ let location ppf (loc : Debuginfo.Scoped_location.t) =
 let rec blambda ppf = function
   | Var id -> Ident.print ppf id
   | Const cst -> structured_constant ppf cst
-  | Apply { func; args; nontail } ->
-    fprintf ppf "@[<2>(apply%s@ %a %a)@]"
+  | Apply { func; args; nontail; yielding } ->
+    fprintf ppf "@[<2>(apply%s%s@ %a %a)@]"
       (if nontail then " nontail" else "")
+      (match yielding with
+      | Lambda.May_yield -> " yielding"
+      | Lambda.Unyielding -> "")
       blambda func
       (pp_print_list ~pp_sep:pp_print_space blambda)
       args
@@ -184,10 +187,13 @@ let rec blambda ppf = function
       for_from
       (match for_dir with Upto -> "to" | Downto -> "downto")
       blambda for_to blambda for_body
-  | Send { method_kind; met; obj; args; nontail } ->
+  | Send { method_kind; met; obj; args; nontail; yielding } ->
     let name = match method_kind with Self -> "sendself" | Public -> "send" in
-    fprintf ppf "@[<2>(%s%s@ met=%a@ %a)@]" name
+    fprintf ppf "@[<2>(%s%s%s@ met=%a@ %a)@]" name
       (if nontail then " nontail" else "")
+      (match yielding with
+      | Lambda.May_yield -> " yielding"
+      | Lambda.Unyielding -> "")
       blambda met
       (pp_print_list ~pp_sep:pp_print_space blambda)
       (obj :: args)

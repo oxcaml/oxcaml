@@ -40,6 +40,14 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+(** An object file or archive to pass to the linker, together with the
+    compilation units it contributes to the link (for an archive, only the units
+    of its required members). *)
+type objfile_to_link =
+  { path : string;
+    units : Compilation_unit.t list
+  }
+
 (** Values of type [t] are mutable structures. *)
 type t
 

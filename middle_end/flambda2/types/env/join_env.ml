@@ -162,8 +162,8 @@ end = struct
   let[@inline] fold_iterator ~f ~init iterator =
     let rec loop iterator acc =
       match Name_map_join_iterator.current iterator with
-      | None -> acc
-      | Some name ->
+      | Null -> acc
+      | This name ->
         Name_map_join_iterator.accept iterator;
         let acc = (f [@inlined hint]) name acc in
         Name_map_join_iterator.advance iterator;
@@ -1616,7 +1616,7 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
           env_extension)
     | Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _ | Naked_int16 _
     | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-    | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+    | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ->
       Misc.fatal_error "Kind mismatch for output of relation: expected %a")
 
 let add_to_inverse_relations inverse_relations name relation ~scrutinee =
@@ -1712,6 +1712,7 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
     | Boxed_vec128 (_, _)
     | Boxed_vec256 (_, _)
     | Boxed_vec512 (_, _)
+    | Boxed_mask (_, _)
     | Closures _ | String _ | Array _ ->
       ty, inverse_relations)
   | Value (Ok (No_alias { is_null = Maybe_null { is_null }; non_null = _ })) ->
@@ -1736,7 +1737,8 @@ let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
       | Unknown | Bottom )
   | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     ty, inverse_relations
 
 let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join

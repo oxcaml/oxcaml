@@ -84,6 +84,7 @@ and debug_event_kind = Debug_event.debug_event_kind =
 and debug_event_info = Debug_event.debug_event_info =
     Event_function
   | Event_return of int
+  | Event_unyielding_call of int
   | Event_other
 
 and debug_event_repr = Debug_event.debug_event_repr =

@@ -136,6 +136,10 @@ let simplify_unbox_number (boxable_number_kind : K.Boxable_number.t) dacc
       ( T.boxed_vec512_alias_to ~naked_vec512:result_var'
           (Alloc_mode.For_types.unknown ()),
         K.naked_vec512 )
+    | Naked_mask ->
+      ( T.boxed_mask_alias_to ~naked_mask:result_var'
+          (Alloc_mode.For_types.unknown ()),
+        K.naked_mask )
   in
   let alloc_mode =
     T.prove_alloc_mode_of_boxed_number (DA.typing_env dacc) boxed_number_ty
@@ -196,6 +200,7 @@ let simplify_box_number (boxable_number_kind : K.Boxable_number.t) alloc_mode
     | Naked_vec128 -> T.box_vec128 naked_number_ty alloc_mode
     | Naked_vec256 -> T.box_vec256 naked_number_ty alloc_mode
     | Naked_vec512 -> T.box_vec512 naked_number_ty alloc_mode
+    | Naked_mask -> T.box_mask naked_number_ty alloc_mode
   in
   let dacc = DA.add_variable dacc result_var ty in
   SPR.create original_term ~try_reify:true dacc
@@ -273,9 +278,14 @@ let simplify_string_length dacc ~original_term ~arg:_ ~arg_ty:str_ty ~result_var
     if String_info.Set.is_empty str_infos
     then SPR.create_invalid dacc
     else
+      let machine_width = DE.machine_width (DA.denv dacc) in
       let lengths =
-        String_info.Set.elements str_infos
-        |> List.map String_info.size |> Target_ocaml_int.Set.of_list
+        String_info.Set.fold
+          (fun str lengths ->
+            Target_ocaml_int.Set.add
+              (Target_ocaml_int.of_int machine_width (String.length str))
+              lengths)
+          str_infos Target_ocaml_int.Set.empty
       in
       let ty = T.these_naked_immediates lengths in
       let dacc = DA.add_variable dacc result_var ty in
@@ -818,6 +828,7 @@ let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
         | Naked_vec128 -> T.box_vec128
         | Naked_vec256 -> T.box_vec256
         | Naked_vec512 -> T.box_vec512
+        | Naked_mask -> T.box_mask
       in
       let ty = boxer contents_ty Alloc_mode.For_types.heap in
       let dacc = DA.add_variable dacc result_var ty in

@@ -20,7 +20,7 @@
  (deps id_fn.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} id_fn.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize)
+   (run %{bin:ocamlopt.opt} id_fn.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize)
    (with-outputs-to id_fn.output.corrected (pipe-outputs (run cat id_fn.ll) (run ./filter.sh))))))
 
 (rule
@@ -44,9 +44,9 @@
  (deps const_val.ml const_val_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} const_val.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} const_val.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to const_val_ir.output.corrected (pipe-outputs (run cat const_val.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} const_val_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} const_val.cmx const_val_main.cmx -opaque -o const_val.output.exe))))
 
 (rule
@@ -96,10 +96,10 @@
  (action
   (progn
    (run clang int_ops_stub.c -c -g -O3 -I %{project_root}/runtime)
-   (run %{bin:ocamlopt.opt} int_ops_data.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} int_ops.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} int_ops_data.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} int_ops.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to int_ops_ir.output.corrected (pipe-outputs (run cat int_ops.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} int_ops_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} int_ops_stub.o int_ops_data.cmx int_ops.cmx int_ops_main.cmx -opaque -o int_ops.output.exe))))
 
 (rule
@@ -148,10 +148,10 @@
  (deps gcd_data.ml gcd.ml gcd_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} gcd_data.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} gcd.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} gcd_data.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} gcd.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to gcd_ir.output.corrected (pipe-outputs (run cat gcd.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} gcd_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} gcd_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} gcd_data.cmx gcd.cmx gcd_main.cmx -opaque -o gcd.output.exe))))
 
 (rule
@@ -200,10 +200,10 @@
  (deps array_rev_data.ml array_rev.ml array_rev_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} array_rev_data.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} array_rev.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} array_rev_data.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} array_rev.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to array_rev_ir.output.corrected (pipe-outputs (run cat array_rev.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} array_rev_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} array_rev_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} array_rev_data.cmx array_rev.cmx array_rev_main.cmx -opaque -o array_rev.output.exe))))
 
 (rule
@@ -252,9 +252,9 @@
  (deps float_ops.ml float_ops_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} float_ops.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} float_ops.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to float_ops_ir.output.corrected (pipe-outputs (run cat float_ops.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} float_ops_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} float_ops_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} float_ops.cmx float_ops_main.cmx -opaque -o float_ops.output.exe))))
 
 (rule
@@ -303,10 +303,10 @@
  (deps many_args_defn.ml many_args.ml many_args_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} many_args_defn.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} many_args.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} many_args_defn.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} many_args.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to many_args_ir.output.corrected (pipe-outputs (run cat many_args.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} many_args_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} many_args_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} many_args_defn.cmx many_args.cmx many_args_main.cmx -opaque -o many_args.output.exe))))
 
 (rule
@@ -355,9 +355,9 @@
  (deps multi_ret.ml multi_ret_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} multi_ret.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} multi_ret.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to multi_ret_ir.output.corrected (pipe-outputs (run cat multi_ret.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} multi_ret_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} multi_ret_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} multi_ret.cmx multi_ret_main.cmx -opaque -o multi_ret.output.exe))))
 
 (rule
@@ -406,9 +406,9 @@
  (deps indirect_call.ml indirect_call_main.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} indirect_call.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} indirect_call.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to indirect_call_ir.output.corrected (pipe-outputs (run cat indirect_call.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} indirect_call_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} indirect_call_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} indirect_call.cmx indirect_call_main.cmx -opaque -o indirect_call.output.exe))))
 
 (rule
@@ -458,9 +458,9 @@
  (action
   (progn
    (run clang extcalls_defn.c -c -g -O3 -I %{project_root}/runtime)
-   (run %{bin:ocamlopt.opt} extcalls.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} extcalls.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to extcalls_ir.output.corrected (pipe-outputs (run cat extcalls.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} extcalls_main.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} extcalls_main.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} extcalls_defn.o extcalls.cmx extcalls_main.cmx -opaque -o extcalls.output.exe))))
 
 (rule
@@ -509,7 +509,7 @@
  (deps data_decl.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} data_decl.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} data_decl.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to data_decl_ir.output.corrected (pipe-outputs (run cat data_decl.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} data_decl.cmx -opaque -o data_decl.output.exe))))
 
@@ -559,10 +559,10 @@
  (deps exn_part1.ml exn_part2.ml exn_part3.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} exn_part1.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} exn_part2.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part1.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part2.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to exn_part2_ir.output.corrected (pipe-outputs (run cat exn_part2.ll) (run ./filter.sh)))
-   (run %{bin:ocamlopt.opt} exn_part3.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} exn_part3.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (run %{bin:ocamlopt.opt} exn_part1.cmx exn_part2.cmx exn_part3.cmx -opaque -o exn.output.exe))))
 
 (rule
@@ -611,7 +611,7 @@
  (deps alloc.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} alloc.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} alloc.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to alloc_ir.output.corrected (pipe-outputs (run cat alloc.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} alloc.cmx -opaque -o alloc.output.exe))))
 
@@ -661,8 +661,8 @@
  (deps tailcall2.ml tailcall.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} tailcall2.ml -c -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
-   (run %{bin:ocamlopt.opt} tailcall.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} tailcall2.ml -c -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} tailcall.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to tailcall_ir.output.corrected (pipe-outputs (run cat tailcall.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} tailcall2.cmx tailcall.cmx -opaque -o tailcall.output.exe))))
 
@@ -712,7 +712,7 @@
  (deps switch.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} switch.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} switch.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to switch_ir.output.corrected (pipe-outputs (run cat switch.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} switch.cmx -opaque -o switch.output.exe))))
 
@@ -763,7 +763,7 @@
  (action
   (progn
    (run clang csel_stub.c -c -g -O3 -I %{project_root}/runtime)
-   (run %{bin:ocamlopt.opt} csel.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
+   (run %{bin:ocamlopt.opt} csel.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm -dcfg -dlinear)
    (with-outputs-to csel_ir.output.corrected (pipe-outputs (run cat csel.ll) (run ./filter.sh)))
    (run %{bin:ocamlopt.opt} csel_stub.o csel.cmx -opaque -o csel.output.exe))))
 
@@ -813,7 +813,7 @@
  (deps dls_get.ml)
  (action
   (progn
-   (run %{bin:ocamlopt.opt} dls_get.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize)
+   (run %{bin:ocamlopt.opt} dls_get.ml -c -llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir -dno-asm-comments -disable-poll-insertion -g -O3 -flambda2-no-simplify-stubs -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize)
    (with-outputs-to dls_get.output.corrected (pipe-outputs (run cat dls_get.ll) (run ./filter.sh))))))
 
 (rule

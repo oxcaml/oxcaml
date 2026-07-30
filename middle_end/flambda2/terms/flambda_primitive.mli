@@ -72,6 +72,7 @@ module Array_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of t list
         (** Accesses to arrays of unboxed products are unarized on the way into
             Flambda 2. The float array optimization never applies for these
@@ -126,6 +127,7 @@ module Array_load_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   val print : Format.formatter -> t -> unit
 
@@ -155,6 +157,7 @@ module Array_set_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   val print : Format.formatter -> t -> unit
 
@@ -193,6 +196,7 @@ module Duplicate_array_kind : sig
     | Naked_vec128s of { length : Target_ocaml_int.t option }
     | Naked_vec256s of { length : Target_ocaml_int.t option }
     | Naked_vec512s of { length : Target_ocaml_int.t option }
+    | Naked_masks of { length : Target_ocaml_int.t option }
 
   val print : Format.formatter -> t -> unit
 

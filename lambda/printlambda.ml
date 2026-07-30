@@ -92,6 +92,7 @@ let array_kind = function
   | Punboxedfloatarray f -> unboxed_float f
   | Punboxedoruntaggedintarray i -> unboxed_integer i
   | Punboxedvectorarray v -> unboxed_vector v
+  | Punboxedmaskarray -> "unboxed_mask"
   | Pgcscannableproductarray kinds ->
     "scannableproduct " ^ scannable_product_element_kinds kinds
   | Pgcignorableproductarray kinds ->
@@ -119,6 +120,7 @@ let array_ref_kind ppf k =
   | Punboxedvectorarray_ref Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_ref Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_ref Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
+  | Punboxedmaskarray_ref -> fprintf ppf "unboxed_mask"
   | Pgcscannableproductarray_ref kinds ->
     fprintf ppf "scannableproduct %s" (scannable_product_element_kinds kinds)
   | Pgcignorableproductarray_ref kinds ->
@@ -148,6 +150,7 @@ let array_set_kind ppf k =
   | Punboxedvectorarray_set Unboxed_vec128 -> fprintf ppf "unboxed_vec128"
   | Punboxedvectorarray_set Unboxed_vec256 -> fprintf ppf "unboxed_vec256"
   | Punboxedvectorarray_set Unboxed_vec512 -> fprintf ppf "unboxed_vec512"
+  | Punboxedmaskarray_set -> fprintf ppf "unboxed_mask"
   | Pgcscannableproductarray_set (mode, kinds) ->
     fprintf ppf "scannableproduct%a %s" pp_mode mode
       (scannable_product_element_kinds kinds)
@@ -176,6 +179,7 @@ let rec mixed_block_element print_value_kind ppf el =
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
@@ -221,6 +225,7 @@ let rec raw_value_kind ppf rk =
   | Parrayval elt_kind -> fprintf ppf "%sarray" (array_kind elt_kind)
   | Pboxedintval bi -> fprintf ppf "%s" (boxed_integer bi)
   | Pboxedvectorval bv -> fprintf ppf "%s" (boxed_vector bv)
+  | Pboxedmaskval -> fprintf ppf "mask"
   | Pvariant { consts; non_consts; } ->
     variant_kind value_kind ppf ~consts ~non_consts
 
@@ -242,6 +247,7 @@ let rec layout ppf lay_ =
   | Punboxed_or_untagged_integer bi ->
     fprintf ppf "%s" (unboxed_integer_layout bi)
   | Punboxed_vector bv -> fprintf ppf "%s" (unboxed_vector_layout bv)
+  | Punboxed_mask -> fprintf ppf "mask"
   | Punboxed_product layouts ->
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
@@ -276,6 +282,8 @@ let return_kind ppf (mode, kind) =
       fprintf ppf ": %s%s%s@ " smode (boxed_integer bi) or_null_suffix
     | Pboxedvectorval bv ->
       fprintf ppf ": %s%s%s@ " smode (boxed_vector bv) or_null_suffix
+    | Pboxedmaskval ->
+      fprintf ppf ": %smask%s@ " smode or_null_suffix
     | Pvariant { consts; non_consts; } ->
       fprintf ppf ": %a@ "
         (fun ppf () -> variant_kind value_kind ppf ~consts ~non_consts) ()
@@ -283,6 +291,7 @@ let return_kind ppf (mode, kind) =
   | Punboxed_float bf -> fprintf ppf ": %s@ " (unboxed_float bf)
   | Punboxed_or_untagged_integer bi -> fprintf ppf ": %s@ " (unboxed_integer bi)
   | Punboxed_vector bv -> fprintf ppf ": %s@ " (unboxed_vector bv)
+  | Punboxed_mask -> fprintf ppf ": unboxed_mask@ "
   | Punboxed_product _ -> fprintf ppf ": %a@ " layout kind
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
@@ -341,6 +350,7 @@ let rec mixed_block_element
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Word -> fprintf ppf "word"
   | Untagged_immediate -> fprintf ppf "untagged_immediate"
   | Product shape ->
@@ -845,10 +855,18 @@ let primitive ppf = function
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_load_field_imm"
         | Pointer -> fprintf ppf "atomic_load_field_ptr")
+  | Patomic_load_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_load_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_set_field_imm"
         | Pointer -> fprintf ppf "atomic_set_field_ptr")
+  | Patomic_set_mixed_field { index ; shape } ->
+      fprintf ppf "atomic_set_mixed_field %a %a"
+        pp_print_int index
+        (mixed_block_shape (fun _ () -> ())) shape
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> fprintf ppf "atomic_exchange_field_imm"
@@ -1049,10 +1067,12 @@ let name_of_primitive = function
       (match immediate_or_pointer with
         | Immediate -> "atomic_load_field_imm"
         | Pointer -> "atomic_load_field_ptr")
+  | Patomic_load_mixed_field _ -> "atomic_load_mixed_field"
   | Patomic_set_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_set_field_imm"
         | Pointer -> "atomic_set_field_ptr")
+  | Patomic_set_mixed_field _ -> "atomic_set_mixed_field"
   | Patomic_exchange_field {immediate_or_pointer} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_exchange_field_imm"
@@ -1211,7 +1231,8 @@ let debug_uid ppf duid =
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
-  | Const_base(Const_untagged_char c) -> fprintf ppf "#%C" c
+  | Const_base(Const_untagged_char c) ->
+      fprintf ppf "#%C" (Char.chr (c land 0xff))
   | Const_base(Const_string (s, _, _)) -> fprintf ppf "%S" s
   | Const_immstring s -> fprintf ppf "#%S" s
   | Const_base(Const_float f) -> fprintf ppf "%s" f
@@ -1277,6 +1298,11 @@ let rec lam ppf = function
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let form =
+        match ap.ap_yielding with
+        | May_yield -> form ^ "[yielding]"
+        | Unyielding -> form
+      in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
         apply_tailcall_attribute ap.ap_tailcall
@@ -1402,13 +1428,19 @@ let rec lam ppf = function
        lam for_to lam for_body
   | Lassign(id, expr) ->
       fprintf ppf "@[<2>(assign@ %a@ %a)@]" Ident.print id lam expr
-  | Lsend (k, met, obj, largs, pos, reg, _, _) ->
+  | Lsend (k, met, obj, largs, pos, reg, _, _, yielding) ->
       let args ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       let kind =
         if k = Self then "self" else if k = Cached then "cache" else "" in
       let form = apply_kind "send" pos reg in
-      fprintf ppf "@[<2>(%s%s@ %a@ %a%a)@]" form kind lam obj lam met args largs
+      let marker =
+        match yielding with
+        | May_yield -> "[yielding]"
+        | Unyielding -> ""
+      in
+      fprintf ppf "@[<2>(%s%s%s@ %a@ %a%a)@]" form kind marker
+        lam obj lam met args largs
   | Levent(expr, ev) ->
       let kind =
        match ev.lev_kind with

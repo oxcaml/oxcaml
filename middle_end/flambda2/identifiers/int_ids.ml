@@ -52,6 +52,7 @@ module Const_data = struct
     | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
     | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
     | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
+    | Naked_mask of Vector_types.Mask.Bit_pattern.t
     | Null
     | Poison of Flambda_kind.t * string
 
@@ -124,6 +125,11 @@ module Const_data = struct
           Flambda_colours.naked_number
           Vector_types.Vec512.Bit_pattern.print v
           Flambda_colours.pop
+      | Naked_mask v ->
+        Format.fprintf ppf "%t#mask[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Mask.Bit_pattern.print v
+          Flambda_colours.pop
       | Null ->
         Format.fprintf ppf "%t#null%t"
           Flambda_colours.naked_number
@@ -155,6 +161,8 @@ module Const_data = struct
         Vector_types.Vec256.Bit_pattern.compare v1 v2
       | Naked_vec512 v1, Naked_vec512 v2 ->
         Vector_types.Vec512.Bit_pattern.compare v1 v2
+      | Naked_mask v1, Naked_mask v2 ->
+        Vector_types.Mask.Bit_pattern.compare v1 v2
       | Null, Null -> 0
       | Poison (kind1, name1), Poison (kind2, name2) ->
         let c = Flambda_kind.compare kind1 kind2 in
@@ -183,6 +191,8 @@ module Const_data = struct
       | _, Naked_vec256 _ -> 1
       | Naked_vec512 _, _ -> -1
       | _, Naked_vec512 _ -> 1
+      | Naked_mask _, _ -> -1
+      | _, Naked_mask _ -> 1
       | Poison _, _ -> -1
       | _, Poison _ -> 1
 
@@ -209,13 +219,15 @@ module Const_data = struct
           Vector_types.Vec256.Bit_pattern.equal v1 v2
         | Naked_vec512 v1, Naked_vec512 v2 ->
           Vector_types.Vec512.Bit_pattern.equal v1 v2
+        | Naked_mask v1, Naked_mask v2 ->
+          Vector_types.Mask.Bit_pattern.equal v1 v2
         | Null, Null -> true
         | Poison (kind1, name1), Poison (kind2, name2) ->
           Flambda_kind.equal kind1 kind2 && String.equal name1 name2
         | ( ( Naked_immediate _ | Tagged_immediate _ | Naked_float _
             | Naked_float32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-            | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
-            | Naked_nativeint _ | Null | Poison _ ),
+            | Naked_mask _ | Naked_int8 _ | Naked_int16 _ | Naked_int32 _
+            | Naked_int64 _ | Naked_nativeint _ | Null | Poison _ ),
             _ ) ->
           false
 
@@ -233,6 +245,7 @@ module Const_data = struct
       | Naked_vec128 v -> Vector_types.Vec128.Bit_pattern.hash v
       | Naked_vec256 v -> Vector_types.Vec256.Bit_pattern.hash v
       | Naked_vec512 v -> Vector_types.Vec512.Bit_pattern.hash v
+      | Naked_mask v -> Vector_types.Mask.Bit_pattern.hash v
       | Null -> Hashtbl.hash 0
       | Poison (kind, name) ->
         Hashtbl.hash (Flambda_kind.hash kind, String.hash name)
@@ -393,6 +406,8 @@ module Const = struct
   let naked_vec256 i = create (Naked_vec256 i)
 
   let naked_vec512 i = create (Naked_vec512 i)
+
+  let naked_mask i = create (Naked_mask i)
 
   let const_true machine_width =
     tagged_immediate (Target_ocaml_int.bool_true machine_width)

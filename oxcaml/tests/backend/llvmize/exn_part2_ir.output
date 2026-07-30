@@ -2180,4 +2180,5 @@ module asm "  movq camlExn_part2__catch_wildcard_HIDE_STAMP.recover_rbp_var.L428
 module asm "  jmpq *%rbx"
 
 !0 = !{ i32 1, !"oxcaml_module", !"Exn_part2" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }

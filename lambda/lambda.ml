@@ -126,6 +126,15 @@ type region_close =
   | Rc_nontail
   | Rc_close_at_apply
 
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+let join_yielding_kind a b =
+  match a, b with
+  | May_yield, _ | _, May_yield -> May_yield
+  | Unyielding, Unyielding -> Unyielding
+
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
 module Scalar = Scalar
@@ -364,7 +373,15 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_compare_exchange_field of
     {immediate_or_pointer : immediate_or_pointer}
@@ -415,6 +432,7 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
@@ -440,6 +458,7 @@ and value_kind_non_null =
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
+  | Pboxedmaskval
 
 and layout =
   | Ptop
@@ -447,6 +466,7 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Slambdaident.t
@@ -467,6 +487,7 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
@@ -486,6 +507,7 @@ and array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   | Punspecializedarray
@@ -499,6 +521,7 @@ and array_ref_kind =
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
+  | Punboxedmaskarray_ref
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   | Punspecializedarray_ref of locality_mode
@@ -512,6 +535,7 @@ and array_set_kind =
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
+  | Punboxedmaskarray_set
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
@@ -632,6 +656,7 @@ let rec equal_value_kind_non_null x y =
   | Pboxedfloatval f1, Pboxedfloatval f2 -> Primitive.equal_boxed_float f1 f2
   | Pboxedintval bi1, Pboxedintval bi2 -> Primitive.equal_boxed_integer bi1 bi2
   | Pboxedvectorval v1, Pboxedvectorval v2 -> Primitive.equal_boxed_vector v1 v2
+  | Pboxedmaskval, Pboxedmaskval -> true
   | Pintval, Pintval -> true
   | Parrayval elt_kind1, Parrayval elt_kind2 -> elt_kind1 = elt_kind2
   | Pvariant { consts = consts1; non_consts = non_consts1; },
@@ -647,7 +672,7 @@ let rec equal_value_kind_non_null x y =
              && equal_constructor_shape cstr1 cstr2)
            non_consts1 non_consts2
   | (Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pintval | Pvariant _
-      | Parrayval _ | Pboxedvectorval _), _ -> false
+      | Parrayval _ | Pboxedvectorval _ | Pboxedmaskval), _ -> false
 
 and equal_value_kind x y =
   equal_value_kind_non_null x.raw_kind y.raw_kind
@@ -670,6 +695,7 @@ and equal_mixed_block_element :
   | Vec128, Vec128
   | Vec256, Vec256
   | Vec512, Vec512
+  | Mask, Mask
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
@@ -678,7 +704,7 @@ and equal_mixed_block_element :
   | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+     | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
@@ -745,12 +771,13 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Vec128, Vec128
   | Vec256, Vec256
   | Vec512, Vec512
+  | Mask, Mask
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> Some m1
   | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
       Some m1
   | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
-      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
       | Untagged_immediate | Product _ | Splice_variable _ ),
       _ ) ->
       None
@@ -790,7 +817,7 @@ let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Product elts -> Array.for_all is_value_or_void_element elts
   | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     false
 (* CR layout poly: This function probably shouldn't exist at all and we should
    merge mixed_block_shape and block_shape. *)
@@ -830,9 +857,10 @@ let rec join_layout x y =
   | Punboxed_vector v1, Punboxed_vector v2
     when Primitive.equal_unboxed_vector v1 v2 ->
       x
+  | Punboxed_mask, Punboxed_mask -> x
   | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
   | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-      | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ ),
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
       Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
@@ -1080,6 +1108,7 @@ type lambda =
   | Lsend of
       meth_kind * lambda * lambda * lambda list
       * region_close * locality_mode * scoped_location * layout
+      * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -1137,6 +1166,11 @@ and lfunction =
     loc: scoped_location;
     mode: locality_mode;
     ret_mode: locality_mode;
+    yielding: yielding_kind;
+    (* [Unyielding] if fully applying the closure can never perform a free
+       effect (it neither closes over nor is passed any yielding value).
+       Only set precisely by [Translcore]; other construction sites
+       conservatively default to [May_yield]. *)
   }
 
 and lkindtemplate =
@@ -1177,6 +1211,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute;
@@ -1216,7 +1251,7 @@ let rec try_to_find_location lam =
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _, _)
   | Levent (_, { lev_loc = loc; _ })
   | Lsplice (loc, _) ->
     loc
@@ -1434,10 +1469,13 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      if is_local_mode ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
-  { kind; params; return; body; attr; loc; mode; ret_mode }
+  { kind; params; return; body; attr; loc; mode; ret_mode;
+    yielding = May_yield }
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
+
+let lfunction_with_yielding yielding (lf : lfunction) = { lf with yielding }
 
 let lambda_unit = Lconst const_unit
 
@@ -1497,6 +1535,7 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
+let layout_unboxed_mask = Punboxed_mask
 
 let layout_unboxed_vector v =
   match v with
@@ -1510,6 +1549,7 @@ let layout_unboxed_vector v =
   | Unboxed_vec512 -> Punboxed_vector Unboxed_vec512
 
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+let layout_boxed_mask = non_null_value Pboxedmaskval
 
 let layout_tupled_vector v =
   let fields =
@@ -1669,8 +1709,9 @@ let make_key e =
         Lsequence (tr_rec env e1,tr_rec env e2)
     | Lassign (x,e) ->
         Lassign (x,tr_rec env e)
-    | Lsend (m,e1,e2,es,pos,mo,_loc,layout) ->
-        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
+    | Lsend (m,e1,e2,es,pos,mo,_loc,layout,yielding) ->
+        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,
+               layout,yielding)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
@@ -1773,7 +1814,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f for_from; f for_to; f for_body
   | Lassign(_, e) ->
       f e
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       List.iter f (met::obj::args)
   | Levent (e, _evt) ->
       tail e
@@ -1866,7 +1907,7 @@ let rec free_variables = function
            (Ident.Set.remove for_id (free_variables for_body)))
   | Lassign(id, e) ->
       Ident.Set.add id (free_variables e)
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       free_variables_list
         (Ident.Set.union (free_variables met) (free_variables obj))
         args
@@ -1943,6 +1984,7 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
     then Product [|Vec128; Vec128|]
     else Vec256
   | Vec512 -> Vec512
+  | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
@@ -1973,6 +2015,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
       then Product [|Vec128; Vec128|]
       else Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
@@ -2004,7 +2047,7 @@ let transl_module_representation repr =
     match elt with
     | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
     | Product _ | Void -> false
   in
   if Array.for_all is_value shape
@@ -2193,9 +2236,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         assert (not (Ident.Map.mem id s));
         let id = try Ident.Map.find id l with Not_found -> id in
         Lassign(id, subst s l e)
-    | Lsend (k, met, obj, args, pos, mode, loc, layout) ->
+    | Lsend (k, met, obj, args, pos, mode, loc, layout, yielding) ->
         Lsend (k, subst s l met, subst s l obj, subst_list s l args,
-               pos, mode, loc, layout)
+               pos, mode, loc, layout, yielding)
     | Levent (lam, evt) ->
         let old_env = evt.lev_env in
         let env_updates =
@@ -2273,11 +2316,12 @@ let duplicate_function =
      Ident.Map.empty).subst_lfunction
 
 let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
-                      mode; ret_mode } as lfunction) =
+                      mode; ret_mode; yielding } as lfunction) =
   let new_body = f old_body in
   if old_body == new_body
   then lfunction
-  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode }
+  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
+         yielding }
 
 let shallow_map ~tail ~non_tail:f lam =
   match lam with
@@ -2286,8 +2330,8 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lconst _
   | Lsplice _ -> lam
   | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
-             ap_region_close; ap_mode; ap_loc; ap_tailcall; ap_inlined;
-             ap_specialised; ap_probe } ->
+             ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
+             ap_inlined; ap_specialised; ap_probe } ->
       let new_func = f old_func in
       let new_args = Misc.Stdlib.List.map_sharing f old_args in
       if old_func == new_func && old_args == new_args
@@ -2299,6 +2343,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ap_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
@@ -2472,13 +2517,13 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lassign (v, old_e) ->
       let new_e = f old_e in
       if old_e == new_e then lam else Lassign (v, new_e)
-  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout) ->
+  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout, yielding) ->
       let new_m = f old_m in
       let new_o = f old_o in
       let new_el = Misc.Stdlib.List.map_sharing f old_el in
       if old_m == new_m && old_o == new_o && old_el == new_el
       then lam
-      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout)
+      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout, yielding)
   | Levent (old_l, ev) ->
       let new_l = tail old_l in
       if old_l == new_l then lam else Levent (new_l, ev)
@@ -2601,7 +2646,8 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
+        | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -2612,7 +2658,7 @@ let mixed_block_projection_may_allocate shape ~path =
     match element with
     | Float_boxed mode -> Some mode
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    | Untagged_immediate | Vec128 | Vec256 | Vec512 -> None
+    | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -2671,12 +2717,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parraysetu _ | Parraysets _
   | Parrayrefu ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
   | Parrayrefs ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
@@ -2764,7 +2810,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
     Some alloc_heap
   | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
+  | Patomic_load_mixed_field _
   | Patomic_set_field _
+  | Patomic_set_mixed_field _
   | Patomic_exchange_field _
   | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _
@@ -2957,7 +3005,8 @@ let primitive_can_raise prim =
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3017,6 +3066,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Base Mask -> layout_unboxed_mask
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
@@ -3027,6 +3077,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
+  | Unboxed_mask -> layout_boxed_mask
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_or_untagged_integer
       (Untagged_int | Untagged_int8 | Untagged_int16) ->
@@ -3043,13 +3094,35 @@ let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
-  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
   | Same_as_ocaml_repr (Genvar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+
+let strip_locality_mode shape =
+  let rec strip_elt elt =
+    match elt with
+    | Float_boxed _ -> Float_boxed ()
+    | Product elts -> Product (Array.map strip_elt elts)
+    | Value vk -> Value vk
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Mask -> Mask
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Splice_variable id -> Splice_variable id
+  in
+  Array.map strip_elt shape
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
@@ -3076,6 +3149,7 @@ let element_layout_of_array_kind = function
   | Pgenarray | Paddrarray | Pgcignorableaddrarray -> layout_value_field
   | Punboxedoruntaggedintarray i -> layout_unboxed_int i
   | Punboxedvectorarray bv -> layout_unboxed_vector bv
+  | Punboxedmaskarray -> layout_unboxed_mask
   | Pgcscannableproductarray kinds -> layout_of_scannable_kinds kinds
   | Pgcignorableproductarray kinds -> layout_of_ignorable_kinds kinds
   | Punspecializedarray ->
@@ -3091,6 +3165,7 @@ let array_kind_of_array_ref_kind : array_ref_kind -> array_kind = function
   | Punboxedfloatarray_ref bf -> Punboxedfloatarray bf
   | Punboxedoruntaggedintarray_ref i -> Punboxedoruntaggedintarray i
   | Punboxedvectorarray_ref bv -> Punboxedvectorarray bv
+  | Punboxedmaskarray_ref -> Punboxedmaskarray
   | Pgcscannableproductarray_ref kinds -> Pgcscannableproductarray kinds
   | Pgcignorableproductarray_ref kinds -> Pgcignorableproductarray kinds
   | Punspecializedarray_ref _ -> Punspecializedarray
@@ -3104,6 +3179,7 @@ let array_kind_of_array_set_kind : array_set_kind -> array_kind = function
   | Punboxedfloatarray_set bf -> Punboxedfloatarray bf
   | Punboxedoruntaggedintarray_set i -> Punboxedoruntaggedintarray i
   | Punboxedvectorarray_set bv -> Punboxedvectorarray bv
+  | Punboxedmaskarray_set -> Punboxedmaskarray
   | Pgcscannableproductarray_set (_, kinds) -> Pgcscannableproductarray kinds
   | Pgcignorableproductarray_set kinds -> Pgcignorableproductarray kinds
   | Punspecializedarray_set _ -> Punspecializedarray
@@ -3123,6 +3199,7 @@ let rec layout_of_mixed_block_element element =
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
@@ -3158,6 +3235,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
     assert (not split_vectors);
     Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
+  | Punboxed_mask -> Mask
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
@@ -3190,6 +3268,7 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
@@ -3199,7 +3278,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate
   | Splice_variable _ ->
     [el]
 
@@ -3216,7 +3295,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
           { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
+        | Word | Vec128 |  Vec256 | Vec512 | Mask | Untagged_immediate ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
       (mixed_block_element_leaves mbe)
@@ -3407,7 +3486,9 @@ let primitive_result_layout (p : primitive) =
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
     layout_any_value
-  | Patomic_set_field _ -> layout_unit
+  | Patomic_load_mixed_field { index ; shape } ->
+    layout_of_mixed_block_shape shape ~path:[index]
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
   | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_exchange_field { immediate_or_pointer = Pointer } ->
@@ -3461,6 +3542,7 @@ let array_ref_kind mode = function
     Punboxedoruntaggedintarray_ref int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_ref float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_ref
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
   | Punspecializedarray -> Punspecializedarray_ref mode
@@ -3475,6 +3557,7 @@ let array_set_kind mode = function
     Punboxedoruntaggedintarray_set int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_set float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_set
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
   | Punspecializedarray -> Punspecializedarray_set mode
@@ -3486,6 +3569,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Punboxedfloatarray_set uf -> Punboxedfloatarray_ref uf
   | Punboxedoruntaggedintarray_set ui -> Punboxedoruntaggedintarray_ref ui
   | Punboxedvectorarray_set uv -> Punboxedvectorarray_ref uv
+  | Punboxedmaskarray_set -> Punboxedmaskarray_ref
   | Pgcscannableproductarray_set (_, scannables) ->
     Pgcscannableproductarray_ref scannables
   | Pgcignorableproductarray_set ignorables ->
@@ -3512,7 +3596,7 @@ let may_allocate_in_region lam =
 
     | Lapply {ap_mode=Alloc_local}
     | Lkindinstantiate {kinst_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Alloc_local,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
@@ -3591,7 +3675,8 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _
-  | Punboxedoruntaggedintarray _  -> 1
+  | Punboxedoruntaggedintarray _
+  | Punboxedmaskarray -> 1
   | Punboxedvectorarray Unboxed_vec128 -> 2
   | Punboxedvectorarray Unboxed_vec256 -> 4
   | Punboxedvectorarray Unboxed_vec512 -> 8
@@ -3632,6 +3717,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64
+  | Punboxedmaskarray -> 8
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8

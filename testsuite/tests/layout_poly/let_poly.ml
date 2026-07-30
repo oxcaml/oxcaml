@@ -17,7 +17,7 @@ external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let (a, b, c, d) =
@@ -47,9 +47,8 @@ Error: This expression is not allowed in a "let poly_" definition;
 let poly_ const x y = x
 and poly_ apply f x = f x
 [%%expect{|
-val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <lpoly>
-val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b =
-  <lpoly>
+val poly_ const : 'a -> 'b -> 'a = <lpoly>
+val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
 |}]
 
 (* CR-soon zqian: Tuple patterns are not yet supported by transl.
@@ -72,14 +71,11 @@ Lines 4-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig
-           val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-           val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'b
-         end
+         sig val poly_ f : 'a -> 'b -> 'a val poly_ g : 'a -> 'b -> 'b end
        is not included in
          sig val f : int val g : int end
        Values do not match:
-         val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+         val poly_ f : 'a -> 'b -> 'a
        is not included in
          val f : int
        The type "'a -> 'b -> 'a" is not compatible with the type "int"
@@ -100,11 +96,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val regular_id : 'a -> 'a end
        is not included in
-         sig val regular_id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ regular_id : 'a -> 'a end
        Values do not match:
          val regular_id : 'a -> 'a
        is not included in
-         val regular_id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ regular_id : 'a -> 'a
        the second has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
@@ -154,11 +150,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ id : 'a -> 'a end
        is not included in
          sig val id : 'a -> 'a end
        Values do not match:
-         val id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ id : 'a -> 'a
        is not included in
          val id : 'a -> 'a
        the first has 1 more layout parameter that is not used,
@@ -178,7 +174,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* constructor: passing when all args are syntactic values *)
 let poly_ f = Some (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). ('a -> 'a) option = <lpoly>
+val poly_ f : ('a -> 'a) option = <lpoly>
 |}]
 
 (* constructor: failing when an arg is not a syntactic value *)
@@ -194,13 +190,13 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* variant: passing - no payload *)
 let poly_ f _ = `A
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> [> `A ] = <lpoly>
+val poly_ f : 'a -> [> `A ] = <lpoly>
 |}]
 
 (* variant: passing - payload is a syntactic value *)
 let poly_ f = `A (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). [> `A of 'a -> 'a ] = <lpoly>
+val poly_ f : [> `A of 'a -> 'a ] = <lpoly>
 |}]
 
 (* variant: failing - payload is not a syntactic value *)
@@ -242,7 +238,7 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* unboxed tuple: passing when all components are syntactic values *)
 let poly_ f = #(42, fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). #(int * ('a -> 'a)) = <lpoly>
+val poly_ f : #(int * ('a -> 'a)) = <lpoly>
 |}]
 
 (* unboxed tuple: failing when a component is not a syntactic value *)
@@ -260,7 +256,7 @@ type r = { a : int; b : int -> int }
 let poly_ f _ = { a = 42; b = fun x -> x }
 [%%expect{|
 type r = { a : int; b : int -> int; }
-val f : layout_ l. ('a : l). 'a -> r = <lpoly>
+val poly_ f : 'a -> r = <lpoly>
 |}]
 
 (* record: failing when a field is not a syntactic value *)
@@ -278,7 +274,7 @@ type ur = #{ a : int; b : int }
 let poly_ f _ = #{ a = 42; b = 0 }
 [%%expect{|
 type ur = #{ a : int; b : int; }
-val f : layout_ l. ('a : l). 'a -> ur = <lpoly>
+val poly_ f : 'a -> ur = <lpoly>
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
@@ -294,13 +290,13 @@ Error: This expression is not allowed in a "let poly_" definition;
 (* RHS might constrain a layout and makes it not polymorphic *)
 let poly_ f x y = #(x, (y, y))
 [%%expect{|
-val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+val poly_ f : 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
 let poly_ f x = (x : (_ : any))
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ f : 'a -> 'a = <lpoly>
 |}]
 
 (* [value] does constrain the layout *)
@@ -316,7 +312,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 (* [assert false] is layout poly *)
 let poly_ f () = assert false
 [%%expect{|
-val f : layout_ l. ('a : l). unit -> 'a = <lpoly>
+val poly_ f : unit -> 'a = <lpoly>
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic
@@ -338,7 +334,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <lpoly>
+val poly_ foo : 'a -> 'b -> unit = <lpoly>
 |}]
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no

@@ -292,14 +292,14 @@ let rec fracture_lam lambda : slambda =
   | Lassign (id, lam) ->
     let value = fracture_dynamic lam in
     create_dynamic (if lam == value then lambda else Lassign (id, value))
-  | Lsend (kind, met, obj, args, pos, mode, loc, layout) ->
+  | Lsend (kind, met, obj, args, pos, mode, loc, layout, yielding) ->
     let fmet = fracture_dynamic met in
     let fobj = fracture_dynamic obj in
     let fargs = fracture_dynamic_list args in
     create_dynamic
       (if fmet == met && fobj == obj && fargs == args
        then lambda
-       else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout))
+       else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout, yielding))
   | Levent (lam, ev) ->
     slet_local "body" lam (fun body_c body_r ->
         SLhalves
@@ -445,6 +445,7 @@ let rec fracture_lam lambda : slambda =
                         ap_result_layout = kinst_result_layout;
                         ap_region_close = Rc_normal;
                         ap_mode = kinst_mode;
+                        ap_yielding = Unyielding;
                         ap_loc = kinst_loc;
                         ap_tailcall = Default_tailcall;
                         ap_inlined = Default_inlined;
@@ -554,7 +555,8 @@ and fracture_prim lambda prim args loc =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
+  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field

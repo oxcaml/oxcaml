@@ -2,6 +2,7 @@
  only-default-codegen;
  flags = " -O3";
  flags += " -experimental-optimizations";
+ flags += " -flambda2-simplify-stubs";
  expect.opt;
 *)
 

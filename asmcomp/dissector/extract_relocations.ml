@@ -28,65 +28,111 @@
 (* CR mshinwell: This file needs to be code reviewed *)
 
 module Elf = Compiler_owee.Owee_elf
+module Buf = Compiler_owee.Owee_buf
 module Rela = Compiler_owee.Owee_elf_relocation
 
 let log_verbose = Dissector_log.log_verbose
 
-module Relocation_entry = struct
+(* A partition's partially-linked object file. *)
+module Mapped_object_file = struct
   type t =
-    { symbol_name : string;
-      offset : int64
+    { filename : string;
+      buf : Buf.t;
+      header : Elf.header;
+      sections : Elf.section array;
+      symbols : Elf.symbol array;
+      rela_text_sections : (Elf.section * Buf.t) list
     }
 
-  let symbol_name t = t.symbol_name
+  let filename t = t.filename
 
-  let offset t = t.offset
+  let buf t = t.buf
+
+  let header t = t.header
+
+  let sections t = t.sections
+
+  let symbols t = t.symbols
+
+  let rela_text_sections t = t.rela_text_sections
+
+  (* Find all sections with names starting with prefix *)
+  let find_sections_with_prefix sections prefix =
+    Array.to_seq sections
+    |> Seq.filter (fun (section : Elf.section) ->
+        String.starts_with ~prefix section.sh_name_str)
+    |> List.of_seq
+
+  (* Find the symbol table section *)
+  let find_symtab_section sections =
+    Array.find_opt
+      (fun (section : Elf.section) ->
+        Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
+      sections
+
+  let read (unix : (module Compiler_owee.Unix_intf.S)) ~filename =
+    let module Unix = (val unix) in
+    log_verbose "extracting relocations from %s" filename;
+    let buf = Buf.map_binary (module Unix) filename in
+    let header, sections = Elf.read_elf buf in
+    (* Find all .rela.text* sections (handles function sections: .rela.text,
+       .rela.text.foo, .rela.text.bar, etc.) *)
+    let rela_text_sections = find_sections_with_prefix sections ".rela.text" in
+    (match rela_text_sections with
+    | [] -> log_verbose "  no .rela.text* sections found"
+    | _ ->
+      log_verbose "  found %d .rela.text* sections"
+        (List.length rela_text_sections));
+    (* Find symbol table *)
+    let symtab_section =
+      match find_symtab_section sections with
+      | Some section -> section
+      | None ->
+        Misc.fatal_errorf "Dissector: no symbol table found in %s" filename
+    in
+    (* Find string table (sh_link of symtab points to it) *)
+    let strtab_index = symtab_section.sh_link in
+    if strtab_index >= Array.length sections
+    then
+      Misc.fatal_errorf "Dissector: symtab sh_link out of range in %s" filename;
+    let strtab_section = sections.(strtab_index) in
+    let symtab_body = Elf.section_body buf symtab_section in
+    let strtab_body = Elf.section_body buf strtab_section in
+    let symbols = Elf.read_symbols ~symtab_body ~strtab_body in
+    let rela_text_sections =
+      List.map
+        (fun (section : Elf.section) -> section, Elf.section_body buf section)
+        rela_text_sections
+    in
+    { filename; buf; header; sections; symbols; rela_text_sections }
 end
 
 type t =
-  { convert_to_plt : Relocation_entry.t list;
-    convert_to_got : Relocation_entry.t list;
+  { plt_symbols : Relocatable_symbol_name.t list;
+    got_symbols : Relocatable_symbol_name.t list;
     num_plt : int;
     num_got : int
   }
 
-let convert_to_plt t = t.convert_to_plt
+let plt_symbols t = t.plt_symbols
 
-let convert_to_got t = t.convert_to_got
+let got_symbols t = t.got_symbols
 
 let num_plt t = t.num_plt
 
 let num_got t = t.num_got
 
-let empty =
-  { convert_to_plt = []; convert_to_got = []; num_plt = 0; num_got = 0 }
-
-(* Accumulator for efficient merging - stores lists in reverse order *)
-type accumulator =
-  { acc_plt : Relocation_entry.t list;
-    acc_got : Relocation_entry.t list;
-    acc_num_plt : int;
-    acc_num_got : int
-  }
-
-let empty_accumulator =
-  { acc_plt = []; acc_got = []; acc_num_plt = 0; acc_num_got = 0 }
-
-(* Add entries to accumulator - O(n) where n is size of entries being added *)
-let accumulate acc entries =
-  { acc_plt = List.rev_append entries.convert_to_plt acc.acc_plt;
-    acc_got = List.rev_append entries.convert_to_got acc.acc_got;
-    acc_num_plt = acc.acc_num_plt + entries.num_plt;
-    acc_num_got = acc.acc_num_got + entries.num_got
-  }
-
-(* Finalize accumulator into result - reverses the lists *)
-let finalize acc =
-  { convert_to_plt = List.rev acc.acc_plt;
-    convert_to_got = List.rev acc.acc_got;
-    num_plt = acc.acc_num_plt;
-    num_got = acc.acc_num_got
-  }
+(* Record a relocation; we only care about which symbols relocations occur
+   against, not their frequency, so we use a bitmap to deduplicate. *)
+let record_relocation ~seen ~acc ~num ~sym_index ~symbol_name =
+  (* [num] counts every site, not deduplicated symbols: it feeds the
+     per-partition log summary in [Dissector.run]. *)
+  incr num;
+  if not (Misc.Bitmap.get seen sym_index)
+  then begin
+    Misc.Bitmap.set seen sym_index;
+    acc := Relocatable_symbol_name.of_string symbol_name :: !acc
+  end
 
 (* Parse RELA entries and extract PLT32 and REX_GOTPCRELX relocations for
    undefined symbols (st_shndx = SHN_UNDEF). Only undefined symbols need PLT/GOT
@@ -98,22 +144,15 @@ let finalize acc =
 
    PC32 relocations to undefined symbols are an error. They occur when code is
    compiled with -nodynlink, which is incompatible with the dissector. *)
-let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
-  let convert_to_plt = ref [] in
-  let convert_to_got = ref [] in
-  Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
-      (* Check for PC32 relocations to undefined symbols - these are an error *)
-      if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.pc32
-      then
-        match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
-        | Some shndx when Rela.Section_index.is_undef shndx ->
+let parse_rela_section ~rela_body ~symbols ~record_plt ~record_got =
+  Rela.iteri_rela_entries ~rela_body ~f:(fun ~index:_ entry ->
+      match entry.r_type with
+      (* PC32 relocations to undefined symbols are an error *)
+      | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.pc32 -> (
+        match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
+        | Some sym when Rela.Section_index.is_undef sym.Elf.st_shndx ->
           let symbol_name =
-            match
-              Rela.read_symbol_name ~symtab_body ~strtab_body
-                ~sym_index:entry.r_sym
-            with
-            | Some name -> name
-            | None -> "<unknown>"
+            if String.equal sym.Elf.name "" then "<unknown>" else sym.Elf.name
           in
           Misc.fatal_errorf
             "Dissector: R_X86_64_PC32 relocation to undefined symbol %s at \
@@ -121,106 +160,66 @@ let parse_rela_section ~rela_body ~symtab_body ~strtab_body =
              The dissector requires code to be compiled without -nodynlink \
              (i.e., with dynamic linking support enabled)."
             symbol_name entry.r_offset
-        | _ -> ()
-      else if
-        Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-        || Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-      then
+        | _ -> ())
+      | rt
+        when Rela.Reloc_type.equal rt Rela.Reloc_type.plt32
+             || Rela.Reloc_type.equal rt Rela.Reloc_type.rex_gotpcrelx -> (
         (* Only process relocations for undefined symbols *)
-        match Rela.read_symbol_shndx ~symtab_body ~sym_index:entry.r_sym with
+        match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
         | None ->
           log_verbose "  reloc %s at 0x%Lx: no symbol shndx"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
-        | Some shndx when Rela.Section_index.is_defined shndx ->
+        | Some sym when Rela.Section_index.is_defined sym.Elf.st_shndx ->
           log_verbose "  reloc %s at 0x%Lx: symbol defined (shndx=%d), skipping"
             (Rela.Reloc_type.name entry.r_type)
             entry.r_offset
-            (Rela.Section_index.to_int shndx)
-        | Some _ -> (
-          match
-            Rela.read_symbol_name ~symtab_body ~strtab_body
-              ~sym_index:entry.r_sym
-          with
-          | None ->
-            log_verbose "  reloc %s at 0x%Lx: no symbol name"
-              (Rela.Reloc_type.name entry.r_type)
-              entry.r_offset
-          | Some symbol_name ->
-            log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
-              (Rela.Reloc_type.name entry.r_type)
-              entry.r_offset symbol_name;
-            let reloc_entry =
-              { Relocation_entry.symbol_name; offset = entry.r_offset }
-            in
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then convert_to_plt := reloc_entry :: !convert_to_plt
-            else convert_to_got := reloc_entry :: !convert_to_got));
-  let rev_and_count lst =
-    List.fold_left (fun (acc, n) x -> x :: acc, n + 1) ([], 0) lst
+            (Rela.Section_index.to_int sym.Elf.st_shndx)
+        | Some sym ->
+          let symbol_name = sym.Elf.name in
+          log_verbose "  reloc %s at 0x%Lx -> %s (UNDEF)"
+            (Rela.Reloc_type.name entry.r_type)
+            entry.r_offset symbol_name;
+          if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
+          then record_plt ~sym_index:entry.r_sym ~symbol_name
+          else record_got ~sym_index:entry.r_sym ~symbol_name)
+      | _ -> ())
+
+let extract_from_rela_text_sections ~symbols sections =
+  (* Symbols are deduplicated, keyed on the symbol table index. One "seen"
+     bitmap per list: a symbol may need both an IPLT and an IGOT entry. *)
+  let num_symbols = Array.length symbols in
+  let plt_seen = Misc.Bitmap.make num_symbols in
+  let got_seen = Misc.Bitmap.make num_symbols in
+  let plt_symbols = ref [] in
+  let got_symbols = ref [] in
+  let num_plt = ref 0 in
+  let num_got = ref 0 in
+  let record_plt ~sym_index ~symbol_name =
+    record_relocation ~seen:plt_seen ~acc:plt_symbols ~num:num_plt ~sym_index
+      ~symbol_name
   in
-  let convert_to_plt, num_plt = rev_and_count !convert_to_plt in
-  let convert_to_got, num_got = rev_and_count !convert_to_got in
-  { convert_to_plt; convert_to_got; num_plt; num_got }
+  let record_got ~sym_index ~symbol_name =
+    record_relocation ~seen:got_seen ~acc:got_symbols ~num:num_got ~sym_index
+      ~symbol_name
+  in
+  (* CR sspies: Consider rewriting this accumulation as a fold (possibly with
+     TMC) so that the refs and the final reversals are not needed. See #6447. *)
+  List.iter
+    (fun ((rela_section : Elf.section), rela_body) ->
+      log_verbose "  processing section %s" rela_section.sh_name_str;
+      parse_rela_section ~rela_body ~symbols ~record_plt ~record_got)
+    sections;
+  (* CR sspies: The reversal here affects the order in which entries are written
+     into the respective tables. The order should not matter, so we can
+     eventually remove this reversal as well. See #6447. *)
+  { plt_symbols = List.rev !plt_symbols;
+    got_symbols = List.rev !got_symbols;
+    num_plt = !num_plt;
+    num_got = !num_got
+  }
 
-(* Find a section by name *)
-let find_section sections name =
-  Array.find_opt
-    (fun (section : Elf.section) -> String.equal section.sh_name_str name)
-    sections
-
-(* Find all sections with names starting with prefix *)
-let find_sections_with_prefix sections prefix =
-  Array.to_list sections
-  |> List.filter (fun (section : Elf.section) ->
-      String.starts_with ~prefix section.sh_name_str)
-
-(* Find the symbol table section *)
-let find_symtab_section sections =
-  Array.find_opt
-    (fun (section : Elf.section) ->
-      Elf.Section_type.(equal (of_u32 section.sh_type) sht_symtab))
-    sections
-
-(* Internal version that adds to an accumulator *)
-let extract_into_accumulator (unix : (module Compiler_owee.Unix_intf.S))
-    ~filename acc =
-  let module Unix = (val unix) in
-  log_verbose "extracting relocations from %s" filename;
-  let buf = Compiler_owee.Owee_buf.map_binary (module Unix) filename in
-  let _header, sections = Elf.read_elf buf in
-  (* Find all .rela.text* sections (handles function sections: .rela.text,
-     .rela.text.foo, .rela.text.bar, etc.) *)
-  let rela_text_sections = find_sections_with_prefix sections ".rela.text" in
-  match rela_text_sections with
-  | [] ->
-    log_verbose "  no .rela.text* sections found";
-    acc
-  | _ -> (
-    log_verbose "  found %d .rela.text* sections"
-      (List.length rela_text_sections);
-    (* Find symbol table *)
-    match find_symtab_section sections with
-    | None -> acc
-    | Some symtab_section ->
-      (* Find string table (sh_link of symtab points to it) *)
-      let strtab_index = symtab_section.sh_link in
-      if strtab_index >= Array.length sections
-      then acc
-      else
-        let strtab_section = sections.(strtab_index) in
-        let symtab_body = Elf.section_body buf symtab_section in
-        let strtab_body = Elf.section_body buf strtab_section in
-        (* Process all .rela.text* sections and accumulate results *)
-        List.fold_left
-          (fun acc (rela_section : Elf.section) ->
-            log_verbose "  processing section %s" rela_section.sh_name_str;
-            let rela_body = Elf.section_body buf rela_section in
-            let result =
-              parse_rela_section ~rela_body ~symtab_body ~strtab_body
-            in
-            accumulate acc result)
-          acc rela_text_sections)
-
-let extract unix ~filename =
-  finalize (extract_into_accumulator unix ~filename empty_accumulator)
+let extract (input : Mapped_object_file.t) =
+  let symbols = Mapped_object_file.symbols input in
+  extract_from_rela_text_sections ~symbols
+    (Mapped_object_file.rela_text_sections input)

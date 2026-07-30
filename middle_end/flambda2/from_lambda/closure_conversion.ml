@@ -139,7 +139,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     let c = Numeric_types.Float_by_bit_pattern.create (float_of_string c) in
     register_const acc dbg (SC.boxed_float (Const c)) "float"
   | Const_base (Const_float32 c) ->
-    let c = Numeric_types.Float32_by_bit_pattern.create (float_of_string c) in
+    let c = Numeric_types.Float32_by_bit_pattern.of_string c in
     register_const acc dbg (SC.boxed_float32 (Const c)) "float32"
   | Const_base (Const_int32 c) ->
     register_const acc dbg (SC.boxed_int32 (Const c)) "int32"
@@ -153,8 +153,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     register_const acc dbg (SC.boxed_nativeint (Const c)) "nativeint"
   | Const_base (Const_untagged_char c) ->
     ( acc,
-      reg_width
-        (RWC.naked_int8 (Numeric_types.Int8.unsigned_of_int_exn (Char.code c))),
+      reg_width (RWC.naked_int8 (Numeric_types.Int8.of_int_exn c)),
       "untagged_char" )
   | Const_base (Const_untagged_int c) ->
     ( acc,
@@ -223,7 +222,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
               | Naked_immediate _ | Naked_float32 _ | Naked_float _
               | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
               | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _
-              | Naked_vec512 _ ->
+              | Naked_vec512 _ | Naked_mask _ ->
                 Misc.fatal_errorf
                   "Unboxed constants are not allowed inside of Const_block: %a"
                   Printlambda.structured_constant const
@@ -284,7 +283,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
         (fun new_index arg ->
           match flattened_reordered_shape.(new_index) with
           | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-          | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+          | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
             arg
           | Float_boxed _ -> unbox_float_constant arg)
         args
@@ -632,6 +631,11 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
       [ { kind = K.naked_vec512;
           arg_transformer = None;
           return_transformer = None
+        } ]
+    | Mask ->
+      [ { kind = K.naked_mask;
+          arg_transformer = None;
+          return_transformer = None
         } ])
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
@@ -708,6 +712,11 @@ let unarize_extern_repr ~machine_width alloc_mode
     [ { kind = K.naked_vec512;
         arg_transformer = Some (P.Unbox_number Naked_vec512);
         return_transformer = Some (P.Box_number (Naked_vec512, alloc_mode))
+      } ]
+  | Unboxed_mask ->
+    [ { kind = K.naked_mask;
+        arg_transformer = Some (P.Unbox_number Naked_mask);
+        return_transformer = Some (P.Box_number (Naked_mask, alloc_mode))
       } ]
   | Unboxed_or_untagged_integer Untagged_int ->
     [ { kind = K.naked_immediate;
@@ -1307,7 +1316,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
       | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
-      | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
+      | Patomic_load_mixed_field _ | Patomic_set_field _
+      | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
@@ -1573,7 +1583,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                           | Naked_float32 _ | Naked_int8 _ | Naked_int16 _
                           | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
                           | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-                          | Null
+                          | Naked_mask _ | Null
                           | Poison
                               ( ( Value
                                 | Naked_number
@@ -1581,7 +1591,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                                     | Naked_int8 | Naked_int16 | Naked_int32
                                     | Naked_int64 | Naked_nativeint
                                     | Naked_vec128 | Naked_vec256 | Naked_vec512
-                                      )
+                                    | Naked_mask )
                                 | Region | Rec_info ),
                                 _ ) ->
                             Misc.fatal_errorf
@@ -2921,8 +2931,8 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_no_escaping_local_allocs =
     match Function_decl.result_mode decl with
-    | Alloc_heap -> false
-    | Alloc_local -> true
+    | Alloc_heap -> true
+    | Alloc_local -> false
   in
   let main_code =
     Code.create main_code_id ~params_and_body
