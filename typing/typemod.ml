@@ -116,11 +116,12 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   mode
 
 let register_allocation ~env ~loc ~desc : Alloc.lr * Value.lr =
-  let closure_mode =
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
-  in
-  Allocation.submode_err (loc, desc)
-    (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode;
+  let closures = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
+  List.iter
+    (fun (_, closure_mode) ->
+      Allocation.submode_err (loc, desc)
+        (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
+    closures;
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap

@@ -119,6 +119,8 @@ type 'd const =
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
   | Allocated_on_heap : ('l * disallowed) pos const
+  | Inside_noalloc_closure : pinpoint -> ('l * disallowed) pos const
+      (** INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const

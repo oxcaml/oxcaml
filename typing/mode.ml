@@ -174,6 +174,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Legacy x -> Legacy x
         | Stack_expression -> Stack_expression
         | Allocated_on_heap -> Allocated_on_heap
+        | Inside_noalloc_closure pp -> Inside_noalloc_closure pp
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
@@ -221,6 +222,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
         | Allocated_on_heap -> Allocated_on_heap
+        | Inside_noalloc_closure pp -> Inside_noalloc_closure pp
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -249,6 +251,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
         | Allocated_on_heap -> Allocated_on_heap
+        | Inside_noalloc_closure pp -> Inside_noalloc_closure pp
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -5048,6 +5051,10 @@ module Report = struct
     | Stack_expression ->
       Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Allocated_on_heap -> Fmt.pp_print_string ppf "it is allocated on the heap"
+    | Inside_noalloc_closure pp ->
+      let print_pp = print_pinpoint pp |> Option.get in
+      Fmt.fprintf ppf "it is inside %t@ which is required not to allocate"
+        (print_pp ~definite:true ~capitalize:false)
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }

@@ -798,10 +798,11 @@ let dynamic_pat_mode pat_mode =
 type allocation =
   { alloc_mode : Alloc.r;
     (** The mode of the allocation. *)
-    closure_mode : Allocation.lr;
-    (** A mode below the allocation mode of every closure enclosing the
-        allocation. Constraining it to [alloc] forces all of them to be
-        [alloc]. *)
+    closures : (Hint.pinpoint * Allocation.r) list;
+    (** The allocation mode of every closure enclosing the allocation, paired
+        with the pinpoint of that closure, from the innermost closure to the
+        outermost one. Constraining one of them to [alloc] forces that closure
+        to be [alloc]. *)
     pp : Hint.pinpoint
     (** Points at the allocation, for error messages. *)
   }
@@ -819,9 +820,9 @@ let register_mode_for_optimisation ~loc alloc_mode =
 
 let register_allocation_mode ~env ~loc alloc_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
-  let closure_mode = Env.walk_locks_for_allocation ~env pp in
+  let closures = Env.walk_locks_for_allocation ~env pp in
   let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := {alloc_mode; closure_mode; pp} :: !allocations
+  allocations := {alloc_mode; closures; pp} :: !allocations
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -863,14 +864,25 @@ let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   in
   alloc_mode, mode_default mode
 
-(** The allocation mode forced on the closures enclosing a heap allocation. *)
-let heap_allocated = Allocation.of_const ~hint:Allocated_on_heap Alloc
+let constrain_enclosing_closures pp closures =
+  List.iter
+    (fun (_, closure_mode) ->
+      Allocation.submode_err pp
+        (Allocation.of_const ~hint:Allocated_on_heap Alloc)
+        closure_mode)
+    closures
+
+let enclosing_noalloc_closure closures =
+  List.find_map
+    (fun (closure_pp, closure_mode) ->
+      match Allocation.Guts.get_ceil closure_mode with
+      | Noalloc | Noalloc_strict -> Some closure_pp
+      | Alloc -> None)
+    closures
 
 let constrain_closures () =
   let heap, pending =
-    (* Visited in registration (i.e. source) order, so that the first
-       offending allocation is the one reported. *)
-    List.rev !allocations
+    !allocations
     |> List.partition (fun {alloc_mode; _} ->
       match
         Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
@@ -881,32 +893,35 @@ let constrain_closures () =
          [optimise_allocations]. *)
       | Local -> false)
   in
-  allocations := List.rev pending;
-  List.iter
-    (fun {closure_mode; pp; _} ->
-      Allocation.submode_err pp heap_allocated closure_mode)
-    heap
+  allocations := pending;
+  (* Visited in registration (i.e. source) order, so that the first offending
+     allocation is the one reported. *)
+  List.iter (fun {closures; pp; _} -> constrain_enclosing_closures pp closures)
+    (List.rev heap)
 
 let constrain_allocations () =
   let local, pending =
-    (* Visited in registration (i.e. source) order, so that the first
-       offending allocation is the one reported. *)
-    List.rev !allocations
-    |> List.partition (fun {closure_mode; _} ->
-      match Allocation.Guts.get_ceil closure_mode with
+    !allocations
+    |> List.partition_map (fun ({closures; _} as allocation) ->
+      match enclosing_noalloc_closure closures with
       (* Some enclosing closure is required not to allocate, so the
          allocation has to be on the stack. *)
-      | Noalloc | Noalloc_strict -> true
+      | Some closure_pp -> Left (allocation, closure_pp)
       (* No enclosing closure needs it on the stack; leave it to
          [optimise_allocations]. *)
-      | Alloc -> false)
+      | None -> Right allocation)
   in
-  allocations := List.rev pending;
+  allocations := pending;
+  (* Visited in registration (i.e. source) order, so that the first offending
+     allocation is the one reported. *)
   List.iter
-    (fun {alloc_mode; pp; _} ->
-      Locality.submode_err pp Locality.local
+    (fun ({alloc_mode; pp; _}, closure_pp) ->
+      let stack_allocated =
+        Locality.of_const ~hint:(Inside_noalloc_closure closure_pp) Local
+      in
+      Locality.submode_err pp stack_allocated
         (Alloc.proj_comonadic Areality alloc_mode))
-    local
+    (List.rev local)
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
@@ -921,12 +936,11 @@ let optimise_allocations () =
   (* Reset first: the loop below can raise. *)
   reset_allocations ();
   List.iter
-    (fun {alloc_mode; closure_mode; pp} ->
+    (fun {alloc_mode; closures; pp} ->
       match Locality.zap_to_ceil (Alloc.proj_comonadic Areality alloc_mode)
       with
       | Local -> ()
-      | Global ->
-        Allocation.submode_err pp heap_allocated closure_mode)
+      | Global -> constrain_enclosing_closures pp closures)
     allocations
 
 (** We keep this state which is passed as an optional argument throughout
