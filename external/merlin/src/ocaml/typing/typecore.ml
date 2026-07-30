@@ -11545,25 +11545,12 @@ and type_function_cases_expect
     in
     let () =
       try unify_exp_types loc env ty_fun (instance ty_expected)
-      with exn ->
-        (* Merlin: We recover from this error in [type_function]. *)
-        record_exp_and_reraise ~exn
-          { exp_desc =
-              Texp_function
-                { params = [];
-                  body = Tfunction_cases cases;
-                  ret_mode =
-                    { mode_modes = Alloc.disallow_right ret_mode; mode_desc = []};
-                  ret_sort;
-                  alloc_mode = Alloc.disallow_left alloc_mode;
-                  zero_alloc = Zero_alloc.default;
-                };
-            exp_loc = loc;
-            exp_extra = [];
-            exp_type = ty_fun;
-            exp_attributes = attrs;
-            exp_env = env;
-          }
+      with exn when !Clflags.typing_recovery
+                 && Typing_recovery.is_recoverable exn ->
+        (* Merlin: recover locally (as upstream does), keeping the typed cases.
+           Re-raising here would collapse the enclosing [Texp_function] (and its
+           parameters) to a [*type-error*] node in the outer [type_expect]. *)
+        Typing_recovery.erroneous_type_register ty_expected
     in
     cases, ty_fun, alloc_mode,
       { ret_sort;
