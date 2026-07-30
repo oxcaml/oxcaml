@@ -142,11 +142,14 @@ static void doclang_preview(char *buffer, size_t capacity, value metadata,
 
   if (Is_long(observed)) {
     intnat immediate = Long_val(observed);
-    if (doclang_type_is(metadata, "unit")) {
+    if (doclang_type_is(metadata, "unit")
+        || doclang_type_ends_with(metadata, "-> unit")) {
       snprintf(buffer, capacity, "()");
-    } else if (doclang_type_is(metadata, "bool")) {
+    } else if (doclang_type_is(metadata, "bool")
+               || doclang_type_ends_with(metadata, "-> bool")) {
       snprintf(buffer, capacity, "%s", immediate == 0 ? "false" : "true");
-    } else if (doclang_type_is(metadata, "char")) {
+    } else if (doclang_type_is(metadata, "char")
+               || doclang_type_ends_with(metadata, "-> char")) {
       snprintf(buffer, capacity, "'%c'", (char)immediate);
     } else if (immediate == 0 && doclang_type_ends_with(metadata, " option")) {
       snprintf(buffer, capacity, "None");
