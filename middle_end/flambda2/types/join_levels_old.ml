@@ -98,7 +98,7 @@ let join_types ~env_at_fork envs_with_levels =
         let same_unit =
           Compilation_unit.equal
             (Name.compilation_unit name)
-            (Compilation_unit.get_current_exn ())
+            (Current_unit.get_cu_exn ())
         in
         if same_unit && not (TE.mem base_env name)
         then

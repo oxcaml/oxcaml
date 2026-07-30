@@ -111,7 +111,7 @@ let typecheck_intf info ast =
   let modes =
     let modalities = tsg.Typedtree.sig_modalities in
     let staticity = Typemod.staticity_of_modalities modalities in
-    let mode = Env.mode_unit ~staticity in
+    let mode = Persistent_env.mode_pers_mod staticity in
     Includecore.Specific ((mode, None), mode)
   in
   ignore (Includemod.signatures info.env ~mark:true ~modes sg sg);

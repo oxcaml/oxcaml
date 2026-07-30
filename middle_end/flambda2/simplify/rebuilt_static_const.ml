@@ -316,14 +316,6 @@ let create_empty_array are_rebuilding array_kind =
   then Block_not_rebuilt { free_names = Name_occurrences.empty; cost_metrics }
   else create_normal_non_code ~cost_metrics (SC.empty_array array_kind)
 
-let create_mutable_string are_rebuilding ~initial_value =
-  let cost_metrics =
-    Cost_metrics.from_size (Code_size.of_int (String.length initial_value))
-  in
-  if ART.do_not_rebuild_terms are_rebuilding
-  then Block_not_rebuilt { free_names = Name_occurrences.empty; cost_metrics }
-  else create_normal_non_code ~cost_metrics (SC.mutable_string ~initial_value)
-
 let create_immutable_string are_rebuilding str =
   let cost_metrics =
     Cost_metrics.from_size (Code_size.of_int (String.length str))
@@ -367,7 +359,7 @@ let map_set_of_closures t ~find_code_metadata ~f =
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _
       | Immutable_mask_array _ | Immutable_value_array _ | Empty_array _
-      | Mutable_string _ | Immutable_string _ ->
+      | Immutable_string _ ->
         t))
   | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ | Code_not_rebuilt _ ->
     t
@@ -485,7 +477,10 @@ module Group = struct
          ~body:(Expr.create_invalid Code_not_rebuilt)
          ~free_names_of_body:Unknown
          ~my_closure:(Variable.create "my_closure" Flambda_kind.value)
-         ~my_alloc_mode:Alloc_mode.For_applications.heap
+         ~my_alloc_mode:
+           (Alloc_mode.For_applications.heap
+              ~alloc_region:
+                (Variable.create "my_alloc_region" Flambda_kind.region))
          ~my_depth:(Variable.create "my_depth" Flambda_kind.rec_info))
 
   let pieces_of_code_including_those_not_rebuilt t =

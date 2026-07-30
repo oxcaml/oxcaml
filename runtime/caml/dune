@@ -73,6 +73,7 @@
   (exec.h as caml/exec.h)
   (fail.h as caml/fail.h)
   (fiber.h as caml/fiber.h)
+  (dynamic.h as caml/dynamic.h)
   (finalise.h as caml/finalise.h)
   (fix_code.h as caml/fix_code.h)
   (frame_descriptors.h as caml/frame_descriptors.h)

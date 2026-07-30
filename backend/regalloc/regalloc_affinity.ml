@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Phys_reg = Regs.Phys_reg
 
 type affinity =

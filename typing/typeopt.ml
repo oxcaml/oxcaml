@@ -211,6 +211,7 @@ let classify ~classify_product env ty layout : _ classification =
   else match get_desc ty with
   | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
+  | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -248,7 +249,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval | `Box)
+      | Some (`Lexing_position | `Expr | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -801,6 +802,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
+  | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+    num_nodes_visited,
+    add_nullability_from_ty env scty
+      (value_kind_of_scannable_jkind env (Jkind.disallow_right jkind))
   | _ ->
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
@@ -810,17 +815,28 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Scannable { separability } ->
+    let pointerness = pointerness_of_separability separability in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
+      (* The declared shape's separability can be more precise than what
+         [value_kind] computes here (e.g. for existential type variables), so
+         take the better of the two. *)
+      (* CR layouts: The most precise thing would be a real meet of value kinds
+         (e.g. a pointerness of [Immediate] could remove the non-constant
+         constructors from [Pvariant _]) *)
+      let kind =
+        match pointerness, kind.raw_kind with
+        | Immediate, Pgenval -> { kind with raw_kind = Pintval }
+        | Immediate, _ | Pointer, _ -> kind
+      in
       num_nodes_visited, Value kind
     | None ->
-      let raw_kind =
-        value_kind_of_pointerness (pointerness_of_separability separability)
-      in
-      num_nodes_visited, Value { generic_value with raw_kind }
+      num_nodes_visited,
+      Value
+        { generic_value with raw_kind = value_kind_of_pointerness pointerness }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -849,6 +865,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tmod _ -> Misc.fatal_error "Typeopt: unexpected Tmod"
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()
@@ -1252,7 +1269,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1278,6 +1295,29 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
+
+let layout_of_ident env ident =
+  let path = Path.Pident ident in
+  match Env.find_module path env with
+  | _ -> Some layout_any_value
+  | exception Not_found ->
+    let value_desc =
+      try Env.find_value path env
+      with Not_found ->
+        Misc.fatal_errorf "Failed to find value_desc for %a"
+          Ident.print ident
+    in
+    let { val_type; val_kind; val_loc; _ } =
+      Subst.Lazy.force_value_description value_desc
+    in
+    match val_kind with
+    | Val_reg sort | Val_mut (_, sort) ->
+      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout env val_loc const_sort val_type in
+      Some layout
+    | Val_prim _ -> None
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some layout_any_value
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
@@ -1309,6 +1349,10 @@ let layout_of_non_void_sort c =
     ~error:(fun const ->
       Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
+
+let layout_or_sort env loc sort ty =
+  try layout env loc sort ty
+  with Error (_, Non_value_layout _) -> layout_of_sort loc sort
 
 let function_return_layout env loc sort ty =
   match is_function_type env ty with

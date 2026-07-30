@@ -75,6 +75,8 @@ module Lambda_utils = struct
         ap_args = args;
         ap_region_close = region_close;
         ap_mode = mode;
+        (* CR-someday aspsmith: Make [ap_yielding] more precise *)
+        ap_yielding = May_yield;
         ap_tailcall = tailcall;
         ap_inlined = inlined;
         ap_specialised = specialised;
@@ -129,7 +131,7 @@ module Lambda_utils = struct
 
       let ( * ) = binop (Integral (size, Mul))
 
-      let ( / ) = binop (Integral (size, Div Unsafe))
+      let ( / ) = binop (Integral (size, Div (Unsafe, Signed)))
 
       let ( = ) = binop (Icmp (size, Ceq))
 

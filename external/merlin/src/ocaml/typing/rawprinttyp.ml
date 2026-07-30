@@ -162,6 +162,9 @@ and raw_type_desc ppf ty =
       raw_lid_type_list pack.pack_cstrs
   | Tof_kind jkind ->
     fprintf ppf "Tof_kind@ %a" (Format_doc.compat (Jkind.format env)) jkind
+  | Tbox t ->
+    fprintf ppf "@[Tbox@ %a@]" raw_type t
+
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"

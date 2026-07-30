@@ -597,11 +597,7 @@ val variant :
   Alloc_mode.For_types.t ->
   t
 
-val this_immutable_string :
-  string -> machine_width:Target_system.Machine_width.t -> t
-
-val mutable_string :
-  size:int -> machine_width:Target_system.Machine_width.t -> t
+val this_immutable_string : string -> t
 
 val exactly_this_closure :
   Function_slot.t ->
@@ -1017,6 +1013,10 @@ module Rewriter : sig
     val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
     val closure : 'a closure_field list -> 'a t
+
+    (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+        matching the type of its (unboxed) contents. *)
+    val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
   end
 
   type 'a expr
