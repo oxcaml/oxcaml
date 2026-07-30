@@ -335,6 +335,7 @@ let rec fracture_lam lambda : slambda =
       { ktmpl_params;
         ktmpl_return;
         ktmpl_body;
+        ktmpl_ret_mode;
         ktmpl_env;
         ktmpl_env_mode;
         ktmpl_loc
@@ -358,7 +359,7 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_block;
               attributes = default_param_attribute;
-              mode = ktmpl_env_mode
+              mode = alloc_local
             }
           in
           let _, body =
@@ -385,16 +386,10 @@ let rec fracture_lam lambda : slambda =
             { sval_comptime = body_c;
               sval_runtime =
                 lfunction
-                  ~kind:
-                    (Curried
-                       { nlocal =
-                           (match ktmpl_env_mode with
-                           | Alloc_heap -> 0
-                           | Alloc_local -> 1)
-                       })
+                  ~kind:(Curried { nlocal = 1 })
                   ~params:[closure_param] ~return:ktmpl_return ~body
                   ~attr:default_function_attribute ~loc:ktmpl_loc
-                  ~mode:alloc_heap ~ret_mode:ktmpl_env_mode
+                  ~mode:alloc_heap ~ret_mode:ktmpl_ret_mode
             })
     in
     let free_var_capture =
