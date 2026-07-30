@@ -44,6 +44,9 @@ let compile ~extra_flags name =
  (foreign_archives stubs512))
 |}
 
+(* The tests only run if the host CPU supports AVX512: [avx512_available.exe]
+   exits nonzero otherwise, in which case the test is skipped and the empty
+   output still matches [empty.expected]. *)
 let run name =
   let subst = function
     | "enabled_if" -> enabled_if
@@ -56,10 +59,11 @@ let run name =
 (rule
  (alias runtest)
  ${enabled_if}
+ (deps avx512_available.exe ${runner})
  (action
   (with-outputs-to
    ${output}
-   (run ./${runner}))))
+   (run bash -c "if ./avx512_available.exe; then ./${runner}; fi"))))
 |}
 
 let diff_output name =
