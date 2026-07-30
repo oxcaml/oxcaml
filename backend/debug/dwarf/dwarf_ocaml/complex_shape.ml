@@ -355,15 +355,14 @@ and flatten_product_layout_exn (cs : t) =
   | Unboxed_product { components; kind = Unboxed_tuple } ->
     List.map (fun arg -> None, arg) components
 
-type complex_shape = t
-
 (** Tracks the recursive binders in scope during the conversion from the named
-    binders of [Shape.t] to the De Bruijn-indexed binders of
-    [Runtime_shape.t]. The environment maps each in-scope
-    [Shape.Rec_var_ident.t] to its De Bruijn index relative to the current
-    position (maintained by [add_binder]) and the layout at which its binder
-    was entered. *)
+    binders of [Shape.t] to the De Bruijn-indexed binders of [Runtime_shape.t].
+    The environment maps each in-scope [Shape.Rec_var_ident.t] to its De Bruijn
+    index relative to the current position (maintained by [add_binder]) and the
+    layout at which its binder was entered. *)
 module Rec_binder_env : sig
+  type complex_shape := t
+
   type t
 
   val empty : t
@@ -403,7 +402,7 @@ end = struct
   let add_binder t rv ~layout =
     t
     |> S.Rec_var_env.map (fun (idx, ly) ->
-           RS.DeBruijn_index.move_under_binder idx, ly)
+        RS.DeBruijn_index.move_under_binder idx, ly)
     |> S.Rec_var_env.add rv (RS.DeBruijn_index.create 0, layout)
 
   module Lookup = struct
@@ -427,6 +426,8 @@ end = struct
 end
 
 module Shape_cache : sig
+  type complex_shape := t
+
   type t
 
   val create : int -> t
@@ -461,7 +462,7 @@ end = struct
     (* CR sspies: Add a hash function to Layout.t *)
   end)
 
-  type t = complex_shape Cache.t
+  type nonrec t = t Cache.t
 
   let create initial_size = Cache.create initial_size
 
