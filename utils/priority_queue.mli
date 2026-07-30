@@ -38,7 +38,8 @@ module type Priority_queue = sig
 
   val iter : 'a t -> f:('a element -> unit) -> unit
 
-  val fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
+  val fold_unordered :
+    'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
 end
 
 module Make (Priority : Order) : Priority_queue with type priority = Priority.t

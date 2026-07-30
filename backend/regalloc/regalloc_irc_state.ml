@@ -54,7 +54,7 @@ module PrioritizedWorkList = Priority_queue.Make (Priority)
 
 let instruction_set_of_prioritized_work_list
     (mwl : Instruction.t PrioritizedWorkList.t) : Instruction.Set.t =
-  PrioritizedWorkList.fold mwl ~init:Instruction.Set.empty
+  PrioritizedWorkList.fold_unordered mwl ~init:Instruction.Set.empty
     ~f:(fun acc { PrioritizedWorkList.priority = _; data = elem } ->
       Instruction.Set.add elem acc)
 

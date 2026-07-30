@@ -42,7 +42,8 @@ module type Priority_queue = sig
 
   val iter : 'a t -> f:('a element -> unit) -> unit
 
-  val fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
+  val fold_unordered :
+    'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc
 end
 
 (* CR-soon gyorsh: check whether the dynamic array module from the stdlib can be
@@ -188,7 +189,8 @@ module Make (Priority : Order) :
       f elem
     done
 
-  let fold : 'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc =
+  let fold_unordered :
+      'a t -> f:('acc -> 'a element -> 'acc) -> init:'acc -> 'acc =
    fun queue ~f ~init ->
     let res = ref init in
     for i = 0 to pred queue.size do
