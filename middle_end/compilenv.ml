@@ -184,7 +184,7 @@ let get_unit comp_unit =
   if equal_up_to_pack_prefix comp_unit current_unit.uib_unit
   then
     Misc.fatal_error
-      "get_unit_export_info: unable to get unit_info for current unit";
+      "get_unit: unable to get unit_info for current unit";
   let name = CU.to_global_name_without_prefix comp_unit in
   try
     Infos_table.find global_infos_table name
