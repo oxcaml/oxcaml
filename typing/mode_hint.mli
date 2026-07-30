@@ -65,6 +65,10 @@ type legacy =
   | Class
   | Quoted
 
+type noalloc =
+  | Noalloc
+  | Noalloc_strict
+
 (* CR-soon zqian: add loop and function body to [region_desc] *)
 type region_desc = Borrow
 
@@ -119,7 +123,9 @@ type 'd const =
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
   | Allocated_on_heap : ('l * disallowed) pos const
-  | Inside_noalloc_closure : pinpoint -> ('l * disallowed) pos const
+  | Allocated_in_noalloc_closure :
+      pinpoint * noalloc
+      -> ('l * disallowed) pos const
       (** INVARIANT: The [pinpoint] cannot be [Unknown]. *)
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const

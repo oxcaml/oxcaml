@@ -876,7 +876,8 @@ let enclosing_noalloc_closure closures =
   List.find_map
     (fun (closure_pp, closure_mode) ->
       match Allocation.Guts.get_ceil closure_mode with
-      | Noalloc | Noalloc_strict -> Some closure_pp
+      | Noalloc -> Some (closure_pp, Hint.Noalloc)
+      | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
       | Alloc -> None)
     closures
 
@@ -906,7 +907,7 @@ let constrain_allocations () =
       match enclosing_noalloc_closure closures with
       (* Some enclosing closure is required not to allocate, so the
          allocation has to be on the stack. *)
-      | Some closure_pp -> Left (allocation, closure_pp)
+      | Some closure -> Left (allocation, closure)
       (* No enclosing closure needs it on the stack; leave it to
          [optimise_allocations]. *)
       | None -> Right allocation)
@@ -915,9 +916,11 @@ let constrain_allocations () =
   (* Visited in registration (i.e. source) order, so that the first offending
      allocation is the one reported. *)
   List.iter
-    (fun ({alloc_mode; pp; _}, closure_pp) ->
+    (fun ({alloc_mode; pp; _}, (closure_pp, closure_mode)) ->
       let stack_allocated =
-        Locality.of_const ~hint:(Inside_noalloc_closure closure_pp) Local
+        Locality.of_const
+          ~hint:(Allocated_in_noalloc_closure (closure_pp, closure_mode))
+          Local
       in
       Locality.submode_err pp stack_allocated
         (Alloc.proj_comonadic Areality alloc_mode))
