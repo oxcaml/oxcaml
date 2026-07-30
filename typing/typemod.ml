@@ -3649,7 +3649,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       let mode_res =
         Value.join
           [ Value.disallow_right mm_res;
-            Value.min_with_monadic Staticity funct_staticity ]
+            Value.min_with_monadic Staticity
+              (Staticity.apply_hint (Functor_to_application funct.mod_loc)
+                 funct_staticity) ]
       in
       { mod_desc =
           Tmod_apply

@@ -178,6 +178,13 @@ type 'd morph =
   | Parameter_to_functor : Location.t -> ('l * 'r) morph
       (** The identity morphism connecting a parameter's staticity to the
           functor's. Carries the parameter's location. *)
+  | Functor_to_application : Location.t -> ('l * disallowed) neg morph
+      (** The identity morphism from a functor's staticity to its application
+          result's staticity (a monadic axis, hence [neg]). Carries the
+          application's location. *)
+  | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
+      (** The dual of [Functor_to_application]: from the result's staticity back
+          to the functor's. Carries the application's location. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Allocation : allocation -> ('l * 'r) morph

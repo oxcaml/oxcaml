@@ -50,6 +50,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
         (loc, Functor_parameter), Functor_to_parameter (fst pp)
+      | Functor_to_application loc ->
+        (loc, Functor), Application_to_functor (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_l loc
@@ -76,6 +78,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
         (loc, Functor_parameter), Functor_to_parameter (fst pp)
+      | Application_to_functor loc ->
+        (loc, Module), Functor_to_application (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_r loc
@@ -101,6 +105,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -118,6 +123,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -137,6 +143,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
@@ -159,6 +167,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
@@ -5025,6 +5035,18 @@ module Report = struct
           ( Fmt.dprintf "shares the staticity of %t"
               (print_pp ~definite:true ~capitalize:false),
             param_pp ))
+    | Functor_to_application loc ->
+      Some
+        ( Fmt.dprintf "is an application of the functor at %a"
+            (Location.Doc.loc ~capitalize_first:false)
+            loc,
+          (loc, Functor) )
+    | Application_to_functor loc ->
+      Some
+        ( Fmt.dprintf "is applied at %a"
+            (Location.Doc.loc ~capitalize_first:false)
+            loc,
+          (loc, Module) )
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
@@ -5147,7 +5169,8 @@ module Report = struct
     let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
-    | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _ ->
+    | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _
+    | Functor_to_application _ | Application_to_functor _ ->
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
     | Skip | Crossing ->

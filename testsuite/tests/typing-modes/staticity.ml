@@ -523,6 +523,8 @@ Line 3, characters 24-37:
 3 |   module (Y @ static) = F(struct end)
                             ^^^^^^^^^^^^^
 Error: The module is "dynamic"
+         because it is an application of the functor at line 3, characters 24-25
+         which is "dynamic"
          because it shares the staticity of the functor parameter at line 2, characters 12-13
          which is "dynamic".
        However, the module highlighted is expected to be "static".
