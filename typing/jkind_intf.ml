@@ -326,7 +326,6 @@ module History = struct
     | External_argument
     | External_result
     | Statement
-    | Optional_argument
     | Optional_arg_default
     | Layout_poly_in_external
     | Unboxed_tuple_element

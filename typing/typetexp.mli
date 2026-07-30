@@ -154,10 +154,10 @@ val get_type_param_name: Parsetree.core_type -> string option
 exception Already_bound
 
 type value_loc =
-    Tuple | Poly_variant | Object_field
+    Tuple | Poly_variant | Object_field | Optional_arg
 
 type sort_loc =
-    Fun_arg | Fun_ret | Optional_arg
+    Fun_arg | Fun_ret
 
 type cannot_quantify_reason
 type jkind_info
