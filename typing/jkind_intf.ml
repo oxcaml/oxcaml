@@ -57,7 +57,7 @@ module type Sort = sig
   type var
 
   module Const : sig
-    type t =
+    type t = private
       | Base of base
       | Product of t list
       | Univar of univar
@@ -67,6 +67,14 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+
+    val of_base : base -> t
+
+    val product : t list -> t
+
+    val univar : univar -> t
+
+    val genvar : var -> t
 
     val equal : t -> t -> bool
 
