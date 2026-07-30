@@ -40,8 +40,6 @@ val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
 (* n-ary functions will impose locality bounds on arguments, since the middle end
   must know where to allocate closures of partially applied functions *)
 
-(* CR ageorges: partially applying fst can't yield a polymorphic locality, and the
-   following ought to fail *)
 let foo =
   let cglobal = "global" in
   let clocal @ local = "local" in

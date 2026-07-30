@@ -1408,7 +1408,7 @@ end = struct
   (* Find all direct paths (via vlowers) from some
     variable [v] to all other reachable visible variables
     at generic level. *)
-  (* CR ageorges: WARNING: cycles are *not* registered
+  (* WARNING: cycles are *not* registered
       as a separate morphism:
       e.g.: let [w] be a visible generic variable with
             the following (vlower) edges:

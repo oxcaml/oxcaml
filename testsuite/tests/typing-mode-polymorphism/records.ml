@@ -99,15 +99,12 @@ Error: This value is "aliased"
        However, the highlighted expression is expected to be "unique".
 |}]
 
-(* CR ageorges: principality issue with portable refs *)
 let foo () =
-  use_portable (alloc 42)
+  use_portable (alloc (fun () -> ()))
 [%%expect{|
-val foo : unit @ 'm -> unit @ [> dynamic] = <fun>
-|}, Principal{|
-Line 2, characters 15-25:
-2 |   use_portable (alloc 42)
-                   ^^^^^^^^^^
+Line 2, characters 15-37:
+2 |   use_portable (alloc (fun () -> ()))
+                   ^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
