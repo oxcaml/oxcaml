@@ -1642,17 +1642,17 @@ Error: The allocation is "local"
 |}]
 
 
-(** Test 5.2: an allocation nested inside several enclosing functions forces
-    every enclosing layer. The functions [g] and [h] each capture the parameter
-    [a], so building each inner closure is itself an allocation in its parent;
-    together with the innermost [Just a] this makes every one of the three nested
-    functions an allocation site, so each is forced to [alloc]. *)
+(** Test 5.2: an allocation nested inside several enclosing functions reaches
+    every layer: [g] and [h] each capture [a], so building each inner closure
+    is itself an allocation in its parent. A [noalloc] layer demands that the
+    allocations inside it be stack-allocated, so the error surfaces where a
+    closure made local by that demand then has to escape as a return value. *)
 
 (* All three layers annotated [noalloc_strict]: the capture chain reaches the
    outermost function, so building the closure [g] (which transitively captures
-   [a]) is an allocation inside the outermost function and is reported there --
-   demonstrating that the deepest allocation forces every enclosing layer, not
-   just the immediately enclosing one. *)
+   [a]) is an allocation inside [layers3_ss]. That function demands it be
+   local, and [g] then cannot be returned -- the deepest allocation reaches
+   every enclosing layer, not just the immediately enclosing one. *)
 let (layers3_ss @ noalloc_strict) (a : int) =
   let (g @ noalloc_strict) () =
     let (h @ noalloc_strict) () = Just a in
@@ -1696,8 +1696,8 @@ Error: The allocation is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Annotating only the middle layer still errors: building the closure [h]
-   inside [g] is an allocation that forces [g]. *)
+(* Annotating only the middle layer still errors: building the closure [h] is
+   an allocation that [g] demands be local, and [h] is [g]'s return value. *)
 let layers_middle (a : int) =
   let (g @ noalloc_strict) () =
     let h () = Just a in
@@ -1718,7 +1718,7 @@ Error: The allocation is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Annotating only the innermost layer still errors: [Just a] forces [h]. *)
+(* Only the innermost layer: [Just a] is demanded local but must be global. *)
 let layers_inner (a : int) =
   let g () =
     let (h @ noalloc_strict) () = Just a in
@@ -2163,22 +2163,19 @@ Line 1, characters 32-51:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
-(** Test 6.4: Nested noalloc functions *)
-(* CR shsong: f cannot be implied as noalloc_strict unless explicitly annotated.
-    Analysis: In walk_locks_for_allocation, we force closures to be alloc until
-    we encounter a [Closure_noalloc_lock]. Everything outside [Closure_noalloc_lock]
-    will still be forced to be alloc.
-    An alternative implementation: loop over all locks and see whether there is a
-    [Closure_noalloc_lock] before adding any submode constraints.
-    Tradeoff:
-    1. the alternative implementation should allow us to accept the
-    [nested_noalloc_func_implicit] case. However, the current implementation is ok
-    if we expect user to always annotate functions if they want it them to be noalloc.
-    2. the alternative implementation avoids the current check on whether the
-    Allocation mode axis is changed while walking locks.
-    3. the alternative implementation requires iterate over the locks twice, which
-    affects the performance.
-*)
+(** Test 6.4: nested noalloc functions.
+
+    [walk_locks_for_allocation] only collects the enclosing closures of an
+    allocation; nothing is constrained until [constrain_allocations],
+    [constrain_closures], and [optimise_allocations] run. An enclosing
+    function therefore does not have to be annotated in order to come out
+    [noalloc]: a requirement imposed on it from elsewhere, such as the
+    coercion at the end of each case below, is enough. *)
+
+(* [f] is not annotated -- the coercion is what requires it to be
+   [noalloc_strict]. Every allocation inside it is [exclave_]-marked and so
+   lands on the stack, and nothing forced [f] to [alloc] along the way, so
+   this is accepted. *)
 let nested_noalloc_func_implicit () =
   let f () = exclave_
     let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
@@ -2190,6 +2187,7 @@ val nested_noalloc_func_implicit : unit -> unit -> (unit -> 'a -> 'a) @ local =
   <fun>
 |}]
 
+(* The same, with [f] annotated: the annotation is allowed but not needed. *)
 let nested_noalloc_func_explicit () =
   let (f @ noalloc_strict) () = exclave_
     let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
@@ -2394,14 +2392,11 @@ Error: The allocation is "local"
 
   [module type of M] must produce a self-contained module type on the spot, so
   it zaps the modalities of [M]'s items while type-checking -- long before
-  [optimise_allocations] settles the allocation axis. [constrain_closures] is
-  therefore called immediately before that zap: every allocation already known
-  to be on the heap has by then forced its enclosing closures to [alloc], so
-  the floor the zap reads is correct.
-
-  What makes that possible is [check_nongen_modtype], which runs just before
-  and defaults the arrow modes reachable from the scraped signature; the
-  areality of the allocations surfacing there is therefore known. *)
+  [optimise_allocations] settles the allocation axis. Both settling passes
+  therefore run inside [type_module_type_of]: [constrain_allocations] before
+  [check_nongen_modtype] defaults the arrow modes reachable from the scraped
+  signature, and [constrain_closures] after it, once each allocation's areality
+  is known and before the zap reads the floor of the item modes. *)
 
 (* Case 1: the functions are annotated. The annotation survives. *)
 module M_annot = struct
@@ -2443,9 +2438,7 @@ module M_proj : sig val f : int -> int end @@ portable noalloc_strict
 module type S_proj = sig val f : int -> int @@ portable noalloc_strict end
 |}]
 
-(* Case 3: the function really does allocate on the heap. [constrain_closures]
-   has already forced it to [alloc], so the module type reports [alloc]: no
-   [noalloc_strict] is claimed, and no error is raised. *)
+(* Case 3: the function really does allocate on the heap. *)
 module M_alloc = struct
   let pack x = [| x |]
 end
@@ -2457,11 +2450,8 @@ module type S_alloc =
   sig val pack : ('a : value_maybe_null). 'a -> 'a array @@ stateless end
 |}]
 
-(* Case 4: the allocation is internal to a function body, so its areality need
-   not be reachable from the scraped signature. That is harmless: an allocation
-   unreachable from the signature is also unreachable by any later constraint,
-   so [optimise_allocations] pushes it to [local] and a [noalloc_strict] claim
-   would be correct. *)
+(* Case 4: the allocation is internal to a function body and so never surfaces
+   in the scraped signature. *)
 module M_internal = struct
   let f () = let g () = (1, 2) in let (a, b) = g () in a + b
 end
@@ -2471,8 +2461,8 @@ module M_internal : sig val f : unit -> int end @@ portable
 module type S_internal = sig val f : unit -> int @@ portable end
 |}]
 
-(* Case 5: the allocation lives in a nested module and is only forced onto the
-   heap after the [module type of]. *)
+(* Case 5: the allocation lives in a nested module, and the constraint that
+   puts it on the heap ([sink] below) comes after the [module type of]. *)
 module M_nested = struct
   module Inner = struct let g () = (1, 2) end
 end
@@ -2506,10 +2496,6 @@ module type S_functor =
   end
 |}]
 
-(* [include functor] in a signature is the other zap that runs while
-   type-checking. It takes a functor *module type*, whose modalities are
-   written by the user and so already constant, leaving the zap nothing to do
-   -- including when that module type itself came from [module type of]. *)
 module Fm (X : sig end) = struct let g () = (1, 2) end
 module type FT = module type of Fm
 module type S_incl = sig include functor FT end
