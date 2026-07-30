@@ -271,49 +271,49 @@ let double_match c a b =
 [%%expect_asm X86_64{|
 double_match:
   subq  $8, %rsp
-  movq  64(%r14), %rsi
+  movq  72(%r14), %rsi
   sarq  $1, %rax
   cmpq  $1, %rax
   je    .L1
   ja    .L3
-  movq  64(%r14), %rax
+  movq  72(%r14), %rax
   subq  $16, %rax
-  movq  %rax, 64(%r14)
-  cmpq  80(%r14), %rax
+  movq  %rax, 72(%r14)
+  cmpq  88(%r14), %rax
   jl    <hidden GC jump pad>
 .L0:
-  addq  72(%r14), %rax
+  addq  80(%r14), %rax
   addq  $8, %rax
   movq  $1792, -8(%rax)
   movq  %rbx, (%rax)
   jmp   .L5
 .L1:
-  movq  64(%r14), %rax
+  movq  72(%r14), %rax
   subq  $16, %rax
-  movq  %rax, 64(%r14)
-  cmpq  80(%r14), %rax
+  movq  %rax, 72(%r14)
+  cmpq  88(%r14), %rax
   jl    <hidden GC jump pad>
 .L2:
-  addq  72(%r14), %rax
+  addq  80(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   movq  %rdi, (%rax)
   jmp   .L5
 .L3:
-  movq  64(%r14), %rax
+  movq  72(%r14), %rax
   subq  $16, %rax
-  movq  %rax, 64(%r14)
-  cmpq  80(%r14), %rax
+  movq  %rax, 72(%r14)
+  cmpq  88(%r14), %rax
   jl    <hidden GC jump pad>
 .L4:
-  addq  72(%r14), %rax
+  addq  80(%r14), %rax
   addq  $8, %rax
   movq  $1793, -8(%rax)
   leaq  2(%rdi), %rbx
   movq  %rbx, (%rax)
 .L5:
   movq  (%rax), %rax
-  movq  %rsi, 64(%r14)
+  movq  %rsi, 72(%r14)
   addq  $8, %rsp
   ret
 |}]

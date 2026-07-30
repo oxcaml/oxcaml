@@ -60,6 +60,13 @@ CAMLextern int caml_check_pending_actions (void);
 
 #ifdef CAML_INTERNALS
 
+#ifdef FAULTING_SAFEPOINTS
+/* A page with no access rights; [safepoint_trigger] domain-state
+   fields are pointed here to make polls fault. Allocated by
+   [caml_init_signals]; never freed. */
+CAMLextern void* caml_safepoint_trigger_page;
+#endif
+
 value caml_process_pending_actions_with_root (value extra_root); // raises
 /* This is identical to [caml_process_pending_actions], except that it
    registers its argument as a root and eventually returns it. This is

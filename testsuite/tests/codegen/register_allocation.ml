@@ -337,7 +337,7 @@ let double_loop_no_definition_at_beginning array n list =
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
   movq  %rbx, %rsi
-  movq  64(%r14), %rbx
+  movq  72(%r14), %rbx
   cmpq  $1, %rsi
   jl    .L5
   movq  %rbx, 16(%rsp)
@@ -347,15 +347,15 @@ double_loop_no_definition_at_beginning:
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
 .L0:
-  movq  64(%r14), %rbx
+  movq  72(%r14), %rbx
   movq  %rbx, 8(%rsp)
-  movq  64(%r14), %rbx
+  movq  72(%r14), %rbx
   subq  $40, %rbx
-  movq  %rbx, 64(%r14)
-  cmpq  80(%r14), %rbx
+  movq  %rbx, 72(%r14)
+  cmpq  88(%r14), %rbx
   jl    <hidden GC jump pad>
 .L1:
-  addq  72(%r14), %rbx
+  addq  80(%r14), %rbx
   addq  $8, %rbx
   movq  $5111, -8(%rbx)
   movq  <hidden PC-relative offset>(%rip), %rcx
@@ -385,14 +385,14 @@ double_loop_no_definition_at_beginning:
   je    .L2
 .L4:
   movq  8(%rsp), %rbx
-  movq  %rbx, 64(%r14)
+  movq  %rbx, 72(%r14)
   movq  (%rsp), %rdx
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
   movq  16(%rsp), %rbx
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rbx, 72(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
@@ -410,8 +410,8 @@ double_loop_no_definition_at_beginning.f:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]

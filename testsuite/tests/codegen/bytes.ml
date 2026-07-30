@@ -199,8 +199,8 @@ bytes_safe_get_int32:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]
