@@ -294,6 +294,68 @@ let classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
+(*
+let rec scannable_product_array_kind elt_ty_for_error loc layouts =
+  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
+
+and sort_to_scannable_product_element_kind elt_ty_for_error loc
+      (layout : Jkind.Layout.Const.t) =
+  match layout with
+  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
+                               with non-representable layout"
+  | Base (Scannable, { separability; _ }) ->
+      let open Jkind_axis.Separability in
+      if le separability (upper_bound_if_is_always_gc_ignorable ())
+        then Pint_scannable else Paddr_scannable
+  | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
+          Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask), _) as c ->
+    raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
+  | Base (Void, _) ->
+    raise (Error (loc, Unsupported_void_in_array))
+  | Product sorts ->
+    Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
+  | Univar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
+
+let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
+  match sorts with
+  | [Base (Vec128, _); Base (Vec128, _)] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | [Base (Vec128, _); Base (Vec128, _); Base (Vec128, _); Base (Vec128, _)] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | _ -> List.map (sort_to_ignorable_product_element_kind loc) sorts
+
+and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
+  match layout with
+  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
+                               with non-representable layout"
+  (* Scannable axes are irrelevant, since we already know we can ignore *)
+  | Base (Scannable, _sa) -> Pint_ignorable
+  | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
+  | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
+  | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base (Bits16, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base (Bits32, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base (Bits64, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base (Word, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
+  | Base ((Vec128 | Vec256 | Vec512), _) ->
+    raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base (Mask, _) -> raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
+  | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  | Univar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
+*)
+
 let scannable_product_array_kind _ _ _ = ()
 
 let ignorable_product_array_kind _ _ = ()
