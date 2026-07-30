@@ -62,13 +62,9 @@ type error =
         value: Global_module.Name.t;
       }
 
-include (struct
-  exception Error of error
-  let error e = Typing_recovery.log_and_raise (Error e)
-end : sig
-  type exn += private Error of error
-  val error : error -> 'a
-end)
+(* These errors are location-less and will be logged and re-raised in Env *)
+exception Error of error
+let error err = raise (Error err)
 
 module Persistent_signature = struct
   type t =
