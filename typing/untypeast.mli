@@ -15,6 +15,13 @@
 
 open Parsetree
 
+(* Performed while untyping a [Texp_unquote]: a client (notably [Translquotes])
+   installs a handler that translates the spliced-in expression. The [untype_*]
+   entry points install a trivial handler, so this is transparent for every
+   other caller. *)
+type _ Effect.t +=
+  | Unquote : Typedtree.expression -> expression Effect.t
+
 val lident_of_path : Path.t -> Longident.t
 
 type mapper = {

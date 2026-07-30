@@ -18,6 +18,7 @@
   (exit_module std_exit)
   (internal_modules Camlinternal*)
   (modules_before_stdlib camlinternalFormatBasics camlinternalAtomic))
+ (modules_without_implementation camlinternalParsetree camlinternalAsttypes)
  (flags
   (:standard
    -strict-sequence
@@ -46,6 +47,50 @@
  (target Makefile.config)
  (action
   (copy ../Makefile.config Makefile.config)))
+
+; Copies of Parsetree/Pprintast and their dependencies, renamed to Camlinternal*
+; (via rename_syntax.sed) so their module names do not clash with the compiler's
+; own Parsetree/Location/... (ocamlcommon is (wrapped false)). They are used by
+; Quote to represent and print quoted expressions at run time. Generated into the
+; build directory only (never checked in).
+(rule
+ (targets
+  camlinternalAsttypes.mli
+  camlinternalParsetree.mli
+  camlinternalLongident.ml
+  camlinternalLongident.mli
+  camlinternalFormat_doc.ml
+  camlinternalFormat_doc.mli
+  camlinternalPprintast.ml
+  camlinternalPprintast.mli)
+ (deps
+  rename_syntax.sed
+  %{project_root}/parsing/asttypes.mli
+  %{project_root}/parsing/parsetree.mli
+  %{project_root}/parsing/longident.ml
+  %{project_root}/parsing/longident.mli
+  %{project_root}/utils/format_doc.ml
+  %{project_root}/utils/format_doc.mli
+  %{project_root}/parsing/pprintast.ml
+  %{project_root}/parsing/pprintast.mli)
+ (action
+  (progn
+   (with-stdout-to camlinternalAsttypes.mli
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/asttypes.mli))
+   (with-stdout-to camlinternalParsetree.mli
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/parsetree.mli))
+   (with-stdout-to camlinternalLongident.ml
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/longident.ml))
+   (with-stdout-to camlinternalLongident.mli
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/longident.mli))
+   (with-stdout-to camlinternalFormat_doc.ml
+    (run sed -E -f rename_syntax.sed %{project_root}/utils/format_doc.ml))
+   (with-stdout-to camlinternalFormat_doc.mli
+    (run sed -E -f rename_syntax.sed %{project_root}/utils/format_doc.mli))
+   (with-stdout-to camlinternalPprintast.ml
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/pprintast.ml))
+   (with-stdout-to camlinternalPprintast.mli
+    (run sed -E -f rename_syntax.sed %{project_root}/parsing/pprintast.mli)))))
 
 (install
  (files
@@ -100,8 +145,6 @@
   camlinternalMod.mli
   camlinternalOO.ml
   camlinternalOO.mli
-  camlinternalQuote.ml
-  camlinternalQuote.mli
   char.ml
   char.mli
   complex.ml
@@ -566,7 +609,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmi
   .stdlib.objs/byte/camlinternalOO.cmi
   .stdlib.objs/byte/camlinternalFormat.cmi
-  .stdlib.objs/byte/camlinternalQuote.cmi
   .stdlib.objs/byte/camlinternalAtomic.cms
   .stdlib.objs/byte/camlinternalComprehension.cms
   .stdlib.objs/byte/camlinternalMod.cms
@@ -574,7 +616,6 @@
   .stdlib.objs/byte/camlinternalLazy.cms
   .stdlib.objs/byte/camlinternalOO.cms
   .stdlib.objs/byte/camlinternalFormat.cms
-  .stdlib.objs/byte/camlinternalQuote.cms
   .stdlib.objs/byte/camlinternalAtomic.cmsi
   .stdlib.objs/byte/camlinternalComprehension.cmsi
   .stdlib.objs/byte/camlinternalMod.cmsi
@@ -582,7 +623,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmsi
   .stdlib.objs/byte/camlinternalOO.cmsi
   .stdlib.objs/byte/camlinternalFormat.cmsi
-  .stdlib.objs/byte/camlinternalQuote.cmsi
   .stdlib.objs/byte/camlinternalAtomic.cmt
   .stdlib.objs/byte/camlinternalComprehension.cmt
   .stdlib.objs/byte/camlinternalMod.cmt
@@ -590,7 +630,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmt
   .stdlib.objs/byte/camlinternalOO.cmt
   .stdlib.objs/byte/camlinternalFormat.cmt
-  .stdlib.objs/byte/camlinternalQuote.cmt
   .stdlib.objs/byte/camlinternalAtomic.cmti
   .stdlib.objs/byte/camlinternalComprehension.cmti
   .stdlib.objs/byte/camlinternalMod.cmti
@@ -598,7 +637,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmti
   .stdlib.objs/byte/camlinternalOO.cmti
   .stdlib.objs/byte/camlinternalFormat.cmti
-  .stdlib.objs/byte/camlinternalQuote.cmti
   .stdlib.objs/native/camlinternalAtomic.cmx
   .stdlib.objs/native/camlinternalComprehension.cmx
   .stdlib.objs/native/camlinternalMod.cmx
@@ -606,7 +644,6 @@
   .stdlib.objs/native/camlinternalLazy.cmx
   .stdlib.objs/native/camlinternalOO.cmx
   .stdlib.objs/native/camlinternalFormat.cmx
-  .stdlib.objs/native/camlinternalQuote.cmx
   .stdlib.objs/byte/std_exit.cmi
   .stdlib.objs/byte/std_exit.cmo
   .stdlib.objs/byte/std_exit.cms

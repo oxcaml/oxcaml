@@ -29,6 +29,15 @@ val constr : Format.formatter -> Longident.t -> unit
 val expression : Format.formatter -> Parsetree.expression -> unit
 val string_of_expression : Parsetree.expression -> string
 
+(** Rewrite the runtime-metaprogramming stamps [base\num] introduced by
+    {!Translquotes} back to the readable [base] / [base__N] disambiguation.
+    Applied before printing the body of a quotation. *)
+val normalize_quote : Parsetree.expression -> Parsetree.expression
+
+(** Print the body of a runtime-metaprogramming quotation: {!normalize_quote}
+    followed by printing it inside the quotation brackets [<[ ... ]>]. *)
+val quoted_expression : Format.formatter -> Parsetree.expression -> unit
+
 val pattern: Format.formatter -> Parsetree.pattern -> unit
 
 val core_type: Format.formatter -> Parsetree.core_type -> unit

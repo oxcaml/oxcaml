@@ -394,13 +394,19 @@ Error: Unbound constructor "My_constructor"
    not the local one.  *)
 let e = <[ fun (x : int) -> x ]> in <[ fun (type int) () -> $e ]>
 [%%expect {|
-- : <[unit -> int -> int]> expr = <[fun (type int) () -> fun (x : int) -> x]>
+- : <[unit -> int -> int]> expr =
+<[fun (type int) -> fun () -> fun (x : int) -> x]>
 |}];;
 (* Exception *)
 let e = <[ Stdlib.raise (Failure "") ]> in
 <[ let exception Failure of string in $e ]>
 [%%expect {|
-- : 'a expr = <[let exception Failure in Stdlib.raise (Failure "")]>
+Line 2, characters 3-40:
+2 | <[ let exception Failure of string in $e ]>
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Local exception definition using "let exception"
+       is not supported inside quoted expressions,
+       as seen at line 2, characters 3-40.
 |}];;
 (* We can avoid the following two bugs by banning [let exception],
    but they seem unlikely enough. *)
@@ -410,21 +416,20 @@ let e = Stdlib.Obj.magic_many <[ Stdlib.raise (Failure "") ]> in
 <[ fun (module Stdlib : S) -> $e ]>
 [%%expect {|
 - : <[(module S) -> $('a)]> expr =
-<[
-  fun (((module Stdlib) : (module S)) : (module S)) ->
-    Stdlib.raise (Failure "")
-]>
+<[fun (((module Stdlib)  : (module S)) : (module S)) ->
+    Stdlib.raise (Failure "")]>
 |}];;
 (* CR jbachurski: This is wrong -- the inner exn should refer to the
    global [Stdlib], not the extension.
    Note [Continuation_already_taken] is not re-exported by [Stdlib] (bug?). *)
 let e = <[ Stdlib.raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
 [%%expect {|
-- : 'a expr =
-<[
-  let exception Continuation_already_taken in
-    Stdlib.raise Continuation_already_taken
-]>
+Line 1, characters 60-106:
+1 | let e = <[ Stdlib.raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
+                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Local exception definition using "let exception"
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 60-106.
 |}];;
 
 (* Similar examples to the above could be constructed for locally declared

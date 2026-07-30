@@ -16,7 +16,7 @@ Test reference to global
 Output: Hello world!
 
 Test late compilation error
-File "//eval//", line 3, characters 12-72:
+File "//eval//", lines 2-3, characters 12-64:
 Error: [@tail_mod_cons]: Functions cannot be both local-returning and [@tail_mod_cons]
 Error during eval (expected)
 

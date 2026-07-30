@@ -347,7 +347,7 @@ Error: Type variable "'a" is used outside any quotations,
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
-<[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
+<[fun (type a) (type b) -> fun (x : a) (y : b) -> (x, y)]>
 |}];;
 
 type t4 = A | B;;
@@ -415,19 +415,19 @@ type _ t_param_re_staged_gadt =
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
+<[fun (f : ('a : value) . 'a -> 'a) (x : 'b) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('a) -> $('a)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
+<[fun (f : ('a : value) . 'a -> 'a) (x : 'a) -> f x]>
 |}];;
 
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
 - : <[$('a) -> ('a0. 'a0 -> 'a0) -> $('a)]> expr =
-<[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
+<[fun (x : 'a) (f : ('a : value) . 'a -> 'a) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (g: 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g]>;;
@@ -438,8 +438,9 @@ type _ t_param_re_staged_gadt =
      $('d) list -> ($('d) -> $('e)) -> $('e) list]>
     expr
 =
-<[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g
-]>
+<[fun (f : ('a : value) . 'a -> 'a)
+    (g : ('b : value) ('c : value) . 'b list -> ('b -> 'c) -> 'c list) ->
+    f g]>
 |}];;
 
 let bar (f : <[int -> int]>) = f 42;;
@@ -528,7 +529,7 @@ val eta1 : <[$('a) expr -> $('a) expr @ once]> expr =
 
 let eta1' = <[ fun (type a) (x : a) : a -> $(<[ x ]>) ]>
 [%%expect {|
-val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
+val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) -> fun (x : a) -> x]>
 |}]
 
 (* Applicative *)

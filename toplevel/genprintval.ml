@@ -431,7 +431,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
               | Tconstr (path, [_], _)
                 when Path.same path Predef.path_expr ->
-                Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+                Oval_code (O.obj obj : Parsetree.expression)
 
               | _ ->
                 match Env.find_type path env with

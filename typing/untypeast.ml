@@ -22,6 +22,13 @@ open Ast_helper
 
 module T = Typedtree
 
+(* Performed while untyping a [Texp_unquote]: a client (notably [Translquotes])
+   installs a handler that translates the spliced-in expression. The [untype_*]
+   entry points install a trivial handler, so this is transparent for every
+   other caller. *)
+type _ Effect.t +=
+  | Unquote : T.expression -> expression Effect.t
+
 type mapper = {
   attribute: mapper -> T.attribute -> attribute;
   attributes: mapper -> T.attribute list -> attribute list;
@@ -347,13 +354,43 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in
   (* todo: fix attributes on extras *)
   let attrs = sub.attributes sub pat.pat_attributes in
+  (* Drop any type inspections first: they carry no source-level information
+     (they only guided inference) and may be interleaved with the other extras.
+     Whatever remains must be a single extra we understand. *)
+  let pat_extra =
+    List.filter
+      (fun (e, _, _) ->
+        match e with Tpat_inspected_type _ -> false | _ -> true)
+      pat.pat_extra
+  in
+  let pat = { pat with pat_extra } in
+  (* Wrap [inner] with the remaining extras of an unpack pattern, innermost
+     first. Only wrapping extras can follow a [Tpat_unpack]. *)
+  let wrap_unpack_extras rem inner =
+    List.fold_left
+      (fun p (e, _, _) ->
+        match e with
+        | Tpat_constraint (ct, modes) ->
+            Pat.mk ~loc
+              (Ppat_constraint
+                 (p, Option.map (sub.typ sub) ct, Typemode.untransl_mode modes))
+        | Tpat_open (_path, lid, _env) -> Pat.mk ~loc (Ppat_open (lid, p))
+        | _ -> Misc.fatal_error "Untypeast: unexpected extra on unpack pattern")
+      inner rem
+  in
   let desc =
   match pat with
-      { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
-        Ppat_unpack { txt = None; loc  }
-    | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var { name; _ }; _ } ->
-        Ppat_unpack { name with txt = Some name.txt }
+      { pat_extra = (Tpat_unpack, uloc, _attrs) :: rem; _ } ->
+        (* A module unpack turns the [Tpat_var]/[Tpat_any] into [Ppat_unpack];
+           any further extras (type constraints) wrap it. *)
+        let base =
+          match pat.pat_desc with
+          | Tpat_any -> Ppat_unpack { txt = None; loc = uloc }
+          | Tpat_var { name; _ } ->
+              Ppat_unpack { name with txt = Some name.txt }
+          | _ -> Misc.fatal_error "Untypeast: unexpected module unpack pattern"
+        in
+        (wrap_unpack_extras rem (Pat.mk ~loc base)).ppat_desc
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
@@ -362,6 +399,9 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
                          Option.map (sub.typ sub) ct, modes)
     | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
         Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
+    | { pat_extra = _ :: _; _ } ->
+        Misc.fatal_error
+          "Untypeast: unexpected combination of pattern type extras"
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -460,8 +500,8 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode modes)
     | Texp_inspected_type _ ->
-        (* Type inspections are unnecessary in a Parsetree,
-           as type inference reproduces them *)
+        (* Type inspections carry no source-level information (they only guided
+           inference), so they are dropped. *)
         sexp.pexp_desc
     | Texp_borrowed -> Pexp_borrow sexp
     | Texp_ghost_region ->sexp.pexp_desc
@@ -540,6 +580,11 @@ let label : Types.arg_label -> Parsetree.arg_label = function
 let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 
 let expression sub exp =
+  match exp.exp_desc with
+  (* A stage-0 splice is a real insertion: hand the spliced expression to the
+     installed [Unquote] handler and use whatever it returns in its place. *)
+  | Texp_unquote e -> Effect.perform (Unquote e)
+  | _ ->
   let loc = sub.location sub exp.exp_loc in
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
@@ -840,8 +885,10 @@ let expression sub exp =
     | Texp_overwrite (exp1, exp2) ->
         Pexp_overwrite(sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole _ -> Pexp_hole
-    | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
-    | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_quote exp -> Pexp_quote (sub.expr sub exp)
+    | Texp_splice exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_unquote _ ->
+        Misc.fatal_error "Untypeast: Texp_unquote is dispatched above"
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -1144,6 +1191,9 @@ let core_type sub ct =
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
+    (* A stage-0 type splice is a real insertion; types are erased, so it
+       becomes a hole [_] that inference fills in on re-typing. *)
+    | Ttyp_unquote _ -> Ptyp_any None
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
@@ -1285,14 +1335,29 @@ let default_mapper =
     jkind_declaration = jkind_declaration;
   }
 
+(* Install the default [Unquote] handler, which simply untypes the spliced
+   expression back into a [Pexp_splice], so that untyping behaves as it always
+   has for callers that do not care about staging. [Translquotes] runs the
+   mapper under its own handler instead of going through these entry points. *)
+let rec run_default : type a. (unit -> a) -> a = fun f ->
+  Effect.Deep.try_with f ()
+    { effc =
+        (fun (type b) (eff : b Effect.t) ->
+          match eff with
+          | Unquote e ->
+            Some (fun (k : (b, _) Effect.Deep.continuation) ->
+              Effect.Deep.continue k
+                (Exp.mk (Pexp_splice (untype_expression e))))
+          | _ -> None) }
+
+and untype_expression ?(mapper=default_mapper) expression =
+  run_default (fun () -> mapper.expr mapper expression)
+
 let untype_structure ?(mapper : mapper = default_mapper) structure =
-  mapper.structure mapper structure
+  run_default (fun () -> mapper.structure mapper structure)
 
 let untype_signature ?(mapper : mapper = default_mapper) signature =
-  mapper.signature mapper signature
-
-let untype_expression ?(mapper=default_mapper) expression =
-  mapper.expr mapper expression
+  run_default (fun () -> mapper.signature mapper signature)
 
 let untype_pattern ?(mapper=default_mapper) pattern =
-  mapper.pat mapper pattern
+  run_default (fun () -> mapper.pat mapper pattern)

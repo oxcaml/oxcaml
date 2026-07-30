@@ -27,6 +27,269 @@ open Location
 open Longident
 open Parsetree
 
+(* --- Quote stamp normalization ----------------------------------------- *)
+
+(* Runtime metaprogramming freshens every bound name to [base\stamp] at
+   construction time (a backslash cannot occur in a source identifier, so the
+   stamp is unambiguous and unconfusable with any operator). Before a quoted
+   expression is printed we rewrite those names to the readable [base] /
+   [base__N] scheme the compiler uses elsewhere: the first binder of a given
+   base keeps it, later distinct binders get [__1], [__2], ...; every use is
+   rewritten to match its binder. Value variables, type variables and modules
+   are numbered independently (they cannot capture one another). This is a
+   syntactic pass over [Parsetree]; it is shared with the standard library
+   ([Quote]) through the verbatim copy of this file. *)
+let normalize_quote (root : expression) : expression =
+  let renamed : (string, string) Hashtbl.t = Hashtbl.create 64 in
+  let counter : (string, int) Hashtbl.t = Hashtbl.create 64 in
+  let base_of s =
+    match String.index_opt s '\\' with
+    | Some i -> String.sub s 0 i
+    | None -> s
+  in
+  let has_stamp s = String.contains s '\\' in
+  (* Map a stamped name to its readable form, numbering per (namespace, base)
+     in first-seen (i.e. binder) order. [ns] keeps the namespaces disjoint. *)
+  let assign ns s =
+    let key = ns ^ ":" ^ s in
+    match Hashtbl.find_opt renamed key with
+    | Some n -> n
+    | None ->
+        let base = base_of s in
+        let ckey = ns ^ ":" ^ base in
+        let k =
+          match Hashtbl.find_opt counter ckey with Some k -> k | None -> 0
+        in
+        Hashtbl.replace counter ckey (k + 1);
+        let n = if k = 0 then base else base ^ "__" ^ string_of_int k in
+        Hashtbl.add renamed key n;
+        n
+  in
+  (* Normalize a name that carries a stamp, otherwise leave it untouched: a
+     binder or use with no stamp is a name we did not freshen (a free/external
+     identifier, or a binder in a construct that is not part of hygiene, such as
+     a locally abstract type), and must be printed verbatim. *)
+  let rename ns s = if has_stamp s then assign ns s else s in
+  let binder = rename in
+  let use = rename in
+  let rename_loc f (x : string loc) = { x with txt = f x.txt } in
+  (* Normalize every component of a qualified name: the final component in
+     namespace [ns] (a value or type), the module prefix in the module
+     namespace. A stamp can leak into a prefixed name (an operator resolved to
+     [Stdlib.(+)] whose field aliases a freshened binder), so we clean each
+     component rather than only bare [Lident]s. *)
+  let rec norm_lident ns = function
+    | Lident s -> Lident (rename ns s)
+    | Ldot (h, f) ->
+        Ldot
+          ( { h with txt = norm_lident "module" h.txt },
+            { f with txt = rename ns f.txt } )
+    | Lapply (a, b) ->
+        Lapply
+          ( { a with txt = norm_lident "module" a.txt },
+            { b with txt = norm_lident "module" b.txt } )
+  in
+  let value_use lid = norm_lident "value" lid in
+  let rec expr e = { e with pexp_desc = edesc e.pexp_desc }
+  and edesc d =
+    match d with
+    | Pexp_ident lid -> Pexp_ident { lid with txt = value_use lid.txt }
+    | Pexp_constant _ | Pexp_unboxed_unit | Pexp_unboxed_bool _
+    | Pexp_new _ | Pexp_extension _ | Pexp_unreachable | Pexp_hole
+    | Pexp_pack _ | Pexp_object _ | Pexp_idx _ ->
+        d
+    | Pexp_comprehension c -> Pexp_comprehension (comprehension c)
+    (* Children are bound left-to-right so that binders are numbered in source
+       order (OCaml would otherwise evaluate constructor arguments right-to-
+       left, reversing the [__N] suffixes). *)
+    | Pexp_let (m, r, vbs, body) ->
+        let vbs = List.map value_binding vbs in
+        Pexp_let (m, r, vbs, expr body)
+    | Pexp_function (ps, c, b) ->
+        let ps = List.map param ps in
+        let c = fun_constraint c in
+        Pexp_function (ps, c, fun_body b)
+    | Pexp_apply (f, args) ->
+        let f = expr f in
+        Pexp_apply (f, List.map (fun (l, a) -> (l, expr a)) args)
+    | Pexp_match (e, cs) ->
+        let e = expr e in
+        Pexp_match (e, List.map case cs)
+    | Pexp_try (e, cs) ->
+        let e = expr e in
+        Pexp_try (e, List.map case cs)
+    | Pexp_tuple l -> Pexp_tuple (List.map (fun (s, e) -> (s, expr e)) l)
+    | Pexp_unboxed_tuple l ->
+        Pexp_unboxed_tuple (List.map (fun (s, e) -> (s, expr e)) l)
+    | Pexp_construct (lid, eo) -> Pexp_construct (lid, Option.map expr eo)
+    | Pexp_variant (l, eo) -> Pexp_variant (l, Option.map expr eo)
+    | Pexp_record (fs, eo) ->
+        Pexp_record
+          (List.map (fun (lid, e) -> (lid, expr e)) fs, Option.map expr eo)
+    | Pexp_record_unboxed_product (fs, eo) ->
+        Pexp_record_unboxed_product
+          (List.map (fun (lid, e) -> (lid, expr e)) fs, Option.map expr eo)
+    | Pexp_field (e, lid) -> Pexp_field (expr e, lid)
+    | Pexp_unboxed_field (e, lid) -> Pexp_unboxed_field (expr e, lid)
+    | Pexp_setfield (e1, lid, e2) -> Pexp_setfield (expr e1, lid, expr e2)
+    | Pexp_array (m, l) -> Pexp_array (m, List.map expr l)
+    | Pexp_ifthenelse (c, t, eo) ->
+        Pexp_ifthenelse (expr c, expr t, Option.map expr eo)
+    | Pexp_sequence (e1, e2) -> Pexp_sequence (expr e1, expr e2)
+    | Pexp_while (e1, e2) -> Pexp_while (expr e1, expr e2)
+    | Pexp_for (p, e1, e2, dir, e3) ->
+        let p = pat p in
+        let e1 = expr e1 in
+        let e2 = expr e2 in
+        Pexp_for (p, e1, e2, dir, expr e3)
+    | Pexp_constraint (e, cto, m) ->
+        Pexp_constraint (expr e, Option.map typ cto, m)
+    | Pexp_coerce (e, cto, ct) ->
+        Pexp_coerce (expr e, Option.map typ cto, typ ct)
+    | Pexp_send (e, l) -> Pexp_send (expr e, l)
+    | Pexp_setvar (l, e) -> Pexp_setvar (l, expr e)
+    | Pexp_override l -> Pexp_override (List.map (fun (n, e) -> (n, expr e)) l)
+    | Pexp_letmodule (n, me, e) -> Pexp_letmodule (n, me, expr e)
+    | Pexp_letexception (ec, e) -> Pexp_letexception (ec, expr e)
+    | Pexp_assert e -> Pexp_assert (expr e)
+    | Pexp_lazy e -> Pexp_lazy (expr e)
+    | Pexp_poly (e, cto) -> Pexp_poly (expr e, Option.map typ cto)
+    | Pexp_newtype (n, j, e) -> Pexp_newtype (n, j, expr e)
+    | Pexp_open (od, e) -> Pexp_open (od, expr e)
+    | Pexp_letop lop ->
+        let let_ = binding_op lop.let_ in
+        let ands = List.map binding_op lop.ands in
+        Pexp_letop { let_; ands; body = expr lop.body }
+    | Pexp_stack e -> Pexp_stack (expr e)
+    | Pexp_overwrite (e1, e2) -> Pexp_overwrite (expr e1, expr e2)
+    | Pexp_quote e -> Pexp_quote (expr e)
+    | Pexp_splice e -> Pexp_splice (expr e)
+    | Pexp_borrow e -> Pexp_borrow (expr e)
+  and param p =
+    match p.pparam_desc with
+    | Pparam_val (l, eo, p') ->
+        { p with pparam_desc = Pparam_val (l, Option.map expr eo, pat p') }
+    | Pparam_newtype _ -> p
+  and fun_body = function
+    | Pfunction_body e -> Pfunction_body (expr e)
+    | Pfunction_cases (cs, loc, attrs) ->
+        Pfunction_cases (List.map case cs, loc, attrs)
+  and fun_constraint c =
+    { c with
+      ret_type_constraint = Option.map type_constraint c.ret_type_constraint
+    }
+  and type_constraint = function
+    | Pconstraint ct -> Pconstraint (typ ct)
+    | Pcoerce (cto, ct) -> Pcoerce (Option.map typ cto, typ ct)
+  and value_binding vb =
+    let pvb_pat = pat vb.pvb_pat in
+    let pvb_expr = expr vb.pvb_expr in
+    let pvb_constraint = Option.map value_constraint vb.pvb_constraint in
+    { vb with pvb_pat; pvb_expr; pvb_constraint }
+  and value_constraint = function
+    | Pvc_constraint { locally_abstract_univars; typ = t } ->
+        Pvc_constraint { locally_abstract_univars; typ = typ t }
+    | Pvc_coercion { ground; coercion } ->
+        Pvc_coercion
+          { ground = Option.map typ ground; coercion = typ coercion }
+  and binding_op bop =
+    let pbop_pat = pat bop.pbop_pat in
+    { bop with pbop_pat; pbop_exp = expr bop.pbop_exp }
+  and case c =
+    let pc_lhs = pat c.pc_lhs in
+    let pc_guard = Option.map expr c.pc_guard in
+    { pc_lhs; pc_guard; pc_rhs = expr c.pc_rhs }
+  and pat p = { p with ppat_desc = pdesc p.ppat_desc }
+  and pdesc d =
+    match d with
+    | Ppat_any | Ppat_constant _ | Ppat_interval _ | Ppat_unboxed_unit
+    | Ppat_unboxed_bool _ | Ppat_type _ | Ppat_unpack _ | Ppat_extension _ ->
+        d
+    | Ppat_var s -> Ppat_var (rename_loc (binder "value") s)
+    | Ppat_alias (p, s) -> Ppat_alias (pat p, rename_loc (binder "value") s)
+    | Ppat_tuple (l, c) ->
+        Ppat_tuple (List.map (fun (s, p) -> (s, pat p)) l, c)
+    | Ppat_unboxed_tuple (l, c) ->
+        Ppat_unboxed_tuple (List.map (fun (s, p) -> (s, pat p)) l, c)
+    | Ppat_construct (lid, arg) ->
+        Ppat_construct (lid, Option.map (fun (vs, p) -> (vs, pat p)) arg)
+    | Ppat_variant (l, po) -> Ppat_variant (l, Option.map pat po)
+    | Ppat_record (fs, c) ->
+        Ppat_record (List.map (fun (lid, p) -> (lid, pat p)) fs, c)
+    | Ppat_record_unboxed_product (fs, c) ->
+        Ppat_record_unboxed_product
+          (List.map (fun (lid, p) -> (lid, pat p)) fs, c)
+    | Ppat_array (m, l) -> Ppat_array (m, List.map pat l)
+    | Ppat_or (p1, p2) -> Ppat_or (pat p1, pat p2)
+    | Ppat_constraint (p, cto, m) ->
+        Ppat_constraint (pat p, Option.map typ cto, m)
+    | Ppat_lazy p -> Ppat_lazy (pat p)
+    | Ppat_exception p -> Ppat_exception (pat p)
+    | Ppat_effect (p1, p2) -> Ppat_effect (pat p1, pat p2)
+    | Ppat_open (lid, p) -> Ppat_open (lid, pat p)
+  and typ t = { t with ptyp_desc = tdesc t.ptyp_desc }
+  and tdesc d =
+    match d with
+    | Ptyp_any _ | Ptyp_of_kind _ | Ptyp_extension _ -> d
+    | Ptyp_var (s, j) -> Ptyp_var (use "type" s, j)
+    | Ptyp_package pt ->
+        let ppt_cstrs =
+          List.map (fun (l, t) -> (l, typ t)) pt.ppt_cstrs
+        in
+        Ptyp_package { pt with ppt_cstrs }
+    | Ptyp_constr (lid, args) ->
+        let lid = { lid with txt = norm_lident "type" lid.txt } in
+        Ptyp_constr (lid, List.map typ args)
+    | Ptyp_class (lid, args) ->
+        let lid = { lid with txt = norm_lident "type" lid.txt } in
+        Ptyp_class (lid, List.map typ args)
+    | Ptyp_repr (l, t) -> Ptyp_repr (l, typ t)
+    | Ptyp_newlayout (l, t) -> Ptyp_newlayout (l, typ t)
+    | Ptyp_arrow (l, t1, t2, m1, m2) -> Ptyp_arrow (l, typ t1, typ t2, m1, m2)
+    | Ptyp_tuple l -> Ptyp_tuple (List.map (fun (s, t) -> (s, typ t)) l)
+    | Ptyp_unboxed_tuple l ->
+        Ptyp_unboxed_tuple (List.map (fun (s, t) -> (s, typ t)) l)
+    | Ptyp_object (fs, c) -> Ptyp_object (List.map object_field fs, c)
+    | Ptyp_alias (t, s, j) -> Ptyp_alias (typ t, s, j)
+    | Ptyp_variant (rs, c, l) -> Ptyp_variant (List.map row_field rs, c, l)
+    | Ptyp_poly (vars, body) ->
+        Ptyp_poly
+          ( List.map (fun (v, j) -> (rename_loc (binder "type") v, j)) vars,
+            typ body )
+    | Ptyp_open (lid, t) -> Ptyp_open (lid, typ t)
+    | Ptyp_quote t -> Ptyp_quote (typ t)
+    | Ptyp_splice t -> Ptyp_splice (typ t)
+  and comprehension = function
+    | Pcomp_list_comprehension c ->
+        Pcomp_list_comprehension (comp c)
+    | Pcomp_array_comprehension (m, c) ->
+        Pcomp_array_comprehension (m, comp c)
+  and comp c =
+    (* Clauses bind the variables the body uses, so number them first. *)
+    let pcomp_clauses = List.map comp_clause c.pcomp_clauses in
+    { pcomp_clauses; pcomp_body = expr c.pcomp_body }
+  and comp_clause = function
+    | Pcomp_for bs -> Pcomp_for (List.map comp_binding bs)
+    | Pcomp_when e -> Pcomp_when (expr e)
+  and comp_binding b =
+    let pcomp_cb_iterator = comp_iterator b.pcomp_cb_iterator in
+    { b with pcomp_cb_iterator; pcomp_cb_pattern = pat b.pcomp_cb_pattern }
+  and comp_iterator = function
+    | Pcomp_range { start; stop; direction } ->
+        let start = expr start in
+        Pcomp_range { start; stop = expr stop; direction }
+    | Pcomp_in e -> Pcomp_in (expr e)
+  and object_field f =
+    match f.pof_desc with
+    | Otag (l, t) -> { f with pof_desc = Otag (l, typ t) }
+    | Oinherit t -> { f with pof_desc = Oinherit (typ t) }
+  and row_field f =
+    match f.prf_desc with
+    | Rtag (l, b, ts) -> { f with prf_desc = Rtag (l, b, List.map typ ts) }
+    | Rinherit t -> { f with prf_desc = Rinherit (typ t) }
+  in
+  expr root
+
 let prefix_symbols  = [ '!'; '?'; '~' ]
 let infix_symbols = [ '='; '<'; '>'; '@'; '^'; '|'; '&'; '+'; '-'; '*'; '/';
                       '$'; '%'; '#' ]
@@ -846,8 +1109,17 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_constant (c) -> pp f "%a" constant c
     | Ppat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
-    | Ppat_constraint (p, ct, _) ->
-        pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_constraint (p, ct, m) ->
+        begin match ct with
+        | Some ct ->
+            pp f "@[<2>(%a@;:@;%a)@]"
+            (pattern1 ctxt) p
+            (core_type2_with_optional_modes ctxt) (ct, m)
+        | None ->
+            pp f "@[<2>(%a%a)@]"
+            (pattern1 ctxt) p
+            optional_at_modes m
+        end
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->
@@ -2500,6 +2772,13 @@ let string_of_expression x =
   let f = str_formatter in
   expression f x;
   flush_str_formatter ()
+
+let quoted_expression f x =
+  expression f
+    { pexp_desc = Pexp_quote (normalize_quote x);
+      pexp_loc = Location.none;
+      pexp_loc_stack = [];
+      pexp_attributes = [] }
 
 let structure = print_reset_with_maximal_extensions structure
 

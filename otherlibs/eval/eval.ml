@@ -113,7 +113,6 @@ let read_bundles_from_exe () =
 let counter = ref 0
 
 let eval (expr : 'a expr) =
-  let code : CamlinternalQuote.Code.t = Obj.magic expr in
   (* TODO: assert the JIT is supported *)
   let id = !counter in
   incr counter;
@@ -144,11 +143,9 @@ let eval (expr : 'a expr) =
   (* TODO: set commandline flags *)
   (* Compilation happens here during partial application, not when thunk is
      called *)
-  let code = CamlinternalQuote.Code.Closed.close code in
-  let exp = CamlinternalQuote.Code.Closed.to_exp code in
-  let code_string =
-    Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
-  in
+  (* [Quote.string_of_expr] prints the code with stamped names normalised to
+     valid, readable identifiers, so the result re-parses. *)
+  let code_string = "let eval = (" ^ Quote.string_of_expr expr ^ ")" in
   let lexbuf = Lexing.from_string code_string in
   Location.input_lexbuf := Some lexbuf;
   Location.init lexbuf "//eval//";

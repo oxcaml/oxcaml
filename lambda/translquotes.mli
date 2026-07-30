@@ -26,9 +26,9 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Translate an expression inside a Texp_quotation. The [transl] argument is a
-    function used to translate spliced expressions that need to be translated at
-    compile time. *)
+(** Translate the body of a [Texp_quote] to lambda that builds, at run time, the
+    [Parsetree.expression] representing it. The [transl] argument is used to
+    translate unquoted expressions (spliced in at program-generation time). *)
 val transl_quote :
   scopes:Debuginfo.Scoped_location.scopes ->
   loc:Location.t ->

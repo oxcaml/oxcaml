@@ -26,37 +26,41 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* CR metaprogramming aivaskovic: This file has not been code reviewed *)
+(* A quotation value [_ expr] is represented at run time by a
+   [CamlinternalParsetree.expression] (built by [Translquotes]); it is printed
+   with the copy of [Pprintast] linked into the standard library. *)
 
 #syntax quotations on
 
-open CamlinternalQuote
+open CamlinternalParsetree
+
+let none = CamlinternalLocation.none
+
+let mk pexp_desc =
+  { pexp_desc; pexp_loc = none; pexp_loc_stack = []; pexp_attributes = [] }
+
+let const pconst_desc = mk (Pexp_constant { pconst_desc; pconst_loc = none })
 
 module Expr = struct
+  let bool b : <[bool]> expr =
+    let name = if b then "true" else "false" in
+    let txt = CamlinternalLongident.Lident name in
+    let lid = { CamlinternalLocation.txt; loc = none } in
+    Obj.magic (mk (Pexp_construct (lid, None)))
 
-  let inject_constr x =
-    Code.of_exp Loc.unknown
-      (Exp.mk (Exp_desc.construct (Constructor.ident x) None) [])
-
-  let bool b =
-    let q = match b with
-    | true -> inject_constr (Identifier.Constructor.builtin "true")
-    | false -> inject_constr (Identifier.Constructor.builtin "false")
-    in (Obj.magic q : <[bool]> expr)
-
-  let inject x = Code.of_exp Loc.unknown (Exp.mk (Exp_desc.constant x) [])
-
-  let int x = (Obj.magic (inject (Constant.int x)) : <[int]> expr)
-  let int32 x = (Obj.magic (inject (Constant.int32 x)) : <[int32]> expr)
-  let int64 x = (Obj.magic (inject (Constant.int64 x)) : <[int64]> expr)
-  let nativeint x =
-    (Obj.magic (inject (Constant.nativeint x)) : <[nativeint]> expr)
-  let float x =
-    let s = Format.sprintf "%h" x
-    in (Obj.magic (inject (Constant.float s)) : <[float]> expr)
-  let char x = (Obj.magic (inject (Constant.char x)) : <[char]> expr)
-  let string x = (Obj.magic (inject (Constant.string x None)) : <[string]> expr)
-
+  let int x : <[int]> expr =
+    Obj.magic (const (Pconst_integer (string_of_int x, None)))
+  let int32 x : <[int32]> expr =
+    Obj.magic (const (Pconst_integer (Int32.to_string x, Some 'l')))
+  let int64 x : <[int64]> expr =
+    Obj.magic (const (Pconst_integer (Int64.to_string x, Some 'L')))
+  let nativeint x : <[nativeint]> expr =
+    Obj.magic (const (Pconst_integer (Nativeint.to_string x, Some 'n')))
+  let float x : <[float]> expr =
+    Obj.magic (const (Pconst_float (Printf.sprintf "%h" x, None)))
+  let char x : <[char]> expr = Obj.magic (const (Pconst_char x))
+  let string x : <[string]> expr =
+    Obj.magic (const (Pconst_string (x, none, None)))
 end
 
 let duplicate e =
@@ -64,7 +68,7 @@ let duplicate e =
   e, e
 
 let print fmt e =
-  Format.fprintf fmt "%a" Exp.print (Code.to_exp (Obj.magic e : Code.t))
+  let e : expression = Obj.magic e in
+  CamlinternalPprintast.expression fmt (CamlinternalPprintast.normalize_quote e)
 
-let string_of_expr e =
-  e |> Obj.magic_many |> Format.asprintf "%a" print
+let string_of_expr e = Format.asprintf "%a" print (Obj.magic_many e)

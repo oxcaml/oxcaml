@@ -248,6 +248,7 @@ type no_open_quotations_context =
   | Layout_polymorphism_qt
   | Tconst_pat_qt of Longident.t
   | Class_type_qt
+  | Letexception_qt
 
 type none_in_quotations_context =
   | Constructor

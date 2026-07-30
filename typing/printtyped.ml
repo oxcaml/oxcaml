@@ -425,6 +425,9 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_unquote t ->
+      line i ppf "Ttyp_unquote\n";
+      core_type i ppf t
   | Ttyp_repr (lv, ct) ->
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
@@ -883,11 +886,14 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
-  | Texp_quotation e ->
-    line i ppf "Texp_quotation";
-      expression i ppf e
-  | Texp_antiquotation e ->
-    line i ppf "Texp_antiquotation";
+  | Texp_quote e ->
+    line i ppf "Texp_quote";
+    expression i ppf e
+  | Texp_splice e ->
+    line i ppf "Texp_splice";
+    expression i ppf e
+  | Texp_unquote e ->
+    line i ppf "Texp_unquote";
     expression i ppf e
 
 and value_description i ppf x =

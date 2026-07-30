@@ -843,6 +843,7 @@ type no_open_quotations_context =
   | Layout_polymorphism_qt
   | Tconst_pat_qt of Longident.t
   | Class_type_qt
+  | Letexception_qt
 
 let print_structure_components_reason ppf = function
   | Project -> Format_doc.fprintf ppf "have any components"
@@ -5127,6 +5128,9 @@ let print_unsupported_quotation ppf =
         (Format.asprintf "%a" Pprintast.longident tconst)
   | Class_type_qt ->
       fprintf ppf "Using class type annotations"
+  | Letexception_qt ->
+      fprintf ppf "Local exception definition using %a"
+        (Style.inline_code) "let exception"
 
 let print_unbound_in_quotation ppf =
   function

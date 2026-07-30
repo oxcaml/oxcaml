@@ -1336,9 +1336,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_splice t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
+      (* At stage 1 the splice lands at stage 0: a real type insertion which,
+         types being erased, becomes a hole. Deeper nesting keeps it syntactic.
+         This mirrors [Texp_unquote]/[Texp_splice] on the expression side. *)
+      let unquote = (Env.stage env :> int) = 1 in
       let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
-      ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
+      let desc = if unquote then Ttyp_unquote cty else Ttyp_splice cty in
+      ctyp desc (newty (Tsplice cty.ctyp_type))
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 

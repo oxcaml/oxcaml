@@ -144,11 +144,10 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
      <[Inst0.t]> expr -> int NonInst1.t expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : <[Inst0.t]> expr) ->
-    (x : ((int) NonInst1.t) expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[Inst0.t]>, int NonInst1.t) Stdlib.Type.eq)
+    (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr)]>
 |}]
 (* t ~ <[s]>  when s instantiable *)
 let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
@@ -159,11 +158,10 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
      <[Inst0.t]> expr -> int NonInst1.t expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : <[Inst0.t]> expr) ->
-    (x : ((int) NonInst1.t) expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (int NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq)
+    (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr)]>
 |}]
 
 (* One side instantiable and the other under quotes/splices *)
@@ -175,10 +173,10 @@ let _ = <[ fun (Equal : (Inst0.t, $(int NonInst1.t)) Type.eq)
 - : <[(Inst0.t, $(int NonInst1.t)) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (Inst0.t, _)
-    Stdlib.Type.eq) (x : Inst0.t) -> x
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (Inst0.t, _) Stdlib.Type.eq)
+    (x : Inst0.t) -> (x : _)]>
 |}]
 (* $t ~ s  when s instantiable *)
 let _ = <[ fun (Equal : ($(int NonInst1.t), Inst0.t) Type.eq)
@@ -187,10 +185,10 @@ let _ = <[ fun (Equal : ($(int NonInst1.t), Inst0.t) Type.eq)
 - : <[($(int NonInst1.t), Inst0.t) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, Inst0.t)
-    Stdlib.Type.eq) (x : Inst0.t) -> x
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (_, Inst0.t) Stdlib.Type.eq)
+    (x : Inst0.t) -> (x : _)]>
 |}]
 (* t ~ <[s]>  when t instantiable *)
 let _ = <[ fun (Equal : (Inst1.t, <[int NonInst0.t]>) Type.eq)
@@ -201,11 +199,10 @@ let _ = <[ fun (Equal : (Inst1.t, <[int NonInst0.t]>) Type.eq)
      Inst1.t expr -> <[int NonInst0.t]> expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (Inst1.t, <[(int) NonInst0.t]>) Stdlib.Type.eq) (x : (Inst1.t) expr) ->
-    (x : <[(int) NonInst0.t]> expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (Inst1.t, <[int NonInst0.t]>) Stdlib.Type.eq)
+    (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr)]>
 |}]
 (* <[t]> ~ s  when s instantiable *)
 let _ = <[ fun (Equal : (<[int NonInst0.t]>, Inst1.t) Type.eq)
@@ -216,11 +213,10 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]>, Inst1.t) Type.eq)
      Inst1.t expr -> <[int NonInst0.t]> expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[(int) NonInst0.t]>, Inst1.t) Stdlib.Type.eq) (x : (Inst1.t) expr) ->
-    (x : <[(int) NonInst0.t]> expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[int NonInst0.t]>, Inst1.t) Stdlib.Type.eq)
+    (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr)]>
 |}]
 
 (* Both sides instantiable and quotes/splices *)
@@ -246,11 +242,10 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)
      <[Inst0.t]> expr -> <[Inst0.t']> expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, <[Inst0.t']>) Stdlib.Type.eq) (x : <[Inst0.t]> expr) -> (x
-    : <[Inst0.t']> expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[Inst0.t]>, <[Inst0.t']>) Stdlib.Type.eq)
+    (x : <[Inst0.t]> expr) -> (x : <[Inst0.t']> expr)]>
 |}]
 (* $t ~ <[s]>  and t, s instantiable *)
 let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
@@ -261,10 +256,10 @@ let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
      <[Inst0.t']> expr -> $(Inst2.t) expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, <[Inst0.t']>)
-    Stdlib.Type.eq) (x : <[Inst0.t']> expr) -> (x : _ expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (_, <[Inst0.t']>) Stdlib.Type.eq)
+    (x : <[Inst0.t']> expr) -> (x : _ expr)]>
 |}]
 (* <[t]> ~ $s  and t, s instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
@@ -275,10 +270,10 @@ let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
      <[Inst0.t']> expr -> $(Inst2.t) expr]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (<[Inst0.t']>, _)
-    Stdlib.Type.eq) (x : <[Inst0.t']> expr) -> (x : _ expr)
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[Inst0.t']>, _) Stdlib.Type.eq)
+    (x : <[Inst0.t']> expr) -> (x : _ expr)]>
 |}]
 
 (* Type constructor in splice, but its parameter in quote *)
@@ -294,10 +289,8 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
      Inst0.t -> Inst0.t']>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, _) Stdlib.Type.eq)
-    (x : Inst0.t) -> (x : Inst0.t')
-]>
+<[fun ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (_, _) Stdlib.Type.eq)
+    (x : Inst0.t) -> (x : Inst0.t')]>
 |}]
 
 (** Flexibility (linking) happens before instantiability (equations). **)
@@ -386,11 +379,10 @@ let f = <[
   ]>
 [%%expect {|
 val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
-  <[
-    fun (type a) (x : _ expr) (eq : (_, a) Stdlib.Type.eq) ->
-      (fun (x__1 : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()) x eq;
-      (match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x)
-  ]>
+  <[fun (type a) ->
+      fun (x : _ expr) (eq : (_, a) Stdlib.Type.eq) ->
+        ((fun (x__1 : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ())) x eq;
+        (match eq with | (Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) -> x)]>
 |}]
 (* $t ~ s  equates s to t when s instantiable -- $0 escapes! *)
 let f = <[
@@ -416,11 +408,10 @@ let f = <[
   ]>
 [%%expect {|
 val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
-  <[
-    fun (type a) (x : _ expr) (eq : (a, _) Stdlib.Type.eq) ->
-      (fun (x__1 : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()) x eq;
-      (match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x)
-  ]>
+  <[fun (type a) ->
+      fun (x : _ expr) (eq : (a, _) Stdlib.Type.eq) ->
+        ((fun (x__1 : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ())) x eq;
+        (match eq with | (Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) -> x)]>
 |}]
 (* s ~ $t  equates s to t when s instantiable -- $0 escapes! *)
 let f = <[

@@ -1,0 +1,27 @@
+File "eval_test.ml", line 64, characters 9-22:
+64 |     let[@tail_mod_cons] rec foo x = exclave_
+              ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the tail_mod_cons attribute cannot appear in this context
+
+File "eval_test.ml", line 92, characters 22-28:
+92 |     let[@zero_alloc][@inline never][@local never] check_simplify () =
+                           ^^^^^^
+Warning 53 [misplaced-attribute]: the inline attribute cannot appear in this context
+
+File "eval_test.ml", line 92, characters 37-42:
+92 |     let[@zero_alloc][@inline never][@local never] check_simplify () =
+                                          ^^^^^
+Warning 53 [misplaced-attribute]: the local attribute cannot appear in this context
+
+File "eval_test.ml", line 96, characters 11-17:
+96 |       let[@inline] f () =
+                ^^^^^^
+Warning 53 [misplaced-attribute]: the inline attribute cannot appear in this context
+
+File "eval_test.ml", line 92, characters 9-19:
+92 |     let[@zero_alloc][@inline never][@local never] check_simplify () =
+              ^^^^^^^^^^
+Warning 199 [unchecked-zero-alloc-attribute]: the zero_alloc attribute cannot be checked.
+  The function it is attached to was optimized away.
+  You can try to mark this function as [@inline never]
+  or move the attribute to the relevant callers of this function.

@@ -277,7 +277,7 @@ let print_out_value ppf tree =
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
     | Oval_code e ->
-        deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
+        deprecated_printer (fun fmt -> Pprintast.quoted_expression fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function

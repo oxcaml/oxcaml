@@ -1551,11 +1551,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
-  | Texp_quotation exp ->
-      Translquote.transl_quote
+  | Texp_quote exp ->
+      Translquotes.transl_quote
         ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes layout) exp
   (* TODO: update scopes *)
-  | Texp_antiquotation exp ->
+  | Texp_splice exp | Texp_unquote exp ->
       fatal_errorf
         "@[Cannot unquote expression outside of a quotation context:@ \
          %a@]"

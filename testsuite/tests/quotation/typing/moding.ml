@@ -122,7 +122,7 @@ Error: This value is "local"
 (* Unique result *)
 <[ let x @ unique = M.x_unique () in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x : _ @ unique = (M.x_unique () : _ @ unique) in x]>
+- : <[M.t]> expr = <[let (x @ unique) = (M.x_unique () : @ unique) in x]>
 |}];;
 
 (* Once result *)
@@ -139,7 +139,7 @@ Error: This value is "once"
 (* Portable result *)
 <[ let x @ portable = M.x in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x : _ @ portable = (M.x : _ @ portable) in x]>
+- : <[M.t]> expr = <[let (x @ portable) = (M.x : @ portable) in x]>
 |}];;
 
 (* Contended result *)
@@ -271,8 +271,7 @@ let x = <[42]> in <[$x + $x]>
 |}];;
 let x = <[Some 42]> in <[Option.get $x + Option.get $x]>
 [%%expect{|
-- : <[int]> expr =
-<[(Stdlib.Option.get (Some 42)) + (Stdlib.Option.get (Some 42))]>
+- : <[int]> expr = <[(Option.get (Some 42)) + (Option.get (Some 42))]>
 |}];;
 let x = <[fun () -> 2]> in <[$x () + $x ()]>
 [%%expect{|
@@ -356,8 +355,7 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
     <[ $(x ()) + $(x ()) ]> ) ]>
 [%%expect{|
 - : <[int]> expr =
-<[let r = (Stdlib.ref 0) in (r := ((! r) + 1); ! r) + (r := ((! r) + 1); ! r)
-]>
+<[let r = ref 0 in (r := ((!r) + 1); !r) + (r := ((!r) + 1); !r)]>
 |}];;
 
 (** Duplication of [once] quotes *)

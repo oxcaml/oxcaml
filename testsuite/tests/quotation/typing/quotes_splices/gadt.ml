@@ -25,19 +25,13 @@ let sorry2 =
 [%%expect {|
 val sorry0 : (('a, 'b) Type.eq -> 'c @ once) -> 'c = <fun>
 val sorry1 : <[(($('a), $('b)) Type.eq -> $('c) @ once) -> $('c)]> expr =
-  <[
-    fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-      Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))
-  ]>
+  <[fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
+      Obj.magic_many (f (Obj.magic Stdlib.Type.Equal))]>
 val sorry2 :
   <[<[(($($('a)), $($('b))) Type.eq -> $($('c)) @ once) -> $($('c))]> expr]>
   expr =
-  <[
-    <[
-      fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-        Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))
-      ]>
-  ]>
+  <[<[fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
+        Obj.magic_many (f (Obj.magic Stdlib.Type.Equal))]>]>
 |}]
 
 
@@ -84,10 +78,9 @@ compile (
       Pair (Int 1, Bool true), Pair (Int 0, Bool false)))
 [%%expect {|
 - : <[int * bool]> expr =
-<[
-  if (if (Stdlib.Int.equal (3 + (-3)) 0) then false else true) then (1, true)
-  else (0, false)
-]>
+<[if (if Int.equal (3 + (-3)) 0 then false else true)
+  then (1, true)
+  else (0, false)]>
 |}]
 
 (* Abstract interpretation; check refutations work *)
@@ -160,17 +153,17 @@ let _ = <[
     (fun (Equal : (<[t]> expr, <[int]> expr) Type.eq) -> <[ x + 1 ]>) |> ignore;
     <[()]>) ]>
 [%%expect {|
-- : <[$('t) -> unit]> expr = <[fun (type t) (x : t) -> ()]>
+- : <[$('t) -> unit]> expr = <[fun (type t) -> fun (x : t) -> ()]>
 |}]
 (* 1 ~~> 2 ~~> 1  @  1 <=> 1 *)
 let _ = <[ fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
     <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
 [%%expect {|
 - : <[($('t), int) Type.eq -> $('t) -> <[int]> expr @ once]> expr =
-<[
-  fun (type t) ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, int)
-    Stdlib.Type.eq) (x : t) -> <[($(Stdlib.Quote.Expr.int (x + 1))) * 2]>
-]>
+<[fun (type t) ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (t, int) Stdlib.Type.eq)
+      (x : t) -> <[($(Quote.Expr.int (x + 1))) * 2]>]>
 |}]
 (* 1 ~~> 2 ~~> 1  @ 2 <=> 2 *)
 let _ = <[ <[
@@ -179,16 +172,14 @@ let _ = <[ <[
     <[()]>) ]> ]>
 [%%expect {|
 - : <[<[$($('t)) -> unit]> expr]> expr =
-<[
-  <[
-    fun (type t) (x : t) ->
-      $
-        (Stdlib.ignore
-           (fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-              (<[t]> expr, <[int]> expr) Stdlib.Type.eq) -> <[x + 1]>);
-         <[()]>)
-    ]>
-]>
+<[<[fun (type t) ->
+      fun (x : t) ->
+        $(ignore
+            (fun
+               ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+                  (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
+               -> <[x + 1]>);
+          <[()]>)]>]>
 |}]
 (* 2 ~~> 3 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[ fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
@@ -197,12 +188,11 @@ let _ = <[ <[ fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
 - : <[<[($($('t)), int) Type.eq -> $($('t)) -> <[int]> expr @ once]> expr]>
     expr
 =
-<[
-  <[
-    fun (type t) ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, int)
-      Stdlib.Type.eq) (x : t) -> <[($(Stdlib.Quote.Expr.int (x + 1))) * 2]>
-    ]>
-]>
+<[<[fun (type t) ->
+      fun
+        ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+           (t, int) Stdlib.Type.eq)
+        (x : t) -> <[($(Quote.Expr.int (x + 1))) * 2]>]>]>
 |}]
 (* 0 ~~> 2 ~~> 0  @  0 <=> 0 *)
 let _ = fun (type t) (Equal : (t, bool) Type.eq) (x : t) ->
@@ -236,20 +226,15 @@ let _ = <[ fun (type t) (Equal : (t, bool) Type.eq) (x : t) ->
 [%%expect {|
 - : <[($('t), bool) Type.eq -> $('t) -> <[<[bool]> expr]> expr @ once]> expr
 =
-<[
-  fun (type t) ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, bool)
-    Stdlib.Type.eq) (x : t) ->
-    <[
-      Stdlib.Obj.magic_many
-        <[
-          Stdlib.not
-            ($
-               ($
-                  (match x with | true -> <[<[true]>]> | false ->
-                     <[<[false]>]>)))
-          ]>
-      ]>
-]>
+<[fun (type t) ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (t, bool) Stdlib.Type.eq)
+      (x : t) ->
+      <[Obj.magic_many
+          (<[not
+               ($($(match x with
+                    | true -> <[<[true]>]>
+                    | false -> <[<[false]>]>)))]>)]>]>
 |}]
 (* 1 ~~> 3 ~~> 1  @  1 <=> 1  with persistent [M.t] *)
 let _ = <[ fun (Equal : (M.t, bool) Type.eq) (x : M.t) ->
@@ -260,20 +245,14 @@ let _ = <[ fun (Equal : (M.t, bool) Type.eq) (x : M.t) ->
       |> not ]> ]> ]>
 [%%expect {|
 - : <[(M.t, bool) Type.eq -> M.t -> <[<[bool]> expr]> expr @ once]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, bool)
-    Stdlib.Type.eq) (x : M.t) ->
-    <[
-      Stdlib.Obj.magic_many
-        <[
-          Stdlib.not
-            ($
-               ($
-                  (match x with | true -> <[<[true]>]> | false ->
-                     <[<[false]>]>)))
-          ]>
-      ]>
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, bool) Stdlib.Type.eq)
+    (x : M.t) ->
+    <[Obj.magic_many
+        (<[not
+             ($($(match x with
+                  | true -> <[<[true]>]>
+                  | false -> <[<[false]>]>)))]>)]>]>
 |}]
 
 (* 0 ~~> 0  @  1 <=> 1 *)
@@ -301,11 +280,10 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
      <[M.t]> expr -> <[int]> expr @ once]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) (x : <[M.t]> expr) ->
-    <[($x) + 1]>
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
+    (x : <[M.t]> expr) -> <[($x) + 1]>]>
 |}]
 
 (* CR metaprogramming jbachurski: Error messages are often confusing here,
@@ -462,11 +440,10 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         <[ fun (x : M.t) -> x + 1 ]> ]>
 [%%expect {|
 - : <[(<[M.t]> expr, <[int]> expr) Type.eq -> <[M.t -> int]> expr]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) ->
-    <[fun (x : M.t) -> x + 1]>
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
+    -> <[fun (x : M.t) -> x + 1]>]>
 |}]
 
 (* Introduce the value and then splice to introduce the evidence *)
@@ -478,7 +455,7 @@ let _ = <[
       <[x + 1]>)
     |> sorry0) ]>
 [%%expect{|
-- : <[$('t) -> int]> expr = <[fun (type t) (x : t) -> x + 1]>
+- : <[$('t) -> int]> expr = <[fun (type t) -> fun (x : t) -> x + 1]>
 |}]
 (* 1 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[
@@ -488,17 +465,15 @@ let _ = <[ <[
     |> $sorry1) ]> ]>
 [%%expect{|
 - : <[<[$($('t)) -> int]> expr]> expr =
-<[
-  <[
-    fun (type t) (x : t) ->
-      $
-        ((fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-            (<[t]> expr, <[int]> expr) Stdlib.Type.eq) -> <[x + 1]>)
-           |>
-           (fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-              Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))))
-    ]>
-]>
+<[<[fun (type t) ->
+      fun (x : t) ->
+        $((fun
+             ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+                (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
+             -> <[x + 1]>)
+            |>
+            (fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
+               Obj.magic_many (f (Obj.magic Stdlib.Type.Equal))))]>]>
 |}]
 (* 0 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[
@@ -508,7 +483,7 @@ let _ = <[ <[
     |> sorry0)) ]> ]>
 [%%expect{|
 - : <[<[$($('t)) -> int]> expr]> expr =
-<[<[fun (type t) (x : t) -> $(Stdlib.Obj.magic_many <[x + 1]>)]>]>
+<[<[fun (type t) -> fun (x : t) -> $(Obj.magic_many (<[x + 1]>))]>]>
 |}]
 
 (* Evidence travels to the wrong stage in the future -- should always fail:
@@ -646,13 +621,11 @@ let _ =
         $x + 1 ]> ]>
 [%%expect{|
 - : <[<[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr]> expr =
-<[
-  fun (x : <[M.t]> expr) ->
-    <[
-      fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-        Stdlib.Type.eq) -> ($x) + 1
-      ]>
-]>
+<[fun (x : <[M.t]> expr) ->
+    <[fun
+        ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+           (M.t, int) Stdlib.Type.eq)
+        -> ($x) + 1]>]>
 |}]
 
 (* Evidence travels to the right stage in the past, but the target is spliced
@@ -856,13 +829,14 @@ let _ = <[
      <[M.t]> expr -> <[int]> expr @ once]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, string)
-    Stdlib.Type.eq) ->
-    fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-      (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) ->
-      fun (x : <[M.t]> expr) -> <[($x) + 0]>
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (M.t, string) Stdlib.Type.eq)
+    ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+         (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
+      -> fun (x : <[M.t]> expr) -> <[($x) + 0]>]>
 |}]
 (* succeeds, because we instantiate stage 1 *)
 let _ =
@@ -875,12 +849,14 @@ let _ =
      (<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> string]>
     expr
 =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, string)
-    Stdlib.Type.eq) ->
-    fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-      (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) -> fun (x : M.t) -> x ^ ""
-]>
+<[fun
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+       (M.t, string) Stdlib.Type.eq)
+    ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+         (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
+      -> fun (x : M.t) -> x ^ ""]>
 |}]
 (* fails, because we only instantiate stage 2 *)
 let _ =
@@ -921,7 +897,7 @@ let time_traveller =
           ($(x : <[int]> expr) : int) ]>) |> ignore;
         <[()]>) ]>
 [%%expect {|
-val time_traveller : <[unit -> unit]> expr = <[fun (type t) () -> ()]>
+val time_traveller : <[unit -> unit]> expr = <[fun (type t) -> fun () -> ()]>
 |}]
 
 (* Magic *)
@@ -942,7 +918,7 @@ let magic_with_time_travel =
   ) ]>
 [%%expect {|
 val magic_with_time_travel : <[$('a) -> $('b)]> expr =
-  <[fun (type a) (type b) (x : a) -> (x : b)]>
+  <[fun (type a) (type b) -> fun (x : a) -> x]>
 |}]
 let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
   let result = ref (None : b option) in
