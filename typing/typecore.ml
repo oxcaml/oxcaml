@@ -619,27 +619,24 @@ let modality_hint ~loc : Mode.Hint.is_contained_by =
   { containing = First_class_modality Modality;
     container = (loc, Expression) }
 
-(* On [-principal]: no warning is emitted here, deliberately. A [Tmod] only
-   ever enters a type from a written annotation, so the decision below is not
-   a guess made from inferred information in the way that record-field or
-   array-literal disambiguation is. The usual proxy for "principal enough",
-   [is_principal] (i.e. generalised), is also unusable at this site: the
-   expected type of an expression is essentially never at [generic_level], so
-   gating on it warns on every single use of the feature. What remains
-   unaccounted for is an annotation reaching a type through unification with a
-   LATER expression, e.g. [fun y -> ignore (y : (t @@ portable)); y]; see the
-   report. *)
-(* Expand manifest aliases far enough to see a wrapper, WITHOUT consulting
+(* No [-principal] warning is emitted here, deliberately: a [Tmod] only ever
+   enters a type from a written annotation, so this is not a guess made from
+   inferred information in the way record-field disambiguation is. The usual
+   proxy, [is_principal], is unusable at this site anyway -- an expression's
+   expected type is essentially never at [generic_level], so gating on it
+   would warn on every use of the feature. Not covered: an annotation reaching
+   a type by unification with a later expression, as in
+   [fun y -> ignore (y : (t @@ portable)); y]. *)
+(* Expand manifest aliases far enough to reveal a wrapper, without consulting
    local (GADT) equations.
 
-   Refusing to expand at all whenever the environment holds a local equation
-   is unsound, not merely conservative: a public alias for [(t @@ aliased)]
-   can be forgotten by [:>], which does expand, while the mode side never
-   applies the modality -- yielding a [unique] value from an [aliased] one.
-   Conversely, expanding through a local equation would make unpacking depend
-   on non-principal information. Stopping at locally abstract types avoids
-   both: a globally manifest alias always unpacks, and one revealed only by a
-   local equation never does, in either mode. *)
+   Both extremes are wrong here. Never expanding is unsound: [:>] does expand,
+   so it can forget a public alias for [(t @@ aliased)] while the mode side
+   never applies the modality, yielding a [unique] value from an [aliased]
+   one. Always expanding would make unpacking depend on non-principal
+   information. Stopping at locally abstract types gives a globally manifest
+   alias that always unpacks and a locally revealed one that never does, in
+   either mode. *)
 let rec expand_head_for_modality env ty =
   match get_desc ty with
   | Tconstr (path, _, _) -> (
@@ -6643,15 +6640,13 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)
     env (expected_mode : expected_mode) sexp ty_expected_explained =
-  (* [(e : ty)] and [(e :> ty)] carry a type of their own and unify it with
+  (* [(e : ty)] and [(e :> ty)] carry their own type and unify it with
      [ty_expected] themselves, so the hook below must not fire on them: it
-     would take the wrapper off the expectation while the node still reports
-     the annotation as written, and the two would then fail to unify. The
-     recursive call those nodes make on their subexpression reaches this hook
-     with the annotation as the expected type, which is where the rule
-     belongs -- so [(e : (t @@ m))] PACKS, exactly like a return-type
-     annotation. Explicit unpacking is spelled [(e : t)], which needs nothing
-     here because the actual side already unpacks [e]. *)
+     would strip the wrapper from the expectation while the node still reports
+     the annotation as written, and the two would fail to unify. Their
+     recursive call on the subexpression reaches this hook with the annotation
+     as the expected type, so [(e : (t @@ m))] packs. Explicit unpacking is
+     [(e : t)], handled by the actual side. *)
   let carries_own_type =
     match sexp.pexp_desc with
     | Pexp_constraint (_, Some _, _) | Pexp_coerce _ -> true
@@ -6662,11 +6657,9 @@ and type_expect_
     else unpack_modality ~loc:sexp.pexp_loc env ty_expected_explained.ty
   with
   | Some (modality, payload) ->
-      (* The expected type has [@@ m] at top level. Check the expression
-         against the payload, at [m] applied to the expected mode. The
-         recorded [exp_type] keeps the wrapper, so that this expression still
-         answers the question its caller asked; whoever wants the payload
-         unpacks on the actual side. *)
+      (* Check the expression against the payload, at [m] applied to the
+         expected mode. [exp_type] keeps the wrapper; consumers that want the
+         payload unpack on the actual side. *)
       let expected_mode =
         mode_unpack_modality ~loc:sexp.pexp_loc modality expected_mode
       in
@@ -9303,9 +9296,7 @@ and type_ident env ?(recarg=Rejected) lid =
   in
   (* after layout instantiation, the value loses layout polymorphism. *)
   let val_lpoly = Lpoly.determined [] in
-  (* A value whose type is [(t @@ m)] is seen as a [t] at [m] applied to its
-     mode. This is the actual-side counterpart of the unpacking in
-     [type_expect_]. *)
+  (* A value of type [(t @@ m)] is seen as a [t] at [m] applied to its mode. *)
   let val_type, actual_mode =
     unpack_modality_actual ~loc:lid.loc env val_type actual_mode
   in

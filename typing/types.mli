@@ -205,7 +205,7 @@ and type_desc =
       they do for [Tpoly]; generic structural traversals rebuild it; and the
       leaf consumers that classify a runtime representation look through it
       too (the [scrape_ty] functions strip it, so most of them never see one).
-      Do not reintroduce a [fatal_error] on this constructor. *)
+  *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]

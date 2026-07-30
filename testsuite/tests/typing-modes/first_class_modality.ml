@@ -9,11 +9,10 @@
    inclusion (which accepts a type crossing at least as much as expected),
    mode crossing, and the validation inherited from the other [@@] positions.
 
-   Stage 4 added automatic unpacking, which changed several cases here. The
-   pattern is always the same: a top-level wrapper on an ACTUAL type now
-   unpacks, so a test that wanted to observe the wrapper itself has to keep it
-   out of top-level actual position -- either under a type constructor, or
-   behind the explicit-source form of [:>]. Each such case says so. The
+   Because a top-level wrapper on an ACTUAL type unpacks automatically, a test
+   that wants to observe the wrapper itself must keep it out of top-level
+   actual position -- either under a type constructor, or behind the
+   explicit-source form of [:>]. Each such case says so. The
    unpacking rule itself is tested in [first_class_modality_unpack.ml]. *)
 
 type t
@@ -450,26 +449,23 @@ type r = { old_field : t @@ portable; new_field : (t @@ portable) }
 type r = { old_field : t @@ portable; new_field : (t @@ portable); }
 |}]
 
-(* Toplevel value printing goes through [genprintval], which is one of the
-   sites Stage 3 changed from a fatal error to a look-through. This used
-   [Obj.magic] before Stage 4, which was then the only way to obtain a value
-   of this type; automatic introduction now supplies one directly. *)
+(* Toplevel value printing goes through [genprintval], which looks through the
+   wrapper. *)
 let x : (int @@ portable) = 5
 [%%expect{|
 val x : (int @@ portable) @@ stateless = 5
 |}]
 
-(* Nested wrappers are distinct types and do not normalise (design question
-   Q2): [((t @@ m1) @@ m2)] is not identified with [(t @@ m1 m2)]. *)
+(* Nested wrappers are distinct types and do not normalise:
+   [((t @@ m1) @@ m2)] is not identified with [(t @@ m1 m2)]. *)
 type nested = ((int @@ portable) @@ contended)
 [%%expect{|
 type nested = ((int @@ portable) @@ contended)
 |}]
 
-(* Automatic introduction (Stage 4): a bare value acquires the modality, being
-   checked at the modality applied to the expected mode. This case was written
-   as an error, under the name [no_auto_intro], when unpacking did not exist.
-   Both directions of the rule are exercised in
+(* Automatic introduction: a bare value acquires the modality, being checked
+   at the modality applied to the expected mode. Both directions of the rule
+   are exercised in
    [first_class_modality_unpack.ml]. *)
 let auto_intro : (int @@ portable) = 1
 [%%expect{|

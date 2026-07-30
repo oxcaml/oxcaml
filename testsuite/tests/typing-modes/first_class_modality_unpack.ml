@@ -68,8 +68,7 @@ let round_trip (x : (t @@ portable)) : (t @@ portable) = x
 val round_trip : (t @@ portable) -> (t @@ portable) = <fun>
 |}]
 
-(* Introduction from a plain value. This is the case the pre-Stage-4 test file
-   pinned as an error under the name [no_auto_intro]. *)
+(* Introduction from a plain value. *)
 let intro : (int @@ portable) = 1
 [%%expect{|
 val intro : (int @@ portable) @@ stateless = 1
@@ -166,14 +165,11 @@ let elim_via_annot (x : (t @@ portable) @ nonportable) = (x : t @ portable)
 val elim_via_annot : (t @@ portable) -> t = <fun>
 |}]
 
-(* SENTINEL for the interaction between the two annotation positions.
-   [let w : (t @@ m) = e in ...] desugars to a constraint on BOTH the pattern
-   and the expression, so the expected-side hook (firing on the pattern's
-   type) meets the expression's own re-stated annotation. If the hook is
-   allowed to fire on a node that carries its own type, the wrapper and the
-   stripped expectation fail to unify and this stops compiling with
-   "this expression has type (t @@ portable) but an expression was expected of
-   type t". Keep this passing. *)
+(* [let w : (t @@ m) = e] desugars to a constraint on BOTH the pattern and the
+   expression, so the expected-side unpacking (firing on the pattern's type)
+   meets the expression's own annotation. If unpacking is allowed to fire on a
+   node that carries its own type, the wrapper and the stripped expectation
+   fail to unify and this stops compiling. *)
 let annotated_binding (y : t @ portable) =
   let w : (t @@ portable) = y in
   w
@@ -436,4 +432,51 @@ Line 1, characters 19-25:
 Error: This pattern matches values of type "'a * 'b"
        but a pattern was expected which matches values of type
          "(t * t @@ portable)"
+|}]
+
+(* A worked example. [decorate] builds its result list in the caller's region,
+   so the spine costs nothing and dies there, while the strings it handles are
+   ordinary heap data that outlives it: the closure keeps one in [last_long],
+   and [twice] feeds the result back in. Without the modality the elements
+   would be tarred with the list's mode and neither would be allowed. *)
+let last_long : string ref = ref ""
+
+let rec decorate (xs : (string @@ global) list @ local)
+  : (string @@ global) list @ local =
+  exclave_
+  match xs with
+  | [] -> []
+  | s :: rest ->
+    (if String.length s > 10 then last_long := s);
+    (s ^ "!") :: decorate rest
+[%%expect{|
+val last_long : string ref @@ stateless = {contents = ""}
+val decorate :
+  (string @@ global) list @ local -> (string @@ global) list @ local = <fun>
+|}]
+
+(* The modality on the RESULT is what lets the output be fed back in. *)
+let twice (xs : (string @@ global) list @ local)
+  : (string @@ global) list @ local =
+  exclave_ decorate (decorate xs)
+[%%expect{|
+val twice :
+  (string @@ global) list @ local -> (string @@ global) list @ local = <fun>
+|}]
+
+(* Without it, the same code is rejected: an element of a local list is local,
+   so it can neither be retained nor returned as global. *)
+let rejected (xs : string list @ local) : string list @ local =
+  exclave_
+  match xs with
+  | [] -> []
+  | s :: rest -> (if String.length s > 10 then last_long := s); s :: rejected rest
+[%%expect{|
+Line 5, characters 60-61:
+5 |   | s :: rest -> (if String.length s > 10 then last_long := s); s :: rejected rest
+                                                                ^
+Error: This value is "local"
+         because it is contained (via constructor "::") in the value at line 5, characters 4-13
+         which is "local".
+       However, the highlighted expression is expected to be "global".
 |}]

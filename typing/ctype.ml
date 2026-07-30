@@ -2658,9 +2658,10 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-  (* Deliberately opaque: looking through would allow record/variant
-     operations on [t @@ m] while dropping the modality from the mode, which
-     is only sound once elimination is implemented. Revisit in Stage 4. *)
+  (* Deliberately opaque. Looking through would allow record and variant
+     operations directly on [t @@ m] while dropping the modality from the
+     mode; such uses must unpack first, which happens on the actual side in
+     [Typecore]. *)
   | Tmod _ -> Has_no_typedecl
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
