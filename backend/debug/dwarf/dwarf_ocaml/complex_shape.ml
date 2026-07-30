@@ -202,6 +202,13 @@ let err_exn f =
 let force_runtime_shape_exn cs =
   match runtime_shape cs with Some s -> s | None -> raise Layout_missing
 
+(* Addressability does not change how a sort is represented, so layouts recorded
+   in shapes are compared modulo [Addressable] wrappers (e.g. an expected layout
+   that had its wrapper stripped must still match the wrapped layout recorded
+   for a field). *)
+let equal_layouts_erasing_addressable ly1 ly2 =
+  Layout.equal (Layout.erase_addressable ly1) (Layout.erase_addressable ly2)
+
 (* CR mshinwell: it seems like this should move to the frontend *)
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
@@ -231,6 +238,8 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
+  (* Addressability does not change how a sort is represented *)
+  | Addressable ly -> layout_to_types_layout ly
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
     : RS.Runtime_layout.t =
@@ -406,6 +415,8 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     match RS.Runtime_layout.of_base_layout b with
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
+  (* Addressability does not change how a sort is represented *)
+  | Addressable ly -> layout_to_unknown_shape ly
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
 
@@ -422,6 +433,9 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     else unknown_shape_exn ()
   in
   match type_shape.desc, type_layout with
+  | _, Some (Addressable ly) ->
+    (* Addressability does not change how a sort is represented *)
+    type_shape_to_complex_shape_exn ~cache ~rec_env type_shape (Some ly)
   | Leaf, _ -> unknown_shape_exn ()
   | Unknown_type, _ -> unknown_shape_exn ()
   | Tuple args, (None | Some (Base Scannable)) -> (
@@ -446,7 +460,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f "tuple must have value layout, but got: %a" pp_layout type_layout)
   | At_layout (shape, ly), None ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly
-  | At_layout (shape, ly1), Some ly2 when Layout.equal ly1 ly2 ->
+  | At_layout (shape, ly1), Some ly2
+    when equal_layouts_erasing_addressable ly1 ly2 ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly1
   | At_layout (shape, layout), Some type_layout ->
     err_or_unknown_exn (fun f ->
@@ -479,12 +494,13 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     match Shape.DeBruijn_env.get_opt rec_env ~de_bruijn_index:i, layout with
     | Some (Some (Layout.Base base as ly1)), ly2_opt
     (* We combine the [None] and [Some] layout cases with the guard: *)
-      when Option.value ~default:true (Option.map (Layout.equal ly1) ly2_opt)
-      -> (
+      when Option.value ~default:true
+             (Option.map (equal_layouts_erasing_addressable ly1) ly2_opt) -> (
       match RS.Runtime_layout.of_base_layout base with
       | Void -> void
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | Some (Some ly1), Some ly2 when not (Layout.equal ly1 ly2) ->
+    | Some (Some ly1), Some ly2
+      when not (equal_layouts_erasing_addressable ly1 ly2) ->
       err_or_unknown_exn (fun f ->
           f "Recursive variable has wrong layout. Expected %a, got %a" pp_layout
             ly2 pp_layout ly1)
@@ -502,7 +518,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
       match RS.Runtime_layout.of_base_layout base with
       | Void -> void
       | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | (Some None | None), Some (Layout.Product _ as ly) ->
+    | (Some None | None), Some (Layout.(Product _ | Addressable _) as ly) ->
       layout_to_unknown_shape ly
     | (Some None | None), Some (Univar _) ->
       Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
@@ -675,7 +691,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           kind = Record_unboxed
         },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal field_layout) ly2)
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable field_layout) ly2)
     -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env field_type field_layout
@@ -718,8 +735,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Variant_unboxed
         { name; variant_uid = _; arg_name; arg_uid = _; arg_shape; arg_layout },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal arg_layout) ly2)
-    -> (
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable arg_layout) ly2) -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env arg_shape arg_layout
     in

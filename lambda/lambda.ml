@@ -3070,6 +3070,9 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
+  (* Addressability does not change how a sort is represented outside of a
+     block. *)
+  | Addressable sort -> layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
   | Genvar _ ->
@@ -3094,6 +3097,7 @@ let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
+  | Same_as_ocaml_repr (Addressable _)
   | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false

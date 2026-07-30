@@ -70,6 +70,15 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** [Addressable t] is the sort of data represented like [t], but
+              whose kind additionally promises that, when boxed, all of its
+              information is stored in the data portion of a block.
+              Addressability never changes how a sort is represented outside of
+              a block. When [t] is already addressable, [t addressable = t]; the
+              normalizing constructor [addressable] takes advantage of this, but
+              no operation may rely on [Addressable] never wrapping an
+              addressable sort. *)
 
     val of_base : base -> t
 
@@ -84,6 +93,17 @@ module type Sort = sig
     val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
+
+    (** Whether this sort is certainly addressable: [c addressable = c]. *)
+    val is_definitely_addressable : t -> bool
+
+    (** Normalizing constructor for [Addressable]: returns the argument
+        unchanged when it is definitely addressable. *)
+    val addressable : t -> t
+
+    (** Deeply erase [Addressable] wrappers. The result classifies data with the
+        same representation outside of a block. *)
+    val erase_addressable : t -> t
 
     val scannable : t
 

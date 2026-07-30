@@ -452,7 +452,10 @@ module Type_decl_shape = struct
             (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
               let ly2 = mixed_block_shape_to_layout mix_shape in
               match ly with
-              | Some ly when not (Layout.equal ly ly2) ->
+              (* Compare modulo addressability, which the runtime
+                 representation of the constructor erases. *)
+              | Some ly
+                when not (Layout.equal (Layout.erase_addressable ly) ly2) ->
                 if !Clflags.dwarf_pedantic
                 then
                   Misc.fatal_errorf_doc
@@ -471,10 +474,13 @@ module Type_decl_shape = struct
             List.map
               (fun { Shape.field_name = _; field_value = _, ly } ->
                 match ly with
+                (* Compare modulo addressability, which the runtime
+                   representation of the constructor erases. *)
                 | Some ly
                   when not
-                         (Layout.equal ly Layout.scannable
-                         || Layout.equal ly Layout.void) ->
+                         (let ly = Layout.erase_addressable ly in
+                          Layout.equal ly Layout.scannable
+                          || Layout.equal ly Layout.void) ->
                   if !Clflags.dwarf_pedantic
                   then
                     Misc.fatal_errorf_doc

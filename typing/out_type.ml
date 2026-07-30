@@ -1269,6 +1269,12 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+  (* Print the operator around its body, which prints as if unwrapped
+     (addressability does not change the bounds). In particular, this handles
+     the layouts [get_const] cannot: [Addressable] layouts can contain sort
+     variables. *)
+  | Layout (Addressable lay) ->
+    Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)

@@ -65,6 +65,10 @@ module Sort : sig
 
   val equal_base : base -> base -> bool
 
+  (** Whether [b addressable = b]: types of sort [b] store all of their
+      information in the data portion of a block when boxed. *)
+  val base_is_addressable : base -> bool
+
   type univar = { name : string option }
 
   type t =
@@ -72,6 +76,7 @@ module Sort : sig
     | Base of base
     | Product of t list
     | Univar of univar
+    | Addressable of t
 
   and var
 
@@ -93,11 +98,31 @@ module Sort : sig
 
   val equate_tracking_mutation : t -> t -> equate_result
 
+  (** [constrain_addressable s] constrains [s] to be addressable, i.e. solves
+      [s = s addressable]. An unfilled variable is filled with [Addressable] of
+      a fresh variable. Mutation of [s] is reported as [Equal_mutated_first]. *)
+  val constrain_addressable : t -> equate_result
+
+  (** [strip_addressable t] removes [Addressable] wrappers at the head of [t],
+      looking through filled variables. Never mutates. Stripping is only
+      meaningful in a context where [t] is known to be addressable (so that
+      [t = t' addressable] implies [t = t']). *)
+  val strip_addressable : t -> t
+
+  (** Whether this sort is certainly addressable: [s addressable = s]. Returns
+      [false] on unfilled variables, whose addressability is not yet known. *)
+  val is_definitely_addressable : t -> bool
+
+  (** Normalizing constructor for [Addressable]: returns the argument unchanged
+      when it is definitely addressable. *)
+  val addressable : t -> t
+
   (** Post-condition (which holds deeply within the sort): If the result is a
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
-  (** Determines if the sort is [Scannable] or an unfilled sort variable *)
+  (** Determines if the sort is [Scannable] or an unfilled sort variable,
+      possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
   (** Decompose a sort into a list (of the given length) of fresh sort
@@ -141,11 +166,16 @@ module Layout : sig
       2. Scannable axes are meaningful only when the layout might be scannable
       ([any], [scannable], a sort variable, or an abstract kind). On other
       layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
-      [float64]. See [Layout.Const.get_root_scannable_axes]. *)
+      [float64]. See [Layout.Const.get_root_scannable_axes].
+
+      3. Like products, [Addressable] has two possible encodings: at the layout
+      level or within a sort. [Addressable (Any _)] can only be encoded at the
+      layout level. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
 
   module Const : sig
     (** The type is private so that constants can only be built through the
@@ -162,6 +192,7 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
 
     val any : Scannable_axes.t -> t
 
@@ -182,6 +213,13 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
+
+    (** Whether this layout is certainly addressable: [c addressable = c]. *)
+    val is_definitely_addressable : t -> bool
+
+    (** Normalizing constructor for [Addressable]: returns the argument
+        unchanged when it is definitely addressable. *)
+    val addressable : t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

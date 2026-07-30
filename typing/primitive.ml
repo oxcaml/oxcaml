@@ -515,9 +515,12 @@ module Repr_check = struct
     | Unboxed_mask -> true
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
-  let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
+  let rec sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
     | Base _ -> false
+    (* Addressability does not change how a sort is represented when passed to
+       a C stub. *)
+    | Addressable s -> sort_is_product s
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
     | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
 
@@ -527,7 +530,7 @@ module Repr_check = struct
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Unpacked_product _ | Repr_poly -> []
 
-  let c_stub_return_errors = function
+  let rec c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
@@ -538,6 +541,8 @@ module Repr_check = struct
       then [Product_return]
       else []
     | Same_as_ocaml_repr (Product _) -> [Product_return]
+    | Same_as_ocaml_repr (Addressable s) ->
+      c_stub_return_errors (Same_as_ocaml_repr s)
     | Same_as_ocaml_repr (Univar _) ->
       Misc.fatal_error "c_stub_return_errors: univar"
     | Same_as_ocaml_repr (Genvar _) ->

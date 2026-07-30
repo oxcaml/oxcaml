@@ -575,6 +575,7 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Any _ -> l
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
+    | Addressable l -> Addressable (instance_layout l)
   in
   match t.jkind.base with
   | Kconstr _ -> t

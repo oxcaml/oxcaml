@@ -2001,6 +2001,9 @@ module Element_repr = struct
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
+      (* Addressability does not change how a layout is represented within a
+         block. *)
+      | Addressable layout -> layout_to_t layout
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
@@ -3205,6 +3208,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
+      | Addressable layout -> has_any layout
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
@@ -4233,13 +4237,17 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
+    let rec sort_is_scannable : Jkind.Sort.Const.t -> bool = function
+      | Base Scannable -> true
+      | Base _ | Product _ -> false
+      | Addressable s -> sort_is_scannable s
+      | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
+      | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
+    in
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort (Base Scannable) -> true
-      | Sort (Base _ | Product _) -> false
-      | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Sort (Genvar _) -> Misc.fatal_error "typedecl: Genvar in native repr"
+      | Sort s -> sort_is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -4381,7 +4389,7 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Unboxed_attribute layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_absent, (Sort ((Product _) as c)) ->
+  | Native_repr_attr_absent, (Sort ((Product _ | Addressable _) as c)) ->
     (if Language_extension.erasable_extensions_only ()
      then
        (* CR layouts v7.1: Using an unboxed product in a C external is not
@@ -4412,7 +4420,8 @@ let make_native_repr
     Misc.fatal_error "typedecl: Univar in concrete type"
   | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
     Misc.fatal_error "typedecl: Genvar in concrete type"
-  | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
+  | Native_repr_attr_present Unboxed,
+    (Sort (Product _ | Base Void | Addressable _)) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
@@ -4442,14 +4451,18 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
+  | Native_repr_attr_present Unpacked,
+    Sort ((Product _ | Addressable (Product _)) as sort) ->
+    (* Addressability does not change the out-of-block product
+       representation. *)
     (if Language_extension.erasable_extensions_only ()
      then
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             Warnings.Unpacked_attribute));
     Unpacked_product sort
-  | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
+  | Native_repr_attr_present Unpacked, (Sort (Base _ | Addressable _) | Poly)
+    ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
