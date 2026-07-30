@@ -185,6 +185,21 @@ let doclang_attribute name attributes =
   | attribute :: _ -> Some attribute
   | [] -> None
 
+let doclang_debug_all_functions () =
+  match Sys.getenv_opt "DOX_DEBUG_ALL_FUNCTIONS" with
+  | Some ("1" | "true") -> true
+  | None | Some _ -> false
+
+let doclang_synthetic_attribute location =
+  { Parsetree.attr_name =
+      { Location.txt = "doclang.debug_function"; loc = location };
+    attr_payload = PStr [];
+    attr_loc = location
+  }
+
+let doclang_binding_location pattern expression =
+  { pattern.pat_loc with loc_end = expression.exp_loc.loc_end }
+
 let doclang_type expression =
   Printtyp.wrap_printing_env expression.exp_env ~error:true (fun () ->
     Format.asprintf "%a" Printtyp.type_expr expression.exp_type)
@@ -2442,28 +2457,49 @@ and transl_scoped_exp ?binding_observation ~scopes layout expr =
 (* Decides whether a pattern binding should introduce a new scope. *)
 and transl_bound_exp ~scopes ~in_structure ~recursive pat layout expr loc
       attrs =
+  let is_function =
+    match expr.exp_desc with
+    | Texp_function _ -> true
+    | _ -> false
+  in
   let binding_observation =
     match doclang_attribute "doclang.observe_binding" attrs with
-    | None -> None
+    | None when not (doclang_debug_all_functions ()) -> None
+    | None ->
+      let label =
+        match pat_bound_idents pat with
+        | identifier :: _ -> Ident.name identifier
+        | [] -> "function"
+      in
+      let location =
+        if is_function
+        then pat.pat_loc
+        else doclang_binding_location pat expr
+      in
+      let attribute = doclang_synthetic_attribute location in
+      Some
+        { attribute; kind = "binding"; label; type_ = doclang_type expr }
     | Some attribute ->
       let label =
         match pat_bound_idents pat with
         | identifier :: _ -> Ident.name identifier
         | [] -> "binding"
       in
-      Some
-        { attribute; kind = "binding"; label; type_ = doclang_type expr }
+      let attribute =
+        if is_function
+        then attribute
+        else
+          { attribute with
+            attr_loc = doclang_binding_location pat expr
+          }
+      in
+      Some { attribute; kind = "binding"; label; type_ = doclang_type expr }
   in
   let should_introduce_scope =
     match expr.exp_desc with
     | Texp_function _ -> true
     | _ when in_structure -> true
     | _ -> false in
-  let is_function =
-    match expr.exp_desc with
-    | Texp_function _ -> true
-    | _ -> false
-  in
   let function_observation =
     if is_function
     then
