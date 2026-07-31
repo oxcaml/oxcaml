@@ -1822,6 +1822,12 @@ let all_void_sort_option sort =
   | Some sort -> Jkind.Sort.Const.all_void sort
   | None -> false
 
+(* CR layouts v5: it wouldn't be too hard to support records that are all
+   void.  just needs a bit of refactoring in translcore *)
+let check_record_not_all_void loc sorts =
+  if List.for_all all_void_sort_option sorts then
+    raise (Error (loc, Jkind_empty_record))
+
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
@@ -1829,8 +1835,6 @@ let all_void_sort_option sort =
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
 let update_label_sorts (type rep) env loc types ~(form : rep record_form)
       ~default_to_scannable =
-  (* CR layouts v5: it wouldn't be too hard to support records that are all
-     void.  just needs a bit of refactoring in translcore *)
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1845,15 +1849,10 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
     ) types
   in
   let sorts, jkinds = List.split sorts_and_jkinds in
-  let allow_all_void =
-    match form with
-    | Legacy -> false
-    | Unboxed_product -> true
-  in
-  let is_all_void () = List.for_all all_void_sort_option sorts in
-  if not allow_all_void && is_all_void () then
-    raise (Error (loc, Jkind_empty_record))
-  else sorts, jkinds
+  (match form with
+   | Legacy -> check_record_not_all_void loc sorts
+   | Unboxed_product -> ());
+  sorts, jkinds
 
 let update_label_sorts_in_place env loc lbls ~form =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
@@ -2514,6 +2513,11 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
       sorts_and_types
   in
+  (match (kind : Mixed_product_kind.t) with
+   | Record | Cstr_record ->
+     check_record_not_all_void loc
+       (Array.to_list consts |> List.map Option.some)
+   | Cstr_tuple | Module -> ());
   let all_scannable =
     Array.for_all
       (fun (const : Jkind.Sort.Const.t) ->
