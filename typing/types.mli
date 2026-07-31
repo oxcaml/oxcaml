@@ -931,6 +931,13 @@ and mixed_block_element =
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Splice of Jkind_types.Sort.var
+  (* An element whose layout is a generalized sort variable bound by a
+     surrounding [poly_] binding; it is instantiated to a concrete element
+     when slambda instantiates the binding. Only ever appears in shapes
+     computed when typing or translating a use of a record or variant whose
+     declaration has an undetermined representation, never in a
+     declaration. *)
 
 and mixed_product_shape = mixed_block_element array
 
@@ -1354,6 +1361,8 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
+
+val mixed_product_shape_contains_splice : mixed_product_shape -> bool
 
 val equal_unsafe_mode_crossing :
   type_equal:(type_expr -> type_expr -> bool) ->

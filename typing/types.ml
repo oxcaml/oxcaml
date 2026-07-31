@@ -512,6 +512,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   | Void
+  | Splice of Jkind_types.Sort.var
 
 and mixed_product_shape = mixed_block_element array
 
@@ -883,9 +884,12 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
+  | Splice v1, Splice v2
+    (* Sort variables are compared by physical identity. *)
+    -> v1 == v2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-    | Product _ | Void ), _
+    | Product _ | Void | Splice _ ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
@@ -935,9 +939,22 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
+  | Splice _, _ | _, Splice _ ->
+    (* Splices never appear in declarations and have no meaningful order. *)
+    Misc.fatal_error "Types.compare_mixed_block_element: Splice"
 
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
+
+let rec mixed_block_element_contains_splice = function
+  | Splice _ -> true
+  | Product es -> Array.exists mixed_block_element_contains_splice es
+  | Scannable _ | Float_boxed | Float64 | Float32 | Bits8 | Bits16
+  | Untagged_immediate | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
+  | Word | Void -> false
+
+let mixed_product_shape_contains_splice shape =
+  Array.exists mixed_block_element_contains_splice shape
 
 let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -1029,7 +1046,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
-  | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
+  | Genvar v -> Splice v
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -1116,6 +1133,7 @@ let rec mixed_block_element_to_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "Void"
+  | Splice _ -> "Splice"
 
 let mixed_block_element_to_lowercase_string = function
   | Scannable _ -> "scannable"
@@ -1138,6 +1156,7 @@ let mixed_block_element_to_lowercase_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "void"
+  | Splice _ -> "splice"
 
 (**** Definitions for backtracking ****)
 

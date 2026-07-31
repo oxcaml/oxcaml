@@ -1990,6 +1990,7 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Product shapes ->
     Product (transl_mixed_product_shape shapes)
   | Void -> Product [||]
+  | Splice v -> Splice_variable (Slambdaident.of_sort_var v)
 
 and transl_mixed_product_shape shape =
   Array.map transl_mixed_block_element shape
@@ -2023,6 +2024,7 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
       Product
         (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
     | Void -> Product [||]
+    | Splice v -> Splice_variable (Slambdaident.of_sort_var v)
   ) shape
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
@@ -2048,7 +2050,7 @@ let transl_module_representation repr =
     | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
+    | Product _ | Void | Splice _ -> false
   in
   if Array.for_all is_value shape
   then Module_value_only { field_count = Array.length shape }

@@ -79,6 +79,12 @@ let rec count_types_element (elt : Types.mixed_block_element) : t =
   | Product elts ->
     Array.fold_left (fun acc e -> add acc (count_types_element e)) zero elts
   | Void -> zero
+  | Splice _ ->
+    (* A splice may be instantiated to a value or flat layout, so count it as
+       both, which in particular makes [all_value] false (the shape may become
+       mixed). A product instantiation can contribute more bytes than this;
+       see the CR in [Typedecl.Element_repr.mixed_product_shape_known]. *)
+    { value = 8; flat = 8 }
 
 let count_types_shape shape =
   Array.fold_left (fun acc elt -> add acc (count_types_element elt)) zero shape

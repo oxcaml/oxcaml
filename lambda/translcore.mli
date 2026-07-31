@@ -57,6 +57,7 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
+  | Block_index_layout_poly
 
 exception Error of Location.t * error
 

@@ -7510,7 +7510,7 @@ and type_expect_
             | Float_boxed -> true
             | Float64 | Float32 | Scannable _ | Bits8 | Bits16 | Bits32 | Bits64
             | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Void
-            | Product _ ->
+            | Product _ | Splice _ ->
               false
             end
           | _ -> false

@@ -39,6 +39,7 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
+  | Block_index_layout_poly
 
 exception Error of Location.t * error
 
@@ -2386,9 +2387,17 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     | None -> false (* unboxed is not on heap *)
     | Some m -> is_heap_mode m
   in
+  let duppable =
+    (* [Pduprecord] carries the record representation, in which slambda cannot
+       instantiate splices, so a spliced record is copied field by field. *)
+    match repres with
+    | Record_mixed shape ->
+      not (Types.mixed_product_shape_contains_splice shape)
+    | _ -> true
+  in
   match opt_init_expr with
   | Some (init_expr, init_expr_sort, _)
-    when on_heap && size >= Config.max_young_wosize ->
+    when on_heap && size >= Config.max_young_wosize && duppable ->
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
@@ -2766,6 +2775,12 @@ and transl_idx ~scopes loc env ba uas =
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
+      (* CR layout-polymorphism: the gap check below needs the byte offsets of
+         the shape's elements, which for a spliced shape are not known until
+         instantiation. Supporting this requires re-running the check at
+         instantiation. *)
+      if Types.mixed_product_shape_contains_splice shape then
+        raise (Error (loc, Block_index_layout_poly));
       let shape = Lambda.transl_mixed_product_shape shape in
       (* Check to make sure the gap never overflows.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
@@ -3232,6 +3247,10 @@ let report_error_doc ppf = function
          and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
         (64 - Mixed_product_bytes.block_index_offset_bits)
+  | Block_index_layout_poly ->
+      fprintf ppf
+        "Block indices into records whose representation depends on a@ \
+         layout-polymorphic type are not yet supported."
 let () =
   Location.register_error_of_exn
     (function

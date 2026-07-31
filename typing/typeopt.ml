@@ -903,6 +903,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     in
     num_nodes_visited, Product kinds
   | Void -> num_nodes_visited, Product [||]
+  | Splice v -> num_nodes_visited, Splice_variable (Slambdaident.of_sort_var v)
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
@@ -1060,7 +1061,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                      Typedecl.update_constructor_representation_and_arg_sorts
                        env loc cd_args ~is_extension_constructor:false
                    in
-                   ~variable_repr:true, Result.to_option repr,
+                   let repr =
+                     match repr with
+                     | Ok (Types.Constructor_mixed shape)
+                       when Types.mixed_product_shape_contains_splice shape ->
+                       (* Value kinds are not rewritten when slambda
+                          instantiates a [poly_] binding, so they must not
+                          contain splices; fall back to [Pgenval]. *)
+                       None
+                     | _ -> Result.to_option repr
+                   in
+                   ~variable_repr:true, repr,
                    { constructor with cd_args })
             in
             match cstr_shape_opt with

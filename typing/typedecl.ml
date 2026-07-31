@@ -154,7 +154,6 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
@@ -1953,6 +1952,7 @@ module Element_repr = struct
     | Float_element
     | Value_element of Jkind_types.Scannable_axes.t
     | Void
+    | Splice_element of Jkind_types.Sort.var
     (* This type technically permits [Float_element] to appear in an unboxed
        product, but we never generate that and make no attempt to apply the
        float record optimization to records of unboxed products of floats. Kinds
@@ -1967,6 +1967,7 @@ module Element_repr = struct
       Scannable Jkind_types.Scannable_axes.value_axes
     | Value_element sa -> Scannable sa
     | Void -> Void
+    | Splice_element v -> Splice v
     and of_unboxed_element : unboxed_element -> mixed_block_element = function
       | Float64 -> Float64
       | Float32 -> Float32
@@ -2017,14 +2018,19 @@ module Element_repr = struct
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
-      | Genvar _ -> None
+      | Genvar v -> Some (Splice_element v)
       in
       Option.bind layout layout_to_t
 
   let mixed_product_shape_known loc ts kind =
     let mixed =
+      (* A splice may be instantiated to a non-value layout, so it must be
+         given a mixed shape. *)
       List.exists
-        (function ((Unboxed_element _ | Void), _) -> true | _ -> false) ts
+        (function
+          | ((Unboxed_element _ | Void | Splice_element _), _) -> true
+          | ((Float_element | Value_element _), _) -> false)
+        ts
     in
     if not mixed then `Not_mixed else begin
       let shape =
@@ -2032,6 +2038,10 @@ module Element_repr = struct
       in
       (* All-value/void shapes will compile to uniform blocks, so the
          scannable prefix length limit doesn't apply. *)
+      (* CR layout-polymorphism: a splice's contribution to the value prefix
+         is not known until instantiation (it is counted as a single value
+         here, but may be instantiated to a product of several). A complete
+         prefix length check would re-run at instantiation. *)
       let mpb = Mixed_product_bytes.count_types_shape shape in
       if not (Mixed_product_bytes.all_value mpb)
       then
@@ -2071,7 +2081,7 @@ let check_atomic_fields reprs lbls =
   let is_value (repr : Element_repr.t option) =
     match repr with
     | Some (Value_element _ | Float_element) -> true
-    | Some (Unboxed_element _ | Void) | None -> false
+    | Some (Unboxed_element _ | Void | Splice_element _) | None -> false
   in
   List.iter2
     (fun repr (lbl : Types.label_declaration) ->
@@ -2190,7 +2200,7 @@ let compute_record_repr
                                     | Bits8 | Bits16 | Bits32 | Bits64
                                     | Vec128 | Vec256 | Vec512 | Mask | Word
                                     | Untagged_immediate | Product _))
-            | Some Value_element _ | None ->
+            | Some (Value_element _ | Splice_element _) | None ->
                 Misc.fatal_error "Expected only floats and float64s")
           reprs
         |> Array.of_list
@@ -2303,6 +2313,10 @@ let compute_repr_summary env lbls jkinds ~default_to_scannable =
           | Unboxed_element ( Float32 | Bits8 | Bits16 | Bits32 | Bits64
                             | Vec128 | Vec256 | Vec512 | Mask | Word
                             | Untagged_immediate | Product _ ) ->
+              repr_summary.non_float64_unboxed_fields <- true
+          | Splice_element _ ->
+              (* A splice may be instantiated to a non-value layout, so it
+                 forces a mixed representation, like an unboxed field. *)
               repr_summary.non_float64_unboxed_fields <- true
           | Value_element _ -> repr_summary.values <- true
           | Void ->
@@ -2515,17 +2529,6 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
       sorts_and_types
   in
-  (* CR layout-polymorphism: We error on seeing layout variables (univars or
-     generalized sort variables), as they are not supported in a
-     [Types.mixed_block_element], which this function returns.
-
-     To support [any]-fields with layout polymorphism, this function should
-     instead return a [Lambda.mixed_block_element], which supports
-     [Splice_variable]s. This will require hopefully-minor changes to
-     callers of [finalize_{record,constructor}_representation], and more
-     importantly, testing. *)
-  if not (Array.for_all Jkind.Sort.Const.is_concrete consts) then
-    raise (Error (loc, Layout_poly_variable_representation));
   let all_scannable =
     Array.for_all
       (fun (const : Jkind.Sort.Const.t) ->
@@ -6025,10 +6028,6 @@ let report_error ~loc = function
   | Layout_poly_unsupported ->
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-  | Layout_poly_variable_representation ->
-    Location.errorf ~loc
-      "The representation of this record or variant depends on a@ \
-       layout-polymorphic type, which is not yet supported."
   | Misplaced_flatten_floats ->
     Location.errorf ~loc
       "The %a attribute is only allowed on records with one or more@ \

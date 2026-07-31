@@ -797,7 +797,9 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Scannable _ | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-                 | Void | Product _ ->
+                 | Void | Product _
+                 (* The layout is not determined yet, so be conservative. *)
+                 | Splice _ ->
                    Dereference)
             | Constructor_undetermined | Constructor_variable _ -> Dereference)
       in
@@ -826,7 +828,9 @@ let rec expression : Typedtree.expression -> term_judg =
              | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
              | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-             | Void | Product _ ->
+             | Void | Product _
+             (* The layout is not determined yet, so be conservative. *)
+             | Splice _ ->
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"

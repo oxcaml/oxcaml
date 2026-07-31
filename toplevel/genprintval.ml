@@ -823,7 +823,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate
                         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-                        | Word | Product _ ->
+                        | Word | Product _ | Splice _ ->
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")
