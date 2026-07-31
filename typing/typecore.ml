@@ -2424,10 +2424,6 @@ let solve_Ppat_construct tps (penv : Pattern_env.t) loc constr no_existentials
     try
       TypePairs.iter
         (fun (t1, t2) ->
-          (* CR ageorges: are these still needed after putting back
-             generalize_structure? *)
-          generalize_structure t1;
-          generalize_structure t2;
           if not (fully_generic t1 && fully_generic t2) then
             let msg =
               Format_doc.doc_printf
