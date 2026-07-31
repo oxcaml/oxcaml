@@ -397,6 +397,7 @@ let deep_copy () =
         | Tquote_eval t -> Tquote_eval (copy t)
         | Tsplice t -> Tsplice (copy t)
         | Tbox t -> Tbox (copy t)
+        | Tmod (t, mod_bounds) -> Tmod (copy t, mod_bounds)
         | Tlink _ | Tsubst _ -> assert false
       in
       Transient_expr.(set_desc (repr ty') desc);
@@ -6660,9 +6661,9 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
                 val_modalities = Modality.of_const Modality.Const.id
               };
             kind = Id_value;
-            unique_use = (Uniqueness.disallow_left Uniqueness.legacy,
-             Linearity.disallow_right Linearity.legacy);
-            mode = Mode.Value.disallow_right Mode.Value.legacy
+            unique_use = (Uniqueness.newvar (), Linearity.newvar ());
+            mode = Mode.Value.newvar ();
+            staticity = Staticity.newvar ()
           };
       exp_loc = loc;
       exp_extra = [];
@@ -7528,6 +7529,7 @@ and type_expect_
                   args,
                   pm.apply_position,
                   ap_mode,
+                  Mode.Yielding.newvar (),
                   None
                 );
               exp_loc = loc;
@@ -9579,7 +9581,8 @@ and type_function_
                     ret_mode;
                     ret_sort;
                     alloc_mode;
-                    zero_alloc=Zero_alloc.default
+                    zero_alloc=Zero_alloc.default;
+                    yielding = Yielding.newvar ()
                   });
               exp_loc = loc;
               exp_extra = [];
@@ -9777,7 +9780,8 @@ and type_function_
                 Texp_function
                   { params; body; ret_mode; ret_sort;
                     alloc_mode = Alloc.disallow_left alloc_mode;
-                    zero_alloc = Zero_alloc.default });
+                    zero_alloc = Zero_alloc.default;
+                    yielding = Yielding.newvar () });
               exp_loc = loc;
               exp_extra = [];
               exp_type;
@@ -11619,6 +11623,7 @@ and type_function_cases_expect
                   ret_sort;
                   alloc_mode = Alloc.disallow_left alloc_mode;
                   zero_alloc = Zero_alloc.default;
+                  yielding = Yielding.newvar ()
                 };
             exp_loc = loc;
             exp_extra = [];

@@ -3610,7 +3610,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       begin match app_view with
       | { arg = None; loc = app_loc; attributes = app_attributes; _ } ->
           Msupport.raise_error (apply_error ());
-          { mod_desc = Tmod_apply_unit(funct);
+          { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar ());
             mod_type = mty_res;
             mod_mode = Value.(disallow_right min), None;
             mod_env = env;
