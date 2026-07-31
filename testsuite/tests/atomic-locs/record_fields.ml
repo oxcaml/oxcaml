@@ -357,6 +357,57 @@ Line 1, characters 50-67:
 Error: Use of "[%atomic.loc]" with mixed record fields (here "f") is forbidden.
 |}];;
 
+(* Using an atomic field of a record with variable representation *)
+type ('a : any) t = { a : 'a; mutable f: int [@atomic]}
+[%%expect{|
+0
+type ('a : any) t = { a : 'a; mutable f : int [@atomic]; }
+|}];;
+
+let undetermined_project t = t.f
+[%%expect{|
+(let
+  (undetermined_project =
+     (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+  (apply (field_imm 1 (global Toploop!)) "undetermined_project"
+    undetermined_project))
+val undetermined_project : 'a t -> int = <fun>
+|}];;
+
+let undetermined_set t = t.f <- 42
+[%%expect{|
+(let
+  (undetermined_set =
+     (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+  (apply (field_imm 1 (global Toploop!)) "undetermined_set" undetermined_set))
+val undetermined_set : 'a t -> unit = <fun>
+|}];;
+
+let undetermined_loc t = [%atomic.loc t.f]
+[%%expect{|
+(let
+  (undetermined_loc =
+     (function {nlocal = 0} t (makeblock 0 (*,value<int>) t 1)))
+  (apply (field_imm 1 (global Toploop!)) "undetermined_loc" undetermined_loc))
+val undetermined_loc : 'a t -> int atomic_loc = <fun>
+|}];;
+
+type ('a : any) w = A of { a : 'a; mutable f: int [@atomic]}
+[%%expect{|
+0
+type ('a : any) w = A of { a : 'a; mutable f : int [@atomic]; }
+|}];;
+
+let undetermined_project_inline t = match t with A r -> r.f
+[%%expect{|
+(let
+  (undetermined_project_inline =
+     (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+  (apply (field_imm 1 (global Toploop!)) "undetermined_project_inline"
+    undetermined_project_inline))
+val undetermined_project_inline : 'a w -> int = <fun>
+|}];;
+
 (* Marking a field [@atomic] in a float-only record disables the unboxing optimization. *)
 module Float_records = struct
   type flat = { x : float; mutable y : float }
@@ -374,7 +425,7 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic float field
   which prevents the float record optimization.
   The fields of this record will be boxed instead of being
   represented as a flat float array.
-(apply (field_imm 1 (global Toploop!)) "Float_records/470"
+(apply (field_imm 1 (global Toploop!)) "Float_records/498"
   (let
     (mk_flat =
        (function {nlocal = 0} x[value<float>] y[value<float>]
@@ -594,7 +645,7 @@ Line 5, characters 14-19:
 Warning 9 [missing-record-field-pattern]: the following labels are not bound
   in this record pattern: "y".
   Either bind these labels explicitly or add "; _" to the pattern.
-(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/533"
+(apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/561"
   (let
     (warning = (function {nlocal = 0} param : int (field_int 0 param))
      allowed = (function {nlocal = 0} param : int (field_int 0 param))
@@ -635,7 +686,7 @@ module Functional_update_ok = struct
   let allowed t = { t with y = 42 }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/549"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_ok/577"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -655,7 +706,7 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/557"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_copy_ok/585"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -689,7 +740,7 @@ module Functional_update_multi_ok = struct
   let allowed t = { t with y = 42; z = 67 } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/573"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_ok/601"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -713,7 +764,7 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/582"
+(apply (field_imm 1 (global Toploop!)) "Functional_update_multi_copy_ok/610"
   (let
     (allowed =
        (function {nlocal = 0} t
@@ -742,7 +793,7 @@ end
 
 let project (t : Mixed_blocks.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/587" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks/615" (makeblock 0))
 module Mixed_blocks :
   sig
     type t = { padding : #(int * int * int); mutable field : int [@atomic]; }
@@ -786,7 +837,7 @@ end
 
 let project (t : Mixed_blocks_2.t) = t.field
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/597" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_2/625" (makeblock 0))
 module Mixed_blocks_2 :
   sig
     type t = { mutable field : int [@atomic]; padding : #(int * int * int); }
@@ -832,7 +883,7 @@ module Mixed_blocks_rec = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/610" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/638" (makeblock 0))
 module Mixed_blocks_rec :
   sig
     type t = { padding : u; mutable field : int [@atomic]; }
@@ -940,7 +991,7 @@ module Atomic_float_with_float_hash = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/636"
+(apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/664"
   (let
     (disallowed =
        (function {nlocal = 0} t : float
@@ -961,7 +1012,7 @@ module Inline_record_atomic_in_mixed = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/645"
+(apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/673"
   (let
     (disallowed =
        (function {nlocal = 0} t : int
