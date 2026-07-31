@@ -336,6 +336,52 @@ let num_args_addressing = function
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
 
+let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
+  match op with
+  | Ilea addr ->
+    (* The delta is absorbed into the displacement of the addressing
+       expression, multiplied by the total scale with which the folded
+       register contributes to the address. *)
+    let displ, arg_weights =
+      match addr with
+      | Ibased (_, _, displ) -> displ, [||]
+      | Iindexed displ -> displ, [| 1 |]
+      | Iindexed2 displ -> displ, [| 1; 1 |]
+      | Iscaled (scale, displ) -> displ, [| scale |]
+      | Iindexed2scaled (scale, displ) -> displ, [| 1; scale |]
+    in
+    if Array.length arg_is_folded_reg <> Array.length arg_weights
+    then
+      Misc.fatal_errorf
+        "Arch.fold_delta_into_specific_operation: addressing mode expects %d \
+         argument(s) but the instruction has %d"
+        (Array.length arg_weights)
+        (Array.length arg_is_folded_reg);
+    if delta < -0x8000_0000 || delta > 0x7FFF_FFFF
+    then None
+    else begin
+      let multiplier = ref 0 in
+      Array.iteri
+        (fun i is_folded_reg ->
+          if is_folded_reg then multiplier := !multiplier + arg_weights.(i))
+        arg_is_folded_reg;
+      (* Only fold if the operation actually reads the register: deleting the
+         preceding addition must not shrink the register's live range. *)
+      if !multiplier = 0
+      then None
+      else begin
+        let displ_delta = !multiplier * delta in
+        let new_displ = displ + displ_delta in
+        if new_displ < -0x8000_0000 || new_displ > 0x7FFF_FFFF
+        then None
+        else Some (Ilea (offset_addressing addr displ_delta))
+      end
+    end
+  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
+  | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
+  | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _ ->
+    None
+
 let addressing_displacement_for_llvmize addr =
   if not !Clflags.llvm_backend
   then

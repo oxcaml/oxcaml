@@ -63,8 +63,7 @@ let clz32 x = Builtins.int32_clz (Int32_u.to_int32 x)
 clz32:
   movl  %eax, %eax
   lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -63(%rax,%rax), %rax
   ret
 |}]
 
@@ -75,8 +74,7 @@ clz32_const:
   movl  $6, %eax
   movl  %eax, %eax
   lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -63(%rax,%rax), %rax
   ret
 |}]
 
@@ -195,13 +193,11 @@ ctz_native_const:
 
 (* Population count - int *)
 
-(* CR ttebbi: The -1 should be folded into the lea. *)
 let popcnt_tagged x = Builtins.int_popcnt x
 [%%expect_asm X86_64{|
 popcnt_tagged:
   popcnt %rax, %rax
-  decq  %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -1(%rax,%rax), %rax
   ret
 |}]
 
@@ -211,8 +207,7 @@ let popcnt_tagged_const () = Builtins.int_popcnt 6
 popcnt_tagged_const:
   movl  $13, %eax
   popcnt %rax, %rax
-  decq  %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -1(%rax,%rax), %rax
   ret
 |}]
 
