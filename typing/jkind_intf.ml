@@ -78,6 +78,12 @@ module type Sort = sig
         can be instantiated as void. *)
     val maybe_all_void : t -> bool
 
+    (** True if the sort contains no univars or genvars.
+
+        CR layout-polymorphism: This function should be deleted once we support
+        layout-poly any-fields *)
+    val is_concrete : t -> bool
+
     val scannable : t
 
     val void : t
@@ -230,10 +236,12 @@ module type Sort = sig
       variable, it is set to [scannable] first. *)
   val default_to_scannable_and_get : t -> Const.t
 
-  (** Like [default_to_scannable_and_get] but returns a [Some] wrapping. Avoids
-      allocating a fresh [Some] box when the result is one of the known base
-      constants. *)
-  val default_to_scannable_and_get_some : t -> Const.t option
+  (** Like [default_to_scannable_and_get], but returns [None] if the result is
+      not concrete.
+
+      CR layout-polymorphism: This function should be deleted once we support
+      layout-poly any-fields *)
+  val get_concrete_defaulting_to_scannable : t -> Const.t option
 
   (* CR layouts v12: Default this to void. *)
 

@@ -205,6 +205,11 @@ module Sort = struct
       | Univar _ | Genvar _ -> true
       | Product ts -> List.for_all maybe_all_void ts
 
+    let rec is_concrete = function
+      | Base _ -> true
+      | Product ts -> List.for_all is_concrete ts
+      | Univar _ | Genvar _ -> false
+
     let scannable = Base Scannable
 
     let untagged_immediate = Base Untagged_immediate
@@ -828,11 +833,9 @@ module Sort = struct
       (* path compression *)
       result
 
-  (* Like [default_to_scannable_and_get], but returns a [Some] wrapping. Reuses
-     pre-allocated [Some] boxes when the result is one of the known base
-     constants, to avoid an allocation per call site. *)
-  let default_to_scannable_and_get_some s =
-    Const.some (default_to_scannable_and_get s)
+  let get_concrete_defaulting_to_scannable s =
+    let const = default_to_scannable_and_get s in
+    if Const.is_concrete const then Const.some const else None
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s

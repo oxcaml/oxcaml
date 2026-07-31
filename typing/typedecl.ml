@@ -154,6 +154,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
@@ -1856,8 +1857,9 @@ let eagerly_check_record_not_all_void loc sorts =
     | None -> false
     | Some sort ->
       (match Jkind.Sort.to_const_opt sort with
-       | Some const -> Jkind.Sort.Const.all_void const
-       | None -> false)
+       | Some const when Jkind.Sort.Const.is_concrete const ->
+         Jkind.Sort.Const.all_void const
+       | Some _ | None -> false)
   in
   if List.for_all field_is_void sorts then
     raise (Error (loc, Jkind_empty_record))
@@ -1898,7 +1900,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
       let ld_sort =
         Option.bind sort
           (if default_to_scannable
-           then Jkind.Sort.default_to_scannable_and_get_some
+           then Jkind.Sort.get_concrete_defaulting_to_scannable
            else Jkind.Sort.to_const_opt)
       in
       sort, (ld_sort, jkind)
@@ -1934,7 +1936,7 @@ let update_constructor_arguments_sorts env loc cd_args =
           let jkind = Ctype.type_jkind env ca_type in
           let sort = Jkind.sort_option_of_jkind env jkind in
           let ca_sort =
-            Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+            Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
           in
           {arg with ca_sort}, jkind)
         args
@@ -2075,7 +2077,7 @@ module Element_repr = struct
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
-      | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
+      | Genvar _ -> None
       in
       Option.bind layout layout_to_t
 
@@ -2382,7 +2384,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =
-      Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+      Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
     in
     let rep =
       (* Weirdly, we CAN give the record a representation even if its kind is
@@ -2585,6 +2587,17 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
       sorts_and_types
   in
+  (* CR layout-polymorphism: We error on seeing layout variables (univars or
+     generalized sort variables), as they are not supported in a
+     [Types.mixed_block_element], which this function returns.
+
+     To support [any]-fields with layout polymorphism, this function should
+     instead return a [Lambda.mixed_block_element], which supports
+     [Splice_variable]s. This will require hopefully-minor changes to
+     callers of [finalize_{record,constructor}_representation], and more
+     importantly, testing. *)
+  if not (Array.for_all Jkind.Sort.Const.is_concrete consts) then
+    raise (Error (loc, Layout_poly_variable_representation));
   let all_scannable =
     Array.for_all
       (fun (const : Jkind.Sort.Const.t) ->
@@ -2682,7 +2695,7 @@ let rec update_decl_jkind env dpath decl =
       let sort_of_jkind jkind =
         Option.bind
           (Jkind.sort_option_of_jkind env jkind)
-          Jkind.Sort.default_to_scannable_and_get_some
+          Jkind.Sort.get_concrete_defaulting_to_scannable
       in
       let cstrs =
         List.map
@@ -2749,7 +2762,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ca_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
@@ -2760,7 +2773,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ld_sort =
-              Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
@@ -6115,6 +6128,10 @@ let report_error ~loc = function
   | Layout_poly_unsupported ->
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
+  | Layout_poly_variable_representation ->
+    Location.errorf ~loc
+      "The representation of this record or variant depends on a@ \
+       layout-polymorphic type, which is not yet supported."
   | Misplaced_flatten_floats ->
     Location.errorf ~loc
       "The %a attribute is only allowed on records with one or more@ \
