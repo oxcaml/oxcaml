@@ -84,6 +84,14 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
+            # This leg is also our only plain-O3 testsuite coverage (the
+            # match-in-match leg only exercises O3 combined with
+            # flambda2-match-in-match), so don't remove it if the metrics
+            # pipeline goes away.
+            # The metrics pipeline (instrumentation, install, collection) runs
+            # on every event so that breakage surfaces before merging; the
+            # artifact upload and the push to the metrics repo happen only on
+            # pushes to main (see the push-metrics job).
             collect_metrics: true
             disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml'
 
@@ -595,44 +603,36 @@ jobs:
               -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
           done
 
-      - name: Collect and push metrics
-        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Collect metrics
+        if: matrix.collect_metrics == true
         env:
-          # Ideally this secret would be scoped to a dedicated deployment
-          # environment (with `environment:` on the job); that requires
-          # repo-settings changes, so we suppress the finding for now.
-          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }} # zizmor: ignore[secrets-outside-env]
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          # The actual commit being tested (not the merge commit, for PRs)
-          COMMIT_HASH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
-          # Checkout metrics repository
-          gh repo clone oxcaml/oxcaml-metrics metrics-repo
-
-          # Create raw-data directory if it doesn't exist
-          mkdir -p metrics-repo/raw-data
-
-          # Use the metrics collection script (CSV filename and PR number computed internally)
-          python3 $GITHUB_WORKSPACE/scripts/collect-metrics.py \
+          mkdir -p "$GITHUB_WORKSPACE/_metrics_output"
+          # CSV filename and PR number are computed inside the script
+          python3 "$GITHUB_WORKSPACE/scripts/collect-metrics.py" \
             --install-dir "$GITHUB_WORKSPACE/_install" \
-            --output-dir "metrics-repo/raw-data" \
-            --commit-hash "$COMMIT_HASH" \
+            --output-dir "$GITHUB_WORKSPACE/_metrics_output" \
+            --commit-hash "$GITHUB_SHA" \
             --commit-message "$COMMIT_MESSAGE" \
             --profile-dir "$GITHUB_WORKSPACE/_profile_csv" \
             --verbose
+          # The script only warns when profiling produced no CSVs (it then
+          # skips the profiles archive); fail loudly so a silently broken
+          # profile=1 pipeline is caught before merging.
+          ls "$GITHUB_WORKSPACE"/_metrics_output/profiles-*.tar.gz
 
-          # Commit and push metrics
-          cd metrics-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Configure git to use gh for authentication
-          git config --local credential.helper ""
-          git config --local credential.https://github.com.helper "!gh auth git-credential"
-
-          git add raw-data/
-          git commit -m "Add metrics for commit ${COMMIT_HASH}"
-          git push || (git pull --rebase && git push)
+      - name: Upload metrics artifact
+        # Only pushes to main upload: the artifact exists solely as the
+        # short-lived handoff of raw data to the push-metrics job. The durable
+        # copy of the raw is the Release asset written by push-metrics; this
+        # artifact just needs to outlive the run, so keep retention short.
+        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: metrics-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ github.workspace }}/_metrics_output
+          retention-days: 7
 
       - name: Upload core dumps
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -648,6 +648,107 @@ jobs:
           name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
           path: /Users/runner/Library/Logs/DiagnosticReports
 
+  push-metrics:
+    name: Push metrics
+    runs-on: ubuntu-latest
+    needs: build
+    # !cancelled(): push metrics whenever the O3 metrics leg produced data,
+    # even if an unrelated matrix leg failed.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    # The APP_ID / PRIVATE_KEY for the metrics GitHub App live in this deployment
+    # environment, which restricts them to deployments from main.
+    environment: metrics
+    env:
+      # The metrics store this producer publishes to.
+      METRICS_REPO: oxcaml/oxcaml-metrics
+    steps:
+      - name: Download metrics artifact
+        id: download
+        # The artifact is absent if the O3 metrics leg failed; skip the push then.
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: metrics-${{ github.sha }}-${{ github.run_id }}
+          path: metrics-data
+
+      # Mint a short-lived (~1h) token scoped to ONLY the metrics repo, from the
+      # metrics GitHub App's private key. Even though it runs in the producer's
+      # workflow, it cannot touch this repo or anything but METRICS_REPO.
+      - name: Mint token for the metrics repo
+        id: app-token
+        if: steps.download.outcome == 'success'
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: oxcaml
+          repositories: oxcaml-metrics
+          # Narrow the token to exactly what this job needs (push commits + manage
+          # Releases both fall under Contents), regardless of what else the App may
+          # be granted later.
+          permission-contents: write
+
+      # --- The revised pipeline --------------------------------------------------
+      # Old flow: push RAW (multi-MB tarball + CSV) into the metrics repo's git on
+      #   every commit, then a second workflow there converts it and commits again.
+      #   Git kept every raw blob forever (~1.8 GB and growing) and there was a
+      #   producer/processor commit ping-pong.
+      # New flow (this job, single commit, no raw in git):
+      #   1. sparse-clone the metrics repo (data/ + scripts/ only, --depth 1),
+      #   2. run its convert_metrics.py to fold the raw into a small per-commit CSV,
+      #   3. commit ONLY data/ and push,
+      #   4. archive the raw as a Release asset (durable, out of git history).
+      - name: Convert + commit data-only, archive raw to a Release
+        if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git   # let git authenticate through gh (uses GH_TOKEN)
+
+          # 1. Sparse clone of the metrics repo (data/ + scripts/ only, no history).
+          git clone --depth 1 --filter=blob:none --sparse \
+            "https://github.com/${METRICS_REPO}" metrics-repo
+          git -C metrics-repo sparse-checkout set data scripts
+          git -C metrics-repo config user.name  "github-actions[bot]"
+          git -C metrics-repo config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 2. Convert raw -> small per-commit CSV under data/.
+          art=$(ls metrics-data/artifact-sizes-*.csv)
+          prof=$(ls metrics-data/profiles-*.tar.gz)
+          python3 metrics-repo/scripts/convert_metrics.py \
+            --artifact-sizes "$art" --profiles "$prof" --output-dir metrics-repo/data
+
+          # 3. Commit ONLY data/ and push (raw never enters the metrics git repo).
+          # Guard on the staged diff so re-running this job is idempotent: if a
+          # previous attempt already pushed the data commit (and only the release
+          # upload flaked), the reproduced CSV stages nothing and `git commit` would
+          # exit 1 under `set -e`, failing before the upload we came back to finish.
+          git -C metrics-repo add data/
+          if git -C metrics-repo diff --cached --quiet; then
+            echo "data/ unchanged (re-run of an already-pushed conversion); skipping commit"
+          else
+            git -C metrics-repo commit -q -m "Add processed metrics for commit ${GITHUB_SHA}"
+            if git -C metrics-repo show --name-only --pretty=format: HEAD | grep -q '^raw-data/'; then
+              echo "ERROR: commit contains raw-data/ — raw leaked into git" >&2; exit 1
+            fi
+            git -C metrics-repo show --stat --oneline HEAD
+            # Retry is conflict-free: each run adds a uniquely-named
+            # data/metrics-<date>-<sha>.csv, so concurrent runs never touch the same
+            # file (no more producer/processor ping-pong).
+            git -C metrics-repo push \
+              || (git -C metrics-repo pull --rebase && git -C metrics-repo push)
+          fi
+
+          # 4. Durably archive the raw as a monthly Release asset (out of git).
+          # Tolerate the release already existing (a same-month run racing us), but
+          # let a real create failure (auth/permissions) surface instead of turning
+          # into a misleading "release not found" from the upload below.
+          month=$(basename "$art" | sed -E 's/^artifact-sizes-([0-9]{4}-[0-9]{2}).*/\1/')
+          gh release create "raw-$month" --repo "$METRICS_REPO" \
+            --title "Raw metrics $month" --notes "Raw profiles + artifact sizes" \
+            || gh release view "raw-$month" --repo "$METRICS_REPO" >/dev/null
+          gh release upload "raw-$month" --repo "$METRICS_REPO" --clobber "$art" "$prof"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
