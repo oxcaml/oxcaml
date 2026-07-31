@@ -23,6 +23,6 @@ let[@inline] unbox_int_and_add_one_wrapper (x : int_box) =
 let box_int_then_call_unbox_int_and_add_one_wrapper (x : int) =
   (* This call should pass the "argument types useful" check: we don't know
      anything more precise about the value of the argument, but we do know that
-     it's first field is available as a variable in the program -- we want to
+     its first field is available as a variable in the program -- we want to
      speculatively inline, because we could eliminate projection primitives. *)
   unbox_int_and_add_one_wrapper (Box x)
