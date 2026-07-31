@@ -398,7 +398,6 @@ let can_apply_primitive p pmode pos args =
     else if nargs < p.prim_arity then false
     else if pos <> Typedtree.Tail then true
     else begin
-      (* CR ageorges: what level to choose here *)
       let return_mode =
         Ctype.prim_mode pmode p.prim_native_repr_res ~level:0
       in
