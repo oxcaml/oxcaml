@@ -123,7 +123,7 @@ module Rec_var_ident = struct
 
   let mk_fresh () =
     let comp_unit =
-      match Compilation_unit.get_current () with
+      match Current_unit.get_cu () with
       | None -> ""
       | Some cu -> Compilation_unit.full_path_as_string cu
     in
