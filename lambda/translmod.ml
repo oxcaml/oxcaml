@@ -1690,6 +1690,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
         ap_specialised = Default_specialise;
         ap_mode = alloc_heap;
         ap_region_close = Rc_normal;
+        ap_yielding = Unyielding;
         ap_probe = None
       }
   in
