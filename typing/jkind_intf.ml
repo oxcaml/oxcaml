@@ -74,6 +74,10 @@ module type Sort = sig
 
     val all_void : t -> bool
 
+    (** Like [all_void], but a layout variable counts as maybe-void, since it
+        can be instantiated as void. *)
+    val maybe_all_void : t -> bool
+
     val scannable : t
 
     val void : t

@@ -196,6 +196,15 @@ module Sort = struct
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
       | Product ts -> List.for_all all_void ts
 
+    let rec maybe_all_void = function
+      | Base Void -> true
+      | Base
+          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
+        false
+      | Univar _ | Genvar _ -> true
+      | Product ts -> List.for_all maybe_all_void ts
+
     let scannable = Base Scannable
 
     let untagged_immediate = Base Untagged_immediate
