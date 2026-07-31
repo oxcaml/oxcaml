@@ -6080,8 +6080,6 @@ let pattern_needs_partial_application_check p =
 (* Check that a type is generalizable at some level *)
 let generalizable level ty =
   with_type_mark begin fun mark ->
-    (* CR ageorges: what should the following behavior be if one of the
-      modes in a Join is generic the rest aren't?*)
     let check_const_mode m =
       if Mode.Alloc.check_generic m then
         Option.is_some (Mode.Alloc.Guts.check_const m)
