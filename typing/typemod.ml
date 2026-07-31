@@ -4238,25 +4238,32 @@ and normalize_signature_item = function
 
 let type_module_type_of env smod =
   let remove_aliases = has_remove_aliases_attribute smod.pmod_attributes in
-  let tmty =
+  let tmty, skip_nongen_check =
     match smod.pmod_desc with
     | Pmod_ident lid -> (* turn off strengthening in this case *)
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
+        in
+        (* A persistent-rooted path denotes [.cmi] content, whose value types
+           carry no weak, mode or jkind variables, so [check_nongen_modtype]
+           below has nothing to find and nothing to zap. *)
+        let skip_nongen_check =
+          List.for_all Ident.is_global (Path.heads path)
         in
           { mod_desc = Tmod_ident (path, lid);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
             mod_attributes = smod.pmod_attributes;
-            mod_loc = smod.pmod_loc }
+            mod_loc = smod.pmod_loc },
+          skip_nongen_check
     | _ ->
         let me, _shape = type_module env smod in
-        me
+        me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
-  check_nongen_modtype env smod.pmod_loc mty;
+  if not skip_nongen_check then check_nongen_modtype env smod.pmod_loc mty;
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
