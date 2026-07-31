@@ -306,6 +306,13 @@ module type Solver_mono = sig
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
 
+  (** Moves a variable [u] whose level is above [current_level] and below
+      [generic_level] to [generic_level + i], where [i] is the difference
+      between [u.level] and [current_level] (the same is then done to all of
+      [u]'s children) *)
+  val generalize_topology :
+    current_level:int -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
+
   (** Generalizes a variable whose level is above [current_level], by putting
       its level to [generic_level], and all its children above [current_level]
       to [generic_level + i] for some nonzero [i]. *)

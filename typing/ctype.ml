@@ -248,11 +248,14 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
         else begin
           (* Generalize all remaining nodes *)
           Transient_expr.set_level ty generic_level;
-          if structure then match ty.desc with
-            Tconstr (_, _, abbrev) ->
+          match ty.desc with
+          | Tconstr (_, _, abbrev) when structure ->
               (* In structure mode, we drop abbreviations, as the goal of
                  this mode is to reduce sharing *)
               abbrev := Mnil
+          | Tarrow ((_, marg, mret), _, _, _) when not structure ->
+              Alloc.generalize_topology ~current_level:!current_level marg;
+              Alloc.generalize_topology ~current_level:!current_level mret
           | _ -> ()
         end
   end pool;

@@ -174,6 +174,8 @@ module type Common = sig
 
   val update_level : int -> ('l * 'r) t -> unit
 
+  val generalize_topology : current_level:int -> ('l * 'r) t -> unit
+
   val generalize : current_level:int -> ('l * 'r) t -> unit
 
   val generalize_structure : current_level:int -> ('l * 'r) t -> unit
