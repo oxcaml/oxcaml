@@ -272,6 +272,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
