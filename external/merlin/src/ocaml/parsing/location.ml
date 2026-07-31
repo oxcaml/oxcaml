@@ -1123,6 +1123,7 @@ let deprecated_script_alert program =
   in
   prerr_alert none alert
 
+(*
 let set_from_env flag Clflags.{ parse; usage; env_var } =
   try
     match parse (Sys.getenv env_var) with
@@ -1145,6 +1146,7 @@ let read_clflags_from_env () =
     Clflags.color := Some Misc.Color.Never;
   set_from_env Clflags.error_style Clflags.error_style_reader;
   ()
+*)
 
 (******************************************************************************)
 (* Reporting errors on exceptions *)

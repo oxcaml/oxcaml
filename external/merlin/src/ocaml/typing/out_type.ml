@@ -1310,12 +1310,12 @@ module Aliases = struct
       | Tfield(_, _, _, ty2) ->
           mark_loops_rec visited ty2
       | Tnil -> ()
-      | Tquote ty | Tsplice ty | Tquote_eval ty ->
-          mark_loops_rec visited ty
-      | Tbox ty ->
-          mark_loops_rec visited ty
-      | Trepr (ty, _) ->
-          mark_loops_rec visited ty
+      | Tquote ty
+      | Tsplice ty
+      | Tquote_eval ty
+      | Tbox ty
+      | Trepr (ty, _)
+      | Tmod (ty, _) -> mark_loops_rec visited ty
       | Tof_kind _ -> ()
       | Tsubst _ -> ()
       | Tlink _ -> fatal_error "Printtyp.mark_loops_rec (2)"

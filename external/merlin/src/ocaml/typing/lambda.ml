@@ -41,6 +41,7 @@ type array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of unit
   | Pgcignorableproductarray of unit
   | Punspecializedarray
