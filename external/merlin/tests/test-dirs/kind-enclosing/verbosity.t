@@ -76,8 +76,8 @@
         unforkable
         yielding
         once
-        stateful
         unique
+        stateful
         read_write
         uncontended
         static
@@ -88,8 +88,8 @@
         unforkable
         yielding
         once
-        stateful
         unique
+        stateful
         read_write
         uncontended
         static
