@@ -360,17 +360,18 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
     if delta < -0x8000_0000 || delta > 0x7FFF_FFFF
     then None
     else begin
-      let multiplier = ref 0 in
-      Array.iteri
-        (fun i is_folded_reg ->
-          if is_folded_reg then multiplier := !multiplier + arg_weights.(i))
-        arg_is_folded_reg;
+      let multiplier =
+        Misc.Stdlib.Array.fold_lefti
+          (fun i multiplier is_folded_reg ->
+            if is_folded_reg then multiplier + arg_weights.(i) else multiplier)
+          0 arg_is_folded_reg
+      in
       (* Only fold if the operation actually reads the register: deleting the
          preceding addition must not shrink the register's live range. *)
-      if !multiplier = 0
+      if multiplier = 0
       then None
       else begin
-        let displ_delta = !multiplier * delta in
+        let displ_delta = multiplier * delta in
         let new_displ = displ + displ_delta in
         if new_displ < -0x8000_0000 || new_displ > 0x7FFF_FFFF
         then None
