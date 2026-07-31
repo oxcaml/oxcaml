@@ -3361,13 +3361,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
           Tpackage pack ->
-            (* CR ageorges: should we remove modes here? *)
-            List.iter
-              (fun (_n, t) ->
-                 Mode.Alloc.with_zap_scope
-                   (fun ~zap_scope ->
-                      Ctype.remove_mode_and_jkind_variables ~zap_scope t))
-              pack.pack_cstrs;
             check_package_closed ~loc:smod.pmod_loc ~env ~typ:exp.exp_type
               pack.pack_cstrs;
             if !Clflags.principal &&
