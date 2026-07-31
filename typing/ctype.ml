@@ -2781,7 +2781,7 @@ let expand_head_opt env ty =
 
 let create_yielding_mode_l yielding =
   let yielding =
-    if Language_extension.(is_at_least Mode_polymorphism Beta)
+    if Language_extension.(is_at_least Mode_polymorphism Alpha)
     then fst (Yielding.newvar_above 0 yielding)
     else yielding
   in
