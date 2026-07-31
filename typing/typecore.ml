@@ -260,6 +260,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
   | Mixed_record_atomic_loc of Longident.t
+  | Undetermined_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -320,8 +321,6 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
-  | Indeterminate_record_layout of type_expr * string
-  | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -1334,14 +1333,17 @@ let check_atomic_loc ~loc ~env record_repres mutability lid =
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  (* We should know constructor representation at this point. *)
-  | Record_inlined (_, Constructor_undetermined, _)
+  (* May finalize to mixed at translation time; conservatively reject. *)
+  | Record_undetermined | Record_variable _
+  | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _) ->
+      raise (Error (loc, env, Undetermined_record_atomic_loc lid))
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
   | Record_float | Record_ufloat
-  (* We should know record representation at this point. *)
-  | Record_dummy _ | Record_undetermined ->
+  (* Only exists as an intermediate step of typechecking the decl itself *)
+  | Record_dummy _ ->
       Misc.fatal_error "check_atomic_loc: unexpected record representation"
 
 (* Represents information about an array type inferred using type-directed
@@ -1976,17 +1978,12 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
           representative_label.lbl_all
           vars_and_ty_args
       in
-      match
+      let sorts, rep =
         Typedecl.update_record_representation ~why env loc form
           ~old_repres:representative_label.lbl_repres
           (lbls_and_ty_args |> Array.to_list)
-      with
-      | Ok (sorts, rep) ->
-          let sorts = sorts |> Array.of_list in
-          Variable sorts, rep
-      | Error (Unrepresentable_field name) ->
-          raise (Error (loc, env,
-                        Indeterminate_record_layout(containing_type, name)))
+      in
+      Variable (Array.of_list sorts), rep
   in
   sorts, rep
 
@@ -2854,7 +2851,8 @@ module Label = NameChoice (struct
   let in_env lbl =
     match lbl.lbl_repres with
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
-    | Record_mixed _ | Record_dummy _ | Record_undetermined -> true
+    | Record_mixed _ | Record_dummy _ | Record_undetermined
+    | Record_variable _ -> true
     | Record_inlined _ -> false
 end)
 
@@ -3106,8 +3104,8 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
-let representation_for_tuple_constructor env constr ty_args ~loc ~types
-      ~containing_type ~why : _ Result.t =
+let representation_for_tuple_constructor env constr ~loc ~types ~why
+    : _ Result.t =
   match constr.cstr_shape with
   | (Constructor_uniform_value | Constructor_mixed _) as shape ->
       begin match
@@ -3129,23 +3127,27 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
         with
         | Ok jkinds_and_sorts ->
             let jkinds, sorts = List.split jkinds_and_sorts in
-            begin match
-              Typedecl.update_constructor_representation env
-                (Cstr_tuple ty_args) jkinds ~loc ~is_extension_constructor:false
-            with
-            | Ok shape -> Ok (shape, sorts)
-            | Error (Unrepresentable_argument i) ->
-                (* lmaurer: Impossible? *)
-                raise (Error (loc, env,
-                              Indeterminate_constructor_layout(
-                                containing_type, constr.cstr_name, i)))
-            | Error (Unrepresentable_argument_field _) ->
-                (* Should be impossible because we passed [Cstr_tuple] *)
-                Misc.fatal_error
-                  "Unrepresentable_argument_field with Cstr_tuple"
-            end
+            let args =
+              List.map2
+                (fun (ca : Types.constructor_argument) (ty, _loc) ->
+                   { ca with ca_type = ty })
+                constr.cstr_args types
+            in
+            let sorts_and_types =
+              List.map2 (fun sort (ty, _loc) -> sort, ty) sorts types
+              |> Array.of_list
+            in
+            let shape =
+              Typedecl.update_constructor_representation_or_variable env
+                (Cstr_tuple args) jkinds ~loc ~sorts_and_types
+            in
+            Ok (shape, sorts)
         | Error err -> Error err
       end
+  | Constructor_variable _ ->
+      Misc.fatal_error
+        "representation_for_tuple_constructor: unexpected typechecked \
+         representation in a constructor description"
 
 (* Typing of patterns *)
 
@@ -3805,8 +3807,8 @@ and type_pat_aux
            representable, and the call to [representation_for_tuple_constructor]
            below, are quite redundant. We should refactor. *)
         match
-          representation_for_tuple_constructor !!penv constr args ~loc ~types
-            ~containing_type:expected_ty ~why:Constructor_arg_projection
+          representation_for_tuple_constructor !!penv constr ~loc ~types
+            ~why:Constructor_arg_projection
         with
         | Ok (repr, sorts) -> repr, sorts
         | Error (Unrepresentable_arg (loc, ty, err)) ->
@@ -6636,7 +6638,7 @@ and type_expect_
             -> false
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-          | Record_undetermined
+          | Record_undetermined | Record_variable _
             -> true
           | Record_dummy _ ->
             Misc.fatal_error "type_expect: dummy record representation"
@@ -6861,22 +6863,15 @@ and type_expect_
               then Field_assignment
               else Field_functional_update
             in
-            begin match
-              (* XXX This is redundantly going to get the sort and jkind for
-                 each label all over again. Possibly we're doing things in the
-                 wrong order. *)
+            (* XXX This is redundantly going to get the sort and jkind for
+               each label all over again. Possibly we're doing things in the
+               wrong order. *)
+            let _sorts, rep =
               Typedecl.update_record_representation ~why env
                 sexp.pexp_loc record_form ~old_repres:representation
                 labels_with_updated_types
-            with
-            | Ok (_, rep) -> rep
-            | Error _ ->
-                (* This should be impossible since we already ran everything
-                   through [jkind_and_sort_for_label_definition] *)
-                Misc.fatal_errorf
-                  "No representation for record whose fields have sorts: %a"
-                    Printtyp.type_expr ty_expected
-            end
+            in
+            rep
       in
       let fields =
         Array.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
@@ -8798,7 +8793,7 @@ and type_block_access env expected_base_ty principal
       raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
     (match label.lbl_repres with
-     | Record_boxed | Record_undetermined -> ()
+     | Record_boxed | Record_undetermined | Record_variable _ -> ()
      | Record_mixed shape ->
        if Array.exists (function Float_boxed -> true | _ -> false) shape then
          bad_record_error "[@@flatten_floats]"
@@ -10722,9 +10717,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   let shape, sorts =
     let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
     match
-      representation_for_tuple_constructor env constr ty_args
-        ~loc:sexp.pexp_loc ~types
-        ~containing_type:ty_res ~why:Constructor_arg_assignment
+      representation_for_tuple_constructor env constr ~loc:sexp.pexp_loc
+        ~types ~why:Constructor_arg_assignment
     with
     | Ok (shape, sorts) -> shape, sorts
     | Error (Unrepresentable_arg (loc, ty, err)) ->
@@ -13067,6 +13061,14 @@ let report_error ~loc env =
         "Use of %a with mixed record fields (here %a) is forbidden."
         Style.inline_code "[%atomic.loc]"
         quoted_longident lid
+  | Undetermined_record_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a with fields of records@ whose representation is not yet@ \
+         determined (here %a) is forbidden,@ as the representation may be@ \
+         mixed.@ @{<hint>Hint@}: annotate the record's type to determine@ \
+         its representation."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
@@ -13412,20 +13414,6 @@ let report_error ~loc env =
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
-  | Indeterminate_record_layout (ty,field_name) ->
-      Location.errorf ~loc
-        "@[Cannot access record with unrepresentable field.@]@ \
-         The record has type %a,@ whose field %s is not representable."
-        Printtyp.type_expr ty
-        field_name
-  | Indeterminate_constructor_layout (ty,cstr_name,i) ->
-      Location.errorf ~loc
-        "@[Cannot access variant with unrepresentable argument.@] \
-         The variant has type %a,@ whose constructor %s@ has an \
-         unrepresentable argument at index %d."
-        Printtyp.type_expr ty
-        cstr_name
-        i
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
