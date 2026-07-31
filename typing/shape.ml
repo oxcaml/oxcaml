@@ -113,7 +113,7 @@ module Rec_var_ident = struct
      shapes are marshalled into .cms files and mixed with locally created
      shapes when imported. The compilation unit avoids identifier collisions. *)
   type t =
-    { comp_unit : Compilation_unit.t option;
+    { comp_unit : string;
       id : int
     }
 
@@ -122,29 +122,28 @@ module Rec_var_ident = struct
   let reinit () = counter := 0
 
   let mk_fresh () =
-    let comp_unit = Compilation_unit.get_current () in
+    let comp_unit =
+      match Compilation_unit.get_current () with
+      | None -> ""
+      | Some cu -> Compilation_unit.full_path_as_string cu
+    in
     let n = !counter in
     incr counter;
     { comp_unit; id = n }
 
   let equal t1 t2 =
-    Int.equal t1.id t2.id
-    && Option.equal Compilation_unit.equal t1.comp_unit t2.comp_unit
+    Int.equal t1.id t2.id && String.equal t1.comp_unit t2.comp_unit
 
   let compare t1 t2 =
     let c = Int.compare t1.id t2.id in
-    if c <> 0 then c
-    else Option.compare Compilation_unit.compare t1.comp_unit t2.comp_unit
+    if c <> 0 then c else String.compare t1.comp_unit t2.comp_unit
 
-  let hash { comp_unit; id } =
-    Hashtbl.hash (Option.map Compilation_unit.hash comp_unit, id)
+  let hash { comp_unit; id } = Hashtbl.hash (comp_unit, id)
 
   let print fmt { comp_unit; id } =
     match comp_unit with
-    | None -> Format.fprintf fmt "rv%d" id
-    | Some cu ->
-      Format.fprintf fmt "rv%s.%d"
-        (Compilation_unit.full_path_as_string cu) id
+    | "" -> Format.fprintf fmt "rv%d" id
+    | comp_unit -> Format.fprintf fmt "rv%s.%d" comp_unit id
 end
 
 module Rec_var_env = Map.Make (Rec_var_ident)

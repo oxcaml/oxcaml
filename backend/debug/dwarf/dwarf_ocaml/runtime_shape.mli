@@ -32,8 +32,8 @@ module Sort = Jkind_types.Sort
 module DeBruijn_index : sig
   type t
 
-  (** Initial index, pick [0] for the top-level index. Cannot be negative. *)
-  val create : int -> t
+  (** The top-level index. *)
+  val zero : t
 
   val move_under_binder : t -> t
 

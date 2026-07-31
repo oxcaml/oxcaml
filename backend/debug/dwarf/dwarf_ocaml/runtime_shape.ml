@@ -35,10 +35,7 @@ module Layout = Sort.Const
 module DeBruijn_index = struct
   type t = int
 
-  let create n =
-    if n < 0
-    then Misc.fatal_errorf "DeBruijn_index.create: negative index %d" n
-    else n
+  let zero = 0
 
   let move_under_binder n = n + 1
 

@@ -403,7 +403,7 @@ end = struct
     t
     |> S.Rec_var_env.map (fun (idx, ly) ->
         RS.DeBruijn_index.move_under_binder idx, ly)
-    |> S.Rec_var_env.add rv (RS.DeBruijn_index.create 0, layout)
+    |> S.Rec_var_env.add rv (RS.DeBruijn_index.zero, layout)
 
   module Lookup = struct
     type t =
