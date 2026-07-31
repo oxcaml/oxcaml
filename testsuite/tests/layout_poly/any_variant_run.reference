@@ -1,0 +1,15 @@
+map_or value: 5
+map_or value none: 42
+map_or float64: 3.25
+map_or product: 5 five
+record value: str 7
+record float64: 2.50 7
+record product: 1 2.0 7
+with_n float64: 1.25 100
+with_n value: s 100
+set_payload float64: 6.75 9
+set_payload value: bee 3
+atomic float64: 6 2.50
+atomic value: 9 x
+ir float64: 9.50 21
+ir value: inl
