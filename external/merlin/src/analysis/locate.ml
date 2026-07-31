@@ -1156,8 +1156,7 @@ let from_string ~config ~env ~local_defs ~pos ?let_pun_behavior
 let doc_from_uid ~config ~loc (uid : Shape.Uid.t) =
   let rec get_comp_unit uid =
     match (uid : Shape.Uid.t) with
-    | Item { comp_unit; _ }
-    | Compilation_unit comp_unit -> Some comp_unit
+    | Item { comp_unit; _ } | Compilation_unit comp_unit -> Some comp_unit
     | Unboxed_version uid -> get_comp_unit uid
     | Internal | Predef _ -> None
   in
