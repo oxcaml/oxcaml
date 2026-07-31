@@ -35,12 +35,37 @@ module UnboxedSingleton = struct
   type inner = { y: int }
   type outer = { mutable x: inner# [@atomic] }
 
+  let print_inner ppf (i : inner#) = Printf.fprintf ppf "#{y = %d}" i.#y
+
   let () =
     Printf.printf "== idx_atomic with unboxed singleton ==\n";
     let t = { x = #{ y = 1 } } in
-    Printf.printf "(.x.#y) = %d\n" (Idx_atomic.get t (.x.#y));
-    Printf.printf "(.x.#y) <- 2\n"; Idx_atomic.set t (.x.#y) 2;
-    Printf.printf "(.x.#y) = %d\n" (Idx_atomic.get t (.x.#y));
+    let fst = (.x) in
+    let snd = (.x.#y) in
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.x.#y) = %d\n" (Idx_atomic.get t snd);
+    Printf.printf "(.x) <- #{y = 2}\n"; Idx_atomic.set t fst #{y = 2};
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.x.#y) = %d\n" (Idx_atomic.get t snd);
+    Printf.printf "(.x.#y) <- 3\n"; Idx_atomic.set t snd 3;
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.x.#y) = %d\n" (Idx_atomic.get t snd);
+    ()
+
+  (* test deepening idx_atomic *)
+  let () =
+    Printf.printf "== deepening idx_atomic with unboxed singleton ==\n";
+    let t = { x = #{ y = 1 } } in
+    let fst = (.x) in
+    let snd = (.idx_atomic(fst).#y) in
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Idx_atomic.get t snd);
+    Printf.printf "(.x) <- #{y = 2}\n"; Idx_atomic.set t fst #{y = 2};
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Idx_atomic.get t snd);
+    Printf.printf "(.idx_atomic((.x)).#y) <- 3\n"; Idx_atomic.set t snd 3;
+    Printf.printf "(.x) = %a\n" print_inner (Idx_atomic.get t fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Idx_atomic.get t snd);
     ()
 end
 

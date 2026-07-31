@@ -7852,14 +7852,15 @@ and type_expect_
     let mut =
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ }, _)
-      | Baccess_block (Immutable, _) ->
+      | Baccess_block (Immutable_access, _) ->
         Immutable
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
-      | Baccess_block (Mutable, _) ->
+      | Baccess_block (Mutable_access, _) ->
         Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic }
       | Baccess_field
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _)
+      | Baccess_block (Atomic_access, _) ->
         Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic }
     in
     let (el_ty, modality), uas =
@@ -8939,13 +8940,18 @@ and type_block_access env expected_base_ty principal
     in
     let idx_type_expected =
       match mut with
-      | Immutable -> Predef.type_idx_imm base_ty el_ty
-      | Mutable -> Predef.type_idx_mut base_ty el_ty
+      | Immutable_access -> Predef.type_idx_imm base_ty el_ty
+      | Mutable_access -> Predef.type_idx_mut base_ty el_ty
+      | Atomic_access -> Predef.type_idx_atomic base_ty el_ty
     in
     let idx =
       type_expect env mode_legacy idx (mk_expected idx_type_expected) in
     let ba = Baccess_block (mut, idx) in
-    let mut = match mut with Immutable -> false | Mutable -> true in
+    let mut =
+      match mut with
+      | Immutable_access -> false
+      | Mutable_access | Atomic_access -> true
+    in
     let modality = Typemode.idx_expected_modalities ~mut in
     { ba; base_ty; el_ty; modality }
 

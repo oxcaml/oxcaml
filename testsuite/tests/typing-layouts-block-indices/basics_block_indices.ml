@@ -515,9 +515,87 @@ val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
+let idx_atomic x = (.idx_atomic(x))
 [%%expect{|
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+val idx_atomic : ('a, 'b) idx_atomic -> ('a, 'b) idx_atomic = <fun>
+|}]
+
+(* Invalid index deepening *)
+
+type t = { imm: int; mutable mut: int; mutable atomic: int [@atomic]}
+[%%expect{|
+type t = { imm : int; mutable mut : int; mutable atomic : int [@atomic]; }
+|}]
+
+let validImm = (.idx_imm((.imm)))
+[%%expect{|
+val validImm : (t, int) idx_imm = <abstr>
+|}]
+
+let invalidImm1 = (.idx_mut((.imm)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidImm1 = (.idx_mut((.imm)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let invalidImm2 = (.idx_atomic((.imm)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidImm2 = (.idx_atomic((.imm)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidMut1 = (.idx_imm((.mut)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidMut1 = (.idx_imm((.mut)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let validMut = (.idx_mut((.mut)))
+[%%expect{|
+val validMut : (t, int) idx_mut = <abstr>
+|}]
+
+let invalidMut2 = (.idx_atomic((.mut)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidMut2 = (.idx_atomic((.mut)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidAtomic1 = (.idx_imm((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic1 = (.idx_imm((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let invalidAtomic2 = (.idx_mut((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic2 = (.idx_mut((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let validAtomic = (.idx_atomic((.atomic)))
+[%%expect{|
+val validAtomic : (t, int) idx_atomic = <abstr>
 |}]
 
 (*****************************************)
@@ -574,6 +652,13 @@ let unbox_idx_atomic = (.x.#y)
 type inner = { y : int; }
 type outer = { mutable x : inner# [@atomic]; }
 val unbox_idx_atomic : (outer, int) idx_atomic = <abstr>
+|}]
+
+let fst = (.x)
+let snd = (.idx_atomic(fst).#y)
+[%%expect{|
+val fst : (outer, inner#) idx_atomic = <abstr>
+val snd : (outer, int) idx_atomic = <abstr>
 |}]
 
 (* Block indices to mixed record *)
