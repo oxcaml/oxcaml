@@ -100,11 +100,20 @@ type unrepresentable_constructor =
   | Unrepresentable_argument_field of string
 
 (* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any]. *)
+   declaration time was [None] because it has an argument of kind [any].
+   Without [default_to_scannable], unfilled sort variables are treated as
+   unrepresentable, resulting in an [Error] *)
 val update_constructor_representation:
     Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
     loc:Location.t -> is_extension_constructor:bool ->
+    default_to_scannable:bool ->
     (Types.constructor_representation, unrepresentable_constructor) Result.t
+
+val update_constructor_representation_or_variable:
+    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
+    loc:Location.t ->
+    sorts_and_types:(Jkind.sort * type_expr) array ->
+    Types.constructor_representation
 
 (* Same as above, but also computes sorts of arguments *)
 val update_constructor_representation_and_arg_sorts :
@@ -118,12 +127,23 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 (* Update the representation of a record whose representation at declaration
-   time was variable because it has a field of kind [any] *)
+   time was undetermined because it has a field of kind [any] *)
 val update_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.sort list * 'rep, unrepresentable_record) Result.t
+    Jkind.sort list * 'rep
+
+(* Finalize variable (inlined) record representations, defaulting any unfilled
+   sorts. *)
+val finalize_record_representation:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation
+
+(* As [finalize_record_representation], for [Constructor_variable]. *)
+val finalize_constructor_representation:
+    Env.t -> Location.t -> Types.constructor_representation ->
+    Types.constructor_representation
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option

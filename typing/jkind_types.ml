@@ -828,6 +828,15 @@ module Sort = struct
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
 
+  let rec to_const_opt : t -> Const.t option = function
+    | Base b -> Some (Static.Const.of_base b)
+    | Product ts ->
+      Misc.Stdlib.List.map_option to_const_opt ts
+      |> Option.map (fun cs : Const.t -> Const.Product cs)
+    | Univar uv -> Some (Univar uv)
+    | Var r -> (
+      match r.contents with None -> None | Some s -> to_const_opt s)
+
   let is_scannable_or_var s =
     match get s with Base Scannable | Var _ -> true | _ -> false
 

@@ -269,6 +269,8 @@ let record_representation i ppf = let open Types in function
       (if flatten_floats then " [@@flatten_floats]" else "")
   | Record_undetermined ->
     line i ppf "Record_undetermined\n"
+  | Record_variable _ ->
+    line i ppf "Record_variable\n"
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->

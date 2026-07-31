@@ -1106,6 +1106,10 @@ module Record_diffing = struct
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
             "compare_with_representation: dummy record representation"
+        | Record_variable _, _
+        | _, Record_variable _ ->
+          Misc.fatal_error
+            "compare_with_representation: typechecked record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with

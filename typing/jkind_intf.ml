@@ -238,6 +238,9 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
+  (** Return a [Const.t] if the sort has no unset variables, or [None] *)
+  val to_const_opt : t -> Const.t option
+
   (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
   val var_default_to_scannable_and_get : var -> Const.t
 

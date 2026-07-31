@@ -2115,6 +2115,10 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
+      let shape =
+        Typedecl.finalize_constructor_representation head.pat_env
+          head.pat_loc shape
+      in
       let arg_sorts =
         List.map Jkind.Sort.default_for_transl_and_get arg_sorts
       in
@@ -2155,7 +2159,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
-    | Constructor_undetermined ->
+    | (Constructor_undetermined | Constructor_variable _) ->
       fatal_error "Matching.get_exr_args_constr: variable representation"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
@@ -2176,7 +2180,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
-        | Constructor_undetermined ->
+        | (Constructor_undetermined | Constructor_variable _) ->
             fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
@@ -2572,6 +2576,10 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
     | _ ->
         assert false
   in
+  let lbl_repres =
+    Typedecl.finalize_record_representation head.pat_env head.pat_loc
+      lbl_repres
+  in
   let rec make_args pos =
     if pos >= Array.length all_labels then
       rem
@@ -2628,8 +2636,10 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
-        | Record_inlined (_, Constructor_undetermined, _)
-        | Record_undetermined ->
+        | Record_inlined
+            (_, (Constructor_undetermined
+                | Constructor_variable _), _)
+        | Record_undetermined | Record_variable _ ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =
