@@ -57,19 +57,18 @@ mul_3:
 let div x y = Int64_u.div x y
 [%%expect_asm X86_64{|
 div:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
   je    .L1
   cmpq  $-1, %rcx
   je    .L0
-  movq  %rdi, %rax
   cqto
   idivq %rcx
   ret
 .L0:
-  xorl  %eax, %eax
-  subq  %rdi, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 .L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -231,11 +230,11 @@ unsigned_rem_7:
   movabsq $2635249153387078803, %rdi
   movq  %rbx, %rax
   mulq  %rdi
-  movq  %rdx, %rax
-  movq  %rbx, %rdi
-  subq  %rax, %rdi
-  shrq  $1, %rdi
-  addq  %rdx, %rdi
+  movq  %rdx, %rdi
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  shrq  $1, %rax
+  leaq  (%rax,%rdx), %rdi
   shrq  $2, %rdi
   imulq $7, %rdi
   movq  %rbx, %rax
@@ -287,14 +286,13 @@ pred:
 let abs x = Int64_u.abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $0, %rbx
+  cmpq  $0, %rax
   jl    .L0
-  movq  %rbx, %rax
   ret
 .L0:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  xorl  %ebx, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -527,24 +525,24 @@ float_of_bits:
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
 let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
+  movabsq $-9223372036854775808, %rdi
+  subq  %rdi, %rbx
+  movabsq $-9223372036854775808, %rsi
   movq  %rax, %rdi
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rbx
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
+  subq  %rsi, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -568,13 +566,13 @@ equal:
 let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   cmpq  $1, %rax
   sete  %al
   movzbq %al, %rax
@@ -586,13 +584,11 @@ equal_using_compare:
 let min x y = Int64_u.min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -600,13 +596,11 @@ min:
 let max x y = Int64_u.max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jl    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 

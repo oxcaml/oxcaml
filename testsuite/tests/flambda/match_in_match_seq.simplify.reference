@@ -17,10 +17,10 @@ let code loopify(never) size(35) newer_version_of(foo_12)
                 let prim_1 = %int_comp.gt (s_1, 5) in
                 switch prim_1
                   | 0 -> self_1 (int_add)
-                  | 1 -> k2 (int_add, s_1))
-         where k2 (int_add, s_1) =
-           let int_add_1 = int_add in
+                  | 1 -> k2 (s_1, int_add))
+         where k2 (s_1, int_add) =
            let s_2 = s_1 in
+           let int_add_1 = int_add in
            let int_mul = %int_barith.mul (s_2, s_2) in
            let int_add_2 = %int_barith.add (acc, int_mul) in
            cont `self` (int_add_2, int_add_1))
