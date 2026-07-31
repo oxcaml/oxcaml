@@ -799,9 +799,7 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
                  | Void | Product _ ->
                    Dereference)
-            | Constructor_undetermined ->
-                Misc.fatal_error
-                  "value_rec_check: variable constructor representation")
+            | Constructor_undetermined | Constructor_variable _ -> Dereference)
       in
       let arg i (_sort, e) = expression e << arg_mode i in
       join [
@@ -833,9 +831,11 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
           | Record_inlined (_, Constructor_undetermined, _)
-          | Record_undetermined ->
-            Misc.fatal_error
-              "value_rec_check: unexpected unknown representation"
+          | Record_inlined (_, Constructor_variable _, _)
+          | Record_undetermined | Record_variable _ ->
+            (* The representation is not determined yet, so be
+               conservative. *)
+            Dereference
         in
         let field ((label : Data_types.label_description), _sort, field_def) =
           let env =
@@ -852,7 +852,8 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
       begin match rep with
-      | Record_unboxed_product ->
+      | Record_unboxed_product
+      | Record_unboxed_product_variable ->
         let field (_, _, field_def) =
           let env =
             match field_def with
@@ -865,9 +866,6 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
-      | Record_unboxed_product_variable ->
-        Misc.fatal_error
-          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
