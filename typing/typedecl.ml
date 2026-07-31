@@ -2286,7 +2286,7 @@ let compute_repr_summary env lbls jkinds =
    computes updated labels, updated rep, and updated jkind *)
 let compute_record_kind (type rep) env loc (form : rep record_form)
       lbls (rep : rep) ~warn :
-    _ * (rep, _) Result.t * _ =
+    _ * rep * _ =
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Record_unboxed ->
     let jkind =
@@ -2303,7 +2303,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
          since it's not actually needed in order to produce code (the
          in-memory representation is always exactly the underlying value). *)
       if Option.is_none sort then assert_any_args_support loc;
-      Ok Record_unboxed
+      Record_unboxed
     in
     [ld_sort], rep, jkind
   | Legacy, _, Record_dummy _
@@ -2366,6 +2366,15 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         (match first_any with
         | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
         | None -> Ok Record_unboxed_product)
+    in
+    let rep : rep =
+      match rep with
+      | Ok rep -> rep
+      | Error (Unrepresentable_field _) ->
+        assert_any_args_support loc;
+        (match form with
+         | Legacy -> Record_undetermined
+         | Unboxed_product -> Record_unboxed_product_variable)
     in
     sorts, rep, jkind
   | Legacy, _,
@@ -2659,13 +2668,6 @@ let rec update_decl_jkind env dpath decl =
       let lbls =
         List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
       in
-      let rep =
-        match rep with
-        | Ok rep -> rep
-        | Error _ ->
-          assert_any_args_support decl.type_loc;
-          Record_undetermined
-      in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
       let type_jkind = Jkind.mark_best type_jkind in
@@ -2691,13 +2693,6 @@ let rec update_decl_jkind env dpath decl =
         in
         let lbls =
           List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
-        in
-        let rep =
-          match rep with
-          | Ok rep -> rep
-          | Error _ ->
-            assert_any_args_support decl.type_loc;
-            Record_unboxed_product_variable
         in
         (* See Note [Quality of jkinds during inference] for more information
            about when we mark jkinds as best *)
