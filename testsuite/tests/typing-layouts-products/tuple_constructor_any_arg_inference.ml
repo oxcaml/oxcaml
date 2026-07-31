@@ -1,10 +1,20 @@
 (* TEST
- flags = "-extension layouts_beta";
+ reference =
+   "${test_source_directory}/tuple_constructor_any_arg_inference.reference";
  flambda2;
- compile_only = "true";
- ocamlopt_opt_exit_status = "2";
- setup-ocamlopt.opt-build-env;
- ocamlopt.opt;
+ {
+   flags = "-extension layouts_beta";
+   native;
+ }{
+   flags = "-extension layouts_beta -Oclassic";
+   native;
+ }{
+   flags = "-extension layouts_beta -O3";
+   native;
+ }{
+   flags = "-extension layouts_beta";
+   bytecode;
+ }
 *)
 
 (* A variable-representation variant used in functions that don't constrain the
