@@ -361,8 +361,8 @@ and flatten_product_layout_exn (cs : t) =
     index relative to the current position (maintained by [add_binder]) and the
     layout at which its binder was entered.
 
-    Environments are hash-consed (deduplicated in a [table]) so that they can
-    be used as part of [Shape_cache] keys with O(1) equality and hashing. *)
+    Environments are hash-consed (deduplicated in a [table]) so that they can be
+    used as part of [Shape_cache] keys with O(1) equality and hashing. *)
 module Rec_binder_env : sig
   type t
 

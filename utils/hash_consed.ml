@@ -88,7 +88,9 @@ module Dedup (H : Hashtbl.HashedType) () = struct
 
   let hash e = e.hash
 
-  let equal e1 e2 = Int.equal e1.hash e2.hash && e1.value == e2.value
+  (* Interning returns one canonical element per equivalence class, so physical
+     equality suffices for elements interned in the same table. *)
+  let equal e1 e2 = e1 == e2
 
   let canonical table value = (create table value).value
 

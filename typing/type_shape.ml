@@ -832,6 +832,14 @@ module Eval_env = struct
   (* The substitution maps are deduplicated individually (rather than as one
    bundle) to avoid combinatorial blowup when one map changes and the others
    stay the same. *)
+  (* CR-someday sspies: Each extension of an environment re-hashes the whole
+     map when interning it, making a chain of [n] extensions O(n^2). If this
+     shows up in profiles, cache a commutative (multiset) hash alongside each
+     map, i.e. the sum of the per-binding hashes, and update it incrementally
+     on extension. The same applies to [Rec_binder_env.add_binder] in
+     [Complex_shape], where fixing it additionally requires switching the
+     environment to absolute binder depths to avoid the De Bruijn shift
+     rewriting the entire map. *)
   type t =
     { type_var_env : Type_var_env.t;
       mutrec_env : Mutrec_env.t;

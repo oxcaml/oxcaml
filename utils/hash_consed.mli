@@ -32,9 +32,16 @@
 
     This module enables hash-consing via the [Dedup] functor. An application of
     [Dedup] yields an abstract element type [t] and an abstract type [table].
-    These help to avoid mixing values that are memoized in different tables,
-    which would break the invariant that structural equality of two values
-    implies physical equality of the deduplicated version. *)
+    Since the functor is generative, elements of distinct applications cannot be
+    mixed up.
+
+    Note, however, that a single application can be used to create several
+    tables, and the types do not prevent mixing elements interned in different
+    tables of the same application. Doing so breaks the invariant that
+    structural equality of the underlying values implies physical equality of
+    the interned elements: [equal] can spuriously return [false] for such
+    elements. All elements that are compared with each other (e.g. as parts of
+    keys in the same cache) must therefore be interned in the same table. *)
 
 module type S = sig
   (** The underlying element type. *)
@@ -60,8 +67,10 @@ module type S = sig
   (** [hash e] returns the precomputed hash of [e]. O(1). *)
   val hash : t -> int
 
-  (** [equal e1 e2] returns [true] iff [e1] and [e2] are the same hash-consed
-      element. This is O(1) because it uses physical equality on the values. *)
+  (** [equal e1 e2] is physical equality of the hash-consed elements. This is
+      O(1) and coincides with structural equality of the underlying values,
+      provided [e1] and [e2] were interned in the same table (see the module
+      comment above). *)
   val equal : t -> t -> bool
 
   (** [canonical table v] is the canonical, shared representative of [v]. *)
