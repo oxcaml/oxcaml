@@ -86,7 +86,6 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
 
    But we've decided to punt on this issue in the short term.
 *)
-(* CR ageorges: is mode polymorphism erasable? *)
 let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts | Layout_poly | Mode_polymorphism
   | Mode_polymorphism_printing ->

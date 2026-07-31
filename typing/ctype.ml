@@ -980,7 +980,6 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
-(* CR ageorges: lower the level of mode variables as well? *)
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
