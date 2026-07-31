@@ -2389,9 +2389,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
        appear here when updating later for dealing with [any]. Since none of
        these cases can have an [any], we don't need to do anything further. *)
     Misc.fatal_error
-      "Typedecl.update_record_kind: unexpected record representation"
+      "Typedecl.compute_record_kind: unexpected record representation"
 
-let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
+let update_inlined_record_representation env loc lbls jkinds tag vrep
+      : _ Result.t =
   match vrep with
   | Variant_unboxed ->
     (* The shape of an unboxed constructor is always
@@ -2410,59 +2411,20 @@ let update_record_inlined_kind env loc lbls jkinds tag vrep : _ Result.t =
       Error (Unrepresentable_field name)
     | Error (Unrepresentable_argument _) ->
       Misc.fatal_error
-        "Typedecl.update_record_kind: unexpected tuple constructor error"
+        "Typedecl.update_inlined_record_representation: unexpected tuple \
+         constructor error"
     end
   | Variant_extensible | Variant_with_null ->
     (* Extension constructors always have a known shape, and
        [Variant_with_null] cannot have an inlined record argument. *)
     Misc.fatal_error
-      "Typedecl.update_record_kind: unexpected variant representation"
+      "Typedecl.update_inlined_record_representation: unexpected variant \
+       representation"
 
 (* Given a record with a variable representation, but updated labels, compute
    the updated representation *)
-let update_record_kind (type rep) env loc (form : rep record_form)
-      ~(old_repres : rep) lbls ~warn :
-    (rep, _) Result.t =
-  let types = List.map snd lbls in
-  let _sorts, jkinds = update_label_sorts env loc types ~form in
-  let reprs, repr_summary = compute_repr_summary env lbls jkinds in
-  let rep : (rep, _) Result.t =
-    match form, old_repres with
-    | Legacy, Record_undetermined ->
-      (* CR layouts: improve the readability of this match *)
-      let { values; floats; atomic_floats; float64s;
-              non_float64_unboxed_fields; atomic_fields; voids;
-              first_any } = repr_summary
-      in
-      let rep =
-        compute_record_repr loc reprs lbls
-          ~represent_as_float_array:false ~flatten_floats:false ~warn
-          ~refining_block_with_any:true ~values ~floats ~atomic_floats ~float64s
-          ~non_float64_unboxed_fields ~atomic_fields ~voids ~first_any
-      in
-      begin match rep with
-      | Ok (Record_boxed | Record_mixed _) -> ()
-      | Ok _ ->
-        Misc.fatal_error "none became something other than mixed"
-      | Error _ -> ()
-      end;
-      rep
-    | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
-      update_record_inlined_kind env loc lbls jkinds tag vrep
-    | Unboxed_product, _ ->
-      (match repr_summary.first_any with
-      | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
-      | None -> Ok Record_unboxed_product)
-    | Legacy,
-      (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-      | Record_ufloat | Record_mixed _ | Record_dummy _) ->
-        Misc.fatal_error
-          "Typedecl.update_record_kind: representation already determined"
-  in
-  rep
-
 let update_record_representation
-      (type rep) ~why ~old_repres
+      (type rep) ~why ~(old_repres : rep)
       env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
     match form with
@@ -2489,8 +2451,46 @@ let update_record_representation
        layout/mode polymorphism introducing concerns about principality of
        inferred layouts/modes. *)
     let snap = Btype.snapshot () in
-    let ans =
-      update_record_kind env loc form ~old_repres lbls_and_types ~warn
+    let types = List.map snd lbls_and_types in
+    let _sorts, jkinds = update_label_sorts env loc types ~form in
+    let reprs, repr_summary =
+      compute_repr_summary env lbls_and_types jkinds
+    in
+    let ans : (rep, _) Result.t =
+      match form, old_repres with
+      | Legacy, Record_undetermined ->
+        (* CR layouts: improve the readability of this match *)
+        let { values; floats; atomic_floats; float64s;
+                non_float64_unboxed_fields; atomic_fields; voids;
+                first_any } = repr_summary
+        in
+        let rep =
+          compute_record_repr loc reprs lbls_and_types
+            ~represent_as_float_array:false ~flatten_floats:false ~warn
+            ~refining_block_with_any:true ~values ~floats ~atomic_floats
+            ~float64s ~non_float64_unboxed_fields ~atomic_fields ~voids
+            ~first_any
+        in
+        begin match rep with
+        | Ok (Record_boxed | Record_mixed _) -> ()
+        | Ok _ ->
+          Misc.fatal_error "none became something other than mixed"
+        | Error _ -> ()
+        end;
+        rep
+      | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
+        update_inlined_record_representation env loc lbls_and_types jkinds tag
+          vrep
+      | Unboxed_product, _ ->
+        (match repr_summary.first_any with
+        | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
+        | None -> Ok Record_unboxed_product)
+      | Legacy,
+        (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+        | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+          Misc.fatal_error
+            "Typedecl.update_record_representation: representation already \
+             determined"
     in
     Btype.backtrack snap;
     ans
