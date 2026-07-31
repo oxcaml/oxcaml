@@ -3289,9 +3289,12 @@ let as_interval fail ?(low = min_int) ?(high = max_int) l =
     | None -> as_interval_nofail l
     | Some act -> as_interval_canfail act ~low ~high l )
 
+let skip_lambda_switch_compilation () =
+  !Clflags.skip_lambda_switch_compilation
+
 let call_switcher kind loc fail arg ?low ?high int_lambda_list =
-  match low, high, !Clflags.native_code with
-  | Some 0, Some high, true ->
+  match skip_lambda_switch_compilation (), low, high, !Clflags.native_code with
+  | true, Some 0, Some high, true ->
     let sw : Lambda.lambda_switch =
       { sw_numconsts = high + 1;
         sw_consts = int_lambda_list;
@@ -3301,7 +3304,7 @@ let call_switcher kind loc fail arg ?low ?high int_lambda_list =
       }
     in
     Lswitch (arg, sw, loc, kind)
-  | _, _, _ ->
+  | _, _, _, _ ->
     let edges, (cases, actions) = as_interval fail ?low ?high int_lambda_list in
     Switcher.zyva loc kind edges arg cases actions
 
