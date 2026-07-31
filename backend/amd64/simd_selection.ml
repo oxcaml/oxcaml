@@ -221,11 +221,11 @@ let select_operation_sse ~dbg op args =
     simd_store_sse_or_avx ~mode:Arch.identity_addressing movntps vmovntps_m128_X
       args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss args
+    seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss_X_X_Xm32 args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
-    sse_or_avx maxss vmaxss args
+    sse_or_avx maxss vmaxss_X_X_Xm32 args
   | "caml_simd_float32_min" | "caml_sse_float32_min" ->
-    sse_or_avx minss vminss args
+    sse_or_avx minss vminss_X_X_Xm32 args
   | "caml_simd_cast_float32_int64" | "caml_sse_cast_float32_int64" ->
     sse_or_avx cvtss2si_r64_Xm32 vcvtss2si_r64_Xm32 args
   | "caml_sse_float32x4_cmp" ->
@@ -244,8 +244,10 @@ let select_operation_sse ~dbg op args =
   | "caml_sse_float32x4_rcp" -> sse_or_avx rcpps vrcpps_X_Xm128 args
   | "caml_sse_float32x4_rsqrt" -> sse_or_avx rsqrtps vrsqrtps_X_Xm128 args
   | "caml_sse_float32x4_sqrt" -> sse_or_avx sqrtps vsqrtps_X_Xm128 args
-  | "caml_sse_vec128_high_64_to_low_64" -> sse_or_avx movhlps vmovhlps args
-  | "caml_sse_vec128_low_64_to_high_64" -> sse_or_avx movlhps vmovlhps args
+  | "caml_sse_vec128_high_64_to_low_64" ->
+    sse_or_avx movhlps vmovhlps_X_X_X args
+  | "caml_sse_vec128_low_64_to_high_64" ->
+    sse_or_avx movlhps vmovlhps_X_X_X args
   | "caml_sse_vec128_interleave_high_32" ->
     sse_or_avx unpckhps vunpckhps_X_X_Xm128 args
   | "caml_simd_vec128_interleave_low_32" | "caml_sse_vec128_interleave_low_32"
@@ -291,11 +293,11 @@ let select_operation_sse2 ~dbg op args =
     (* Does not have a mode; base address is always in rdi. *)
     sse_or_avx maskmovdqu vmaskmovdqu args
   | "caml_sse2_float64_sqrt" | "sqrt" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd args
+    seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd_X_X_Xm64 args
   | "caml_simd_float64_max" | "caml_sse2_float64_max" ->
-    sse_or_avx maxsd vmaxsd args
+    sse_or_avx maxsd vmaxsd_X_X_Xm64 args
   | "caml_simd_float64_min" | "caml_sse2_float64_min" ->
-    sse_or_avx minsd vminsd args
+    sse_or_avx minsd vminsd_X_X_Xm64 args
   | "caml_simd_cast_float64_int64" | "caml_sse2_cast_float64_int64" ->
     sse_or_avx cvtsd2si_r64_Xm64 vcvtsd2si_r64_Xm64 args
   | "caml_sse2_float64x2_sqrt" -> sse_or_avx sqrtpd vsqrtpd_X_Xm128 args
@@ -569,28 +571,28 @@ let select_operation_sse41 ~dbg op args =
       sse_or_avx dppd vdppd ~i args
     | "caml_sse41_int8x16_extract" ->
       let i, args = extract_constant args ~max:15 op in
-      sse_or_avx pextrb vpextrb ~i args
+      sse_or_avx pextrb vpextrb_r64m8_X ~i args
     | "caml_sse41_int16x8_extract" ->
       let i, args = extract_constant args ~max:7 op in
       sse_or_avx pextrw_r64m16_X vpextrw_r64m16_X ~i args
     | "caml_sse41_int32x4_extract" ->
       let i, args = extract_constant args ~max:3 op in
-      sse_or_avx pextrd vpextrd ~i args
+      sse_or_avx pextrd vpextrd_r32m32_X ~i args
     | "caml_sse41_int64x2_extract" ->
       let i, args = extract_constant args ~max:1 op in
-      sse_or_avx pextrq vpextrq ~i args
+      sse_or_avx pextrq vpextrq_r64m64_X ~i args
     | "caml_sse41_int8x16_insert" ->
       let i, args = extract_constant args ~max:15 op in
-      sse_or_avx pinsrb vpinsrb ~i args
+      sse_or_avx pinsrb vpinsrb_X_X_r32m8 ~i args
     | "caml_sse41_int16x8_insert" ->
       let i, args = extract_constant args ~max:7 op in
-      sse_or_avx pinsrw_X_r32m16 vpinsrw ~i args
+      sse_or_avx pinsrw_X_r32m16 vpinsrw_X_X_r32m16 ~i args
     | "caml_sse41_int32x4_insert" ->
       let i, args = extract_constant args ~max:3 op in
-      sse_or_avx pinsrd vpinsrd ~i args
+      sse_or_avx pinsrd vpinsrd_X_X_r32m32 ~i args
     | "caml_sse41_int64x2_insert" ->
       let i, args = extract_constant args ~max:1 op in
-      sse_or_avx pinsrq vpinsrq ~i args
+      sse_or_avx pinsrq vpinsrq_X_X_r64m64 ~i args
     | "caml_sse41_float32x4_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
@@ -993,8 +995,8 @@ let select_operation_avx2 ~dbg:_ op args =
       instr vpackusdw_Y_Y_Ym256 args
     | "caml_avx2_vec256_permute_64" ->
       let i, args = extract_constant args ~max:255 op in
-      instr vpermpd ~i args
-    | "caml_avx2_vec256_permutev_32" -> instr vpermps args
+      instr vpermpd_Y_Ym256 ~i args
+    | "caml_avx2_vec256_permutev_32" -> instr vpermps_Y_Y_Ym256 args
     | "caml_avx2_int8x32_sad_unsigned" -> instr vpsadbw_Y_Y_Ym256 args
     | "caml_avx2_vec128x2_shuffle_8" -> instr vpshufb_Y_Y_Ym256 args
     | "caml_avx2_vec128x2_shuffle_high_16" ->
@@ -1088,8 +1090,8 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float64x4_mul_add" -> instr vfmadd213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_mul_add" -> instr vfmadd213ps_X_X_Xm128 args
     | "caml_fma_float32x8_mul_add" -> instr vfmadd213ps_Y_Y_Ym256 args
-    | "caml_fma_float64_mul_add" -> instr vfmadd213sd args
-    | "caml_fma_float32_mul_add" -> instr vfmadd213ss args
+    | "caml_fma_float64_mul_add" -> instr vfmadd213sd_X_X_Xm64 args
+    | "caml_fma_float32_mul_add" -> instr vfmadd213ss_X_X_Xm32 args
     | "caml_fma_float64x2_mul_addsub" -> instr vfmaddsub213pd_X_X_Xm128 args
     | "caml_fma_float64x4_mul_addsub" -> instr vfmaddsub213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_mul_addsub" -> instr vfmaddsub213ps_X_X_Xm128 args
@@ -1098,8 +1100,8 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float64x4_mul_sub" -> instr vfmsub213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_mul_sub" -> instr vfmsub213ps_X_X_Xm128 args
     | "caml_fma_float32x8_mul_sub" -> instr vfmsub213ps_Y_Y_Ym256 args
-    | "caml_fma_float64_mul_sub" -> instr vfmsub213sd args
-    | "caml_fma_float32_mul_sub" -> instr vfmsub213ss args
+    | "caml_fma_float64_mul_sub" -> instr vfmsub213sd_X_X_Xm64 args
+    | "caml_fma_float32_mul_sub" -> instr vfmsub213ss_X_X_Xm32 args
     | "caml_fma_float64x2_mul_subadd" -> instr vfmsubadd213pd_X_X_Xm128 args
     | "caml_fma_float64x4_mul_subadd" -> instr vfmsubadd213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_mul_subadd" -> instr vfmsubadd213ps_X_X_Xm128 args
@@ -1108,14 +1110,14 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float64x4_neg_mul_add" -> instr vfnmadd213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_neg_mul_add" -> instr vfnmadd213ps_X_X_Xm128 args
     | "caml_fma_float32x8_neg_mul_add" -> instr vfnmadd213ps_Y_Y_Ym256 args
-    | "caml_fma_float64_neg_mul_add" -> instr vfnmadd213sd args
-    | "caml_fma_float32_neg_mul_add" -> instr vfnmadd213ss args
+    | "caml_fma_float64_neg_mul_add" -> instr vfnmadd213sd_X_X_Xm64 args
+    | "caml_fma_float32_neg_mul_add" -> instr vfnmadd213ss_X_X_Xm32 args
     | "caml_fma_float64x2_neg_mul_sub" -> instr vfnmsub213pd_X_X_Xm128 args
     | "caml_fma_float64x4_neg_mul_sub" -> instr vfnmsub213pd_Y_Y_Ym256 args
     | "caml_fma_float32x4_neg_mul_sub" -> instr vfnmsub213ps_X_X_Xm128 args
     | "caml_fma_float32x8_neg_mul_sub" -> instr vfnmsub213ps_Y_Y_Ym256 args
-    | "caml_fma_float64_neg_mul_sub" -> instr vfnmsub213sd args
-    | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss args
+    | "caml_fma_float64_neg_mul_sub" -> instr vfnmsub213sd_X_X_Xm64 args
+    | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
 let select_operation_cfg ~dbg op args =
