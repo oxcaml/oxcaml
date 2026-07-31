@@ -415,6 +415,16 @@ and eval_prim env prim =
     if new_shape == old_shape
     then prim
     else Psetmixedfield (is, new_shape, init_or_assign)
+  | Patomic_load_mixed_field { index; shape = old_shape } ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Patomic_load_mixed_field { index; shape = new_shape }
+  | Patomic_set_mixed_field { index; shape = old_shape } ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Patomic_set_mixed_field { index; shape = new_shape }
   | Pmake_unboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -497,8 +507,7 @@ and eval_prim env prim =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
-  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
@@ -552,7 +561,9 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape
-  | Psetmixedfield (_, shape, _) ->
+  | Psetmixedfield (_, shape, _)
+  | Patomic_load_mixed_field { shape; index = _ }
+  | Patomic_set_mixed_field { shape; index = _ } ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmake_idx_mixed_field (shape, _, _) ->
     assert_mixed_block_shape_contains_no_splices shape

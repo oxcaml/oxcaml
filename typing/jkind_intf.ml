@@ -74,12 +74,6 @@ module type Sort = sig
 
     val all_void : t -> bool
 
-    (** True if the sort contains no univars or genvars.
-
-        CR layout-polymorphism: This function should be deleted once we support
-        layout-poly any-fields *)
-    val is_concrete : t -> bool
-
     val scannable : t
 
     val void : t
@@ -232,11 +226,11 @@ module type Sort = sig
       variable, it is set to [scannable] first. *)
   val default_to_scannable_and_get : t -> Const.t
 
-  (** Like [default_to_scannable_and_get], but returns [None] if the result is
-      not concrete.
-
-      CR layout-polymorphism: This function should be deleted once we support
-      layout-poly any-fields *)
+  (** Like [default_to_scannable_and_get], but returns [None] if the result
+      contains a univar or genvar. Layout variables cannot be defaulted (each
+      instantiation supplies its own layout), so they have no static constant;
+      in particular, [None] means properties like [all_void] have no static
+      answer. *)
   val get_concrete_defaulting_to_scannable : t -> Const.t option
 
   (* CR layouts v12: Default this to void. *)
