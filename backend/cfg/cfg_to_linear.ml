@@ -407,20 +407,44 @@ let adjust_stack_offset body (block : Cfg.basic_block)
     let delta_bytes = block_stack_offset - prev_stack_offset in
     to_linear_instr (Ladjust_stack_offset { delta_bytes }) ~next:body
 
-let make_Llabel cfg_with_layout label =
+let make_Llabel cfg_with_layout label ~is_loop_header =
   Linear.Llabel
     { label;
       section_name =
         (if !Oxcaml_flags.basic_block_sections
          then CL.get_section cfg_with_layout label
-         else None)
+         else None);
+      is_loop_header
     }
+
+(* A block's label is considered a loop header if some predecessor appears at
+   the same or a later position in the layout, i.e. the label is the target of a
+   backward branch in the emitted order. (This cannot use [Cfg_loop_infos],
+   which requires a reducible CFG; the CFG is allowed to become irreducible
+   before linearization.) *)
+let compute_is_loop_header layout : Cfg.basic_block -> bool =
+  if not !Oxcaml_flags.align_loops
+  then fun _ -> false
+  else
+    let position = Label.Tbl.create (DLL.length layout) in
+    DLL.iteri layout ~f:(fun i label -> Label.Tbl.replace position label i);
+    fun (block : Cfg.basic_block) ->
+      (not block.is_trap_handler)
+      &&
+      let pos = Label.Tbl.find position block.start in
+      Label.Set.exists
+        (fun pred ->
+          match Label.Tbl.find_opt position pred with
+          | None -> false
+          | Some pred_pos -> pred_pos >= pos)
+        block.predecessors
 
 (* CR-someday gyorsh: handle duplicate labels in new layout: print the same
    block more than once. *)
 let run cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
+  let is_loop_header = compute_is_loop_header layout in
   let next = ref Linear_utils.labelled_insn_end in
   let tailrec_label = ref None in
   DLL.iter_right_cell layout ~f:(fun cell ->
@@ -464,7 +488,8 @@ let run cfg_with_layout =
             then
               let instr =
                 to_linear_instr
-                  (make_Llabel cfg_with_layout block.start)
+                  (make_Llabel cfg_with_layout block.start
+                     ~is_loop_header:(is_loop_header block))
                   ~next:body
               in
               { instr with

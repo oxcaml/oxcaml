@@ -448,7 +448,7 @@ let emit_function_or_basic_block_section_name () =
   in
   emit_named_text_section !function_name ~suffix
 
-let emit_Llabel fallthrough lbl section_name =
+let emit_Llabel fallthrough lbl section_name ~is_loop_header =
   (if !Oxcaml_flags.basic_block_sections
    then
      match section_name with
@@ -460,7 +460,15 @@ let emit_Llabel fallthrough lbl section_name =
          emit_function_or_basic_block_section_name ();
          D.cfi_startproc ())
      | None -> ());
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* Aligning loop headers to 16 bytes makes it less likely that a small loop
+     body straddles a 64-byte cache line boundary, which can cost a factor of 2
+     in throughput on some microarchitectures. 16 bytes matches what GCC and
+     Clang emit for -falign-loops. Padding before a fallthrough loop header is
+     executed (as nops) only once per loop entry. *)
+  if is_loop_header && !fastcode_flag
+  then D.align ~fill:Nop ~bytes:16
+  else if (not fallthrough) && !fastcode_flag
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Output a pseudo-register *)
@@ -2564,9 +2572,9 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel { label = lbl; section_name } ->
+  | Llabel { label = lbl; section_name; is_loop_header } ->
     let lbl = label_to_asm_label ~section:Text lbl in
-    emit_Llabel fallthrough lbl section_name
+    emit_Llabel fallthrough lbl section_name ~is_loop_header
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))

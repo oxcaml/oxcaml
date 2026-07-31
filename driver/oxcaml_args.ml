@@ -238,6 +238,14 @@ let mk_reorder_blocks_random f =
       "<seed> Randomly reorder basic blocks in every function, using the \
        provided seed (intended for testing, off by default)." )
 
+let mk_align_loops f =
+  ( "-align-loops",
+    Arg.Unit f,
+    " Align loop headers to a 16-byte boundary (amd64 only)" )
+
+let mk_no_align_loops f =
+  ("-no-align-loops", Arg.Unit f, " Do not align loop headers (default)")
+
 let mk_basic_block_sections f =
   if Config.function_sections then
     ( "-basic-block-sections",
@@ -1341,6 +1349,8 @@ module type Oxcaml_options = sig
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
+  val align_loops : unit -> unit
+  val no_align_loops : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -1532,6 +1542,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
+      mk_align_loops F.align_loops;
+      mk_no_align_loops F.no_align_loops;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
@@ -1888,6 +1900,9 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
+  let align_loops = set' Oxcaml_flags.align_loops
+  let no_align_loops = clear' Oxcaml_flags.align_loops
+
   (* Bundle of experimental codegen optimizations enabled by
      [-experimental-optimizations]. *)
   let experimental_optimizations () =
@@ -1900,7 +1915,8 @@ module Oxcaml_options_impl = struct
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
+    cfg_value_propagation_flow ();
+    align_loops ()
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2483,6 +2499,7 @@ module Extra_params = struct
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
+    | "align-loops" -> set' Oxcaml_flags.align_loops
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
     | "heap-reduction-threshold" ->

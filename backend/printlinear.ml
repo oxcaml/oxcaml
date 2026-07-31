@@ -89,8 +89,9 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
-  | Llabel { label = lbl; section_name } ->
-    fprintf ppf "%a%a:" label lbl section_name_to_string section_name
+  | Llabel { label = lbl; section_name; is_loop_header } ->
+    fprintf ppf "%a%a%s:" label lbl section_name_to_string section_name
+      (if is_loop_header then "[loop header]" else "")
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
     fprintf ppf "if %a goto %a" (test tst) i.arg label lbl

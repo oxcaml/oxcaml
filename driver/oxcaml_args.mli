@@ -69,6 +69,8 @@ module type Oxcaml_options = sig
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
+  val align_loops : unit -> unit
+  val no_align_loops : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
