@@ -357,26 +357,24 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
          argument(s) but the instruction has %d"
         (Array.length arg_weights)
         (Array.length arg_is_folded_reg);
-    if delta < -0x8000_0000 || delta > 0x7FFF_FFFF
+    let multiplier =
+      Misc.Stdlib.Array.fold_lefti
+        (fun i multiplier is_folded_reg ->
+          if is_folded_reg then multiplier + arg_weights.(i) else multiplier)
+        0 arg_is_folded_reg
+    in
+    (* Only fold if the operation actually reads the register: deleting the
+       preceding addition must not shrink the register's live range. *)
+    if multiplier = 0
     then None
     else begin
-      let multiplier =
-        Misc.Stdlib.Array.fold_lefti
-          (fun i multiplier is_folded_reg ->
-            if is_folded_reg then multiplier + arg_weights.(i) else multiplier)
-          0 arg_is_folded_reg
-      in
-      (* Only fold if the operation actually reads the register: deleting the
-         preceding addition must not shrink the register's live range. *)
-      if multiplier = 0
+      (* Cannot overflow: the multiplier is at most 9 and [delta] comes from
+         an amd64 instruction immediate, which fits in 32 bits. *)
+      let displ_delta = multiplier * delta in
+      let new_displ = displ + displ_delta in
+      if new_displ < -0x8000_0000 || new_displ > 0x7FFF_FFFF
       then None
-      else begin
-        let displ_delta = multiplier * delta in
-        let new_displ = displ + displ_delta in
-        if new_displ < -0x8000_0000 || new_displ > 0x7FFF_FFFF
-        then None
-        else Some (Ilea (offset_addressing addr displ_delta))
-      end
+      else Some (Ilea (offset_addressing addr displ_delta))
     end
   | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
   | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
