@@ -129,8 +129,9 @@ let field_offset_for_label lbl repres =
       lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
-  | Record_inlined (_, Constructor_undetermined, _)
-  | Record_undetermined ->
+  | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _)
+  | (Record_undetermined | Record_variable _) ->
       fatal_error "field_offset_for_label: variable record representation"
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
@@ -645,6 +646,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | [arg, _] -> transl_exp ~scopes layout arg
         | _ -> assert false
       end else begin
+        let shape =
+          Typedecl.finalize_constructor_representation e.exp_env e.exp_loc
+            shape
+        in
         let ll =
           List.map (fun (e, sort) ->
             let layout = layout_exp sort e in
@@ -698,7 +703,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     None
               | Constructor_uniform_value ->
                   Some (Const_block(runtime_tag, constants))
-              | Constructor_undetermined ->
+              | (Constructor_undetermined | Constructor_variable _) ->
                   fatal_error
                     "transl_exp: variable constructor representation")
           in
@@ -723,7 +728,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
-                | Constructor_undetermined ->
+                | (Constructor_undetermined | Constructor_variable _) ->
                     fatal_error
                       "transl_exp: variable constructor representation"
               in
@@ -769,7 +774,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
                   Pmakeblock(0, Immutable, Shape shape, alloc_mode)
-              | Constructor_undetermined ->
+              | (Constructor_undetermined | Constructor_variable _) ->
                   fatal_error "Unexpected indeterminate representation in \
                                extensible variant"
             in
@@ -795,6 +800,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   of_location ~scopes e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
+      let representation =
+        Typedecl.finalize_record_representation e.exp_env e.exp_loc
+          representation
+      in
       transl_record ~scopes e.exp_loc e.exp_env
         (Option.map transl_alloc_mode alloc_mode)
         fields representation extended_expression
@@ -817,10 +826,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
 
         (* Expect that usage of atomic.loc with mixed/variable records was
            rejected during typechecking. *)
-        | Record_unboxed | Record_inlined (_, Constructor_undetermined, _)
+        | Record_unboxed | Record_inlined
+            (_, (Constructor_undetermined | Constructor_variable _), _)
         | Record_inlined (_, Constructor_mixed _, _) | Record_float
         | Record_ufloat | Record_mixed _ | Record_dummy _
-        | Record_undetermined ->
+        | Record_undetermined | Record_variable _ ->
           Misc.fatal_error
             "transl: Texp_atomic_loc got unexpected record representation"
       in
@@ -829,9 +839,13 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let loc = of_location ~scopes e.exp_loc in
       Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode alloc_mode),
              [arg; lbl], loc)
-  | Texp_field { record = arg; record_sort = arg_sort; record_repres;
-                 lid = _; label = lbl; boxing = float;
+  | Texp_field { record = arg; record_sort = arg_sort;
+                 record_repres; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
+      let record_repres =
+        Typedecl.finalize_record_representation arg.exp_env e.exp_loc
+          record_repres
+      in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let arg_layout = layout_exp arg_sort arg in
       let targ = transl_exp ~scopes arg_layout arg in
@@ -914,8 +928,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
-        | Record_inlined (_, Constructor_undetermined, _)
-        | Record_undetermined ->
+        | Record_inlined
+            (_, (Constructor_undetermined | Constructor_variable _), _)
+        | (Record_undetermined | Record_variable _) ->
           fatal_error "transl_exp0: variable record representation"
       in
       begin match prim_and_args with
@@ -925,8 +940,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unboxed_field{ record = arg; record_sort = arg_sort; record_sorts;
                         label = lbl; record_repres; _ } ->
     begin match record_repres with
-    | Record_unboxed_product_variable ->
-      fatal_error "transl_exp0: variable unboxed-product record representation"
+    | Record_unboxed_product_variable
     | Record_unboxed_product ->
       let lbl_layout l =
         let sort =
@@ -960,6 +974,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
+      let record_repres =
+        Typedecl.finalize_record_representation arg.exp_env e.exp_loc
+          record_repres
+      in
       let modify_mode = transl_modify_mode arg_mode in
       let mode = Assignment modify_mode in
       let sort_arg =
@@ -990,7 +1008,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           else
             Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_undetermined, _) ->
+        | Record_inlined
+            (_, (Constructor_undetermined
+                | Constructor_variable _), _) ->
           fatal_error "transl_exp0: unexpected unknown representation"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
@@ -1033,7 +1053,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
             fatal_error "transl_exp0: unexpected dummy representation"
-        | Record_undetermined ->
+        | (Record_undetermined | Record_variable _) ->
             fatal_error "transl_exp0: unexpected unknown representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
@@ -2468,8 +2488,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, _, Variant_with_null) -> assert false
             | Record_dummy _ ->
               fatal_error "transl_record: unexpected dummy representation"
-            | Record_inlined (_, Constructor_undetermined, _)
-            | Record_undetermined ->
+            | Record_inlined
+                (_, (Constructor_undetermined
+                    | Constructor_variable _), _)
+            | Record_undetermined | Record_variable _ ->
               fatal_error "transl_record: unexpected variable representation"
           in
           let field_layout = layout_exp lbl_sort expr in
@@ -2560,8 +2582,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
-                 | Record_inlined (_, Constructor_undetermined, _)
-                 | Record_undetermined ->
+                 | Record_inlined
+                     (_, (Constructor_undetermined
+                         | Constructor_variable _), _)
+                 | Record_undetermined | Record_variable _ ->
                    fatal_error
                      "transl_record: unexpected variable representation"
                in
@@ -2625,8 +2649,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_inlined (_, Constructor_undetermined, _)
-        | Record_undetermined ->
+        | Record_inlined
+            (_, (Constructor_undetermined | Constructor_variable _), _)
+        | (Record_undetermined | Record_variable _) ->
           fatal_error "transl_record: unexpected variable representation"
       with Not_constant ->
         let loc = of_location ~scopes loc in
@@ -2681,8 +2706,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Null, _, _) -> assert false
         | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
-        | Record_inlined (_, Constructor_undetermined, _)
-        | Record_undetermined ->
+        | Record_inlined
+            (_, (Constructor_undetermined | Constructor_variable _), _)
+        | (Record_undetermined | Record_variable _) ->
           fatal_error "transl_record: unexpected variable representation"
     in
     begin match opt_init_expr with
@@ -2698,9 +2724,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
-  | Record_unboxed_product_variable ->
-    fatal_error
-      "transl_record_unboxed_product: variable unboxed-product representation"
+  | Record_unboxed_product_variable
   | Record_unboxed_product ->
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
@@ -2744,7 +2768,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
     end
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-and transl_idx ~scopes loc _env ba uas =
+and transl_idx ~scopes loc env ba uas =
   let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
     if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
@@ -2773,6 +2797,7 @@ and transl_idx ~scopes loc _env ba uas =
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
   | Baccess_field (_id, lbl, repres) ->
+    let repres = Typedecl.finalize_record_representation env loc repres in
     begin match repres with
     | Record_boxed
     | Record_float | Record_ufloat ->
@@ -2801,7 +2826,7 @@ and transl_idx ~scopes loc _env ba uas =
              (of_location ~scopes loc))
     | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"
-    | Record_undetermined ->
+    | (Record_undetermined | Record_variable _) ->
       fatal_error "transl_idx: unexpected unknown representation"
     end
   end
@@ -2811,7 +2836,8 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
   begin match repres with
   | Record_dummy _ ->
     Misc.fatal_error "transl_atomic_loc: unexpected dummy representation"
-  | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
+  | (Record_undetermined | Record_variable _) | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _) ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
   | Record_float | Record_ufloat

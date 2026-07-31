@@ -1362,7 +1362,7 @@ let record_has_float_boxed = function
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
-  | Record_undetermined ->
+  | Record_undetermined | Record_variable _ ->
     fatal_error "record_has_float_boxed: unexpected variable representation"
 
 let record_has_atomic_field lbls =
@@ -1379,6 +1379,9 @@ let record_gets_unboxed_version lbls repr =
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
+  | Record_variable _ ->
+    fatal_error
+      "record_gets_unboxed_version: unexpected typechecked representation"
 
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1840,7 +1843,30 @@ let all_void_sort_option sort =
    [transl_declaration] due to mutually recursive types.
 *)
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
+(* CR-soon rtjoa: The [default_to_scannable] parameter was added in
+   oxcaml/oxcaml#6496, but should be removed.
+
+   This function is called in two main code paths:
+
+   1. When typechecking a declaration, to determine the declaration type_kind
+      (e.g. via [compute_record_kind]).
+   2. When typechecking an expression, in order to specialize a record/variant
+      representation to its field sorts (via [update_record_representation]).
+
+   Previously, we always defaulted label sorts to scannable. The above PR made
+   it so we no longer do so for expressions, but introduced the flag to preserve
+   the existing behavior for declarations.
+
+   This leaves the question of why we need to default in declarations, as in
+   [transl_type_decl], sort variables are already defaulted by calling
+   [Ctype.closed_type_decl]. The reason is that in
+   [transl_extension_constructor_decl], the constructor representation is
+   computed *before* defaulting, causing fatal errors if we don't default here.
+   We should fix this, so this function never needs to default and the flag can
+   be removed.
+*)
+let update_label_sorts (type rep) env loc types ~(form : rep record_form)
+      ~default_to_scannable =
   (* CR layouts v5: it wouldn't be too hard to support records that are all
      void.  just needs a bit of refactoring in translcore *)
   let sorts_and_jkinds =
@@ -1848,7 +1874,10 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
       let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
       let ld_sort =
-        Option.bind sort Jkind.Sort.default_to_scannable_and_get_some
+        Option.bind sort
+          (if default_to_scannable
+           then Jkind.Sort.default_to_scannable_and_get_some
+           else Jkind.Sort.to_const_opt)
       in
       ld_sort, jkind
     ) types
@@ -1866,7 +1895,9 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
 
 let update_label_sorts_in_place env loc lbls ~form =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
+  let sorts, jkinds =
+    update_label_sorts env loc types ~form ~default_to_scannable:true
+  in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
@@ -1990,11 +2021,20 @@ module Element_repr = struct
     in
     of_t t
 
-  let classify env ty jkind =
+  (* If [default_to_scannable] is true, unfilled sort variables are defaulted;
+     otherwise the element is classified as [None]. See the comment above
+     [update_label_sorts].
+  *)
+  let classify env ty jkind ~default_to_scannable =
+
     if is_float env ty
     then Some Float_element
     else
-      let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+      let layout =
+        if default_to_scannable
+        then Jkind.get_layout_defaulting_to_scannable env jkind
+        else Jkind.get_layout env jkind
+      in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
       | Base (Scannable, sa) -> Some (Value_element sa)
@@ -2013,7 +2053,6 @@ module Element_repr = struct
       | Base (Mask, _) -> Some (Unboxed_element Mask)
       | Base (Void, _) -> Some Void
       | Product l ->
-        (* CR rtjoa: changed this bc of scannable axes *)
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
@@ -2062,7 +2101,9 @@ type unrepresentable_constructor =
   | Unrepresentable_argument_field of string
 
 let mixed_block_element env ty jkind =
-  let unboxed_element = Element_repr.classify env ty jkind in
+  let unboxed_element =
+    Element_repr.classify env ty jkind ~default_to_scannable:true
+  in
   Option.map Element_repr.to_shape_element unboxed_element
 
 (* Atomic fields must have layout value. *)
@@ -2080,14 +2121,15 @@ let check_atomic_fields reprs lbls =
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
-    ~is_extension_constructor
+    ~is_extension_constructor ~default_to_scannable
   =
   let flat_suffix =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env arg_type arg_jkind,
+            Element_repr.classify env arg_type arg_jkind
+              ~default_to_scannable,
             arg_type)
             arg_types_and_modes arg_jkinds
         in
@@ -2097,7 +2139,8 @@ let update_constructor_representation
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-            Element_repr.classify env ld.Types.ld_type arg_jkind,
+            Element_repr.classify env ld.Types.ld_type arg_jkind
+              ~default_to_scannable,
             ld.Types.ld_type)
             fields arg_jkinds
         in
@@ -2118,6 +2161,16 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
+let update_constructor_representation_or_variable env cd_args jkinds ~loc
+    ~sorts_and_types =
+  match
+    update_constructor_representation env cd_args jkinds ~loc
+      ~is_extension_constructor:false ~default_to_scannable:false
+  with
+  | Ok shape -> shape
+  | Error (Unrepresentable_argument _ | Unrepresentable_argument_field _) ->
+      Constructor_variable sorts_and_types
+
 let update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =
@@ -2125,7 +2178,7 @@ let update_constructor_representation_and_arg_sorts env loc args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
-      ~is_extension_constructor
+      ~is_extension_constructor ~default_to_scannable:true
   in
   args, ~constant, constructor_shape, arg_sorts
 
@@ -2186,7 +2239,6 @@ let compute_record_repr
       Ok (Record_mixed shape)
     else
       mixed_record ()
-  (* Any record with a field of kind [any] can't be represented. *)
   | ~first_any:(Some id), .. ->
     Result.Error (Unrepresentable_field (Ident.name id))
   | ~values:false, ~floats:false, ~atomic_floats:false,
@@ -2256,11 +2308,12 @@ type element_repr_summary =
      mutable first_any : Ident.t option;
   }
 
-let compute_repr_summary env lbls jkinds =
+let compute_repr_summary env lbls jkinds ~default_to_scannable =
   let reprs =
     List.map2
       (fun (_lbl, ld_type) jkind ->
-          Element_repr.classify env ld_type jkind, ld_type)
+          Element_repr.classify env ld_type jkind ~default_to_scannable,
+          ld_type)
       lbls jkinds
   in
   let repr_summary =
@@ -2325,8 +2378,12 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds = update_label_sorts env loc types ~form in
-    let reprs, repr_summary = compute_repr_summary env lbls jkinds in
+    let sorts, jkinds =
+      update_label_sorts env loc types ~form ~default_to_scannable:true
+    in
+    let reprs, repr_summary =
+      compute_repr_summary env lbls jkinds ~default_to_scannable:true
+    in
     let jkind =
       match form with
       | Legacy ->
@@ -2395,7 +2452,8 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     sorts, rep, jkind
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
-          | Record_ufloat | Record_unboxed | Record_undetermined)
+          | Record_ufloat | Record_unboxed | Record_undetermined
+          | Record_variable _)
     ->
     (* These are never created by [transl_declaration], so they will only
        appear here when updating later for dealing with [any]. Since none of
@@ -2404,28 +2462,21 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       "Typedecl.compute_record_kind: unexpected record representation"
 
 let update_inlined_record_representation env loc lbls jkinds tag vrep
-      : _ Result.t =
+      ~sorts_and_types =
   match vrep with
   | Variant_unboxed ->
     (* The shape of an unboxed constructor is always
        [Constructor_uniform_value], as at declaration time. *)
-    Ok (Record_inlined (tag, Constructor_uniform_value, Variant_unboxed))
+    Record_inlined (tag, Constructor_uniform_value, Variant_unboxed)
   | Variant_boxed _ as vrep ->
     let lbl_decls =
       List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
     in
-    begin match
-      update_constructor_representation env (Cstr_record lbl_decls)
-        jkinds ~loc ~is_extension_constructor:false
-    with
-    | Ok shape -> Ok (Record_inlined (tag, shape, vrep))
-    | Error (Unrepresentable_argument_field name) ->
-      Error (Unrepresentable_field name)
-    | Error (Unrepresentable_argument _) ->
-      Misc.fatal_error
-        "Typedecl.update_inlined_record_representation: unexpected tuple \
-         constructor error"
-    end
+    let shape =
+      update_constructor_representation_or_variable env
+        (Cstr_record lbl_decls) jkinds ~loc ~sorts_and_types
+    in
+    Record_inlined (tag, shape, vrep)
   | Variant_extensible | Variant_with_null ->
     (* Extension constructors always have a known shape, and
        [Variant_with_null] cannot have an inlined record argument. *)
@@ -2434,7 +2485,7 @@ let update_inlined_record_representation env loc lbls jkinds tag vrep
        representation"
 
 (* Given a record with a variable representation, but updated labels, compute
-   the updated representation *)
+   the fields' sorts and the updated representation. *)
 let update_record_representation
       (type rep) ~why ~(old_repres : rep)
       env loc (form : rep record_form) lbls_and_types =
@@ -2443,71 +2494,129 @@ let update_record_representation
     | Legacy -> Record { unboxed = false }
     | Unboxed_product -> Record_unboxed_product
   in
-  (* We want to allow exactly one side effect here: force the type to be
-     representable, returning its sort from this function. Thus we get the
-     sort here rather than inside the snapshot/backtrack region below. *)
   let sorts =
     List.map
       (fun (_lbl, ld_type) -> representable_sort ~why env loc kloc ld_type)
       lbls_and_types
   in
-  let rep =
-    let warn =
-      (* Only warn during initial typechecking rather than when updating at
-         use sites, so that we only warn once and honour suppressed warnings *)
-      false
-    in
-    (* lmaurer: This isn't great. We currently believe that determining layouts
-       and record representations and such shouldn't cause problems with
-       information escaping GADT matches, but that could easily change with
-       layout/mode polymorphism introducing concerns about principality of
-       inferred layouts/modes. *)
-    let snap = Btype.snapshot () in
-    let types = List.map snd lbls_and_types in
-    let _sorts, jkinds = update_label_sorts env loc types ~form in
-    let reprs, repr_summary =
-      compute_repr_summary env lbls_and_types jkinds
-    in
-    let ans : (rep, _) Result.t =
-      match form, old_repres with
-      | Legacy, Record_undetermined ->
-        (* CR layouts: improve the readability of this match *)
-        let { values; floats; atomic_floats; float64s;
-                non_float64_unboxed_fields; atomic_fields; voids;
-                first_any } = repr_summary
-        in
-        let rep =
-          compute_record_repr loc reprs lbls_and_types
-            ~represent_as_float_array:false ~flatten_floats:false ~warn
-            ~refining_block_with_any:true ~values ~floats ~atomic_floats
-            ~float64s ~non_float64_unboxed_fields ~atomic_fields ~voids
-            ~first_any
-        in
-        begin match rep with
-        | Ok (Record_boxed | Record_mixed _) -> ()
-        | Ok _ ->
-          Misc.fatal_error "none became something other than mixed"
-        | Error _ -> ()
-        end;
-        rep
-      | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
-        update_inlined_record_representation env loc lbls_and_types jkinds tag
-          vrep
-      | Unboxed_product, _ ->
-        (match repr_summary.first_any with
-        | Some id -> Result.Error (Unrepresentable_field (Ident.name id))
-        | None -> Ok Record_unboxed_product)
-      | Legacy,
-        (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-        | Record_ufloat | Record_mixed _ | Record_dummy _) ->
-          Misc.fatal_error
-            "Typedecl.update_record_representation: representation already \
-             determined"
-    in
-    Btype.backtrack snap;
-    ans
+  let types = List.map snd lbls_and_types in
+  let _sorts, jkinds =
+    update_label_sorts env loc types ~form ~default_to_scannable:false
   in
-  Result.map (fun rep -> sorts, rep) rep
+  let reprs, repr_summary =
+    compute_repr_summary env lbls_and_types jkinds ~default_to_scannable:false
+  in
+  let sorts_and_types () =
+    List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
+    |> Array.of_list
+  in
+  let rep : rep =
+    match form, old_repres with
+    | Legacy, Record_undetermined ->
+      (* CR layouts: improve the readability of this match *)
+      let { values; floats; atomic_floats; float64s;
+              non_float64_unboxed_fields; atomic_fields; voids;
+              first_any } = repr_summary
+      in
+      let rep =
+        compute_record_repr loc reprs lbls_and_types
+          ~represent_as_float_array:false ~flatten_floats:false ~warn:false
+          ~refining_block_with_any:true ~values ~floats ~atomic_floats
+          ~float64s ~non_float64_unboxed_fields ~atomic_fields ~voids
+          ~first_any
+      in
+      begin match rep with
+      | Ok ((Record_boxed | Record_mixed _) as rep) -> rep
+      | Ok _ ->
+        Misc.fatal_error "undetermined became something other than mixed"
+      | Error (Unrepresentable_field _) ->
+        Record_variable (sorts_and_types ())
+      end
+    | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
+      update_inlined_record_representation env loc lbls_and_types jkinds tag
+        vrep ~sorts_and_types:(sorts_and_types ())
+    | Unboxed_product, _ ->
+      (match repr_summary.first_any with
+      | Some _ -> old_repres
+      | None -> Record_unboxed_product)
+    | Legacy,
+      (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+      | Record_ufloat | Record_mixed _ | Record_dummy _
+      | Record_variable _) ->
+        Misc.fatal_error
+          "Typedecl.update_record_representation: representation already \
+           determined"
+  in
+  sorts, rep
+
+let finalize_typechecked_shape env loc sorts_and_types kind =
+  let consts =
+    Array.map
+      (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
+      sorts_and_types
+  in
+  let all_scannable =
+    Array.for_all
+      (fun (const : Jkind.Sort.Const.t) ->
+         match const with
+         | Base Scannable -> true
+         | _ -> false)
+      consts
+  in
+  if all_scannable then
+    (* Optimization: the other branch would also compute [`Not_mixed] *)
+    `Not_mixed
+  else
+    let ts =
+      Array.to_list sorts_and_types
+      |> List.map (fun (_sort, ty) ->
+           Element_repr.classify env ty (Ctype.type_jkind env ty)
+             ~default_to_scannable:false,
+           ty)
+    in
+    match Element_repr.mixed_product_shape loc ts kind with
+    | Ok shape -> shape
+    | Error (Element_repr.Unrepresentable_element _) ->
+        Misc.fatal_error
+          "Typedecl.finalize_typechecked_shape: unrepresentable element, but \
+           typechecking succeeded"
+
+let finalize_typechecked_constructor env loc sorts_and_types kind
+    : Types.constructor_representation =
+  match finalize_typechecked_shape env loc sorts_and_types kind with
+  | `Not_mixed -> Constructor_uniform_value
+  | `Mixed shape -> Constructor_mixed shape
+
+let finalize_constructor_representation env loc
+    (shape : Types.constructor_representation) =
+  match shape with
+  | Constructor_uniform_value | Constructor_mixed _ -> shape
+  | Constructor_variable sorts_and_types ->
+      finalize_typechecked_constructor env loc sorts_and_types Cstr_tuple
+  | Constructor_undetermined ->
+      Misc.fatal_error
+        "Typedecl.finalize_constructor_representation: representation was \
+         not typechecked"
+
+let finalize_record_representation env loc
+    (repres : Types.record_representation) =
+  match repres with
+  | Record_variable sorts_and_types ->
+      (match finalize_typechecked_shape env loc sorts_and_types Record with
+       | `Not_mixed -> Record_boxed
+       | `Mixed shape -> Record_mixed shape)
+  | Record_inlined (tag, Constructor_variable sorts_and_types,
+                    vrep) ->
+      let shape =
+        finalize_typechecked_constructor env loc sorts_and_types Cstr_record
+      in
+      Record_inlined (tag, shape, vrep)
+  | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
+      Misc.fatal_error
+        "Typedecl.finalize_record_representation: representation was not \
+         typechecked"
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+    | Record_ufloat | Record_mixed _ | Record_dummy _) -> repres
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
