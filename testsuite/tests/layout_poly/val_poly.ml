@@ -682,3 +682,136 @@ Error: Abstract kinds are not yet supported in products.
  *       layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
  *   end
  * |}] *)
+
+(** inclusion checks between [layout_] and [val poly_] **)
+
+(* equivalent with one variable  *)
+
+module F (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val poly_ f : 'a -> 'a
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'a end) ->
+    sig val poly_ f : 'a -> 'a end
+|}]
+
+module F (M : sig
+  val poly_ f : 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is '_representable_layout_16
+         because of the definition of f at line 4, characters 2-39.
+       But the layout of 'a must be a sublayout of
+           '_representable_layout_16 separable non_null
+         because of the definition of f at line 2, characters 2-24.
+|}]
+
+(* equivalent with two variables *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'b end) ->
+    sig val poly_ f : 'a -> 'b end
+|}]
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The layout of 'a is '_representable_layout_21
+         because of the definition of f at line 4, characters 2-50.
+       But the layout of 'a must be a sublayout of
+           '_representable_layout_21 separable non_null
+         because of the definition of f at line 2, characters 2-24.
+|}]
+
+(* equivalent with two variables, one concrete *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : x) ('b : bits64). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-55.
+|}]
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x. ('a : x) ('b : bits64). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val poly_ f : ('b : bits64). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val poly_ f : ('b : bits64). 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The layout of 'a is '_representable_layout_26
+         because of the definition of f at line 4, characters 2-53.
+       But the layout of 'a must be a sublayout of
+           '_representable_layout_26 separable non_null
+         because of the definition of f at line 2, characters 2-24.
+|}]
