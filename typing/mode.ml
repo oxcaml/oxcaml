@@ -5525,6 +5525,10 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let update_level i a = with_log (S.update_level i obj a)
 
+  let generalize_topology ~current_level a =
+    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    then S.generalize_topology ~log:None ~current_level a
+
   let generalize ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
     then S.generalize ~log:None ~current_level obj a
@@ -5715,6 +5719,10 @@ module Monadic_gen (Obj : Obj) = struct
   let generic_level = S.generic_level
 
   let update_level i a = with_log (S.update_level i obj a)
+
+  let generalize_topology ~current_level a =
+    if Language_extension.(is_at_least Mode_polymorphism Alpha)
+    then S.generalize_topology ~log:None ~current_level a
 
   let generalize ~current_level a =
     if Language_extension.(is_at_least Mode_polymorphism Alpha)
@@ -7058,6 +7066,11 @@ module Value_with (Areality : Areality) = struct
   let update_level i { monadic = monadic0; comonadic = comonadic0 } =
     Monadic.update_level i monadic0;
     Comonadic.update_level i comonadic0
+
+  let generalize_topology ~current_level
+      { monadic = monadic0; comonadic = comonadic0 } =
+    Monadic.generalize_topology ~current_level monadic0;
+    Comonadic.generalize_topology ~current_level comonadic0
 
   let generalize ~current_level { monadic = monadic0; comonadic = comonadic0 } =
     Monadic.generalize ~current_level monadic0;

@@ -1486,7 +1486,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     current_level < u.level < generic_level ==>
       Forall v in the reachable set of variables from u:
         v.level = generic_level + (v.level - current_level) *)
-  let rec generalize_topology : type a.
+  let rec generalize_topology_v : type a.
       log:_ -> current_level:int -> a var -> unit =
    fun ~log ~current_level u ->
     if u.level <= current_level || u.level >= generic_level
@@ -1495,7 +1495,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let new_level = generic_level + (u.level - current_level) in
       set_level ~log u new_level;
       let do_gen _ (Amorphvar (v, _f, _f_hint)) =
-        generalize_topology ~log ~current_level v
+        generalize_topology_v ~log ~current_level v
       in
       VarMap.iter do_gen u.vupper;
       VarMap.iter do_gen u.vlower
@@ -1529,7 +1529,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let generalize_v : type a.
       log:_ -> a C.obj -> current_level:int -> a var -> unit =
    fun ~log dst ~current_level u ->
-    generalize_topology ~log ~current_level u;
+    generalize_topology_v ~log ~current_level u;
     update_level_v ~log dst generic_level u
 
   (* generalize_structure first moves a variable to generic_level (like generalize does).
@@ -1562,8 +1562,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun ~log dst ~current_level u ->
     (* if the following does not hold:
         current_level < u.level || u.level = generic_level
-      [generalize_topology] and [update_level] do nothing. We check it here to optimize
-      away the subsequent checks *)
+      [generalize_topology_v] and [update_level] do nothing. We check it here
+      to optimize away the subsequent checks *)
     if u.level <= current_level || u.level = generic_level
     then ()
     else begin
@@ -1573,7 +1573,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         set_vlower ~log u VarMap.empty;
         set_vupper ~log u VarMap.empty
       end;
-      generalize_topology ~log ~current_level u;
+      generalize_topology_v ~log ~current_level u;
       update_level_v ~log dst generic_level u;
       let vlower_above_current =
         VarMap.filter
@@ -1600,6 +1600,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         create_gencopy ~log dst ~current_level u
       end
     end
+
+  let generalize_topology (type a l r) ~current_level (a : (a, l * r) mode) ~log
+      =
+    match a with
+    | Amodevar (Amorphvar (v, _f, _f_hint)) ->
+      generalize_topology_v ~log ~current_level v
+    | Amode _ -> ()
+    | Amodejoin (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, _f, _f_hint)) ->
+          generalize_topology_v ~log ~current_level v)
+        mvs
+    | Amodemeet (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, _f, _f_hint)) ->
+          generalize_topology_v ~log ~current_level v)
+        mvs
 
   let generalize (type a l r) ~current_level (obj : a C.obj)
       (a : (a, l * r) mode) ~log =
