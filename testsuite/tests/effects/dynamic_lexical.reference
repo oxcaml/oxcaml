@@ -44,3 +44,7 @@ parent d_worker [expect 111]: 111
 generator inside task d_lex [expect 1]: 1
 escaped generator d_lex [expect 9]: 9
 escaped generator own binding [expect 42]: 42
+
+# Test 9: handle survives fork-point stack growth
+child d_lex after growth [expect 1]: 1
+child d_worker [expect 222]: 222

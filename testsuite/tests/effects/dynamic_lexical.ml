@@ -15,11 +15,8 @@ open Modes
 
 type fiber
 external current_fiber : unit -> fiber = "caml_dynamic_current_fiber"
-  [@@noalloc]
 external set_lexical_parent : fiber -> unit = "caml_dynamic_set_lexical_parent"
-  [@@noalloc]
 external set_lexical_root : unit -> unit = "caml_dynamic_set_lexical_root"
-  [@@noalloc]
 
 let print_null = function
   | This x -> Int.to_string x
@@ -53,7 +50,12 @@ let reset () = next_worker := 100
    scheduler itself (as if stolen by another worker), with scheduler-local
    bindings for [d_worker] and [d_both] in scope; their lexical parent is
    pinned to the fork point. [Yield] resumes the task under a fresh fiber
-   with a different [d_worker] binding, simulating migration. *)
+   with a different [d_worker] binding, simulating migration.
+
+   Task fibers that are not fork/join children are mounted via
+   [handle_task], which marks them as lexical roots before the body runs:
+   span freezing at fork points must stop at the task base instead of
+   running into the scheduler's own chain. *)
 let rec handle : (unit -> unit) -> unit = fun f ->
   Effect.Deep.match_with f ()
     { retc = (fun () -> ());
@@ -72,14 +74,19 @@ let rec handle : (unit -> unit) -> unit = fun f ->
             Effect.Deep.continue k ())
         | Spawn_unpinned g ->
           Some (fun k ->
-            handle g;
+            handle_task g;
             Effect.Deep.continue k ())
         | Yield ->
           Some (fun k ->
-            handle (fun () ->
+            handle_task (fun () ->
               with_temp d_worker 999 ~f:(fun () ->
                 Effect.Deep.continue k ())))
         | _ -> None) }
+
+and handle_task : (unit -> unit) -> unit = fun f ->
+  handle (fun () ->
+    set_lexical_root ();
+    f ())
 
 and run_task : fiber -> (unit -> unit) -> unit = fun parent g ->
   handle (fun () ->
@@ -95,7 +102,7 @@ let passthrough f =
 let () =
   reset ();
   print_endline "# Test 1: pinning across reparenting";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       with_temp d_both 2 ~f:(fun () ->
         fork_join
@@ -117,7 +124,7 @@ let () =
 let () =
   reset ();
   print_endline "\n# Test 2: shadowing inside the child";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       fork_join
         (fun () ->
@@ -130,7 +137,7 @@ let () =
 let () =
   reset ();
   print_endline "\n# Test 3: nested fork_join";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       fork_join
         (fun () ->
@@ -150,7 +157,7 @@ let () =
 let () =
   reset ();
   print_endline "\n# Test 4: intermediate fiber captured with the fork";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       passthrough (fun () ->
         with_temp d_inter 7 ~f:(fun () ->
@@ -166,7 +173,7 @@ let () =
 let () =
   reset ();
   print_endline "\n# Test 5: suspend and resume under a new parent";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       fork_join
         (fun () ->
@@ -183,7 +190,7 @@ let () =
 let () =
   reset ();
   print_endline "\n# Test 6: child stack growth";
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       fork_join
         (fun () ->
@@ -254,7 +261,7 @@ let () =
   let stash : (unit, unit) Effect.Deep.continuation option ref =
     ref None
   in
-  handle (fun () ->
+  handle_task (fun () ->
     with_temp d_lex 1 ~f:(fun () ->
       fork_join
         (fun () ->
@@ -281,3 +288,38 @@ let () =
   match !stash with
   | Some k -> with_temp d_lex 9 ~f:(fun () -> Effect.Deep.continue k ())
   | None -> assert false
+
+(* The fork-point handle is the fiber's stable dynamic-state node, so it
+   survives stack reallocation: growing the fork point's stack after taking
+   the handle (bytecode fibers start tiny and grow by realloc) must not
+   invalidate the edge or the bindings reached through it. *)
+
+let () =
+  reset ();
+  print_endline "\n# Test 9: handle survives fork-point stack growth";
+  with_temp d_worker 111 ~f:(fun () ->
+    passthrough (fun () ->
+      (* fiber T: the fork point, growing after its handle is taken *)
+      set_lexical_root ();
+      with_temp d_lex 1 ~f:(fun () ->
+        let t = current_fiber () in
+        let rec grow n =
+          if n = 0
+          then 0
+          else begin
+            let r = grow (n - 1) in
+            ignore (Sys.opaque_identity (r + n));
+            r
+          end
+        in
+        ignore (grow 100_000);
+        passthrough (fun () ->
+          (* fiber S: the child's own "worker" *)
+          with_temp d_worker 222 ~f:(fun () ->
+            passthrough (fun () ->
+              (* fiber C: pinned to T after T's stack moved *)
+              set_lexical_parent t;
+              Printf.printf "child d_lex after growth [expect 1]: %s\n"
+                (get d_lex);
+              Printf.printf "child d_worker [expect 222]: %s\n"
+                (get d_worker)))))))

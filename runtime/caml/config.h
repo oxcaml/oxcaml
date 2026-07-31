@@ -193,9 +193,9 @@ typedef uint64_t uintnat;
 /* Number of words used in the control structure at the start of a stack
    (must match sizeof(struct stack_info) from fiber.h) */
 #ifdef ARCH_SIXTYFOUR
-#define Stack_ctx_words (15 + 1)
+#define Stack_ctx_words (11 + 1)
 #else
-#define Stack_ctx_words (15 + 2)
+#define Stack_ctx_words (11 + 2)
 #endif
 
 /* Whether to use guard pages for fiber stacks */
