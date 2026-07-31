@@ -383,13 +383,16 @@ let undetermined_set t = t.f <- 42
 val undetermined_set : 'a t -> unit = <fun>
 |}];;
 
+(* Rejected, as this may finalize to a mixed block *)
 let undetermined_loc t = [%atomic.loc t.f]
 [%%expect{|
-(let
-  (undetermined_loc =
-     (function {nlocal = 0} t (makeblock 0 (*,value<int>) t 1)))
-  (apply (field_imm 1 (global Toploop!)) "undetermined_loc" undetermined_loc))
-val undetermined_loc : 'a t -> int atomic_loc = <fun>
+Line 1, characters 25-42:
+1 | let undetermined_loc t = [%atomic.loc t.f]
+                             ^^^^^^^^^^^^^^^^^
+Error: Use of "[%atomic.loc]" with fields of records
+       whose representation is not yet determined (here "f") is forbidden,
+       as the representation may be mixed.
+       Hint: annotate the record's type to determine its representation.
 |}];;
 
 type ('a : any) w = A of { a : 'a; mutable f: int [@atomic]}

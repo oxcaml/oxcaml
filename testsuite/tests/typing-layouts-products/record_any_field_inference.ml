@@ -1,10 +1,20 @@
 (* TEST
- flags = "-extension layouts_beta";
+ reference =
+   "${test_source_directory}/record_any_field_inference.reference";
  flambda2;
- compile_only = "true";
- ocamlopt_opt_exit_status = "2";
- setup-ocamlopt.opt-build-env;
- ocamlopt.opt;
+ {
+   flags = "-extension layouts_beta";
+   native;
+ }{
+   flags = "-extension layouts_beta -Oclassic";
+   native;
+ }{
+   flags = "-extension layouts_beta -O3";
+   native;
+ }{
+   flags = "-extension layouts_beta";
+   bytecode;
+ }
 *)
 
 (* A record with an [any]-field, used in functions that don't constrain the
