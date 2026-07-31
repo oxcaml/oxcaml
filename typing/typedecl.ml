@@ -1835,6 +1835,33 @@ let all_void_sort_option sort =
   | Some sort -> Jkind.Sort.Const.all_void sort
   | None -> false
 
+(* CR layouts v5: it wouldn't be too hard to support records that are all
+   void.  just needs a bit of refactoring in translcore *)
+let check_record_not_all_void_defaulting loc sorts =
+  if
+    List.for_all
+      (fun sort ->
+         Jkind.Sort.Const.maybe_all_void
+           (Jkind.Sort.default_for_transl_and_get sort))
+      sorts
+  then raise (Error (loc, Jkind_empty_record))
+
+(* Check a record's sorts to see if it is surely all-void, i.e. if all uses
+   of the record would cause [check_record_not_all_void_defaulting] to fire.
+   We still need that check, as this treats missing/variable sorts
+   conservatively, but this allows for errors on e.g. declarations. *)
+let eagerly_check_record_not_all_void loc sorts =
+  let field_is_void (sort : Jkind.Sort.t option) =
+    match sort with
+    | None -> false
+    | Some sort ->
+      (match Jkind.Sort.to_const_opt sort with
+       | Some const -> Jkind.Sort.Const.all_void const
+       | None -> false)
+  in
+  if List.for_all field_is_void sorts then
+    raise (Error (loc, Jkind_empty_record))
+
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
@@ -1864,8 +1891,6 @@ let all_void_sort_option sort =
 *)
 let update_label_sorts (type rep) env loc types ~(form : rep record_form)
       ~default_to_scannable =
-  (* CR layouts v5: it wouldn't be too hard to support records that are all
-     void.  just needs a bit of refactoring in translcore *)
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1876,19 +1901,15 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
            then Jkind.Sort.default_to_scannable_and_get_some
            else Jkind.Sort.to_const_opt)
       in
-      ld_sort, jkind
+      sort, (ld_sort, jkind)
     ) types
   in
+  let live_sorts, sorts_and_jkinds = List.split sorts_and_jkinds in
   let sorts, jkinds = List.split sorts_and_jkinds in
-  let allow_all_void =
-    match form with
-    | Legacy -> false
-    | Unboxed_product -> true
-  in
-  let is_all_void () = List.for_all all_void_sort_option sorts in
-  if not allow_all_void && is_all_void () then
-    raise (Error (loc, Jkind_empty_record))
-  else sorts, jkinds
+  (match form with
+   | Legacy -> eagerly_check_record_not_all_void loc live_sorts
+   | Unboxed_product -> ());
+  sorts, jkinds
 
 let update_label_sorts_in_place env loc lbls ~form =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
@@ -2507,6 +2528,10 @@ let update_record_representation
     List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
     |> Array.of_list
   in
+  let add_delayed_all_void_check () =
+    !Env.add_delayed_check_forward (fun () ->
+      check_record_not_all_void_defaulting loc sorts)
+  in
   let rep : rep =
     match form, old_repres with
     | Legacy, Record_undetermined ->
@@ -2527,11 +2552,19 @@ let update_record_representation
       | Ok _ ->
         Misc.fatal_error "undetermined became something other than mixed"
       | Error (Unrepresentable_field _) ->
+        add_delayed_all_void_check ();
         Record_variable (sorts_and_types ())
       end
     | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
-      update_inlined_record_representation env loc lbls_and_types jkinds tag
-        vrep ~sorts_and_types:(sorts_and_types ())
+      let rep =
+        update_inlined_record_representation env loc lbls_and_types jkinds tag
+          vrep ~sorts_and_types:(sorts_and_types ())
+      in
+      (match rep with
+       | Record_inlined (_, Constructor_variable _, _) ->
+         add_delayed_all_void_check ()
+       | _ -> ());
+      rep
     | Unboxed_product, _ ->
       (match repr_summary.first_any with
       | Some _ -> old_repres
