@@ -1355,7 +1355,8 @@ struct
         live_vars env
     in
     let env =
-      ME.use_meet_env env ~f:(fun env ->
+      ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) env
+        ~f:(fun env ->
           ME.add_env_extension_with_extra_variables
             ~meet_expanded_head:(Meet.meet_expanded_head ())
             env extension)
@@ -1406,7 +1407,8 @@ struct
         aliases_of_names base_env
     in
     let final_env =
-      ME.use_meet_env base_env ~f:(fun env ->
+      ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) base_env
+        ~f:(fun env ->
           Name.Map.fold
             (fun name ty env ->
               ME.add_equation env name ty
@@ -1476,7 +1478,8 @@ struct
             aliases_of_name base_env)
         aliases_of_names base_env
     in
-    ME.use_meet_env base_env ~f:(fun env ->
+    ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) base_env
+      ~f:(fun env ->
         Name.Map.fold
           (fun name ty env ->
             ME.add_equation env name ty

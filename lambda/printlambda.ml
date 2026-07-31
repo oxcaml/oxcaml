@@ -1476,10 +1476,10 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->
       fprintf ppf "$%a" slam slambda
-  | Lkindtemplate {ktmpl_params; ktmpl_return; ktmpl_body; ktmpl_mode;
-                   ktmpl_env; ktmpl_loc = _} ->
+  | Lkindtemplate {ktmpl_params; ktmpl_return; ktmpl_body; ktmpl_ret_mode;
+                   ktmpl_env; ktmpl_env_mode; ktmpl_loc = _} ->
       let pr_env ppf env =
-        fprintf ppf "{@[";
+        fprintf ppf "@[{";
         Ident.Map.iter
           (fun id (l, layout) ->
             match l with
@@ -1489,16 +1489,16 @@ let rec lam ppf = function
               fprintf ppf "@,%a=%a%a;"
                 Ident.print id layout_annotation layout lam l)
           env;
-        fprintf ppf "@]}"
+        fprintf ppf "}@]"
       in
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
-      fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a%a)@]"
-        (locality_kind ktmpl_mode)
+      fprintf ppf "@[<2>(ktemplate@ %a%a@ %a%a%a)@]"
+        locality_mode ktmpl_env_mode
         pr_env ktmpl_env
         pr_params ktmpl_params
-        return_kind (ktmpl_mode, ktmpl_return)
+        return_kind (ktmpl_ret_mode, ktmpl_return)
         lam ktmpl_body
   | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
                       kinst_mode = _; kinst_loc = _} ->
