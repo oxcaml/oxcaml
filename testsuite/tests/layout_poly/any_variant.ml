@@ -3,6 +3,9 @@
  expect;
 *)
 
+(* We don't yet support variable-representation records and variants with
+   generalized sort variables. See [Typedecl.finalize_typechecked_shape]. *)
+
 type ('a : any) t =
   | None
   | Some of 'a
@@ -15,7 +18,11 @@ let poly_ map_or f y = function
   | None -> y
   | Some x -> f x
 [%%expect{|
-val poly_ map_or : 'a. ('a -> 'b) -> 'b -> 'a t -> 'b = <lpoly>
+Line 3, characters 4-10:
+3 |   | Some x -> f x
+        ^^^^^^
+Error: The representation of this record or variant depends on a
+       layout-polymorphic type, which is not yet supported.
 |}]
 
 module _ : sig
@@ -34,11 +41,11 @@ Lines 3-7, characters 6-3:
 7 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val poly_ map_or : 'a. ('a -> 'b) -> 'b -> 'a t -> 'b end
+         sig val poly_ map_or : ('a -> 'b) -> 'b -> 'a t -> 'b end
        is not included in
          sig val map_or : int end
        Values do not match:
-         val poly_ map_or : 'a. ('a -> 'b) -> 'b -> 'a t -> 'b
+         val poly_ map_or : ('a -> 'b) -> 'b -> 'a t -> 'b
        is not included in
          val map_or : int
        The type "('a -> 'b) -> 'b -> 'a t -> 'b"
