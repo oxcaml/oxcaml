@@ -2321,7 +2321,7 @@ let type_scheme_for_merlin ~print_non_value_jkind_on_type_variables ppf ty =
   prepared_type_scheme ppf ty;
   if print_non_value_jkind_on_type_variables
   then (
-    let qtvs = extract_qtvs [ty] in
+    let qtvs = extract_qtvs [ty] |> tree_of_qtvs in
     print_annotated_qtvs_as_comment ppf qtvs)
 
 
