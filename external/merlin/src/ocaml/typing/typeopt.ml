@@ -286,7 +286,9 @@ let classify ~classify_product env ty layout : _ classification =
   | Base (Vec128, _) -> Unboxed_vector Unboxed_vec128
   | Base (Vec256, _) ->
     if split_vectors
-    then Product (Pgcignorableproductarray ())
+    then Product (Pgcignorableproductarray
+                    [ Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128 ])
     else Unboxed_vector Unboxed_vec256
   | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
   | Base (Mask, _) -> Unboxed_mask
@@ -297,7 +299,6 @@ let classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
-(*
 let rec scannable_product_array_kind elt_ty_for_error loc layouts =
   List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
 
@@ -357,11 +358,6 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
-*)
-
-let scannable_product_array_kind _ _ _ = ()
-
-let ignorable_product_array_kind _ _ = ()
 
 let array_kind_of_elt env loc ty =
   let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
