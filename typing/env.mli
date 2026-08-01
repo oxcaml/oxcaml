@@ -480,11 +480,13 @@ val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
     declaration. *)
 val gadt_constraints_differ : base:t -> t -> bool
 
-(** [revert_local_constraints ~base ~refined env] restores, in [env], every
-    local constraint binding on which [refined] differs from [base] to its
-    state in [base]. [refined] must derive from [base], and [env] from
-    [refined]. *)
-val revert_local_constraints : base:t -> refined:t -> t -> t
+(** [revert_local_constraints ~base env] reverts [env]'s local (GADT)
+    constraints to their state in [base]. Constraints added after [base] are
+    dropped even when they came from later, unrelated patterns: their
+    recorded jkinds may have been derived under the constraints being
+    reverted (see [Ctype.add_gadt_equation]), so keeping them would be
+    unsound. [env] must derive from [base]. *)
+val revert_local_constraints : base:t -> t -> t
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:

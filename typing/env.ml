@@ -2998,20 +2998,8 @@ let add_local_constraint ~stage path info env =
 let gadt_constraints_differ ~base env =
   base.local_constraints != env.local_constraints
 
-let revert_local_constraints ~base ~refined env =
-  if base.local_constraints == refined.local_constraints then env
-  else
-    let local_constraints =
-      StagedPath.Map.fold
-        (fun key decl acc ->
-          match StagedPath.Map.find_opt key base.local_constraints with
-          | Some base_decl ->
-            if base_decl == decl then acc
-            else StagedPath.Map.add key base_decl acc
-          | None -> StagedPath.Map.remove key acc)
-        refined.local_constraints env.local_constraints
-    in
-    { env with local_constraints }
+let revert_local_constraints ~base env =
+  { env with local_constraints = base.local_constraints }
 
 let add_implicit_jkind ~loc name jkind env =
   { env with

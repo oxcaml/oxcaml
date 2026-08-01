@@ -6419,18 +6419,18 @@ and type_function_ret_info =
    the payload ([why] distinguishes the two). So each committed sort must
    also be derivable with the pattern's refinements reverted.
 
-   [outer_env] and [branch_env] are the environments from before and after
-   typing the pattern; their difference in local constraints is exactly the
-   pattern's refinements. *)
+   [outer_env] is the environment from before typing the pattern;
+   [branch_env], from after, only serves to detect whether the pattern added
+   refinements. Each sort is re-derived with the frame's local constraints
+   reset to [outer_env]'s: even constraints added by later patterns cannot be
+   kept, as their recorded jkinds may derive from the reverted ones (see
+   [Ctype.add_gadt_equation]). *)
 let check_calling_convention_sorts_against_partial_match
       ~why ~match_loc ~outer_env ~branch_env calling_convention_sorts =
   if Env.gadt_constraints_differ ~base:outer_env branch_env then
     List.iter
       (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
-        let weak_env =
-          Env.revert_local_constraints ~base:outer_env ~refined:branch_env
-            ccs_env
-        in
+        let weak_env = Env.revert_local_constraints ~base:outer_env ccs_env in
         let sort_why =
           match ccs_kind with
           | `Argument -> Jkind.History.Function_argument
