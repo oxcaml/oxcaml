@@ -181,8 +181,10 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 val partial_value : 'a v -> 'a -> unit = <fun>
 |}]
 
-(* An enclosing partial match must not cancel an inner total match's
-   narrowing: only the partial pattern's own refinements are reverted. *)
+(* An enclosing partial match conservatively also drops the narrowing of
+   later patterns, even an inner total match's: a later constraint's recorded
+   jkind may derive from the reverted refinements (see the [eq] case below),
+   so none of them can be kept. *)
 let partial_then_total : type a (b : any). a v -> b s -> b -> unit =
   fun A I _x -> ()
 [%%expect{|
@@ -193,4 +195,26 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "C"
 
 val partial_then_total : 'a ('b : any). 'a v -> 'b s -> 'b -> unit = <fun>
+|}]
+
+(* A later pattern's equation can launder the reverted refinements: [Refl]'s
+   equation records [b]'s jkind as computed under [Val]'s refinement of [a],
+   so keeping it while reverting [Val]'s refinement would wrongly justify
+   [x]'s layout. [f_eq B64 Refl #2L] used to segfault. *)
+type ('a : any) tv = Val : ('a : value) tv | B64 : ('a : bits64) tv
+type ('x : any, 'y : any) eq = Refl : ('z : any). ('z, 'z) eq
+
+let f_eq : type (a : any) (b : any). a tv -> (a, b) eq -> b -> unit -> unit =
+  fun Val Refl x () -> ()
+[%%expect{|
+type ('a : any) tv = Val : 'a tv | B64 : ('a : bits64). 'a tv
+type ('x : any, 'y : any) eq = Refl : ('z : any). ('z, 'z) eq
+Line 5, characters 6-9:
+5 |   fun Val Refl x () -> ()
+          ^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "B64"
+
+val f_eq : ('a : any) ('b : any). 'a tv -> ('a, 'b) eq -> 'b -> unit -> unit =
+  <fun>
 |}]
