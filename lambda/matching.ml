@@ -96,6 +96,13 @@ open Lambda
 open Parmatch
 open Printpat.Compat
 
+let doclang_pattern_action_hook =
+  ref
+    (fun (_ : pattern) (_ : (pattern * Ident.t) list) action -> action)
+
+let set_doclang_pattern_action_hook hook =
+  doclang_pattern_action_hook := hook
+
 module Scoped_location = Debuginfo.Scoped_location
 
 let dbg () = !Clflags.dump_matchcomp
@@ -373,7 +380,9 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+      | `Alias (subpattern, id, _, _, _, _, _) ->
+          let alias = General.erase p in
+          explode (General.view subpattern) ((alias, id) :: aliases) rem
       | `Var (id, str, uid, sort, mode) ->
           explode
             { p with pat_desc =
@@ -396,34 +405,54 @@ end = struct
              compile a tuple pattern [match e1, .. en with ...]
              without allocating the tuple [(e1, .., en)].
           *)
-          let rec fresh_clause arg_id action_vars renaming_env = function
+          let rec fresh_clause arg_id action_vars action_bindings renaming_env =
+            function
             | [] ->
                 let fresh_pat = alpha renaming_env { p with pat_desc = view } in
-                let fresh_action = mk_action ~vars:(List.rev action_vars) in
+                let alias_bindings =
+                  List.filter_map
+                    (fun (pattern, id) ->
+                      Option.map
+                        (fun actual -> pattern, actual)
+                        (List.assoc_opt id action_bindings))
+                    aliases
+                in
+                let fresh_action =
+                  (!doclang_pattern_action_hook) (General.erase fresh_pat)
+                    alias_bindings
+                    (mk_action ~vars:(List.rev action_vars))
+                in
                 (fresh_pat, fresh_action)
             | (pat_id, pat_duid) :: rem_vars ->
-              if not (List.mem pat_id aliases) then begin
+              if not (List.exists (fun (_, id) -> Ident.same pat_id id) aliases)
+              then begin
                 let fresh_id = Ident.rename pat_id in
                 let action_vars = fresh_id :: action_vars in
+                let action_bindings = (pat_id, fresh_id) :: action_bindings in
                 let renaming_env = ((pat_id, fresh_id) :: renaming_env) in
-                fresh_clause arg_id action_vars renaming_env rem_vars
+                fresh_clause arg_id action_vars action_bindings renaming_env
+                  rem_vars
               end else begin match arg_id, arg with
                 | Some id, _
                 | None, Lvar id ->
                   let action_vars = id :: action_vars in
-                  fresh_clause arg_id action_vars renaming_env rem_vars
+                  let action_bindings = (pat_id, id) :: action_bindings in
+                  fresh_clause arg_id action_vars action_bindings renaming_env
+                    rem_vars
                 | None, _ ->
                   (* [pat_id] is a name used locally to refer to the argument,
                      so it makes sense to reuse it (refreshed) *)
                   let id = Ident.rename pat_id in
                   let action_vars = (id :: action_vars) in
+                  let action_bindings = (pat_id, id) :: action_bindings in
                   let pat, action =
-                    fresh_clause (Some id) action_vars renaming_env rem_vars
+                    fresh_clause (Some id) action_vars action_bindings
+                      renaming_env rem_vars
                   in
                   pat, bind_alias pat id pat_duid ~arg ~arg_sort ~action
               end
           in
-          fresh_clause None [] [] patbound_action_vars :: rem
+          fresh_clause None [] [] [] patbound_action_vars :: rem
     in
     explode (p : Half_simple.pattern :> General.pattern) [] []
 end
@@ -3959,6 +3988,8 @@ let rec event_branch repr lam =
           } )
   | Llet (str, k, id, duid, lam, body), _ ->
       Llet (str, k, id, duid, lam, event_branch repr body)
+  | Lsequence (before, body), _ ->
+      Lsequence (before, event_branch repr body)
   | Lstaticraise _, _ -> lam
   | _, Some _ ->
       fatal_errorf "Matching.event_branch: %a" Printlambda.lambda lam
