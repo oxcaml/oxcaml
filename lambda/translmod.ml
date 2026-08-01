@@ -204,7 +204,9 @@ and apply_coercion_result loc strict funct params args yielding cc_res =
                       ap_yielding=
                         Translmode.transl_yielding_mode_l yielding;
                       ap_tailcall=Default_tailcall;
-                      ap_inlined=Default_inlined;
+                      ap_inlined=
+                        if !Clflags.stubs_forward_inlining
+                        then Forward_inlined else Default_inlined;
                       ap_specialised=Default_specialise;
                       ap_probe=None;
                     })))

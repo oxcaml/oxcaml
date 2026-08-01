@@ -1204,6 +1204,7 @@ let apply_inlined_attribute ppf = function
   | Always_inlined -> fprintf ppf " always_inline"
   | Never_inlined -> fprintf ppf " never_inline"
   | Hint_inlined -> fprintf ppf " hint_inline"
+  | Forward_inlined -> fprintf ppf " forward_inline"
   | Unroll i -> fprintf ppf " never_inline(%i)" i
 
 let apply_specialised_attribute ppf = function

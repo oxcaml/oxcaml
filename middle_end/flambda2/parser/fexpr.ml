@@ -281,6 +281,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined

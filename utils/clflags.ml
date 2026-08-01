@@ -1093,6 +1093,9 @@ let ddissector_verbose = ref false             (* -ddissector-verbose *)
 let ddissector_partitions = ref false          (* -ddissector-partitions *)
 let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
 
+(* CR bclement: should be changed to [true] after proper testing *)
+let stubs_forward_inlining = ref false         (* -stubs-forward-inlining *)
+
 let prepend_directory file_name =
   match !directory with
   | Some directory -> Filename.concat directory file_name

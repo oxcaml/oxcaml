@@ -131,6 +131,7 @@ let parse_inlined_attribute attr : inlined_attribute =
           "never", Never_inlined;
           "always", Always_inlined;
           "hint", Hint_inlined;
+          "forward", Forward_inlined;
         ]
         payload
 
@@ -550,7 +551,8 @@ let get_inlined_attribute_on_module e =
       | Tmod_constraint (me, _, _, _) ->
         let inner_attr = get me in
         begin match attr with
-        | Always_inlined | Hint_inlined | Never_inlined | Unroll _ -> attr
+        | Always_inlined | Hint_inlined | Forward_inlined | Never_inlined
+        | Unroll _ -> attr
         | Default_inlined -> inner_attr
         end
       | _ -> attr

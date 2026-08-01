@@ -621,7 +621,9 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_args = List.map (fun p -> Lvar (p.name)) params;
         ap_loc = no_loc;
         ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
+        ap_inlined =
+          if !Clflags.stubs_forward_inlining
+          then Forward_inlined else Default_inlined;
         ap_specialised = Default_specialise;
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
