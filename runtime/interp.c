@@ -40,6 +40,9 @@
 #include "caml/startup.h"
 #include "caml/startup_aux.h"
 
+CAMLextern void caml_doclang_observe_register_partial(value original,
+                                                       value partial);
+
 /* Registers for the abstract machine:
         pc         the code pointer
         sp         the stack pointer (grows downward)
@@ -667,6 +670,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         for (mlsize_t i = 0; i < num_args; i++) Field(accu, i + 3) = sp[i];
         Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
         Closinfo_val(accu) = Make_closinfo(0, 2, 1);
+        caml_doclang_observe_register_partial(env, accu);
         sp += num_args;
         goto do_return;
       }
