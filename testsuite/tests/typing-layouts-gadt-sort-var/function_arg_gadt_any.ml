@@ -180,3 +180,17 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 
 val partial_value : 'a v -> 'a -> unit = <fun>
 |}]
+
+(* An enclosing partial match must not cancel an inner total match's
+   narrowing: only the partial pattern's own refinements are reverted. *)
+let partial_then_total : type a (b : any). a v -> b s -> b -> unit =
+  fun A I _x -> ()
+[%%expect{|
+Line 2, characters 6-7:
+2 |   fun A I _x -> ()
+          ^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "C"
+
+val partial_then_total : 'a ('b : any). 'a v -> 'b s -> 'b -> unit = <fun>
+|}]
