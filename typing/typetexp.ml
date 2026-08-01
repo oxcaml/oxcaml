@@ -1328,7 +1328,6 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tof_kind tjkind) in
       ctyp (Ttyp_of_kind jkind) ty
   | Ptyp_modality (t, modalities) ->
-      Language_extension.assert_enabled ~loc Mode Language_extension.Alpha;
       let cty = transl_type env ~policy ~row_context mode t in
       let modalities =
         Typemode.transl_modalities ~maturity:Language_extension.Stable Immutable
