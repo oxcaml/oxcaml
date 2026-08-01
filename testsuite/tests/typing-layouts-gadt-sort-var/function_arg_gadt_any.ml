@@ -194,7 +194,13 @@ Line 2, characters 6-7:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "C"
 
-val partial_then_total : 'a ('b : any). 'a v -> 'b s -> 'b -> unit = <fun>
+Line 2, characters 10-12:
+2 |   fun A I _x -> ()
+              ^^
+Error: This function's argument has type b,
+       whose layout is known only from the GADT pattern match at line 2, characters 6-7.
+       That match is not exhaustive, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
 (* A later pattern's equation can launder the reverted refinements: [Refl]'s
@@ -215,6 +221,11 @@ Line 5, characters 6-9:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "B64"
 
-val f_eq : ('a : any) ('b : any). 'a tv -> ('a, 'b) eq -> 'b -> unit -> unit =
-  <fun>
+Line 5, characters 15-16:
+5 |   fun Val Refl x () -> ()
+                   ^
+Error: This function's argument has type b,
+       whose layout is known only from the GADT pattern match at line 5, characters 6-9.
+       That match is not exhaustive, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
