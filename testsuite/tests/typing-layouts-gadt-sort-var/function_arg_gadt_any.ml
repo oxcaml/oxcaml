@@ -181,6 +181,20 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 val partial_value : 'a v -> 'a -> unit = <fun>
 |}]
 
+(* The branch body still sees a partial match's narrowing (returning [x] at
+   type [int] needs [a = int]); only caller-facing sorts must be justified
+   without it. *)
+let body_uses_narrowing : type a. a v -> a -> int = fun A x -> x
+[%%expect{|
+Line 1, characters 56-57:
+1 | let body_uses_narrowing : type a. a v -> a -> int = fun A x -> x
+                                                            ^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "C"
+
+val body_uses_narrowing : 'a v -> 'a -> int = <fun>
+|}]
+
 (* An enclosing partial match conservatively also drops the narrowing of
    later patterns, even an inner total match's: a later constraint's recorded
    jkind may derive from the reverted refinements (see the [eq] case below),
