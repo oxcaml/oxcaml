@@ -18,11 +18,16 @@
 let current_unit : Unit_info.t option ref =
   ref None
 
+(* Kept in sync with [current_unit] by [set] and [unset], the only mutation
+   points: neither ref is exported. *)
+let current_cu : Compilation_unit.t option ref =
+  ref None
+
 let get () =
   !current_unit
 
 let get_cu () =
-  Option.map Unit_info.modname (get ())
+  !current_cu
 
 let get_cu_or_dummy () =
   Option.value (get_cu ()) ~default:Compilation_unit.dummy
@@ -38,10 +43,12 @@ let is_current t =
   | Some t' -> Compilation_unit.equal t t'
 
 let set cu =
-  current_unit := Some cu
+  current_unit := Some cu;
+  current_cu := Some (Unit_info.modname cu)
 
 let unset () =
-  current_unit := None
+  current_unit := None;
+  current_cu := None
 
 module Name = struct
   let get () =
