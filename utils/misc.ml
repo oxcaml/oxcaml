@@ -760,44 +760,67 @@ module Utf8_lexeme = struct
     ('s', 0x30c, 0x161); (* š *)   ('z', 0x30c, 0x17e); (* ž *)
   ]
 
-  let normalize_generic ~keep_ascii transform s =
-    let rec norm check buf prev i =
-      if i >= String.length s then begin
-        Buffer.add_utf_8_uchar buf (transform prev)
-      end else begin
-        let d = String.get_utf_8_uchar s i in
-        let u = Uchar.utf_decode_uchar d in
-        check d u;
-        let i' = i + Uchar.utf_decode_length d in
-        match Hashtbl.find_opt known_pairs (prev, u) with
-        | Some u' ->
-            norm check buf u' i'
-        | None ->
-            Buffer.add_utf_8_uchar buf (transform prev);
-            norm check buf u i'
-      end in
-    let ascii_limit = 128 in
-    if s = ""
-    || keep_ascii && String.for_all (fun x -> Char.code x < ascii_limit) s
-    then Ok s
+  let normalize_generic ?first s =
+    (* [first : Uchar.t -> Uchar.t] is an optional function to be
+       applied to the first character of [s] only.*)
+    if s = "" then Ok ""
     else
-      let buf = Buffer.create (String.length s) in
-      let valid = ref true in
-      let check d u =
-        valid := !valid && Uchar.utf_decode_is_valid d && u <> Uchar.rep
-      in
+      let only_ascii = String.for_all Char.Ascii.is_valid s in
+      (* get the first character of [s] *)
       let d = String.get_utf_8_uchar s 0 in
-      let u = Uchar.utf_decode_uchar d in
-      check d u;
-      norm check buf u (Uchar.utf_decode_length d);
-      let contents = Buffer.contents buf in
-      if !valid then
-        Ok contents
-      else
-        Error contents
+      let u0 = Uchar.utf_decode_uchar d in
+      let i0 = Uchar.utf_decode_length d in
+      let u0' = match first with None -> u0 | Some transform -> transform u0 in
+      if u0' = u0 && only_ascii then
+        (* If the first character is unchanged by the [first] transformation,
+           and the string is ascii-only, we can return it unchanged. *)
+        Ok s
+      else if only_ascii then begin
+        (* If the first character is changed but the rest
+           of the string is ascii-only, we can concatenate
+           the new first character with the rest. *)
+        let ulen = Uchar.utf_8_byte_length u0' in
+        let restlen = String.length s - i0 in
+        let res = Bytes.create (ulen + restlen) in
+        let ulen' = Bytes.set_utf_8_uchar res 0 u0' in
+        assert (ulen = ulen');
+        BytesLabels.blit_string
+          ~src:s ~src_pos:i0 ~dst:res ~dst_pos:ulen ~len:restlen;
+        Ok (Bytes.unsafe_to_string res)
+      end else begin
+        (* Otherwise we are in the slow path where each character
+           must be normalized. *)
+        let buf = Buffer.create (String.length s) in
+        let valid = ref true in
+        let check d u =
+          valid := !valid && Uchar.utf_decode_is_valid d && u <> Uchar.rep
+        in
+        check d u0;
+        let rec norm prev i =
+          if i >= String.length s then begin
+            Buffer.add_utf_8_uchar buf prev
+          end else begin
+            let d = String.get_utf_8_uchar s i in
+            let u = Uchar.utf_decode_uchar d in
+            check d u;
+            let i' = i + Uchar.utf_decode_length d in
+            match Hashtbl.find_opt known_pairs (prev, u) with
+            | Some u' ->
+                norm u' i'
+            | None ->
+                Buffer.add_utf_8_uchar buf prev;
+                norm u i'
+          end in
+        norm u0' i0;
+        let contents = Buffer.contents buf in
+        if !valid then
+          Ok contents
+        else
+          Error contents
+      end
 
   let normalize s =
-    normalize_generic ~keep_ascii:true (fun u -> u) s
+    normalize_generic s
 
   (* Capitalization *)
 
@@ -827,16 +850,10 @@ module Utf8_lexeme = struct
       | _ -> u
 
   let capitalize s =
-    let first = ref true in
-    normalize_generic ~keep_ascii:false
-      (fun u -> if !first then (first := false; uchar_uppercase u) else u)
-      s
+    normalize_generic ~first:uchar_uppercase s
 
   let uncapitalize s =
-    let first = ref true in
-    normalize_generic ~keep_ascii:false
-      (fun u -> if !first then (first := false; uchar_lowercase u) else u)
-      s
+    normalize_generic ~first:uchar_lowercase s
 
   let is_capitalized s =
     s <> "" &&
