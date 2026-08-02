@@ -192,11 +192,13 @@ type poly_record = { mutable poly_field : 'a. 'a option [@atomic]; }
 val test_poly_read : poly_record -> int option = <fun>
 |}]
 
-(* CR rtjoa: unsound. [Atomic.Loc.set] through this location would store a value
-   of a single type into a field that must hold a polymorphic one. *)
 let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
 [%%expect{|
-val test_poly_atomic_loc : poly_record -> 'a option atomic_loc = <fun>
+Line 1, characters 45-71:
+1 | let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Use of "[%atomic.loc]" (here "poly_field")
+       for polymorphic record fields is forbidden.
 |}]
 
 (* Test Invalid_atomic_loc_payload errors *)

@@ -548,11 +548,13 @@ let ok = (.p_imm)
 val ok : (poly_imm, 'a option) idx_imm = <abstr>
 |}]
 
-(* CR rtjoa: unsound. [Idx_mut.set] through this index would store a value of a
-   single type into a field that must hold a polymorphic one. *)
 let bad = (.p_mut)
 [%%expect{|
-val bad : (poly_mut, 'a option) idx_mut = <abstr>
+Line 1, characters 12-17:
+1 | let bad = (.p_mut)
+                ^^^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_mut") are forbidden.
 |}]
 
 type poly_unboxed = #{ p_u : 'a. 'a option }
@@ -562,11 +564,13 @@ type poly_unboxed = #{ p_u : 'a. 'a option; }
 type holds_poly = { mutable h : poly_unboxed; }
 |}]
 
-(* CR rtjoa: unsound for the same reason: the mutability comes from [h], and the
-   polymorphism from the unboxed field [p_u]. *)
 let bad_unboxed = (.h.#p_u)
 [%%expect{|
-val bad_unboxed : (holds_poly, 'a option) idx_mut = <abstr>
+Line 1, characters 23-26:
+1 | let bad_unboxed = (.h.#p_u)
+                           ^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_u") are forbidden.
 |}]
 
 (**************)
