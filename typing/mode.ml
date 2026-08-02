@@ -5584,9 +5584,9 @@ module Monadic_gen (Obj : Obj) = struct
   let join_const_unhint c m =
     (* The underlying object is the opposite lattice, so this is a meet, and
        [meet_const max] is the identity *)
-    if C.le Obj.obj (C.max Obj.obj) c
+    if C.le obj (C.max obj) c
     then m
-    else S.Unhint.apply Obj.obj (Simple (Meet_const c)) m
+    else S.Unhint.apply obj (Simple (Meet_const c)) m
 
   let join_const ?hint c m = wrap ?hint (join_const_unhint c) (disallow_left m)
 
