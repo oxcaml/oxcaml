@@ -2276,6 +2276,25 @@ let solve_constructor_annotation
   in
   ty_args, Some (existentials, cty)
 
+(* The GADT constructor matches recorded while typing a pattern, for
+   [type_function]'s calling-convention check. Only the (constructor,
+   expected type) pair is recorded: the check rebuilds the constructor's
+   evidence from a fresh instance, since the types and jkinds recorded by
+   the original elaboration may derive from other, bypassable matches. *)
+let gadt_match_log : (constructor_description * type_expr) list ref = ref []
+
+let collect_gadt_matches f =
+  let saved = !gadt_match_log in
+  gadt_match_log := [];
+  match f () with
+  | v ->
+      let log = List.rev !gadt_match_log in
+      gadt_match_log := saved;
+      (v, log)
+  | exception e ->
+      gadt_match_log := saved;
+      raise e
+
 let solve_Ppat_construct tps (penv : Pattern_env.t) loc constr no_existentials
         existential_styp expected_ty =
   (* if constructor is gadt, we must verify that the expected type has the
@@ -2331,6 +2350,8 @@ let solve_Ppat_construct tps (penv : Pattern_env.t) loc constr no_existentials
       (ty_args, equated_types, existential_ctyp)
     end
   in
+  if constr.cstr_generalized && not penv.in_counterexample then
+    gadt_match_log := (constr, expected_ty) :: !gadt_match_log;
   if !Clflags.principal && not penv.in_counterexample then begin
     (* Do not warn for counter-examples *)
     let exception Warn_only_once in
@@ -3189,7 +3210,10 @@ type ('case_pattern, 'case_data) half_typed_case =
     branch_env: Env.t;
     pat_vars: pattern_variable list;
     module_vars: module_variables;
-    contains_gadt: bool; }
+    contains_gadt: bool;
+    (* The GADT constructor matches recorded while typing the pattern; see
+       [gadt_match_log]. *)
+    gadt_matches: (constructor_description * type_expr) list; }
 
 (* Used to split patterns into value cases and exception cases. *)
 let split_half_typed_cases env zipped_cases =
@@ -6014,6 +6038,12 @@ let contains_gadt p =
      | Tpat_construct (_, cd, _, _, _) when cd.cstr_generalized -> true
      | _ -> false } p
 
+let contains_or_pattern p =
+  exists_general_pattern { f = fun (type k) (p : k general_pattern) ->
+     match p.pat_desc with
+     | Tpat_or _ -> true
+     | _ -> false } p
+
 (* There are various things that we need to do in presence of GADT constructors
    that aren't required if there are none.
    However, because of disambiguation, we can't know for sure whether the
@@ -6365,7 +6395,7 @@ type type_function_result_param =
 
 (* A sort that is part of the function's calling convention, committed while
    typing the suffix of an n-ary function; see
-   [check_calling_convention_sorts_against_partial_match]. *)
+   [check_calling_convention_sorts]. *)
 type calling_convention_sort =
   { ccs_ty : type_expr;
     ccs_sort : Jkind.sort;
@@ -6374,6 +6404,28 @@ type calling_convention_sort =
     ccs_loc : Location.t;
     ccs_kind : [`Argument | `Result];
   }
+
+(* A value parameter's pattern match, as relevant to the calling-convention
+   check: the GADT constructor matches it performed, and whether a caller can
+   reach the later arguments without satisfying it. *)
+type cc_param_match =
+  { pm_gadt_matches : (constructor_description * type_expr) list;
+    (* Whether the pattern contains or-patterns, whose evidence holds only
+       branch-wise and so is never replayed. *)
+    pm_contains_or : bool;
+    pm_bypassable : [`Partial_match | `Optional_argument] option;
+    pm_match_loc : Location.t;
+    (* The environment the pattern was typed in. *)
+    pm_env : Env.t;
+  }
+
+type calling_convention_info =
+  { cc_sorts : calling_convention_sort list;
+    (* Outermost parameter first. *)
+    cc_param_matches : cc_param_match list;
+  }
+
+let empty_cc_info = { cc_sorts = []; cc_param_matches = [] }
 
 (* The result of calling [type_function]. For the outer call to
    [type_function], it's the result of typechecking the entire function;
@@ -6399,8 +6451,9 @@ type type_function_result =
        left.
     *)
     ret_info: type_function_ret_info option;
-    (* The argument/result sorts committed by this parameter suffix. *)
-    calling_convention_sorts: calling_convention_sort list;
+    (* The argument/result sorts committed by this parameter suffix, and its
+       parameters' matches. *)
+    cc_info: calling_convention_info;
   }
 
 and type_function_ret_info =
@@ -6410,46 +6463,88 @@ and type_function_ret_info =
     ret_sort: Jkind.sort;
   }
 
-(* A parameter pattern's GADT refinements (local constraints, cf.
-   [Ctype.add_gadt_equation]) hold in the branch body, which runs only after
-   the match succeeds. They must not justify the function's argument and
-   result sorts: arguments are passed before the match runs, and a caller may
-   pick a constructor missing from a partial match — or, for an optional
-   argument, omit the argument entirely, bypassing even a pattern that covers
-   the payload ([why] distinguishes the two). So each committed sort must
-   also be derivable with the pattern's refinements reverted.
+(* Rebuild one GADT constructor match's evidence against the
+   calling-convention environment [cc]: instantiate the constructor afresh
+   and unify its result type with an instance of the expected type, in
+   pattern mode over [cc]'s constraints. Starting from the constructor's
+   declaration is what makes this sound: the types and jkinds recorded by
+   the original elaboration may derive from bypassable matches — even
+   through the jkinds of instantiated type variables, which no environment
+   manipulation can undo. A failed replay leaves [cc] unchanged: evidence is
+   dropped, never trusted. *)
+let replay_gadt_match cc ~env (cstr, expected_ty) =
+  let view = Env.revert_local_constraints ~base:cc env in
+  let penv =
+    Pattern_env.make view ~equations_scope:(Ctype.get_current_level ())
+      ~in_counterexample:false
+  in
+  match
+    let _, ty_res, _ = instance_constructor Keep_existentials_flexible cstr in
+    unify_pat_types_return_equated_pairs ~refine:true Location.none penv
+      ~pat:ty_res ~expected:(instance expected_ty)
+  with
+  | _ -> !!penv
+  | exception (Error _ | Ctype.Unify _) -> cc
 
-   [outer_env] is the environment from before typing the pattern;
-   [branch_env], from after, only serves to detect whether the pattern added
-   refinements. Each sort is re-derived with the frame's local constraints
-   reset to [outer_env]'s: even constraints added by later patterns cannot be
-   kept, as their recorded jkinds may derive from the reverted ones (see
-   [Ctype.add_gadt_equation]). *)
-let check_calling_convention_sorts_against_partial_match
-      ~why ~match_loc ~outer_env ~branch_env calling_convention_sorts =
-  if Env.gadt_constraints_differ ~base:outer_env branch_env then
-    List.iter
-      (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
-        let weak_env = Env.revert_local_constraints ~base:outer_env ccs_env in
-        let sort_why =
-          match ccs_kind with
-          | `Argument -> Jkind.History.Function_argument
-          | `Result -> Jkind.History.Function_result
-        in
-        let ok =
-          (* [~fixed:true] so that the re-check does not mutate the jkinds of
-             type variables. *)
-          match Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty with
-          | Ok sort -> Jkind.Sort.equate sort ccs_sort
-          | Error _ -> false
-        in
-        if not ok then
-          raise
-            (Error
-               (ccs_loc, ccs_env,
-                Function_type_escapes_partial_match
-                  { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
-      calling_convention_sorts
+(* A function's arguments are passed, and its calling convention used, before
+   any parameter pattern is matched. So the sorts committed for its arguments
+   and result may rely only on refinements that hold for every caller: those
+   of total matches of required arguments (a caller must supply a value that
+   satisfies them). A caller can bypass a non-exhaustive match by picking a
+   missing constructor, and an optional argument's pattern by omitting the
+   argument, so if any parameter is bypassable, re-derive each committed sort
+   in the calling-convention environment: the function's outer environment
+   plus the non-bypassable matches' replayed evidence. *)
+let check_calling_convention_sorts ~outer_env { cc_sorts; cc_param_matches } =
+  let bypassed =
+    List.find_map
+      (fun pm ->
+        match pm.pm_bypassable with
+        | Some why -> Some (why, pm.pm_match_loc)
+        | None -> None)
+      cc_param_matches
+  in
+  match bypassed with
+  | None -> ()
+  | Some (why, match_loc) ->
+    if List.exists
+         (fun { ccs_env; _ } ->
+           Env.gadt_constraints_differ ~base:outer_env ccs_env)
+         cc_sorts
+    then begin
+      let cc =
+        List.fold_left
+          (fun cc pm ->
+            if pm.pm_bypassable = None && not pm.pm_contains_or then
+              List.fold_left
+                (fun cc m -> replay_gadt_match cc ~env:pm.pm_env m)
+                cc pm.pm_gadt_matches
+            else cc)
+          outer_env cc_param_matches
+      in
+      List.iter
+        (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
+          let view = Env.revert_local_constraints ~base:cc ccs_env in
+          let sort_why =
+            match ccs_kind with
+            | `Argument -> Jkind.History.Function_argument
+            | `Result -> Jkind.History.Function_result
+          in
+          let ok =
+            (* [~fixed:true] so that the re-check does not mutate the jkinds
+               of type variables. *)
+            match Ctype.type_sort ~why:sort_why ~fixed:true view ccs_ty with
+            | Ok sort -> Jkind.Sort.equate sort ccs_sort
+            | Error _ -> false
+          in
+          if not ok then
+            raise
+              (Error
+                 (ccs_loc, ccs_env,
+                  Function_type_escapes_partial_match
+                    { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
+        cc_sorts
+    end
 
 (* value binding elaboration *)
 
@@ -9287,12 +9382,12 @@ and type_function
   | { pparam_desc = Pparam_newtype (newtype_var, jkind_annot) } :: rest ->
       (* Check everything else in the scope of (type a). *)
       let (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
-           calling_convention_sorts),
+           cc_info),
           exp_type, id, uid =
         type_newtype env newtype_var jkind_annot (fun env ->
           let { function_ = exp_type, params, body;
                 newtypes; params_contain_gadt = contains_gadt;
-                fun_alloc_mode; ret_info; calling_convention_sorts;
+                fun_alloc_mode; ret_info; cc_info;
               }
             =
             (* mimic the typing of Pexp_newtype by minting a new type var,
@@ -9303,7 +9398,7 @@ and type_function
               rest body_constraint body ~in_function ~first
           in
           (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
-           calling_convention_sorts),
+           cc_info),
           exp_type)
       in
       let newtype = id, newtype_var, jkind_annot, uid in
@@ -9311,7 +9406,7 @@ and type_function
           unify_exp_types loc env exp_type (instance ty_expected));
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
-        fun_alloc_mode; ret_info; calling_convention_sorts;
+        fun_alloc_mode; ret_info; cc_info;
       }
   | { pparam_desc = Pparam_val (arg_label, default_arg, pat); pparam_loc }
       :: rest
@@ -9408,7 +9503,7 @@ and type_function
               default_arg_sort
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry,
-           ext_env, inner_calling_convention_sorts), partial =
+           gadt_matches, inner_cc_info), partial =
         (* Check everything else in the scope of the parameter. *)
         map_half_typed_cases Value env expected_pat_mode
           ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
@@ -9417,10 +9512,10 @@ and type_function
           [ { pattern = pat; has_guard = false; needs_refute = false }, () ]
           ~type_body:begin
             fun () pat ~when_env:_ ~ext_env ~cont:_ ~ty_expected ~ty_infer:_
-              ~contains_gadt:param_contains_gadt ->
+              ~contains_gadt:param_contains_gadt ~gadt_matches ->
               let { function_ = _, params_suffix, body;
                     newtypes; params_contain_gadt = suffix_contains_gadt;
-                    fun_alloc_mode; ret_info; calling_convention_sorts;
+                    fun_alloc_mode; ret_info; cc_info;
                   }
                 =
                 type_function ext_env expected_inner_mode ty_expected
@@ -9464,7 +9559,7 @@ and type_function
                   More_args {partial_mode = Alloc.disallow_right fun_alloc_mode}
               in
               pat, params_suffix, body, ret_info, newtypes, contains_gadt,
-              curry, ext_env, calling_convention_sorts
+              curry, gadt_matches, cc_info
           end
         |> function
           (* The result must be a singleton because we passed a singleton
@@ -9472,21 +9567,6 @@ and type_function
         | [ result ], partial -> result, partial
         | ([] | _ :: _ :: _), _ -> assert false
       in
-      (* Even a total pattern on an optional argument is bypassed when the
-         caller omits the argument: the default runs only after the arguments
-         are passed. *)
-      begin match partial, default_arg with
-      | Total, None -> ()
-      | Partial, _ | Total, Some _ ->
-        let why =
-          match partial with
-          | Partial -> `Partial_match
-          | Total -> `Optional_argument
-        in
-        check_calling_convention_sorts_against_partial_match ~why
-          ~match_loc:pat.pat_loc ~outer_env:env ~branch_env:ext_env
-          inner_calling_convention_sorts
-      end;
       let exp_type =
         instance
           (newgenty
@@ -9554,33 +9634,50 @@ and type_function
             };
         }
       in
-      let ret_info, calling_convention_sorts =
+      let ret_info, cc_info =
         match ret_info with
-        | Some _ as x -> x, inner_calling_convention_sorts
+        | Some _ as x -> x, inner_cc_info
         | None ->
           let ret_mode =
             {ret_mode_annots with mode_modes = Alloc.disallow_right ret_mode }
           in
           Some { ret_sort ; ret_mode },
           (* This innermost frame determines the function's result sort. *)
-          { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
-            ccs_loc = loc; ccs_kind = `Result }
-          :: inner_calling_convention_sorts
+          { inner_cc_info with
+            cc_sorts =
+              { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
+                ccs_loc = loc; ccs_kind = `Result }
+              :: inner_cc_info.cc_sorts }
       in
-      let calling_convention_sorts =
+      let cc_info =
+        let pm =
+          { pm_gadt_matches = gadt_matches;
+            pm_contains_or = contains_or_pattern pat;
+            pm_bypassable =
+              (match partial, default_arg with
+               | Partial, _ -> Some `Partial_match
+               | Total, Some _ -> Some `Optional_argument
+               | Total, None -> None);
+            pm_match_loc = pat.pat_loc;
+            pm_env = env;
+          }
+        in
         (* A parameter's own sort is checked against enclosing patterns,
            never its own. *)
-        { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
-          ccs_loc = pparam_loc; ccs_kind = `Argument }
-        :: calling_convention_sorts
+        { cc_sorts =
+            { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
+              ccs_loc = pparam_loc; ccs_kind = `Argument }
+            :: cc_info.cc_sorts;
+          cc_param_matches = pm :: cc_info.cc_param_matches;
+        }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
         ret_info; fun_alloc_mode = Some alloc_mode;
-        calling_convention_sorts;
+        cc_info;
       }
   | [] ->
-    let exp_type, body, fun_alloc_mode, ret_info, calling_convention_sorts =
+    let exp_type, body, fun_alloc_mode, ret_info, cc_info =
       let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
         body_constraint
       in
@@ -9622,7 +9719,7 @@ and type_function
                 exp_type;
             }
           in
-          body.exp_type, Tfunction_body body, None, None, []
+          body.exp_type, Tfunction_body body, None, None, empty_cc_info
       | Pfunction_cases (cases, _, attributes) ->
           let type_cases_expect env expected_mode ty_expected =
             type_function_cases_expect
@@ -9630,7 +9727,7 @@ and type_function
               ~first
           in
           let (cases, exp_type, fun_alloc_mode, ret_info,
-               calling_convention_sorts), exp_extra =
+               cc_info), exp_extra =
             match ret_type_constraint with
             | None -> type_cases_expect env expected_mode ty_expected, []
             | Some constraint_ ->
@@ -9648,23 +9745,21 @@ and type_function
               let function_cases_constraint_arg =
                 { is_self = (fun _ -> false);
                   type_with_constraint = (fun env expected_mode ty ->
-                    let cases, _, fun_alloc_mode, ret_info,
-                        calling_convention_sorts =
+                    let cases, _, fun_alloc_mode, ret_info, cc_info =
                       type_cases_expect env expected_mode ty
                     in
-                    cases, fun_alloc_mode, ret_info, calling_convention_sorts);
+                    cases, fun_alloc_mode, ret_info, cc_info);
                   type_without_constraint = (fun env expected_mode ->
-                    let cases, ty_fun, fun_alloc_mode, ret_info,
-                        calling_convention_sorts =
+                    let cases, ty_fun, fun_alloc_mode, ret_info, cc_info =
                       (* The analogy to [type_exp] for expressions. *)
                       type_cases_expect env expected_mode
                         (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
                     in
-                    (cases, fun_alloc_mode, ret_info, calling_convention_sorts),
+                    (cases, fun_alloc_mode, ret_info, cc_info),
                     ty_fun);
                 }
               in
-              let (body, fun_alloc_mode, ret_info, calling_convention_sorts),
+              let (body, fun_alloc_mode, ret_info, cc_info),
                   exp_type, exp_extra =
                 type_constraint_expect function_cases_constraint_arg
                   env expected_mode loc type_mode.mode_modes constraint_
@@ -9676,8 +9771,7 @@ and type_function
                 | _ :: _ ->
                   [ Texp_mode type_mode ; exp_extra ]
               in
-              (body, exp_type, fun_alloc_mode, ret_info,
-               calling_convention_sorts),
+              (body, exp_type, fun_alloc_mode, ret_info, cc_info),
               exp_extra
           in
           let cases =
@@ -9686,7 +9780,7 @@ and type_function
             | _ :: _ as fc_exp_extra -> { cases with fc_exp_extra }
           in
           exp_type, Tfunction_cases cases, Some fun_alloc_mode, Some ret_info,
-          calling_convention_sorts
+          cc_info
      in
      { function_ = exp_type, [], body; newtypes = [];
      (* [No_gadt] is fine because this return value is only meant to indicate
@@ -9694,7 +9788,7 @@ and type_function
         the body is a [Tfunction_cases] whose patterns include a GADT.
      *)
        params_contain_gadt = No_gadt;
-       ret_info; fun_alloc_mode; calling_convention_sorts;
+       ret_info; fun_alloc_mode; cc_info;
      }
 
 and type_label_access
@@ -10903,6 +10997,7 @@ and map_half_typed_cases
         -> ty_expected:_ (* type to check body in scope of *)
         -> ty_infer:_ (* type to infer for body *)
         -> contains_gadt:_ (* whether the pattern contains a GADT *)
+        -> gadt_matches:_ (* the pattern's GADT constructor matches *)
         -> ret)
     -> check_if_total:bool (* if false, assume Partial right away *)
     -> ret list * partial
@@ -10968,9 +11063,10 @@ and map_half_typed_cases
                 with_local_level_generalize_structure
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
-              let (pat, ext_env, force, pvs, mvs) =
-                type_pattern ?cont category ~lev ~alloc_mode:pat_mode env
-                  pattern ty_arg sort_arg allow_modules
+              let (pat, ext_env, force, pvs, mvs), gadt_matches =
+                collect_gadt_matches (fun () ->
+                  type_pattern ?cont category ~lev ~alloc_mode:pat_mode env
+                    pattern ty_arg sort_arg allow_modules)
               in
               pattern_force := force @ !pattern_force;
               { typed_pat = pat;
@@ -10981,6 +11077,7 @@ and map_half_typed_cases
                 pat_vars = pvs;
                 module_vars = mvs;
                 contains_gadt = contains_gadt (as_comp_pattern category pat);
+                gadt_matches;
               }
             end
           in
@@ -11038,7 +11135,7 @@ and map_half_typed_cases
     map_conts
     (fun { typed_pat = pat; branch_env = ext_env;
            pat_vars = pvs; module_vars = mvs;
-           case_data; contains_gadt; _ } cont
+           case_data; contains_gadt; gadt_matches; _ } cont
         ->
         let ext_env =
           if contains_gadt then
@@ -11068,7 +11165,7 @@ and map_half_typed_cases
             duplicate_type ty_res
           else ty_res in
         type_body case_data pat ~when_env ~ext_env ~cont ~ty_expected
-          ~ty_infer:ty_res' ~contains_gadt)
+          ~ty_infer:ty_res' ~contains_gadt ~gadt_matches)
     conts half_typed_cases
   end in
   let do_init = may_contain_gadts || needs_exhaust_check in
@@ -11179,7 +11276,7 @@ and type_cases
     caselist ~check_if_total
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
-        ~ty_infer ~contains_gadt:_ ->
+        ~ty_infer ~contains_gadt:_ ~gadt_matches:_ ->
         let cont = Option.map (fun (id,_) -> id) cont in
         let guard =
           match pc_guard with
@@ -11260,19 +11357,33 @@ and type_function_cases_expect
         fc_arg_sort = arg_sort;
       }
     in
-    let calling_convention_sorts =
+    let cc_info =
       (* Both sorts were committed before the cases' own patterns were typed,
-         so enclosing patterns must validate them. *)
-      [ { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
-          ccs_loc = loc; ccs_kind = `Argument };
-        { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
-          ccs_loc = loc; ccs_kind = `Result } ]
+         so enclosing patterns must validate them. The cases' own evidence is
+         never replayed: with several cases, a caller only has to satisfy one
+         of them. *)
+      { cc_sorts =
+          [ { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
+              ccs_loc = loc; ccs_kind = `Argument };
+            { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
+              ccs_loc = loc; ccs_kind = `Result } ];
+        cc_param_matches =
+          [ { pm_gadt_matches = [];
+              pm_contains_or = true;
+              pm_bypassable =
+                (match partial with
+                 | Partial -> Some `Partial_match
+                 | Total -> None);
+              pm_match_loc = loc;
+              pm_env = env;
+            } ];
+      }
     in
     cases, ty_fun, alloc_mode,
       { ret_sort;
         ret_mode =
           {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} },
-      calling_convention_sorts
+      cc_info
   end
 
 and type_effect_cases
@@ -11811,11 +11922,12 @@ and type_n_ary_function
     let in_function = mk_expected (instance ty_expected) ?explanation, loc in
     let { function_ = exp_type, result_params, body;
           newtypes; params_contain_gadt = contains_gadt;
-          ret_info; fun_alloc_mode; calling_convention_sorts = _;
+          ret_info; fun_alloc_mode; cc_info;
         } =
       type_function env expected_mode ty_expected params constraint_ body
         ~in_function ~first:true
     in
+    check_calling_convention_sorts ~outer_env:env cc_info;
     let fun_alloc_mode, { ret_mode; ret_sort } =
       match fun_alloc_mode, ret_info with
       | Some x, Some y -> x, y
