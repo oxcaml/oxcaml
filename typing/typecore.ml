@@ -260,6 +260,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
   | Mixed_record_atomic_loc of Longident.t
+  | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -301,6 +302,7 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Block_index_atomic_unsupported
+  | Block_index_polymorphic_field of Longident.t
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -1327,9 +1329,11 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc ~loc ~env record_repres mutability lid =
-  if not (Types.is_atomic mutability) then
+let check_atomic_loc ~loc ~env record_repres label lid =
+  if not (Types.is_atomic label.lbl_mut) then
     raise (Error (loc, env, Label_not_atomic lid));
+  if is_poly_Tpoly label.lbl_arg then
+    raise (Error (loc, env, Polymorphic_atomic_loc lid));
   match record_repres with
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
@@ -1343,6 +1347,21 @@ let check_atomic_loc ~loc ~env record_repres mutability lid =
   (* We should know record representation at this point. *)
   | Record_dummy _ | Record_variable ->
       Misc.fatal_error "check_atomic_loc: unexpected record representation"
+
+(* Mutable indices to polymorphic fields cannot be taken, as they would allow
+   writing non-polymorphic values. *)
+let check_index_not_to_poly_field ~env ba uas =
+  let check lid lbl_arg =
+    if is_poly_Tpoly lbl_arg then
+      raise (Error (lid.loc, env, Block_index_polymorphic_field lid.txt))
+  in
+  begin match ba with
+  | Baccess_field (lid, label, _) -> check lid label.lbl_arg
+  | Baccess_block _ -> ()
+  end;
+  List.iter
+    (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
+    uas
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -7774,6 +7793,7 @@ and type_expect_
         (el_ty, modality)
         uas
     in
+    if mut then check_index_not_to_poly_field ~env ba uas;
     let expected_modality = Typemode.idx_expected_modalities ~mut in
     begin
       match Modality.Const.equate modality expected_modality with
@@ -8533,7 +8553,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-          check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
+          check_atomic_loc ~loc ~env record_repres label lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -13069,6 +13089,11 @@ let report_error ~loc env =
         "Use of %a with mixed record fields (here %a) is forbidden."
         Style.inline_code "[%atomic.loc]"
         quoted_longident lid
+  | Polymorphic_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a (here %a)@ for polymorphic record fields is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
@@ -13256,6 +13281,11 @@ let report_error ~loc env =
   | Block_index_atomic_unsupported ->
     Location.error ~loc
       "Block indices do not yet support [@atomic] record fields."
+  | Block_index_polymorphic_field lid ->
+    Location.errorf ~loc
+      "Mutable block indices to polymorphic record fields@ (here %a) are \
+       forbidden."
+      quoted_longident lid
   | Submode_failed(e, submode_reason) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
     (* CR-soon zqian: move the following hints into the new hint system, then
