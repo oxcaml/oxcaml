@@ -188,12 +188,18 @@ let[@inline] make () =
     degree = Reg.Tbl.create num_registers
   }
 
+(* Graphs are per-function and [num_registers] only grows within one, so the
+   edge-set fallback below never needs to upgrade back to a matrix. *)
 let[@inline] clear graph =
   let num_registers = Reg.For_testing.get_stamp () in
   (match graph.adj_set with
   | EdgeSet set -> EdgeSet.clear set
   | BitMatrix matrix ->
-    if BitMatrix.capacity matrix < num_registers
+    (* Spill rewrites add registers, so a function can cross the threshold
+       between rounds; the bound is on the threshold, not the spare capacity. *)
+    if num_registers >= Lazy.force bit_matrix_threshold
+    then graph.adj_set <- EdgeSet (EdgeSet.make ~num_registers)
+    else if BitMatrix.capacity matrix < num_registers
     then graph.adj_set <- BitMatrix (BitMatrix.make ~num_registers)
     else BitMatrix.clear matrix);
   Reg.Tbl.clear graph.adj_list;
