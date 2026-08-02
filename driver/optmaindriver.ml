@@ -21,6 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
+  Compmisc.init_backtrace_recording ();
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with

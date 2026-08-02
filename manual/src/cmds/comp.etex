@@ -144,6 +144,23 @@ A mapping of file names to lists of arguments that
 will be added to the command line (and "OCAMLPARAM") arguments.
 \end{options}
 
+\paragraph{compiler-backtraces}{Backtraces for internal compiler errors}
+
+At startup the compiler turns exception-backtrace recording off for its own
+process, overriding "OCAMLRUNPARAM=b=1" if the environment sets it. The
+compiler raises heavily as internal control flow, so recording a backtrace on
+every raise is a measurable cost, and the recorded trace is only ever useful
+for diagnosing an internal compiler error.
+
+\begin{options}
+\item["OXCAML_BACKTRACES" \rm(environment variable)]
+Set this to any value other than "0", "false", "no", "off" or the empty
+string (compared case-insensitively) to keep backtrace recording on, so that
+an internal compiler error prints a backtrace. This does not affect programs
+built by the compiler: their backtrace behaviour is governed by their own
+"OCAMLRUNPARAM" as usual.
+\end{options}
+
 \section{s:modules-file-system}{Modules and the file system}
 
 This short section is intended to clarify the relationship between the

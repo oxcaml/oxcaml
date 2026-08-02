@@ -13,6 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val init_backtrace_recording : unit -> unit
+(** Turn exception-backtrace recording off for the compiler, overriding any
+    ambient [OCAMLRUNPARAM] ["b"] setting, unless the [OXCAML_BACKTRACES]
+    environment variable is set to something other than [""], ["0"], ["false"],
+    ["no"] or ["off"] (compared case-insensitively), in which case turn it on.
+    Recording state is per-domain; the compiler is single-domain. Call once at
+    driver startup, before any compilation work. *)
+
 val init_path :
   ?auto_include:Load_path.auto_include_callback -> ?dir:string -> unit -> unit
 val init_parameters : unit -> unit

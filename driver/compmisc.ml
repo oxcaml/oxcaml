@@ -13,6 +13,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Keyed off a dedicated variable rather than OCAMLRUNPARAM's [b]: environments
+   that force b=1 globally would otherwise defeat this override. *)
+let backtraces_requested () =
+  let v = Sys.getenv_opt "OXCAML_BACKTRACES" in
+  match Option.map String.lowercase_ascii v with
+  | None | Some ("" | "0" | "false" | "no" | "off") -> false
+  | Some _ -> true
+
+let init_backtrace_recording () =
+  Printexc.record_backtrace (backtraces_requested ())
+
 let auto_include find_in_dir fn =
   if !Clflags.no_auto_include_otherlibs || !Clflags.no_std_include then
     raise Not_found

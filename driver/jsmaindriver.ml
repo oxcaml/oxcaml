@@ -16,6 +16,7 @@
 module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
 
 let main argv ppf =
+  Compmisc.init_backtrace_recording ();
   Clflags.jsir := true;
   let program = "ocamlj" in
   let columns =
