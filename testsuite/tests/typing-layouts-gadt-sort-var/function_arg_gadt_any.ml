@@ -30,10 +30,8 @@ Error: This function's argument has type a,
        Function arguments and results must be representable independently of any non-exhaustive match.
 |}]
 
-(* Like [f], but the narrowing comes from a type equation ([Yes] forces
-   [a = int -> int]) rather than from a jkind refinement of [a] ([V] above is
-   fully polymorphic and adds no equation). Both forms of narrowing are
-   recorded as local constraints and both must be reverted.
+(* Like [f], but [Yes] equates [a] with a closed type, rather than with the
+   constructor's own (value-kinded) type variable as [V] does.
    [g No #2L] used to segfault. *)
 type ('a : any) isf = Yes : (int -> int) isf | No : ('a : bits64) isf
 
@@ -195,10 +193,9 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 val body_uses_narrowing : 'a v -> 'a -> int = <fun>
 |}]
 
-(* An enclosing partial match conservatively also drops the narrowing of
-   later patterns, even an inner total match's: a later constraint's recorded
-   jkind may derive from the reverted refinements (see the [eq] case below),
-   so none of them can be kept. *)
+(* An inner total match's evidence survives an enclosing partial match's
+   check: every caller must supply an [I], so [b = int] holds for all
+   callers. *)
 let partial_then_total : type a (b : any). a v -> b s -> b -> unit =
   fun A I _x -> ()
 [%%expect{|
@@ -208,19 +205,14 @@ Line 2, characters 6-7:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "C"
 
-Line 2, characters 10-12:
-2 |   fun A I _x -> ()
-              ^^
-Error: This function's argument has type b,
-       whose layout is known only from the GADT pattern match at line 2, characters 6-7.
-       That match is not exhaustive, so a caller could reach this argument at a different layout.
-       Function arguments and results must be representable independently of any non-exhaustive match.
+val partial_then_total : 'a ('b : any). 'a v -> 'b s -> 'b -> unit = <fun>
 |}]
 
-(* A later pattern's equation can launder the reverted refinements: [Refl]'s
-   equation records [b]'s jkind as computed under [Val]'s refinement of [a],
-   so keeping it while reverting [Val]'s refinement would wrongly justify
-   [x]'s layout. [f_eq B64 Refl #2L] used to segfault. *)
+(* [Refl] is total, but the equation recorded while typing it was computed
+   under [Val]'s refinement of [a]. The check must rebuild [Refl]'s evidence
+   from the constructor itself, in an environment without [Val]'s narrowing,
+   or [x]'s layout is wrongly justified. [f_eq B64 Refl #2L] used to
+   segfault. *)
 type ('a : any) tv = Val : ('a : value) tv | B64 : ('a : bits64) tv
 type ('x : any, 'y : any) eq = Refl : ('z : any). ('z, 'z) eq
 
