@@ -50,10 +50,14 @@ module EdgeSet : S = struct
 
   let default_size = 256
 
+  (* The quadratic estimate is only a rehash-avoidance hint: uncapped it would
+     preallocate ~1GiB of empty buckets at the bit-matrix threshold. *)
+  let max_initial_size = 1 lsl 20
+
   let make ~num_registers =
     let estimated_size = (num_registers * num_registers) asr 5 in
     EdgeTbl.create
-      (if estimated_size < default_size then default_size else estimated_size)
+      (Int.max default_size (Int.min estimated_size max_initial_size))
 
   let clear set = EdgeTbl.clear set
 
