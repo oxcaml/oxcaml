@@ -21,6 +21,12 @@ open Typedtree
 open Lambda
 open Debuginfo.Scoped_location
 
+val prepare_doclang_structure :
+  Compilation_unit.t ->
+  generated_path:string ->
+  Typedtree.structure ->
+  Typedtree.structure
+
 val pure_module : module_expr -> let_kind
 
 (* Used for translating Alloc_heap values in classes and modules. *)

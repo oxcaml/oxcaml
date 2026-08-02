@@ -20,7 +20,8 @@ open Lambda
 open Debuginfo.Scoped_location
 
 val set_doclang_pattern_action_hook :
-  (pattern -> (pattern * Ident.t) list -> lambda -> lambda) -> unit
+  (pattern -> (pattern * Ident.t) list -> lambda -> Jkind.Sort.Const.t ->
+   lambda -> lambda) -> unit
 
 (* Entry points to match compiler *)
 val for_function:

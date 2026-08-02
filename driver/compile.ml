@@ -76,6 +76,11 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
     )
 
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
+  let structure =
+    Translcore.prepare_doclang_structure i.module_name
+      ~generated_path:(Unit_info.original_source_file i.target)
+      structure
+  in
   let argument_coercion =
     match argument_interface with
     | Some { ai_coercion_from_primary; ai_signature = _ } ->
