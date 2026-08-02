@@ -177,3 +177,121 @@ test Utf8.uncapitalize "Hello\255" (Error "hello\u{FFFD}");;
 [%%expect {|
 - : test_result = Ok ()
 |}];;
+
+
+(* Not upstream. Boundary cases for the match-based tables of
+   ocaml/ocaml#14618; keep on a 5.5 merge.
+
+   [get_known_pair] inspects its first argument with [Uchar.unsafe_to_char],
+   which is [%identity], so for a base character above U+00FF the resulting
+   "char" holds a value above 255 and every branch must simply miss. (For
+   U+0080-U+00FF it is an ordinary Latin-1 character, which also misses: no
+   arm is a non-ASCII letter.) The two cases below are the discriminating
+   ones: U+0141 and U+0161 have low bytes 0x41 ('A') and 0x61 ('a'), so a
+   truncating conversion would wrongly fold them with the following combining
+   character. *)
+
+test Utf8.normalize "\u{0141}\u{0300}" (Ok "\u{0141}\u{0300}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.normalize "\u{0161}\u{0301}" (Ok "\u{0161}\u{0301}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.normalize "\u{0100}\u{0300}" (Ok "\u{0100}\u{0300}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.normalize "\u{898B}\u{0300}" (Ok "\u{898B}\u{0300}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.uncapitalize "\u{0141}\u{0300}" (Ok "\u{0141}\u{0300}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+(* [capitalize] does upcase the first character here; what matters is that
+   the combining acute is not folded into it. *)
+test Utf8.capitalize "\u{0161}\u{0301}" (Ok "\u{0160}\u{0301}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+(* A cased non-ASCII first character followed by a combining character that
+   does compose with a *later* ASCII base character: exercises the slow path
+   with a transformed first character. *)
+
+test Utf8.uncapitalize "\u{0160}eE\u{0301}" (Ok "\u{0161}e\u{00C9}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.capitalize "\u{0161}eE\u{0301}" (Ok "\u{0160}e\u{00C9}");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+(* [uchar_lowercase]/[uchar_uppercase] round-trip through the int-carrying
+   [case] constructors introduced by #14618. *)
+
+test Utf8.uncapitalize "\u{1E9E}x" (Ok "\u{00DF}x");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.capitalize "\u{00DF}x" (Ok "\u{1E9E}x");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.capitalize "\u{00FF}x" (Ok "\u{0178}x");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+(* Single-character ASCII input: [restlen] is 0, so the fast path performs a
+   zero-length blit. *)
+
+test Utf8.capitalize "a" (Ok "A");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.uncapitalize "A" (Ok "a");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.capitalize "A" (Ok "A");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.uncapitalize "_" (Ok "_");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+(* Invalid first byte: the [first] transformation is applied to U+FFFD, and
+   the error tag must survive it. *)
+
+test Utf8.normalize "\xffa" (Error "\u{FFFD}a");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.capitalize "\xffa" (Error "\u{FFFD}a");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
+
+test Utf8.uncapitalize "\x80A" (Error "\u{FFFD}A");;
+[%%expect {|
+- : test_result = Ok ()
+|}];;
