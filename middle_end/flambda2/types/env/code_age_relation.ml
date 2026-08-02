@@ -39,8 +39,9 @@ let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
       then Known false
       else
         match resolver comp_unit with
-        | exception _ ->
-          Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
+        | exception exn ->
+          Misc.fatal_errorf "Exception in resolver: %s@ Backtrace is: %s"
+            (Printexc.to_string exn)
             (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
         | None -> Unknown
         | Some t -> (
