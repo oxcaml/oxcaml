@@ -1022,7 +1022,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        itself. Anything else goes through [loop], which collapses a constant
        at the top. *)
     match drop_neutral_join obj l with
-    | [(Amodevar _ as m)] -> disallow_right m
+    | [(Amodevar _ as m)] | [(Amode _ as m)] -> disallow_right m
     | l -> loop (C.min obj) Min VarMap.empty l
 
   let meet (type a l) obj l =
@@ -1067,7 +1067,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     (* Dual of [join]. *)
     match drop_neutral_meet obj l with
-    | [(Amodevar _ as m)] -> disallow_left m
+    | [(Amodevar _ as m)] | [(Amode _ as m)] -> disallow_left m
     | l -> loop (C.max obj) Max VarMap.empty l
 
   let get_loose_ceil : type a l r. a C.obj -> (a, l * r) mode -> a =
