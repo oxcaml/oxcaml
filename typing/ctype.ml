@@ -6331,17 +6331,19 @@ let cross_right_alloc env ?modalities ty mode =
    and this info must be preserved. The [_ret] variants below cross modes on
    all axes except locality and are to be used on return modes. *)
 
+let crossing_of_ty_ret env ?modalities ty =
+  (* [Per_axis.max] is the identity crossing on an axis. Must be applied after
+     the modality, which could otherwise reintroduce crossing on areality. *)
+  let ax = Crossing.Axis.Comonadic Areality in
+  Crossing.set ax (Crossing.Per_axis.max ax) (crossing_of_ty env ?modalities ty)
+
 let cross_left_alloc_ret env ?modalities ty mode =
-  let mode' = cross_left_alloc env ?modalities ty mode in
-  Alloc.join
-    [mode';
-     Alloc.min_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+  let crossing = crossing_of_ty_ret env ?modalities ty in
+  mode |> Alloc.disallow_right |> Crossing.apply_left_alloc crossing
 
 let cross_right_alloc_ret env ?modalities ty mode =
-  let mode' = cross_right_alloc env ?modalities ty mode in
-  Alloc.meet
-    [mode';
-     Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+  let crossing = crossing_of_ty_ret env ?modalities ty in
+  mode |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing
 
 let submode_with_cross env ~is_ret ty l r =
   let r' =
