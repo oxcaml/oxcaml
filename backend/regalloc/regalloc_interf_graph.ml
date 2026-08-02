@@ -156,8 +156,10 @@ module Degree = struct
   let to_float deg = if deg = max_int then Float.infinity else Float.of_int deg
 end
 
+(* Bound on [num_registers] below which the bit matrix is used; the matrix is
+   quadratic in [num_registers], so this caps it at ~29MiB. *)
 let bit_matrix_threshold : int Lazy.t =
-  Regalloc_utils.int_of_param ~default:0 "BIT_MATRIX_THRESHOLD"
+  Regalloc_utils.int_of_param ~default:20_000 "BIT_MATRIX_THRESHOLD"
 
 (** Interference graph representation.
 

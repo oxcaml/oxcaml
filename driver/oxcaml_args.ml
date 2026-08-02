@@ -1896,7 +1896,6 @@ module Oxcaml_options_impl = struct
     x86_peephole_optimize ();
     regalloc_param "SPLIT_AROUND_LOOPS:on";
     regalloc_param "AFFINITY:on";
-    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_eliminate_dead_trap_handlers ();
