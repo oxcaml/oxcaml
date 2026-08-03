@@ -290,7 +290,7 @@ let value_descriptions ~loc env name
            pc_yielding =
              Ctype.prim_params_yielding env vd2.Types.val_type
                ~arity:p1.prim_arity;
-           pc_zero_alloc = prim_coercion_zero_alloc_check;
+           pc_zero_alloc_check = prim_coercion_zero_alloc_check;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end
