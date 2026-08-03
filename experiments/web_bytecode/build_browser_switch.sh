@@ -18,6 +18,9 @@ toolchain_prefix=(
   OPAMSWITCH="$release_opam_switch"
   opam exec --
 )
+if [ -n "${OXBROWSER_COMPILER_BIN:-}" ]; then
+  toolchain_prefix+=(env "PATH=$OXBROWSER_COMPILER_BIN:$PATH")
+fi
 
 run_tool() {
   "${toolchain_prefix[@]}" "$@"
