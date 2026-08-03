@@ -30,8 +30,12 @@
  dst = "plain/";
  copy;
 
- set flg = "-no-alias-deps -nocwd -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter P (so it gets a [.cmi] with [cu = None]). *)
 
@@ -39,7 +43,7 @@
  module = "p/p__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlopt.byte;
 

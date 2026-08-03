@@ -33,8 +33,12 @@
  src = "bar1.mli bar1.ml";         dst = "bar1/";     copy;
  src = "bar2.mli bar2.ml";         dst = "bar2/";     copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Step 1: parameter [P] and argument [P_int]. *)
 
@@ -42,7 +46,7 @@
  module = "p/p__.ml";
  ocamlc.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlc.byte;
 
@@ -50,7 +54,7 @@
  module = "p_int/p_int__.ml";
  ocamlc.byte;
 
- flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ flags = "$flg -as-argument-for P -I p -H p_int -open-cmi p_int/p_int__.cmi";
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlc.byte;
 
@@ -89,7 +93,7 @@
  module = "main_shared.ml";
  ocamlc.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_shared.bc";
  all_modules = "\
