@@ -15,13 +15,10 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
-(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -66,9 +63,7 @@ div:
   idivq %rcx
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 .L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -290,9 +285,7 @@ abs:
   jl    .L0
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 

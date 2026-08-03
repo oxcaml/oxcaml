@@ -2512,6 +2512,7 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
+  | Lop (Specific Ineg) -> I.neg (res i 0)
   | Lop (Intop Iclz) ->
     (* CR-someday gyorsh: can we do it at selection? mshinwell: We need to
        address this and the similar CRs below. My feeling is that we should try
