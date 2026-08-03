@@ -203,23 +203,17 @@ let flambda_to_flambda0 : type m.
             slot_offsets,
             final_typing_env,
             last_pass_name ) =
-        if Flambda_features.enable_reaper ()
+        (* CR mvellacott: we can't run the Reaper here when LTO support is
+           enabled because it isn't safe to run the Reaper twice on the same
+           code. It would be nice to remove this limitation in the future. *)
+        if
+          Flambda_features.enable_reaper ()
+          && not (Flambda_features.support_lto ())
         then (
           let flambda, free_names, all_code, slot_offsets, final_typing_env =
-            (* CR mvellacott: make it more clear what we're profiling *)
             Profile.record_call ~accumulate:true "reaper" (fun () ->
-                if Flambda_features.support_lto ()
-                then (
-                  (* CR mvellacott: store these in the CMR *)
-                  let _deps, _traverse_rebuild =
-                    Flambda2_reaper.Reaper.Staged.traverse flambda
-                  in
-                  Flambda2_reaper.Cmr_format.save
-                    ~filename:(prefixname ^ ".cmr") "Hello, cmr!";
-                  flambda, free_names, all_code, slot_offsets, final_typing_env)
-                else
-                  Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
-                    ~all_code ~final_typing_env flambda)
+                Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
+                  ~final_typing_env flambda)
           in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
@@ -246,10 +240,25 @@ let flambda_to_flambda0 : type m.
       print_fexpr last_pass_name
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
+      let cmr_payload =
+        (* CR mvellacott: we needn't require -flambda2-reaper to be passed
+           here. *)
+        if Flambda_features.support_lto () && Flambda_features.enable_reaper ()
+        then
+          (* CR mvellacott: store these in the CMR *)
+          let _deps, _traverse_rebuild =
+            Flambda2_reaper.Reaper.Staged.traverse flambda
+          in
+          Some "Hello, cmr!"
+        else None
+      in
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
         build_run_result flambda ~free_names ~final_typing_env ~sections
           ~all_code slot_offsets
       in
+      Option.iter
+        (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr"))
+        cmr_payload;
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
   in
