@@ -418,6 +418,10 @@ let peephole_optimize_from pos =
     in
     X86_peephole_optimize.optimize_from_cell start
 
+let iter_sections f =
+  Section_name.Tbl.iter f asm_code_by_section;
+  Section_name.Tbl.iter f delayed_sections
+
 let generate_code asm =
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
