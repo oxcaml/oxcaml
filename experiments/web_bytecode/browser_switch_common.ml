@@ -35,7 +35,7 @@ let capture_diagnostics f =
 
 let compilation_unit filename =
   let name =
-    Unit_info.modname_from_source filename
+    Unit_info.strict_modname_from_source filename
     |> Compilation_unit.Name.of_string
   in
   Compilation_unit.create Compilation_unit.Prefix.empty name
