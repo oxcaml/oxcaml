@@ -226,7 +226,9 @@ let value_descriptions ~loc env name
     | Val_prim p, Check check ->
       ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
         Some check )
-    | _, (Default_zero_alloc | Ignore_assert_all | Check _ | Assume _) ->
+    | ( (Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ |
+         Val_anc _),
+        (Default_zero_alloc | Ignore_assert_all | Check _ | Assume _) ) ->
       vd1.val_zero_alloc, None
   in
   begin match Zero_alloc.sub vd1_zero_alloc vd2.val_zero_alloc with
