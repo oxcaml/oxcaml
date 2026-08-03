@@ -80,7 +80,6 @@ type env =
     should_keep_function_param :
       Code_id.t -> Variable.t -> KS.t -> param_decision;
     function_return_decision : param_decision list Code_id.Map.t;
-    kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
@@ -114,7 +113,7 @@ let raw_is_var_used uses var kind =
   | Value | Naked_number _ -> Analysis.has_use uses (Code_id_or_name.var var)
 
 let is_var_used (env : env) var =
-  raw_is_var_used env.uses var (Name.Map.find (Name.var var) env.kinds)
+  raw_is_var_used env.uses var (Variable.kind var)
 
 let is_name_used (env : env) name =
   Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
@@ -221,8 +220,7 @@ let get_arity params_decisions =
           (List.map (fun k -> Component_for_creation.Singleton k) arity) ])
 
 let is_dead_var env v =
-  let (kind : K.t) = Name.Map.find (Name.var v) env.kinds in
-  match kind with
+  match Variable.kind v with
   | Region | Rec_info -> false
   | Value | Naked_number _ ->
     not (Analysis.has_source env.uses (Code_id_or_name.var v))
@@ -324,21 +322,18 @@ let function_params_and_body_free_names fpb =
         f
         (regions @ (my_closure :: my_depth :: Bound_parameters.vars params)))
 
-let get_simple_kind env simple =
+let get_simple_kind simple =
   Simple.pattern_match'
     ~const:(fun const -> Reg_width_const.kind const)
     ~symbol:(fun _ ~coercion:_ -> K.value)
-    ~var:(fun var ~coercion:_ -> Name.Map.find (Name.var var) env.kinds)
+    ~var:(fun var ~coercion:_ -> Variable.kind var)
     simple
 
-let name_poison ~category env name =
+let name_poison ~category name =
   let kind =
-    match Name.Map.find_opt name env.kinds with
-    | Some k -> k
-    | None ->
-      if Name.is_symbol name
-      then K.value
-      else Misc.fatal_errorf "Unbound name %a" Name.print name
+    Name.pattern_match name
+      ~symbol:(fun _ -> K.value)
+      ~var:(fun var -> Variable.kind var)
   in
   poison category kind
 
@@ -352,10 +347,10 @@ let rewrite_simple (env : env) simple =
       then
         (* This can happen if an unboxed block now only has an application for
            its only use, see [unboxed_or_function.ml] test. *)
-        name_poison ~category:"reaper_rewrite_simple_unboxed" env name
+        name_poison ~category:"reaper_rewrite_simple_unboxed" name
       else if is_name_used env name
       then simple
-      else name_poison ~category:"reaper_unused_name" env name)
+      else name_poison ~category:"reaper_unused_name" name)
     ~const:(fun _ -> simple)
 
 let rewrite_simple_opt (env : env) = function
@@ -1227,7 +1222,7 @@ let rebuild_apply env apply =
                 Simple.pattern_match arg
                   ~const:(fun _ -> arg)
                   ~name:(fun name ~coercion:_ ->
-                    name_poison ~category:"reaper_unused_argument" env name)
+                    name_poison ~category:"reaper_unused_argument" name)
             in
             let args_and_keep =
               if known_arity
@@ -1508,7 +1503,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
               if nth < List.length args
               then
                 let arg = List.nth args nth in
-                if K.equal field_kind (get_simple_kind env arg)
+                if K.equal field_kind (get_simple_kind arg)
                 then arg
                 else poison "reaper_dead_unboxed_field" field_kind
               else poison "reaper_dead_unboxed_field" field_kind
@@ -2464,7 +2459,7 @@ type result =
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context kinds
+    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
@@ -2605,7 +2600,6 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       function_params_to_keep;
       should_keep_function_param;
       function_return_decision;
-      kinds;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
