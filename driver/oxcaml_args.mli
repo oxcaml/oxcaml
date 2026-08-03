@@ -58,6 +58,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
@@ -100,6 +102,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -144,6 +147,8 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
+  val simplify_stubs : unit -> unit
+  val no_simplify_stubs : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit

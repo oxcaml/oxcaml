@@ -35,6 +35,10 @@ module Extension = struct
       | F16C
       | FMA
       | AVX512F
+      | AVX512DQ
+      | AVX512CD
+      | AVX512BW
+      | AVX512VL
 
     let rank = function
       | POPCNT -> 0
@@ -53,6 +57,10 @@ module Extension = struct
       | F16C -> 13
       | FMA -> 14
       | AVX512F -> 15
+      | AVX512DQ -> 16
+      | AVX512CD -> 17
+      | AVX512BW -> 18
+      | AVX512VL -> 19
 
     let compare left right = Int.compare (rank left) (rank right)
   end
@@ -77,6 +85,10 @@ module Extension = struct
     | F16C -> "F16C"
     | FMA -> "FMA"
     | AVX512F -> "AVX512F"
+    | AVX512DQ -> "AVX512DQ"
+    | AVX512CD -> "AVX512CD"
+    | AVX512BW -> "AVX512BW"
+    | AVX512VL -> "AVX512VL"
 
   let generation = function
     | POPCNT -> "Nehalem+"
@@ -95,6 +107,10 @@ module Extension = struct
     | F16C -> "Ivybridge+"
     | FMA -> "Haswell+"
     | AVX512F -> "SkylakeXeon+"
+    | AVX512DQ -> "SkylakeXeon+"
+    | AVX512CD -> "SkylakeXeon+"
+    | AVX512BW -> "SkylakeXeon+"
+    | AVX512VL -> "SkylakeXeon+"
 
   let enabled_by_default = function
     (* We enable all Haswell extensions by default, unless the compiler
@@ -113,12 +129,15 @@ module Extension = struct
     | AVX2 -> Config.has_avx2
     | F16C -> Config.has_f16c
     | FMA -> Config.has_fma
-    | PREFETCHW | PREFETCHWT1 | AVX512F -> false
+    | PREFETCHW | PREFETCHWT1 | AVX512F | AVX512DQ | AVX512CD | AVX512BW
+    | AVX512VL ->
+      false
 
   let all =
     Set.of_list
       [ POPCNT; LZCNT; PREFETCHW; PREFETCHWT1; SSE3; SSSE3; SSE4_1; SSE4_2;
-        CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F ]
+        CLMUL; BMI; BMI2; AVX; AVX2; F16C; FMA; AVX512F; AVX512DQ; AVX512CD;
+        AVX512BW; AVX512VL ]
 
   let directly_implied_by e1 e2 =
     match e1, e2 with
@@ -128,9 +147,14 @@ module Extension = struct
     | SSE4_2, AVX
     | AVX, AVX2
     | AVX2, AVX512F
+    | AVX512F, AVX512DQ
+    | AVX512F, AVX512CD
+    | AVX512F, AVX512BW
+    | AVX512F, AVX512VL
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
-       SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F), _
+       SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
+       AVX512DQ | AVX512CD | AVX512BW | AVX512VL), _
        -> false
 
   let rec fix set less =
@@ -191,6 +215,11 @@ module Extension = struct
       | AVX2 -> enabled AVX2
       | F16C -> enabled F16C
       | FMA -> enabled FMA
+      | AVX512F -> enabled AVX512F
+      | AVX512DQ -> enabled AVX512DQ
+      | AVX512CD -> enabled AVX512CD
+      | AVX512BW -> enabled AVX512BW
+      | AVX512VL -> enabled AVX512VL
     in
     Array.for_all enabled instr.ext
 end

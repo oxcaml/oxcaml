@@ -155,8 +155,12 @@ let () =
   (* Check that compiler generated stubs are ignored with [@@@zero_alloc all] *)
   print_test "test_stub_dep.ml test_stub.ml";
   (* generates an indirect call. *)
-  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
-    ~extra_sources:[] ~exit_code:2 "t1";
+  print_test_expected_output ~cutoff:default_cutoff
+    ~extra_deps:[]
+      (* The indirect call is part of a stub, and it gets transformed to a
+         direct call when simplified. *)
+    ~extra_flags:"-flambda2-no-simplify-stubs" ~extra_sources:[] ~exit_code:2
+    "t1";
   (* deleting dead functions works *)
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:["test_warning199.mli"] ~exit_code:0 "test_warning199";

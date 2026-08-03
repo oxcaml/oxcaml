@@ -93,9 +93,9 @@ let rec eliminate_ref id = function
                     for_body = eliminate_ref id lf.for_body }
   | Lassign(v, e) ->
       Lassign(v, eliminate_ref id e)
-  | Lsend(k, m, o, el, pos, mode, loc, layout) ->
+  | Lsend(k, m, o, el, pos, mode, loc, layout, yielding) ->
       Lsend(k, eliminate_ref id m, eliminate_ref id o,
-            List.map (eliminate_ref id) el, pos, mode, loc, layout)
+            List.map (eliminate_ref id) el, pos, mode, loc, layout, yielding)
   | Levent(l, ev) ->
       Levent(eliminate_ref id l, ev)
   | Lifused(v, e) ->
@@ -104,7 +104,7 @@ let rec eliminate_ref id = function
       Lregion(eliminate_ref id e, layout)
   | Lexclave e ->
       Lexclave(eliminate_ref id e)
-  | Lsplice _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
 (* Simplification of exits *)
@@ -196,12 +196,13 @@ let simplify_exits lam =
       count ~try_depth lf.for_to;
       count ~try_depth lf.for_body
   | Lassign(_v, l) -> count ~try_depth l
-  | Lsend(_k, m, o, ll, _, _, _, _) -> List.iter (count ~try_depth) (m::o::ll)
+  | Lsend(_k, m, o, ll, _, _, _, _, _) ->
+      List.iter (count ~try_depth) (m::o::ll)
   | Levent(l, _) -> count ~try_depth l
   | Lifused(_v, l) -> count ~try_depth l
   | Lregion (l, _) -> count ~try_depth:(try_depth+1) l
   | Lexclave l -> count ~try_depth:(try_depth-1) l
-  | Lsplice _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
   and count_default ~try_depth sw = match sw.sw_failaction with
@@ -380,16 +381,17 @@ let simplify_exits lam =
                     for_to = simplif ~layout:None ~try_depth lf.for_to;
                     for_body = simplif ~layout:None ~try_depth lf.for_body}
   | Lassign(v, l) -> Lassign(v, simplif ~layout:None ~try_depth l)
-  | Lsend(k, m, o, ll, pos, mode, loc, layout) ->
+  | Lsend(k, m, o, ll, pos, mode, loc, layout, yielding) ->
       Lsend(k, simplif ~layout:None ~try_depth m, simplif ~layout:None ~try_depth o,
-            List.map (simplif ~layout:None ~try_depth) ll, pos, mode, loc, layout)
+            List.map (simplif ~layout:None ~try_depth) ll, pos, mode, loc,
+            layout, yielding)
   | Levent(l, ev) -> Levent(simplif ~layout ~try_depth l, ev)
   | Lifused(v, l) -> Lifused (v,simplif ~layout ~try_depth l)
   | Lregion (l, ly) -> Lregion (
       simplif ~layout ~try_depth:(try_depth + 1) l,
       result_layout ly)
   | Lexclave l -> Lexclave (simplif ~layout ~try_depth:(try_depth - 1) l)
-  | Lsplice _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
       fatal_error_invalid_constructor l
   in
   simplif ~layout:None ~try_depth:0 lam
@@ -536,7 +538,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       (* Lalias-bound variables are never assigned, so don't increase
          v's refcount *)
       count bv l
-  | Lsend(_, m, o, ll, _, _, _, _) -> List.iter (count bv) (m::o::ll)
+  | Lsend(_, m, o, ll, _, _, _, _, _) -> List.iter (count bv) (m::o::ll)
   | Levent(l, _) -> count bv l
   | Lifused(v, l) ->
       if count_var v > 0 then count bv l
@@ -551,7 +553,7 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       count bv l1;
       (* Don't move code into an exclave *)
       count Ident.Map.empty l2
-  | Lsplice _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
   and count_lfunction fn =
@@ -714,14 +716,16 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
                              for_to = simplif lf.for_to;
                              for_body = simplif lf.for_body}
   | Lassign(v, l) -> Lassign(v, simplif l)
-  | Lsend(k, m, o, ll, pos, mode, loc, layout) ->
-      Lsend(k, simplif m, simplif o, List.map simplif ll, pos, mode, loc, layout)
+  | Lsend(k, m, o, ll, pos, mode, loc, layout, yielding) ->
+      Lsend(k, simplif m, simplif o, List.map simplif ll, pos, mode, loc,
+            layout, yielding)
   | Levent(l, ev) -> Levent(simplif l, ev)
   | Lifused(v, l) ->
       if count_var v > 0 then simplif l else lambda_unit
   | Lregion (l, layout) -> Lregion (simplif l, layout)
   | Lexclave l -> Lexclave (simplif l)
-  | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as l ->
+    fatal_error_invalid_constructor l
   in
   simplif lam
 
@@ -807,7 +811,7 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos false for_body
   | Lassign (_, lam) ->
       emit_tail_infos false lam
-  | Lsend (_, meth, obj, args, _, _, _loc, _) ->
+  | Lsend (_, meth, obj, args, _, _, _loc, _, _) ->
       emit_tail_infos false meth;
       emit_tail_infos false obj;
       list_emit_tail_infos false args
@@ -819,7 +823,7 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos is_tail lam
   | Lexclave lam ->
       emit_tail_infos is_tail lam
-  | Lsplice _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
       fatal_error_invalid_constructor lambda
 and list_emit_tail_infos_fun f is_tail =
   List.iter (fun x -> emit_tail_infos is_tail (f x))
@@ -901,6 +905,11 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
             ap_loc = loc;
             ap_region_close = Rc_normal;
             ap_mode = alloc_heap;
+            (* CR-someday aspsmith: We could be more precise here (the wrapper
+               tail-calls a known inner function), but it doesn't currently
+               matter: this function is only called during lambda-to-flambda,
+               which ignores [ap_yielding]. *)
+            ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
             ap_inlined = Default_inlined;
             ap_specialised = Default_specialise;

@@ -64,8 +64,15 @@ let get_func_decl_params_arity t code_id =
     then Lambda.Tupled
     else
       let nlocal =
-        Flambda_arity.num_params (Code_metadata.params_arity info)
-        - Code_metadata.first_complex_local_param info
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index ->
+          Flambda_arity.num_params (Code_metadata.params_arity info) - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
       in
       Lambda.Curried { nlocal }
   in
@@ -196,6 +203,7 @@ end = struct
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
               | Naked_number Naked_vec256 -> UK.naked_vec256_fields
               | Naked_number Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_number Naked_mask -> UK.naked_mask_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields

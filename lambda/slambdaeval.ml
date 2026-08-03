@@ -152,7 +152,7 @@ let rec eval_slam env slam : value Or_missing.t =
     let slv_comptime = eval_slam env sval_comptime in
     let slv_runtime = eval_lam env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
-  | SLlayout layout -> Present (SLVlayout layout)
+  | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
   | SLglobal _ -> errf "cross-module eval not implemented"
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
@@ -173,12 +173,12 @@ let rec eval_slam env slam : value Or_missing.t =
     Present
       (SLVclosure
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
+  | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
       eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
     in
     let eval_arg arg = eval_slam env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
+    let args = Array.map eval_arg sapp_args in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
       Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
@@ -200,6 +200,7 @@ and eval_lam_shallow env lam =
         ap_result_layout = old_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding;
         ap_loc;
         ap_tailcall;
         ap_inlined;
@@ -216,6 +217,7 @@ and eval_lam_shallow env lam =
           ap_result_layout = new_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
@@ -280,17 +282,23 @@ and eval_lam_shallow env lam =
     if new_layout == old_layout
     then lam
     else Lifthenelse (cond, iftrue, iffalse, new_layout)
-  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout) ->
+  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout, yielding)
+    ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then lam
-    else Lsend (kind, met, obj, args, region_close, mode, loc, new_layout)
+    else
+      Lsend (kind, met, obj, args, region_close, mode, loc, new_layout, yielding)
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
     let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
     halves.slv_runtime
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -346,29 +354,27 @@ and eval_mixed_block_element :
  fun env element ->
   match element with
   | Splice_variable id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
+    eval_var env id |> expect_not_missing |> expect Tlayout
+    |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
 and eval_layout env layout =
   match layout with
-  | Psplicevar id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout
+  | Psplicevar id -> eval_var env id |> expect_not_missing |> expect Tlayout
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Pbottom ->
+  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
     layout
 
 and eval_lfunction_shallow env
@@ -491,7 +497,8 @@ and eval_prim env prim =
   | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
   | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
   | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
+  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _
+  | Patomic_load_mixed_field _ | Patomic_set_field _ | Patomic_set_mixed_field _
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
@@ -511,7 +518,7 @@ exception Found_a_splice
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
     ()
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
@@ -520,7 +527,7 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
     Array.iter assert_mixed_block_element_contains_no_splices elements
@@ -581,12 +588,14 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
-  | Lsend (_, _, _, _, _, _, _, layout) ->
+  | Lsend (_, _, _, _, _, _, _, layout, _) ->
     assert_layout_contains_no_splices layout
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =

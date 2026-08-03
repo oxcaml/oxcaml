@@ -9,16 +9,16 @@ module MenhirBasics = struct
   
   type token = 
     | WORD of (
-# 4 "src/sherlodoc/type_parser.mly"
+# 4 "external/merlin/src/sherlodoc/type_parser.mly"
       (string)
-# 15 "src/sherlodoc/type_parser.ml"
+# 15 "external/merlin/src/sherlodoc/type_parser.ml"
   )
     | WILDCARD
     | STAR
     | POLY of (
-# 5 "src/sherlodoc/type_parser.mly"
+# 5 "external/merlin/src/sherlodoc/type_parser.mly"
       (string)
-# 22 "src/sherlodoc/type_parser.ml"
+# 22 "external/merlin/src/sherlodoc/type_parser.ml"
   )
     | PARENS_OPEN
     | PARENS_CLOSE
@@ -84,16 +84,16 @@ and ('s, 'r) _menhir_cell1_PARENS_OPEN =
 
 and ('s, 'r) _menhir_cell1_WORD = 
   | MenhirCell1_WORD of 's * ('s, 'r) _menhir_state * (
-# 4 "src/sherlodoc/type_parser.mly"
+# 4 "external/merlin/src/sherlodoc/type_parser.mly"
       (string)
-# 90 "src/sherlodoc/type_parser.ml"
+# 90 "external/merlin/src/sherlodoc/type_parser.ml"
 )
 
 and 's _menhir_cell0_WORD = 
   | MenhirCell0_WORD of 's * (
-# 4 "src/sherlodoc/type_parser.mly"
+# 4 "external/merlin/src/sherlodoc/type_parser.mly"
       (string)
-# 97 "src/sherlodoc/type_parser.ml"
+# 97 "external/merlin/src/sherlodoc/type_parser.ml"
 )
 
 and _menhir_box_main = 
@@ -104,7 +104,7 @@ let _menhir_action_01 =
     (
 # 216 "<standard.mly>"
     ( [] )
-# 108 "src/sherlodoc/type_parser.ml"
+# 108 "external/merlin/src/sherlodoc/type_parser.ml"
      : (string list))
 
 let _menhir_action_02 =
@@ -112,138 +112,138 @@ let _menhir_action_02 =
     (
 # 219 "<standard.mly>"
     ( x :: xs )
-# 116 "src/sherlodoc/type_parser.ml"
+# 116 "external/merlin/src/sherlodoc/type_parser.ml"
      : (string list))
 
 let _menhir_action_03 =
   fun x ->
     (
-# 49 "src/sherlodoc/type_parser.mly"
+# 49 "external/merlin/src/sherlodoc/type_parser.mly"
            ( [x] )
-# 124 "src/sherlodoc/type_parser.ml"
+# 124 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_action_04 =
   fun x xs ->
     (
-# 50 "src/sherlodoc/type_parser.mly"
+# 50 "external/merlin/src/sherlodoc/type_parser.mly"
                                                ( x::xs )
-# 132 "src/sherlodoc/type_parser.ml"
+# 132 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_action_05 =
   fun x ->
     (
-# 49 "src/sherlodoc/type_parser.mly"
+# 49 "external/merlin/src/sherlodoc/type_parser.mly"
            ( [x] )
-# 140 "src/sherlodoc/type_parser.ml"
+# 140 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_action_06 =
   fun x xs ->
     (
-# 50 "src/sherlodoc/type_parser.mly"
+# 50 "external/merlin/src/sherlodoc/type_parser.mly"
                                                ( x::xs )
-# 148 "src/sherlodoc/type_parser.ml"
+# 148 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_action_07 =
   fun t ->
     (
-# 13 "src/sherlodoc/type_parser.mly"
+# 13 "external/merlin/src/sherlodoc/type_parser.mly"
               ( t )
-# 156 "src/sherlodoc/type_parser.ml"
+# 156 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_08 =
   fun t ->
     (
-# 17 "src/sherlodoc/type_parser.mly"
+# 17 "external/merlin/src/sherlodoc/type_parser.mly"
            ( t )
-# 164 "src/sherlodoc/type_parser.ml"
+# 164 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_09 =
   fun a b ->
     (
-# 18 "src/sherlodoc/type_parser.mly"
+# 18 "external/merlin/src/sherlodoc/type_parser.mly"
                        ( Type_parsed.Arrow (a, b) )
-# 172 "src/sherlodoc/type_parser.ml"
+# 172 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_10 =
   fun () ->
     (
-# 36 "src/sherlodoc/type_parser.mly"
+# 36 "external/merlin/src/sherlodoc/type_parser.mly"
              ( Type_parsed.Wildcard )
-# 180 "src/sherlodoc/type_parser.ml"
+# 180 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_11 =
   fun w ->
     (
-# 37 "src/sherlodoc/type_parser.mly"
+# 37 "external/merlin/src/sherlodoc/type_parser.mly"
            ( Type_parsed.Tyvar w )
-# 188 "src/sherlodoc/type_parser.ml"
+# 188 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_12 =
   fun w ->
     (
-# 38 "src/sherlodoc/type_parser.mly"
+# 38 "external/merlin/src/sherlodoc/type_parser.mly"
            ( Type_parsed.Tycon (w, []) )
-# 196 "src/sherlodoc/type_parser.ml"
+# 196 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_13 =
   fun () ->
     (
-# 26 "src/sherlodoc/type_parser.mly"
+# 26 "external/merlin/src/sherlodoc/type_parser.mly"
     ( Type_parsed.Wildcard )
-# 204 "src/sherlodoc/type_parser.ml"
+# 204 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_14 =
   fun ts ->
     (
-# 27 "src/sherlodoc/type_parser.mly"
+# 27 "external/merlin/src/sherlodoc/type_parser.mly"
             ( Type_parsed.tuple ts )
-# 212 "src/sherlodoc/type_parser.ml"
+# 212 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_15 =
   fun ts w ws ->
     (
-# 29 "src/sherlodoc/type_parser.mly"
+# 29 "external/merlin/src/sherlodoc/type_parser.mly"
     (
       List.fold_left ( fun acc w ->
 	  Type_parsed.Tycon (w, [acc])) (Type_parsed.Tycon (w, ts)) ws
     )
-# 223 "src/sherlodoc/type_parser.ml"
+# 223 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_16 =
   fun xs ->
     (
-# 22 "src/sherlodoc/type_parser.mly"
+# 22 "external/merlin/src/sherlodoc/type_parser.mly"
                          ( Type_parsed.tuple xs )
-# 231 "src/sherlodoc/type_parser.ml"
+# 231 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t))
 
 let _menhir_action_17 =
   fun t ->
     (
-# 43 "src/sherlodoc/type_parser.mly"
+# 43 "external/merlin/src/sherlodoc/type_parser.mly"
            ( [t] )
-# 239 "src/sherlodoc/type_parser.ml"
+# 239 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_action_18 =
   fun ts ->
     (
-# 44 "src/sherlodoc/type_parser.mly"
+# 44 "external/merlin/src/sherlodoc/type_parser.mly"
                                                   ( ts )
-# 247 "src/sherlodoc/type_parser.ml"
+# 247 "external/merlin/src/sherlodoc/type_parser.ml"
      : (Type_parsed.t list))
 
 let _menhir_print_token : token -> string =

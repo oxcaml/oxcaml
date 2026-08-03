@@ -55,6 +55,7 @@ let unbox_number ~dbg kind arg =
   | Naked_vec128 -> C.unbox_vec128 dbg arg
   | Naked_vec256 -> C.unbox_vec256 dbg arg
   | Naked_vec512 -> C.unbox_vec512 dbg arg
+  | Naked_mask -> C.unbox_mask dbg arg
   | Naked_int32 -> C.unbox_int dbg Boxed_int32 arg
   | Naked_int64 -> C.unbox_int dbg Boxed_int64 arg
   | Naked_nativeint -> C.unbox_int dbg Boxed_nativeint arg
@@ -67,6 +68,7 @@ let box_number ~dbg kind alloc_mode arg =
   | Naked_vec128 -> C.box_vec128 dbg alloc_mode arg
   | Naked_vec256 -> C.box_vec256 dbg alloc_mode arg
   | Naked_vec512 -> C.box_vec512 dbg alloc_mode arg
+  | Naked_mask -> C.box_mask dbg alloc_mode arg
   | Naked_int32 -> C.box_int_gen dbg Boxed_int32 alloc_mode arg
   | Naked_int64 -> C.box_int_gen dbg Boxed_int64 alloc_mode arg
   | Naked_nativeint -> C.box_int_gen dbg Boxed_nativeint alloc_mode arg
@@ -110,6 +112,7 @@ let mixed_block_kinds shape =
         | Naked_vec128 -> KS.naked_vec128
         | Naked_vec256 -> KS.naked_vec256
         | Naked_vec512 -> KS.naked_vec512
+        | Naked_mask -> KS.naked_mask
         | Naked_nativeint -> KS.naked_nativeint
         | Naked_immediate -> KS.naked_immediate)
       (Array.to_list (K.Mixed_block_shape.flat_suffix shape))
@@ -144,6 +147,7 @@ let memory_chunk_of_flat_suffix_element :
   | Naked_vec128 -> Onetwentyeight_unaligned
   | Naked_vec256 -> Twofiftysix_unaligned
   | Naked_vec512 -> Fivetwelve_unaligned
+  | Naked_mask -> Word_mask
   | Naked_int64 | Naked_nativeint | Naked_immediate -> Word_int
 
 let block_load ~dbg (kind : P.Block_access_kind.t) (mutability : Mutability.t)
@@ -255,6 +259,7 @@ let make_array ~dbg kind alloc_mode args =
   | Naked_vec128s -> C.allocate_unboxed_vec128_array ~elements:args mode dbg
   | Naked_vec256s -> C.allocate_unboxed_vec256_array ~elements:args mode dbg
   | Naked_vec512s -> C.allocate_unboxed_vec512_array ~elements:args mode dbg
+  | Naked_masks -> C.allocate_unboxed_mask_array ~elements:args mode dbg
   | Unboxed_product _ ->
     if P.Array_kind.must_be_gc_scannable kind
     then C.make_alloc ~mode dbg ~tag:0 args
@@ -275,6 +280,7 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
     C.unboxed_vec128_array_length arr dbg
   | Naked_vec256s -> C.unboxed_vec256_array_length arr dbg
   | Naked_vec512s -> C.unboxed_vec512_array_length arr dbg
+  | Naked_masks -> C.unboxed_mask_array_length arr dbg
   | Immediates | Gc_ignorable_values | Values | Naked_floats | Unboxed_product _
     ->
     (* [Paddrarray] may be a lie sometimes, but we know for certain that the bit
@@ -331,6 +337,8 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
       (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
     C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
       ~array_index:index dbg
+  | Naked_masks, Naked_masks ->
+    C.unboxed_mask_array_ref arr ~array_index:index dbg
   | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
     C.unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr
       ~array_index:index dbg
@@ -408,48 +416,58 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
     array_load_512 ~ptr_out_of_heap:false ~dbg ~element_width_log2:6 arr index
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
       | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-      | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec256s | Naked_vec512s | Naked_masks ),
       (Gc_ignorable_values | Values) ) ->
     Misc.fatal_errorf
       "Cannot use array load kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
       | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-      | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec256s | Naked_vec512s | Naked_masks ),
       Immediates )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
-      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s | Naked_masks ),
       (Naked_ints | Naked_int64s | Naked_nativeints) )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Naked_floats ) ->
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
+      Naked_floats )
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_floats ),
+      Naked_masks ) ->
     Misc.fatal_errorf
       "Array reinterpret load operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_load_kind.print load_kind
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_ints
       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_float32s )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 32-bit load kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int16s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 16-bit load kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int8s ) ->
     Misc.fatal_errorf
       "Array reinterpret loads with 8-bit load kinds are not supported:@ %a"
@@ -457,10 +475,15 @@ let array_load ~dbg (array_kind : P.Array_kind.t)
   | ( (Gc_ignorable_values | Values),
       (Naked_vec128s | Naked_vec256s | Naked_vec512s) ) ->
     Misc.fatal_error "Attempted to load a SIMD vector from a value array."
-  | Unboxed_product _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
+  | Naked_masks, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
     Misc.fatal_errorf
-      "Loading of SIMD vectors from unboxed product arrays is not currently \
-       supported:@ %a"
+      "Array reinterpret load from mask array to SIMD vector not supported:@ %a"
+      Debuginfo.print_compact dbg
+  | ( Unboxed_product _,
+      (Naked_vec128s | Naked_vec256s | Naked_vec512s | Naked_masks) ) ->
+    Misc.fatal_errorf
+      "Loading of SIMD vectors and masks from unboxed product arrays is not \
+       currently supported:@ %a"
       Debuginfo.print_compact dbg
 
 let addr_array_store init ~arr ~index ~new_value dbg =
@@ -483,6 +506,8 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
       (Naked_ints | Naked_int64s | Naked_nativeints) ) ->
     C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
       ~new_value dbg
+  | Naked_masks, Naked_masks ->
+    C.unboxed_mask_array_set arr ~index ~new_value dbg
   | Unboxed_product _, (Naked_ints | Naked_int64s | Naked_nativeints) ->
     C.unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
       ~new_value dbg
@@ -588,48 +613,58 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
       new_value
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
       | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-      | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec256s | Naked_vec512s | Naked_masks ),
       (Values _ | Gc_ignorable_values) ) ->
     Misc.fatal_errorf
       "Cannot use array set kind [Values] on naked number/vector arrays:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
       | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-      | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec256s | Naked_vec512s | Naked_masks ),
       Immediates )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s
-      | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_vec128s | Naked_vec256s | Naked_vec512s | Naked_masks ),
       (Naked_ints | Naked_int64s | Naked_nativeints) )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
-      Naked_floats ) ->
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
+      Naked_floats )
+  | ( ( Immediates | Gc_ignorable_values | Values | Naked_float32s | Naked_ints
+      | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_floats ),
+      Naked_masks ) ->
     Misc.fatal_errorf
       "Array reinterpret set operation (array kind %a, array ref kind %a) not \
        yet supported"
       P.Array_kind.print array_kind P.Array_set_kind.print set_kind
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats | Naked_ints
       | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_float32s )
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int32s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 32-bit set kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int8s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int16s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 16-bit set kinds are not supported:@ %a"
       Debuginfo.print_compact dbg
   | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
       | Naked_float32s | Naked_ints | Naked_int16s | Naked_int32s | Naked_int64s
-      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ),
+      | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+      | Naked_masks ),
       Naked_int8s ) ->
     Misc.fatal_errorf
       "Array reinterpret stores with 8-bit set kinds are not supported:@ %a"
@@ -637,10 +672,16 @@ let array_set0 ~dbg (array_kind : P.Array_kind.t)
   | ( (Gc_ignorable_values | Values),
       (Naked_vec128s | Naked_vec256s | Naked_vec512s) ) ->
     Misc.fatal_error "Attempted to store a SIMD vector to a value array."
-  | Unboxed_product _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
+  | Naked_masks, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
     Misc.fatal_errorf
-      "Storing of SIMD vectors from unboxed product arrays is not currently \
-       supported:@ %a"
+      "Array reinterpret store from SIMD vector to mask array not supported:@ \
+       %a"
+      Debuginfo.print_compact dbg
+  | ( Unboxed_product _,
+      (Naked_vec128s | Naked_vec256s | Naked_vec512s | Naked_masks) ) ->
+    Misc.fatal_errorf
+      "Storing of SIMD vectors and masks to unboxed product arrays is not \
+       currently supported:@ %a"
       Debuginfo.print_compact dbg
 
 let array_set ~dbg array_kind set_kind ~arr ~index ~new_value =

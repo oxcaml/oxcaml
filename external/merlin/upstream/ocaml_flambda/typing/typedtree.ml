@@ -149,6 +149,7 @@ type label_ambiguity =
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+  | Module_pack : type_expr -> [< `pat | `exp ] type_inspection
 
 and _ poly_param =
   | Param : type_expr -> [`pat] poly_param
@@ -325,9 +326,14 @@ and expression_desc =
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
-  | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * label_description *
-      alloc_mode
+  | Texp_atomic_loc of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      alloc_mode : alloc_mode;
+    }
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -1612,7 +1618,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_letmutable (_, exp) -> fold_antiquote_exp f acc exp
   | Texp_mutvar _ -> acc
   | Texp_setmutvar (_, _, exp) -> fold_antiquote_exp f acc exp
-  | Texp_atomic_loc (exp, _, _, _, _) -> fold_antiquote_exp f acc exp
+  | Texp_atomic_loc { record = exp; _ } -> fold_antiquote_exp f acc exp
   | Texp_idx (_, _) -> acc
   | Texp_quotation exp ->
       fold_antiquote_exp (fold_antiquote_exp f) acc exp

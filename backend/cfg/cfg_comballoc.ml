@@ -45,7 +45,18 @@ let rec find_next_allocation : cell option -> allocation option =
       find_next_allocation (DLL.next cell))
 
 (* [find_compatible_allocations cell ~curr_mode ~curr_size] returns the
-   allocations compatible with mode [curr_mode] and total size [curr_size]. *)
+   allocations compatible with mode [curr_mode] and total size [curr_size].
+
+   GC-safety invariant: combining hoists the allocation of every later block to
+   the first allocation's point, while each block's initializing stores stay in
+   place. The reserved-but-uninitialized blocks are thus exposed to any GC
+   safepoint between the first and last combined allocation, and to any raise
+   (which would leave them live below [young_ptr] on the unwind path). So the
+   pass may only continue across instructions that are neither GC safepoints nor
+   able to raise. That holds here because: the pass runs after [Cfg_polling] so
+   every safepoint is an explicit [Poll] (stopped at below); basic instructions
+   never raise; and no [Specific], [Intop_atomic], or [Store] op allocates or
+   polls. *)
 let find_compatible_allocations :
     cell option ->
     curr_mode:Cmm.Alloc_mode.t ->
@@ -131,7 +142,12 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
   match first_allocation with
   | None -> ()
   | Some { bytes; dbginfo; mode; cell } ->
-    assert (List.length dbginfo = 1);
+    if List.length dbginfo <> 1
+    then
+      Misc.fatal_errorf
+        "Cfg_comballoc: the first allocation should carry a single block of \
+         debug info but carries %d"
+        (List.length dbginfo);
     let compatible_allocs =
       find_compatible_allocations (DLL.next cell) ~curr_mode:mode
         ~curr_size:bytes

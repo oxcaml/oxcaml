@@ -39,6 +39,11 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
+  let denv =
+    if Code_metadata.stub code_metadata
+    then DE.enter_stub_function denv
+    else denv
+  in
   let my_closure_duid = Flambda_debug_uid.none in
   let denv =
     match function_slot_opt with
@@ -388,9 +393,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
      considered with a set of inlining arguments coherent with the one used to
      compile the current file when inlining. *)
   let inlining_arguments =
-    Inlining_arguments.meet
-      (Code.inlining_arguments code)
-      inlining_arguments_from_denv
+    Inlining_arguments.combine ~from_env:inlining_arguments_from_denv
+      ~from_metadata:(Code.inlining_arguments code)
   in
   let result_arity = Code.result_arity code in
   let return_cont_params =
@@ -539,7 +543,9 @@ let simplify_function context ~outer_dacc function_slot code_id
   in
   let code_id, outer_dacc =
     match Code_or_metadata.view code_or_metadata with
-    | Code_present code when not (Code.stub code) ->
+    | Code_present code
+      when (not (Code.stub code))
+           || C.stub_can_be_simplified (DA.denv outer_dacc) ->
       let rec run ~outer_dacc ~code count =
         let { code_id; code = new_code; outer_dacc; should_resimplify } =
           simplify_function0 context ~outer_dacc (Some function_slot) code_id
@@ -1147,8 +1153,10 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     all_sets_of_closures_and_symbols
     closure_bound_names_inside_functions_all_sets value_slots_and_types_all_sets
 
-let simplify_stub_function dacc code ~all_code ~simplify_function_body =
-  let context = C.create_for_stub dacc ~all_code ~simplify_function_body in
+let simplify_static_stub_function dacc code ~all_code ~simplify_function_body =
+  let context =
+    C.create_for_static_stub dacc ~all_code ~simplify_function_body
+  in
   let closure_bound_names_inside_function =
     (* Unused, the type of the value slot is going to be unknown *)
     Function_slot.Map.empty

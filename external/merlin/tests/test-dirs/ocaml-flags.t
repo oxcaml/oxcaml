@@ -115,6 +115,7 @@ logic.
   -dcmm-invariants
   -dcounters
   -dcse
+  -ddebug-avail-sets
   -ddebug-available-regs
   -ddebug-invariants
   -ddebug-uid-tables
