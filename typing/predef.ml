@@ -602,6 +602,13 @@ let option_argument_sort = None
 let option_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
+(* The jkind of an optional argument, as opposed to
+   [option_argument_jkind], the jkind of the argument to the [option]
+   type. *)
+(* CR-soon lmaurer: Remove this when these are once again the same. *)
+let optional_argument_jkind =
+  Jkind.Builtin.value_or_null ~why:Optional_argument
+
 let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
@@ -1283,9 +1290,3 @@ let builtin_type_constrs =
   List.map
     (fun t -> let id = ident_of_type_constr t in (Ident.name id, id))
     all_type_constrs
-
-(* Externally, this is the jkind of an optional argument, as opposed to the
-   jkind of the argument to the [option] type. *)
-(* CR-soon lmaurer: Remove this when these are once again the same. *)
-let option_argument_jkind =
-  Jkind.Builtin.value_or_null ~why:Optional_argument
