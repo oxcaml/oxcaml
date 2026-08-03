@@ -250,7 +250,7 @@ let flambda_to_flambda0 : type m.
           let _deps, _traverse_rebuild =
             Flambda2_reaper.Reaper.Staged.traverse flambda
           in
-          Some ()
+          Some { Flambda2_reaper.Cmr_format.final_typing_env }
         else None
       in
       let { unit = flambda;
@@ -365,8 +365,23 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
-let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width:_
+let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables:_ ~cmr_filename =
-  Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename;
-  (* CR mvellacott: implement! *)
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let { Flambda2_reaper.Cmr_format.final_typing_env } =
+    Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
+      ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
+  in
+  (* CR mvellacott: The following print is for a temporary test, and should be
+     replaced with an actual implementation. *)
+  Option.iter
+    (fun typing_env ->
+      let module_symbol =
+        Flambda2_identifiers.Symbol.for_compilation_unit
+          (Compilation_unit.get_current_exn ())
+      in
+      Printf.eprintf "Restored typing env defines module symbol: %b\n"
+        (Flambda2_types.Typing_env.mem typing_env
+           (Flambda2_identifiers.Name.symbol module_symbol)))
+    final_typing_env;
   Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"

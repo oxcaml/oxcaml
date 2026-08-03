@@ -16,8 +16,8 @@
 (**************************************************************************)
 
 (* CR mvellacott: (long term) get rid of CMR files, and put the data in CMX instead *)
-(* CR mvellacott: (short term) store actually useful data in CMR files *)
-type t = unit
+(* CR mvellacott: (short term) store complete data in CMR files *)
+type t = { final_typing_env : Typing_env.t option }
 
 type error =
   | Wrong_format of string
@@ -31,4 +31,10 @@ exception Error of error
     for the unit being stored; it describes the data written alongside it. *)
 val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
 
-val restore : filename:string -> t
+(** The resuming invocation must use the same machine width and compilation unit
+    as the one that wrote the file. *)
+val restore :
+  filename:string ->
+  machine_width:Target_system.Machine_width.t ->
+  resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  t

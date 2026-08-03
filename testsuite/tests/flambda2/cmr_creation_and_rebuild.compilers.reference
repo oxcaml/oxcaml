@@ -1,2 +1,3 @@
+Restored typing env defines module symbol: true
 >> Fatal error: reaped_flambda2_to_cmm unimplemented
 Fatal error: exception Misc.Fatal_error
