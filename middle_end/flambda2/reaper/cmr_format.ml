@@ -17,6 +17,16 @@
 
 type t = string
 
+module File_contents = struct
+  type cmr_format = t
+
+  type t = string
+
+  let create (t : cmr_format) : t = t
+
+  let deserialise (t : t) : cmr_format = t
+end
+
 type error =
   | Wrong_format of string
   | Wrong_version of string
@@ -26,30 +36,34 @@ type error =
 exception Error of error
 
 let save ~filename t =
+  let file_contents = File_contents.create t in
   let oc = open_out_bin filename in
   Misc.try_finally
     (fun () ->
       output_string oc Config.cmr_magic_number;
-      output_value oc t)
+      output_value oc file_contents)
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
 
 let restore ~filename =
   let ic = open_in_bin filename in
-  Misc.try_finally
-    (fun () ->
-      let magic = Config.cmr_magic_number in
-      let format_code = String.sub magic 0 9 in
-      let buffer = really_input_string ic (String.length magic) in
-      if String.equal buffer magic
-      then
-        try (input_value ic : t) with
-        | End_of_file | Failure _ -> raise (Error (Corrupted filename))
-        | Error e -> raise (Error e)
-      else if String.starts_with ~prefix:format_code buffer
-      then raise (Error (Wrong_version filename))
-      else raise (Error (Wrong_format filename)))
-    ~always:(fun () -> close_in ic)
+  let file_contents =
+    Misc.try_finally
+      (fun () ->
+        let magic = Config.cmr_magic_number in
+        let format_code = String.sub magic 0 9 in
+        let buffer = really_input_string ic (String.length magic) in
+        if String.equal buffer magic
+        then
+          try (input_value ic : File_contents.t) with
+          | End_of_file | Failure _ -> raise (Error (Corrupted filename))
+          | Error e -> raise (Error e)
+        else if String.starts_with ~prefix:format_code buffer
+        then raise (Error (Wrong_version filename))
+        else raise (Error (Wrong_format filename)))
+      ~always:(fun () -> close_in ic)
+  in
+  File_contents.deserialise file_contents
 
 open Format_doc
 
