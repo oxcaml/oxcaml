@@ -38,18 +38,12 @@
 #include <process.h>
 #include <processthreadsapi.h>
 #include <wtypes.h>
-#else
+#elif !defined(CAML_BARE_METAL)
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
 
-/* An events ring needs an OS (files, mmap), so the whole producer is
-   compiled out on bare metal: the CAML_EV_* / CAML_RUNTIME_EVENTS_*
-   macros in runtime_events.h compile to nothing there, and the
-   primitives backing the [Runtime_events] module are not defined, so a
-   program using it fails at link time. */
-#ifndef CAML_BARE_METAL
-
+/* On bare metal the ring is malloced rather than a shared file mapping. */
 #define RUNTIME_EVENTS_VERSION 1
 
 /*
@@ -133,16 +127,26 @@ static void write_to_ring(ev_category category, ev_message_type type,
 static void events_register_write_buffer(int index, value event_name);
 static void runtime_events_create_from_stw_single(void);
 
+#ifdef CAML_BARE_METAL
+static void runtime_events_teardown_from_stw_single(int remove_file);
+#else
 static void stw_teardown_runtime_events(
   caml_domain_state *domain_state,
   void *remove_file_data, int num_participating,
   caml_domain_state **participating_domains);
+#endif
 
 void caml_runtime_events_init(void) {
 
   caml_plat_mutex_init(&user_events_lock);
   caml_register_generational_global_root(&user_events);
 
+#ifdef CAML_BARE_METAL
+  /* Ring is created on demand by an explicit Runtime_events.start (). */
+  runtime_events_path = NULL;
+  ring_size_words = 1 << caml_params->runtime_events_log_wsize;
+  preserve_ring = 0;
+#else
   runtime_events_path = caml_secure_getenv(T("OCAML_RUNTIME_EVENTS_DIR"));
 
   if (runtime_events_path) {
@@ -159,13 +163,17 @@ void caml_runtime_events_init(void) {
     runtime_events_create_from_stw_single();
     /* stw_single: mutators and domains have not started yet. */
   }
+#endif
 }
 
 /* teardown the ring buffers. This must be called from a stop-the-world
    unless we are sure there is only a single domain running (e.g after a fork)
 */
 static void runtime_events_teardown_from_stw_single(int remove_file) {
-#ifdef _WIN32
+#ifdef CAML_BARE_METAL
+    (void)remove_file;
+    caml_stat_free(current_metadata);
+#elif defined(_WIN32)
     UnmapViewOfFile(current_metadata);
     CloseHandle(ring_file_handle);
     CloseHandle(ring_handle);
@@ -190,6 +198,9 @@ static void runtime_events_teardown_from_stw_single(int remove_file) {
 }
 
 void caml_runtime_events_post_fork(void) {
+#ifdef CAML_BARE_METAL
+  return;
+#else
   /* We are here in the child process after a call to fork (which can only
      happen when there is a single domain) and no mutator code that can spawn a
      new domain can have run yet. Let's be double sure. */
@@ -206,6 +217,7 @@ void caml_runtime_events_post_fork(void) {
     /* We still have the path and ring size from our parent */
     caml_runtime_events_start();
   }
+#endif
 }
 
 /* Return the path of the ring buffers file of this process, or NULL
@@ -213,11 +225,31 @@ void caml_runtime_events_post_fork(void) {
    read the ring buffers of the current process. Always returns a
    freshly-allocated string. */
 char_os* caml_runtime_events_current_location(void) {
+#ifdef CAML_BARE_METAL
+  /* The ring is anonymous memory, so there is no path to hand a consumer.
+     An in-process consumer needs a way to reach [current_metadata] directly;
+     see caml_runtime_events_current_ring below. */
+  return NULL;
+#else
   if( atomic_load_acquire(&runtime_events_enabled) ) {
     return caml_stat_strdup_noexc_os(current_ring_loc);
   } else {
     return NULL;
   }
+#endif
+}
+
+/* Direct access to this process's ring. On a hosted system a consumer mmaps
+   the ring file; with an anonymous ring that is not possible, so expose the
+   mapping itself. Returns NULL when runtime events are not enabled. */
+CAMLexport void* caml_runtime_events_current_ring(uintnat *size)
+{
+  if (atomic_load_acquire(&runtime_events_enabled)) {
+    if (size != NULL) *size = current_ring_total_size;
+    return (void*)current_metadata;
+  }
+  if (size != NULL) *size = 0;
+  return NULL;
 }
 
 /* Write a lifecycle event and then trigger a stop the world to tear down the
@@ -231,11 +263,15 @@ void caml_runtime_events_destroy(void) {
     /* clean up runtime_events when we exit if we haven't been instructed to
       preserve the file. */
     int remove_file = preserve_ring ? 0 : 1;
+#ifdef CAML_BARE_METAL
+    runtime_events_teardown_from_stw_single(remove_file);  /* single domain */
+#else
     do {
       caml_try_run_on_all_domains(&stw_teardown_runtime_events,
                                   &remove_file, NULL);
     }
     while( atomic_load_acquire(&runtime_events_enabled) );
+#endif
   }
 }
 
@@ -246,13 +282,16 @@ static void runtime_events_create_from_stw_single(void) {
   /* Don't initialise runtime_events twice */
   if (!atomic_load_acquire(&runtime_events_enabled)) {
     int ring_headers_length, ring_data_length;
-#ifdef _WIN32
+#ifdef CAML_BARE_METAL
+    /* Noop */
+#elif defined(_WIN32)
     DWORD pid = GetCurrentProcessId();
 #else
     int ring_fd, ret;
     long int pid = getpid();
 #endif
 
+#ifndef CAML_BARE_METAL
     current_ring_loc = caml_stat_alloc(RUNTIME_EVENTS_MAX_MSG_LENGTH);
 
     if (runtime_events_path) {
@@ -262,6 +301,7 @@ static void runtime_events_create_from_stw_single(void) {
       snprintf_os(current_ring_loc, RUNTIME_EVENTS_MAX_MSG_LENGTH,
                   T("%ld.events"), pid);
     }
+#endif
 
     current_ring_total_size =
         RUNTIME_EVENTS_MAX_CUSTOM_EVENTS *
@@ -270,7 +310,14 @@ static void runtime_events_create_from_stw_single(void) {
                         sizeof(struct runtime_events_buffer_header)) +
         sizeof(struct runtime_events_metadata_header);
 
-#ifdef _WIN32
+#ifdef CAML_BARE_METAL
+    current_metadata = (struct runtime_events_metadata_header*)
+                        caml_stat_calloc_noexc(1, current_ring_total_size);
+
+    if (current_metadata == NULL) {
+      caml_fatal_error("Unable to allocate runtime events ring");
+    }
+#elif defined(_WIN32)
     ring_file_handle = CreateFile(
       current_ring_loc,
       GENERIC_READ | GENERIC_WRITE,
@@ -391,7 +438,11 @@ static void runtime_events_create_from_stw_single(void) {
 
     atomic_store_release(&runtime_events_paused, 0);
 
+#ifdef CAML_BARE_METAL
+    caml_ev_lifecycle(EV_RING_START, 0);   /* no pid */
+#else
     caml_ev_lifecycle(EV_RING_START, pid);
+#endif
 
 
     while (Is_some (current_user_event)) {
@@ -414,6 +465,10 @@ static void runtime_events_create_from_stw_single(void) {
    start/stop (to avoid the aforementioned race), and of course to
    ensure that the setup/teardown is observed by all domains returning
    from the STW. */
+
+/* The STW callbacks are only reachable on a multi-domain system; on bare metal
+   start/destroy call the _from_stw_single functions directly. */
+#ifndef CAML_BARE_METAL
 
 /* Stop the world section which calls [runtime_events_create_raw], used when we
    can't be sure there is only a single domain running. */
@@ -440,10 +495,16 @@ static void stw_teardown_runtime_events(
   }
 }
 
+#endif /* !CAML_BARE_METAL */
+
 CAMLexport void caml_runtime_events_start(void) {
+#ifdef CAML_BARE_METAL
+  runtime_events_create_from_stw_single();
+#else
   while (!atomic_load_acquire(&runtime_events_enabled)) {
     caml_try_run_on_all_domains(&stw_create_runtime_events, NULL, NULL);
   }
+#endif
 }
 
 CAMLexport void caml_runtime_events_pause(void) {
@@ -877,8 +938,6 @@ CAMLexport value caml_runtime_events_user_resolve(
 
   CAMLreturn (Val_none);
 }
-
-#endif /* !CAML_BARE_METAL */
 
 /* Linker compatibility with unused 4 stdlib externals */
 

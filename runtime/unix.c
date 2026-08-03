@@ -177,6 +177,14 @@ void caml_plat_mem_unmap(void* mem, uintnat size)
   if (mem != NULL) free(((void **)mem)[-1]);
 }
 
+/* Monotonic nanosecond counter used by the runtime-events producer. The
+   platform already has to supply caml_bare_metal_time_ns, so reuse it rather
+   than requiring a second clock. */
+uint64_t caml_time_counter(void)
+{
+  return caml_bare_metal_time_ns();
+}
+
 #else /* !CAML_BARE_METAL */
 
 int caml_read_fd(int fd, int flags, void * buf, int n)
