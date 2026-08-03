@@ -144,7 +144,7 @@ let missing_cmi_filename unit_name =
   let requested = Compilation_unit.Name.to_string unit_name ^ ".cmi" in
   Misc.normalized_unit_filename requested
 
-let reset_flags environment =
+let reset_flags ?project_dir environment =
   Clflags.annotations := false;
   Clflags.binary_annotations := false;
   Clflags.dont_write_files := true;
@@ -152,17 +152,18 @@ let reset_flags environment =
   Clflags.no_std_include := environment = Browser;
   Clflags.no_cwd := environment = Browser;
   Clflags.include_dirs :=
-    (match environment with
-     | Native -> []
-     | Browser -> browser_include_dirs);
+    Option.to_list project_dir
+    @ (match environment with
+       | Native -> []
+       | Browser -> browser_include_dirs);
   Clflags.hidden_include_dirs := [];
   Clflags.open_modules := [];
   Clflags.preprocessor := None;
   Clflags.all_ppx := [];
   Clflags.use_threads := false
 
-let prepare_compiler environment ~filename =
-  reset_flags environment;
+let prepare_compiler ?project_dir environment ~filename =
+  reset_flags ?project_dir environment;
   Location.reset ();
   Lexer.reset_syntax_mode ();
   Typemod.reset ~preserve_persistent_env:false;
@@ -176,6 +177,7 @@ let prepare_compiler environment ~filename =
   (match environment with
    | Native -> ()
    | Browser ->
+     Option.iter (fun dir -> Load_path.add_dir ~hidden:false dir) project_dir;
      List.iter
        (fun include_dir -> Load_path.add_dir ~hidden:false include_dir)
        browser_include_dirs);

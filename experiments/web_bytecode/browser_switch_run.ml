@@ -95,3 +95,95 @@ let utop_string ~browser ~filename ~source =
           Toploop.execute_phrase true ppf phrase)
         phrases
       |> ignore))
+
+type dox_unit = {
+  filename : string;
+  source : string;
+}
+
+let dox_unit_of_json json =
+  let open Yojson.Safe.Util in
+  { filename = json |> member "filename" |> to_string;
+    source = json |> member "source" |> to_string
+  }
+
+let remove_if_exists path =
+  try Sys.remove path with Sys_error _ -> ()
+
+let run_dox_project ~request =
+  let open Yojson.Safe.Util in
+  let request = Yojson.Safe.from_string request in
+  let units = request |> member "units" |> to_list |> List.map dox_unit_of_json in
+  let directory = Filename.temp_dir "dox_browser_" "" in
+  let event_path = Filename.concat directory "events" in
+  let compiled = ref [] in
+  let manifest_paths = ref [] in
+  let cleanup () =
+    List.iter
+      (fun ({ filename; _ } : dox_unit) ->
+        let source_path = Filename.concat directory filename in
+        let output_prefix = Browser_switch_common.file_prefix source_path in
+        List.iter remove_if_exists
+          [ source_path;
+            source_path ^ ".ppx.ast";
+            output_prefix ^ ".cmo";
+            output_prefix ^ ".cmi";
+            output_prefix ^ ".cmt";
+            output_prefix ^ ".cms";
+            output_prefix ^ ".annot";
+            output_prefix ^ ".dox-constructs"
+          ])
+      units;
+    remove_if_exists event_path;
+    (try Sys.rmdir directory with Sys_error _ -> ())
+  in
+  Fun.protect ~finally:cleanup (fun () ->
+    Browser_switch_common.with_missing_cmi_detection Browser_switch_common.Browser
+      (fun () ->
+        List.iter
+          (fun ({ filename; source } : dox_unit) ->
+            let source_path = Filename.concat directory filename in
+            let output_prefix = Browser_switch_common.file_prefix source_path in
+            let manifest_path = output_prefix ^ ".dox-constructs" in
+            Browser_switch_common.write_source_file ~source_path ~source;
+            Dox_browser_runtime.set_env "DOX_TRACE_ALL" "1";
+            Dox_browser_runtime.set_env "DOX_EXECUTION_MANIFEST" manifest_path;
+            Browser_switch_common.prepare_compiler Browser_switch_common.Browser
+              ~project_dir:directory ~filename;
+            let cmo_path =
+              Browser_switch_common.compile_source_file
+                ~filename ~source_path ~output_prefix
+            in
+            compiled := cmo_path :: !compiled;
+            manifest_paths := manifest_path :: !manifest_paths)
+          units;
+        ensure_browser_toplevel_initialized ();
+        Toploop.initialize_toplevel_env ();
+        Topdirs.dir_directory Browser_switch_common.browser_cmis_dir;
+        Topdirs.dir_directory directory;
+        List.iter Topdirs.dir_directory
+          Browser_switch_package_manifest.browser_package_include_dirs;
+        Dox_browser_runtime.set_env "DOCLANG_EVENT_PATH" event_path;
+        Dox_browser_runtime.reset_trace ();
+        let ppf = Format.err_formatter in
+        List.rev !compiled
+        |> List.iter (fun cmo_path ->
+          if not (Toploop.load_file ppf cmo_path) then
+            failwith ("Could not load " ^ Filename.basename cmo_path));
+        let events =
+          if Sys.file_exists event_path then Browser_switch_common.read_file event_path
+          else ""
+        in
+        let manifests =
+          List.rev !manifest_paths
+          |> List.filter_map (fun path ->
+            if Sys.file_exists path then Some (Browser_switch_common.read_file path)
+            else None)
+        in
+        `Assoc
+          [ "kind", `String "ok";
+            "events", `String events;
+            "trace", `String (Dox_browser_runtime.read_trace ());
+            "manifests", `List (List.map (fun text -> `String text) manifests)
+          ]
+        |> Yojson.Safe.to_string))
