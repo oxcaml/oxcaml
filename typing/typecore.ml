@@ -9353,7 +9353,27 @@ and type_function
           [ { pattern = pat; has_guard = false; needs_refute = false }, () ]
           ~type_body:begin
             fun () pat ~when_env:_ ~ext_env ~cont:_ ~ty_expected ~ty_infer:_
-              ~contains_gadt:param_contains_gadt ->
+              ~contains_gadt:param_contains_gadt ~check_partial_now ->
+              let ext_env =
+                (* A caller can bypass this pattern's match, by picking a
+                   constructor missing from a partial match or by omitting an
+                   optional argument, yet the function's calling convention
+                   (its argument and result layouts) is fixed before any
+                   match runs. So the rest of the function, body included,
+                   must not use the pattern's GADT equations: drop them.
+                   Exhaustiveness must be decided now, so a match made total
+                   only by how later parameters or the body are typed counts
+                   as partial here. See oxcaml/oxcaml#6689. *)
+                if Env.local_constraints_have_been_added ~since:env ext_env
+                && (Option.is_some default_arg
+                    || (match check_partial_now () with
+                        | Partial -> true
+                        | Total -> false))
+                then
+                  Env.replace_local_constraints ext_env
+                    ~with_constraints_from:env
+                else ext_env
+              in
               let { function_ = _, params_suffix, body;
                     newtypes; params_contain_gadt = suffix_contains_gadt;
                     fun_alloc_mode; ret_info;
@@ -10803,6 +10823,9 @@ and map_half_typed_cases
         -> ty_expected:_ (* type to check body in scope of *)
         -> ty_infer:_ (* type to infer for body *)
         -> contains_gadt:_ (* whether the pattern contains a GADT *)
+        -> check_partial_now:(unit -> partial)
+             (* checks exhaustiveness before the bodies are typed; possibly
+                more partial than the final result (see its definition) *)
         -> ret)
     -> check_if_total:bool (* if false, assume Partial right away *)
     -> ret list * partial
@@ -10933,6 +10956,33 @@ and map_half_typed_cases
   in
   (* type bodies *)
   let ty_res' = instance ty_res in
+  (* Lets [type_body] check exhaustiveness before the bodies are typed,
+     without emitting warnings. The result may be more partial than the
+     final [partial] below: typing the bodies can refine types in ways that
+     rule out more constructors. *)
+  let check_partial_now () =
+    if not check_if_total then Partial
+    else
+      match category with
+      | Computation ->
+          (* No callback needs this for computation cases. *)
+          Partial
+      | Value ->
+          let ty_arg_check =
+            (* Copy types to avoid contaminating them; see the comment on
+               [ty_arg_check] below. *)
+            Subst.type_expr
+              (Subst.with_additional_action Duplicate_variables Subst.identity)
+              ty_arg'
+          in
+          let val_cases =
+            List.map
+              (fun htc -> { htc.untyped_case with pattern = htc.typed_pat })
+              half_typed_cases
+          in
+          Warnings.without_warnings (fun () ->
+            check_partial ~lev env ty_arg_check loc val_cases)
+  in
   (* Why is it needed to keep the level of result raised ?  *)
   let result = with_local_level_if_principal ~post:ignore begin fun () ->
     map_conts
@@ -10968,7 +11018,7 @@ and map_half_typed_cases
             duplicate_type ty_res
           else ty_res in
         type_body case_data pat ~when_env ~ext_env ~cont ~ty_expected
-          ~ty_infer:ty_res' ~contains_gadt)
+          ~ty_infer:ty_res' ~contains_gadt ~check_partial_now)
     conts half_typed_cases
   end in
   let do_init = may_contain_gadts || needs_exhaust_check in
@@ -11079,7 +11129,7 @@ and type_cases
     caselist ~check_if_total
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
-        ~ty_infer ~contains_gadt:_ ->
+        ~ty_infer ~contains_gadt:_ ~check_partial_now:_ ->
         let cont = Option.map (fun (id,_) -> id) cont in
         let guard =
           match pc_guard with

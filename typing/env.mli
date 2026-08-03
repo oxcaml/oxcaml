@@ -473,6 +473,10 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
+
+val local_constraints_have_been_added : since:t -> t -> bool
+val replace_local_constraints : with_constraints_from:t -> t -> t
+
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:

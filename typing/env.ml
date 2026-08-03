@@ -2995,6 +2995,17 @@ let add_local_constraint ~stage path info env =
     local_constraints =
       StagedPath.Map.add { stage; path } info env.local_constraints }
 
+let local_constraints_have_been_added ~since env =
+  (* [env] must derive from [since]; as constraints are only ever added,
+     comparing sizes is exact. Physical equality is only a fast path: for
+     immutable values it may be [false] even when nothing was added. *)
+  since.local_constraints != env.local_constraints
+  && StagedPath.Map.cardinal since.local_constraints
+     <> StagedPath.Map.cardinal env.local_constraints
+
+let replace_local_constraints ~with_constraints_from env =
+  { env with local_constraints = with_constraints_from.local_constraints }
+
 let add_implicit_jkind ~loc name jkind env =
   { env with
     implicit_jkinds =
