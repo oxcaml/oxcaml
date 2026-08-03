@@ -2357,16 +2357,16 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
     | External _ as e -> add_used_primitive loc env path; e
     | x -> x
   in
+  let has_constant_constructor =
+    match arg_exps with
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+        cstr_constant
+    | [_; {exp_desc = Texp_variant(_, None)}]
+    | [{exp_desc = Texp_variant(_, None)}; _] -> true
+    | _ -> false
+  in
   if should_specialize_primitive p then
-    let has_constant_constructor =
-      match arg_exps with
-      | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
-      | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
-          cstr_constant
-      | [_; {exp_desc = Texp_variant(_, None)}]
-      | [{exp_desc = Texp_variant(_, None)}; _] -> true
-      | _ -> false
-    in
     match specialize_primitive env loc ty ~has_constant_constructor prim with
     | None -> prim
     | Some prim -> prim
