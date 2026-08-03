@@ -443,6 +443,7 @@ let to_subst_by_type_function s p =
 let new_type_id = s_ref (-1)
 let reset_additional_action_id () =
   new_type_id := -1;
+  Mode.reset_persistent_id ();
   Jkind_types.Sort.reset_cmi_sort_id ()
 
 let newpersty desc =
