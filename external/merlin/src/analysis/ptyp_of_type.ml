@@ -146,6 +146,9 @@ and core_type type_expr =
           (mknoloc (Longident.unflatten id |> Option.get), core_type t))
     in
     Typ.package (Typ.package_type loc args)
+  | Tmod (ty, _) ->
+    (* At the moment, there's no user syntax to represent Tmod *)
+    core_type ty
 
 and modtype_declaration id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
