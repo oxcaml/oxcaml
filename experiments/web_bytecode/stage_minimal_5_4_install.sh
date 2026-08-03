@@ -91,7 +91,7 @@ if [ ! -f "$repo_root/_build/main/compilerlibs/META" ] \
    || [ ! -f "$repo_root/_build/main/toplevel/byte/ocamltoplevel.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/dynlink/dynlink.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/str/str.cma" ] \
-   || [ ! -f "$repo_root/_build/main/otherlibs/systhreads4/byte/threads.cma" ] \
+   || [ ! -f "$repo_root/_build/main/otherlibs/systhreads/byte/threads.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/unix/unix.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/stdlib_stable/stdlib_stable.cma" ]; then
   run_dune build --root=. --workspace=duneconf/main.ws --display=short --only-package=ocaml \
@@ -103,7 +103,7 @@ if [ ! -f "$repo_root/_build/main/compilerlibs/META" ] \
     _build/main/toplevel/byte/ocamltoplevel.cma \
     _build/main/otherlibs/dynlink/dynlink.cma \
     _build/main/otherlibs/str/str.cma \
-    _build/main/otherlibs/systhreads4/byte/threads.cma \
+    _build/main/otherlibs/systhreads/byte/threads.cma \
     _build/main/otherlibs/unix/unix.cma \
     _build/main/otherlibs/stdlib_stable/stdlib_stable.cma
 fi
@@ -212,13 +212,13 @@ copy_flattened_artifacts \
   "$repo_root/_build/main/otherlibs/str/.str.objs/byte"
 
 mkdir -p "$tmp_install/lib/ocaml/threads"
-cp -f "$repo_root/_build/main/otherlibs/systhreads4/META" "$tmp_install/lib/ocaml/threads/"
-cp -f "$repo_root/_build/main/otherlibs/systhreads4/byte/threads.cma" \
+cp -f "$repo_root/_build/main/otherlibs/systhreads/META" "$tmp_install/lib/ocaml/threads/"
+cp -f "$repo_root/_build/main/otherlibs/systhreads/byte/threads.cma" \
   "$tmp_install/lib/ocaml/threads/"
 copy_flattened_artifacts \
   "$tmp_install/lib/ocaml/threads" \
-  "$repo_root/_build/main/otherlibs/systhreads4/byte/.threads.objs/byte"
-cp -f "$repo_root/_build/main/otherlibs/systhreads4/threads.h" \
+  "$repo_root/_build/main/otherlibs/systhreads/byte/.threads.objs/byte"
+cp -f "$repo_root/_build/main/otherlibs/systhreads/threads.h" \
   "$tmp_install/lib/ocaml/caml/threads.h"
 
 copy_package_dir "unix" "$repo_root/_build/main/otherlibs/unix"
