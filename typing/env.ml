@@ -3003,11 +3003,10 @@ let local_constraints_have_been_added ~since env =
      added iff the count differs. *)
   since.local_constraints_update_count <> env.local_constraints_update_count
 
-let replace_local_constraints ~with_constraints_from env =
+let revert_local_constraints ~since env =
   { env with
-    local_constraints = with_constraints_from.local_constraints;
-    local_constraints_update_count =
-      with_constraints_from.local_constraints_update_count }
+    local_constraints = since.local_constraints;
+    local_constraints_update_count = since.local_constraints_update_count }
 
 let add_implicit_jkind ~loc name jkind env =
   { env with

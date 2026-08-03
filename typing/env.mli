@@ -477,7 +477,12 @@ val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
 (** Assumes the environment was built by adding to [since] *)
 val local_constraints_have_been_added : since:t -> t -> bool
 
-val replace_local_constraints : with_constraints_from:t -> t -> t
+(** Assumes the environment was built by adding to [since].
+    [revert_local_constraints ~since env] is [env] with its local (GADT)
+    constraints replaced by [since]'s.
+
+    Arbitrary uses of this function may create ill-formed environments *)
+val revert_local_constraints : since:t -> t -> t
 
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
