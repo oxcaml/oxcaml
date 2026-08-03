@@ -306,6 +306,7 @@ module Flambda2 = struct
     let flow = ref false
     let simplify = ref false
     let reaper = ref false
+    let compact = ref false
   end
 
   module Expert = struct
