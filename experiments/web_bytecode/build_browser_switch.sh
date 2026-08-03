@@ -163,6 +163,11 @@ standard_runtime_js_files=()
 while IFS= read -r runtime_file; do
   case "$runtime_file" in
     */graphics.js|*/runtime_events.js) ;;
+    */toplevel.js)
+      # Use the runtime from this OxCaml checkout. Dox adds a digest-keyed
+      # cache for bytecode translated by the browser toplevel.
+      standard_runtime_js_files+=("$repo_root/external/js_of_ocaml/runtime/js/toplevel.js")
+      ;;
     *) standard_runtime_js_files+=("$runtime_file") ;;
   esac
 done < <(find "$js_of_ocaml_compiler_dir" -maxdepth 1 -type f -name '*.js' | sort)

@@ -22,6 +22,16 @@
   let doxClosures = new WeakMap();
   let doxFunctionConsumption = new WeakMap();
   const doxEnvironment = new Map();
+  let doxMetadataCache = new Map();
+  let doxHexCache = new Map();
+  const doxCompactPhases = new Set([
+    "tail-handoff",
+    "tail-link",
+    "call-attempt-open",
+    "call-attempt-consumed",
+    "activation-closure",
+    "closure-created",
+  ]);
 
   global.doxSetEnv = function doxSetEnv(name, value) {
     const key = String(name);
@@ -52,12 +62,27 @@
     return output;
   }
 
-  function doxFields(metadata) {
-    return doxBytes(metadata).split("\x1f");
+  function doxSiteHex(site) {
+    let output = doxHexCache.get(site);
+    if (output === undefined) {
+      output = doxHex(site);
+      doxHexCache.set(site, output);
+    }
+    return output;
   }
 
-  function doxShouldTrace(metadata) {
-    const path = doxFields(metadata)[3] || "";
+  function doxFields(metadata) {
+    const bytes = doxBytes(metadata);
+    let fields = doxMetadataCache.get(bytes);
+    if (fields === undefined) {
+      fields = bytes.split("\x1f");
+      doxMetadataCache.set(bytes, fields);
+    }
+    return fields;
+  }
+
+  function doxShouldTraceFields(fields) {
+    const path = fields[3] || "";
     return path.endsWith(".ml.md") || path.startsWith("<dox-inline:");
   }
 
@@ -282,9 +307,8 @@
     return doxPreviewDynamic(value, depth);
   }
 
-  function doxPreview(metadata, value, exception = false) {
+  function doxPreview(metadata, value, exception = false, fields = doxFields(metadata)) {
     if (exception) return { display: "<exception>", complete: false };
-    const fields = doxFields(metadata);
     const schema = fields[9] || "";
     if (schema) return doxPreviewSchema({ text: schema, at: 0 }, value, 0, schema);
     const type = fields[8] || "";
@@ -297,18 +321,27 @@
     return doxPreviewDynamic(value);
   }
 
-  function doxEmit(phase, occurrence, parent, metadata, observed, hasObserved, detail = null) {
+  function doxEmit(
+    phase,
+    occurrence,
+    parent,
+    metadata,
+    observed,
+    hasObserved,
+    detail = null,
+    knownFields = null,
+  ) {
     if (doxTraceTruncated) return;
-    const fields = doxFields(metadata);
-    if (!doxShouldTrace(metadata)) return;
+    const fields = knownFields || doxFields(metadata);
+    if (!doxShouldTraceFields(fields)) return;
     const site = fields[0] || "";
-    const compact = new Set(["tail-handoff", "tail-link", "call-attempt-open", "call-attempt-consumed", "activation-closure", "closure-created"]).has(phase);
+    const compact = doxCompactPhases.has(phase);
     const publicMetadata = compact
       ? [site, "", "", "", "0", "0", "0", "0", ""].join("\x1f")
       : fields.slice(0, 9).join("\x1f");
-    const preview = detail === null && hasObserved ? doxPreview(metadata, observed, phase === "raise") : { display: detail || "", complete: detail !== null || !hasObserved };
+    const preview = detail === null && hasObserved ? doxPreview(metadata, observed, phase === "raise", fields) : { display: detail || "", complete: detail !== null || !hasObserved };
     const content = [phase, "0", String(occurrence), parent ? String(parent) : "", publicMetadata, preview.complete ? "1" : "0", (hasObserved || detail !== null) ? preview.display : ""].join("\x1f");
-    const line = `observe\t${doxHex(site)}\t${doxHex(content)}\n`;
+    const line = `observe\t${doxSiteHex(site)}\t${doxHex(content)}\n`;
     if (doxTraceBytes + line.length > doxTraceLimit) {
       doxTraceLines.push("trace-truncated\tbrowser-size-limit\t\n");
       doxTraceTruncated = true;
@@ -319,7 +352,8 @@
   }
 
   function doxEnter(metadata, tailCapable) {
-    if (!doxShouldTrace(metadata)) return 0;
+    const fields = doxFields(metadata);
+    if (!doxShouldTraceFields(fields)) return 0;
     const occurrence = ++doxCounter;
     const pending = doxPendingTail;
     const parent = pending?.parent ?? (doxStack.at(-1)?.occurrence || 0);
@@ -331,9 +365,9 @@
       overapplyParent: pending?.parent || 0,
       overapplyRemaining: pending?.remaining || 0,
     });
-    doxEmit("enter", occurrence, parent, metadata, 0, false);
-    const kind = doxFields(metadata)[1];
-    if (kind === "call") doxEmit("call-attempt-open", occurrence, parent, metadata, 0, false);
+    doxEmit("enter", occurrence, parent, metadata, 0, false, null, fields);
+    const kind = fields[1];
+    if (kind === "call") doxEmit("call-attempt-open", occurrence, parent, metadata, 0, false, null, fields);
     else if (kind === "function" && parent) {
       if (doxPendingClosureId) doxEmit("activation-closure", occurrence, parent, metadata, 0, false, String(doxPendingClosureId));
       doxEmit("call-attempt-consumed", occurrence, parent, metadata, 0, false);
@@ -389,6 +423,8 @@
     doxClosureCounter = 0;
     doxClosures = new WeakMap();
     doxFunctionConsumption = new WeakMap();
+    doxMetadataCache = new Map();
+    doxHexCache = new Map();
   };
 
   global.doxReadTrace = function doxReadTrace() { return doxTraceLines.join(""); };
@@ -407,7 +443,7 @@
   global.caml_doclang_observe_return = (metadata, occurrence, observed) => doxLeave("return", metadata, occurrence, observed);
   global.caml_doclang_observe_raise = (metadata, occurrence, observed) => doxLeave("raise", metadata, occurrence, observed);
   global.caml_doclang_observe_register_function = (fn, consumption, metadata) => {
-    if (typeof fn !== "function" || !doxShouldTrace(metadata)) return 0;
+    if (typeof fn !== "function" || !doxShouldTraceFields(doxFields(metadata))) return 0;
     const id = ++doxClosureCounter;
     doxClosures.set(fn, { id, metadata });
     doxFunctionConsumption.set(fn, consumption | 0);

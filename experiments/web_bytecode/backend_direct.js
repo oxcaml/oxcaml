@@ -4,7 +4,7 @@ import {
 } from "./playground_prelude.js";
 
 const buildBase = "./build";
-const compilerAssetVersion = "20260803-dox-current-oxcaml-3";
+const compilerAssetVersion = "20260803-dox-incremental-3";
 
 const loadedScriptUrls = new Map();
 let browserFsManifestPromise = null;
@@ -410,7 +410,7 @@ async function runBackendWithLazyFs(methodName, filename, source) {
 export const ready = (async () => {
   emitStatus("loading", "loading runtime");
   await loadScript(
-    new URL("./runtime_shims.js?v=20260803-dox-current-oxcaml-3", import.meta.url),
+    new URL("./runtime_shims.js?v=20260803-dox-incremental-1", import.meta.url),
   );
   emitStatus("loading", "loading compiler");
   await loadScript(buildAssetUrl("web_bytecode_js.bc.js"));

@@ -102,6 +102,22 @@ type dox_unit = {
   source : string;
 }
 
+type cached_dox_unit = {
+  kind : string;
+  source_digest : string;
+}
+
+(* The browser worker lives for the lifetime of the page, so its pseudo-filesystem
+   can be the incremental build store.  Entries after the first changed unit are
+   invalidated conservatively: OCaml units execute front-to-back, and this keeps
+   both interfaces and initialization order correct without maintaining a second
+   dependency graph in the browser bridge. *)
+let dox_cache_directory =
+  lazy (Filename.temp_dir ~temp_dir:"." "dox_browser_cache_" "")
+
+let dox_unit_cache : (string, cached_dox_unit) Hashtbl.t = Hashtbl.create 32
+let dox_compilation_order = ref []
+
 let dox_unit_of_json json =
   let open Yojson.Safe.Util in
   { kind = json |> member "kind" |> to_string_option |> Option.value ~default:"document";
@@ -112,7 +128,49 @@ let dox_unit_of_json json =
 let remove_if_exists path =
   try Sys.remove path with Sys_error _ -> ()
 
+let source_digest source = Digest.string source |> Digest.to_hex
+
+let unit_paths directory ({ filename; _ } : dox_unit) =
+  let source_path = Filename.concat directory filename in
+  let output_prefix = Browser_switch_common.file_prefix source_path in
+  source_path, output_prefix
+
+let remove_unit_artifacts directory unit =
+  let source_path, output_prefix = unit_paths directory unit in
+  List.iter remove_if_exists
+    [ source_path ^ ".ppx.ast";
+      output_prefix ^ ".cmo";
+      output_prefix ^ ".cmi";
+      output_prefix ^ ".cmt";
+      output_prefix ^ ".cms";
+      output_prefix ^ ".annot";
+      output_prefix ^ ".dox-constructs"
+    ]
+
+let remove_cached_unit directory filename cached =
+  let unit = { kind = cached.kind; filename; source = "" } in
+  let source_path, _ = unit_paths directory unit in
+  remove_if_exists source_path;
+  remove_unit_artifacts directory unit
+
+let cached_unit_is_usable directory (({ kind; filename; source } : dox_unit) as unit) =
+  let _, output_prefix = unit_paths directory unit in
+  match Hashtbl.find_opt dox_unit_cache filename with
+  | Some cached ->
+    String.equal cached.kind kind
+    && String.equal cached.source_digest (source_digest source)
+    && Sys.file_exists (output_prefix ^ ".cmo")
+    && Sys.file_exists (output_prefix ^ ".cmi")
+    && (not (Filename.check_suffix filename ".ml.md")
+       || Sys.file_exists (output_prefix ^ ".dox-constructs"))
+  | None -> false
+
+let cache_unit ({ kind; filename; source } : dox_unit) =
+  Hashtbl.replace dox_unit_cache filename
+    { kind; source_digest = source_digest source }
+
 let run_dox_project ~request =
+  let started_at = Sys.time () in
   let open Yojson.Safe.Util in
   let request = Yojson.Safe.from_string request in
   let units = request |> member "units" |> to_list |> List.map dox_unit_of_json in
@@ -129,28 +187,12 @@ let run_dox_project ~request =
       project_cmis
   in
   let compiling_alias = ref false in
-  let directory = Filename.temp_dir ~temp_dir:"." "dox_browser_" "" in
+  let directory = Lazy.force dox_cache_directory in
   let event_path = Filename.concat directory "events" in
   let compiled = ref [] in
   let manifest_paths = ref [] in
   let cleanup () =
-    List.iter
-      (fun ({ filename; _ } : dox_unit) ->
-        let source_path = Filename.concat directory filename in
-        let output_prefix = Browser_switch_common.file_prefix source_path in
-        List.iter remove_if_exists
-          [ source_path;
-            source_path ^ ".ppx.ast";
-            output_prefix ^ ".cmo";
-            output_prefix ^ ".cmi";
-            output_prefix ^ ".cmt";
-            output_prefix ^ ".cms";
-            output_prefix ^ ".annot";
-            output_prefix ^ ".dox-constructs"
-          ])
-      units;
-    remove_if_exists event_path;
-    (try Sys.rmdir directory with Sys_error _ -> ())
+    remove_if_exists event_path
   in
   Fun.protect ~finally:cleanup (fun () ->
     Browser_switch_common.with_missing_cmi_detection
@@ -163,7 +205,7 @@ let run_dox_project ~request =
               ~source_path:(Filename.concat directory filename) ~source)
           units;
         Dox_browser_runtime.set_env "DOX_TRACE_ALL" "1";
-        let compile_unit ({ kind; filename; _ } : dox_unit) =
+        let compile_unit (({ kind; filename; _ } : dox_unit) as unit) =
           let source_path = Filename.concat directory filename in
           let output_prefix = Browser_switch_common.file_prefix source_path in
           let manifest_path = output_prefix ^ ".dox-constructs" in
@@ -174,22 +216,64 @@ let run_dox_project ~request =
             ~project_dir:directory ~filename;
           Clflags.no_alias_deps := true;
           compiling_alias := String.equal kind "alias";
+          remove_unit_artifacts directory unit;
           let cmo_path =
             Fun.protect
               (fun () ->
                 try
                   Browser_switch_common.compile_source_file_direct
                     ~source_path ~output_prefix
-                with exn ->
+                with
+                | Browser_switch_common.Missing_cmi _ as exn -> raise exn
+                | exn ->
                   failwith
                     (Printf.sprintf "compiling %s: %s" filename
                        (Printexc.to_string exn)))
               ~finally:(fun () -> compiling_alias := false)
           in
-          if Filename.check_suffix filename ".ml.md"
-          then manifest_paths := manifest_path :: !manifest_paths;
+          cache_unit unit;
           cmo_path
         in
+        let units_by_filename = Hashtbl.create (List.length units) in
+        List.iter
+          (fun ({ filename; _ } as unit) ->
+            Hashtbl.replace units_by_filename filename unit)
+          units;
+        Hashtbl.to_seq dox_unit_cache
+        |> List.of_seq
+        |> List.iter (fun (filename, cached) ->
+          if not (Hashtbl.mem units_by_filename filename)
+          then (
+            Hashtbl.remove dox_unit_cache filename;
+            remove_cached_unit directory filename cached));
+        let rec reusable_prefix reused = function
+          | filename :: remaining ->
+            (match Hashtbl.find_opt units_by_filename filename with
+            | Some unit when cached_unit_is_usable directory unit ->
+              reusable_prefix (unit :: reused) remaining
+            | None | Some _ -> List.rev reused)
+          | [] -> List.rev reused
+        in
+        let reused = reusable_prefix [] !dox_compilation_order in
+        let reused_filenames = Hashtbl.create (List.length reused) in
+        List.iter
+          (fun ({ filename; _ } : dox_unit) ->
+            Hashtbl.replace reused_filenames filename ())
+          reused;
+        let pending =
+          List.filter
+            (fun ({ filename; _ } : dox_unit) ->
+              not (Hashtbl.mem reused_filenames filename))
+            units
+        in
+        (* Once one unit changes, no later cached interface or implementation is
+           trusted.  Remove it before compiling so a failed compile cannot
+           accidentally resolve against an artifact from the previous run. *)
+        List.iter
+          (fun ({ filename; _ } as unit) ->
+            Hashtbl.remove dox_unit_cache filename;
+            remove_unit_artifacts directory unit)
+          pending;
         let rec discover_order ordered pending =
           match pending with
           | [] -> ordered
@@ -221,7 +305,19 @@ let run_dox_project ~request =
               let newly_ordered = List.rev_map fst succeeded in
               discover_order (ordered @ newly_ordered) (List.rev_map fst blocked)
         in
-        let compilation_order = discover_order [] units in
+        let compilation_order = reused @ discover_order [] pending in
+        let compiled_at = Sys.time () in
+        dox_compilation_order :=
+          List.map (fun ({ filename; _ } : dox_unit) -> filename) compilation_order;
+        manifest_paths :=
+          compilation_order
+          |> List.filter_map (fun ({ filename; _ } as unit) ->
+            if Filename.check_suffix filename ".ml.md"
+            then
+              let _, output_prefix = unit_paths directory unit in
+              Some (output_prefix ^ ".dox-constructs")
+            else None)
+          |> List.rev;
         compiled := [];
         List.iter
           (fun ({ kind; filename; _ } : dox_unit) ->
@@ -249,6 +345,7 @@ let run_dox_project ~request =
             failwith
               (Printf.sprintf "loading %s: %s" (Filename.basename cmo_path)
                  (Printexc.to_string exn)));
+        let loaded_at = Sys.time () in
         let events =
           if Sys.file_exists event_path then Browser_switch_common.read_file event_path
           else ""
@@ -259,10 +356,24 @@ let run_dox_project ~request =
             if Sys.file_exists path then Some (Browser_switch_common.read_file path)
             else None)
         in
+        let trace = Dox_browser_runtime.read_trace () in
+        let collected_at = Sys.time () in
+        let milliseconds from_ until_ =
+          `Int (Float.round ((until_ -. from_) *. 1000.) |> int_of_float)
+        in
         `Assoc
           [ "kind", `String "ok";
             "events", `String events;
-            "trace", `String (Dox_browser_runtime.read_trace ());
-            "manifests", `List (List.map (fun text -> `String text) manifests)
+            "trace", `String trace;
+            "manifests", `List (List.map (fun text -> `String text) manifests);
+            ( "cache",
+              `Assoc
+                [ "compiledUnits", `Int (List.length pending);
+                  "reusedUnits", `Int (List.length reused) ] );
+            ( "timings",
+              `Assoc
+                [ "compileMs", milliseconds started_at compiled_at;
+                  "loadMs", milliseconds compiled_at loaded_at;
+                  "collectMs", milliseconds loaded_at collected_at ] )
           ]
         |> Yojson.Safe.to_string))

@@ -1,4 +1,4 @@
-const backendPromise = import("./backend_direct.js?v=20260803-dox-current-oxcaml-4").then((backend) => {
+const backendPromise = import("./backend_direct.js?v=20260803-dox-incremental-3").then((backend) => {
   backend.addBackendStatusListener(({ state, text }) => {
     globalThis.postMessage({ type: "status", state, text });
   });

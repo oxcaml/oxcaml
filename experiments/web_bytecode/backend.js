@@ -5,9 +5,28 @@ let nextRequestId = 1;
 let backendWorker = null;
 let directBackendPromise = null;
 let workerFailed = false;
+const doxProjectResultCache = new Map();
+const doxProjectResultCacheLimit = 4;
+
+function doxProjectCacheKey(request) {
+  if (typeof request !== "string") return JSON.stringify(request.units ?? []);
+  try {
+    return JSON.stringify(JSON.parse(request).units ?? []);
+  } catch (_error) {
+    return request;
+  }
+}
+
+function rememberDoxProjectResult(key, result) {
+  doxProjectResultCache.delete(key);
+  doxProjectResultCache.set(key, result);
+  while (doxProjectResultCache.size > doxProjectResultCacheLimit) {
+    doxProjectResultCache.delete(doxProjectResultCache.keys().next().value);
+  }
+}
 
 const backendWorkerUrl = new URL(
-  "./backend_worker.js?v=20260803-dox-current-oxcaml-4",
+  "./backend_worker.js?v=20260803-dox-incremental-3",
   import.meta.url,
 ).href;
 
@@ -154,7 +173,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260803-dox-current-oxcaml-4");
+    directBackendPromise = import("./backend_direct.js?v=20260803-dox-incremental-3");
   }
   return directBackendPromise;
 }
@@ -229,7 +248,18 @@ export async function runString(filename, source, options = {}) {
 }
 
 export async function runDoxProject(request, options = {}) {
-  return callWorker("runDoxProject", [request], options);
+  if (options.signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+  const cacheKey = doxProjectCacheKey(request);
+  const cached = doxProjectResultCache.get(cacheKey);
+  if (cached) {
+    rememberDoxProjectResult(cacheKey, cached);
+    return cached;
+  }
+  const result = await callWorker("runDoxProject", [request], options);
+  if (result?.kind === "ok") rememberDoxProjectResult(cacheKey, result);
+  return result;
 }
 
 export async function utopString(filename, source, options = {}) {
