@@ -1926,30 +1926,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | _ -> None
 
-let transl_primitive_common loc ~poly_mode ~poly_sort
-      pos p env ty path arg_exps =
-  let prim =
-    let loc = to_location loc in
-    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
-    | External _ as e -> add_used_primitive loc env path; e
-    | x -> x
-  in
-  if should_specialize_primitive p then
-    let has_constant_constructor =
-      match arg_exps with
-      | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
-      | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
-          cstr_constant
-      | [_; {exp_desc = Texp_variant(_, None)}]
-      | [{exp_desc = Texp_variant(_, None)}; _] -> true
-      | _ -> false
-    in
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
-    | None -> prim
-    | Some prim -> prim
-  else
-    prim
-
 let caml_equal =
   Lambda.simple_prim_on_values ~name:"caml_equal" ~arity:2 ~alloc:true
 let caml_string_equal =
@@ -2334,152 +2310,6 @@ let lambda_of_prim prim_name prim loc args arg_exps =
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
-(* Whether a primitive allocates when fully applied. *)
-
-type allocation =
-  | No_allocation
-  | Allocation of Lambda.locality_mode
-  | Unknown
-
-let allocation_of_option = function
-  | None -> No_allocation
-  | Some mode -> Allocation mode
-
-(* This mirrors, for the allocation axis only, what [lambda_of_prim] above
-   builds for each [prim].  Keep the two in step. *)
-let prim_may_allocate p prim =
-  let of_lambda_prim prim =
-    (* [specialize_primitive] resolves array kinds from the type at the
-       occurrence.  When that type is not yet known -- which can happen when
-       this is reached from the type checker rather than from the translation
-       -- the array kind can still be unspecialized, and for a read the answer
-       depends on how it resolves. *)
-    match Lambda.primitive_may_allocate_opt prim with
-    | None -> Unknown
-    | Some alloc -> allocation_of_option alloc
-  in
-  match prim with
-  | Primitive (prim, _) -> of_lambda_prim prim
-  | External p ->
-      allocation_of_option (Lambda.locality_mode_of_primitive_description p)
-  | Comparison (comp, knd) -> of_lambda_prim (comparison_primitive comp knd)
-  | Sys_argv ->
-      allocation_of_option
-        (Lambda.locality_mode_of_primitive_description prim_sys_argv)
-  | Atomic (op, _, immediate_or_pointer) ->
-      of_lambda_prim (atomic_lambda_primitive op immediate_or_pointer)
-  | Loc _ ->
-      (* With no argument this is a constant; with one, [lambda_of_prim] pairs
-         the location with the argument in a heap block. *)
-      if p.prim_arity = 0 then No_allocation else Allocation alloc_heap
-  | Identity ->
-      (* Compiles to the argument itself. *)
-      No_allocation
-  | Frame_pointers ->
-      (* Compiles to a constant. *)
-      No_allocation
-  | Raise _ ->
-      (* [Praise] does not allocate; the exception value is allocated by
-         whoever built it. *)
-      No_allocation
-  | Raise_with_backtrace ->
-      (* [caml_restore_raw_backtrace] is declared [~alloc:false]. *)
-      No_allocation
-  | Peek (Some _) | Poke (Some _) -> No_allocation
-  | Apply _ | Revapply _ ->
-      (* These compile to an [Lapply] of the function argument.  The operator
-         itself allocates nothing; whatever the callee allocates is accounted
-         for through the callee's own mode. *)
-      No_allocation
-  | Peek None | Poke None ->
-      (* Layout not resolved yet. *)
-      Unknown
-  | Send _ | Send_self _ | Send_cache _ | Lazy_force _ | Unsupported _ ->
-      (* A method call, the lazy forcing machinery, or a raise of
-         [Invalid_argument]: not a single primitive we can classify. *)
-      Unknown
-
-(* Whether an application of a primitive compiles to a direct primitive
-   application, or whether [Translcore] first has to eta-expand the primitive
-   into a closure.  This is the classification [Translcore] makes when
-   translating [Texp_apply]; the type checker needs the same answer to know
-   whether that closure gets allocated. *)
-
-type application_kind =
-  | Direct
-      (* Compiles to [transl_primitive_application]: no closure. *)
-  | Eta_expanded
-      (* Compiles to [transl_primitive], which builds a heap closure. *)
-  | Depends_on_poly_result_mode
-      (* The primitive is over-applied in tail position and its result mode is
-         [Prim_poly], so this is [Direct] exactly when that mode resolves to
-         the heap.  Resolving it zaps a mode variable, which is fine after
-         type checking but not during it, so the caller decides. *)
-
-let is_omitted = function
-  | Arg _ -> false
-  | Omitted _ -> true
-
-let application_kind p pos args =
-  if List.exists (fun (_, arg) -> is_omitted arg) args then Eta_expanded
-  else
-    let nargs = List.length args in
-    if nargs = p.prim_arity then Direct
-    else if nargs < p.prim_arity then Eta_expanded
-    else if pos <> Typedtree.Tail then Direct
-    else
-      match p.prim_native_repr_res with
-      | Prim_global, _ -> Direct
-      | Prim_local, _ -> Eta_expanded
-      | Prim_poly, _ -> Depends_on_poly_result_mode
-
-(* Whether a fully-applied occurrence of [p] allocates.
-
-   Unlike the functions above this one is total: it answers [Unknown] rather
-   than raising, and it leaves no trace on type, mode or sort inference
-   variables.  It is meant to be called from the type checker, where a
-   primitive-related error must not be reported early -- translating the same
-   primitive raises it again later, in the right phase and with the right
-   location. *)
-let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
-  (* [lookup_primitive_unspecialized] needs a locality to build the
-     [Lambda.primitive] with, and for a [Prim_poly] primitive taking the
-     caller's mode would mean zapping its mode variable.  Pass a constant
-     instead: [Lambda.primitive_may_allocate_opt] dispatches on the
-     primitive's constructor and never on the locality it carries, so the
-     [No_allocation] / [Allocation] answer is unaffected -- only the
-     [Allocation] payload, which the type checker discards.  A constant keeps
-     [to_locality] and [to_modify_mode] on [zap_to_floor]'s constant path, so
-     no mode variable is touched. *)
-  let poly_mode = Some (Mode.Locality.disallow_right Mode.Locality.global) in
-  let snap = Btype.snapshot () in
-  let result =
-    try
-      (* [path = None] keeps [add_used_primitive] a no-op, so this records no
-         cross-unit use of an [external]. *)
-      let sloc = of_location ~scopes:empty_scopes loc in
-      prim_may_allocate p
-        (transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
-           None arg_exps)
-    with
-    (* Let the bug-indicating exceptions through, ... *)
-    | Misc.Fatal_error | Out_of_memory | Stack_overflow as exn ->
-        Btype.backtrack snap;
-        raise exn
-    (* ... but swallow every user error: looking a primitive up raises from
-       [lookup_primitive_unspecialized], [Typeopt] and [Typedecl], and
-       reporting any of those here would report them in the wrong phase, and
-       at the location of the primitive rather than of the offending argument.
-       Translation raises them again where they belong. *)
-    | _ -> Unknown
-  in
-  (* [specialize_primitive] calls [Ctype.type_sort] and [Ctype.type_jkind],
-     which default sort and jkind variables.  Those are recorded in the trail,
-     so this undoes them.  No mode variable is touched: see the constant
-     locality above. *)
-  Btype.backtrack snap;
-  result
-
 let check_primitive_arity loc p =
   let mode =
     match p.prim_native_repr_res with
@@ -2518,6 +2348,30 @@ let check_primitive_arity loc p =
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
 (* Eta-expand a primitive *)
+
+let transl_primitive_common loc ~poly_mode ~poly_sort
+      pos p env ty path arg_exps =
+  let prim =
+    let loc = to_location loc in
+    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
+    | External _ as e -> add_used_primitive loc env path; e
+    | x -> x
+  in
+  if should_specialize_primitive p then
+    let has_constant_constructor =
+      match arg_exps with
+      | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+      | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+          cstr_constant
+      | [_; {exp_desc = Texp_variant(_, None)}]
+      | [{exp_desc = Texp_variant(_, None)}; _] -> true
+      | _ -> false
+    in
+    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    | None -> prim
+    | Some prim -> prim
+  else
+    prim
 
 let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   let prim =
@@ -2782,6 +2636,153 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     end
   in
   lam
+
+(* Whether a primitive allocates when fully applied. *)
+
+type allocation =
+  | No_allocation
+  | Allocation of Lambda.locality_mode
+  | Unknown
+
+let allocation_of_option = function
+  | None -> No_allocation
+  | Some mode -> Allocation mode
+
+(* This mirrors, for the allocation axis only, what [lambda_of_prim] above
+   builds for each [prim].  Keep the two in step. *)
+let prim_may_allocate p prim =
+  let of_lambda_prim prim =
+    (* [specialize_primitive] resolves array kinds from the type at the
+       occurrence.  When that type is not yet known -- which can happen when
+       this is reached from the type checker rather than from the translation
+       -- the array kind can still be unspecialized, and for a read the answer
+       depends on how it resolves. *)
+    match Lambda.primitive_may_allocate_opt prim with
+    | None -> Unknown
+    | Some alloc -> allocation_of_option alloc
+  in
+  match prim with
+  | Primitive (prim, _) -> of_lambda_prim prim
+  | External p ->
+      allocation_of_option (Lambda.locality_mode_of_primitive_description p)
+  | Comparison (comp, knd) -> of_lambda_prim (comparison_primitive comp knd)
+  | Sys_argv ->
+      allocation_of_option
+        (Lambda.locality_mode_of_primitive_description prim_sys_argv)
+  | Atomic (op, _, immediate_or_pointer) ->
+      of_lambda_prim (atomic_lambda_primitive op immediate_or_pointer)
+  | Loc _ ->
+      (* With no argument this is a constant; with one, [lambda_of_prim] pairs
+         the location with the argument in a heap block. *)
+      if p.prim_arity = 0 then No_allocation else Allocation alloc_heap
+  | Identity ->
+      (* Compiles to the argument itself. *)
+      No_allocation
+  | Frame_pointers ->
+      (* Compiles to a constant. *)
+      No_allocation
+  | Raise _ ->
+      (* [Praise] does not allocate; the exception value is allocated by
+         whoever built it. *)
+      No_allocation
+  | Raise_with_backtrace ->
+      (* [caml_restore_raw_backtrace] is declared [~alloc:false]. *)
+      No_allocation
+  | Peek (Some _) | Poke (Some _) -> No_allocation
+  | Apply _ | Revapply _ ->
+      (* These compile to an [Lapply] of the function argument.  The operator
+         itself allocates nothing; whatever the callee allocates is accounted
+         for through the callee's own mode. *)
+      No_allocation
+  | Peek None | Poke None ->
+      (* Layout not resolved yet. *)
+      Unknown
+  | Send _ | Send_self _ | Send_cache _ | Lazy_force _ | Unsupported _ ->
+      (* A method call, the lazy forcing machinery, or a raise of
+         [Invalid_argument]: not a single primitive we can classify. *)
+      Unknown
+
+(* Whether an application of a primitive compiles to a direct primitive
+   application, or whether [Translcore] first has to eta-expand the primitive
+   into a closure.  This is the classification [Translcore] makes when
+   translating [Texp_apply]; the type checker needs the same answer to know
+   whether that closure gets allocated. *)
+
+type application_kind =
+  | Direct
+      (* Compiles to [transl_primitive_application]: no closure. *)
+  | Eta_expanded
+      (* Compiles to [transl_primitive], which builds a heap closure. *)
+  | Depends_on_poly_result_mode
+      (* The primitive is over-applied in tail position and its result mode is
+         [Prim_poly], so this is [Direct] exactly when that mode resolves to
+         the heap.  Resolving it zaps a mode variable, which is fine after
+         type checking but not during it, so the caller decides. *)
+
+let is_omitted = function
+  | Arg _ -> false
+  | Omitted _ -> true
+
+let application_kind p pos args =
+  if List.exists (fun (_, arg) -> is_omitted arg) args then Eta_expanded
+  else
+    let nargs = List.length args in
+    if nargs = p.prim_arity then Direct
+    else if nargs < p.prim_arity then Eta_expanded
+    else if pos <> Typedtree.Tail then Direct
+    else
+      match p.prim_native_repr_res with
+      | Prim_global, _ -> Direct
+      | Prim_local, _ -> Eta_expanded
+      | Prim_poly, _ -> Depends_on_poly_result_mode
+
+(* Whether a fully-applied occurrence of [p] allocates.
+
+   Unlike the functions above this one is total: it answers [Unknown] rather
+   than raising, and it leaves no trace on type, mode or sort inference
+   variables.  It is meant to be called from the type checker, where a
+   primitive-related error must not be reported early -- translating the same
+   primitive raises it again later, in the right phase and with the right
+   location. *)
+let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
+  (* [lookup_primitive_unspecialized] needs a locality to build the
+     [Lambda.primitive] with, and for a [Prim_poly] primitive taking the
+     caller's mode would mean zapping its mode variable.  Pass a constant
+     instead: [Lambda.primitive_may_allocate_opt] dispatches on the
+     primitive's constructor and never on the locality it carries, so the
+     [No_allocation] / [Allocation] answer is unaffected -- only the
+     [Allocation] payload, which the type checker discards.  A constant keeps
+     [to_locality] and [to_modify_mode] on [zap_to_floor]'s constant path, so
+     no mode variable is touched. *)
+  let poly_mode = Some (Mode.Locality.disallow_right Mode.Locality.global) in
+  let snap = Btype.snapshot () in
+  let result =
+    try
+      (* [path = None] keeps [add_used_primitive] a no-op, so this records no
+         cross-unit use of an [external]. *)
+      let sloc = of_location ~scopes:empty_scopes loc in
+      prim_may_allocate p
+        (transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
+           None arg_exps)
+    with
+    (* Let the bug-indicating exceptions through, ... *)
+    | Misc.Fatal_error | Out_of_memory | Stack_overflow as exn ->
+        Btype.backtrack snap;
+        raise exn
+    (* ... but swallow every user error: looking a primitive up raises from
+       [lookup_primitive_unspecialized], [Typeopt] and [Typedecl], and
+       reporting any of those here would report them in the wrong phase, and
+       at the location of the primitive rather than of the offending argument.
+       Translation raises them again where they belong. *)
+    | _ -> Unknown
+  in
+  (* [specialize_primitive] calls [Ctype.type_sort] and [Ctype.type_jkind],
+     which default sort and jkind variables.  Those are recorded in the trail,
+     so this undoes them.  No mode variable is touched: see the constant
+     locality above. *)
+  Btype.backtrack snap;
+  result
+
 
 (* The allocation an occurrence of a primitive makes, as the registration the
    type checker should perform.  Everything that decides whether a primitive
