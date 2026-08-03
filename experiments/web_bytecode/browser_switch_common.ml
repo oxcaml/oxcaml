@@ -157,7 +157,6 @@ let reset_flags ?project_dir environment =
         | Browser -> browser_include_dirs))
     |> List.map (fun path -> { Clflags.path; cmx_guaranteed = false });
   Clflags.hidden_include_dirs := [];
-  Clflags.open_modules := [];
   Clflags.preprocessor := None;
   Clflags.all_ppx := [];
   Clflags.use_threads := false
