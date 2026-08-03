@@ -15,16 +15,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = string
+type t = unit
 
 module File_contents = struct
   type cmr_format = t
 
-  type t = string
+  type t = { used_value_slots : Value_slot.Set.t }
 
-  let create (t : cmr_format) : t = t
+  let create ~used_value_slots (() : cmr_format) : t = { used_value_slots }
 
-  let deserialise (t : t) : cmr_format = t
+  let deserialise { used_value_slots = _ } : cmr_format = ()
 end
 
 type error =
@@ -35,8 +35,8 @@ type error =
 
 exception Error of error
 
-let save ~filename t =
-  let file_contents = File_contents.create t in
+let save ~filename ~used_value_slots t =
+  let file_contents = File_contents.create ~used_value_slots t in
   let oc = open_out_bin filename in
   Misc.try_finally
     (fun () ->

@@ -92,6 +92,7 @@ type run_result =
     unit : Flambda_unit.t;
     all_code : Exported_code.t;
     exported_offsets : Exported_offsets.t;
+    used_value_slots : Flambda2_identifiers.Value_slot.Set.t;
     reachable_names : NO.t
   }
 
@@ -124,7 +125,7 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
       ~used_value_slots ~exported_offsets ~sections all_code
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
-  { cmx; unit; all_code; exported_offsets; reachable_names }
+  { cmx; unit; all_code; exported_offsets; used_value_slots; reachable_names }
 
 type flambda_result =
   { flambda : Flambda_unit.t;
@@ -249,15 +250,22 @@ let flambda_to_flambda0 : type m.
           let _deps, _traverse_rebuild =
             Flambda2_reaper.Reaper.Staged.traverse flambda
           in
-          Some "Hello, cmr!"
+          Some ()
         else None
       in
-      let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
+      let { unit = flambda;
+            exported_offsets;
+            cmx;
+            all_code;
+            used_value_slots;
+            reachable_names
+          } =
         build_run_result flambda ~free_names ~final_typing_env ~sections
           ~all_code slot_offsets
       in
       Option.iter
-        (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr"))
+        (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr")
+           ~used_value_slots)
         cmr_payload;
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
@@ -359,7 +367,6 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width:_
     ~keep_symbol_tables:_ ~cmr_filename =
-  let cmr_data = Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename in
-  Printf.eprintf "Loaded data from CMR file: %s\n" cmr_data;
+  Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename;
   (* CR mvellacott: implement! *)
   Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"

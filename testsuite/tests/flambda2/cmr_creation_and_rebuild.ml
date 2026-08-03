@@ -19,8 +19,8 @@
  check-ocamlopt.opt-output;
 *)
 
-(* CR mvellacott: This tests placeholder functionality: that a hello world
-   message is successfully roundtripped through a CMR file. It will be
-   removed. *)
+(* CR mvellacott: This tests placeholder functionality: that a CMR file is
+   written and read back without error. It will be replaced as the resume path
+   is implemented. *)
 
 let () = ()
