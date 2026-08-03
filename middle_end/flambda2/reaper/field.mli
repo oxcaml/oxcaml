@@ -43,6 +43,10 @@ val view : t -> view
 
 (** {1 Constructing fields} *)
 
+(** Fields are hashconsed, so not stable across processes. To serialise them
+    store their [view]s, and use this function to recreate them. *)
+val create : view -> t
+
 (** {2 Real fields}
 
     These are fields that "exist at runtime" in the sense that they can be

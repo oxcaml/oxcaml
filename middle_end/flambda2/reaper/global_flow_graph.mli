@@ -156,3 +156,15 @@ val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
   graph ->
   unit
+
+val ids_for_export : graph -> Ids_for_export.t
+
+(** Fields are hashconsed, so for serialisation the [Field.view] of each one
+    needs serialising separately. *)
+val fields_for_export : graph -> Field.Set.t
+
+(** Rebuild the graph, applying [renaming] to all identifiers and [rename_field]
+    to all fields. The implementation assumes that the renaming is injective,
+    data will be lost otherwise. *)
+val apply_renaming :
+  graph -> Renaming.t -> rename_field:(Field.t -> Field.t) -> graph
