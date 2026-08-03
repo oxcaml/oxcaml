@@ -16,6 +16,10 @@
 module Staged : sig
   module Traverse_rebuild : sig
     type t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    val apply_renaming : t -> Renaming.t -> t
   end
 
   (** Traverse the compilation unit in preparation for Reaper analysis. *)
