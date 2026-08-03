@@ -59,6 +59,13 @@ val staticity_of_modalities:
   Typedtree.modalities -> Mode.Staticity.Const.t
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
+
+(* Transform that drops from [cmi_globals] and [cmi_crcs] any module named by
+   the [-nondep] flag. Paired with the signature erasure done in
+   [type_interface] / [type_implementation]; applied as a [save_signature]
+   transform. *)
+val remove_nondep_from_cmi:
+        Cmi_format.cmi_infos_lazy -> Cmi_format.cmi_infos_lazy
         (*
 val type_open_:
         ?used_slot:bool ref -> ?toplevel:bool ->
@@ -175,6 +182,7 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Cannot_remove_nondep_dependency of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
