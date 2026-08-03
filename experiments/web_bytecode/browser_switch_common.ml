@@ -145,15 +145,17 @@ let missing_cmi_filename unit_name =
 let reset_flags ?project_dir environment =
   Clflags.annotations := false;
   Clflags.binary_annotations := false;
+  Clflags.binary_annotations_cms := false;
   Clflags.dont_write_files := true;
   Clflags.native_code := false;
   Clflags.no_std_include := environment = Browser;
   Clflags.no_cwd := environment = Browser;
   Clflags.include_dirs :=
-    Option.to_list project_dir
-    @ (match environment with
-       | Native -> []
-       | Browser -> browser_include_dirs);
+    (Option.to_list project_dir
+     @ (match environment with
+        | Native -> []
+        | Browser -> browser_include_dirs))
+    |> List.map (fun path -> { Clflags.path; cmx_guaranteed = false });
   Clflags.hidden_include_dirs := [];
   Clflags.open_modules := [];
   Clflags.preprocessor := None;
