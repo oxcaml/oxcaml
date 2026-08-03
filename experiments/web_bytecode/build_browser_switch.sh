@@ -74,7 +74,8 @@ for package_name in \
   ppxlib.ast \
   ppx_jane \
   ppx_deriving \
-  ppx_module_timer.runtime
+  ppx_module_timer.runtime \
+  yojson
 do
   require_package "$package_name"
 done
@@ -120,7 +121,7 @@ fi
 
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
-common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast"
+common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast,yojson"
 install_lib_root=$(run_tool ocamlc -where)
 package_lib_root=$(dirname "$(run_tool ocamlfind query base)")
 js_of_ocaml_compiler_dir="$(run_tool ocamlfind query js_of_ocaml-compiler)"
@@ -187,6 +188,10 @@ compile "$common_js_packages" "$experiment_dir/browser_switch_interface.ml" \
   "$tmpdir/browser_switch_interface.cmo" \
   -I "$tmpdir"
 
+compile "$common_js_packages" "$experiment_dir/dox_browser_runtime.ml" \
+  "$tmpdir/dox_browser_runtime.cmo" \
+  -I "$tmpdir"
+
 compile "$common_js_packages" "$experiment_dir/browser_switch_run.ml" \
   "$tmpdir/browser_switch_run.cmo" \
   -I "$tmpdir"
@@ -201,6 +206,7 @@ run_tool ocamlfind ocamlc -g -no-check-prims -linkall -predicates ppx_driver \
   "$tmpdir/browser_switch_common.cmo" \
   "$tmpdir/browser_switch_check.cmo" \
   "$tmpdir/browser_switch_interface.cmo" \
+  "$tmpdir/dox_browser_runtime.cmo" \
   "$tmpdir/browser_switch_run.cmo" \
   "$tmpdir/browser_switch_js.cmo" \
   -o "$build_dir/web_bytecode_js.bc"

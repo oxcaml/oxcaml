@@ -150,6 +150,33 @@ let utop_string filename source =
   with
   | Browser_switch_common.Missing_cmi filename -> missing_cmi_result filename
 
+let run_dox_project request =
+  try
+    let output, result =
+      with_output_capture (fun () ->
+        Browser_switch_run.run_dox_project
+          ~request:(string_of_js_string request))
+    in
+    let json =
+      match Yojson.Safe.from_string result with
+      | `Assoc fields ->
+        `Assoc (("output", `String output) :: fields)
+      | _ -> `Assoc [ "kind", `String "error"; "output", `String output ]
+    in
+    js_string (Yojson.Safe.to_string json)
+  with
+  | Browser_switch_common.Missing_cmi filename ->
+    js_string
+      (Yojson.Safe.to_string
+         (`Assoc [ "kind", `String "missing_cmi"; "filename", `String filename ]))
+  | exn ->
+    js_string
+      (Yojson.Safe.to_string
+         (`Assoc
+            [ "kind", `String "error";
+              "message", `String (Printexc.to_string exn)
+            ]))
+
 let export name value =
   let global = pure_js_expr "globalThis" in
   js_set global (js_string name) value
@@ -160,4 +187,5 @@ let () =
   js_set obj (js_string "interfaceString") (wrap_callback interface_string);
   js_set obj (js_string "runString") (wrap_callback run_string);
   js_set obj (js_string "utopString") (wrap_callback utop_string);
+  js_set obj (js_string "runDoxProject") (wrap_callback run_dox_project);
   export "WebBytecodeJs" obj

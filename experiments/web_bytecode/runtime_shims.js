@@ -5,6 +5,400 @@
   const bitsF32 = new Float32Array(bitsBuffer);
   function noteShimCall(_name) {}
 
+  // Dox execution tracing.  The native runtime writes the same records to a
+  // file; in a browser the records live in memory for the duration of one
+  // evaluation.  Keep this implementation deliberately independent of the
+  // playground UI so embedders can consume the exact compiler protocol.
+  const doxTraceLimit = 12_000_000;
+  let doxTraceBytes = 0;
+  let doxTraceTruncated = false;
+  let doxTraceLines = [];
+  let doxCounter = 0;
+  let doxHandoffCounter = 0;
+  let doxStack = [];
+  let doxPendingTail = null;
+  let doxPendingClosureId = 0;
+  let doxClosureCounter = 0;
+  let doxClosures = new WeakMap();
+  let doxFunctionConsumption = new WeakMap();
+  const doxEnvironment = new Map();
+
+  global.doxSetEnv = function doxSetEnv(name, value) {
+    doxEnvironment.set(String(name), String(value));
+  };
+
+  function doxBytes(value) {
+    if (typeof global.caml_jsbytes_of_string === "function") {
+      return global.caml_jsbytes_of_string(value);
+    }
+    return String(value);
+  }
+
+  function doxHex(value) {
+    const bytes = typeof value === "string" ? value : doxBytes(value);
+    let output = "";
+    for (let index = 0; index < bytes.length; index += 1) {
+      output += (bytes.charCodeAt(index) & 0xff).toString(16).padStart(2, "0");
+    }
+    return output;
+  }
+
+  function doxFields(metadata) {
+    return doxBytes(metadata).split("\x1f");
+  }
+
+  function doxIsBlock(value) {
+    return value !== null && typeof value === "object";
+  }
+
+  function doxTag(value) {
+    if (!doxIsBlock(value)) return -1;
+    if (Array.isArray(value)) return value[0] | 0;
+    return Number.isInteger(value.t) ? value.t : 0;
+  }
+
+  function doxSize(value) {
+    if (!doxIsBlock(value)) return 0;
+    if (Array.isArray(value)) return Math.max(0, value.length - 1);
+    if (Array.isArray(value.c)) return value.c.length;
+    return 0;
+  }
+
+  function doxField(value, index) {
+    if (Array.isArray(value)) return value[index + 1];
+    return value?.c?.[index];
+  }
+
+  function doxString(value) {
+    try {
+      return doxBytes(value);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function doxSchemaNumber(state, separator) {
+    let value = 0;
+    while (state.at < state.text.length && /[0-9]/.test(state.text[state.at])) {
+      value = value * 10 + Number(state.text[state.at++]);
+    }
+    if (state.text[state.at] === separator) state.at += 1;
+    return value;
+  }
+
+  function doxSchemaName(state) {
+    const length = doxSchemaNumber(state, ":");
+    const name = state.text.slice(state.at, state.at + length);
+    state.at += length;
+    return name;
+  }
+
+  function doxSkipSchema(state) {
+    const kind = state.text[state.at++];
+    if ("LOARFE".includes(kind)) doxSkipSchema(state);
+    else if (kind === "M") {
+      doxSkipSchema(state);
+      doxSkipSchema(state);
+    } else if (kind === "T") {
+      const count = doxSchemaNumber(state, ":");
+      for (let index = 0; index < count; index += 1) doxSkipSchema(state);
+    } else if (kind === "Q") {
+      const count = doxSchemaNumber(state, ":");
+      for (let index = 0; index < count; index += 1) {
+        doxSchemaName(state);
+        doxSkipSchema(state);
+      }
+    } else if (kind === "V") {
+      const constants = doxSchemaNumber(state, ":");
+      for (let index = 0; index < constants; index += 1) doxSchemaName(state);
+      const blocks = doxSchemaNumber(state, ":");
+      for (let index = 0; index < blocks; index += 1) {
+        doxSchemaNumber(state, ",");
+        doxSchemaName(state);
+        const arity = doxSchemaNumber(state, ":");
+        for (let field = 0; field < arity; field += 1) doxSkipSchema(state);
+      }
+    }
+  }
+
+  function doxPreviewDynamic(value, depth = 0) {
+    if (depth > 7) return { display: "…", complete: false };
+    if (typeof value === "number") return { display: String(value), complete: true };
+    if (typeof value === "function") return { display: "<function>", complete: false };
+    const string = doxString(value);
+    if (string !== null && !Array.isArray(value)) {
+      const shown = string.slice(0, 240).replace(/[\x00-\x1f\x7f]/g, ".");
+      return {
+        display: JSON.stringify(shown) + (string.length > 240 ? "…" : ""),
+        complete: string.length <= 240,
+      };
+    }
+    if (!doxIsBlock(value)) return { display: "<opaque>", complete: false };
+    const shown = Math.min(doxSize(value), 12);
+    const fields = [];
+    let complete = shown === doxSize(value);
+    for (let index = 0; index < shown; index += 1) {
+      const child = doxPreviewDynamic(doxField(value, index), depth + 1);
+      fields.push(child.display);
+      complete &&= child.complete;
+    }
+    if (shown < doxSize(value)) fields.push("…");
+    return { display: `#${doxTag(value)}(${fields.join(", ")})`, complete };
+  }
+
+  function doxPreviewSchema(state, value, depth = 0, self = null) {
+    const start = state.at;
+    if (depth > 7 || start >= state.text.length) {
+      doxSkipSchema(state);
+      return { display: "…", complete: false };
+    }
+    const kind = state.text[state.at++];
+    if (kind === "I") return { display: String(value), complete: typeof value === "number" };
+    if (kind === "B") return { display: value === 0 ? "false" : "true", complete: typeof value === "number" };
+    if (kind === "U") return { display: "()", complete: true };
+    if (kind === "C") return { display: `'${String.fromCharCode(value | 0)}'`, complete: typeof value === "number" };
+    if (kind === "D") return { display: String(value), complete: typeof value === "number" };
+    if (kind === "S") {
+      const string = doxString(value);
+      if (string === null) return { display: "<opaque>", complete: false };
+      const shown = string.slice(0, 240).replace(/[\x00-\x1f\x7f]/g, ".");
+      return { display: JSON.stringify(shown) + (string.length > 240 ? "…" : ""), complete: string.length <= 240 };
+    }
+    if (kind === "F") {
+      doxSkipSchema(state);
+      return { display: "<function>", complete: false };
+    }
+    if (kind === "X") {
+      if (!self) return { display: "<opaque>", complete: false };
+      const nested = { text: self, at: 0 };
+      return doxPreviewSchema(nested, value, depth + 1, self);
+    }
+    if (kind === "?") return doxPreviewDynamic(value, depth);
+    if (kind === "Z") return doxPreviewDynamic(value, depth);
+    if (kind === "T") {
+      const count = doxSchemaNumber(state, ":");
+      const values = [];
+      let complete = doxIsBlock(value) && doxSize(value) >= count;
+      for (let index = 0; index < count; index += 1) {
+        const child = doxPreviewSchema(state, doxField(value, index), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+      }
+      return { display: `(${values.join(", ")})`, complete };
+    }
+    if (kind === "L") {
+      const elementStart = state.at;
+      const skip = { text: state.text, at: state.at };
+      doxSkipSchema(skip);
+      state.at = skip.at;
+      const values = [];
+      let current = value;
+      let complete = true;
+      while (doxIsBlock(current) && doxTag(current) === 0 && doxSize(current) === 2 && values.length < 12) {
+        const childState = { text: state.text.slice(elementStart, skip.at), at: 0 };
+        const child = doxPreviewSchema(childState, doxField(current, 0), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+        current = doxField(current, 1);
+      }
+      if (current !== 0) { values.push("…"); complete = false; }
+      return { display: `[${values.join("; ")}]`, complete };
+    }
+    if (kind === "O" || kind === "R") {
+      const elementStart = state.at;
+      doxSkipSchema(state);
+      if (kind === "O" && value === 0) return { display: "None", complete: true };
+      if (!doxIsBlock(value) || doxSize(value) < 1) return { display: "<opaque>", complete: false };
+      const childState = { text: state.text.slice(elementStart, state.at), at: 0 };
+      const child = doxPreviewSchema(childState, doxField(value, 0), depth + 1, self);
+      return kind === "O"
+        ? { display: `Some (${child.display})`, complete: child.complete }
+        : { display: `{contents = ${child.display}}`, complete: child.complete };
+    }
+    if (kind === "A") {
+      const elementStart = state.at;
+      doxSkipSchema(state);
+      if (!doxIsBlock(value)) return { display: "[|<opaque>|]", complete: false };
+      const shown = Math.min(doxSize(value), 12);
+      const values = [];
+      let complete = shown === doxSize(value);
+      for (let index = 0; index < shown; index += 1) {
+        const childState = { text: state.text.slice(elementStart, state.at), at: 0 };
+        const child = doxPreviewSchema(childState, doxField(value, index), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+      }
+      if (!complete && shown < doxSize(value)) values.push("…");
+      return { display: `[|${values.join("; ")}|]`, complete };
+    }
+    if (kind === "Q") {
+      const count = doxSchemaNumber(state, ":");
+      const fields = [];
+      let complete = doxIsBlock(value) && doxSize(value) >= count;
+      for (let index = 0; index < count; index += 1) {
+        const name = doxSchemaName(state);
+        const child = doxPreviewSchema(state, doxField(value, index), depth + 1, state.text.slice(start));
+        fields.push(`${name} = ${child.display}`);
+        complete &&= child.complete;
+      }
+      return { display: `{${fields.join("; ")}}`, complete };
+    }
+    if (kind === "V") {
+      const constants = doxSchemaNumber(state, ":");
+      const constantNames = [];
+      for (let index = 0; index < constants; index += 1) constantNames.push(doxSchemaName(state));
+      const blocks = doxSchemaNumber(state, ":");
+      let matched = typeof value === "number" ? constantNames[value] : null;
+      let complete = matched !== undefined && matched !== null;
+      for (let index = 0; index < blocks; index += 1) {
+        const tag = doxSchemaNumber(state, ",");
+        const name = doxSchemaName(state);
+        const arity = doxSchemaNumber(state, ":");
+        const values = [];
+        const thisBlock = !matched && doxIsBlock(value) && doxTag(value) === tag && doxSize(value) >= arity;
+        for (let field = 0; field < arity; field += 1) {
+          const child = doxPreviewSchema(state, thisBlock ? doxField(value, field) : 0, depth + 1, state.text.slice(start));
+          if (thisBlock) { values.push(child.display); complete &&= child.complete; }
+        }
+        if (thisBlock) { matched = arity ? `${name} (${values.join(", ")})` : name; complete = true; }
+      }
+      return { display: matched || "<opaque>", complete: Boolean(matched) && complete };
+    }
+    doxSkipSchema({ text: state.text, at: start });
+    return doxPreviewDynamic(value, depth);
+  }
+
+  function doxPreview(metadata, value, exception = false) {
+    if (exception) return { display: "<exception>", complete: false };
+    const fields = doxFields(metadata);
+    const schema = fields[9] || "";
+    if (schema) return doxPreviewSchema({ text: schema, at: 0 }, value, 0, schema);
+    const type = fields[8] || "";
+    if (typeof value === "number") {
+      if (type === "unit" || type.endsWith("-> unit")) return { display: "()", complete: true };
+      if (type === "bool" || type.endsWith("-> bool")) return { display: value === 0 ? "false" : "true", complete: true };
+      if (type.endsWith(" option") && value === 0) return { display: "None", complete: true };
+      if (type.endsWith(" list") && value === 0) return { display: "[]", complete: true };
+    }
+    return doxPreviewDynamic(value);
+  }
+
+  function doxEmit(phase, occurrence, parent, metadata, observed, hasObserved, detail = null) {
+    if (doxTraceTruncated) return;
+    const fields = doxFields(metadata);
+    const site = fields[0] || "";
+    const compact = new Set(["tail-handoff", "tail-link", "call-attempt-open", "call-attempt-consumed", "activation-closure", "closure-created"]).has(phase);
+    const publicMetadata = compact
+      ? [site, "", "", "", "0", "0", "0", "0", ""].join("\x1f")
+      : fields.slice(0, 9).join("\x1f");
+    const preview = detail === null && hasObserved ? doxPreview(metadata, observed, phase === "raise") : { display: detail || "", complete: detail !== null || !hasObserved };
+    const content = [phase, "0", String(occurrence), parent ? String(parent) : "", publicMetadata, preview.complete ? "1" : "0", (hasObserved || detail !== null) ? preview.display : ""].join("\x1f");
+    const line = `observe\t${doxHex(site)}\t${doxHex(content)}\n`;
+    if (doxTraceBytes + line.length > doxTraceLimit) {
+      doxTraceLines.push("trace-truncated\tbrowser-size-limit\t\n");
+      doxTraceTruncated = true;
+      return;
+    }
+    doxTraceBytes += line.length;
+    doxTraceLines.push(line);
+  }
+
+  function doxEnter(metadata, tailCapable) {
+    const occurrence = ++doxCounter;
+    const pending = doxPendingTail;
+    const parent = pending?.parent ?? (doxStack.at(-1)?.occurrence || 0);
+    doxPendingTail = null;
+    doxStack.push({ occurrence, parent, tailCapable, overapplyParent: pending?.parent || 0, overapplyRemaining: pending?.remaining || 0 });
+    doxEmit("enter", occurrence, parent, metadata, 0, false);
+    const kind = doxFields(metadata)[1];
+    if (kind === "call") doxEmit("call-attempt-open", occurrence, parent, metadata, 0, false);
+    else if (kind === "function" && parent) {
+      if (doxPendingClosureId) doxEmit("activation-closure", occurrence, parent, metadata, 0, false, String(doxPendingClosureId));
+      doxEmit("call-attempt-consumed", occurrence, parent, metadata, 0, false);
+      doxPendingClosureId = 0;
+    }
+    if (pending?.handoff) doxEmit("tail-link", occurrence, parent, metadata, 0, false, `${pending.handoff}:${pending.remaining}`);
+    return occurrence;
+  }
+
+  function doxLeave(phase, metadata, occurrence, observed) {
+    doxPendingTail = null;
+    const frame = doxStack.at(-1);
+    if (!frame || frame.occurrence !== occurrence) return 0;
+    doxStack.pop();
+    doxEmit(phase, occurrence, frame.parent, metadata, observed, true);
+    if (doxFields(metadata)[1] === "call") {
+      doxEmit(phase === "raise" ? "call-attempt-raise" : "call-attempt-return", occurrence, frame.parent, metadata, observed, true);
+    }
+    return 0;
+  }
+
+  global.doxResetTrace = function doxResetTrace() {
+    doxTraceBytes = 0;
+    doxTraceTruncated = false;
+    doxTraceLines = [];
+    doxCounter = 0;
+    doxHandoffCounter = 0;
+    doxStack = [];
+    doxPendingTail = null;
+    doxPendingClosureId = 0;
+    doxClosureCounter = 0;
+    doxClosures = new WeakMap();
+    doxFunctionConsumption = new WeakMap();
+  };
+
+  global.doxReadTrace = function doxReadTrace() { return doxTraceLines.join(""); };
+  global.caml_doclang_observe_enter = (metadata) => doxEnter(metadata, false);
+  global.caml_doclang_observe_enter_tail = (metadata) => doxEnter(metadata, true);
+  global.caml_doclang_observe_parameter = (occurrence, metadata, observed) => {
+    const frame = doxStack.at(-1);
+    if (frame?.occurrence === occurrence) doxEmit("parameter", occurrence, frame.parent, metadata, observed, true);
+    return 0;
+  };
+  global.caml_doclang_observe_write = (metadata, observed) => {
+    const occurrence = ++doxCounter;
+    doxEmit("write", occurrence, doxStack.at(-1)?.occurrence || 0, metadata, observed, true);
+    return 0;
+  };
+  global.caml_doclang_observe_return = (metadata, occurrence, observed) => doxLeave("return", metadata, occurrence, observed);
+  global.caml_doclang_observe_raise = (metadata, occurrence, observed) => doxLeave("raise", metadata, occurrence, observed);
+  global.caml_doclang_observe_register_function = (fn, consumption, metadata) => {
+    if (typeof fn !== "function") return 0;
+    const id = ++doxClosureCounter;
+    doxClosures.set(fn, { id, metadata });
+    doxFunctionConsumption.set(fn, consumption | 0);
+    doxEmit("closure-created", id, doxStack.at(-1)?.occurrence || 0, metadata, 0, false, "");
+    return 0;
+  };
+  global.caml_doclang_observe_register_partial = (original, partial) => {
+    if (typeof partial !== "function") return 0;
+    const source = doxClosures.get(original);
+    const consumption = doxFunctionConsumption.get(original);
+    if (!source || !consumption) return 0;
+    const id = ++doxClosureCounter;
+    doxClosures.set(partial, { id, metadata: source.metadata });
+    doxFunctionConsumption.set(partial, Math.max(1, consumption - 1));
+    doxEmit("closure-created", id, doxStack.at(-1)?.occurrence || 0, source.metadata, 0, false, `derived:${source.id}`);
+    return 0;
+  };
+  global.caml_doclang_observe_call_function = (fn) => {
+    doxPendingClosureId = doxClosures.get(fn)?.id || 0;
+    return 0;
+  };
+  global.caml_doclang_observe_is_registered_function = (fn, supplied) =>
+    (doxFunctionConsumption.get(fn) || 0) > 0 && supplied >= doxFunctionConsumption.get(fn) ? 1 : 0;
+  global.caml_doclang_observe_tail_handoff = (metadata, occurrence, fn, supplied) => {
+    const frame = doxStack.at(-1);
+    const consumed = doxFunctionConsumption.get(fn) || 0;
+    if (!frame || frame.occurrence !== occurrence || consumed <= 0 || supplied < consumed) return 0;
+    const handoff = ++doxHandoffCounter;
+    const remaining = supplied - consumed;
+    doxEmit("tail-handoff", occurrence, frame.parent, metadata, 0, false, `${handoff}:${remaining}`);
+    doxStack.pop();
+    doxPendingTail = { parent: occurrence, remaining, handoff };
+    return 0;
+  };
+
   function bitsToFloat32(bits) {
     bitsI32[0] = bits | 0;
     return bitsF32[0];
@@ -70,12 +464,22 @@
 
   global.caml_sys_getenv_opt = function caml_sys_getenv_opt(name) {
     noteShimCall(`caml_sys_getenv_opt:${String(name)}`);
+    const key = String(name);
+    if (doxEnvironment.has(key)) {
+      const value = doxEnvironment.get(key);
+      if (typeof global.caml_string_of_jsbytes === "function") {
+        return [0, global.caml_string_of_jsbytes(value)];
+      }
+      if (typeof global.caml_string_of_jsstring === "function") {
+        return [0, global.caml_string_of_jsstring(value)];
+      }
+      return [0, value];
+    }
     if (
       typeof global.jsoo_sys_getenv !== "function"
     ) {
       return 0;
     }
-    const key = String(name);
     const value = global.jsoo_sys_getenv(key);
     if (value === undefined) {
       return 0;
