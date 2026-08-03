@@ -88,7 +88,6 @@ if [ ! -f "$repo_root/_build/main/compilerlibs/META" ] \
    || [ ! -f "$repo_root/_build/main/ocamlbytecomp.cma" ] \
    || [ ! -f "$repo_root/_build/main/ocamloptcomp.cma" ] \
    || [ ! -f "$repo_root/_build/main/oxcaml_common.cma" ] \
-   || [ ! -f "$repo_root/_build/main/utils/oxcaml_utils.cma" ] \
    || [ ! -f "$repo_root/_build/main/toplevel/byte/ocamltoplevel.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/dynlink/dynlink.cma" ] \
    || [ ! -f "$repo_root/_build/main/otherlibs/str/str.cma" ] \
@@ -101,7 +100,6 @@ if [ ! -f "$repo_root/_build/main/compilerlibs/META" ] \
     _build/main/ocamlbytecomp.cma \
     _build/main/ocamloptcomp.cma \
     _build/main/oxcaml_common.cma \
-    _build/main/utils/oxcaml_utils.cma \
     _build/main/toplevel/byte/ocamltoplevel.cma \
     _build/main/otherlibs/dynlink/dynlink.cma \
     _build/main/otherlibs/str/str.cma \
@@ -182,7 +180,6 @@ cp -f "$repo_root/_build/main/ocamlcommon.cma" "$tmp_install/lib/ocaml/compiler-
 cp -f "$repo_root/_build/main/ocamlbytecomp.cma" "$tmp_install/lib/ocaml/compiler-libs/"
 cp -f "$repo_root/_build/main/ocamloptcomp.cma" "$tmp_install/lib/ocaml/compiler-libs/"
 cp -f "$repo_root/_build/main/oxcaml_common.cma" "$tmp_install/lib/ocaml/compiler-libs/"
-cp -f "$repo_root/_build/main/utils/oxcaml_utils.cma" "$tmp_install/lib/ocaml/compiler-libs/"
 cp -f "$repo_root/_build/main/toplevel/byte/ocamltoplevel.cma" "$tmp_install/lib/ocaml/compiler-libs/"
 copy_flattened_artifacts \
   "$tmp_install/lib/ocaml/compiler-libs" \
@@ -190,7 +187,6 @@ copy_flattened_artifacts \
   "$repo_root/_build/main/.ocamlbytecomp.objs/byte" \
   "$repo_root/_build/main/.ocamloptcomp.objs/byte" \
   "$repo_root/_build/main/.oxcaml_common.objs/byte" \
-  "$repo_root/_build/main/utils/.oxcaml_utils.objs/byte" \
   "$repo_root/_build/main/bytecomp/.ocamlbytecomp.objs/byte" \
   "$repo_root/_build/main/file_formats/.ocamlcommon.objs/byte" \
   "$repo_root/_build/main/lambda/.ocamlcommon.objs/byte" \
