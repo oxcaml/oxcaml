@@ -61,21 +61,18 @@ require_dir "$release_opam_root" "OPAM root"
 require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 
 missing_packages=()
-for package_name in \
-  findlib \
-  js_of_ocaml \
-  js_of_ocaml-toplevel \
-  stdlib_stable \
-  base \
-  core \
-  parallel \
-  threads \
-  ppxlib \
-  ppxlib.ast \
-  ppx_jane \
-  ppx_deriving \
-  ppx_module_timer.runtime \
-  yojson
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  required_packages=(
+    findlib js_of_ocaml js_of_ocaml-toplevel threads ppxlib ppxlib.ast yojson
+  )
+else
+  required_packages=(
+    findlib js_of_ocaml js_of_ocaml-toplevel stdlib_stable base core parallel
+    threads ppxlib ppxlib.ast ppx_jane ppx_deriving
+    ppx_module_timer.runtime yojson
+  )
+fi
+for package_name in "${required_packages[@]}"
 do
   require_package "$package_name"
 done
@@ -121,9 +118,13 @@ fi
 
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
-common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast,yojson"
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,threads,ppxlib,ppxlib.ast,yojson"
+else
+  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast,yojson"
+fi
 install_lib_root=$(run_tool ocamlc -where)
-package_lib_root=$(dirname "$(run_tool ocamlfind query base)")
+package_lib_root=$(dirname "$(run_tool ocamlfind query yojson)")
 js_of_ocaml_compiler_dir="$(run_tool ocamlfind query js_of_ocaml-compiler)"
 
 copy_cmis_from_dir() {
@@ -161,9 +162,15 @@ while IFS= read -r runtime_file; do
   esac
 done < <(find "$js_of_ocaml_compiler_dir" -maxdepth 1 -type f -name '*.js' | sort)
 
-jane_runtime_packages="$(package_closure_csv ppx_jane)"
-package_roots="stdlib_stable base core parallel threads ${jane_runtime_packages//,/ }"
-link_packages="$common_js_packages,ppx_jane,$jane_runtime_packages"
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  jane_runtime_packages=""
+  package_roots="threads"
+  link_packages="$common_js_packages"
+else
+  jane_runtime_packages="$(package_closure_csv ppx_jane)"
+  package_roots="stdlib_stable base core parallel threads ${jane_runtime_packages//,/ }"
+  link_packages="$common_js_packages,ppx_jane,$jane_runtime_packages"
+fi
 
 OXBROWSER_PACKAGE_ROOTS="$package_roots" \
   run_tool ocamlrun "$tmpdir/generate_browser_package_manifest.byte" \
