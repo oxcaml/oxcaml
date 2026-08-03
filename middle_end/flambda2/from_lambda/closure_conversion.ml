@@ -842,8 +842,37 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   in
   let call args acc =
     (* Some C primitives have implementations within Flambda itself. *)
-    let[@inline] unboxed_int64_to_and_from_unboxed_float ~src_kind ~dst_kind ~op
-        =
+    let[@local] extcall () =
+      let callee = Simple.symbol call_symbol in
+      let apply =
+        Apply.create ~callee:(Some callee)
+          ~continuation:(Return return_continuation) exn_continuation ~args
+          ~args_arity:param_arity ~return_arity ~call_kind
+          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
+          ~inlining_state:(Inlining_state.default ~round:0)
+          ~probe:None ~position:Normal
+          ~relative_history:(Env.relative_history_from_scoped ~loc env)
+      in
+      Expr_with_acc.create_apply acc apply
+    in
+    let[@local] builtin name prim =
+      let result = Variable.create name (P.result_kind' prim) in
+      let result_duid = Flambda_debug_uid.none in
+      let result' = Bound_var.create result result_duid Name_mode.normal in
+      let bindable = Bound_pattern.singleton result' in
+      let acc, return_result =
+        Apply_cont_with_acc.create acc return_continuation
+          ~args:[Simple.var result]
+          ~dbg
+      in
+      let acc, return_result_expr =
+        Expr_with_acc.create_apply_cont acc return_result
+      in
+      Let_with_acc.create acc bindable
+        (Named.create_prim prim dbg)
+        ~body:return_result_expr
+    in
+    let[@inline] external_is_known_unary_primitive ~src_kind ~dst_kind =
       if prim_arity <> 1
       then Misc.fatal_errorf "Expected arity one for %s" prim_native_name
       else
@@ -851,32 +880,41 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         | [(_, src)], (_, dst)
           when Stdlib.( = ) src src_kind && Stdlib.( = ) dst dst_kind -> (
           match args with
-          | [arg] ->
-            let prim = P.Unary (Reinterpret_64_bit_word op, arg) in
-            let result =
-              Variable.create "reinterpreted" (P.result_kind' prim)
-            in
-            let result_duid = Flambda_debug_uid.none in
-            let result' =
-              Bound_var.create result result_duid Name_mode.normal
-            in
-            let bindable = Bound_pattern.singleton result' in
-            let acc, return_result =
-              Apply_cont_with_acc.create acc return_continuation
-                ~args:[Simple.var result]
-                ~dbg
-            in
-            let acc, return_result_expr =
-              Expr_with_acc.create_apply_cont acc return_result
-            in
-            Let_with_acc.create acc bindable
-              (Named.create_prim prim dbg)
-              ~body:return_result_expr
+          | [arg] -> arg
           | [] | _ :: _ ->
             Misc.fatal_errorf "Expected one arg for %s" prim_native_name)
         | _, _ ->
           Misc.fatal_errorf "Wrong argument and/or result kind(s) for %s"
             prim_native_name
+    in
+    let[@local] unboxed_int64_to_and_from_unboxed_float ~src_kind ~dst_kind ~op
+        =
+      (* This likely should require an [@@builtin] attribute as well, but it
+         doesn't for legacy reasons. *)
+      let arg = external_is_known_unary_primitive ~src_kind ~dst_kind in
+      let prim = P.Unary (Reinterpret_64_bit_word op, arg) in
+      builtin "reinterpreted" prim
+    in
+    let[@local] int_bit_counting kind op =
+      if not prim_c_builtin
+      then extcall ()
+      else
+        let src_kind : Lambda.extern_repr =
+          match (kind : K.Standard_int.t) with
+          | Tagged_immediate -> Same_as_ocaml_repr (Base Scannable)
+          | Naked_immediate -> Unboxed_or_untagged_integer Untagged_int
+          | Naked_int8 -> Unboxed_or_untagged_integer Untagged_int8
+          | Naked_int16 -> Unboxed_or_untagged_integer Untagged_int16
+          | Naked_int32 -> Unboxed_or_untagged_integer Unboxed_int32
+          | Naked_int64 -> Unboxed_or_untagged_integer Unboxed_int64
+          | Naked_nativeint -> Unboxed_or_untagged_integer Unboxed_nativeint
+        in
+        let arg =
+          external_is_known_unary_primitive ~src_kind
+            ~dst_kind:(Unboxed_or_untagged_integer Untagged_int)
+        in
+        let prim = P.Unary (Int_bit_counting (kind, op), arg) in
+        builtin "bits" prim
     in
     match prim_native_name with
     | "caml_int64_float_of_bits_unboxed" ->
@@ -889,18 +927,49 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         ~src_kind:(Unboxed_float Boxed_float64)
         ~dst_kind:(Unboxed_or_untagged_integer Unboxed_int64)
         ~op:Unboxed_float64_as_unboxed_int64
-    | _ ->
-      let callee = Simple.symbol call_symbol in
-      let apply =
-        Apply.create ~callee:(Some callee)
-          ~continuation:(Return return_continuation) exn_continuation ~args
-          ~args_arity:param_arity ~return_arity ~call_kind
-          ~return_mode:alloc_mode_app dbg ~inlined:Default_inlined
-          ~inlining_state:(Inlining_state.default ~round:0)
-          ~probe:None ~position:Normal
-          ~relative_history:(Env.relative_history_from_scoped ~loc env)
-      in
-      Expr_with_acc.create_apply acc apply
+    | "caml_int_clz_tagged_to_untagged" ->
+      int_bit_counting Tagged_immediate Leading_zeros
+    | "caml_int_clz_untagged_to_untagged" ->
+      int_bit_counting Naked_immediate Leading_zeros
+    | "caml_int8_clz_untagged_to_untagged" ->
+      int_bit_counting Naked_int8 Leading_zeros
+    | "caml_int16_clz_untagged_to_untagged" ->
+      int_bit_counting Naked_int16 Leading_zeros
+    | "caml_int32_clz_unboxed_to_untagged" ->
+      int_bit_counting Naked_int32 Leading_zeros
+    | "caml_int64_clz_unboxed_to_untagged" ->
+      int_bit_counting Naked_int64 Leading_zeros
+    | "caml_nativeint_clz_unboxed_to_untagged" ->
+      int_bit_counting Naked_nativeint Leading_zeros
+    | "caml_int_ctz_tagged_to_untagged" ->
+      int_bit_counting Tagged_immediate Trailing_zeros
+    | "caml_int_ctz_untagged_to_untagged" ->
+      int_bit_counting Naked_immediate Trailing_zeros
+    | "caml_int8_ctz_untagged_to_untagged" ->
+      int_bit_counting Naked_int8 Trailing_zeros
+    | "caml_int16_ctz_untagged_to_untagged" ->
+      int_bit_counting Naked_int16 Trailing_zeros
+    | "caml_int32_ctz_unboxed_to_untagged" ->
+      int_bit_counting Naked_int32 Trailing_zeros
+    | "caml_int64_ctz_unboxed_to_untagged" ->
+      int_bit_counting Naked_int64 Trailing_zeros
+    | "caml_nativeint_ctz_unboxed_to_untagged" ->
+      int_bit_counting Naked_nativeint Trailing_zeros
+    | "caml_int_popcnt_tagged_to_untagged" ->
+      int_bit_counting Tagged_immediate Popcount
+    | "caml_int_popcnt_untagged_to_untagged" ->
+      int_bit_counting Naked_immediate Popcount
+    | "caml_int8_popcnt_untagged_to_untagged" ->
+      int_bit_counting Naked_int8 Popcount
+    | "caml_int16_popcnt_untagged_to_untagged" ->
+      int_bit_counting Naked_int16 Popcount
+    | "caml_int32_popcnt_unboxed_to_untagged" ->
+      int_bit_counting Naked_int32 Popcount
+    | "caml_int64_popcnt_unboxed_to_untagged" ->
+      int_bit_counting Naked_int64 Popcount
+    | "caml_nativeint_popcnt_unboxed_to_untagged" ->
+      int_bit_counting Naked_nativeint Popcount
+    | _ -> extcall ()
   in
   let call : Acc.t -> Expr_with_acc.t =
     List.fold_left2
