@@ -38,7 +38,7 @@ val transl_primitive :
   poly_mode:Mode.Locality.l option ->
   poly_sort:Jkind.Sort.t option ->
   yielding:Mode.Yielding.l ->
-  zero_alloc:Zero_alloc.check option ->
+  zero_alloc_check:Zero_alloc.check option ->
   Path.t option ->
   Lambda.lambda
 

@@ -2446,7 +2446,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
     prim
 
 let transl_primitive
-      loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc path =
+      loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc_check path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2544,7 +2544,7 @@ let transl_primitive
      in
      let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args) in
      let zero_alloc : Lambda.zero_alloc_attribute =
-       match (zero_alloc : Zero_alloc.check option) with
+       match (zero_alloc_check : Zero_alloc.check option) with
        | None -> Default_zero_alloc
        | Some { strict; opt; arity = _; loc; custom_error_msg } ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt
