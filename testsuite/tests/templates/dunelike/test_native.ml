@@ -82,10 +82,14 @@
    dst = "util/";
    copy;
 
-   set flg_alias_deps = "-w -53";
-   set flg = "$flg_alias_deps -no-alias-deps -nocwd";
+   set flg_base = "-w -53";
+   set flg_alias_deps = "$flg_base -nocwd";
+   set flg = "$flg_alias_deps -no-alias-deps";
    set flg_int_iface = "$flg -w -49";
    set flg_instance = "-H instances -w -24 -w -58";
+
+   (* dune does not pass [-nocwd] to link *)
+   set flg_link = "$flg_base -no-alias-deps";
 
    (* Need to turn off the fallback inlining heuristic because it marks all
    instantiating functors as [@inline never] in classic mode *)
@@ -443,8 +447,7 @@
    module = "test_native.ml";
    ocamlopt.byte;
 
-   (* dune does not pass [-nocwd] to link *)
-   flags = "$flg_alias_deps -no-alias-deps";
+   flags = "$flg_link";
    module = "";
    program = "$test_build_directory/test_native.exe";
    all_modules = "\
