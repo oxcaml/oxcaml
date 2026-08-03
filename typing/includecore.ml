@@ -221,14 +221,18 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
-  let prim_coercion_zero_alloc : Zero_alloc.check option =
-    match vd1.val_kind, vd2.val_kind, Zero_alloc.get vd2.val_zero_alloc with
-    | Val_prim p1, Val_reg _, Check c when c.arity = p1.prim_arity -> Some c
-    | _, _, _ ->
-      match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
-      | Ok () -> None
-      | Error e -> raise (Dont_match (Zero_alloc e))
+  let vd1_zero_alloc, prim_coercion_zero_alloc_check =
+    match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
+    | Val_prim p, Check check ->
+      ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
+        Some check )
+    | _, (Default_zero_alloc | Ignore_assert_all | Check _ | Assume _) ->
+      vd1.val_zero_alloc, None
   in
+  begin match Zero_alloc.sub vd1_zero_alloc vd2.val_zero_alloc with
+  | Ok () -> ()
+  | Error e -> raise (Dont_match (Zero_alloc e))
+  end;
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =
@@ -286,7 +290,7 @@ let value_descriptions ~loc env name
            pc_yielding =
              Ctype.prim_params_yielding env vd2.Types.val_type
                ~arity:p1.prim_arity;
-           pc_zero_alloc = prim_coercion_zero_alloc;
+           pc_zero_alloc = prim_coercion_zero_alloc_check;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end
