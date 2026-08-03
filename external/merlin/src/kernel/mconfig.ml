@@ -594,6 +594,7 @@ let ocaml_ignored_flags =
     "-no-x86-peephole-optimize";
     "-no-x86-peephole-remove-mov-to-dead-register";
     "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-remove-redundant-extension";
     "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";

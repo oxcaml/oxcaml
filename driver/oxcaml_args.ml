@@ -123,6 +123,11 @@ let mk_no_x86_peephole_remove_redundant_cmp f =
     Arg.Unit f,
     " Disable x86 peephole: remove redundant cmp" )
 
+let mk_no_x86_peephole_remove_redundant_extension f =
+  ( "-no-x86-peephole-remove-redundant-extension",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant sign/zero extension" )
+
 let mk_no_x86_peephole_combine_add_rsp f =
   ( "-no-x86-peephole-combine-add-rsp",
     Arg.Unit f,
@@ -1330,6 +1335,7 @@ module type Oxcaml_options = sig
   val no_x86_peephole_optimize : unit -> unit
   val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
   val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
@@ -1522,6 +1528,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_x86_peephole_remove_mov_to_dead_register;
       mk_no_x86_peephole_remove_redundant_cmp
         F.no_x86_peephole_remove_redundant_cmp;
+      mk_no_x86_peephole_remove_redundant_extension
+        F.no_x86_peephole_remove_redundant_extension;
       mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
@@ -1864,6 +1872,9 @@ module Oxcaml_options_impl = struct
 
   let no_x86_peephole_remove_redundant_cmp =
     clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
+
+  let no_x86_peephole_remove_redundant_extension =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_extension
 
   let no_x86_peephole_combine_add_rsp =
     clear' Oxcaml_flags.x86_peephole_combine_add_rsp
