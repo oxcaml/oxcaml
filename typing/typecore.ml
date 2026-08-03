@@ -9140,7 +9140,8 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
             regstier_allocation_mode for is_applied=true case
             is handled at the application site. *)
          | (Prim_poly, _), Some mode ->
-             register_allocation_mode ~env ~loc:lid.loc (Alloc.max_with_comonadic Areality mode)
+             register_allocation_mode ~env ~loc:lid.loc
+               (Alloc.max_with_comonadic Areality mode)
          | _ -> ()
          end;
        [], ty, Id_prim (mode, sort)

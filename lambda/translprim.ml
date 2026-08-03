@@ -1926,19 +1926,24 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | _ -> None
 
-(* CR shsong: Inline this function since it is only called for once (right?) *)
-let has_constant_constructor arg_exps =
-  match arg_exps with
-  | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
-  | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
-      cstr_constant
-  | [_; {exp_desc = Texp_variant(_, None)}]
-  | [{exp_desc = Texp_variant(_, None)}; _] -> true
-  | _ -> false
-
-let specialize_if_needed env loc ty p arg_exps prim =
+let transl_primitive_common loc ~poly_mode ~poly_sort
+      pos p env ty path arg_exps =
+  let prim =
+    let loc = to_location loc in
+    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
+    | External _ as e -> add_used_primitive loc env path; e
+    | x -> x
+  in
   if should_specialize_primitive p then
-    let has_constant_constructor = has_constant_constructor arg_exps in
+    let has_constant_constructor =
+      match arg_exps with
+      | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+      | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+          cstr_constant
+      | [_; {exp_desc = Texp_variant(_, None)}]
+      | [{exp_desc = Texp_variant(_, None)}; _] -> true
+      | _ -> false
+    in
     match specialize_primitive env loc ty ~has_constant_constructor prim with
     | None -> prim
     | Some prim -> prim
@@ -2450,18 +2455,12 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
   let snap = Btype.snapshot () in
   let result =
     try
-      (* CR shsong: The logic here is very similar to transl_primitive_common,
-      where you call lookup_primitive_unspecialized and prim_may_allocate,
-      while the only difference is whether add_used_primitive is called.
-      I am wondering: (1) what is the purpose of each of three helper functions;
-      (2) can you simply also use transl_primitive_common here? If not, can you
-      just improve transl_primitive_common so that the whether call add_used_primitive is optional?
-      *)
-      let prim =
-        lookup_primitive_unspecialized loc ~poly_mode ~poly_sort Rc_normal p
-      in
+      (* [path = None] keeps [add_used_primitive] a no-op, so this records no
+         cross-unit use of an [external]. *)
       let sloc = of_location ~scopes:empty_scopes loc in
-      prim_may_allocate p (specialize_if_needed env sloc ty p arg_exps prim)
+      prim_may_allocate p
+        (transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
+           None arg_exps)
     with
     (* Let the bug-indicating exceptions through, ... *)
     | Misc.Fatal_error | Out_of_memory | Stack_overflow as exn ->
@@ -2519,16 +2518,6 @@ let check_primitive_arity loc p =
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
 (* Eta-expand a primitive *)
-
-let transl_primitive_common loc ~poly_mode ~poly_sort
-      pos p env ty path arg_exps =
-  let prim =
-    let loc = to_location loc in
-    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
-    | External _ as e -> add_used_primitive loc env path; e
-    | x -> x
-  in
-  specialize_if_needed env loc ty p arg_exps prim
 
 let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   let prim =
