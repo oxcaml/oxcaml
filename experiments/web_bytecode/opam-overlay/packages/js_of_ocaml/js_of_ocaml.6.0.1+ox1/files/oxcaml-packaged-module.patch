@@ -1,0 +1,11 @@
+--- a/lib/js_of_ocaml/js.ml
++++ b/lib/js_of_ocaml/js.ml
+@@ -725,7 +725,7 @@ module Magic = struct
+ 
+   let (eq : (error t, Js_error.t) eq) = Obj.magic Eq
+ 
+-  let m =
++  let m : (module T) =
+     match eq with
+     | Eq ->
+         (module struct

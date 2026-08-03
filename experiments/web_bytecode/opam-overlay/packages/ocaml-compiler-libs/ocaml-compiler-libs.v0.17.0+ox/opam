@@ -1,0 +1,16 @@
+opam-version: "2.0"
+version: "v0.17.0+ox"
+name: "ocaml-compiler-libs"
+synopsis: "OCaml compiler libraries repackaged for the Ox browser toolchain"
+maintainer: "opensource@janestreet.com"
+license: "MIT"
+homepage: "https://github.com/janestreet/ocaml-compiler-libs"
+depends: ["ocaml" {>= "5.2.0"} "dune" {>= "1.5.1"}]
+build: [
+  ["sh" "-ec" "python3 - <<'PY'\nfrom pathlib import Path\np = Path('src/read_cma/read_cma.ml')\ns = p.read_text()\ns = s.replace('let compunit_name Cmo_format.{ cu_name = Compunit name ; _ } = name', 'let compunit_name Cmo_format.{ cu_name; _ } = Compilation_unit.name_as_string cu_name')\np.write_text(s)\np = Path('src/gen/gen.ml')\ns = p.read_text()\ns = s.replace('List.iter units ~f:(fun u -> pr \"module %-*s = %s\" max_len u u);', 'List.iter units ~f:(fun u -> pr \"module %-*s = %s\" max_len u u);\\n  (* Parsetree is interface-only, so it is absent from the archive units. *)\\n  pr \"module Parsetree = Parsetree\";')\np.write_text(s)\nPY"]
+  ["dune" "build" "-p" name "-j" jobs]
+]
+url {
+  src: "https://github.com/janestreet/ocaml-compiler-libs/archive/refs/tags/v0.17.0.tar.gz"
+  checksum: "sha512=c5cd418b0eb74e00c3f63235754bbdb3a3328ac743d6ae885424d8c50b4edaa7068572e689cb3456d222793283927f2984a1ff840b1bc3817f810b5314faf897"
+}

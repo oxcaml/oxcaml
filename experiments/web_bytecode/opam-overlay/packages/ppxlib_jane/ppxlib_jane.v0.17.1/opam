@@ -1,0 +1,27 @@
+opam-version: "2.0"
+synopsis: "Utilities for working with Jane Street AST constructs"
+description: "Part of Jane Street's PPX rewriters collection."
+maintainer: "Jane Street developers"
+authors: "Jane Street Group, LLC"
+license: "MIT"
+homepage: "https://github.com/janestreet/ppxlib_jane"
+bug-reports: "https://github.com/janestreet/ppxlib_jane/issues"
+depends: [
+  "ocaml" {>= "5.3.0" & < "5.5.0"}
+  "dune" {>= "3.11.0"}
+  "ppxlib_ast" {>= "0.33.0" & < "0.36.0"}
+]
+available: arch != "x86_32"
+flags: deprecated
+build: [
+  ["sh" "-ec" "python3 - <<'PY'\nfrom pathlib import Path\np = Path('src/dune')\ns = p.read_text()\ns = s.replace('ppxlib.ast ', 'ppxlib_ast.ast ')\ns = s.replace('ppxlib.astlib', 'ppxlib_ast.astlib')\ns = s.replace('ppxlib.traverse_builtins', 'ppxlib_ast.traverse_builtins')\ns = s.replace('ppxlib.stdppx', 'ppxlib_ast.stdppx')\np.write_text(s)\nPY"]
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://github.com/janestreet/ppxlib_jane.git"
+url {
+  src: "https://github.com/janestreet/ppxlib_jane/archive/refs/tags/v0.17.1.tar.gz"
+  checksum: [
+    "md5=4a9361efc1ee6d099bf6857bbe96e2fb"
+    "sha512=3aacf2b8c01ca45ac3c1e51119fe0cc222739cad4c4def3fbc682aa2f30c35f3e5a91c5e7c859e41cdcce4c52f2f3c2711e6163e0f893cc398e07ce51c2c6265"
+  ]
+}

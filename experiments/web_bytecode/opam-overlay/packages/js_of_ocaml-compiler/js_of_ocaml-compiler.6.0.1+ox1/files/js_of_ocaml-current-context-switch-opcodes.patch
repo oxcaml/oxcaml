@@ -1,0 +1,278 @@
+diff --git a/compiler/lib/instr.ml b/compiler/lib/instr.ml
+index 85e2958..f265138 100644
+--- a/compiler/lib/instr.ml
++++ b/compiler/lib/instr.ml
+@@ -170,14 +170,16 @@ type t =
+   | RAISE_NOTRACE
+   | GETSTRINGCHAR
+   | PERFORM
+-  | RESUME
+-  | RESUMETERM
++  | CONTINUE
++  | CONTINUETERM
++  | DISCONTINUE
++  | DISCONTINUETERM
++  | DISCONTINUE_WITH_BACKTRACE
++  | DISCONTINUE_WITH_BACKTRACETERM
+   | REPERFORMTERM
+   | MAKE_FAUX_MIXEDBLOCK
+   | WITH_STACK
+-  | WITH_STACK_BIND
+   | WITH_STACK_PREEMPTIBLE
+-  | WITH_STACK_BIND_PREEMPTIBLE
+   | FIRST_UNIMPLEMENTED_OP
+ 
+ let equal (a : t) b = Poly.equal a b
+@@ -366,16 +368,18 @@ let ops =
+      ; RAISE_NOTRACE, KStop 0, "RAISE_NOTRACE"
+      ; GETSTRINGCHAR, KNullary, "GETSTRINGCHAR"
+      ; PERFORM, if_v500 KNullaryCall, "PERFORM"
+-     ; RESUME, if_v500 KNullaryCall, "RESUME"
+-     ; RESUMETERM, if_v500 (KStop 1), "RESUMETERM"
++     ; CONTINUE, if_v500 KNullaryCall, "CONTINUE"
++     ; CONTINUETERM, if_v500 (KStop 1), "CONTINUETERM"
++     ; DISCONTINUE, if_v500 KNullaryCall, "DISCONTINUE"
++     ; DISCONTINUETERM, if_v500 (KStop 1), "DISCONTINUETERM"
++     ; DISCONTINUE_WITH_BACKTRACE, if_v500 KNullaryCall, "DISCONTINUE_WITH_BACKTRACE"
++     ; ( DISCONTINUE_WITH_BACKTRACETERM
++       , if_v500 (KStop 1)
++       , "DISCONTINUE_WITH_BACKTRACETERM" )
+      ; REPERFORMTERM, if_v500 (KStop 1), "REPERFORMTERM"
+      ; MAKE_FAUX_MIXEDBLOCK, if_oxcaml KBinary, "MAKE_FAUX_MIXEDBLOCK"
+-     ; WITH_STACK, if_oxcaml (KStop 1), "WITH_STACK"
+-     ; WITH_STACK_BIND, if_oxcaml (KStop 1), "WITH_STACK_BIND"
+-     ; WITH_STACK_PREEMPTIBLE, if_oxcaml (KStop 1), "WITH_STACK_PREEMPTIBLE"
+-     ; ( WITH_STACK_BIND_PREEMPTIBLE
+-       , if_oxcaml (KStop 1)
+-       , "WITH_STACK_BIND_PREEMPTIBLE" )
++     ; WITH_STACK, if_oxcaml KNullaryCall, "WITH_STACK"
++     ; WITH_STACK_PREEMPTIBLE, if_oxcaml KNullaryCall, "WITH_STACK_PREEMPTIBLE"
+      ; FIRST_UNIMPLEMENTED_OP, K_will_not_happen, "FIRST_UNIMPLEMENTED_OP"
+     |]
+   in
+diff --git a/compiler/lib/instr.mli b/compiler/lib/instr.mli
+index f48a62b..904ac1a 100644
+--- a/compiler/lib/instr.mli
++++ b/compiler/lib/instr.mli
+@@ -169,14 +169,16 @@ type t =
+   | RAISE_NOTRACE
+   | GETSTRINGCHAR
+   | PERFORM
+-  | RESUME
+-  | RESUMETERM
++  | CONTINUE
++  | CONTINUETERM
++  | DISCONTINUE
++  | DISCONTINUETERM
++  | DISCONTINUE_WITH_BACKTRACE
++  | DISCONTINUE_WITH_BACKTRACETERM
+   | REPERFORMTERM
+   | MAKE_FAUX_MIXEDBLOCK
+   | WITH_STACK
+-  | WITH_STACK_BIND
+   | WITH_STACK_PREEMPTIBLE
+-  | WITH_STACK_BIND_PREEMPTIBLE
+   | FIRST_UNIMPLEMENTED_OP
+ 
+ type kind =
+diff --git a/compiler/lib/parse_bytecode.ml b/compiler/lib/parse_bytecode.ml
+index 09986e6..243e464 100644
+--- a/compiler/lib/parse_bytecode.ml
++++ b/compiler/lib/parse_bytecode.ml
+@@ -2484,10 +2484,10 @@ and compile infos pc state (instrs : instr list) =
+           :: Let (meths, Field (obj, 0, Non_float))
+           :: instrs)
+     | STOP -> instrs, Stop, state
+-    | RESUME ->
++    | CONTINUE ->
+         let stack = State.accu state in
+         let func = State.peek 0 state in
+-        let arg = State.peek 1 state in
++        let arg = State.peek 0 state in
+         let x, state = State.fresh_var state in
+         if debug_parser ()
+         then
+@@ -2501,30 +2501,18 @@ and compile infos pc state (instrs : instr list) =
+             func
+             Var.print
+             arg;
+-        let state, tail =
+-          match Ocaml_version.compare Ocaml_version.current [ 5; 2 ] < 0 with
+-          | true -> State.pop 2 state, Pc (Int (Targetint.of_int_exn 0))
+-          | false ->
+-              let tail = State.peek 2 state in
+-              State.pop 3 state, Pv tail
+-        in
++        let state, tail = State.pop 1 state, Pc (Int (Targetint.of_int_exn 0)) in
+         compile
+           infos
+           (pc + 1)
+           state
+           (Let (x, Prim (Extern "%resume", [ Pv stack; Pv func; Pv arg; tail ])) :: instrs)
+-    | RESUMETERM ->
++    | CONTINUETERM ->
+         let stack = State.accu state in
+         let func = State.peek 0 state in
+-        let arg = State.peek 1 state in
+-        let x, state = State.fresh_var state in
+-        let tail =
+-          match Ocaml_version.compare Ocaml_version.current [ 5; 2 ] < 0 with
+-          | true -> Pc (Int (Targetint.of_int_exn 0))
+-          | false ->
+-              let tail = State.peek 2 state in
+-              Pv tail
+-        in
++        let arg = State.peek 0 state in
++        let x, state = State.fresh_var state in
++        let tail = Pc (Int (Targetint.of_int_exn 0)) in
+         if debug_parser ()
+         then
+           Format.printf
+@@ -2538,6 +2526,38 @@ and compile infos pc state (instrs : instr list) =
+         ( Let (x, Prim (Extern "%resume", [ Pv stack; Pv func; Pv arg; tail ])) :: instrs
+         , Return x
+         , state )
++    | (DISCONTINUE | DISCONTINUE_WITH_BACKTRACE) as opcode ->
++        let arg_count = match opcode with DISCONTINUE -> 1 | _ -> 2 in
++        let state = State.pop arg_count state in
++        let x, state = State.fresh_var state in
++        compile
++          infos
++          (pc + 1)
++          state
++          (Let
++             ( x
++             , Prim
++                 ( Extern "caml_failwith"
++                 , [ Pc
++                       (String
++                          "OxCaml discontinue is not supported by this js_of_ocaml runtime")
++                   ] ) )
++           :: instrs)
++    | (DISCONTINUETERM | DISCONTINUE_WITH_BACKTRACETERM) as opcode ->
++        let arg_count = match opcode with DISCONTINUETERM -> 1 | _ -> 2 in
++        let state = State.pop arg_count state in
++        let x, state = State.fresh_var state in
++        ( Let
++            ( x
++            , Prim
++                ( Extern "caml_failwith"
++                , [ Pc
++                      (String
++                         "OxCaml discontinue is not supported by this js_of_ocaml runtime")
++                  ] ) )
++          :: instrs
++        , Return x
++        , state )
+     | PERFORM ->
+         let eff = State.accu state in
+         let x, state = State.fresh_var state in
+@@ -2567,6 +2587,7 @@ and compile infos pc state (instrs : instr list) =
+       let effc = State.peek 1 state in
+       let f = State.peek 2 state in
+       let arg = State.peek 3 state in
++      let state = State.pop 4 state in
+       let x, state = State.fresh_var state in
+ 
+       if debug_parser ()
+@@ -2585,85 +2606,30 @@ and compile infos pc state (instrs : instr list) =
+           f
+           Var.print
+           arg;
+-      ( Let (
+-          x,
+-          Prim (Extern "%with_stack", [ Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg ])
+-        ) :: instrs
+-      , Return x
+-      , state )
+-    | WITH_STACK_BIND ->
+-      let valuec = State.accu state in
+-      let exnc = State.peek 0 state in
+-      let effc = State.peek 1 state in
+-      let dyn = State.peek 2 state in
+-      let bind = State.peek 3 state in
+-      let f = State.peek 4 state in
+-      let arg = State.peek 5 state in
+-      let x, state = State.fresh_var state in
+-
+-      if debug_parser ()
+-      then
+-        Format.printf
+-          "%a = with_stack_bind(%a, %a, %a, %a, %a, %a, %a)@."
+-          Var.print
+-          x
+-          Var.print
+-          valuec
+-          Var.print
+-          exnc
+-          Var.print
+-          effc
+-          Var.print
+-          dyn
+-          Var.print
+-          bind
+-          Var.print
+-          f
+-          Var.print
+-          arg;
+-      ( Let (
+-          x,
+-          Prim (
+-            Extern "%with_stack_bind",
+-            [ Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg ]
+-          )
+-        ) :: instrs
+-      , Return x
+-      , state )
++      compile
++        infos
++        (pc + 1)
++        state
++        (Let
++           (x, Prim (Extern "%with_stack", [ Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg ]))
++         :: instrs)
+     | WITH_STACK_PREEMPTIBLE ->
+       let valuec = State.accu state in
+       let exnc = State.peek 0 state in
+       let effc = State.peek 1 state in
+       let f = State.peek 3 state in
+       let arg = State.peek 4 state in
++      let state = State.pop 5 state in
+       let x, state = State.fresh_var state in
+       (* Browser execution is single-threaded. Dropping the [htick] argument
+          preserves effect-handler semantics while omitting scheduler preemption. *)
+-      ( Let (
+-          x,
+-          Prim (Extern "%with_stack", [ Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg ])
+-        ) :: instrs
+-      , Return x
+-      , state )
+-    | WITH_STACK_BIND_PREEMPTIBLE ->
+-      let valuec = State.accu state in
+-      let exnc = State.peek 0 state in
+-      let effc = State.peek 1 state in
+-      let dyn = State.peek 3 state in
+-      let bind = State.peek 4 state in
+-      let f = State.peek 5 state in
+-      let arg = State.peek 6 state in
+-      let x, state = State.fresh_var state in
+-      (* See [WITH_STACK_PREEMPTIBLE]. *)
+-      ( Let (
+-          x,
+-          Prim (
+-            Extern "%with_stack_bind",
+-            [ Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg ]
+-          )
+-        ) :: instrs
+-      , Return x
+-      , state )
++      compile
++        infos
++        (pc + 1)
++        state
++        (Let
++           (x, Prim (Extern "%with_stack", [ Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg ]))
++         :: instrs)
+     | EVENT | BREAK | FIRST_UNIMPLEMENTED_OP -> assert false)
+ 
+ (****)

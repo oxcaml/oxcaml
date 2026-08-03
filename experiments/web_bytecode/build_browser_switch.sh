@@ -66,7 +66,7 @@ require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 missing_packages=()
 if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
   required_packages=(
-    findlib js_of_ocaml js_of_ocaml-toplevel threads yojson
+    findlib js_of_ocaml js_of_ocaml-toplevel yojson
   )
 else
   required_packages=(
@@ -122,7 +122,7 @@ fi
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
 if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
-  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,threads,yojson"
+  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,yojson"
 else
   common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast,yojson"
 fi
@@ -169,7 +169,7 @@ done < <(find "$js_of_ocaml_compiler_dir" -maxdepth 1 -type f -name '*.js' | sor
 
 if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
   jane_runtime_packages=""
-  package_roots="threads"
+  package_roots=""
   link_packages="$common_js_packages"
 else
   jane_runtime_packages="$(package_closure_csv ppx_jane)"
@@ -235,7 +235,7 @@ compile "$common_js_packages" "$experiment_dir/browser_switch_js.ml" \
   "$tmpdir/browser_switch_js.cmo" \
   -I "$tmpdir"
 
-run_tool ocamlfind ocamlc -g -no-check-prims -linkall -predicates ppx_driver \
+run_tool ocamlfind ocamlc -g -no-check-prims -noautolink -linkall -predicates ppx_driver \
   -package "$link_packages" -linkpkg \
   "$tmpdir/browser_switch_package_manifest.cmo" \
   "$tmpdir/browser_switch_ppx.cmo" \
@@ -267,7 +267,12 @@ js_of_ocaml_args=(
 
 js_of_ocaml_args+=(
   "${standard_runtime_js_files[@]}"
-  "${browser_runtime_files[@]}"
+  "$experiment_dir/runtime_compat.js"
+)
+if [ "${#browser_runtime_files[@]}" -gt 0 ]; then
+  js_of_ocaml_args+=("${browser_runtime_files[@]}")
+fi
+js_of_ocaml_args+=(
   "$build_dir/web_bytecode_js.bc"
   -o
   "$build_dir/web_bytecode_js.bc.js"

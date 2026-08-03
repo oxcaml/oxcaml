@@ -41,9 +41,12 @@ let compilation_unit filename =
   Compilation_unit.create Compilation_unit.Prefix.empty name
 
 let file_prefix filename =
-  match Filename.extension filename with
-  | "" -> filename
-  | ext -> String.sub filename 0 (String.length filename - String.length ext)
+  if Filename.check_suffix filename ".ml.md"
+  then String.sub filename 0 (String.length filename - String.length ".ml.md")
+  else
+    match Filename.extension filename with
+    | "" -> filename
+    | ext -> String.sub filename 0 (String.length filename - String.length ext)
 
 let cleanup_if_exists path =
   try Sys.remove path
@@ -124,6 +127,19 @@ let compile_parsed_file ~source_path ~output_prefix =
       output_prefix ^ ".cmo")
     ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
 
+let compile_source_file_direct ~source_path ~output_prefix =
+  let saved_dont_write_files = !Clflags.dont_write_files in
+  Fun.protect
+    (fun () ->
+      Clflags.dont_write_files := false;
+      Compile.implementation
+        ~start_from:Clflags.Compiler_pass.Parsing
+        ~source_file:source_path
+        ~output_prefix
+        ~keep_symbol_tables:false;
+      output_prefix ^ ".cmo")
+    ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
+
 let compile_source_file ~filename ~source_path ~output_prefix =
   let source = read_file source_path in
   let ast_path = source_path ^ ".ppx.ast" in
@@ -149,6 +165,10 @@ let reset_flags ?project_dir environment =
   Clflags.binary_annotations := false;
   Clflags.binary_annotations_cms := false;
   Clflags.dont_write_files := true;
+  (* Dox relies on bytecode events for precise source correlation.  Keeping
+     debug bytecode enabled also matches the compiler's supported path for
+     the traced local functions produced by [prepare_doclang_structure]. *)
+  Clflags.debug := true;
   Clflags.native_code := false;
   Clflags.no_std_include := environment = Browser;
   Clflags.no_cwd := environment = Browser;
@@ -185,7 +205,7 @@ let prepare_compiler ?project_dir environment ~filename =
        browser_include_dirs);
   Compmisc.init_parameters ()
 
-let with_missing_cmi_detection environment f =
+let with_missing_cmi_detection ?(allow_missing = fun _ -> false) environment f =
   match environment with
   | Native -> f ()
   | Browser ->
@@ -196,7 +216,9 @@ let with_missing_cmi_detection environment f =
           (fun ~allow_hidden ~unit_name ->
             match previous_load ~allow_hidden ~unit_name with
             | Some _ as result -> result
-            | None -> raise (Missing_cmi (missing_cmi_filename unit_name)));
+            | None ->
+              let filename = missing_cmi_filename unit_name in
+              if allow_missing filename then None else raise (Missing_cmi filename));
         f ())
       ~finally:(fun () ->
         Persistent_env.Persistent_signature.load := previous_load)

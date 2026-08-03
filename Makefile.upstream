@@ -89,7 +89,7 @@ parsing_SOURCES = $(addprefix parsing/, \
   unit_info.mli unit_info.ml \
   asttypes.mli \
   longident.mli longident.ml \
-  parsetree.mli \
+  parsetree.mli parsetree.ml \
   docstrings.mli docstrings.ml \
   syntaxerr.mli syntaxerr.ml \
   ast_helper.mli ast_helper.ml \

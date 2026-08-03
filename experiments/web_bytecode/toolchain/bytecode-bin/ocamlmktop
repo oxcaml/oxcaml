@@ -1,2 +1,3 @@
 #!/bin/sh
-exec "/Users/julesjacobs/git/jujacobs/oxcaml-basics/upstream/oxcaml-5.4/experiments/web_bytecode/toolchain/bin/ocamlc" "$@"
+tool_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+exec "$tool_dir/../bin/ocamlc" "$@"

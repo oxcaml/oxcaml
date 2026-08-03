@@ -118,7 +118,7 @@ and arg_label = Asttypes.arg_label =
 and variance = Asttypes.variance = Covariant | Contravariant | NoVariance
 and injectivity = Asttypes.injectivity = Injective | NoInjectivity
 
-and index_kind =
+and index_kind = Asttypes.index_kind =
   | Index_int
   | Index_unboxed_int64
   | Index_unboxed_int32

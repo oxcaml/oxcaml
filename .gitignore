@@ -92,6 +92,7 @@ _profile/
 /_install
 /_runtest
 /_opam
+/.opam-oxweb-root/
 /.claude/*.local.*
 
 /oc_cflags.sexp

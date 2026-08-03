@@ -24,7 +24,16 @@
   const doxEnvironment = new Map();
 
   global.doxSetEnv = function doxSetEnv(name, value) {
-    doxEnvironment.set(String(name), String(value));
+    const key = String(name);
+    const text = String(value);
+    global.jsoo_env ??= {};
+    if (text === "") {
+      doxEnvironment.delete(key);
+      delete global.jsoo_env[key];
+    } else {
+      doxEnvironment.set(key, text);
+      global.jsoo_env[key] = text;
+    }
   };
 
   function doxBytes(value) {
@@ -45,6 +54,11 @@
 
   function doxFields(metadata) {
     return doxBytes(metadata).split("\x1f");
+  }
+
+  function doxShouldTrace(metadata) {
+    const path = doxFields(metadata)[3] || "";
+    return path.endsWith(".ml.md") || path.startsWith("<dox-inline:");
   }
 
   function doxIsBlock(value) {
@@ -286,6 +300,7 @@
   function doxEmit(phase, occurrence, parent, metadata, observed, hasObserved, detail = null) {
     if (doxTraceTruncated) return;
     const fields = doxFields(metadata);
+    if (!doxShouldTrace(metadata)) return;
     const site = fields[0] || "";
     const compact = new Set(["tail-handoff", "tail-link", "call-attempt-open", "call-attempt-consumed", "activation-closure", "closure-created"]).has(phase);
     const publicMetadata = compact
@@ -304,11 +319,18 @@
   }
 
   function doxEnter(metadata, tailCapable) {
+    if (!doxShouldTrace(metadata)) return 0;
     const occurrence = ++doxCounter;
     const pending = doxPendingTail;
     const parent = pending?.parent ?? (doxStack.at(-1)?.occurrence || 0);
     doxPendingTail = null;
-    doxStack.push({ occurrence, parent, tailCapable, overapplyParent: pending?.parent || 0, overapplyRemaining: pending?.remaining || 0 });
+    doxStack.push({
+      occurrence,
+      parent,
+      tailCapable,
+      overapplyParent: pending?.parent || 0,
+      overapplyRemaining: pending?.remaining || 0,
+    });
     doxEmit("enter", occurrence, parent, metadata, 0, false);
     const kind = doxFields(metadata)[1];
     if (kind === "call") doxEmit("call-attempt-open", occurrence, parent, metadata, 0, false);
@@ -329,6 +351,28 @@
     doxEmit(phase, occurrence, frame.parent, metadata, observed, true);
     if (doxFields(metadata)[1] === "call") {
       doxEmit(phase === "raise" ? "call-attempt-raise" : "call-attempt-return", occurrence, frame.parent, metadata, observed, true);
+    }
+    if (frame.overapplyParent && frame.overapplyRemaining > 0 && phase === "return") {
+      const consumed = doxFunctionConsumption.get(observed) || 0;
+      if (consumed > 0 && frame.overapplyRemaining >= consumed) {
+        const remaining = frame.overapplyRemaining - consumed;
+        const fallback = doxStack.at(-1)?.occurrence || 0;
+        const handoff = ++doxHandoffCounter;
+        doxEmit(
+          "tail-handoff",
+          frame.overapplyParent,
+          fallback,
+          metadata,
+          0,
+          false,
+          `${handoff}:${remaining}`,
+        );
+        doxPendingTail = {
+          parent: frame.overapplyParent,
+          remaining,
+          handoff,
+        };
+      }
     }
     return 0;
   }
@@ -363,7 +407,7 @@
   global.caml_doclang_observe_return = (metadata, occurrence, observed) => doxLeave("return", metadata, occurrence, observed);
   global.caml_doclang_observe_raise = (metadata, occurrence, observed) => doxLeave("raise", metadata, occurrence, observed);
   global.caml_doclang_observe_register_function = (fn, consumption, metadata) => {
-    if (typeof fn !== "function") return 0;
+    if (typeof fn !== "function" || !doxShouldTrace(metadata)) return 0;
     const id = ++doxClosureCounter;
     doxClosures.set(fn, { id, metadata });
     doxFunctionConsumption.set(fn, consumption | 0);
@@ -395,6 +439,29 @@
     const remaining = supplied - consumed;
     doxEmit("tail-handoff", occurrence, frame.parent, metadata, 0, false, `${handoff}:${remaining}`);
     doxStack.pop();
+    const outer = doxStack.at(-1);
+    if (outer?.tailCapable) {
+      const outerHandoff = ++doxHandoffCounter;
+      doxEmit(
+        "tail-handoff",
+        outer.occurrence,
+        outer.parent,
+        metadata,
+        0,
+        false,
+        `${outerHandoff}:0`,
+      );
+      doxEmit(
+        "tail-link",
+        occurrence,
+        outer.occurrence,
+        metadata,
+        0,
+        false,
+        `${outerHandoff}:0`,
+      );
+      doxStack.pop();
+    }
     doxPendingTail = { parent: occurrence, remaining, handoff };
     return 0;
   };
@@ -596,6 +663,75 @@
       noteShimCall("caml_domain_set_tick_interval_usec_bytecode");
       return 0;
     };
+
+  global.caml_max_domain_count = function caml_max_domain_count() {
+    noteShimCall("caml_max_domain_count");
+    return 1;
+  };
+
+  global.caml_atomic_add_field = function caml_atomic_add_field(ref, field, increment) {
+    ref[field + 1] += increment;
+    return 0;
+  };
+
+  global.caml_atomic_set_field = function caml_atomic_set_field(ref, field, value) {
+    ref[field + 1] = value;
+    return 0;
+  };
+
+  global.caml_atomic_sub_field = function caml_atomic_sub_field(ref, field, decrement) {
+    ref[field + 1] -= decrement;
+    return 0;
+  };
+
+  global.caml_float_of_float32 = function caml_float_of_float32(value) {
+    return value;
+  };
+
+  global.caml_float32_of_float = function caml_float32_of_float(value) {
+    return Math.fround(value);
+  };
+
+  global.caml_float32_of_bits_bytecode = function caml_float32_of_bits_bytecode(bits) {
+    const buffer = new ArrayBuffer(4);
+    const view = new DataView(buffer);
+    view.setInt32(0, bits, true);
+    return view.getFloat32(0, true);
+  };
+
+  const dynamicBindings = new Map();
+  global.caml_dynamic_make = function caml_dynamic_make() {
+    return {};
+  };
+  global.caml_dynamic_get = function caml_dynamic_get(binding) {
+    const values = dynamicBindings.get(binding);
+    return values?.length ? values[values.length - 1] : 0;
+  };
+  global.caml_dynamic_push = function caml_dynamic_push(binding, value) {
+    const values = dynamicBindings.get(binding) ?? [];
+    values.push(value);
+    dynamicBindings.set(binding, values);
+    return 0;
+  };
+  global.caml_dynamic_pop = function caml_dynamic_pop(binding) {
+    const values = dynamicBindings.get(binding);
+    values?.pop();
+    if (!values?.length) dynamicBindings.delete(binding);
+    return 0;
+  };
+
+  global.caml_succ_scannable_prefix_len = function caml_succ_scannable_prefix_len() {
+    return 0;
+  };
+
+  global.caml_obj_uniquely_reachable_words =
+    function caml_obj_uniquely_reachable_words() {
+      global.caml_failwith("Obj.uniquely_reachable_words is not available in JavaScript");
+    };
+
+  global.caml_with_async_exns = function caml_with_async_exns(callback) {
+    return global.caml_callback(callback, [0]);
+  };
 
   global.caml_gc_tweak_get = function caml_gc_tweak_get() {
     noteShimCall("caml_gc_tweak_get");

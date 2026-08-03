@@ -1,0 +1,35 @@
+--- a/runtime/js/array.js
++++ b/runtime/js/array.js
+@@ -198,6 +198,16 @@
+   return b;
+ }
+
++// Provides: caml_iarray_of_array const
++function caml_iarray_of_array(a) {
++  return a;
++}
++
++// Provides: caml_array_of_iarray const
++function caml_array_of_iarray(a) {
++  return a;
++}
++
+ //Provides: caml_make_vect const (const, mutable)
+ //Requires: caml_array_make
+ function caml_make_vect(len, init) {
+--- a/runtime/wasm/array.wat
++++ b/runtime/wasm/array.wat
+@@ -293,4 +293,13 @@
+                (struct.get $float 0 (ref.cast (ref $float) (local.get $v)))
+                (local.get $len))))
+       (ref.i31 (i32.const 0)))
++
++
++   (func (export "caml_iarray_of_array")
++      (param $a (ref eq)) (result (ref eq))
++      (local.get $a))
++
++   (func (export "caml_array_of_iarray")
++      (param $a (ref eq)) (result (ref eq))
++      (local.get $a))
+ )

@@ -7,7 +7,7 @@ let directBackendPromise = null;
 let workerFailed = false;
 
 const backendWorkerUrl = new URL(
-  "./backend_worker.js?v=20260507-webkit-worker-fallback",
+  "./backend_worker.js?v=20260803-dox-current-oxcaml-4",
   import.meta.url,
 ).href;
 
@@ -154,7 +154,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260507-webkit-worker-fallback");
+    directBackendPromise = import("./backend_direct.js?v=20260803-dox-current-oxcaml-4");
   }
   return directBackendPromise;
 }
@@ -168,7 +168,10 @@ async function callDirect(methodName, args) {
   return backend[methodName](...args);
 }
 
-function callWorker(methodName, args) {
+function callWorker(methodName, args, { signal } = {}) {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException("Aborted", "AbortError"));
+  }
   const worker = getBackendWorker();
   if (!worker) {
     return callDirect(methodName, args);
@@ -176,7 +179,23 @@ function callWorker(methodName, args) {
   const id = nextRequestId;
   nextRequestId += 1;
   return new Promise((resolve, reject) => {
-    pendingRequests.set(id, { resolve, reject, methodName, args });
+    const abort = () => {
+      if (!pendingRequests.has(id)) return;
+      backendWorker?.terminate();
+      backendWorker = null;
+      rejectPendingRequests(new DOMException("Aborted", "AbortError"));
+    };
+    const settle = (callback) => (value) => {
+      signal?.removeEventListener("abort", abort);
+      callback(value);
+    };
+    pendingRequests.set(id, {
+      resolve: settle(resolve),
+      reject: settle(reject),
+      methodName,
+      args,
+    });
+    signal?.addEventListener("abort", abort, { once: true });
     worker.postMessage({ id, methodName, args });
   });
 }
@@ -209,6 +228,10 @@ export async function runString(filename, source, options = {}) {
   return callWorker("runString", [filename, source]);
 }
 
+export async function runDoxProject(request, options = {}) {
+  return callWorker("runDoxProject", [request], options);
+}
+
 export async function utopString(filename, source, options = {}) {
   return callWorker("utopString", [filename, source]);
 }
@@ -229,6 +252,7 @@ if (typeof window !== "undefined") {
     interfaceString,
     readyForOptions,
     runString,
+    runDoxProject,
     utopString,
     checkFile,
     runFile,
