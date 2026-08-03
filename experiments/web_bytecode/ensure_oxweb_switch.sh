@@ -32,6 +32,9 @@ do
     ocamlrun|ocamlrund|ocamlruni)
       ln -sf "$repo_root/_install/bin/$tool" "$bytecode_toolchain_bin/$tool"
       ;;
+    ocamlc)
+      ln -sf "$toolchain_bin/ocamlc.opt" "$bytecode_toolchain_bin/$tool"
+      ;;
     *)
       ln -sf "$toolchain_bin/$tool" "$bytecode_toolchain_bin/$tool"
       ;;
