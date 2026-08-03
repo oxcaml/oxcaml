@@ -1057,6 +1057,18 @@ let print_unary_int_arith_op ppf o =
   let fprintf = Format.fprintf in
   match o with Swap_byte_endianness -> fprintf ppf "bswap"
 
+type unary_int_bit_counting_op =
+  | Leading_zeros
+  | Trailing_zeros
+  | Popcount
+
+let print_unary_int_bit_counting_op ppf o =
+  let fprintf = Format.fprintf in
+  match o with
+  | Leading_zeros -> fprintf ppf "clz"
+  | Trailing_zeros -> fprintf ppf "ctz"
+  | Popcount -> fprintf ppf "popcnt"
+
 type unary_float_arith_op =
   | Abs
   | Neg
@@ -1247,6 +1259,7 @@ type unary_primitive =
       }
   | Int_arith of Flambda_kind.Standard_int.t * unary_int_arith_op
   | Float_arith of float_bitwidth * unary_float_arith_op
+  | Int_bit_counting of Flambda_kind.Standard_int.t * unary_int_bit_counting_op
   | Num_conv of
       { src : Flambda_kind.Standard_int_or_float.t;
         dst : Flambda_kind.Standard_int_or_float.t
@@ -1291,7 +1304,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | String_length _ -> true
   | Int_as_pointer m -> ( match m with Heap _ -> true | Local _ -> false)
   | Opaque_identity _ -> false
-  | Int_arith _ -> true
+  | Int_arith _ | Int_bit_counting _ -> true
   | Float_arith _ ->
     (* See comment in effects_and_coeffects *)
     Flambda_features.float_const_prop ()
@@ -1346,6 +1359,7 @@ let compare_unary_primitive p1 p2 =
     | Peek _ -> 28
     | Make_lazy _ -> 29
     | Reinterpret_boxed_vector -> 30
+    | Int_bit_counting _ -> 31
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1390,6 +1404,9 @@ let compare_unary_primitive p1 p2 =
   | Get_tag, Get_tag -> 0
   | String_length kind1, String_length kind2 -> Stdlib.compare kind1 kind2
   | Int_arith (kind1, op1), Int_arith (kind2, op2) ->
+    let c = K.Standard_int.compare kind1 kind2 in
+    if c <> 0 then c else Stdlib.compare op1 op2
+  | Int_bit_counting (kind1, op1), Int_bit_counting (kind2, op2) ->
     let c = K.Standard_int.compare kind1 kind2 in
     if c <> 0 then c else Stdlib.compare op1 op2
   | Num_conv { src = src1; dst = dst1 }, Num_conv { src = src2; dst = dst2 } ->
@@ -1452,7 +1469,7 @@ let compare_unary_primitive p1 p2 =
       | Untag_immediate | Tag_immediate | Project_function_slot _
       | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
       | End_region _ | End_try_region _ | Obj_dup _ | Get_header | Peek _
-      | Make_lazy _ ),
+      | Make_lazy _ | Int_bit_counting _ ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -1484,6 +1501,7 @@ let print_unary_primitive ppf p =
     fprintf ppf "@[(Opaque_identity@ (middle_end_only %b) (kind %a))@]"
       middle_end_only K.print kind
   | Int_arith (_k, o) -> print_unary_int_arith_op ppf o
+  | Int_bit_counting (_k, o) -> print_unary_int_bit_counting_op ppf o
   | Num_conv { src; dst } ->
     fprintf ppf "Num_conv_%a_to_%a"
       Flambda_kind.Standard_int_or_float.print_lowercase src
@@ -1538,6 +1556,7 @@ let arg_kind_of_unary_primitive p =
   | Int_as_pointer _ -> K.value
   | Opaque_identity { middle_end_only = _; kind } -> kind
   | Int_arith (kind, _) -> K.Standard_int.to_kind kind
+  | Int_bit_counting (kind, _) -> K.Standard_int.to_kind kind
   | Num_conv { src; dst = _ } -> K.Standard_int_or_float.to_kind src
   | Boolean_not -> K.value
   | Reinterpret_boxed_vector -> K.value
@@ -1576,6 +1595,7 @@ let result_kind_of_unary_primitive p : result_kind =
     Singleton K.value
   | Opaque_identity { middle_end_only = _; kind } -> Singleton kind
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
+  | Int_bit_counting _ -> Singleton K.naked_immediate
   | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
   | Boolean_not -> Singleton K.value
   | Reinterpret_boxed_vector -> Singleton K.value
@@ -1652,6 +1672,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   | Opaque_identity _ ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Int_arith (_, Swap_byte_endianness)
+  | Int_bit_counting (_, (Leading_zeros | Trailing_zeros | Popcount))
   | Num_conv _ | Boolean_not | Reinterpret_64_bit_word _
   | Reinterpret_boxed_vector ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
@@ -1732,7 +1753,7 @@ let unary_classify_for_printing p =
   | String_length _ | Get_tag -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
-  | Float_arith _ ->
+  | Float_arith _ | Int_bit_counting _ ->
     Neither
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate ->
     Destructive
@@ -1768,7 +1789,7 @@ let free_names_unary_primitive p =
   | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
-  | End_try_region _ | Get_header
+  | End_try_region _ | Get_header | Int_bit_counting _
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     Name_occurrences.empty
 
@@ -1817,7 +1838,7 @@ let apply_renaming_unary_primitive p renaming =
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
-  | Get_header
+  | Get_header | Int_bit_counting _
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     p
 
@@ -1836,7 +1857,7 @@ let ids_for_export_unary_primitive p =
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
-  | Get_header
+  | Get_header | Int_bit_counting _
   | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
     Ids_for_export.empty
 

@@ -105,6 +105,12 @@ module type S = sig
 
   val shift_right_logical : t -> int -> t
 
+  val leading_zeros : t -> int
+
+  val trailing_zeros : t -> int
+
+  val popcount : t -> int
+
   val max : t -> t -> t
 
   val min : t -> t -> t
@@ -237,6 +243,20 @@ module Make (I : S) : S with type t = I.t = struct
 
   let shift_right_logical t i =
     I.shift_right (I.shift_right_logical (I.shift_left t 1) i) 1
+
+  let leading_zeros t =
+    (* The bottom bit is always [0] after shifting, but it must be [1] for
+       [leading_zeros zero] to return the correct value. *)
+    I.leading_zeros (I.or_ (I.shift_left t 1) I.one)
+
+  let trailing_zeros t =
+    (* The bottom bit is always [0] after shifting but must not count as a
+       trailing zero. *)
+    I.trailing_zeros (I.shift_left t 1) - 1
+
+  let popcount t =
+    (* The bottom bit is always [0] after shifting. *)
+    I.popcount (I.shift_left t 1)
 
   let max = I.max
 
