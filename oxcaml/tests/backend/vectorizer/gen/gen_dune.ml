@@ -182,6 +182,10 @@ let () =
   print_test "test_spill_valx2";
   (* can't vectorize *)
   print_test ~filter_exit_code:1 "test_register_compatible";
+  (* regression test: a load of a field a previous store wrote, on a freshly
+     allocated block, must not be vectorized (the allocation is tracked so the
+     read-after-write dependency is recorded). *)
+  print_test ~filter_exit_code:1 "test_alloc_raw";
   ()
 
 let () =

@@ -840,6 +840,90 @@
    (diff test_register_compatible_vectorized.expected test_register_compatible_vectorized.output)))
 
 (rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_alloc_raw_runner.exe test_alloc_raw.cmx.dump)
+ (deps test_alloc_raw.mli test_alloc_raw.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -no-vectorize -o test_alloc_raw_runner.exe))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_alloc_raw.output
+   (run ./test_alloc_raw_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_alloc_raw.expected test_alloc_raw.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_alloc_raw.ml test_alloc_raw_vectorized.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_alloc_raw.mli test_alloc_raw_vectorized.mli)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (targets test_alloc_raw_vectorized_runner.exe test_alloc_raw_vectorized.cmx.dump)
+ (deps test_alloc_raw_vectorized.mli test_alloc_raw_vectorized.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} %{deps} -S -O3 -g -dump-into-file -dcfg -dvectorize -dlinear -regalloc cfg -extension simd -vectorize-max-block-size 1000 -vectorize -o test_alloc_raw_vectorized_runner.exe))))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (target test_alloc_raw_vectorized.cmx.dump.output)
+ (deps ./filter.sh test_alloc_raw_vectorized.cmx.dump)
+ (action
+  (with-outputs-to
+   %{target}
+   (with-accepted-exit-codes 1
+    (run %{deps})))))
+
+(rule
+ (alias runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (action
+   (diff test_alloc_raw_vectorized.cmx.dump.expected test_alloc_raw_vectorized.cmx.dump.output)))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   test_alloc_raw_vectorized.output
+   (run ./test_alloc_raw_vectorized_runner.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy test_alloc_raw.expected test_alloc_raw_vectorized.expected)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff test_alloc_raw_vectorized.expected test_alloc_raw_vectorized.output)))
+
+(rule
  (alias runtest)
  (enabled_if (= %{context_name} "main"))
  (action
