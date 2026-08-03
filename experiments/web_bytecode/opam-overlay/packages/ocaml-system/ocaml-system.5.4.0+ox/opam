@@ -13,7 +13,7 @@ depends: [
   "base-nnp" {post}
 ]
 conflict-class: "ocaml-core-compiler"
-available: sys-ocaml-version = "5.4.0+ox" & (os != "win32" | sys-ocaml-libc = "msvc")
+available: sys-ocaml-version = "5.4.0" & (os != "win32" | sys-ocaml-libc = "msvc")
 flags: [compiler avoid-version]
 build: [
   [
