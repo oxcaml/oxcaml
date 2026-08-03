@@ -106,6 +106,10 @@ let clear_sign_bit arg dbg =
   let mask = Nativeint.lognot (Nativeint.shift_left 1n ((size_int * 8) - 1)) in
   Cop (Cand, [arg; Cconst_natint (mask, dbg)], dbg)
 
+let clear_tag_bit arg dbg =
+  let mask = Nativeint.lognot 1n in
+  Cop (Cand, [arg; Cconst_natint (mask, dbg)], dbg)
+
 let clz bi arg dbg =
   if_operation_supported_bi bi Cclz ~f:(fun () ->
       let res = Cop (Cclz, [make_unsigned_int bi arg dbg], dbg) in
@@ -905,6 +909,10 @@ let transl_builtin name args dbg typ_res =
     popcnt Untagged_int8 (one_arg name args) dbg
   | "caml_nativeint_popcnt_unboxed_to_untagged" ->
     popcnt Unboxed_nativeint (one_arg name args) dbg
+  | "caml_int_ctz_tagged_to_untagged" ->
+    if_operation_supported Cctz ~f:(fun () ->
+        let c = clear_tag_bit (one_arg name args) dbg in
+        sub_int (Cop (Cctz, [c], dbg)) (Cconst_int (1, dbg)) dbg)
   | "caml_int_ctz_untagged_to_untagged" ->
     (* Assuming a 64-bit x86-64 target:
 

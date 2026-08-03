@@ -136,6 +136,12 @@ module Int32_base = struct
 
   let shift_right_logical = Int32.shift_right_logical
 
+  let leading_zeros = Misc.Stdlib.Int32.leading_zeros
+
+  let trailing_zeros = Misc.Stdlib.Int32.trailing_zeros
+
+  let popcount = Misc.Stdlib.Int32.popcount
+
   let max x y = if Stdlib.( > ) (Int32.compare x y) 0 then x else y
 
   let min x y = if Stdlib.( < ) (Int32.compare x y) 0 then x else y
@@ -254,6 +260,12 @@ module Int64_base = struct
   let shift_right = Int64.shift_right
 
   let shift_right_logical = Int64.shift_right_logical
+
+  let leading_zeros = Misc.Stdlib.Int64.leading_zeros
+
+  let trailing_zeros = Misc.Stdlib.Int64.trailing_zeros
+
+  let popcount = Misc.Stdlib.Int64.popcount
 
   let max x y = if Stdlib.( > ) (Int64.compare x y) 0 then x else y
 
@@ -578,6 +590,24 @@ let shift_right_logical t i =
   | Int31 x -> Int31 (Int31.shift_right_logical x i)
   | Int32 x -> Int32 (Int32.shift_right_logical x i)
   | Int63 x -> Int63 (Int63.shift_right_logical x i)
+
+let leading_zeros t =
+  match t with
+  | Int31 x -> Int31.leading_zeros x
+  | Int32 x -> Misc.Stdlib.Int32.leading_zeros x
+  | Int63 x -> Int63.leading_zeros x
+
+let trailing_zeros t =
+  match t with
+  | Int31 x -> Int31.trailing_zeros x
+  | Int32 x -> Misc.Stdlib.Int32.trailing_zeros x
+  | Int63 x -> Int63.trailing_zeros x
+
+let popcount t =
+  match t with
+  | Int31 x -> Int31.popcount x
+  | Int32 x -> Misc.Stdlib.Int32.popcount x
+  | Int63 x -> Int63.popcount x
 
 let max t1 t2 = if Stdlib.( < ) (compare t1 t2) 0 then t2 else t1
 

@@ -77,6 +77,12 @@ let unary_int_arith_op =
     constructor_flag
       (["bswp", Swap_byte_endianness] : (string * P.unary_int_arith_op) list))
 
+let unary_int_bit_counting_op =
+  D.(
+    constructor_flag
+      (["clz", Leading_zeros; "ctz", Trailing_zeros; "popcnt", Popcount]
+        : (string * P.unary_int_bit_counting_op) list))
+
 let binary_int_arith_op =
   D.(
     constructor_flag
@@ -831,6 +837,12 @@ let int_uarith =
     unary "%int_uarith" ~params:(param2 standard_int unary_int_arith_op)
       (fun _ (i, o) -> P.Int_arith (i, o)))
 
+let int_bit_counting =
+  D.(
+    unary "%int_bit_counting"
+      ~params:(param2 standard_int unary_int_bit_counting_op) (fun _ (k, op) ->
+        P.Int_bit_counting (k, op)))
+
 let is_boxed_float =
   D.(unary "%is_boxed_float" ~params:param0 (fun _ () -> P.Is_boxed_float))
 
@@ -1355,6 +1367,7 @@ module OfFlambda = struct
     | Get_tag -> get_tag env ()
     | Is_boxed_float -> is_boxed_float env ()
     | Int_arith (i, o) -> int_uarith env (i, o)
+    | Int_bit_counting (k, op) -> int_bit_counting env (k, op)
     | Int_as_pointer a -> int_as_pointer env a
     | Is_flat_float_array -> is_flat_float_array env ()
     | Is_int _ -> is_int env () (* CR vlaviron: discuss *)
