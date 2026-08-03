@@ -366,6 +366,13 @@ module Stdlib = struct
       done;
       !r
 
+    let fold_lefti f x a =
+      let r = ref x in
+      for i = 0 to Array.length a - 1 do
+        r := f i !r (Array.unsafe_get a i)
+      done;
+      !r
+
     let for_alli p a =
       let n = Array.length a in
       let rec loop i =

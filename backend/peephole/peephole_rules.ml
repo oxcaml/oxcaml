@@ -190,6 +190,65 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
     else None
   | _ -> None
 
+(** Logical condition for simplifying the following case:
+    {v
+    <add/sub> imm, r
+    <specific> ...r..., r
+    v}
+
+    to:
+    {v <specific'> ...r..., r v}
+
+    where <specific> is an arch-specific operation that reads and overwrites
+    [r], and <specific'> is <specific> with the constant folded into its
+    addressing expression (e.g. the displacement of an amd64 [lea], as in
+    [popcnt r; dec r; lea 1(r,r), r] where the [dec] can be folded into the
+    [lea] as [-1(r,r)]). The arch-specific rewriting is delegated to
+    [Arch.fold_delta_into_specific_operation]. Deleting the first instruction is
+    sound because the second one overwrites [r], and it does not affect liveness
+    because <specific'> still reads [r]. *)
+let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    let delta =
+      match fst_val.desc with
+      | Op (Intop_imm (Iadd, imm)) -> Some imm
+      | Op (Intop_imm (Isub, imm)) when imm <> min_int -> Some (-imm)
+      | _ -> None
+    in
+    match delta, snd_val.desc with
+    | Some delta, Op (Specific specific)
+      when Array.length fst_val.arg = 1
+           && Array.length fst_val.res = 1
+           && Array.length snd_val.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.arg 0)
+                (Array.unsafe_get fst_val.res 0)
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.res 0)
+                (Array.unsafe_get snd_val.res 0) -> (
+      let reg = Array.unsafe_get fst_val.res 0 in
+      let arg_is_folded_reg =
+        Array.map (fun arg -> U.are_equal_regs reg arg) snd_val.arg
+      in
+      match
+        Arch.fold_delta_into_specific_operation specific ~arg_is_folded_reg
+          ~delta
+      with
+      | None -> None
+      | Some specific ->
+        let new_cell =
+          DLL.insert_and_return_before snd
+            { snd_val with desc = Cfg.Op (Specific specific) }
+        in
+        DLL.delete_curr fst;
+        DLL.delete_curr snd;
+        Some (U.prev_at_most U.go_back_const new_cell))
+    | _, _ -> None)
+  | _ -> None
+
 let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
   (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
      happen here. Indeed, it is probably better to avoid these useless
@@ -241,4 +300,5 @@ let apply cell =
   |> if_none_do remove_overwritten_mov
   |> if_none_do remove_useless_mov
   |> if_none_do fold_intop_imm
+  |> if_none_do fold_intop_imm_into_specific
   |> if_none_do remove_intop_neutral_element
