@@ -1,0 +1,42 @@
+--- a/src/syntax/ppx_sedlex.ml
++++ b/src/syntax/ppx_sedlex.ml
+@@ -335,7 +335,7 @@ let regexp_of_pattern env =
+   let rec char_pair_op func name ~encoding p tuple =
+     (* Construct something like Sub(a,b) *)
+       match tuple with
+-      | Some { ppat_desc = Ppat_tuple [p0; p1] } -> begin
++      | Some { ppat_desc = Ppat_tuple ([(None, p0); (None, p1)], _) } -> begin
+           match func (aux ~encoding p0) (aux ~encoding p1) with
+             | Some r -> r
+             | None ->
+@@ -351,9 +351,9 @@ let regexp_of_pattern env =
+     (* interpret one pattern node *)
+       match p.ppat_desc with
+       | Ppat_or (p1, p2) -> Sedlex.alt (aux ~encoding p1) (aux ~encoding p2)
+-      | Ppat_tuple (p :: pl) ->
++      | Ppat_tuple ((_, p) :: pl, _) ->
+           List.fold_left
+-            (fun r p -> Sedlex.seq r (aux ~encoding p))
++            (fun r (_, p) -> Sedlex.seq r (aux ~encoding p))
+             (aux ~encoding p) pl
+       | Ppat_construct ({ txt = Lident "Star" }, Some (_, p)) ->
+           Sedlex.rep (aux ~encoding p)
+@@ -372,14 +372,14 @@ let regexp_of_pattern env =
+                 {
+                   ppat_desc =
+                     Ppat_tuple
+-                      [
+-                        p0;
+-                        {
++                      ([
++                        (None, p0);
++                        (None, {
+                           ppat_desc =
+                             Ppat_constant (i1 as i2) | Ppat_interval (i1, i2);
+-                        };
+-                      ];
++                        });
++                      ], _);
+                 } ) ) -> begin
+           match (i1, i2) with
+             | Pconst_integer (i1, _), Pconst_integer (i2, _) ->

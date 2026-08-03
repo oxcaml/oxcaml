@@ -1,0 +1,17 @@
+opam-version: "2.0"
+synopsis: "Declarative definition of command line interfaces for OCaml"
+maintainer: "Daniel Bünzli"
+authors: "The cmdliner programmers"
+license: "ISC"
+homepage: "https://erratique.ch/software/cmdliner"
+bug-reports: "https://github.com/dbuenzli/cmdliner/issues"
+depends: ["ocaml" {>= "4.08.0"}]
+build: [[make "all" "PREFIX=%{prefix}%" "NATIVE=false"]]
+install: [
+  [make "install" "NATIVE=false" "BINDIR=%{_:bin}%" "LIBDIR=%{_:lib}%" "DOCDIR=%{_:doc}%" "SHAREDIR=%{share}%" "MANDIR=%{man}%"]
+  [make "install-doc" "NATIVE=false" "LIBDIR=%{_:lib}%" "DOCDIR=%{_:doc}%" "SHAREDIR=%{share}%" "MANDIR=%{man}%"]
+]
+url {
+  src: "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz"
+  checksum: "sha512=cdc338ae2e56a72b7c75dae9564c57cca4e1fbfac454aabbf8303fcb612346284aede5984dfde7e8a7a496cc870bbd57ddf28cab3a38667279b31657f85c15dd"
+}

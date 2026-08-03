@@ -3,8 +3,8 @@ import {
   withPlaygroundPrelude,
 } from "./playground_prelude.js";
 
-const buildBase = "../../_build/default/experiments/web_bytecode";
-const compilerAssetVersion = "20260506-ppx-driver";
+const buildBase = "./build";
+const compilerAssetVersion = "20260803-dox-current-oxcaml-3";
 
 const loadedScriptUrls = new Map();
 let browserFsManifestPromise = null;
@@ -13,7 +13,7 @@ const browserFsLoadedPaths = new Set();
 const browserFsLoadingPaths = new Map();
 const browserFsConcurrency = 4;
 const browserFsFetchRetries = 4;
-const browserFsRetryLimit = 32;
+const browserFsRetryLimit = 96;
 const browserFsSeedPaths = [
   "/static/cmis/stdlib.cmi",
   "/static/cmis/stdlib__List.cmi",
@@ -77,14 +77,7 @@ function loadScript(url) {
 
 function installGlobalScriptEvaluator() {
   globalThis.__oxcamlEvalGlobalScript = (source, label = "oxcaml-runtime.js") => {
-    if (typeof document === "undefined") {
-      (0, eval)(`${String(source)}\n//# sourceURL=${String(label)}`);
-      return;
-    }
-    const script = document.createElement("script");
-    script.textContent = `${String(source)}\n//# sourceURL=${String(label)}`;
-    document.head.appendChild(script);
-    script.remove();
+    (0, eval)(`${String(source)}\n//# sourceURL=${String(label)}`);
   };
 }
 
@@ -248,10 +241,18 @@ async function ensureBrowserFsSeedLoaded() {
   }
   browserFsSeedPromise = (async () => {
     const manifest = await ensureBrowserFsManifest();
-    const seedEntries = browserFsSeedPaths
-      .map((fsPath) => manifest.entriesByPath.get(fsPath))
-      .filter(Boolean);
-    emitStatus("loading", "loading standard library");
+    const seedEntries = [
+      ...browserFsSeedPaths
+        .map((fsPath) => manifest.entriesByPath.get(fsPath))
+        .filter(Boolean),
+      ...manifest.manifest.filter((entry) =>
+        /^\/static\/cmis\/(?:stdlib|camlinternal).*\.cmi$/i.test(entry.fs_path),
+      ),
+    ].filter(
+      (entry, index, entries) =>
+        entries.findIndex((candidate) => candidate.fs_path === entry.fs_path) === index,
+    );
+    emitStatus("loading", "loading the OCaml standard library");
     await ensureBrowserFsEntriesLoaded(seedEntries);
   })();
   return browserFsSeedPromise;
@@ -408,9 +409,12 @@ async function runBackendWithLazyFs(methodName, filename, source) {
 
 export const ready = (async () => {
   emitStatus("loading", "loading runtime");
-  await loadScript(new URL("./runtime_shims.js", import.meta.url));
+  await loadScript(
+    new URL("./runtime_shims.js?v=20260803-dox-current-oxcaml-3", import.meta.url),
+  );
   emitStatus("loading", "loading compiler");
   await loadScript(buildAssetUrl("web_bytecode_js.bc.js"));
+  globalThis.installDoxRuntimePrimitives?.();
   installGlobalScriptEvaluator();
   await ensureBrowserFsSeedLoaded();
   emitStatus("loading", "starting compiler");
@@ -447,6 +451,31 @@ export async function utopString(filename, source) {
   return runBackendWithLazyFs("utopString", filename, source);
 }
 
+export async function runDoxProject(request) {
+  const backend = await ready;
+  if (typeof backend.runDoxProject !== "function") {
+    throw new Error("Dox project evaluation is unavailable in this compiler bundle");
+  }
+  const encoded = typeof request === "string" ? request : JSON.stringify(request);
+  let previousMissingFilename = null;
+  for (let attempt = 0; attempt < browserFsRetryLimit; attempt += 1) {
+    const result = JSON.parse(backend.runDoxProject(encoded));
+    if (result?.kind !== "missing_cmi") return result;
+    if (
+      typeof result.filename !== "string" ||
+      result.filename === previousMissingFilename
+    ) {
+      throw new Error(`lazy filesystem stalled while loading ${String(result?.filename)}`);
+    }
+    previousMissingFilename = result.filename;
+    emitStatus("loading", `loading ${result.filename}`);
+    if (!(await ensureBrowserFsForMissingFilename(result.filename))) {
+      throw new Error(`missing browser filesystem asset for ${result.filename}`);
+    }
+  }
+  throw new Error("lazy filesystem retry limit exceeded for Dox project");
+}
+
 export async function checkFile(file) {
   const source = await file.text();
   return checkString(file.name, source);
@@ -462,6 +491,7 @@ if (typeof window !== "undefined") {
     checkString,
     interfaceString,
     runString,
+    runDoxProject,
     utopString,
     checkFile,
     runFile,

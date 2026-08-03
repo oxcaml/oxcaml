@@ -1,6 +1,7 @@
 include Ocaml_common.Location
 
 let set_input_name name = input_name := name
+let set_input_lexbuf lexbuf_opt = input_lexbuf := lexbuf_opt
 
 module Error = struct
   [@@@warning "-37"]
@@ -12,103 +13,70 @@ module Error = struct
     if_highlight: string;
   }
 
-  type location_report_kind (*IF_AT_LEAST 408 = Ocaml_common.Location.report_kind *) =
+  type location_report_kind = Ocaml_common.Location.report_kind =
   | Report_error
   | Report_warning of string
   | Report_warning_as_error of string
   | Report_alert of string
   | Report_alert_as_error of string
 
-  type location_msg = Ocaml_common.Location.msg
+  type location_msg =
+    (*IF_AT_LEAST 503 Ocaml_common.Format_doc.t loc *)
+    (*IF_NOT_AT_LEAST 503 (Format.formatter -> unit) loc *)
 
-  type location_report (*IF_AT_LEAST 408 = Ocaml_common.Location.report *) = {
+  type location_report = Ocaml_common.Location.report = {
     kind : location_report_kind;
     main : location_msg;
     sub : location_msg list;
+    (*IF_AT_LEAST 503 footnote: Format_doc.t option; *)
   }
 
-  type t (*IF_AT_LEAST 408 = Ocaml_common.Location.error *) (*IF_NOT_AT_LEAST 408 = old_t *)
-  (** On ocaml >= 4.08: [t] is a [location_report] for which [location_report_kind] must be [Report_error]. *)
-
-  type version_specific_t = [`New_error of location_report | `Old_error of old_t]
-
-  let version_specific_t_of_t : t -> version_specific_t = fun x ->
-    (*IF_AT_LEAST 408 `New_error x *)
-    (*IF_NOT_AT_LEAST 408 `Old_error x *)
+  type t = Ocaml_common.Location.error
 
   let is_well_formed error =
-    match version_specific_t_of_t error with
-    | `New_error { kind = Report_error; _ } -> true
-    | `New_error _ -> false
-    | `Old_error _ -> true
+    match error with
+    | { kind = Report_error; _ } -> true
+    | _ -> false
 
   let string_of_location_msg (msg : location_msg) =
-    Format.asprintf "%a" Format_doc.Doc.format msg.txt
+    (*IF_AT_LEAST 503 Format.asprintf "%a" Ocaml_common.Format_doc.Doc.format msg.txt *)
+    (*IF_NOT_AT_LEAST 503 Format.asprintf "%t" msg.txt *)
 
-  let main_msg error =
-    match version_specific_t_of_t error with
-    | `New_error { main; _ } ->
-        { txt = string_of_location_msg main; loc = main.loc }
-    | `Old_error { msg; loc; _ } -> { txt = msg; loc }
+  let main_msg { main; _ } =
+    { txt = string_of_location_msg main; loc = main.loc }
 
-  let sub_msgs error =
-    match version_specific_t_of_t error with
-    | `New_error { sub; _ } ->
-        List.map
-          (fun err -> { txt = string_of_location_msg err; loc = err.loc })
-          sub
-    | `Old_error { sub; _ } ->
-        let rec deeply_flattened_sub_msgs acc = function
-          | [] -> acc
-          | { loc; msg; sub; _ } :: tail ->
-              deeply_flattened_sub_msgs ({ txt = msg; loc } :: acc) (sub @ tail)
-        in
-        deeply_flattened_sub_msgs [] sub
+  let sub_msgs { sub; _ } =
+    List.map
+      (fun err -> { txt = string_of_location_msg err; loc = err.loc })
+      sub
 
   let of_exn exn =
-    (*IF_AT_LEAST 406 match error_of_exn exn with | Some (`Ok e) -> Some e | None | Some `Already_displayed -> None *)
-    (*IF_NOT_AT_LEAST 406 error_of_exn exn*)
+    match error_of_exn exn with
+    | Some (`Ok e) -> Some e
+    | None | Some `Already_displayed -> None
 
-  let _set_main_msg_old error msg = { error with msg }
-
-  let _set_main_msg_new error msg =
-    let txt = Format_doc.Doc.string msg Format_doc.Doc.empty in
+  let set_main_msg error msg =
+    (*IF_AT_LEAST 503 let txt = Ocaml_common.Format_doc.Doc.msg "%s" msg in *)
+    (*IF_NOT_AT_LEAST 503 let txt ppf = Format.pp_print_string ppf msg in *)
     let main = { error.main with txt } in
     { error with main }
 
-  let set_main_msg error msg =
-    (*IF_NOT_AT_LEAST 408 _set_main_msg_old error msg*)
-    (*IF_AT_LEAST 408 _set_main_msg_new error msg*)
-
-  let _make_error_of_message_old ~sub { loc; txt } =
-    let sub =
-      List.map
-        (fun { loc; txt } -> { loc; msg = txt; sub = []; if_highlight = txt })
-        sub
-    in
-    { loc; msg = txt; sub; if_highlight = txt }
-
-  let _make_error_of_message_new ~sub { loc; txt } =
-    let mk loc text = { loc; txt = Format_doc.Doc.string text Format_doc.Doc.empty } in
+  let make ~sub { loc; txt } =
+    (*IF_AT_LEAST 503 let mk_txt x = Ocaml_common.Format_doc.Doc.msg "%s" x in *)
+    (*IF_NOT_AT_LEAST 503 let mk_txt x ppf = Format.pp_print_string ppf x in *)
+    let mk loc x = { loc; txt = mk_txt x } in
     {
       kind = Report_error;
       main = mk loc txt;
       sub = List.map (fun { loc; txt } -> mk loc txt) sub;
+      (*IF_AT_LEAST 503 footnote = None; *)
     }
 
-  let make ~sub msg =
-    (*IF_NOT_AT_LEAST 408 _make_error_of_message_old ~sub msg*)
-    (*IF_AT_LEAST 408 _make_error_of_message_new ~sub msg*)
-
-  let _set_main_loc_old error loc = { error with loc }
-
-  let _set_main_loc_new error loc =
+  let set_main_loc error loc =
     let main = { error.main with loc } in
     { error with main }
-
-  let set_main_loc error loc =
-    (*IF_NOT_AT_LEAST 408 _set_main_loc_old error loc*)
-    (*IF_AT_LEAST 408 _set_main_loc_new error loc*)
 end
 
-let raise_errorf ?loc msg = raise_errorf ?loc msg
+let raise_errorf ?loc msg =
+  (*IF_AT_LEAST 503 Format.kdprintf (fun pr -> raise_errorf ?loc "%t" (Format_doc.deprecated_printer pr)) msg *)
+  (*IF_NOT_AT_LEAST 503 raise_errorf ?loc msg *)

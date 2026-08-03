@@ -1,4 +1,4 @@
-const backendPromise = import("./backend_direct.js?v=20260507-webkit-worker-fallback").then((backend) => {
+const backendPromise = import("./backend_direct.js?v=20260803-dox-current-oxcaml-4").then((backend) => {
   backend.addBackendStatusListener(({ state, text }) => {
     globalThis.postMessage({ type: "status", state, text });
   });
@@ -10,6 +10,7 @@ const backendPromise = import("./backend_direct.js?v=20260507-webkit-worker-fall
     checkString: backend.checkString,
     interfaceString: backend.interfaceString,
     runString: backend.runString,
+    runDoxProject: backend.runDoxProject,
     utopString: backend.utopString,
   };
 });

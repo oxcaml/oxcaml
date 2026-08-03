@@ -1,0 +1,34 @@
+--- a/compiler/bin-js_of_ocaml/build_fs.ml
++++ b/compiler/bin-js_of_ocaml/build_fs.ml
+@@ -51,9 +51,11 @@
+     {|
+ //Provides: jsoo_create_file_extern
+ function jsoo_create_file_extern(name,content){
+-  if(globalThis.jsoo_create_file)
++  if (globalThis.jsoo_create_file) {
+     globalThis.jsoo_create_file(name,content);
+-  else {
++  } else if (globalThis.caml_create_file) {
++    globalThis.caml_create_file(name,content);
++  } else {
+     if(!globalThis.jsoo_fs_tmp) globalThis.jsoo_fs_tmp = [];
+     globalThis.jsoo_fs_tmp.push({name:name,content:content});
+   }
+--- a/runtime/js/fs.js
++++ b/runtime/js/fs.js
+@@ -318,7 +318,7 @@
+ //Provides: caml_fs_init
+ //Requires: jsoo_create_file
+ function caml_fs_init() {
+-  var tmp = globalThis.jsoo_fs_tmp;
++  var tmp = [].concat(globalThis.jsoo_fs_tmp || [], globalThis.caml_fs_tmp || []);
+   if (tmp) {
+     for (var i = 0; i < tmp.length; i++) {
+       jsoo_create_file(tmp[i].name, tmp[i].content);
+@@ -326,5 +326,6 @@
+   }
+   globalThis.jsoo_create_file = jsoo_create_file;
+   globalThis.jsoo_fs_tmp = [];
++  globalThis.caml_fs_tmp = [];
+   return 0;
+ }

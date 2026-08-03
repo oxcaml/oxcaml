@@ -191,7 +191,7 @@ and copy_expression_desc :
   | Ast_999.Parsetree.Pexp_newtype (x0, x1, x2) ->
       Ast_500.Parsetree.Pexp_newtype
         (copy_loc (fun x -> x) x0, Option.map copy_jkind_annotation x1, copy_expression x2)
-  | Ast_999.Parsetree.Pexp_pack x0 ->
+  | Ast_999.Parsetree.Pexp_pack (x0, _) ->
       Ast_500.Parsetree.Pexp_pack (copy_module_expr x0)
   | Ast_999.Parsetree.Pexp_open (x0, x1) ->
       Ast_500.Parsetree.Pexp_open (copy_open_declaration x0, copy_expression x1)
@@ -218,8 +218,6 @@ and copy_block_access :
   = function
     | Baccess_field lid ->
       Baccess_field (copy_loc copy_Longident_t lid)
-    | Baccess_array (mut, ik, e) ->
-      Baccess_array (copy_mutable_flag mut, copy_index_kind ik, copy_expression e)
     | Baccess_block (mut, e) ->
       Baccess_block (copy_mutable_flag mut, copy_expression e)
 
@@ -338,7 +336,10 @@ and copy_jkind_annotation_desc :
   Ast_999.Parsetree.jkind_annotation_desc -> Ast_500.Parsetree.jkind_annotation_desc =
   function
   | Pjk_default -> Pjk_default
-  | Pjk_abbreviation x0 -> Pjk_abbreviation x0
+  | Pjk_abbreviation x0 ->
+    Pjk_abbreviation
+      (String.concat "." (Longident.flatten (copy_Longident_t x0.txt)))
+  | Pjk_operator (x0, _) -> (copy_jkind_annotation x0).pjkind_desc
   | Pjk_mod (x0, x1) -> Pjk_mod (copy_jkind_annotation x0, copy_modes x1)
   | Pjk_with (x0, x1, x2) -> Pjk_with (copy_jkind_annotation x0, copy_core_type x1, copy_modalities x2)
   | Pjk_kind_of x0 -> Pjk_kind_of (copy_core_type x0)
@@ -346,9 +347,9 @@ and copy_jkind_annotation_desc :
 
 and copy_jkind_annotation :
   Ast_999.Parsetree.jkind_annotation -> Ast_500.Parsetree.jkind_annotation =
-  fun { pjkind_desc; pjkind_loc } ->
-  { pjkind_desc = copy_jkind_annotation_desc pjkind_desc;
-    pjkind_loc = copy_location pjkind_loc;
+  fun { pjka_desc; pjka_loc } ->
+  { pjkind_desc = copy_jkind_annotation_desc pjka_desc;
+    pjkind_loc = copy_location pjka_loc;
   }
 
 and copy_bound_var (var, jkind) =
@@ -703,13 +704,12 @@ and copy_core_type_desc loc :
 and copy_package_type :
     Ast_999.Parsetree.package_type -> Ast_500.Parsetree.package_type =
  fun x ->
-  let x0, x1 = x in
-  ( copy_loc copy_Longident_t x0,
+  ( copy_loc copy_Longident_t x.ppt_path,
     List.map
       (fun x ->
         let x0, x1 = x in
         (copy_loc copy_Longident_t x0, copy_core_type x1))
-      x1 )
+      x.ppt_cstrs )
 
 and copy_row_field : Ast_999.Parsetree.row_field -> Ast_500.Parsetree.row_field
     =
@@ -819,8 +819,16 @@ and copy_structure_item_desc :
       Ast_500.Parsetree.Pstr_attribute (copy_attribute x0)
   | Ast_999.Parsetree.Pstr_extension (x0, x1) ->
       Ast_500.Parsetree.Pstr_extension (copy_extension x0, copy_attributes x1)
-  | Ast_999.Parsetree.Pstr_kind_abbrev (x0, x1) ->
-      Ast_500.Parsetree.Pstr_kind_abbrev (x0, copy_jkind_annotation x1)
+  | Ast_999.Parsetree.Pstr_jkind x0 ->
+      let manifest =
+        match x0.pjkind_manifest with
+        | Some manifest -> copy_jkind_annotation manifest
+        | None ->
+          { Ast_500.Parsetree.pjkind_desc = Pjk_default;
+            pjkind_loc = copy_location x0.pjkind_loc }
+      in
+      Ast_500.Parsetree.Pstr_kind_abbrev
+        (copy_loc (fun x -> x) x0.pjkind_name, manifest)
 
 and copy_include_declaration :
     Ast_999.Parsetree.include_declaration ->
@@ -1148,8 +1156,16 @@ and copy_signature_item_desc :
       Ast_500.Parsetree.Psig_attribute (copy_attribute x0)
   | Ast_999.Parsetree.Psig_extension (x0, x1) ->
       Ast_500.Parsetree.Psig_extension (copy_extension x0, copy_attributes x1)
-  | Ast_999.Parsetree.Psig_kind_abbrev (x0, x1) ->
-      Ast_500.Parsetree.Psig_kind_abbrev (x0, copy_jkind_annotation x1)
+  | Ast_999.Parsetree.Psig_jkind x0 ->
+      let manifest =
+        match x0.pjkind_manifest with
+        | Some manifest -> copy_jkind_annotation manifest
+        | None ->
+          { Ast_500.Parsetree.pjkind_desc = Pjk_default;
+            pjkind_loc = copy_location x0.pjkind_loc }
+      in
+      Ast_500.Parsetree.Psig_kind_abbrev
+        (copy_loc (fun x -> x) x0.pjkind_name, manifest)
 
 and copy_class_type_declaration :
     Ast_999.Parsetree.class_type_declaration ->
@@ -1579,15 +1595,7 @@ and copy_variance : Ast_999.Asttypes.variance -> Ast_500.Asttypes.variance =
   | Ast_999.Asttypes.Covariant -> Ast_500.Asttypes.Covariant
   | Ast_999.Asttypes.Contravariant -> Ast_500.Asttypes.Contravariant
   | Ast_999.Asttypes.NoVariance -> Ast_500.Asttypes.NoVariance
-
-and copy_index_kind : Ast_999.Asttypes.index_kind -> Ast_500.Asttypes.index_kind =
-  function
-  | Ast_999.Asttypes.Index_int -> Ast_500.Asttypes.Index_int
-  | Ast_999.Asttypes.Index_unboxed_int64 -> Ast_500.Asttypes.Index_unboxed_int64
-  | Ast_999.Asttypes.Index_unboxed_int32 -> Ast_500.Asttypes.Index_unboxed_int32
-  | Ast_999.Asttypes.Index_unboxed_int16 -> Ast_500.Asttypes.Index_unboxed_int16
-  | Ast_999.Asttypes.Index_unboxed_int8 -> Ast_500.Asttypes.Index_unboxed_int8
-  | Ast_999.Asttypes.Index_unboxed_nativeint -> Ast_500.Asttypes.Index_unboxed_nativeint
+  | Ast_999.Asttypes.Bivariant -> Ast_500.Asttypes.NoVariance
 
 and copy_value_description :
     Ast_999.Parsetree.value_description -> Ast_500.Parsetree.value_description =
@@ -1665,7 +1673,8 @@ and copy_include_kind :
   | Functor -> Functor
 
 and copy_constant : Ast_999.Parsetree.constant -> Ast_500.Parsetree.constant =
-  function
+ fun constant ->
+  match constant.pconst_desc with
   | Ast_999.Parsetree.Pconst_integer (x0, x1) ->
       Ast_500.Parsetree.Pconst_integer (x0, Option.map (fun x -> x) x1)
   | Ast_999.Parsetree.Pconst_char x0 -> Ast_500.Parsetree.Pconst_char x0
@@ -1681,11 +1690,12 @@ and copy_constant : Ast_999.Parsetree.constant -> Ast_500.Parsetree.constant =
   | Ast_999.Parsetree.Pconst_unboxed_integer (x0, x1) ->
       Ast_500.Parsetree.Pconst_unboxed_integer (x0, x1)
 
-and copy_Longident_t : Longident.t -> Longident.t = function
-  | Longident.Lident x0 -> Longident.Lident x0
-  | Longident.Ldot (x0, x1) -> Longident.Ldot (copy_Longident_t x0, x1)
-  | Longident.Lapply (x0, x1) ->
-      Longident.Lapply (copy_Longident_t x0, copy_Longident_t x1)
+and copy_Longident_t : Ocaml_common.Longident.t -> Longident.t = function
+  | Ocaml_common.Longident.Lident name -> Longident.Lident name
+  | Ocaml_common.Longident.Ldot (prefix, name) ->
+    Longident.Ldot (copy_Longident_t prefix.txt, name.txt)
+  | Ocaml_common.Longident.Lapply (fn, arg) ->
+    Longident.Lapply (copy_Longident_t fn.txt, copy_Longident_t arg.txt)
 
 and copy_loc :
       'f0 'g0.

@@ -1,0 +1,24 @@
+--- a/lib/js_of_ocaml/dom.ml
++++ b/lib/js_of_ocaml/dom.ml
+@@ -283,6 +283,9 @@
+ 
+   method preventDefault : unit meth
+ 
++  (* Currently only available in OxCaml. *)
++  method defaultPrevented : bool t readonly_prop
++
+   (* Legacy methods *)
+   method srcElement : 'a t opt readonly_prop
+ end
+--- a/lib/js_of_ocaml/dom.mli
++++ b/lib/js_of_ocaml/dom.mli
+@@ -294,6 +294,9 @@
+ 
+   method preventDefault : unit meth
+ 
++  (* Currently only available in OxCaml. *)
++  method defaultPrevented : bool t readonly_prop
++
+   (* Legacy methods *)
+   method srcElement : 'a t opt readonly_prop
+ end
