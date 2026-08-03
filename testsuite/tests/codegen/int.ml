@@ -133,11 +133,10 @@ let rem_2 x = x mod 2
 [%%expect_asm X86_64{|
 rem_2:
   sarq  $1, %rax
-  movq  $-2, %rdi
   movq  %rax, %rbx
   shrq  $63, %rbx
   addq  %rax, %rbx
-  andq  %rdi, %rbx
+  andq  $-2, %rbx
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -149,12 +148,11 @@ let is_divisible_by_128 x = (x mod 128) = 0
 [%%expect_asm X86_64{|
 is_divisible_by_128:
   sarq  $1, %rax
-  movq  $-128, %rdi
   movq  %rax, %rbx
   sarq  $6, %rbx
   shrq  $57, %rbx
   addq  %rax, %rbx
-  andq  %rdi, %rbx
+  andq  $-128, %rbx
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax
@@ -368,12 +366,11 @@ collatz:
   addq  $2, %rax
   movq  %rbx, %rdi
   sarq  $1, %rdi
-  movq  $-2, %rcx
   movq  %rdi, %rsi
   shrq  $63, %rsi
   leaq  (%rdi,%rsi), %rdx
   movq  %rdx, %rsi
-  andq  %rcx, %rsi
+  andq  $-2, %rsi
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi

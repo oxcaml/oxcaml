@@ -160,17 +160,29 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Is_immediate result -> result
     | Use_default -> is_immediate (Icomp cmp) n
 
+  (* Turn integer constants that fit in an OCaml integer into [Cconst_int], so
+     that the [Cconst_int] patterns below suffice to recognize all constants
+     that may be used as immediate arguments. *)
+  let normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
+    match expr with
+    | Cconst_natint (n, dbg)
+      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+      Cconst_int (Nativeint.to_int n, dbg)
+    | _ -> expr
+
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
     match arg with
-    | Cop (Ccmpi cmp, [arg1; Cconst_int (n, _)], _) when is_immediate_test cmp n
-      ->
-      Iinttest_imm (cmp, n), arg1
-    | Cop (Ccmpi cmp, [Cconst_int (n, _); arg2], _)
-      when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
-      Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+    | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
+      match normalize_int_constant arg1, normalize_int_constant arg2 with
+      | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
+        Iinttest_imm (cmp, n), arg1
+      | Cconst_int (n, _), arg2
+        when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
+        Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+      | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
     | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
     | Cop (Ccmpf (width, cmp), args, _) -> Ifloattest (width, cmp), Ctuple args
     | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
@@ -225,7 +237,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -235,7 +247,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -243,7 +255,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]

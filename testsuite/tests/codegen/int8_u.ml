@@ -623,8 +623,7 @@ popcount:
 let ctz x = Int8_u.ctz x
 [%%expect_asm X86_64{|
 ctz:
-  movl  $256, %ebx
-  orq   %rbx, %rax
+  orq   $256, %rax
   tzcnt %rax, %rax
   salq  $56, %rax
   sarq  $56, %rax
