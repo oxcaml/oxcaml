@@ -5823,6 +5823,7 @@ let report_error ~loc = function
       Jkind.Violation.report_with_offender ~offender
         env ppf v)
   | Jkind_sort {env; kloc; typ; err} ->
+    Printtyp.wrap_printing_env ~error:true env @@ fun () ->
     let s =
       match kloc with
       | Mixed_product -> "Structures with non-value elements"
