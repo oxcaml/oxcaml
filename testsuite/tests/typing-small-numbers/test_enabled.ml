@@ -201,13 +201,19 @@ let _ : int8 = 1s
 let _ : int8 = 0s
 let _ : int8 = 127s
 let _ : int8 = -128s
-let _ : int8 = 128s
 [%%expect{|
 - : int8 = 1s
 - : int8 = 0s
 - : int8 = 127s
 - : int8 = -128s
-- : int8 = -128s
+|}]
+
+let _ : int8 = 128s
+[%%expect{|
+Line 1, characters 15-19:
+1 | let _ : int8 = 128s
+                   ^^^^
+Error: Integer literal exceeds the range of representable integers of type "int8"
 |}]
 
 let _ : int8 = 129s
@@ -402,13 +408,19 @@ let _ : int16 = 1S
 let _ : int16 = 0S
 let _ : int16 = 32767S
 let _ : int16 = -32768S
-let _ : int16 = 32768S
 [%%expect{|
 - : int16 = 1S
 - : int16 = 0S
 - : int16 = 32767S
 - : int16 = -32768S
-- : int16 = -32768S
+|}]
+
+let _ : int16 = 32768S
+[%%expect{|
+Line 1, characters 16-22:
+1 | let _ : int16 = 32768S
+                    ^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int16"
 |}]
 
 let _ : int16 = 32769S
