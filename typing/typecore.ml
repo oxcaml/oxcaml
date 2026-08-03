@@ -6348,15 +6348,83 @@ type type_function_result_param =
     has_poly : bool;
   }
 
-(* A sort reflected in the function's calling convention. See
-   [check_calling_convention_sorts_against_partial_match]. *)
-type calling_convention_sort =
-  { ccs_ty : type_expr;
-    ccs_sort : Jkind.sort;
-    ccs_env : Env.t;
-    ccs_loc : Location.t;
-    ccs_kind : [`Argument | `Result];
-  }
+module Calling_convention_sort : sig
+  (* A sort reflected in the function's calling convention.
+
+     We can't allow constraints from parameters which partially match on GADTs
+     to justify the function's argument/return sorts, as a caller can still pass
+     a constructor missing from the partial match. See oxcaml/oxcaml#6689. *)
+  type t =
+    { ccs_ty : type_expr;
+      ccs_sort : Jkind.sort;
+      (* The environment the sort was derived in. *)
+      ccs_env : Env.t;
+      ccs_loc : Location.t;
+      ccs_kind : [`Argument | `Result];
+    }
+
+  val check_doesn't_rely_on_partial_match :
+    partial:partial -> has_default:bool -> match_loc:Location.t ->
+    outer_env:Env.t -> branch_env:Env.t -> t list -> unit
+end = struct
+  type t =
+    { ccs_ty : type_expr;
+      ccs_sort : Jkind.sort;
+      ccs_env : Env.t;
+      ccs_loc : Location.t;
+      ccs_kind : [`Argument | `Result];
+    }
+
+  let added_constraints_from_partial_match
+        ~partial ~has_default ~outer_env ~branch_env =
+    if not (Env.local_constraints_have_been_added ~since:outer_env branch_env)
+    then None
+    else
+      match partial, has_default with
+      | Total, false -> None
+      | Partial, _ -> Some `Partial_match
+      (* Optional arguments can be omitted, so they are effectively partial *)
+      | Total, true -> Some `Optional_argument
+
+  let check_doesn't_rely_on_partial_match
+        ~partial ~has_default ~match_loc ~outer_env ~branch_env ts =
+    match
+      added_constraints_from_partial_match ~partial ~has_default ~outer_env
+        ~branch_env
+    with
+    | None -> ()
+    | Some why ->
+      List.iter
+        (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
+          (* Try to re-derive the same sort using an environment without local
+             constraints added since [outer_env].
+
+             This is an approximate check of whether the sort relies on a
+             partial match, as it also disallows depending on parameters which
+             totally match on a GADT. *)
+          let weak_env =
+            Env.revert_local_constraints ccs_env ~since:outer_env
+          in
+          let sort_why =
+            match ccs_kind with
+            | `Argument -> Jkind.History.Function_argument
+            | `Result -> Jkind.History.Function_result
+          in
+          let ok =
+            match
+              Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
+            with
+            | Ok sort -> Jkind.Sort.equate sort ccs_sort
+            | Error _ -> false
+          in
+          if not ok then
+            raise
+              (Error
+                 (ccs_loc, ccs_env,
+                  Function_type_escapes_partial_match
+                    { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
+        ts
+end
 
 (* The result of calling [type_function]. For the outer call to
    [type_function], it's the result of typechecking the entire function;
@@ -6383,7 +6451,7 @@ type type_function_result =
     *)
     ret_info: type_function_ret_info option;
     (* The argument/result sorts of this parameter suffix. *)
-    calling_convention_sorts: calling_convention_sort list;
+    calling_convention_sorts: Calling_convention_sort.t list;
   }
 
 and type_function_ret_info =
@@ -6392,43 +6460,6 @@ and type_function_ret_info =
     (* The sort returned by the function. *)
     ret_sort: Jkind.sort;
   }
-
-(* We can't allow constraints from parameters which partially match on GADTs to
-   justify the function's argument/return sorts, as a caller can still pass a
-   constructor missing from the partial match.
-
-   This function is run at each partial-GADT-match/optional parameter and
-   checks that later sorts can be re-derived with local constraints reset to
-   [outer_env]'s. This is approximate, as it also disallows depending on later
-   parameters which totally match on a GADT.
-
-   See oxcaml/oxcaml#6689. *)
-let check_calling_convention_sorts_against_partial_match
-      ~why ~match_loc ~outer_env ~branch_env calling_convention_sorts =
-  if Env.local_constraints_have_been_added ~since:outer_env branch_env then
-    List.iter
-      (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
-        let weak_env =
-          Env.replace_local_constraints ccs_env
-            ~with_constraints_from:outer_env
-        in
-        let sort_why =
-          match ccs_kind with
-          | `Argument -> Jkind.History.Function_argument
-          | `Result -> Jkind.History.Function_result
-        in
-        let ok =
-          match Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty with
-          | Ok sort -> Jkind.Sort.equate sort ccs_sort
-          | Error _ -> false
-        in
-        if not ok then
-          raise
-            (Error
-               (ccs_loc, ccs_env,
-                Function_type_escapes_partial_match
-                  { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
-      calling_convention_sorts
 
 (* value binding elaboration *)
 
@@ -9452,20 +9483,9 @@ and type_function
         | [ result ], partial -> result, partial
         | ([] | _ :: _ :: _), _ -> assert false
       in
-      begin match partial, default_arg with
-      | Total, None -> ()
-      | Partial, _ | Total, Some _ ->
-        (* Optional arguments can be omitted, so they are effectively partial
-           wrt [check_calling_convention_sorts_against_partial_match]. *)
-        let why =
-          match partial with
-          | Partial -> `Partial_match
-          | Total -> `Optional_argument
-        in
-        check_calling_convention_sorts_against_partial_match ~why
-          ~match_loc:pat.pat_loc ~outer_env:env ~branch_env:ext_env
-          inner_calling_convention_sorts
-      end;
+      Calling_convention_sort.check_doesn't_rely_on_partial_match ~partial
+        ~has_default:(Option.is_some default_arg) ~match_loc:pat.pat_loc
+        ~outer_env:env ~branch_env:ext_env inner_calling_convention_sorts;
       let exp_type =
         instance
           (newgenty
@@ -9535,22 +9555,25 @@ and type_function
       in
       let calling_convention_sorts =
         (* These sorts are added after the call to
-           [check_calling_convention_sorts_against_partial_match] above, so they
-           aren't checked against this parameter's own pattern.
+           [Calling_convention_sort.check_doesn't_rely_on_partial_match]
+           above, so they aren't checked against this parameter's own pattern.
 
            This is sound as:
            1. A parameter pattern cannot refine its own sort
            2. The result type is created outside of the scope of the last
               parameter's pattern *)
         let arg_ccs =
-          { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
-            ccs_loc = pparam_loc; ccs_kind = `Argument }
+          { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
+            ccs_env = env; ccs_loc = pparam_loc; ccs_kind = `Argument }
         in
+        (* [ret_info] is [None] only in the innermost recursive call to
+           [type_function], when it is initially computed. In the other calls,
+           the result sort is already in [inner_calling_convention_sorts]. *)
         let ret_ccs =
           if Option.is_some ret_info then []
           else
-            [ { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
-                ccs_loc = loc; ccs_kind = `Result } ]
+            [ { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
+                ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
         in
         arg_ccs :: ret_ccs @ inner_calling_convention_sorts
       in
@@ -11280,10 +11303,10 @@ and type_function_cases_expect
       }
     in
     let calling_convention_sorts =
-      [ { ccs_ty = ty_arg; ccs_sort = arg_sort; ccs_env = env;
-          ccs_loc = loc; ccs_kind = `Argument };
-        { ccs_ty = ty_ret; ccs_sort = ret_sort; ccs_env = env;
-          ccs_loc = loc; ccs_kind = `Result } ]
+      [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
+          ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };
+        { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
+          ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
     in
     cases, ty_fun, alloc_mode,
       { ret_sort;
