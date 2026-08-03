@@ -55,8 +55,12 @@
  dst = "partial_pq/";
  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter P and argument P_int. *)
 
@@ -64,7 +68,7 @@
  module = "p/p__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlopt.byte;
 
@@ -72,7 +76,7 @@
  module = "p_int/p_int__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ flags = "$flg -as-argument-for P -I p -H p_int -open-cmi p_int/p_int__.cmi";
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlopt.byte;
 
@@ -82,7 +86,7 @@
  module = "q/q__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I q -open Q__";
+ flags = "$flg -as-parameter -H q -open-cmi q/q__.cmi";
  module = "q/q.mli";
  ocamlopt.byte;
 
@@ -92,8 +96,8 @@
  module = "q_impl/q_impl__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for Q -parameter P -I p -I q -I q_impl \
-   -open Q_impl__";
+ flags = "$flg -as-argument-for Q -parameter P -I p -I q -H q_impl \
+   -open-cmi q_impl/q_impl__.cmi";
  module = "q_impl/q_impl.ml";
  ocamlopt.byte;
 
@@ -105,7 +109,7 @@
  module = "foo_q/foo_q__.ml";
  ocamlopt.byte;
 
- flags = "$flg -parameter Q -I p -I q -I foo_q -open Foo_q__";
+ flags = "$flg -parameter Q -I p -I q -H foo_q -open-cmi foo_q/foo_q__.cmi";
  module = "foo_q/foo_q.mli foo_q/foo_q.ml";
  ocamlopt.byte;
 
@@ -119,7 +123,7 @@
  ocamlopt.byte;
 
  flags = "$flg -parameter P -I p -I q -I q_impl -I foo_q \
-   -I nested_arg -open Nested_arg__";
+   -H nested_arg -open-cmi nested_arg/nested_arg__.cmi";
  module = "nested_arg/nested_arg.mli nested_arg/nested_arg.ml";
  ocamlopt.byte;
 
@@ -143,7 +147,7 @@
  module = "main_nested_arg.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_nested_arg.exe";
  all_modules = "\
@@ -177,8 +181,8 @@
  module = "pair_pq/pair_pq__.ml";
  ocamlopt.byte;
 
- flags = "$flg -parameter P -parameter Q -I p -I q -I pair_pq \
-   -open Pair_pq__";
+ flags = "$flg -parameter P -parameter Q -I p -I q -H pair_pq \
+   -open-cmi pair_pq/pair_pq__.cmi";
  module = "pair_pq/pair_pq.mli pair_pq/pair_pq.ml";
  ocamlopt.byte;
 
@@ -190,8 +194,8 @@
  module = "partial_pq/partial_pq__.ml";
  ocamlopt.byte;
 
- flags = "$flg -parameter P -I p -I q -I q_impl -I pair_pq -I partial_pq \
-   -open Partial_pq__";
+ flags = "$flg -parameter P -I p -I q -I q_impl -I pair_pq -H partial_pq \
+   -open-cmi partial_pq/partial_pq__.cmi";
  module = "partial_pq/partial_pq.mli partial_pq/partial_pq.ml";
  ocamlopt.byte;
 
@@ -213,7 +217,7 @@
  module = "main_partial_pq.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_partial_pq.exe";
  all_modules = "\
