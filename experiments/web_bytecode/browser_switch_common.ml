@@ -176,9 +176,10 @@ let prepare_compiler ?project_dir environment ~filename =
   (match environment with
    | Native -> ()
    | Browser ->
-     Option.iter (fun dir -> Load_path.add_dir ~hidden:false dir) project_dir;
+     let visible = Load_path.Visible { cmx_guaranteed = false } in
+     Option.iter (Load_path.add_dir visible) project_dir;
      List.iter
-       (fun include_dir -> Load_path.add_dir ~hidden:false include_dir)
+       (Load_path.add_dir visible)
        browser_include_dirs);
   Compmisc.init_parameters ()
 
