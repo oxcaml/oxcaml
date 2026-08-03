@@ -109,7 +109,8 @@
  ocamlc_byte_exit_status = "0";
  ocamlc.byte;
 
- flags = "$flg -parameter P -parameter Q -I p -I q -open-cmi basic_pq__.cmi";
+ flags = "$flg -parameter P -parameter Q -I . -I p -I q \
+   -open-cmi basic_pq__.cmi";
  module = "basic_pq.mli basic_pq.ml";
  ocamlc.byte;
 
@@ -120,7 +121,8 @@
  module = "user_pq__.ml";
  ocamlc.byte;
 
- flags = "$flg -parameter P -parameter Q -I p -I q -open-cmi user_pq__.cmi";
+ flags = "$flg -parameter P -parameter Q -I . -I p -I q \
+   -open-cmi user_pq__.cmi";
  module = "user_pq.mli user_pq.ml";
  ocamlc.byte;
 
@@ -131,11 +133,11 @@
  module = "basic_pq__.ml";
  ocamlc.byte;
 
- flags = "$flg -parameter P -I p -open-cmi basic_pq__.cmi";
+ flags = "$flg -parameter P -I . -I p -open-cmi basic_pq__.cmi";
  module = "basic_pq.mli basic_pq.ml";
  ocamlc.byte;
 
- flags = "$flg -functorize -I p -I q User_pq";
+ flags = "$flg -functorize -I . -I p -I q User_pq";
  module = "";
  program = "bundle/bundle.cmi";
  all_modules = "";
