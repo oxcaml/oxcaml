@@ -9,7 +9,13 @@ bootstrap_bin_default="/Users/julesjacobs/.opam/oxcaml-5.4.0+oxcaml/bin"
 bootstrap_bin="${BOOTSTRAP_BIN:-$bootstrap_bin_default}"
 bootstrap_lib="$bootstrap_bin/../lib/ocaml"
 local_runtime_lib="$repo_root/_build/install/runtime_stdlib/lib/ocaml_runtime_stdlib"
+if [ ! -d "$local_runtime_lib" ]; then
+  local_runtime_lib="$repo_root/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib"
+fi
 local_runtime_bin="$repo_root/_build/runtime_stdlib/runtime4"
+if [ ! -d "$local_runtime_bin" ]; then
+  local_runtime_bin="$repo_root/_build/runtime_stdlib/runtime"
+fi
 dune_bin="${DUNE_BIN:-$bootstrap_bin/dune}"
 
 require_file() {
