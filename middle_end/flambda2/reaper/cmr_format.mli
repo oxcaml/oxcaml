@@ -17,7 +17,10 @@
 
 (* CR mvellacott: (long term) get rid of CMR files, and put the data in CMX instead *)
 (* CR mvellacott: (short term) store complete data in CMR files *)
-type t = { final_typing_env : Typing_env.t option }
+type t =
+  { unit_metadata : Flambda_unit.Metadata.t;
+    final_typing_env : Typing_env.t option
+  }
 
 type error =
   | Wrong_format of string

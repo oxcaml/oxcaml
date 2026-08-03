@@ -250,7 +250,11 @@ let flambda_to_flambda0 : type m.
           let _deps, _traverse_rebuild =
             Flambda2_reaper.Reaper.Staged.traverse flambda
           in
-          Some { Flambda2_reaper.Cmr_format.final_typing_env }
+          Some
+            { Flambda2_reaper.Cmr_format.unit_metadata =
+                Flambda_unit.metadata flambda;
+              final_typing_env
+            }
         else None
       in
       let { unit = flambda;
@@ -368,18 +372,22 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables:_ ~cmr_filename =
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  let { Flambda2_reaper.Cmr_format.final_typing_env } =
+  let { Flambda2_reaper.Cmr_format.unit_metadata; final_typing_env } =
     Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
   in
-  (* CR mvellacott: The following print is for a temporary test, and should be
+  (* CR mvellacott: The following prints are for a temporary test, and should be
      replaced with an actual implementation. *)
+  let module_symbol =
+    Flambda2_identifiers.Symbol.for_compilation_unit
+      (Compilation_unit.get_current_exn ())
+  in
+  Printf.eprintf "Restored unit metadata matches module symbol: %b\n"
+    (Flambda2_identifiers.Symbol.equal
+       (Flambda_unit.Metadata.module_symbol unit_metadata)
+       module_symbol);
   Option.iter
     (fun typing_env ->
-      let module_symbol =
-        Flambda2_identifiers.Symbol.for_compilation_unit
-          (Compilation_unit.get_current_exn ())
-      in
       Printf.eprintf "Restored typing env defines module symbol: %b\n"
         (Flambda2_types.Typing_env.mem typing_env
            (Flambda2_identifiers.Name.symbol module_symbol)))

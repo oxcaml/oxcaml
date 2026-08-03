@@ -15,7 +15,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = { final_typing_env : Typing_env.t option }
+type t =
+  { unit_metadata : Flambda_unit.Metadata.t;
+    final_typing_env : Typing_env.t option
+  }
 
 module Id_stamp_counters = struct
   (** Identifiers are compared by compilation unit and stamp only, so a resuming
@@ -52,10 +55,12 @@ module File_contents = struct
     { id_stamp_counters : Id_stamp_counters.t;
       table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
+      unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option
     }
 
-  let create ~used_value_slots ({ final_typing_env } : cmr_format) : t =
+  let create ~used_value_slots
+      ({ unit_metadata; final_typing_env } : cmr_format) : t =
     let final_typing_env =
       Option.map
         (fun typing_env ->
@@ -68,18 +73,25 @@ module File_contents = struct
         final_typing_env
     in
     let exported_ids =
-      Option.fold ~none:Ids_for_export.empty
-        ~some:Typing_env.Serializable.ids_for_export final_typing_env
+      Ids_for_export.union_list
+        [ Flambda_unit.Metadata.ids_for_export unit_metadata;
+          Option.fold ~none:Ids_for_export.empty
+            ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
     { id_stamp_counters = Id_stamp_counters.save ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
+      unit_metadata;
       final_typing_env
     }
 
   let deserialise ~machine_width ~resolver
-      { id_stamp_counters; table_data; used_value_slots; final_typing_env } :
-      cmr_format =
+      { id_stamp_counters;
+        table_data;
+        used_value_slots;
+        unit_metadata;
+        final_typing_env
+      } : cmr_format =
     (* Must happen before anything can create an identifier. *)
     Id_stamp_counters.restore id_stamp_counters;
     let renaming, _code_ids =
@@ -93,7 +105,10 @@ module File_contents = struct
           |> Typing_env.Serializable.to_typing_env ~machine_width ~resolver)
         final_typing_env
     in
-    { final_typing_env }
+    let unit_metadata =
+      Flambda_unit.Metadata.apply_renaming unit_metadata renaming
+    in
+    { unit_metadata; final_typing_env }
 end
 
 type error =
