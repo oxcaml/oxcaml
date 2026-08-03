@@ -4084,7 +4084,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (* CR layouts v5: value restriction here to be relaxed *)
       if is_optional l then
         unify_pat val_env pat
-          (type_option (newvar Predef.option_argument_jkind));
+          (type_option (newvar Predef.optional_argument_jkind));
       tps.tps_pattern_variables, pat
     end
   in
@@ -5518,7 +5518,7 @@ let rec approx_type env sty =
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
+      if is_optional p then newvar Predef.optional_argument_jkind
       else begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
@@ -5538,7 +5538,7 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
-        then type_option (newvar Predef.option_argument_jkind)
+        then type_option (newvar Predef.optional_argument_jkind)
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
@@ -10204,7 +10204,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
        | Optional _ ->
            (* CR layouts v5: relax value requirement *)
            unify_exp ~sexp:sarg env arg
-             (type_option(newvar Predef.option_argument_jkind))
+             (type_option(newvar Predef.optional_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg), None,
