@@ -36,8 +36,12 @@
  src = "pair_pq.mli pair_pq.ml";     dst = "pair_pq/";    copy;
  src = "bar_q.mli bar_q.ml";         dst = "bar_q/";  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Step 1: build parameters [P], [Q], and [A]. *)
 
@@ -49,7 +53,7 @@
  module = "q/q__.ml";
  ocamlc.byte;
 
- flags = "$flg -as-parameter -I q -open Q__";
+ flags = "$flg -as-parameter -H q -open-cmi q/q__.cmi";
  module = "q/q.mli";
  ocamlc.byte;
 
@@ -122,7 +126,7 @@
  module = "main_stateful.ml";
  ocamlc.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_stateful.bc";
  all_modules = "\

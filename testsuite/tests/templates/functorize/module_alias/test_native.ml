@@ -54,8 +54,12 @@
  dst = "lib/";
  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter [P] and argument [P_int]. *)
 
@@ -63,7 +67,7 @@
  module = "p/p__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlopt.byte;
 
@@ -71,7 +75,7 @@
  module = "p_int/p_int__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ flags = "$flg -as-argument-for P -I p -H p_int -open-cmi p_int/p_int__.cmi";
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlopt.byte;
 
@@ -95,13 +99,13 @@
  ocamlopt.byte;
 
  (* dune-style renaming library [Lib__] and its two wrappers, which
-    mutually alias each other through [-open Lib__]. *)
+    mutually alias each other through the opened [Lib__] prelude. *)
 
  flags = "$flg_int_iface -parameter P -I p";
  module = "lib/lib__.ml";
  ocamlopt.byte;
 
- set flg_lib = "$flg -parameter P -I p -I lib -open Lib__";
+ set flg_lib = "$flg -parameter P -I p -H lib -open-cmi lib/lib__.cmi";
 
  flags = "$flg_lib";
  module = "lib/mod_a.ml";
@@ -158,7 +162,7 @@
  module = "main_included_alias.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_included_alias.exe";
  all_modules = "\
@@ -206,7 +210,7 @@
  module = "main_circular.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_circular.exe";
  all_modules = "\

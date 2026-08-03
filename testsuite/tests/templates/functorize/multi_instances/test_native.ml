@@ -58,8 +58,12 @@
  dst = "p_int_alt/";
  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter P. *)
 
@@ -67,7 +71,7 @@
  module = "p/p__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlopt.byte;
 
@@ -77,7 +81,7 @@
  module = "p_int/p_int__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ flags = "$flg -as-argument-for P -I p -H p_int -open-cmi p_int/p_int__.cmi";
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlopt.byte;
 
@@ -144,7 +148,7 @@
  module = "main_functorize_share.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_share.exe";
  all_modules = "\
@@ -171,7 +175,7 @@
  module = "main_functorize_type_share.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_type_share.exe";
  all_modules = "\
@@ -198,7 +202,7 @@
  module = "main_instance_state.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_instance_state.exe";
  all_modules = "\
@@ -225,7 +229,7 @@
  module = "main_intf_sig.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_intf_sig.exe";
  all_modules = "\

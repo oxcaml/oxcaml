@@ -41,8 +41,12 @@
  dst = "derived/";
  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter P. *)
 
@@ -50,7 +54,7 @@
  module = "p/p__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlopt.byte;
 
@@ -60,7 +64,7 @@
  module = "basic/basic__.ml";
  ocamlopt.byte;
 
- flags = "$flg -parameter P -I p -I basic -open Basic__";
+ flags = "$flg -parameter P -I p -H basic -open-cmi basic/basic__.cmi";
  module = "basic/basic.mli basic/basic.ml";
  ocamlopt.byte;
 
@@ -70,7 +74,7 @@
  module = "p_int/p_int__.ml";
  ocamlopt.byte;
 
- flags = "$flg -as-argument-for P -I p -I p_int -open P_int__";
+ flags = "$flg -as-argument-for P -I p -H p_int -open-cmi p_int/p_int__.cmi";
  module = "p_int/p_int.mli p_int/p_int.ml";
  ocamlopt.byte;
 
@@ -93,7 +97,7 @@
  module = "main_functorize_derived.ml";
  ocamlopt.byte;
 
- flags = "";
+ flags = "$flg_link";
  module = "";
  program = "$test_build_directory/test_functorize_derived.exe";
  all_modules = "\

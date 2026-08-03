@@ -25,8 +25,12 @@
  dst = "basic/";
  copy;
 
- set flg = "-no-alias-deps -w -53";
+ set flg_base = "-w -53";
+ set flg = "$flg_base -no-alias-deps -nocwd";
  set flg_int_iface = "$flg -w -49";
+
+ (* dune does not pass [-nocwd] to link *)
+ set flg_link = "$flg_base -no-alias-deps";
 
  (* Parameter P. *)
 
@@ -34,7 +38,7 @@
  module = "p/p__.ml";
  ocamlc.byte;
 
- flags = "$flg -as-parameter -I p -open P__";
+ flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
  module = "p/p.mli";
  ocamlc.byte;
 
@@ -44,7 +48,7 @@
  module = "basic/basic__.ml";
  ocamlc.byte;
 
- flags = "$flg -parameter P -I p -I basic -open Basic__";
+ flags = "$flg -parameter P -I p -H basic -open-cmi basic/basic__.cmi";
  module = "basic/basic.mli basic/basic.ml";
  ocamlc.byte;
 
