@@ -1,14 +1,13 @@
 (* Consumer for a dune-library-style bundle.  Only the wrapper [Foo] was
-   passed to [-functorize] and it only re-exports [B].  [Foo__A] is not
-   referenced by the wrapper at all; the functorizer still pulls it into
-   the bundle transitively because [foo__B.cmi] lists it as [Exact].
+   passed to [-functorize] and it only re-exports [B].  The functorizer
+   still pulls [Foo__A], [Foo__B] and [Foo__C] into the bundle: every
+   module referenced from a loaded cmi's bound_globals is loaded and
+   bundled, even ones only recorded as pure aliases under
+   -no-alias-deps (e.g. [Foo__C], referenced only by [foo__.cmi]).
 
-   [Inst.DEP__Foo__.A] and [Inst.DEP__Foo__.B] are also accessible
-   (transitively-pulled modules get a [DEP__] prefix in the bundle to
-   discourage direct access).  [foo__.cmi] lists [Foo__A] and [Foo__B]
-   as [Approximate] (it is pure aliases under -no-alias-deps), but they
-   are [Exact] elsewhere ([foo__B.cmi] and [foo.cmi] respectively), so
-   the functorizer loads them rather than pruning. *)
+   [Inst.DEP__Foo__.A]/[.B]/[.C] are accessible (transitively-pulled
+   modules get a [DEP__] prefix in the bundle to discourage direct
+   access). *)
 
 module Inst = Bundle_foo_lib.Make (P_int) ()
 
@@ -16,4 +15,5 @@ let () =
   let p = P_int.create () in
   print_endline (Inst.Foo.B.bye p);
   print_endline (Inst.DEP__Foo__.A.hello p);
-  print_endline (Inst.DEP__Foo__.B.bye p)
+  print_endline (Inst.DEP__Foo__.B.bye p);
+  print_endline (Inst.DEP__Foo__.C.combined p)

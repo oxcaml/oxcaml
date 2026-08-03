@@ -3,18 +3,15 @@
     [Foo__A]/[Foo__B]/[Foo__C] via [-o]; renaming module [foo__]
     aliases them; wrapper [foo.ml] re-exposes only [B] via [include B].
 
-    Bundling just [Foo]: [Foo__B] is pulled in via [foo.cmi]'s [Exact]
-    dep, [Foo__A] transitively via [foo__B.cmi]'s [Exact] dep on it.
-    [Foo__C] is only [Approximate] in [foo__.cmi] (never [Exact]
-    anywhere), so it prunes to [Pruned_Foo__C] and a consumer
-    touching [Inst.DEP__Foo__.C] fails to compile.  [Foo__A] and
-    [Foo__B] are also [Approximate] in [foo__.cmi] but [Exact]
-    elsewhere, so [Inst.DEP__Foo__.A] and [.B] remain accessible. *)
+    Bundling just [Foo] pulls in all of [Foo__A]/[Foo__B]/[Foo__C]
+    transitively: every module referenced from a loaded cmi's
+    bound_globals is loaded and bundled, including ones only recorded
+    as pure aliases under -no-alias-deps (e.g. [Foo__C], referenced
+    only by [foo__.cmi]). *)
 
  readonly_files = "\
    foo__.ml a.ml b.ml c.ml foo.ml \
    main_foo_lib.ml test_functorize_foo_lib.reference \
-   main_pruned_c.ml bad_pruned_c.reference \
  ";
 
  setup-ocamlopt.byte-build-env;
@@ -99,8 +96,8 @@
  module = "foo/foo.ml";
  ocamlopt.byte;
 
- (* Bundle only [Foo].  [Foo__A] and [Foo__B] get pulled in transitively
-    via [foo.cmi]'s [Exact]-precision bound_globals. *)
+ (* Bundle only [Foo].  [Foo__A], [Foo__B] and [Foo__C] get pulled in
+    transitively via the loaded cmis' bound_globals. *)
 
  flags = "$flg -functorize -I p -I foo Foo";
  module = "";
@@ -119,6 +116,7 @@
    foo/foo__.cmx \
    foo/foo__A.cmx \
    foo/foo__B.cmx \
+   foo/foo__C.cmx \
    foo/foo.cmx \
    p_int/p_int__.cmx \
    p_int/p_int.cmx \
@@ -134,16 +132,4 @@
 
  reference = "test_functorize_foo_lib.reference";
  check-program-output;
-
- (* [Foo__C] is pruned to [Pruned_Foo__C] in the bundle.  Accessing it
-    through [Inst.DEP__Foo__.C] fails to compile. *)
-
- flags = "$flg -I bundle_foo_lib -I p -I p_int -I foo";
- module = "main_pruned_c.ml";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_pruned_c.output";
- ocamlopt.byte;
-
- compiler_reference = "bad_pruned_c.reference";
- check-ocamlopt.byte-output;
 *)

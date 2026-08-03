@@ -27,24 +27,24 @@
 module CU = Compilation_unit
 module GM = Global_module
 
-(** Status of a bundled module in [module_map]:
-    - [Exact id]: the module was referenced with [Exact] precision and is bound
-      locally to [id].
-    - [Approximate]: the module was only ever referenced with [Approximate]
-      precision; references to it get substituted to [Pruned_<head>]. An
-      [Approximate] entry can be upgraded to [Exact] by a later [Exact]
-      reference. *)
-type module_status = Exact of Ident.t | Approximate
+type chain = CU.Name.t list
+(** The modules through which a module is reached, innermost first. Command-line
+    inputs have the empty chain. *)
 
 type state = {
-  rev_modules : (GM.t * Ident.t * Subst.Lazy.signature) list;
+  rev_modules : (GM.t * Subst.Lazy.signature) list;
       (** Bundled modules with their signatures. Two substitutions apply:
           [Signature_with_global_bindings.subst] (GM → GM) and
-          [Subst.add_module]/[Subst.Lazy.signature] (GM → local ident or
-          pruned). Signatures here have gone through the first but not the
-          second (which is applied in one pass at the end of [analyze]). *)
+          [Subst.add_module]/[Subst.Lazy.signature] (GM → local ident).
+          Signatures here have gone through the first but not the second (which
+          is applied in one pass at the end of [analyze]). *)
   param_map : Ident.t GM.Parameter_name.Map.t;
-  module_map : module_status GM.Name.Map.t;
+  module_map : chain GM.Name.Map.t;
+      (** Bundled module → the shortest [chain] through which it has been
+          reached so far. Modules whose shortest chain is non-empty are bound
+          under a [DEP__]-prefixed name to discourage users from accessing them
+          through the bundle. CR-soon zqian: make these nonmentionable instead.
+      *)
 }
 
 let empty_state =
@@ -67,11 +67,24 @@ let maybe_register_parameter p_name state =
   | Some id -> (id, state)
   | None -> register_parameter p_name state
 
-(* [gm] must not be fully instantiated. *)
-let validate_and_load ~chain (gm : GM.t) : Signature_with_global_bindings.t =
-  let name = GM.to_name gm in
+let assert_subset ~gm ~chain sub sup =
+  if not (GM.Parameter_name.Set.subset sub sup) then
+    let set_to_string s =
+      GM.Parameter_name.Set.elements s
+      |> List.map GM.Parameter_name.to_string
+      |> String.concat ", "
+    in
+    let chain_to_string chain =
+      List.map CU.Name.to_string chain |> String.concat ", required by "
+    in
+    Misc.fatal_errorf
+      "{%s} is not a subset of {%s} (while loading %s, required by %s)"
+      (set_to_string sub) (set_to_string sup) (GM.to_string gm)
+      (chain_to_string chain)
+
+let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
   let cu, cmi_params, swg =
-    Env.find_import ~chain (CU.Name.of_head_of_global_name name)
+    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
   in
   assert (Option.is_some cu);
   let tracked_set =
@@ -80,25 +93,47 @@ let validate_and_load ~chain (gm : GM.t) : Signature_with_global_bindings.t =
     |> GM.Parameter_name.Set.of_list
   in
   let cmi_set = GM.Parameter_name.Set.of_list cmi_params in
-  assert (GM.Parameter_name.Set.equal tracked_set cmi_set);
+  assert_subset ~gm ~chain tracked_set cmi_set;
+  assert_subset ~gm ~chain cmi_set tracked_set;
   swg
+
+let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
+    =
+  let cu, cmi_params, swg =
+    Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
+  in
+  assert (Option.is_some cu);
+  let param_set args =
+    List.map (fun (a : _ GM.Argument.t) -> a.param) args
+    |> GM.Parameter_name.Set.of_list
+  in
+  let cmi_set = GM.Parameter_name.Set.of_list cmi_params in
+  let visible_args =
+    List.filter
+      (fun (a : _ GM.Argument.t) -> GM.Parameter_name.Set.mem a.param cmi_set)
+      gm.visible_args
+  in
+  let visible_set = param_set visible_args in
+  let hidden_set = GM.Parameter_name.Set.diff cmi_set visible_set in
+  assert_subset ~gm ~chain hidden_set (param_set gm.hidden_args);
+  let hidden_args = GM.Parameter_name.Set.elements hidden_set in
+  (* The visible args' values are over-approximated as well; complete
+     them recursively. *)
+  let visible_args =
+    List.map
+      (fun (a : GM.t GM.Argument.t) ->
+        let value, _swg = load_approx ~chain a.value in
+        ({ a with value } : GM.t GM.Argument.t))
+      visible_args
+  in
+  (GM.create_exn gm.head visible_args ~hidden_args, swg)
 
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
-  let local_name =
-    let base = GM.Name.to_string (GM.to_name gm) in
-    (* Transitive deps (non-toplevel) get a [DEP__] prefix to discourage
-       users from accessing them through the bundle. *)
-    (* CR-soon zqian: make these nonmentionable instead. *)
-    let is_toplevel = List.is_empty chain in
-    if is_toplevel then base else "DEP__" ^ base
-  in
-  let new_id = Ident.create_local local_name in
   let state =
     {
       state with
-      module_map =
-        GM.Name.Map.add (GM.to_name gm) (Exact new_id) state.module_map;
+      module_map = GM.Name.Map.add (GM.to_name gm) chain state.module_map;
     }
   in
   let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
@@ -122,7 +157,7 @@ let rec insert_module_exact ~chain (gm : GM.t)
       (fun state (a : GM.t GM.Argument.t) ->
         if GM.is_complete a.value then state
         else
-          let swg = validate_and_load ~chain a.value in
+          let swg = load_exact ~chain a.value in
           maybe_insert_module_exact ~chain a.value swg state)
       state gm.visible_args
   in
@@ -134,26 +169,26 @@ let rec insert_module_exact ~chain (gm : GM.t)
       state gm.hidden_args
   in
   let sign_lazy, _staticity = swg.sign in
-  { state with rev_modules = (gm, new_id, sign_lazy) :: state.rev_modules }
+  { state with rev_modules = (gm, sign_lazy) :: state.rev_modules }
 
 and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
-  match GM.Name.Map.find_opt (GM.to_name gm) state.module_map with
-  | Some (Exact _) -> state
-  | Some Approximate | None -> insert_module_exact ~chain gm swg state
+  let name = GM.to_name gm in
+  match GM.Name.Map.find_opt name state.module_map with
+  | None -> insert_module_exact ~chain gm swg state
+  | Some old_chain ->
+      if List.compare_lengths chain old_chain < 0 then
+        { state with module_map = GM.Name.Map.add name chain state.module_map }
+      else state
 
 and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
   match prec with
-  | Approximate -> (
-      let name = GM.to_name gm in
-      match GM.Name.Map.find_opt name state.module_map with
-      | Some _ -> state
-      | None ->
-          {
-            state with
-            module_map = GM.Name.Map.add name Approximate state.module_map;
-          })
+  | Approximate ->
+      let gm, swg = load_approx ~chain gm in
+
+      if GM.is_complete gm then state
+      else maybe_insert_module_exact ~chain gm swg state
   | Exact ->
-      let swg = validate_and_load ~chain gm in
+      let swg = load_exact ~chain gm in
       maybe_insert_module_exact ~chain gm swg state
 
 let make_md md_type : Types.module_declaration =
@@ -206,21 +241,19 @@ let analyze (src_names : CU.Name.Set.t) : result =
             maybe_insert_module_exact ~chain gm swg state)
       src_names empty_state
   in
+  let id_map =
+    GM.Name.Map.mapi
+      (fun (name : GM.Name.t) (chain : chain) ->
+        let base = GM.Name.to_string name in
+        let local_name = if List.is_empty chain then base else "DEP__" ^ base in
+        Ident.create_local local_name)
+      state.module_map
+  in
   let subst =
     GM.Name.Map.fold
-      (fun (name : GM.Name.t) status subst ->
-        let orig_ident = Ident.create_global name in
-        let target =
-          match status with
-          | Exact id -> Path.Pident id
-          | Approximate ->
-              let pruned =
-                GM.Name.create_exn ("Pruned_" ^ name.head) name.args
-              in
-              Path.Pident (Ident.create_global pruned)
-        in
-        Subst.add_module orig_ident target subst)
-      state.module_map Subst.identity
+      (fun (name : GM.Name.t) id subst ->
+        Subst.add_module (Ident.create_global name) (Path.Pident id) subst)
+      id_map Subst.identity
   in
   let params = GM.Parameter_name.Map.bindings state.param_map in
   let subst =
@@ -232,12 +265,13 @@ let analyze (src_names : CU.Name.Set.t) : result =
   in
   let modules =
     List.rev_map
-      (fun (gm, id, sign_lazy) ->
+      (fun (gm, sign_lazy) ->
         (* CR-soon zqian: introduce substitution as a constructor of the
            module type algebra, which allows lazy substitution to persist
            across files. *)
         let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
         let sign = Subst.Lazy.force_signature sign_lazy in
+        let id = GM.Name.Map.find (GM.to_name gm) id_map in
         (gm, id, sign))
       state.rev_modules
   in
