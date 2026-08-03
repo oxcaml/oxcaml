@@ -1,6 +1,6 @@
 (* TEST
  setup-ocamlc.byte-build-env;
- flags = "-dlambda -dno-unique-ids";
+ flags = "-drawlambda -dno-unique-ids";
  ocamlc.byte;
  check-ocamlc.byte-output;
 *)
