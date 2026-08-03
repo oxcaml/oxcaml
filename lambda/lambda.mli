@@ -1403,7 +1403,16 @@ val primitive_may_allocate : primitive -> locality_mode option
       allocation, which doesn't happen in bytecode.  If that changes, or if we
       want to use this for another purpose in bytecode, it will need to be
       revised.
+
+      Raises a fatal error on a primitive whose array kind has not been
+      specialized yet; use [primitive_may_allocate_opt] when the primitive may
+      still be unspecialized.
   *)
+
+val primitive_may_allocate_opt : primitive -> locality_mode option option
+  (** Like [primitive_may_allocate], but total: the outer [None] means the
+      answer depends on information the primitive does not yet carry, namely
+      an unresolved array kind. *)
 
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option

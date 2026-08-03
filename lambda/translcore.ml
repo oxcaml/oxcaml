@@ -310,6 +310,7 @@ let rec iter_exn_names f pat =
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort) ->
+      let poly_mode = Option.map Mode.Locality.disallow_right poly_mode in
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
@@ -317,22 +318,14 @@ let transl_ident loc env ty path desc kind =
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
-let is_omitted = function
-  | Arg _ -> false
-  | Omitted _ -> true
-
 let can_apply_primitive p pmode pos args =
-  if List.exists (fun (_, arg) -> is_omitted arg) args then false
-  else begin
-    let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
-    else if pos <> Typedtree.Tail then true
-    else begin
-      let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
-      is_heap_mode (transl_locality_mode_l return_mode)
-    end
-  end
+  match Translprim.application_kind p pos args with
+  | Direct -> true
+  | Eta_expanded -> false
+  | Depends_on_poly_result_mode ->
+    (* Type checking is over, so resolving the mode variable is fine here. *)
+    let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
+    is_heap_mode (transl_locality_mode_l return_mode)
 
 let zero_alloc_of_application
       ~num_args (annotation : Zero_alloc.assume option) funct =
@@ -454,7 +447,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack
+          ~poly_mode:(Option.map Mode.Locality.disallow_right pmode)
+          ~poly_sort:psort ~stack
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam

@@ -162,17 +162,17 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val y : int ref @@ stateless noalloc_strict
-           val z : 'a -> 'a
-           val x : 'a -> 'a
+           val z : 'a -> 'a @@ noalloc_strict
+           val x : 'a -> 'a @@ noalloc_strict
          end @ stateful
        is not included in
          sig
            val y : int ref @@ stateless noalloc_strict
-           val z : 'a -> 'a
+           val z : 'a -> 'a @@ noalloc_strict
            val x : 'a -> 'a @@ stateless noalloc_strict
          end @ stateful
        Values do not match:
-         val x : 'a -> 'a (* in a structure at stateful *)
+         val x : 'a -> 'a @@ noalloc_strict (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless noalloc_strict (* in a structure at stateful *)
        The first is "stateful"
@@ -188,15 +188,19 @@ Lines 8-12, characters 33-5:
 12 |   end
 Error: Signature mismatch:
        Modules do not match:
-         sig val y : int ref val z : 'a -> 'a val x : 'a -> 'a end @ stateful
+         sig
+           val y : int ref
+           val z : 'a -> 'a @@ noalloc_strict
+           val x : 'a -> 'a @@ noalloc_strict
+         end @ stateful
        is not included in
          sig
            val y : int ref
-           val z : 'a -> 'a
+           val z : 'a -> 'a @@ noalloc_strict
            val x : 'a -> 'a @@ stateless noalloc_strict
          end @ stateful
        Values do not match:
-         val x : 'a -> 'a (* in a structure at stateful *)
+         val x : 'a -> 'a @@ noalloc_strict (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless noalloc_strict (* in a structure at stateful *)
        The first is "stateful"
