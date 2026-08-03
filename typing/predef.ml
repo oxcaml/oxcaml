@@ -170,8 +170,6 @@ let simd_beta_extension_type_constrs : type_constr list = [
   `Mask;
 ]
 
-let simd_alpha_extension_type_constrs : type_constr list = []
-
 let small_number_extension_type_constrs : type_constr list = [
   `Float32;
   `Float32_u;
@@ -195,7 +193,6 @@ let all_type_constrs = (
   @ small_number_extension_type_constrs
   @ simd_stable_extension_type_constrs
   @ simd_beta_extension_type_constrs
-  @ simd_alpha_extension_type_constrs
   @ metaprogramming_extension_type_constrs
 )
 
