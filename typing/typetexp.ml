@@ -1019,7 +1019,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               let arg_mono = Btype.tpoly_get_mono arg_ty in
               (* CR lmaurer: remove value requirement *)
               begin match
-                constrain_type_jkind env arg_mono Predef.option_argument_jkind
+                constrain_type_jkind env arg_mono
+                  Predef.optional_argument_jkind
               with
               | Ok _ -> ()
               | Error e ->
