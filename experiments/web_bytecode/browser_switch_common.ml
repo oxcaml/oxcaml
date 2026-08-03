@@ -102,9 +102,7 @@ let read_file path =
     ~finally:(fun () -> close_in_noerr ic)
 
 let expand_structure_with_ppx ast =
-  Ppxlib_ast.Selected_ast.Of_ocaml.copy_structure ast
-  |> Ppxlib.Driver.map_structure
-  |> Ppxlib_ast.Selected_ast.To_ocaml.copy_structure
+  Browser_switch_ppx.expand_structure ast
 
 let parse_and_expand_source ~filename ~source =
   let lexbuf = Lexing.from_string source in

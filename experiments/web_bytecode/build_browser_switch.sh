@@ -66,7 +66,7 @@ require_dir "$release_opam_root/$release_opam_switch" "OPAM switch"
 missing_packages=()
 if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
   required_packages=(
-    findlib js_of_ocaml js_of_ocaml-toplevel threads ppxlib ppxlib.ast yojson
+    findlib js_of_ocaml js_of_ocaml-toplevel threads yojson
   )
 else
   required_packages=(
@@ -122,7 +122,7 @@ fi
 mkdir -p "$build_dir" "$tmpdir/cmis"
 
 if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
-  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,threads,ppxlib,ppxlib.ast,yojson"
+  common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,threads,yojson"
 else
   common_js_packages="compiler-libs.common,compiler-libs.bytecomp,compiler-libs.toplevel,js_of_ocaml,js_of_ocaml-toplevel,stdlib_stable,base,core,parallel,ppxlib,ppxlib.ast,yojson"
 fi
@@ -200,6 +200,17 @@ fi
 compile "$common_js_packages" "$tmpdir/browser_switch_package_manifest.ml" \
   "$tmpdir/browser_switch_package_manifest.cmo"
 
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  cat > "$tmpdir/browser_switch_ppx.ml" <<'EOF'
+let expand_structure ast = ast
+EOF
+  compile "$common_js_packages" "$tmpdir/browser_switch_ppx.ml" \
+    "$tmpdir/browser_switch_ppx.cmo"
+else
+  compile "$common_js_packages" "$experiment_dir/browser_switch_ppx.ml" \
+    "$tmpdir/browser_switch_ppx.cmo"
+fi
+
 compile "$common_js_packages" "$experiment_dir/browser_switch_common.ml" \
   "$tmpdir/browser_switch_common.cmo" \
   -I "$tmpdir"
@@ -227,6 +238,7 @@ compile "$common_js_packages" "$experiment_dir/browser_switch_js.ml" \
 run_tool ocamlfind ocamlc -g -no-check-prims -linkall -predicates ppx_driver \
   -package "$link_packages" -linkpkg \
   "$tmpdir/browser_switch_package_manifest.cmo" \
+  "$tmpdir/browser_switch_ppx.cmo" \
   "$tmpdir/browser_switch_common.cmo" \
   "$tmpdir/browser_switch_check.cmo" \
   "$tmpdir/browser_switch_interface.cmo" \
