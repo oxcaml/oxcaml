@@ -23,6 +23,16 @@ open Actions
 let no_native_compilers _log env =
   (Result.skip_with_reason "native compilers disabled", env)
 
+(* When the testsuite runs against the boot compiler ([make
+   runtest-upstream-boot], see Makefile.common-ox), the tools that can only
+   be built out of the bytecode compiler-libs (the expect tool, the
+   toplevels) are not available; the corresponding tests are skipped rather
+   than failed. This is opt-in via OCAMLTEST_SKIP_MISSING_TOOLS so that a
+   missing tool remains an error in the regular flow. *)
+let skip_missing_tool tool =
+  Sys.getenv_opt "OCAMLTEST_SKIP_MISSING_TOOLS" <> None
+  && not (Sys.file_exists tool)
+
 let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
@@ -935,6 +945,15 @@ let run_expect_twice input_file log env ~backend =
   end else (result1, env1)
 
 let run_expect_with ~backend log env =
+  let tool =
+    match (backend : Ocaml_backends.t) with
+    | Bytecode -> Ocaml_files.expect
+    | Native -> Ocaml_files.expectnat
+  in
+  if skip_missing_tool tool then
+    (Result.skip_with_reason
+       (Filename.basename tool ^ " tool not available"), env)
+  else
   let input_file = Actions_helpers.testfile env in
   run_expect_twice input_file log env ~backend
 
@@ -1138,6 +1157,15 @@ let compile_modules compiler compilername compileroutput
 let run_test_program_in_toplevel (toplevel : Ocaml_toplevels.toplevel) log env =
   let (module Toplevel) = toplevel in
   let backend = Toplevel.backend in
+  let toplevel_binary =
+    match (backend : Ocaml_backends.t) with
+    | Bytecode -> Ocaml_files.ocaml
+    | Native -> Ocaml_files.ocamlnat
+  in
+  if skip_missing_tool toplevel_binary then
+    (Result.skip_with_reason
+       (Filename.basename toplevel_binary ^ " toplevel not available"), env)
+  else
   let libraries = libraries backend env in
   (* This is a sub-optimal check - skip the test if any libraries requiring
      C stubs are loaded. It would be better at this point to build a custom

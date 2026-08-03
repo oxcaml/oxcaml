@@ -59,7 +59,6 @@ perf.data.old
 # local to root directory
 
 _build/
-_build_boottest/
 _build_upstream/
 .rsync-output
 .rsync-output-compare

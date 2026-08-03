@@ -2,16 +2,9 @@
 # Build rules common to ocaml-ox and oxcaml
 #
 
-ws_boot    = --root=. --workspace=duneconf/boot.ws
-ws_runstd  = --root=. --workspace=duneconf/runtime_stdlib.ws
-ws_main    = --root=. --workspace=duneconf/main.ws
-# The boottest context uses its own build directory: sharing _build (and in
-# particular dune's incremental database in _build/.db) with the other
-# contexts confuses dune when the boottest context directory is created
-# afresh, making it fail to elaborate the (:include ...) directives of the
-# root dune file.
-ws_boottest = --root=. --build-dir=_build_boottest \
-  --workspace=duneconf/boottest.ws
+ws_boot   = --root=. --workspace=duneconf/boot.ws
+ws_runstd = --root=. --workspace=duneconf/runtime_stdlib.ws
+ws_main   = --root=. --workspace=duneconf/main.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -83,27 +76,6 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    $(ENV_VARS)))))
-endef
-
-# Like the main context, but used only to build the bytecode-only artifacts
-# needed to run the upstream testsuite against the boot compiler (see
-# [runtest-upstream-boot] below), without building the main compiler, the
-# native compiler-libs or the otherlibs.
-define dune_boot_test_context
-(lang dune 3.23)
-(using oxcaml 0.1)
-(context (default
-  (name boottest)
-  (profile main)
-  (cms_cmt_dependency cms)
-  (paths
-    (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib")))
-  (env (_
-    (bin_annot_cms true)
-    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
-    (ocamlopt_flags (:standard -fno-asan))
     $(ENV_VARS)))))
 endef
 
@@ -207,7 +179,6 @@ runtest-dwarf: compiler
 duneconf/boot.ws: export contents = $(dune_boot_context)
 duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
-duneconf/boottest.ws: export contents = $(dune_boot_test_context)
 duneconf/%.ws:
 	echo "$$contents" > $@
 
@@ -227,7 +198,6 @@ dune_config_targets = \
   duneconf/boot.ws \
   duneconf/runtime_stdlib.ws \
   duneconf/main.ws \
-  duneconf/boottest.ws \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
@@ -326,24 +296,30 @@ boot_build = _build/default
 #   libraries;
 # - [test_stublibs]: directory providing the dynamically-loaded stubs;
 # - [boot_flow]: non-empty when testing the boot compiler, in which case the
-#   pieces that would require building otherlibs or the native compiler-libs
-#   (fexprc, expectnat, codegen, the otherlibs, ocamldebug, ...) are not
-#   available and are skipped. The corresponding tests are excluded via
-#   oxcaml/testsuite/boot-test-list.
+#   pieces that would require building the compiler-libs (in any mode) or
+#   the otherlibs (the expect tool, the toplevels, fexprc, expectnat,
+#   codegen, the otherlibs, ocamldebug, ...) are not available: the
+#   corresponding tests are skipped by ocamltest (see
+#   OCAMLTEST_SKIP_MISSING_TOOLS in ocamltest/ocaml_actions.ml) or excluded
+#   via oxcaml/testsuite/boot-test-list.
 .PHONY: runtest-upstream test install_for_test
 .PHONY: runtest-upstream-boot test-boot install_for_test_boot
 define prepare_runtest_dir
 	rm -rf _runtest
 	mkdir _runtest
+	# The marker makes every testsuite entry point (including test-one and
+	# promote-failed) tell ocamltest to skip tests whose tools cannot be
+	# built in the boot flow, instead of failing them.
+	if [ -n "$(boot_flow)" ]; then touch _runtest/BOOT_TEST_FLOW; fi
 	ln -s ../_install _runtest/_install
 	# Use rsync to ensure hardlinks are created on both Linux and macOS
 	rsync --link-dest=../../$(ocamldir)/testsuite/ -a $(ocamldir)/testsuite/ _runtest/testsuite/
 	 # replace backend-specific testsuite/tools with their new versions
 	rm -f _runtest/testsuite/tools/*
 	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
-	cp $(test_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
-	chmod 755 _runtest/testsuite/tools/expect
 	if [ -z "$(boot_flow)" ]; then \
+	  cp $(test_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect; \
+	  chmod 755 _runtest/testsuite/tools/expect; \
 	  cp $(test_build)/middle_end/flambda2/tests/tools/fexprc.exe _runtest/testsuite/tools/fexprc; \
 	  chmod 755 _runtest/testsuite/tools/fexprc; \
 	  cp $(test_build)/oxcaml/testsuite/tools/expectnat.exe _runtest/testsuite/tools/expectnat; \
@@ -407,7 +383,9 @@ define prepare_runtest_dir
 		mkdir -p otherlibs/{stdlib_,}$${universe}; \
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
 	 done; \
-	 ln -s ../$(test_build)/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
+	 if [ -z "$(boot_flow)" ]; then \
+	   ln -s ../$(test_build)/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
+	 fi; \
 	)
 
 	# Various directories are put on the -I paths by tools/Makefile;
@@ -415,7 +393,9 @@ define prepare_runtest_dir
 	# various things.
 	mkdir _runtest/utils
 	cp _install/lib/ocaml/compiler-libs/*.cmi _runtest/utils
-	cp $(test_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils
+	if [ -z "$(boot_flow)" ]; then \
+	  cp $(test_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils; \
+	fi
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
 	if [ -z "$(boot_flow)" ]; then \
@@ -446,10 +426,18 @@ define prepare_runtest_dir
 	touch _runtest/VERSION
 	# tools
 	mkdir _runtest/tools
-	ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib
-	ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo
-	ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj
-	ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt
+	if [ -z "$(boot_flow)" ]; then \
+	  ln -s ../_install/bin/ocamlmklib.byte _runtest/tools/ocamlmklib; \
+	  ln -s ../_install/bin/ocamlobjinfo.byte _runtest/tools/ocamlobjinfo; \
+	  ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj; \
+	  ln -s ../_install/bin/ocamlfilt _runtest/tools/ocamlfilt; \
+	else \
+	  for tool in ocamlmklib ocamlobjinfo; do \
+	    $(cpl) $(test_build)/oxcaml/testsuite/tools/compiler_shim.bc \
+              _runtest/tools/$$tool; \
+	    ln -s ../_install/bin/$$tool.opt _runtest/tools/$$tool.opt; \
+	  done; \
+	fi
         # ocamldoc
 	# rm _runtest/ocamldoc
 	# mkdir _runtest/ocamldoc
@@ -466,101 +454,72 @@ install_for_test: boot_flow =
 install_for_test: install
 	$(prepare_runtest_dir)
 
-boot_test_build = _build_boottest/boottest
-
-# Tools and libraries needed to run the stdlib-only subset of the upstream
-# testsuite with the boot compiler, built in the boottest context (that is,
-# by the boot compiler, against the runtime and stdlib produced by
-# [runtime-stdlib]). Everything here is cheap to build: only bytecode is
-# compiled (for the bytecode compilers, the expect tool and the bytecode
-# toplevel), so neither the native compiler-libs nor the otherlibs are
-# built. The stdlib_* universes are kept: they are part of the stdlib and
-# only take seconds to build.
+# Support libraries and tools needed to run the stdlib-only subset of the
+# upstream testsuite with the boot compiler, built in the main context
+# (that is, by the boot compiler, against the runtime and stdlib produced
+# by [runtime-stdlib]). The compilers that the testsuite exercises are the
+# boot compiler's own native binaries (see [boot-_install]), so everything
+# here is cheap: the testsuite support libraries, the stdlib_* universes
+# (part of the stdlib, they only take seconds to build), ocamlyacc and the
+# bytecode shim standing in for the ".byte" tools. In particular the
+# compiler-libs are not built at all, in any mode; tests that need them at
+# test time (the expect tool, the toplevels) are skipped, see
+# OCAMLTEST_SKIP_MISSING_TOOLS in ocamltest/ocaml_actions.ml.
 boot_test_targets = \
-  main.bc \
-  oxcaml_main.bc \
-  lex/main.bc \
   ocamlyacc \
-  toplevel/byte/bytetop \
-  toplevel/expunge.bc \
-  tools/ocamlmklib.bc \
-  tools/objinfo.bc \
-  tools/dumpobj.bc \
-  tools/ocamlfilt.bc \
-  ocamlcommon.cma \
-  ocamlbytecomp.cma \
-  ocamloptcomp.cma \
-  toplevel/byte/ocamltoplevel.cma \
-  oxcaml/testsuite/tools/expect.exe \
+  oxcaml/testsuite/tools/compiler_shim.bc \
   testsuite/lib/lib.cm{,x}a \
   testsuite/lib/testing.cm{,x}a \
   otherlibs/stdlib_upstream_compatible/stdlib_upstream_compatible.cm{,x}a \
   otherlibs/stdlib_stable/stdlib_stable.cm{,x}a \
   otherlibs/stdlib_beta/stdlib_beta.cm{,x}a \
-  otherlibs/stdlib_alpha/stdlib_alpha.cm{,x}a \
-  middle_end/flambda2/numbers/floats/dllflambda2_floats_stubs.so \
-  middle_end/flambda2/algorithms/dllflambda2_algorithms_stubs.so \
-  external/owee/dllcompiler_owee_stubs.so \
-  external/gc-timings/dllgc_timings_stubs.so
+  otherlibs/stdlib_alpha/stdlib_alpha.cm{,x}a
 
 .PHONY: boot-test-artifacts
 boot-test-artifacts: runtime-stdlib
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
-          $(dune) build $(ws_boottest) $(boot_test_targets)
+          $(dune) build $(ws_main) $(boot_test_targets)
 
 # Extend the boot compiler installation in _install (see [boot-_install])
-# with the artifacts needed by the upstream testsuite, laid out as the main
-# compiler's installation would be.
+# with the pieces needed by the upstream testsuite, laid out as the main
+# compiler's installation would be. The ".byte" tools are the bytecode shim
+# (see oxcaml/testsuite/tools/compiler_shim.ml): tests that request them
+# run the boot compiler's native binaries instead.
 .PHONY: boot-test-install
 boot-test-install: boot-_install boot-test-artifacts
-	$(cpl) $(boot_test_build)/main.bc _install/bin/ocamlc.byte
-	$(cpl) $(boot_test_build)/oxcaml_main.bc _install/bin/ocamlopt.byte
-	$(cpl) $(boot_test_build)/lex/main.bc _install/bin/ocamllex.byte
-	$(cpl) $(boot_test_build)/ocamlyacc _install/bin/ocamlyacc
-	$(cpl) $(boot_test_build)/toplevel/byte/bytetop _install/bin/ocaml
-	$(cpl) $(boot_test_build)/tools/ocamlmklib.bc _install/bin/ocamlmklib.byte
-	$(cpl) $(boot_test_build)/tools/objinfo.bc _install/bin/ocamlobjinfo.byte
-	$(cpl) $(boot_test_build)/tools/dumpobj.bc _install/bin/dumpobj.byte
-	$(cpl) $(boot_test_build)/tools/ocamlfilt.bc _install/bin/ocamlfilt
-	$(cpl) $(boot_test_build)/toplevel/expunge.bc _install/lib/ocaml/expunge
+	$(cpl) $(main_build)/oxcaml/testsuite/tools/compiler_shim.bc \
+          _install/bin/ocamlc.byte
+	$(cpl) $(main_build)/oxcaml/testsuite/tools/compiler_shim.bc \
+          _install/bin/ocamlopt.byte
+	$(cpl) $(main_build)/oxcaml/testsuite/tools/compiler_shim.bc \
+          _install/bin/ocamllex.byte
+	$(cpl) $(main_build)/ocamlyacc _install/bin/ocamlyacc
 	mkdir -p _install/lib/ocaml/stublibs
-	$(cpl) $(boot_test_build)/middle_end/flambda2/numbers/floats/dllflambda2_floats_stubs.so \
-          $(boot_test_build)/middle_end/flambda2/algorithms/dllflambda2_algorithms_stubs.so \
-          $(boot_test_build)/external/owee/dllcompiler_owee_stubs.so \
-          $(boot_test_build)/external/gc-timings/dllgc_timings_stubs.so \
-          _install/lib/ocaml/stublibs/
+	$(cpl) -f _install/lib/stublibs/*.so _install/lib/ocaml/stublibs/
 	for universe in upstream_compatible stable beta alpha ; do \
 	  mkdir -p _install/lib/ocaml/stdlib_$$universe; \
-	  $(cpl) $(boot_test_build)/otherlibs/stdlib_$$universe/stdlib_$$universe.{cma,cmxa,a} \
+	  $(cpl) $(main_build)/otherlibs/stdlib_$$universe/stdlib_$$universe.{cma,cmxa,a} \
             _install/lib/ocaml/stdlib_$$universe/; \
-	  $(cpl) $(boot_test_build)/otherlibs/stdlib_$$universe/.stdlib_$$universe.objs/byte/*.cmi \
+	  $(cpl) $(main_build)/otherlibs/stdlib_$$universe/.stdlib_$$universe.objs/byte/*.cmi \
             _install/lib/ocaml/stdlib_$$universe/; \
-	  $(cpl) $(boot_test_build)/otherlibs/stdlib_$$universe/.stdlib_$$universe.objs/native/*.cmx \
+	  $(cpl) $(main_build)/otherlibs/stdlib_$$universe/.stdlib_$$universe.objs/native/*.cmx \
             _install/lib/ocaml/stdlib_$$universe/; \
 	done
-	$(cpl) $(boot_test_build)/ocamlcommon.cma $(boot_test_build)/ocamlbytecomp.cma \
-          $(boot_test_build)/ocamloptcomp.cma \
-          _install/lib/ocaml/compiler-libs/
-	$(cpl) $(boot_test_build)/toplevel/byte/ocamltoplevel.cma _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/.ocamlcommon.objs/byte/*.cmi _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/.ocamlbytecomp.objs/byte/*.cmi _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/.ocamloptcomp.objs/byte/*.cmi _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/toplevel/byte/.ocamltoplevel.objs/byte/*.cmi _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/toplevel/byte/.ocamltoplevel.objs/byte/topdirs.{cmt,cmti} \
-          _install/lib/ocaml/compiler-libs/
-	$(cpl) -f $(boot_test_build)/toplevel/byte/topdirs.mli _install/lib/ocaml/compiler-libs/
-	cp -f _install/lib/ocaml/compiler-libs/topdirs.{cmi,mli,cmt,cmti} _install/lib/ocaml
 
 # Like [install_for_test], but for testing the boot compiler: the compilers
-# that the testsuite exercises are the boot compiler's binaries, and neither
-# the main compiler nor the otherlibs are built. Tests that require anything
-# beyond the stdlib (and the stdlib_* universes) are excluded via
-# oxcaml/testsuite/boot-test-list. Note also that unlike [install_for_test],
-# nothing is installed to the configured prefix, so the rare tests that look
-# outside of _runtest (e.g. via +compiler-libs, which expands to the
-# configured standard library path) can fail.
-install_for_test_boot: test_build = $(boot_test_build)
+# that the testsuite exercises are the boot compiler's own native binaries,
+# and nothing is built beyond the stdlib, the stdlib_* universes and the
+# testsuite support libraries — in particular no compiler-libs, in any
+# mode. Tests that request the ".byte" compilers transparently run the
+# native ones through the compiler shim; tests that need tools that cannot
+# exist in this mode (expect, the toplevels, ocamldebug, ...) are skipped
+# by ocamltest, and whole directories that cannot work are excluded via
+# oxcaml/testsuite/boot-test-list. Note also that unlike
+# [install_for_test], nothing is installed to the configured prefix, so the
+# rare tests that look outside of _runtest (e.g. via +compiler-libs, which
+# expands to the configured standard library path) can fail.
+install_for_test_boot: test_build = $(main_build)
 install_for_test_boot: test_stublibs = _install/lib/ocaml/stublibs
 install_for_test_boot: boot_flow = true
 install_for_test_boot: boot-test-install
@@ -580,6 +539,9 @@ define run_upstream_testsuite
 	fi
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if [ -e "$$OCAMLSRCDIR/BOOT_TEST_FLOW" ]; then \
+	   export OCAMLTEST_SKIP_MISSING_TOOLS=true; \
+	 fi; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
@@ -616,6 +578,9 @@ test-boot: install_for_test_boot
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if [ -e "$$OCAMLSRCDIR/BOOT_TEST_FLOW" ]; then \
+	   export OCAMLTEST_SKIP_MISSING_TOOLS=true; \
+	 fi; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
@@ -642,6 +607,9 @@ locate_test = \
 test-one-no-rebuild:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if [ -e "$$OCAMLSRCDIR/BOOT_TEST_FLOW" ]; then \
+	   export OCAMLTEST_SKIP_MISSING_TOOLS=true; \
+	 fi; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \
@@ -653,6 +621,9 @@ promote-one: install_for_test
 promote-one-no-rebuild:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if [ -e "$$OCAMLSRCDIR/BOOT_TEST_FLOW" ]; then \
+	   export OCAMLTEST_SKIP_MISSING_TOOLS=true; \
+	 fi; \
 	 if $$(which gfortran > /dev/null 2>&1); then \
 	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	 fi; \

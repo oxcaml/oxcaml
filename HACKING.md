@@ -105,15 +105,20 @@ already present on Linux machines. On macOS, install Homebrew, then `brew
 install parallel`.
 - `make runtest-upstream-boot` to run the upstream testsuite with the boot
 compiler (i.e. the compiler built by the system compiler) instead of the
-final compiler. This does not build the main compiler at all: only the
-stdlib, the bytecode compilers and tools, and the expect tool are built in
-support of the testsuite, so it is much faster than `make runtest-upstream`;
-it is also useful when the final compiler itself is miscompiled. Tests that
-need more than that (the otherlibs, the native compiler-libs, ocamldebug,
-etc.) are skipped; see `oxcaml/testsuite/boot-test-list`. Some kept
-directories contain a few tests that fail in this mode for the same
-reasons. After a first run, single tests can be re-run against the boot
-compiler with `make test-one-no-rebuild TEST=...`.
+final compiler. This does not build the main compiler — or any of the
+compiler-libs — at all: only the stdlib and a few small testsuite support
+libraries are built, so it is much faster than `make runtest-upstream`; it
+is also useful when the final compiler itself is miscompiled. Tests that
+request the `ocamlc.byte`/`ocamlopt.byte`/`ocamllex.byte` tools
+transparently run the boot compiler's native binaries instead (through
+`oxcaml/testsuite/tools/compiler_shim.ml`). Tests that need tools that
+cannot be built in this mode (the expect tool, the toplevels, ocamldebug,
+etc.) are skipped by ocamltest, and directories that need the otherlibs or
+the native compiler-libs are excluded via
+`oxcaml/testsuite/boot-test-list`; some kept directories contain a few
+tests that fail in this mode for the same reasons. After a first run,
+single tests can be re-run against the boot compiler with
+`make test-one-no-rebuild TEST=...`.
 
 There is also a `make ci` target which does a full build and test run.
 
