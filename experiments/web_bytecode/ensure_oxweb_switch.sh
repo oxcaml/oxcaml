@@ -26,10 +26,12 @@ for tool in \
   ocamlmklib \
   ocamlobjinfo \
   ocamlobjinfo.opt \
+  ocamlopt \
+  ocamlopt.opt \
   ocamlyacc
 do
   case "$tool" in
-    ocamlrun|ocamlrund|ocamlruni)
+    ocamlrun|ocamlrund|ocamlruni|ocamlopt|ocamlopt.opt)
       ln -sf "$repo_root/_install/bin/$tool" "$bytecode_toolchain_bin/$tool"
       ;;
     ocamlc)
@@ -53,10 +55,7 @@ exec "$toolchain_bin/ocamlc" "\$@"
 EOF
 chmod +x "$bytecode_toolchain_bin/ocamlmktop"
 
-rm -f \
-  "$bytecode_toolchain_bin/ocamlopt" \
-  "$bytecode_toolchain_bin/ocamlopt.opt" \
-  "$bytecode_toolchain_bin/ocamloptp"
+rm -f "$bytecode_toolchain_bin/ocamloptp"
 
 require_package() {
   local package_name=$1

@@ -215,6 +215,10 @@ mkdir -p "$tmp_install/lib/ocaml/threads"
 cp -f "$repo_root/_build/main/otherlibs/systhreads/META" "$tmp_install/lib/ocaml/threads/"
 cp -f "$repo_root/_build/main/otherlibs/systhreads/byte/threads.cma" \
   "$tmp_install/lib/ocaml/threads/"
+cp -f "$repo_root/_build/main/otherlibs/systhreads/byte/libthreads_stubs.a" \
+  "$tmp_install/lib/ocaml/threads/"
+cp -f "$repo_root/_build/main/otherlibs/systhreads/byte/dllthreads_stubs.so" \
+  "$tmp_install/lib/ocaml/stublibs/"
 copy_flattened_artifacts \
   "$tmp_install/lib/ocaml/threads" \
   "$repo_root/_build/main/otherlibs/systhreads/byte/.threads.objs/byte"
