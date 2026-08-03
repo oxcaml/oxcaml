@@ -272,9 +272,6 @@ let with_additional_action =
      attempt to do this based on filename caused spurious "inconsistent
      assumption" errors that couldn't immediately be solved. Revisit
      with a better approach.
-
-     We'll need to revisit the Note [Preparing_for_saving always the same]
-     once we do this tailoring.
   *)
   let (additional_action, sort_var_mapping) : additional_action * sort_map =
     match config with
@@ -1348,13 +1345,9 @@ and compose s1 s2 =
             | Duplicate_variables, (Prepare_for_saving _ as prepare)
                 -> prepare
 
-            (* Note [Preparing_for_saving always the same]
-               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-               The function we put in [Prepare_for_saving] is always the same,
-               so we can take either.
-            *)
-            | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
-                -> prepare1
+            | Prepare_for_saving _, Prepare_for_saving _ ->
+              fatal_error
+                "compose: composing Prepare_for_saving and Prepare_for_saving"
           end;
           sort_var_mapping = begin
             match s1.sort_var_mapping, s2.sort_var_mapping with
