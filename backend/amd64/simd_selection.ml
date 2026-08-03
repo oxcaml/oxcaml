@@ -50,8 +50,16 @@ let seq_or_avx sse vex ?i args =
 let seq_or_avx_zeroed ~dbg seq instr ?i args =
   if Arch.Extension.enabled AVX
   then
-    cfg_operation (Simd.instruction instr i)
-      (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
+    let args =
+      match[@warning "-4"] args with
+      | [(Cmm.Cvar _ as arg)] ->
+        (* The first operand only supplies the upper bits of the result, which
+           are irrelevant here. Using the source avoids materializing a zero,
+           and does not add a dependency since the source is read anyway. *)
+        [arg; arg]
+      | _ -> Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args
+    in
+    cfg_operation (Simd.instruction instr i) args
   else cfg_operation (Simd.sequence seq i) args
 
 let simd_load ~mode instr args =
