@@ -1179,7 +1179,8 @@ module Transfer (Desc_val : Description_value) :
               (* Verify the destroyed registers for exceptional path only. *)
               equations
               |> Equation_set.verify_destroyed_locations
-                   ~destroyed:(Location.of_regs_exn Proc.destroyed_at_raise)
+                   ~destroyed:
+                     (Location.of_regs_exn (Proc.destroyed_at_raise ()))
               |> Result.map_error (fun message ->
                   Printf.sprintf
                     "While verifying locations destroyed at raise: %s" message)

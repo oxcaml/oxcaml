@@ -738,8 +738,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec512 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
       Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
-    | Cconst_mask (_bits, _dbg) ->
-      Misc.fatal_error "avx512 masks not yet implemented"
+    | Cconst_mask (bits, _dbg) ->
+      let r = Reg.createv Cmm.typ_mask in
+      Ok (insert_op env sub_cfg (Operation.Const_mask bits) [||] r)
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
