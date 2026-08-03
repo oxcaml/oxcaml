@@ -143,8 +143,10 @@ Error: Signature mismatch:
        is not included in
          val select_and_apply : ('a -> 'b) array -> int -> 'a -> 'b
            [@@zero_alloc]
-       The former provides a weaker "zero_alloc" guarantee than the latter.
-       Hint: Add a "zero_alloc" attribute to the implementation.
+       zero_alloc arity mismatch:
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
+       Here the former is 2 and the latter is 3.
 |}]
 
 module Underapplied_primitive : sig
@@ -175,6 +177,8 @@ Error: Signature mismatch:
          external make : 'a array -> int -> 'a = "%array_safe_get"
        is not included in
          val make : 'a array -> 'a t [@@zero_alloc]
-       The former provides a weaker "zero_alloc" guarantee than the latter.
-       Hint: Add a "zero_alloc" attribute to the implementation.
+       zero_alloc arity mismatch:
+       When using "zero_alloc" in a signature, the syntactic arity of
+       the implementation must match the function type in the interface.
+       Here the former is 2 and the latter is 1.
 |}]
