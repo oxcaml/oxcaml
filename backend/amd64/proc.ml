@@ -665,7 +665,8 @@ let initial_stack_offset ~num_stack_slots:_ ~contains_calls:_ = 0
 let trap_frame_size_in_bytes = 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  fp || fun_contains_calls ||
+  (fp && not !Oxcaml_flags.omit_leaf_frame_pointers)
+  || fun_contains_calls ||
   Stack_class.Tbl.exists
     fun_num_stack_slots
     ~f:(fun _stack_class num -> num > 0)

@@ -46,6 +46,8 @@ let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
 
+let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
+
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)

@@ -1005,6 +1005,28 @@
  (section lib)
  (package ocaml))
 
+; Build all the files that Merlin needs to work on the compiler. Building @check
+; for the entire repo will build too much, as we don't want to build directories
+; like stdlib/ or the tests. Also, aliases like `@typing/check` are empty in our
+; build rules, which is why we glob on cmi, cmt, and cmti files.
+(alias
+ (name merlin-support)
+ (deps
+  (glob_files .ocamlcommon.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamljcomp.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .oxcaml_common.objs/byte/*.{cmi,cmt,cmti})
+  (alias_rec middle_end/check)
+  (alias_rec backend/check)
+  (alias_rec driver/check)
+  (alias_rec file_formats/check)
+  (alias_rec lex/check)
+  (alias_rec printer/check)
+  (alias_rec chamelon/check)
+  (alias_rec extract_externals/check)
+  (alias_rec ocamltest/check)))
+
 (rule
  (targets compiler-libs-installation.sexp)
  (deps

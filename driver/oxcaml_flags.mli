@@ -44,6 +44,7 @@ val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
+val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
 

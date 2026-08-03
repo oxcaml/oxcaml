@@ -58,6 +58,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
