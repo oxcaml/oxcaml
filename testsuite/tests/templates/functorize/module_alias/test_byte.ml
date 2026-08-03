@@ -1,13 +1,13 @@
 (* TEST
- (* Module aliases under [-no-alias-deps].  A module is pulled into the
-    bundle iff some loaded cmi lists it as [Exact] in [bound_globals];
-    otherwise (only ever [Approximate]) it substitutes to [Pruned_<head>]
-    — the bundle typechecks but consumers touching the pruned reference
-    fail. *)
+ (* Module aliases under [-no-alias-deps].  Every module referenced from
+    a loaded cmi's [bound_globals] is loaded and pulled into the bundle,
+    whether the reference was recorded [Exact] (body-level use) or
+    [Approximate] (pure alias). *)
 
  readonly_files = "\
    message.mli message.ml with_message.ml \
-   pure_alias.ml main_pure_alias.ml bad_pure_alias.reference \
+   pure_alias.ml main_pure_alias.ml \
+   test_functorize_pure_alias.reference \
    included_alias.ml main_included_alias.ml \
    test_functorize_included_alias.reference \
    lib__.ml mod_a.ml mod_b.ml main_circular.ml sig_circular.ml \
@@ -127,9 +127,8 @@
 
  (* Case 2 — [pure_alias.ml] declares only [module Message = Message].
     Under [-no-alias-deps] this records [Message] as [Approximate]
-    (no CRC), and since no other loaded cmi lists it as [Exact],
-    [Message] is pruned to [Pruned_Message].  Bundling succeeds; a
-    consumer that touches [Inst.Pure_alias.Message] fails to compile. *)
+    (no CRC); the functorizer loads [Message]'s cmi anyway and bundles
+    it, so a consumer can use [Inst.Pure_alias.Message]. *)
 
  flags = "$flg -functorize -I p -I message -I pure_alias Pure_alias";
  module = "";
@@ -139,12 +138,28 @@
 
  flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
  module = "main_pure_alias.ml";
- ocamlc_byte_exit_status = "2";
- compiler_output = "bad_pure_alias.output";
  ocamlc.byte;
 
- compiler_reference = "bad_pure_alias.reference";
- check-ocamlc.byte-output;
+ flags = "$flg_link";
+ module = "";
+ program = "$test_build_directory/test_functorize_pure_alias.bc";
+ all_modules = "\
+   message/message.cmo \
+   pure_alias/pure_alias.cmo \
+   p_int/p_int__.cmo \
+   p_int/p_int.cmo \
+   bundle_pure_alias/bundle_pure_alias.cmo \
+   main_pure_alias.cmo \
+ ";
+ ocamlc.byte;
+
+ stdout = "test_functorize_pure_alias.output";
+ stderr = "test_functorize_pure_alias.output";
+ output = "test_functorize_pure_alias.output";
+ run;
+
+ reference = "test_functorize_pure_alias.reference";
+ check-program-output;
 
  (* Case 3 — [included_alias.ml] uses [module Message = struct include
     Message end].  The [include] forces a body-level use, so its cmi
