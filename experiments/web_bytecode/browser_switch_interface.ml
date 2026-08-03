@@ -16,7 +16,7 @@ let interface_string ~browser ~filename ~source =
          let unit_info =
            Unit_info.make_dummy ~input_name:filename compilation_unit
          in
-         Env.set_unit_name (Some unit_info);
+         Env.set_current_unit unit_info;
          let env = Compmisc.initial_env () in
          let implementation =
            Typemod.type_implementation unit_info compilation_unit env ast
