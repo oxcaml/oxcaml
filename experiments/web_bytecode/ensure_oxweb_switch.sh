@@ -85,7 +85,7 @@ if ! OPAMROOT="$local_opam_root" opam switch --short list | grep -Fxq "$local_op
   env \
     PATH="$bytecode_toolchain_bin:$host_path" \
     OPAMROOT="$local_opam_root" \
-    opam switch create "$local_opam_switch" ocaml-system.5.4.0+ox --repositories=oxweb-local,default -y
+    opam switch create "$local_opam_switch" ocaml-system.5.4.0 --repositories=oxweb-local,default -y
 fi
 
 missing_packages=()
