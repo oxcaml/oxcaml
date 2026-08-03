@@ -71,7 +71,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
     List.map
       (fun ((uir, sections) : Cmx_format.unit_infos_raw * _) ->
         let sections =
-          Oxcaml_utils.File_sections.from_array
+          File_sections.from_array
             (Array.map (fun s -> Marshal.from_string s 0) sections)
         in
         let ui : Cmx_format.unit_infos =

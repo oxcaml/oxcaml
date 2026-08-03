@@ -882,8 +882,8 @@ This value is contended but expected to be uncontended.
 ```
 
 because rule 2b insists that it treat `a` as `contended`. Fortunately, `loop`
-doesn't need to be `portable`: since it's defined inside `functorial`, it's
-safe for `functorial` to call `loop` even though `loop` isn't `portable`.
+doesn't need to be `portable`: since it's defined inside `factorial`, it's
+safe for `factorial` to call `loop` even though `loop` isn't `portable`.
 (Remember, rule 1 says we can't call `loop` from _outside the domain that
 created it._ Since `factorial` is `portable`, that could be any domain, but
 nonetheless its whole body executes in one consistent domain.)

@@ -390,7 +390,7 @@ let variable_is_from_missing_cmx_file t name =
   then false
   else
     let comp_unit = Name.compilation_unit name in
-    if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
+    if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
     then false
     else
       match (resolver t) comp_unit with
@@ -416,7 +416,7 @@ let find_with_binding_time_and_mode' t name kind =
   match Name.Map.find_or_null name (names_to_types t) with
   | Null -> (
     let comp_unit = Name.compilation_unit name in
-    if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
+    if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
     then
       let[@inline always] var var =
         Misc.fatal_errorf "Variable %a not bound in typing environment:@ %a"
@@ -515,7 +515,7 @@ let binding_time_and_mode t name =
   Name.pattern_match name
     ~var:(fun var ->
       let comp_unit = Variable.compilation_unit var in
-      if Compilation_unit.is_current comp_unit
+      if Current_unit.is_current comp_unit
       then
         let _typ, binding_time_and_mode =
           find_with_binding_time_and_mode t name None
@@ -535,7 +535,7 @@ let mem ?min_name_mode t name =
       let name_mode =
         match Name.Map.find_or_null name (names_to_types t) with
         | Null ->
-          if Compilation_unit.is_current (Name.compilation_unit name)
+          if Current_unit.is_current (Name.compilation_unit name)
           then None
           else Some Name_mode.in_types
         | This (_ty, binding_time_and_mode) ->
@@ -554,7 +554,7 @@ let mem ?min_name_mode t name =
         | Some c -> c <= 0))
     ~symbol:(fun sym ->
       Symbol.Set.mem sym t.defined_symbols
-      || not (Compilation_unit.is_current (Name.compilation_unit name)))
+      || not (Current_unit.is_current (Name.compilation_unit name)))
 
 let mem_simple ?min_name_mode t simple =
   Simple.pattern_match simple
@@ -652,7 +652,7 @@ let add_variable_definition t var kind name_mode =
      compilation units' variables or symbols (except for predefined symbols such
      as exceptions) in our own compilation unit. *)
   let comp_unit = Variable.compilation_unit var in
-  let this_comp_unit = Compilation_unit.get_current_exn () in
+  let this_comp_unit = Current_unit.get_cu_exn () in
   if not (Compilation_unit.equal comp_unit this_comp_unit)
   then
     Misc.fatal_errorf
@@ -687,7 +687,7 @@ let add_variable_definition t var kind name_mode =
 let add_symbol_definition t sym =
   (* CR-someday mshinwell: check for redefinition when invariants enabled? *)
   let comp_unit = Symbol.compilation_unit sym in
-  let this_comp_unit = Compilation_unit.get_current_exn () in
+  let this_comp_unit = Current_unit.get_cu_exn () in
   if not (Compilation_unit.equal comp_unit this_comp_unit)
   then
     Misc.fatal_errorf
@@ -765,7 +765,7 @@ let invariant_for_new_equation (t : t) name ty =
       let has_local_unbound_name =
         Name_occurrences.fold_names unbound_names ~init:false
           ~f:(fun acc name ->
-            acc || Compilation_unit.is_current (Name.compilation_unit name))
+            acc || Current_unit.is_current (Name.compilation_unit name))
       in
       if has_local_unbound_name
       then
@@ -803,7 +803,7 @@ let replace_equation (t : t) name ty =
           if
             Compilation_unit.equal
               (Variable.compilation_unit var)
-              (Compilation_unit.get_current_exn ())
+              (Current_unit.get_cu_exn ())
           then
             Cached_level.replace_variable_binding
               (One_level.just_after_level t.current_level)
@@ -1237,7 +1237,7 @@ end = struct
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
           | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-          | Boxed_nativeint _ | String _ | Array _ ->
+          | Boxed_mask _ | Boxed_nativeint _ | String _ | Array _ ->
             value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
@@ -1324,7 +1324,7 @@ end = struct
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _ ->
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in

@@ -75,12 +75,16 @@ and token = parse
       match s with
         | "include" -> INCLUDE
         | "set" -> SET
+        | "split" -> SPLIT
         | "unset" -> UNSET
         | "with" -> WITH
         | _ -> IDENTIFIER s
     }
   | "{" { LEFT_BRACE }
   | "}" { RIGHT_BRACE }
+  | "[" { LEFT_BRACKET }
+  | "]" { RIGHT_BRACKET }
+  | "|" { BAR }
   | ";" { SEMI }
   | "(*"
     {

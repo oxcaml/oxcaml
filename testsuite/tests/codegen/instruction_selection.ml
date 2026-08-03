@@ -98,15 +98,15 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $41, %rbx
-  setl  %al
-  cmpq  $11, %rbx
+  movq  (%rax), %rdi
+  xorl  %ebx, %ebx
+  cmpq  $41, %rdi
+  setl  %bl
+  movq  %rdi, %rax
+  cmpq  $11, %rax
   jle   .L0
-  testq %rax, %rax
+  testq %rbx, %rbx
   je    .L0
-  movq  %rbx, %rax
   ret
 .L0:
   movl  $1, %eax
@@ -144,26 +144,26 @@ let bad_max a b =
   !i
 [%%expect_asm X86_64{|
 bad_max:
-  movq  %rax, %rdi
-  movl  $1, %esi
-  cmpq  %rdi, %rsi
+  movq  %rax, %rsi
+  movl  $1, %edi
+  cmpq  %rsi, %rdi
   jge   .L1
 .L0:
   movl  $1, %eax
   jmp   .L2
 .L1:
   xorl  %eax, %eax
-  cmpq  %rbx, %rsi
+  cmpq  %rbx, %rdi
   setl  %al
   testq %rax, %rax
   je    .L3
 .L2:
-  addq  $2, %rsi
-  cmpq  %rdi, %rsi
+  addq  $2, %rdi
+  cmpq  %rsi, %rdi
   jge   .L1
   jmp   .L0
 .L3:
-  movq  %rsi, %rax
+  movq  %rdi, %rax
   ret
 |}]
 
@@ -174,15 +174,15 @@ let int_compare x y =
   | r -> r
 [%%expect_asm X86_64{|
 int_compare:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
+  movq  %rax, %rsi
+  cmpq  %rbx, %rsi
   je    .L0
-  movq  $-1, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 .L0:
   movl  $1, %eax
@@ -217,20 +217,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rbx
+  movq  %rax, %rdi
   subq  $48, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rdi
-  addq  $24, %rdi
-  movq  $2048, -8(%rdi)
-  movq  %rbx, (%rdi)
-  movq  $1, 8(%rdi)
-  leaq  -24(%rdi), %rax
+  leaq  8(%r15), %rbx
+  addq  $24, %rbx
+  movq  $2048, -8(%rbx)
+  movq  %rdi, (%rbx)
+  movq  $1, 8(%rbx)
+  leaq  -24(%rbx), %rax
   movq  $2048, -8(%rax)
-  movq  %rbx, (%rax)
-  movq  %rdi, 8(%rax)
+  movq  %rdi, (%rax)
+  movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
 |}]
@@ -444,9 +444,9 @@ let shift_of_logand (a : int64#) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
+  movl  $1, %ebx
   movq  %rax, %rcx
-  movl  $1, %eax
-  andq  %rax, %rcx
+  andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

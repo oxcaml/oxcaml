@@ -637,6 +637,13 @@ end
 Line 3, characters 10-36:
 3 |   val i : ('a : value mod external_) -> 'a
               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `value mod external_'
+  but was inferred to have kind `value mod immutable external_'.
+
+Line 3, characters 10-36:
+3 |   val i : ('a : value mod external_) -> 'a
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The universal type variable 'a was declared to have kind value
                                                                   mod
                                                                   immutable.
@@ -653,6 +660,13 @@ module type S18 = sig
 end
 
 [%%expect{|
+Line 4, characters 10-22:
+4 |   val i : ('a : value) -> 'a
+              ^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `value'
+  but was inferred to have kind `value mod immutable'.
+
 module type S18 = sig val i : ('a : value mod immutable). 'a -> 'a end
 |}]
 
@@ -941,6 +955,12 @@ module type S35_fail = sig
 end
 
 [%%expect{|
+Line 4, characters 34-44:
+4 |   external[@layout_poly] ignore : ('a : any) -> unit = "%ignore"
+                                      ^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `any' but was inferred to have kind `word'.
+
 Line 4, characters 34-52:
 4 |   external[@layout_poly] ignore : ('a : any) -> unit = "%ignore"
                                       ^^^^^^^^^^^^^^^^^^
@@ -1040,4 +1060,32 @@ module type S37 =
     module type Inner = sig val id : ('t : word). 't -> unit @@ stateless end
     val f : ('t : word). 't -> 't
   end
+|}]
+
+(* Explicit [('a : any)] annotation on this GADT compiles. *)
+
+module type S38_explicit = sig
+  type ('a : any) t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+module type S38_explicit =
+  sig type ('a : any) t = F32 : float# t | I32 : int# t end
+|}]
+
+(* Implicit version compiles. *)
+
+module type S38_implicit = sig
+  [@@@implicit_kind: ('a : any)]
+
+  type 'a t =
+    | F32 : float# t
+    | I32 : int# t
+end
+
+[%%expect{|
+module type S38_implicit =
+  sig type ('a : any) t = F32 : float# t | I32 : int# t end
 |}]

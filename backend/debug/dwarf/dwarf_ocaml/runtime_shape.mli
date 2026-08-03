@@ -57,6 +57,7 @@ module Runtime_layout : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -170,6 +171,7 @@ and predef =
   | Int32
   | Int64
   | Lazy_t of t
+  | Mask
   | Nativeint
   | String
   | Simd of simd_vec_split
@@ -188,6 +190,7 @@ and unboxed =
   | Unboxed_int32
   | Unboxed_int16
   | Unboxed_int8
+  | Unboxed_mask
   | Unboxed_simd of simd_vec_split
 
 and simd_vec_split =

@@ -640,6 +640,8 @@ let array_mode exp =
   | Lambda.Punboxedvectorarray _
   | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
+  | Lambda.Punspecializedarray ->
+    Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"
 
 (* Expression judgment:
      G |- e : m
@@ -757,7 +759,7 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map snd exprs) << Guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
-    | Texp_atomic_loc (expr, _, _, _, _) ->
+    | Texp_atomic_loc { record = expr; _ } ->
       expression expr << Guard
     | Texp_array (_, _, exprs, _) ->
       list expression exprs << array_mode exp
@@ -796,7 +798,10 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
                  | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
                  | Void | Product _ ->
-                   Dereference))
+                   Dereference)
+            | Constructor_variable ->
+                Misc.fatal_error
+                  "value_rec_check: variable constructor representation")
       in
       let arg i (_sort, e) = expression e << arg_mode i in
       join [
@@ -827,6 +832,7 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_inlined (_, Constructor_variable, _)
           | Record_variable ->
             Misc.fatal_error
               "value_rec_check: unexpected unknown representation"

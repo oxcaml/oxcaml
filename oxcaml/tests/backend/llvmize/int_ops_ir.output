@@ -1538,4 +1538,5 @@ declare i64 @llvm.cttz.i64(i64, i1)
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Int_ops" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }

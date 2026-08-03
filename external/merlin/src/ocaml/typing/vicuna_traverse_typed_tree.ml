@@ -151,6 +151,8 @@ let classify env ty : classification =
         (Vicuna_unsupported (Other "Unexpected type constructor Tquote_eval"))
     | Trepr _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
+    | Tbox _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tbox"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -283,6 +285,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote_eval"))
   | Trepr _ ->
     raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
+  | Tbox _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tbox"))
   | Tpackage _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth
@@ -363,7 +367,8 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
-  | Record_variable -> raise (Vicuna_unsupported Field_of_kind_any)
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+    raise (Vicuna_unsupported Field_of_kind_any)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type

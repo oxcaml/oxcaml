@@ -737,8 +737,8 @@ let record_frame_label env live dbg =
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128; _ } -> ()
-      | { typ = Vec256 | Vec512; _ } ->
-        Misc.fatal_error "arm64: got 256/512 bit vector")
+      | { typ = Vec256 | Vec512 | Mask; _ } ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
@@ -1217,15 +1217,20 @@ let emit_named_text_section func_name =
   then (
     (* CR sspies: Clean this up and add proper support for function sections in
        the new asm directives. *)
-    D.switch_to_section_raw
-      ~names:[".text.caml." ^ S.encode (S.create_global func_name)]
-      ~flags:(Some "ax") ~args:["%progbits"] ~is_delayed:false;
+    let name = ".text.caml." ^ S.encode (S.create_global func_name) in
+    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
+      ~is_delayed:false;
+    Emitaux.enter_code_section name;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
        file, we pretend the section is called Text rather than the function
        specific text section. *)
     D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 (* Emit code to load an emitted literal *)
 
@@ -1244,8 +1249,8 @@ let emit_load_literal dst lbl =
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
-  | Vec256 | Vec512 ->
-    Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
+  | Vec256 | Vec512 | Mask ->
+    Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
       Printreg.reg dst
 
 let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
@@ -1254,8 +1259,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
   | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
@@ -1574,9 +1579,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none);
       A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Store (size, addr, assignment)) -> (
     (* NB: assignments other than Word_int and Word_val do not follow the
        Multicore OCaml memory model and so do not emit a barrier *)
@@ -1622,9 +1627,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base))
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->
@@ -1659,8 +1664,12 @@ let emit_instr env i =
   | Lop (Intop_imm (Icomp cmp, n)) ->
     emit_cmpimm (H.reg_x i.arg.(0)) n;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)
-  | Lop (Intop Imod) ->
-    A.ins3 SDIV reg_x_tmp1 (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1));
+  | Lop (Intop (Imod { signed })) ->
+    A.ins3
+      (if signed then SDIV else UDIV)
+      reg_x_tmp1
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1));
     A.ins4 MSUB
       (H.reg_x i.res.(0))
       reg_x_tmp1
@@ -1713,8 +1722,12 @@ let emit_instr env i =
     A.ins4 SUB_shifted_register rd rn rm O.optional_none
   | Lop (Intop Imul) ->
     A.ins_mul (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
-  | Lop (Intop Idiv) ->
-    A.ins3 SDIV (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
+  | Lop (Intop (Idiv { signed })) ->
+    A.ins3
+      (if signed then SDIV else UDIV)
+      (H.reg_x i.res.(0))
+      (H.reg_x i.arg.(0))
+      (H.reg_x i.arg.(1))
   | Lop (Intop_imm (Iand, n)) ->
     let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
     A.ins3 AND_immediate rd rn (O.bitmask (Nativeint.of_int n))
@@ -1730,7 +1743,8 @@ let emit_instr env i =
     A.ins_lsr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
-  | Lop (Intop_imm ((Imul | Idiv | Iclz | Ictz | Ipopcnt | Imod | Imulh _), _))
+  | Lop
+      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
@@ -2230,6 +2244,8 @@ let begin_assembly _unix =
 
 (* Not implemented for arm64 *)
 let register_expect_asm_callback (_ : string -> unit) = ()
+
+let expect_asm_whole_function = ref false
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in

@@ -256,10 +256,6 @@ module Sort = struct
 
     let for_block_element = scannable
 
-    let for_probe_body = scannable
-
-    let for_poly_variant = scannable
-
     let for_boxed_record = scannable
 
     let for_object = scannable
@@ -274,21 +270,13 @@ module Sort = struct
 
     let for_class_arg = scannable
 
-    let for_method = scannable
-
-    let for_initializer = scannable
-
     let for_module = scannable
 
     let for_tuple = scannable
 
-    let for_array_get_result = scannable
-
     let for_array_comprehension_element = scannable
 
     let for_list_element = scannable
-
-    let for_idx = bits64
 
     let for_loop_index = scannable
 
@@ -1010,6 +998,12 @@ module Scannable_axes = struct
     Misc.Le_result.combine
       (Nullability.less_or_equal n1 n2)
       (Separability.less_or_equal s1 s2)
+
+  let meet { nullability = n1; separability = s1 }
+      { nullability = n2; separability = s2 } =
+    { nullability = Nullability.meet n1 n2;
+      separability = Separability.meet s1 s2
+    }
 end
 
 module Layout = struct
@@ -1050,6 +1044,38 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
+
+    let is_scannable_or_any = function
+      | Any _ | Base (Scannable, _) -> true
+      | Base
+          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ),
+            _ ) ->
+        false
+      | Product _ -> false
+      | Univar _ -> false
+      | Genvar _ -> false
+
+    let get_root_scannable_axes t =
+      match t with
+      | Any sa -> Some sa
+      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
+      | Product _ -> None
+      | Univar _ -> None
+      | Genvar _ -> None
+
+    let set_root_scannable_axes t sa =
+      match t with
+      | Any _ -> Any sa
+      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Product _ -> t
+      | Univar _ -> t
+      | Genvar _ -> t
+
+    let meet_root_scannable_axes t sa =
+      match get_root_scannable_axes t with
+      | None -> t
+      | Some sa' -> set_root_scannable_axes t (Scannable_axes.meet sa sa')
 
     module Static = struct
       let scannable_non_null_non_pointer =

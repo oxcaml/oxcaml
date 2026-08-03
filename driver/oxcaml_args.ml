@@ -191,6 +191,17 @@ let mk_cfg_prologue_shrink_wrap_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be shrink-wrapped" )
 
+let mk_omit_leaf_frame_pointers f =
+  ( "-omit-leaf-frame-pointers",
+    Arg.Unit f,
+    " Do not set up frames in leaf functions on frame-pointer-enabled builds" )
+
+let mk_no_omit_leaf_frame_pointers f =
+  ( "-no-omit-leaf-frame-pointers",
+    Arg.Unit f,
+    " Set up frames in all functions on frame-pointer-enabled builds (default)"
+  )
+
 let mk_cfg_merge_blocks f =
   ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
 
@@ -457,6 +468,12 @@ let mk_dissector_partition_size f =
       "<size>  Set the partition size threshold in gigabytes for the dissector \
        pass (default: %g)"
       Clflags.dissector_partition_size_default )
+
+let mk_dissector_max_linker_parallelism f =
+  ( "-dissector-max-linker-parallelism",
+    Arg.Int f,
+    "<n>  Run at most <n> partial links concurrently in the dissector pass; 0 \
+     means no limit (default: 0)" )
 
 let mk_ddissector f =
   ("-ddissector", Arg.Unit f, " Print verbose logging from the dissector pass")
@@ -736,6 +753,20 @@ let mk_no_flambda2_match_in_match f =
   ( "-no-flambda2-match-in-match",
     Arg.Unit f,
     Printf.sprintf " Disable the match-in-match optimisation (Flambda2 only)" )
+
+let mk_simplify_stubs f =
+  ( "-flambda2-simplify-stubs",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow the simplification of stub functions%s (Flambda2 only)"
+      (format_default Flambda2.Default.simplify_stubs) )
+
+let mk_no_simplify_stubs f =
+  ( "-flambda2-no-simplify-stubs",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent the simplification of stub functions%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.simplify_stubs) )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -1164,6 +1195,11 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_ddebug_avail_sets f =
+  ( "-ddebug-avail-sets",
+    Arg.Unit f,
+    " Print availability sets when dumping CFG and Linear" )
+
 let mk_dwarf_for_startup_file f =
   ( "-gstartup",
     Arg.Unit f,
@@ -1214,8 +1250,10 @@ let mk_gdwarf_max_function_complexity f =
 let mk_gdwarf_compression f =
   ( "-gdwarf-compression",
     Arg.String f,
-    Format.sprintf " Set the DWARF compression format (default %s)"
-      !Dwarf_flags.gdwarf_compression )
+    Format.sprintf
+      " Set the DWARF compression format (default %s for\n\
+      \     -gno-upstream-dwarf or -gdwarf-inlined-frames, none otherwise)"
+      Dwarf_flags.default_gdwarf_compression )
 
 let mk_gdwarf_fission f =
   ( "-gdwarf-fission",
@@ -1303,6 +1341,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
@@ -1345,6 +1385,7 @@ module type Oxcaml_options = sig
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -1389,6 +1430,8 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
+  val simplify_stubs : unit -> unit
+  val no_simplify_stubs : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1491,6 +1534,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
       mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
+      mk_omit_leaf_frame_pointers F.omit_leaf_frame_pointers;
+      mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
       mk_cfg_value_propagation F.cfg_value_propagation;
@@ -1535,6 +1580,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
       mk_dissector_partition_size F.dissector_partition_size;
+      mk_dissector_max_linker_parallelism F.dissector_max_linker_parallelism;
       mk_ddissector F.ddissector;
       mk_ddissector_sizes F.ddissector_sizes;
       mk_ddissector_verbose F.ddissector_verbose;
@@ -1587,6 +1633,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_reaper_change_calling_conventions;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
+      mk_simplify_stubs F.simplify_stubs;
+      mk_no_simplify_stubs F.no_simplify_stubs;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1674,6 +1722,19 @@ let set_dissector_partition_size f =
       (Arg.Bad
          "-dissector-partition-size must be greater than 0 and less than 2 GiB");
   Clflags.dissector_partition_size := Some f
+
+let set_dissector_max_linker_parallelism n =
+  let bound =
+    match n with
+    | 0 -> Misc.Maybe_bounded.Unbounded
+    | n when n >= 1 -> Misc.Maybe_bounded.Bounded { bound = n }
+    | _ ->
+        raise
+          (Arg.Bad
+             "-dissector-max-linker-parallelism must be a nonnegative integer \
+              (0 means no limit)")
+  in
+  Oxcaml_flags.dissector_max_linker_parallelism := bound
 
 module Extra_options = struct
   type 'a arg_parser = string -> 'a ref -> string -> unit
@@ -1826,6 +1887,8 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
+  let omit_leaf_frame_pointers = set' Oxcaml_flags.omit_leaf_frame_pointers
+  let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
@@ -1955,6 +2018,7 @@ module Oxcaml_options_impl = struct
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
   let dissector_partition_size = set_dissector_partition_size
+  let dissector_max_linker_parallelism = set_dissector_max_linker_parallelism
   let ddissector = set' Clflags.ddissector
   let ddissector_sizes = set' Clflags.ddissector_sizes
   let ddissector_verbose = set' Clflags.ddissector_verbose
@@ -2057,6 +2121,9 @@ module Oxcaml_options_impl = struct
 
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
+
+  let simplify_stubs = set Flambda2.simplify_stubs
+  let no_simplify_stubs = clear Flambda2.simplify_stubs
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2231,6 +2298,7 @@ module type Debugging_options = sig
   val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit
@@ -2250,6 +2318,7 @@ module Make_debugging_options (F : Debugging_options) = struct
       mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
       mk_gdwarf_may_alter_codegen F.gdwarf_may_alter_codegen;
@@ -2280,6 +2349,7 @@ module Debugging_options_impl = struct
 
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
   let gdwarf_may_alter_codegen () = Debugging.gdwarf_may_alter_codegen := true
@@ -2302,7 +2372,7 @@ module Debugging_options_impl = struct
     Debugging.dwarf_max_function_complexity := c
 
   let gdwarf_compression value =
-    Debugging.gdwarf_compression := String.lowercase_ascii value
+    Debugging.gdwarf_compression := Some (String.lowercase_ascii value)
 
   let gdwarf_fission value =
     match String.lowercase_ascii value with
@@ -2406,6 +2476,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
+    | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
@@ -2418,6 +2489,7 @@ module Extra_params = struct
         true
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
+    | "ddebug-avail-sets" -> set' Debugging.debug_avail_sets
     | "dranges" -> set' Oxcaml_flags.dranges
     | "ddebug-invariants" -> set' Dwarf_flags.ddebug_invariants
     | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs
@@ -2693,6 +2765,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with
@@ -2702,6 +2775,14 @@ module Extra_params = struct
         | None ->
             raise
               (Arg.Bad (Printf.sprintf "Expected float for %s, got %S" name v)))
+    | "dissector-max-linker-parallelism" -> (
+        match int_of_string_opt v with
+        | Some n ->
+            set_dissector_max_linker_parallelism n;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected int for %s, got %S" name v)))
     | "ddissector" -> set' Clflags.ddissector
     | "ddissector-sizes" -> set' Clflags.ddissector_sizes
     | "ddissector-verbose" -> set' Clflags.ddissector_verbose
