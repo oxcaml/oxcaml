@@ -92,8 +92,13 @@ missing_packages=()
 require_package ocamlfind
 require_package js_of_ocaml
 require_package js_of_ocaml-toplevel
-require_package base
-require_package core
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  require_package ppxlib
+  require_package yojson
+else
+  require_package base
+  require_package core
+fi
 
 if [ "${#missing_packages[@]}" -gt 0 ]; then
   opam_in_switch install -y "${missing_packages[@]}"
