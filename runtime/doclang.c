@@ -57,6 +57,7 @@ static _Atomic uintnat
   doclang_closure_cache[DOCLANG_CLOSURE_CACHE_BUCKETS];
 static CAMLthread_local uintnat doclang_stack[DOCLANG_STACK_LIMIT];
 static CAMLthread_local uintnat doclang_parents[DOCLANG_STACK_LIMIT];
+static CAMLthread_local value doclang_metadata[DOCLANG_STACK_LIMIT];
 static CAMLthread_local int doclang_tail_capable[DOCLANG_STACK_LIMIT];
 static CAMLthread_local uintnat doclang_overapply_parents[DOCLANG_STACK_LIMIT];
 static CAMLthread_local uintnat doclang_overapply_remaining[DOCLANG_STACK_LIMIT];
@@ -1130,6 +1131,7 @@ static void doclang_tail_link(value metadata, uintnat occurrence,
 
 static void doclang_release_frame(uintnat index)
 {
+  doclang_metadata[index] = Val_unit;
   doclang_tail_capable[index] = 0;
   doclang_overapply_parents[index] = 0;
   doclang_overapply_remaining[index] = 0;
@@ -1165,6 +1167,7 @@ static value doclang_enter(value metadata, int tail_capable)
   }
   doclang_stack[doclang_depth] = occurrence;
   doclang_parents[doclang_depth] = parent;
+  doclang_metadata[doclang_depth] = metadata;
   doclang_tail_capable[doclang_depth] = tail_capable;
   doclang_depth++;
   doclang_event("enter", occurrence, parent, metadata, Val_unit, 0);
@@ -1635,9 +1638,38 @@ CAMLprim value caml_doclang_observe_return(value metadata,
   return doclang_leave("return", metadata, occurrence_value, observed);
 }
 
+CAMLprim value caml_doclang_observe_leaf(value metadata, value observed)
+{
+  value occurrence = doclang_enter(metadata, 0);
+  if (Long_val(occurrence) != 0) {
+    doclang_leave("return", metadata, occurrence, observed);
+  }
+  return Val_unit;
+}
+
 CAMLprim value caml_doclang_observe_raise(value metadata,
                                           value occurrence_value,
                                           value exception)
 {
   return doclang_leave("raise", metadata, occurrence_value, exception);
+}
+
+CAMLprim value caml_doclang_observe_mark(value unit)
+{
+  (void)unit;
+  return Val_long(doclang_depth);
+}
+
+CAMLprim value caml_doclang_observe_unwind(value mark_value, value exception)
+{
+  uintnat mark = Long_val(mark_value);
+  doclang_overflow_depth = 0;
+  if (mark > doclang_depth) mark = doclang_depth;
+  while (doclang_depth > mark) {
+    uintnat index = doclang_depth - 1;
+    value metadata = doclang_metadata[index];
+    value occurrence = Val_long(doclang_stack[index]);
+    doclang_leave("raise", metadata, occurrence, exception);
+  }
+  return Val_unit;
 }

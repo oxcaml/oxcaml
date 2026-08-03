@@ -34,8 +34,17 @@ function caml_doclang_observe_write(metadata, observed) { return globalThis.caml
 //Provides: caml_doclang_observe_return
 function caml_doclang_observe_return(metadata, occurrence, observed) { return globalThis.caml_doclang_observe_return(metadata, occurrence, observed); }
 
+//Provides: caml_doclang_observe_leaf
+function caml_doclang_observe_leaf(metadata, observed) { return globalThis.caml_doclang_observe_leaf(metadata, observed); }
+
 //Provides: caml_doclang_observe_raise
 function caml_doclang_observe_raise(metadata, occurrence, observed) { return globalThis.caml_doclang_observe_raise(metadata, occurrence, observed); }
+
+//Provides: caml_doclang_observe_mark
+function caml_doclang_observe_mark() { return globalThis.caml_doclang_observe_mark(); }
+
+//Provides: caml_doclang_observe_unwind
+function caml_doclang_observe_unwind(mark, observed) { return globalThis.caml_doclang_observe_unwind(mark, observed); }
 
 //Provides: caml_doclang_observe_register_function
 function caml_doclang_observe_register_function(fn, consumption, metadata) { return globalThis.caml_doclang_observe_register_function(fn, consumption, metadata); }

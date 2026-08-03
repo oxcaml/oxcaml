@@ -180,10 +180,20 @@ let prim_doclang_observe_return =
     (Lambda.simple_prim_on_values
        ~name:"caml_doclang_observe_return" ~arity:3 ~alloc:false)
 
-let prim_doclang_observe_raise =
+let prim_doclang_observe_leaf =
   Pccall
     (Lambda.simple_prim_on_values
-       ~name:"caml_doclang_observe_raise" ~arity:3 ~alloc:false)
+       ~name:"caml_doclang_observe_leaf" ~arity:2 ~alloc:false)
+
+let prim_doclang_observe_mark =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_mark" ~arity:1 ~alloc:false)
+
+let prim_doclang_observe_unwind =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_unwind" ~arity:2 ~alloc:false)
 
 let prim_doclang_observe_parameter =
   Pccall
@@ -521,7 +531,7 @@ let prepare_doclang_structure compilation_unit ~generated_path structure =
                    add_selector "binder" id 25 location
                  | true, None | false, _ -> ());
                 (match expression.exp_desc with
-                 | Texp_apply (callee, _, _, _, _) ->
+                 | Texp_apply (callee, _, _, _, _, _) ->
                    let role =
                      match callee.exp_desc with
                      | Texp_ident { path; _ }
@@ -882,9 +892,9 @@ let doclang_expression_is_user_tail_call expression =
             Texp_ident { desc = { val_kind = Val_prim _; _ }; _ };
           _
         },
-        _, Typedtree.Tail, _, _ ) ->
+        _, Typedtree.Tail, _, _, _ ) ->
     false
-  | Texp_apply (_, _, Typedtree.Tail, _, _) -> true
+  | Texp_apply (_, _, Typedtree.Tail, _, _, _) -> true
   | _ -> false
 
 let doclang_expression_has_user_tail_call expression =
@@ -1043,7 +1053,7 @@ let doclang_schema env root =
     | Tpoly (body, _) | Tlink body | Tsubst (body, _)
     | Tquote body | Tsplice body | Tquote_eval body | Tbox body ->
       schema active body
-    | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil | Tvariant _
+    | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil | Tvariant _ | Tmod _
     | Trepr _ | Tpackage _ | Tof_kind _ -> "Z"
     end
   in
@@ -1108,7 +1118,8 @@ let doclang_observe_write ~scopes ~expression ~operation
       (mutation,
        Lprim (prim_doclang_observe_write, [metadata; new_value_lambda], loc))
   | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_product _ | Psplicevar _ -> mutation
+  | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+    mutation
 
 let doclang_primitive_write = function
   | "%setfield0" | "%setfield1" -> Some ("ref", 1)
@@ -1132,20 +1143,74 @@ let doclang_return_observation ~metadata ~occurrence ~loc layout lambda =
   in
   Llet (Strict, layout, result, Lambda.debug_uid_none, lambda, return)
 
-let doclang_raise_observation ~metadata ~occurrence ~loc layout lambda =
+let doclang_leaf_observation ~scopes observation layout lambda =
+  match layout with
+  | Pvalue _ ->
+    let location = observation.attribute.attr_loc in
+    let loc = of_location ~scopes location in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let result = Ident.create_local "doclang_leaf_result" in
+    Llet
+      ( Strict,
+        layout,
+        result,
+        Lambda.debug_uid_none,
+        lambda,
+        Lsequence
+          (Lprim
+             (prim_doclang_observe_leaf, [metadata; Lvar result], loc),
+           Lvar result) )
+  | _ ->
+    Location.raise_errorf ~loc:observation.attribute.attr_loc
+      "Observed execution currently supports boxed values only."
+
+let doclang_expression_is_leaf expression =
+  match expression.exp_desc with
+  | Texp_ident _ | Texp_constant _
+  | Texp_construct (_, _, _, [], _) -> true
+  | _ -> false
+
+let doclang_unwind_observation ~mark ~loc layout lambda =
   let exception_ = Ident.create_local "doclang_exception" in
   let handler =
     Lsequence
       (Lprim
-         (prim_doclang_observe_raise,
-          [metadata; Lvar occurrence; Lvar exception_], loc),
+         (prim_doclang_observe_unwind,
+          [Lvar mark; Lvar exception_], loc),
        Lprim (Praise Raise_reraise, [Lvar exception_], loc))
   in
   Ltrywith (lambda, exception_, Lambda.debug_uid_none, handler, layout)
 
-let doclang_finish_observation ~metadata ~occurrence ~loc layout lambda =
-  doclang_raise_observation ~metadata ~occurrence ~loc layout
+let doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout lambda =
+  doclang_unwind_observation ~mark ~loc layout
     (doclang_return_observation ~metadata ~occurrence ~loc layout lambda)
+
+let doclang_trywith ~scopes location body exception_ uid handler layout =
+  if not (doclang_trace_all () && doclang_trace_location location)
+  then Ltrywith (body, exception_, uid, handler, layout)
+  else
+    let mark = Ident.create_local "doclang_handler_mark" in
+    let loc = of_location ~scopes location in
+    Llet
+      ( Strict,
+        Lambda.layout_int,
+        mark,
+        Lambda.debug_uid_none,
+        Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+        Ltrywith
+          ( body,
+            exception_,
+            uid,
+            Lsequence
+              (Lprim
+                 (prim_doclang_observe_unwind,
+                  [Lvar mark; Lvar exception_], loc),
+               handler),
+            layout ) )
 
 let rec doclang_has_tail_handoff = function
   | Lprim
@@ -1163,12 +1228,12 @@ let rec doclang_has_tail_handoff = function
     doclang_has_tail_handoff body
   | _ -> false
 
-let rec doclang_finish_tail_paths ~metadata ~occurrence ~loc layout body =
+let rec doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout body =
   let finish =
-    doclang_finish_tail_paths ~metadata ~occurrence ~loc layout
+    doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout
   in
   let guard prefix_layout prefix =
-    doclang_raise_observation ~metadata ~occurrence ~loc prefix_layout prefix
+    doclang_unwind_observation ~mark ~loc prefix_layout prefix
   in
   match body with
   | Lapply ({ ap_func; _ } as apply)
@@ -1229,7 +1294,8 @@ let rec doclang_finish_tail_paths ~metadata ~occurrence ~loc layout body =
     Ltrywith
       (doclang_return_observation ~metadata ~occurrence ~loc layout body,
        exception_, uid, finish handler, result_layout)
-  | body -> doclang_finish_observation ~metadata ~occurrence ~loc layout body
+  | body ->
+    doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout body
 
 let doclang_observe_lambda
       ?(parameters = []) ?(tail_capable = false) ~scopes observation layout
@@ -1244,13 +1310,7 @@ let doclang_observe_lambda
            (Const_string (doclang_metadata observation, location, None)))
     in
     let occurrence = Ident.create_local "doclang_occurrence" in
-    let body =
-      if not tail_capable
-      then doclang_finish_observation ~metadata ~occurrence ~loc layout lambda
-      else
-        doclang_finish_tail_paths ~metadata ~occurrence ~loc layout lambda
-    in
-    let parameter_events =
+    let add_parameter_events body =
       List.fold_right
         (fun (parameter, parameter_value) body ->
           let parameter_metadata =
@@ -1273,13 +1333,37 @@ let doclang_observe_lambda
       then Lprim (prim_doclang_observe_enter, [metadata], loc)
       else Lprim (prim_doclang_observe_enter_tail, [metadata], loc)
     in
-    Llet
-      ( Strict,
-        Lambda.layout_int,
-        occurrence,
-        Lambda.debug_uid_none,
-        enter,
-        parameter_events )
+    let enter_and_run body =
+      Llet
+        ( Strict,
+          Lambda.layout_int,
+          occurrence,
+          Lambda.debug_uid_none,
+          enter,
+          add_parameter_events body )
+    in
+    if tail_capable || String.equal observation.kind "function"
+    then
+      let mark = Ident.create_local "doclang_mark" in
+      let body =
+        if tail_capable
+        then
+          doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout
+            lambda
+        else
+          doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout
+            lambda
+      in
+      Llet
+        ( Strict,
+          Lambda.layout_int,
+          mark,
+          Lambda.debug_uid_none,
+          Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+          enter_and_run body )
+    else
+      enter_and_run
+        (doclang_return_observation ~metadata ~occurrence ~loc layout lambda)
   | _ ->
     Location.raise_errorf ~loc:observation.attribute.attr_loc
       "Observed execution currently supports boxed values only."
@@ -1295,8 +1379,9 @@ let doclang_observe_tail_lambda ~scopes observation layout lambda =
            (Const_string (doclang_metadata observation, location, None)))
     in
     let occurrence = Ident.create_local "doclang_occurrence" in
+    let mark = Ident.create_local "doclang_mark" in
     let guard prefix_layout prefix =
-      doclang_raise_observation ~metadata ~occurrence ~loc prefix_layout prefix
+      doclang_unwind_observation ~mark ~loc prefix_layout prefix
     in
     let rec instrument = function
       | Llet (kind, bound_layout, id, uid, value, body) ->
@@ -1330,7 +1415,7 @@ let doclang_observe_tail_lambda ~scopes observation layout lambda =
             }
         in
         let fallback =
-          doclang_finish_observation ~metadata ~occurrence ~loc layout
+          doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout
             (Lapply apply)
         in
         Lifthenelse
@@ -1339,15 +1424,21 @@ let doclang_observe_tail_lambda ~scopes observation layout lambda =
               [Lvar function_; supplied_arguments], loc),
            tail_apply, fallback, layout)
       | body ->
-        doclang_finish_observation ~metadata ~occurrence ~loc layout body
+        doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout body
     in
     Llet
       ( Strict,
         Lambda.layout_int,
-        occurrence,
+        mark,
         Lambda.debug_uid_none,
-        Lprim (prim_doclang_observe_enter, [metadata], loc),
-        instrument lambda )
+        Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+        Llet
+          ( Strict,
+            Lambda.layout_int,
+            occurrence,
+            Lambda.debug_uid_none,
+            Lprim (prim_doclang_observe_enter, [metadata], loc),
+            instrument lambda ) )
   | _ -> doclang_observe_lambda ~scopes observation layout lambda
 
 let doclang_pattern_is_simple_variable pattern =
@@ -1394,7 +1485,7 @@ let doclang_pattern_observation_lambda ~scopes ~matched ~matched_layout pattern 
           matched_layout,
           matched )
       | Ptop | Pbottom | Punboxed_float _
-      | Punboxed_or_untagged_integer _ | Punboxed_vector _
+      | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
       | Punboxed_product _ | Psplicevar _ ->
         ( doclang_observation ~construct_id
             ~attribute:(doclang_synthetic_attribute pattern.pat_loc)
@@ -1754,6 +1845,11 @@ and transl_exp1 ?binding_observation ~scopes ~in_new_scope layout e =
       Translobj.oo_wrap e.exp_env true
         (transl_exp0 ?binding_observation ~scopes ~in_new_scope layout) e
   in
+  let observe observation =
+    if doclang_expression_is_leaf e
+    then doclang_leaf_observation ~scopes observation layout lambda
+    else doclang_observe_lambda ~scopes observation layout lambda
+  in
   match doclang_attribute "doclang.observe_expression" e.exp_attributes with
   | Some attribute when is_tail_call ->
     let observation =
@@ -1782,7 +1878,7 @@ and transl_exp1 ?binding_observation ~scopes ~in_new_scope layout e =
           ~attribute ~kind:"expression" ~label:"expression"
           e.exp_env e.exp_type
       in
-      doclang_observe_lambda ~scopes observation layout lambda
+      observe observation
   | None
     when doclang_trace_all () && doclang_trace_location e.exp_loc ->
     (match layout, doclang_trace_expression_kind e with
@@ -1806,7 +1902,7 @@ and transl_exp1 ?binding_observation ~scopes ~in_new_scope layout e =
            (doclang_observe_lambda ~scopes observation Lambda.layout_unit
               lambda_unit,
             lambda)
-       else doclang_observe_lambda ~scopes observation layout lambda
+       else observe observation
      | _ -> lambda)
   | Some _ | None -> lambda
 
@@ -1998,11 +2094,12 @@ and transl_exp0 ?binding_observation ~in_new_scope ~scopes
         eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
       let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
-      Ltrywith(transl_exp ~scopes layout body, id, id_duid,
-               Matching.for_trywith ~scopes ~return_layout:layout
-                 e.exp_loc (Lvar id)
-                 (transl_cases_try ~scopes layout pat_expr_list),
-               layout)
+      doclang_trywith ~scopes e.exp_loc
+        (transl_exp ~scopes layout body) id id_duid
+        (Matching.for_trywith ~scopes ~return_layout:layout
+           e.exp_loc (Lvar id)
+           (transl_cases_try ~scopes layout pat_expr_list))
+        layout
   | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
@@ -2433,27 +2530,30 @@ and transl_exp0 ?binding_observation ~in_new_scope ~scopes
         | Record_variable ->
             fatal_error "transl_exp0: unexpected unknown representation"
       in
-      let new_value_id = Ident.create_local "doclang_write_value" in
-      let record_id = Ident.create_local "doclang_write_record" in
-      let args =
-        match args with
-        | [_record; _new_value] -> [Lvar record_id; Lvar new_value_id]
-        | [_record; field; _new_value] ->
-          [Lvar record_id; field; Lvar new_value_id]
-        | _ -> Misc.fatal_error "Unexpected mutable-record primitive arity"
-      in
-      let mutation = Lprim(prim, args, of_location ~scopes e.exp_loc) in
-      let observed =
-        doclang_observe_write ~scopes ~expression:e ~operation:"field"
-          ~new_value_expression:newval
-          ~new_value_lambda:(Lvar new_value_id) newval_layout mutation
-      in
-      Llet
-        (Strict, newval_layout, new_value_id, Lambda.debug_uid_none,
-         newval_lambda,
-         Llet
-           (Strict, arg_layout, record_id, Lambda.debug_uid_none,
-            arg_lambda, observed))
+      if doclang_trace_all () && doclang_trace_location e.exp_loc
+      then
+        let new_value_id = Ident.create_local "doclang_write_value" in
+        let record_id = Ident.create_local "doclang_write_record" in
+        let args =
+          match args with
+          | [_record; _new_value] -> [Lvar record_id; Lvar new_value_id]
+          | [_record; field; _new_value] ->
+            [Lvar record_id; field; Lvar new_value_id]
+          | _ -> Misc.fatal_error "Unexpected mutable-record primitive arity"
+        in
+        let mutation = Lprim(prim, args, of_location ~scopes e.exp_loc) in
+        let observed =
+          doclang_observe_write ~scopes ~expression:e ~operation:"field"
+            ~new_value_expression:newval
+            ~new_value_lambda:(Lvar new_value_id) newval_layout mutation
+        in
+        Llet
+          (Strict, newval_layout, new_value_id, Lambda.debug_uid_none,
+           newval_lambda,
+           Llet
+             (Strict, arg_layout, record_id, Lambda.debug_uid_none,
+              arg_lambda, observed))
+      else Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -3801,7 +3901,7 @@ and transl_function ?binding_observation ~in_new_scope ~scopes e params body
              in
              (parameter_observation, Lvar parameter.name) :: rest, translated
            | Ptop | Pbottom | Punboxed_float _
-           | Punboxed_or_untagged_integer _ | Punboxed_vector _
+           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
            | Punboxed_product _ | Psplicevar _ -> rest, translated)
         | [], translated -> [], translated
         | _ :: _, [] -> [], []
@@ -4552,7 +4652,7 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
             arg_layout,
             transl_exp ~scopes arg_layout arg )
       | Ptop | Pbottom | Punboxed_float _
-      | Punboxed_or_untagged_integer _ | Punboxed_vector _
+      | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
       | Punboxed_product _ | Psplicevar _ -> None
     else None
   in
@@ -4633,10 +4733,11 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
     let id, id_duid = Typecore.name_pattern "exn" (List.map fst exn_cases) in
     let static_exception_id = next_raise_count () in
     Lstaticcatch
-      (Ltrywith (Lstaticraise (static_exception_id, scrutinees), id, id_duid,
-                 Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
-                   exn_cases,
-                 return_layout),
+      (doclang_trywith ~scopes e.exp_loc
+         (Lstaticraise (static_exception_id, scrutinees)) id id_duid
+         (Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
+            exn_cases)
+         return_layout,
        (static_exception_id, val_ids),
        handler,
       Same_region, return_layout)

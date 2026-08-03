@@ -5,6 +5,7 @@ let nextRequestId = 1;
 let backendWorker = null;
 let directBackendPromise = null;
 let workerFailed = false;
+let workerGeneration = 0;
 const doxProjectResultCache = new Map();
 const doxProjectResultCacheLimit = 4;
 
@@ -26,7 +27,7 @@ function rememberDoxProjectResult(key, result) {
 }
 
 const backendWorkerUrl = new URL(
-  "./backend_worker.js?v=20260803-dox-incremental-3",
+  "./backend_worker.js?v=20260803-dox-persistent-cache-7",
   import.meta.url,
 ).href;
 
@@ -120,6 +121,7 @@ function getBackendWorker() {
       return null;
     }
   }
+  if (backendWorker) workerGeneration += 1;
   backendWorker.onmessage = ({ data }) => {
     if (!data || typeof data !== "object") {
       return;
@@ -173,7 +175,7 @@ function getBackendWorker() {
 
 async function directBackend() {
   if (!directBackendPromise) {
-    directBackendPromise = import("./backend_direct.js?v=20260803-dox-incremental-3");
+    directBackendPromise = import("./backend_direct.js?v=20260803-dox-persistent-cache-7");
   }
   return directBackendPromise;
 }
@@ -255,11 +257,27 @@ export async function runDoxProject(request, options = {}) {
   const cached = doxProjectResultCache.get(cacheKey);
   if (cached) {
     rememberDoxProjectResult(cacheKey, cached);
-    return cached;
+    return {
+      ...cached,
+      cache: { ...(cached.cache || {}), frontendResultHit: true },
+      timings: { ...(cached.timings || {}), browserRequestMs: 0 },
+    };
   }
+  const startedAt = performance.now();
   const result = await callWorker("runDoxProject", [request], options);
   if (result?.kind === "ok") rememberDoxProjectResult(cacheKey, result);
-  return result;
+  return {
+    ...result,
+    cache: {
+      ...(result?.cache || {}),
+      frontendResultHit: false,
+      workerGeneration,
+    },
+    timings: {
+      ...(result?.timings || {}),
+      browserRequestMs: Math.round(performance.now() - startedAt),
+    },
+  };
 }
 
 export async function utopString(filename, source, options = {}) {

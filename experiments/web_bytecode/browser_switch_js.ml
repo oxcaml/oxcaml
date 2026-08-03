@@ -203,6 +203,9 @@ let export name value =
   let global = pure_js_expr "globalThis" in
   js_set global (js_string name) value
 
+let dox_cache_directory () =
+  js_string (Browser_switch_run.dox_cache_directory_path ())
+
 let () =
   let obj : js_object = pure_js_expr "({})" in
   js_set obj (js_string "checkString") (wrap_callback check_string);
@@ -210,4 +213,6 @@ let () =
   js_set obj (js_string "runString") (wrap_callback run_string);
   js_set obj (js_string "utopString") (wrap_callback utop_string);
   js_set obj (js_string "runDoxProject") (wrap_callback run_dox_project);
+  js_set obj (js_string "doxCacheDirectory")
+    (wrap_callback dox_cache_directory);
   export "WebBytecodeJs" obj

@@ -107,20 +107,27 @@ type cached_dox_unit = {
   source_digest : string;
 }
 
-(* The browser worker lives for the lifetime of the page, so its pseudo-filesystem
-   can be the incremental build store.  Entries after the first changed unit are
-   invalidated conservatively: OCaml units execute front-to-back, and this keeps
-   both interfaces and initialization order correct without maintaining a second
-   dependency graph in the browser bridge. *)
+(* The browser worker lives for the lifetime of the page, so its
+   pseudo-filesystem can be the incremental build store. Entries after the first
+   changed unit are invalidated conservatively: OCaml units execute
+   front-to-back, and this keeps both interfaces and initialization order correct
+   without maintaining a second dependency graph in the browser bridge. *)
 let dox_cache_directory =
-  lazy (Filename.temp_dir ~temp_dir:"." "dox_browser_cache_" "")
+  lazy
+    (let directory = "/dox-browser-cache" in
+     if not (Sys.file_exists directory) then Sys.mkdir directory 0o755;
+     directory)
 
 let dox_unit_cache : (string, cached_dox_unit) Hashtbl.t = Hashtbl.create 32
 let dox_compilation_order = ref []
 
+let dox_cache_directory_path () = Lazy.force dox_cache_directory
+
 let dox_unit_of_json json =
   let open Yojson.Safe.Util in
-  { kind = json |> member "kind" |> to_string_option |> Option.value ~default:"document";
+  { kind =
+      json |> member "kind" |> to_string_option
+      |> Option.value ~default:"document";
     filename = json |> member "filename" |> to_string;
     source = json |> member "source" |> to_string
   }
@@ -129,6 +136,16 @@ let remove_if_exists path =
   try Sys.remove path with Sys_error _ -> ()
 
 let source_digest source = Digest.string source |> Digest.to_hex
+
+let cache_marker_path output_prefix = output_prefix ^ ".dox-cache"
+
+let cached_unit_to_string cached =
+  String.concat "\n" [ cached.kind; cached.source_digest ]
+
+let cached_unit_of_string value =
+  match String.split_on_char '\n' value with
+  | [ kind; source_digest ] -> Some { kind; source_digest }
+  | _ -> None
 
 let unit_paths directory ({ filename; _ } : dox_unit) =
   let source_path = Filename.concat directory filename in
@@ -144,7 +161,8 @@ let remove_unit_artifacts directory unit =
       output_prefix ^ ".cmt";
       output_prefix ^ ".cms";
       output_prefix ^ ".annot";
-      output_prefix ^ ".dox-constructs"
+      output_prefix ^ ".dox-constructs";
+      cache_marker_path output_prefix
     ]
 
 let remove_cached_unit directory filename cached =
@@ -153,9 +171,26 @@ let remove_cached_unit directory filename cached =
   remove_if_exists source_path;
   remove_unit_artifacts directory unit
 
-let cached_unit_is_usable directory (({ kind; filename; source } : dox_unit) as unit) =
+let cached_unit_is_usable directory
+    (({ kind; filename; source } : dox_unit) as unit) =
   let _, output_prefix = unit_paths directory unit in
-  match Hashtbl.find_opt dox_unit_cache filename with
+  let cached =
+    match Hashtbl.find_opt dox_unit_cache filename with
+    | Some _ as cached -> cached
+    | None ->
+      let marker_path = cache_marker_path output_prefix in
+      if Sys.file_exists marker_path
+      then (
+        match
+          cached_unit_of_string (Browser_switch_common.read_file marker_path)
+        with
+        | Some cached ->
+          Hashtbl.replace dox_unit_cache filename cached;
+          Some cached
+        | None -> None)
+      else None
+  in
+  match cached with
   | Some cached ->
     String.equal cached.kind kind
     && String.equal cached.source_digest (source_digest source)
@@ -165,9 +200,31 @@ let cached_unit_is_usable directory (({ kind; filename; source } : dox_unit) as 
        || Sys.file_exists (output_prefix ^ ".dox-constructs"))
   | None -> false
 
-let cache_unit ({ kind; filename; source } : dox_unit) =
-  Hashtbl.replace dox_unit_cache filename
-    { kind; source_digest = source_digest source }
+let cache_unit directory (({ kind; filename; source } : dox_unit) as unit) =
+  let cached = { kind; source_digest = source_digest source } in
+  let _, output_prefix = unit_paths directory unit in
+  Hashtbl.replace dox_unit_cache filename cached;
+  Browser_switch_common.write_source_file
+    ~source_path:(cache_marker_path output_prefix)
+    ~source:(cached_unit_to_string cached)
+
+let compilation_order_path directory = Filename.concat directory "order"
+
+let restore_compilation_order directory =
+  if !dox_compilation_order = []
+  then (
+    let path = compilation_order_path directory in
+    if Sys.file_exists path
+    then
+      dox_compilation_order :=
+        Browser_switch_common.read_file path
+        |> String.split_on_char '\n'
+        |> List.filter (fun filename -> not (String.equal filename "")))
+
+let persist_compilation_order directory =
+  Browser_switch_common.write_source_file
+    ~source_path:(compilation_order_path directory)
+    ~source:(String.concat "\n" !dox_compilation_order ^ "\n")
 
 let run_dox_project ~request =
   let started_at = Sys.time () in
@@ -188,6 +245,7 @@ let run_dox_project ~request =
   in
   let compiling_alias = ref false in
   let directory = Lazy.force dox_cache_directory in
+  restore_compilation_order directory;
   let event_path = Filename.concat directory "events" in
   let compiled = ref [] in
   let manifest_paths = ref [] in
@@ -231,7 +289,7 @@ let run_dox_project ~request =
                        (Printexc.to_string exn)))
               ~finally:(fun () -> compiling_alias := false)
           in
-          cache_unit unit;
+          cache_unit directory unit;
           cmo_path
         in
         let units_by_filename = Hashtbl.create (List.length units) in
@@ -309,6 +367,7 @@ let run_dox_project ~request =
         let compiled_at = Sys.time () in
         dox_compilation_order :=
           List.map (fun ({ filename; _ } : dox_unit) -> filename) compilation_order;
+        persist_compilation_order directory;
         manifest_paths :=
           compilation_order
           |> List.filter_map (fun ({ filename; _ } as unit) ->

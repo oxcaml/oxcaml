@@ -4,7 +4,11 @@ import {
 } from "./playground_prelude.js";
 
 const buildBase = "./build";
-const compilerAssetVersion = "20260803-dox-incremental-3";
+const compilerAssetVersion = "20260803-dox-persistent-cache-7";
+const artifactDatabaseName = `dox-compiler-artifacts-${compilerAssetVersion}`;
+const artifactStoreName = "artifacts";
+const artifactRecordLimit = 160;
+const artifactSuffixes = [".cmo", ".cmi", ".dox-cache", ".dox-constructs"];
 
 const loadedScriptUrls = new Map();
 let browserFsManifestPromise = null;
@@ -19,6 +23,180 @@ const browserFsSeedPaths = [
   "/static/cmis/stdlib__List.cmi",
 ];
 const statusListeners = new Set();
+let artifactDatabasePromise = null;
+
+function openArtifactDatabase() {
+  if (artifactDatabasePromise) return artifactDatabasePromise;
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  artifactDatabasePromise = new Promise((resolve) => {
+    const request = indexedDB.open(artifactDatabaseName, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(artifactStoreName)) {
+        const store = request.result.createObjectStore(artifactStoreName);
+        store.createIndex("savedAt", "savedAt");
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+  return artifactDatabasePromise;
+}
+
+function databaseRequest(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function databaseTransactionDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+async function sourceDigest(source) {
+  const bytes = new TextEncoder().encode(source);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")).join("");
+}
+
+function unitOutputPrefix(cacheDirectory, filename) {
+  const suffix = filename.endsWith(".ml.md")
+    ? ".ml.md"
+    : filename.includes(".")
+      ? filename.slice(filename.lastIndexOf("."))
+      : "";
+  const basename = suffix ? filename.slice(0, -suffix.length) : filename;
+  return `${cacheDirectory}/${basename}`;
+}
+
+function artifactKey(filename, digest, suffix) {
+  return `${filename}\x1f${digest}\x1f${suffix}`;
+}
+
+function artifactContent(record) {
+  if (typeof record === "string") return record;
+  return typeof record?.content === "string" ? record.content : null;
+}
+
+async function trimArtifactDatabase(database) {
+  const countTransaction = database.transaction(artifactStoreName, "readonly");
+  const count = await databaseRequest(countTransaction.objectStore(artifactStoreName).count());
+  if (count <= artifactRecordLimit) return;
+  const transaction = database.transaction(artifactStoreName, "readwrite");
+  const store = transaction.objectStore(artifactStoreName);
+  const index = store.index("savedAt");
+  let remaining = count - artifactRecordLimit;
+  await new Promise((resolve, reject) => {
+    const request = index.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor || remaining <= 0) {
+        resolve();
+        return;
+      }
+      store.delete(cursor.primaryKey);
+      remaining -= 1;
+      cursor.continue();
+    };
+  });
+  await databaseTransactionDone(transaction);
+}
+
+function readRuntimeFile(path) {
+  try {
+    const runtime = globalThis.jsoo_runtime;
+    const mlPath = runtime.caml_string_of_jsbytes(path);
+    return runtime.caml_jsbytes_of_string(runtime.caml_read_file_content(mlPath));
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function restoreCompilerArtifacts(cacheDirectory, units) {
+  const database = await openArtifactDatabase();
+  if (!database) return { restoredUnits: 0, restoreMs: 0 };
+  const startedAt = performance.now();
+  try {
+    const unitDigests = await Promise.all(
+      units.map(async (unit) => [unit, await sourceDigest(unit.source)]),
+    );
+    const transaction = database.transaction(artifactStoreName, "readonly");
+    const store = transaction.objectStore(artifactStoreName);
+    const order = artifactContent(await databaseRequest(store.get("compilation-order")));
+    if (order) {
+      globalThis.jsoo_create_file(`${cacheDirectory}/order`, order);
+    }
+    let restoredUnits = 0;
+    for (const [unit, digest] of unitDigests) {
+      const prefix = unitOutputPrefix(cacheDirectory, unit.filename);
+      let required = 0;
+      let restored = 0;
+      for (const suffix of artifactSuffixes) {
+        if (suffix === ".dox-constructs" && !unit.filename.endsWith(".ml.md")) continue;
+        required += 1;
+        const content = artifactContent(await databaseRequest(
+          store.get(artifactKey(unit.filename, digest, suffix)),
+        ));
+        if (content !== null) {
+          globalThis.jsoo_create_file(`${prefix}${suffix}`, content);
+          restored += 1;
+        }
+      }
+      if (restored === required) restoredUnits += 1;
+    }
+    return { restoredUnits, restoreMs: Math.round(performance.now() - startedAt) };
+  } catch (_error) {
+    return { restoredUnits: 0, restoreMs: Math.round(performance.now() - startedAt) };
+  }
+}
+
+async function persistCompilerArtifacts(cacheDirectory, units) {
+  const database = await openArtifactDatabase();
+  if (!database) return { persistedUnits: 0, persistMs: 0 };
+  const startedAt = performance.now();
+  try {
+    const unitDigests = await Promise.all(
+      units.map(async (unit) => [unit, await sourceDigest(unit.source)]),
+    );
+    const transaction = database.transaction(artifactStoreName, "readwrite");
+    const store = transaction.objectStore(artifactStoreName);
+    const savedAt = Date.now();
+    const order = readRuntimeFile(`${cacheDirectory}/order`);
+    if (typeof order === "string") {
+      store.put({ content: order, savedAt }, "compilation-order");
+    }
+    let persistedUnits = 0;
+    for (const [unit, digest] of unitDigests) {
+      const prefix = unitOutputPrefix(cacheDirectory, unit.filename);
+      let complete = true;
+      for (const suffix of artifactSuffixes) {
+        if (suffix === ".dox-constructs" && !unit.filename.endsWith(".ml.md")) continue;
+        const content = readRuntimeFile(`${prefix}${suffix}`);
+        if (typeof content !== "string") {
+          complete = false;
+          continue;
+        }
+        store.put(
+          { content, savedAt },
+          artifactKey(unit.filename, digest, suffix),
+        );
+      }
+      if (complete) persistedUnits += 1;
+    }
+    await databaseTransactionDone(transaction);
+    await trimArtifactDatabase(database);
+    return { persistedUnits, persistMs: Math.round(performance.now() - startedAt) };
+  } catch (_error) {
+    return { persistedUnits: 0, persistMs: Math.round(performance.now() - startedAt) };
+  }
+}
 
 export function addBackendStatusListener(listener) {
   statusListeners.add(listener);
@@ -410,7 +588,7 @@ async function runBackendWithLazyFs(methodName, filename, source) {
 export const ready = (async () => {
   emitStatus("loading", "loading runtime");
   await loadScript(
-    new URL("./runtime_shims.js?v=20260803-dox-incremental-1", import.meta.url),
+    new URL("./runtime_shims.js?v=20260803-dox-persistent-cache-7", import.meta.url),
   );
   emitStatus("loading", "loading compiler");
   await loadScript(buildAssetUrl("web_bytecode_js.bc.js"));
@@ -456,11 +634,35 @@ export async function runDoxProject(request) {
   if (typeof backend.runDoxProject !== "function") {
     throw new Error("Dox project evaluation is unavailable in this compiler bundle");
   }
+  const parsedRequest = typeof request === "string" ? JSON.parse(request) : request;
+  const units = Array.isArray(parsedRequest?.units) ? parsedRequest.units : [];
   const encoded = typeof request === "string" ? request : JSON.stringify(request);
+  const cacheDirectory = typeof backend.doxCacheDirectory === "function"
+    ? backend.doxCacheDirectory()
+    : null;
+  const restored = cacheDirectory
+    ? await restoreCompilerArtifacts(cacheDirectory, units)
+    : { restoredUnits: 0, restoreMs: 0 };
   let previousMissingFilename = null;
   for (let attempt = 0; attempt < browserFsRetryLimit; attempt += 1) {
     const result = JSON.parse(backend.runDoxProject(encoded));
-    if (result?.kind !== "missing_cmi") return result;
+    if (result?.kind !== "missing_cmi") {
+      const persisted = result?.kind === "ok" && cacheDirectory
+        && Number(result?.cache?.compiledUnits || 0) > 0
+        ? await persistCompilerArtifacts(cacheDirectory, units)
+        : { persistedUnits: 0, persistMs: 0 };
+      result.cache = {
+        ...(result.cache || {}),
+        persistentRestoredUnits: restored.restoredUnits,
+        persistentPersistedUnits: persisted.persistedUnits,
+      };
+      result.timings = {
+        ...(result.timings || {}),
+        artifactRestoreMs: restored.restoreMs,
+        artifactPersistMs: persisted.persistMs,
+      };
+      return result;
+    }
     if (
       typeof result.filename !== "string" ||
       result.filename === previousMissingFilename

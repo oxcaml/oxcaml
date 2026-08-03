@@ -12,7 +12,7 @@
   const doxTraceLimit = 12_000_000;
   let doxTraceBytes = 0;
   let doxTraceTruncated = false;
-  let doxTraceLines = [];
+  let doxTraceRecords = [];
   let doxCounter = 0;
   let doxHandoffCounter = 0;
   let doxStack = [];
@@ -23,6 +23,7 @@
   let doxFunctionConsumption = new WeakMap();
   const doxEnvironment = new Map();
   let doxMetadataCache = new Map();
+  let doxSchemaCache = new Map();
   let doxHexCache = new Map();
   const doxCompactPhases = new Set([
     "tail-handoff",
@@ -158,6 +159,139 @@
         for (let field = 0; field < arity; field += 1) doxSkipSchema(state);
       }
     }
+  }
+
+  function doxParseSchemaNode(state) {
+    if (state.at >= state.text.length) return { kind: "?" };
+    const kind = state.text[state.at++];
+    if ("IBUCDS?ZX".includes(kind)) return { kind };
+    if (kind === "F" || kind === "L" || kind === "O" || kind === "R" || kind === "A" || kind === "E") {
+      return { kind, child: doxParseSchemaNode(state) };
+    }
+    if (kind === "M") {
+      return { kind, key: doxParseSchemaNode(state), value: doxParseSchemaNode(state) };
+    }
+    if (kind === "T") {
+      const count = doxSchemaNumber(state, ":");
+      return { kind, children: Array.from({ length: count }, () => doxParseSchemaNode(state)) };
+    }
+    if (kind === "Q") {
+      const count = doxSchemaNumber(state, ":");
+      const fields = [];
+      for (let index = 0; index < count; index += 1) fields.push({ name: doxSchemaName(state), child: doxParseSchemaNode(state) });
+      return { kind, fields };
+    }
+    if (kind === "V") {
+      const constantCount = doxSchemaNumber(state, ":");
+      const constants = [];
+      for (let index = 0; index < constantCount; index += 1) constants.push(doxSchemaName(state));
+      const blockCount = doxSchemaNumber(state, ":");
+      const blocks = [];
+      for (let index = 0; index < blockCount; index += 1) {
+        const tag = doxSchemaNumber(state, ",");
+        const name = doxSchemaName(state);
+        const arity = doxSchemaNumber(state, ":");
+        blocks.push({ tag, name, children: Array.from({ length: arity }, () => doxParseSchemaNode(state)) });
+      }
+      return { kind, constants, blocks };
+    }
+    return { kind: "?" };
+  }
+
+  function doxParsedSchema(schema) {
+    let parsed = doxSchemaCache.get(schema);
+    if (parsed === undefined) {
+      parsed = doxParseSchemaNode({ text: schema, at: 0 });
+      doxSchemaCache.set(schema, parsed);
+    }
+    return parsed;
+  }
+
+  function doxPreviewParsed(node, value, depth = 0, self = null) {
+    if (depth > 7) return { display: "…", complete: false };
+    const kind = node.kind;
+    if (kind === "I") return { display: String(value), complete: typeof value === "number" };
+    if (kind === "B") return { display: value === 0 ? "false" : "true", complete: typeof value === "number" };
+    if (kind === "U") return { display: "()", complete: true };
+    if (kind === "C") return { display: `'${String.fromCharCode(value | 0)}'`, complete: typeof value === "number" };
+    if (kind === "D") return { display: String(value), complete: typeof value === "number" };
+    if (kind === "S") {
+      const string = doxString(value);
+      if (string === null) return { display: "<opaque>", complete: false };
+      const shown = string.slice(0, 240).replace(/[\x00-\x1f\x7f]/g, ".");
+      return { display: JSON.stringify(shown) + (string.length > 240 ? "…" : ""), complete: string.length <= 240 };
+    }
+    if (kind === "F") return { display: "<function>", complete: false };
+    if (kind === "X") return self ? doxPreviewParsed(self, value, depth + 1, self) : { display: "<opaque>", complete: false };
+    if (kind === "?" || kind === "Z" || kind === "E" || kind === "M") return doxPreviewDynamic(value, depth);
+    if (kind === "T") {
+      const values = [];
+      let complete = doxIsBlock(value) && doxSize(value) >= node.children.length;
+      for (let index = 0; index < node.children.length; index += 1) {
+        const child = doxPreviewParsed(node.children[index], doxField(value, index), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+      }
+      return { display: `(${values.join(", ")})`, complete };
+    }
+    if (kind === "L") {
+      const values = [];
+      let current = value;
+      let complete = true;
+      while (doxIsBlock(current) && doxTag(current) === 0 && doxSize(current) === 2 && values.length < 12) {
+        const child = doxPreviewParsed(node.child, doxField(current, 0), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+        current = doxField(current, 1);
+      }
+      if (current !== 0) { values.push("…"); complete = false; }
+      return { display: `[${values.join("; ")}]`, complete };
+    }
+    if (kind === "O" || kind === "R") {
+      if (kind === "O" && value === 0) return { display: "None", complete: true };
+      if (!doxIsBlock(value) || doxSize(value) < 1) return { display: "<opaque>", complete: false };
+      const child = doxPreviewParsed(node.child, doxField(value, 0), depth + 1, self);
+      return kind === "O" ? { display: `Some (${child.display})`, complete: child.complete } : { display: `{contents = ${child.display}}`, complete: child.complete };
+    }
+    if (kind === "A") {
+      if (!doxIsBlock(value)) return { display: "[|<opaque>|]", complete: false };
+      const shown = Math.min(doxSize(value), 12);
+      const values = [];
+      let complete = shown === doxSize(value);
+      for (let index = 0; index < shown; index += 1) {
+        const child = doxPreviewParsed(node.child, doxField(value, index), depth + 1, self);
+        values.push(child.display);
+        complete &&= child.complete;
+      }
+      if (!complete && shown < doxSize(value)) values.push("…");
+      return { display: `[|${values.join("; ")}|]`, complete };
+    }
+    if (kind === "Q") {
+      const fields = [];
+      let complete = doxIsBlock(value) && doxSize(value) >= node.fields.length;
+      for (let index = 0; index < node.fields.length; index += 1) {
+        const field = node.fields[index];
+        const child = doxPreviewParsed(field.child, doxField(value, index), depth + 1, node);
+        fields.push(`${field.name} = ${child.display}`);
+        complete &&= child.complete;
+      }
+      return { display: `{${fields.join("; ")}}`, complete };
+    }
+    if (kind === "V") {
+      if (typeof value === "number") {
+        const matched = node.constants[value];
+        return { display: matched || "<opaque>", complete: Boolean(matched) };
+      }
+      if (doxIsBlock(value)) {
+        const block = node.blocks.find((candidate) => candidate.tag === doxTag(value));
+        if (block && doxSize(value) >= block.children.length) {
+          const values = block.children.map((child, index) => doxPreviewParsed(child, doxField(value, index), depth + 1, node).display);
+          return { display: values.length ? `${block.name} (${values.join(", ")})` : block.name, complete: true };
+        }
+      }
+      return { display: "<opaque>", complete: false };
+    }
+    return doxPreviewDynamic(value, depth);
   }
 
   function doxPreviewDynamic(value, depth = 0) {
@@ -310,7 +444,7 @@
   function doxPreview(metadata, value, exception = false, fields = doxFields(metadata)) {
     if (exception) return { display: "<exception>", complete: false };
     const schema = fields[9] || "";
-    if (schema) return doxPreviewSchema({ text: schema, at: 0 }, value, 0, schema);
+    if (schema) return doxPreviewParsed(doxParsedSchema(schema), value);
     const type = fields[8] || "";
     if (typeof value === "number") {
       if (type === "unit" || type.endsWith("-> unit")) return { display: "()", complete: true };
@@ -330,25 +464,32 @@
     hasObserved,
     detail = null,
     knownFields = null,
+    knownPreview = null,
   ) {
-    if (doxTraceTruncated) return;
+    if (doxTraceTruncated) return null;
     const fields = knownFields || doxFields(metadata);
-    if (!doxShouldTraceFields(fields)) return;
-    const site = fields[0] || "";
-    const compact = doxCompactPhases.has(phase);
-    const publicMetadata = compact
-      ? [site, "", "", "", "0", "0", "0", "0", ""].join("\x1f")
-      : fields.slice(0, 9).join("\x1f");
-    const preview = detail === null && hasObserved ? doxPreview(metadata, observed, phase === "raise", fields) : { display: detail || "", complete: detail !== null || !hasObserved };
-    const content = [phase, "0", String(occurrence), parent ? String(parent) : "", publicMetadata, preview.complete ? "1" : "0", (hasObserved || detail !== null) ? preview.display : ""].join("\x1f");
-    const line = `observe\t${doxSiteHex(site)}\t${doxHex(content)}\n`;
-    if (doxTraceBytes + line.length > doxTraceLimit) {
-      doxTraceLines.push("trace-truncated\tbrowser-size-limit\t\n");
+    if (!doxShouldTraceFields(fields)) return null;
+    const preview = knownPreview || (detail === null && hasObserved ? doxPreview(metadata, observed, phase === "raise", fields) : { display: detail || "", complete: detail !== null || !hasObserved });
+    const display = (hasObserved || detail !== null) ? preview.display : "";
+    // Keep execution-time hooks allocation-light. The native text protocol is
+    // materialized once, after the program has finished, by doxReadTrace.
+    // This moves encoding out of the latency-sensitive execution path without
+    // changing the protocol consumed by Dox.
+    const estimatedBytes = 256 + phase.length + display.length;
+    if (doxTraceBytes + estimatedBytes > doxTraceLimit) {
       doxTraceTruncated = true;
-      return;
+      return null;
     }
-    doxTraceBytes += line.length;
-    doxTraceLines.push(line);
+    doxTraceBytes += estimatedBytes;
+    doxTraceRecords.push([
+      phase,
+      occurrence,
+      parent,
+      fields,
+      preview.complete,
+      display,
+    ]);
+    return preview;
   }
 
   function doxEnter(metadata, tailCapable) {
@@ -361,6 +502,7 @@
     doxStack.push({
       occurrence,
       parent,
+      metadata,
       tailCapable,
       overapplyParent: pending?.parent || 0,
       overapplyRemaining: pending?.remaining || 0,
@@ -382,9 +524,10 @@
     const frame = doxStack.at(-1);
     if (!frame || frame.occurrence !== occurrence) return 0;
     doxStack.pop();
-    doxEmit(phase, occurrence, frame.parent, metadata, observed, true);
-    if (doxFields(metadata)[1] === "call") {
-      doxEmit(phase === "raise" ? "call-attempt-raise" : "call-attempt-return", occurrence, frame.parent, metadata, observed, true);
+    const fields = doxFields(metadata);
+    const preview = doxEmit(phase, occurrence, frame.parent, metadata, observed, true, null, fields);
+    if (fields[1] === "call") {
+      doxEmit(phase === "raise" ? "call-attempt-raise" : "call-attempt-return", occurrence, frame.parent, metadata, observed, true, null, fields, preview);
     }
     if (frame.overapplyParent && frame.overapplyRemaining > 0 && phase === "return") {
       const consumed = doxFunctionConsumption.get(observed) || 0;
@@ -414,7 +557,7 @@
   global.doxResetTrace = function doxResetTrace() {
     doxTraceBytes = 0;
     doxTraceTruncated = false;
-    doxTraceLines = [];
+    doxTraceRecords = [];
     doxCounter = 0;
     doxHandoffCounter = 0;
     doxStack = [];
@@ -424,10 +567,34 @@
     doxClosures = new WeakMap();
     doxFunctionConsumption = new WeakMap();
     doxMetadataCache = new Map();
+    doxSchemaCache = new Map();
     doxHexCache = new Map();
   };
 
-  global.doxReadTrace = function doxReadTrace() { return doxTraceLines.join(""); };
+  global.doxReadTrace = function doxReadTrace() {
+    const lines = new Array(doxTraceRecords.length + (doxTraceTruncated ? 1 : 0));
+    for (let index = 0; index < doxTraceRecords.length; index += 1) {
+      const [phase, occurrence, parent, fields, complete, display] = doxTraceRecords[index];
+      const site = fields[0] || "";
+      const publicMetadata = doxCompactPhases.has(phase)
+        ? [site, "", "", "", "0", "0", "0", "0", ""].join("\x1f")
+        : fields.slice(0, 9).join("\x1f");
+      const content = [
+        phase,
+        "0",
+        String(occurrence),
+        parent ? String(parent) : "",
+        publicMetadata,
+        complete ? "1" : "0",
+        display,
+      ].join("\x1f");
+      lines[index] = `observe\t${doxSiteHex(site)}\t${doxHex(content)}\n`;
+    }
+    if (doxTraceTruncated) {
+      lines[doxTraceRecords.length] = "trace-truncated\tbrowser-size-limit\t\n";
+    }
+    return lines.join("");
+  };
   global.caml_doclang_observe_enter = (metadata) => doxEnter(metadata, false);
   global.caml_doclang_observe_enter_tail = (metadata) => doxEnter(metadata, true);
   global.caml_doclang_observe_parameter = (occurrence, metadata, observed) => {
@@ -441,7 +608,21 @@
     return 0;
   };
   global.caml_doclang_observe_return = (metadata, occurrence, observed) => doxLeave("return", metadata, occurrence, observed);
+  global.caml_doclang_observe_leaf = (metadata, observed) => {
+    const occurrence = doxEnter(metadata, false);
+    if (occurrence) doxLeave("return", metadata, occurrence, observed);
+    return 0;
+  };
   global.caml_doclang_observe_raise = (metadata, occurrence, observed) => doxLeave("raise", metadata, occurrence, observed);
+  global.caml_doclang_observe_mark = () => doxStack.length;
+  global.caml_doclang_observe_unwind = (mark, observed) => {
+    const target = Math.max(0, Math.min(doxStack.length, mark | 0));
+    while (doxStack.length > target) {
+      const frame = doxStack.at(-1);
+      doxLeave("raise", frame.metadata, frame.occurrence, observed);
+    }
+    return 0;
+  };
   global.caml_doclang_observe_register_function = (fn, consumption, metadata) => {
     if (typeof fn !== "function" || !doxShouldTraceFields(doxFields(metadata))) return 0;
     const id = ++doxClosureCounter;

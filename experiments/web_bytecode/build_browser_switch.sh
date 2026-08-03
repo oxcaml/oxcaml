@@ -137,9 +137,11 @@ copy_cmis_from_dir() {
 }
 
 copy_cmis_from_dir "$install_lib_root" "$tmpdir/cmis"
-compilerlibs_dir="$(run_tool ocamlfind query compiler-libs 2>/dev/null || true)"
-if [ -n "$compilerlibs_dir" ] && [ -d "$compilerlibs_dir" ]; then
-  copy_cmis_from_dir "$compilerlibs_dir" "$tmpdir/cmis"
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" != 1 ]; then
+  compilerlibs_dir="$(run_tool ocamlfind query compiler-libs 2>/dev/null || true)"
+  if [ -n "$compilerlibs_dir" ] && [ -d "$compilerlibs_dir" ]; then
+    copy_cmis_from_dir "$compilerlibs_dir" "$tmpdir/cmis"
+  fi
 fi
 if [ -d "$js_of_ocaml_compiler_dir/runtime" ]; then
   copy_cmis_from_dir "$js_of_ocaml_compiler_dir/runtime" "$tmpdir/cmis"
