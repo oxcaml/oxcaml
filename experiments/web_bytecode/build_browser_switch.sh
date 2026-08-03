@@ -145,9 +145,11 @@ if [ -d "$js_of_ocaml_compiler_dir/runtime" ]; then
   copy_cmis_from_dir "$js_of_ocaml_compiler_dir/runtime" "$tmpdir/cmis"
 fi
 
-run_tool ocamlfind ocamlc -g -package findlib -linkpkg \
-  "$experiment_dir/generate_browser_package_manifest.ml" \
-  -o "$tmpdir/generate_browser_package_manifest.byte"
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" != 1 ]; then
+  run_tool ocamlfind ocamlc -g -package findlib -linkpkg \
+    "$experiment_dir/generate_browser_package_manifest.ml" \
+    -o "$tmpdir/generate_browser_package_manifest.byte"
+fi
 
 compile() {
   local packages=$1
@@ -175,13 +177,25 @@ else
   link_packages="$common_js_packages,ppx_jane,$jane_runtime_packages"
 fi
 
-OXBROWSER_PACKAGE_ROOTS="$package_roots" \
-  run_tool ocamlrun "$tmpdir/generate_browser_package_manifest.byte" \
-  "$install_lib_root" \
-  "$package_lib_root" \
-  "$tmpdir/browser_switch_package_manifest.ml" \
-  "$tmpdir/browser_packages.map" \
-  "$tmpdir/browser_package_runtimes.list"
+if [ "${OXBROWSER_DOX_MINIMAL:-0}" = 1 ]; then
+  cat > "$tmpdir/browser_switch_package_manifest.ml" <<'EOF'
+let browser_cmis_dir = "/static/cmis"
+let browser_package_roots = []
+let browser_package_include_dirs = []
+let browser_preload_packages = []
+let browser_dont_load_packages = []
+EOF
+  : > "$tmpdir/browser_packages.map"
+  : > "$tmpdir/browser_package_runtimes.list"
+else
+  OXBROWSER_PACKAGE_ROOTS="$package_roots" \
+    run_tool ocamlrun "$tmpdir/generate_browser_package_manifest.byte" \
+    "$install_lib_root" \
+    "$package_lib_root" \
+    "$tmpdir/browser_switch_package_manifest.ml" \
+    "$tmpdir/browser_packages.map" \
+    "$tmpdir/browser_package_runtimes.list"
+fi
 
 compile "$common_js_packages" "$tmpdir/browser_switch_package_manifest.ml" \
   "$tmpdir/browser_switch_package_manifest.cmo"
