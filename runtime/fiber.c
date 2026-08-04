@@ -953,7 +953,8 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_sp = old_stack->local_sp;
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
-  /* The node is stable: it moves to the new stack without being copied */
+  /* The node is stable: handles and lexical edges pointing at it survive
+     the reallocation */
   new_stack->dyn_node = old_stack->dyn_node;
 
   // Detach locals stack and dynamic bindings from old_stack so they will not be freed

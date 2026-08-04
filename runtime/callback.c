@@ -592,7 +592,8 @@ CAMLprim value caml_with_async_exns(value body_callback)
   caml_dynamic_table_unregister_roots(&tbl);
 
   // Re-read the node: the body may have created it (the node itself is
-  // stable across stack reallocation).
+  // stable across stack reallocation). Only the table is restored; lexical
+  // edges belong to the fiber, not to the unwound bindings.
   node = Caml_state->current_stack->dyn_node;
   if(node != NULL) {
     caml_dynamic_table_free(&node->table);
