@@ -1864,6 +1864,20 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
       *)
       let tyvars_str tyvars = List.map (fun v -> v.txt) tyvars in
       let tyvars_jkind_str tyvars = List.map (fun (v, _jkind) -> v.txt) tyvars in
+      (* Compare the two copies of the annotation modulo locations: desugared
+         bindings built programmatically (e.g. by ppx rewriters) are equivalent
+         to parser output except that the locations in the pattern's [Ptyp_poly]
+         and in the expression's constraint need not coincide. *)
+      let equal_core_types_ignoring_locations =
+        let strip =
+          let mapper =
+            { Ast_mapper.default_mapper with
+              location = (fun _this _loc -> Location.none) }
+          in
+          fun cty -> mapper.typ mapper cty
+        in
+        fun t1 t2 -> strip t1 = strip t2
+      in
       let is_desugared_gadt p e =
         let gadt_pattern =
           match p with
@@ -1886,7 +1900,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         | Some (p, pt_tyvars, pt_ct), Some (e_tyvars, e, e_ct)
           when tyvars_jkind_str pt_tyvars = tyvars_str e_tyvars ->
             let ety = Ast_helper.Typ.varify_constructors e_tyvars e_ct in
-            if ety = pt_ct then
+            if equal_core_types_ignoring_locations ety pt_ct then
               Some (p, pt_tyvars, e_ct, e) else None
         | _ -> None
       in
