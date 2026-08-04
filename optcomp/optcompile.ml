@@ -205,7 +205,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Reaper_rebuild { compile_from_reaped_flambda; cmr_file } ->
-      (* CR mvellacott: write the rebuilt unit's .cmx. *)
       compile_from_reaped_flambda ~keep_symbol_tables ~cmr_file info
     | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
@@ -351,7 +350,11 @@ let native unix
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
                ~cmr_filename:cmr_file
                ~cmx_imports_to_reload:
-                 paused_unit_infos.Cmx_format.ui_imports_cmx))
+                 paused_unit_infos.Cmx_format.ui_imports_cmx);
+          Compilenv.save_resumed_unit_info
+            (Unit_info.Artifact.filename
+               (Unit_info.artifact info.target ~extension:ext_flambda_obj))
+            ~paused:paused_unit_infos)
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 

@@ -15,6 +15,9 @@
  all_modules = "";
  ocamlopt.opt;
 
+ file = "cmr_creation_and_rebuild.reaped.cmx";
+ file-exists;
+
  flags = "-flambda2-reaper";
  compile_only = "true";
  all_modules = "cmr_creation_and_rebuild.ml";

@@ -344,6 +344,22 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
   let current_unit = build_unit_info ~main_module_block_format ~arg_descr in
   write_unit_info current_unit filename
 
+let save_resumed_unit_info filename ~paused =
+  let info =
+    build_unit_info ~main_module_block_format:paused.ui_format
+      ~arg_descr:paused.ui_arg_descr
+  in
+  (* We should take fields produced by the frontend and typechecker from the
+     old pre-Reaper cmx, since neither run after resume. *)
+  let info =
+    { info with
+      ui_imports_cmi = paused.ui_imports_cmi;
+      ui_quoted_cmi = paused.ui_quoted_cmi;
+      ui_quoted_cmx = paused.ui_quoted_cmx
+    }
+  in
+  write_unit_info info filename
+
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
   |> Symbol.linkage_name
