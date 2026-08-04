@@ -6,30 +6,12 @@
 *)
 
 (* Cross-check the front end's primitive-allocation classification against the
-   back end's.
-
-   Every function below calls one fully-applied primitive, and carries two
-   independent annotations:
-
-   - [@ noalloc_strict], the Allocation mode axis. Typing decides this from
-     [Translprim.fully_applied_may_allocate], which looks the primitive up and
-     specializes it exactly as [Translprim] will.
-   - [[@zero_alloc strict]], the back-end check. It walks the CFG after
-     optimisation and proves no allocation instruction survives.
-
-   The back-end check is the ground truth. If a function is accepted at
-   [noalloc_strict] but rejected by [zero_alloc strict], the front-end
-   classification is unsound and this test says so.
-
-   Tests are wrapped in [module Test] to avoid the default constraints on
-   top-level functions, and take a single parameter so that no intermediate
-   closure shows up. *)
+   back end's. The back end is the ground truth. *)
 
 (* ==================================================================== *)
 (* Part 1: primitives that map to a non-allocating [Lambda.primitive]   *)
 (* ==================================================================== *)
 
-(* Tagged-integer arithmetic and comparison: [Pscalar]. *)
 module Test = struct
   let[@zero_alloc strict] (add @ noalloc_strict) (x : int) = x + 1
   let[@zero_alloc strict] (sub @ noalloc_strict) (x : int) = x - 1
@@ -54,7 +36,6 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* Booleans: [Pnot], [Psequand], [Psequor]. *)
 module Test = struct
   let[@zero_alloc strict] (bnot @ noalloc_strict) (x : bool) = not x
   let[@zero_alloc strict] (band @ noalloc_strict) (x : bool) = x && false
@@ -69,7 +50,6 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* Block access: [Pfield] and [Psetfield]. *)
 module Test = struct
   let[@zero_alloc strict] (deref @ noalloc_strict) (r : int ref) = !r
   let[@zero_alloc strict] (assign @ noalloc_strict) (r : int ref) = r := 0
@@ -84,8 +64,6 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* Lengths and representation tests: [Pstringlength], [Pbyteslength],
-   [Parraylength], [Pisint]. *)
 module Test = struct
   let[@zero_alloc strict] (slen @ noalloc_strict) (s : string) =
     String.length s
@@ -105,8 +83,6 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* [%identity] and [%opaque] compile to the argument itself and to [Popaque],
-   neither of which allocates. *)
 module Test = struct
   external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
   let[@zero_alloc strict] (ident @ noalloc_strict) (x : int) = my_id x
@@ -122,11 +98,6 @@ module Test :
   end
 |}]
 
-(* Closing over an allocation is not the same as allocating when called. The
-   ref below is allocated once, where it is defined; calling the closure only
-   performs a setfield. Both checks agree that the closure is allocation-free.
-   Compare [functor.ml], where [let f' = let r = ref 42 in fun () -> r := 24]
-   raises exactly this question. *)
 module Test = struct
   let[@zero_alloc strict] (bump_param @ noalloc_strict) (r : int ref) =
     r := 24
@@ -147,7 +118,6 @@ module Test :
   end
 |}]
 
-(* Whereas allocating on each call is rejected, as it should be. *)
 module Test = struct
   let (copy @ noalloc_strict) (r : int ref) = ref !r
 end
@@ -161,21 +131,7 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* -------------------------------------------------------------------- *)
-(* Known conservatism: inference does not give these [noalloc_strict]     *)
-(* -------------------------------------------------------------------- *)
-
-(* These are the shapes from [typing-modes/functor.ml] and
-   [typing-modes/module.ml]. Calling any of them performs only a setfield --
-   the ref was allocated once, where it is bound, not on each call -- so they
-   are genuinely allocation-free, and the back-end check at the end of this
-   section confirms it.
-
-   The current implementation is conservative about them: the modality is not
-   *inferred*, though it is accepted when written out. So the checking is
-   precise and only the inference falls short. *)
-
-(* [functor.ml]: inferred, and no [noalloc_strict] appears. *)
+(* CR shsong: conservatism on mode inference - will be fixed later *)
 module Test = struct
   let f = let r = ref 42 in fun () -> r := 24; ()
 end
@@ -183,7 +139,6 @@ end
 module Test : sig val f : unit -> unit end @@ noalloc_strict
 |}]
 
-(* The same definition with the modality written out is accepted. *)
 module Test = struct
   let (f @ noalloc_strict) = let r = ref 42 in fun () -> r := 24; ()
 end
@@ -191,8 +146,6 @@ end
 module Test : sig val f : unit -> unit end @@ noalloc_strict
 |}]
 
-(* [module.ml]: same conservatism for a ref bound in the enclosing structure.
-   Note [x] itself is inferred [noalloc_strict] while [f] is not. *)
 module Test = struct
   let x : int ref = ref 42
   let f () = x := 24
@@ -202,8 +155,6 @@ module Test : sig val x : int ref @@ stateless val f : unit -> unit end @@
   noalloc_strict
 |}]
 
-(* Written out, it is accepted -- and the back end agrees that calling it
-   allocates nothing. *)
 module Test = struct
   let x : int ref = ref 42
   let[@zero_alloc strict] (f @ noalloc_strict) () = x := 24
@@ -220,11 +171,8 @@ module Test :
 (* Part 2: primitives whose allocation depends on the types involved    *)
 (* ==================================================================== *)
 
-(* These are the cases a name-only classification cannot express: the same
-   primitive allocates at one type and not at another. *)
-
-(* [%compare] at [int] becomes a [Pscalar] three-way compare; at [string] it
-   becomes [caml_string_compare], a C call declared [[@@noalloc]]. *)
+(* [%compare] at [int] is a [Pscalar] compare; at [string] it is a
+   [[@@noalloc]] C call. *)
 module Test = struct
   let[@zero_alloc strict] (cmp_int @ noalloc_strict) (x : int) = compare x 0
   let[@zero_alloc strict] (cmp_string @ noalloc_strict) (x : string) =
@@ -242,8 +190,7 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* A constant constructor argument specializes generic equality to an integer
-   comparison even though the type alone would not allow it. *)
+(* A constant constructor argument specializes generic equality. *)
 module Test = struct
   let[@zero_alloc strict] (eq_none @ noalloc_strict) (x : int option) =
     x = None
@@ -271,8 +218,7 @@ module Test :
   end @@ portable noalloc_strict
 |}]
 
-(* Reading a [float array] unboxes into a fresh box, so it does allocate and
-   the front end must reject it. *)
+(* Reading a [float array] boxes, so it is rejected. *)
 module Test = struct
   let (get_float @ noalloc_strict) (a : float array) = Array.unsafe_get a 0
 end
@@ -286,7 +232,7 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* At an unknown type [%compare] becomes [caml_compare], which allocates. *)
+(* At an unknown type [%compare] is [caml_compare], which allocates. *)
 module Test = struct
   let (cmp_poly @ noalloc_strict) x = compare x x
 end
@@ -304,8 +250,6 @@ Error: The allocation is "local"
 (* Part 3: C externals                                                  *)
 (* ==================================================================== *)
 
-(* [[@@noalloc]] on an external is [prim_alloc = false], which the classifier
-   reads directly. *)
 module Test = struct
   external eq_nofail : string -> string -> bool = "caml_string_equal"
     [@@noalloc]
@@ -321,7 +265,7 @@ module Test :
   end
 |}]
 
-(* The same C function without the attribute is assumed to allocate. *)
+(* Without the attribute, assumed to allocate. *)
 module Test = struct
   external eq_may_alloc : string -> string -> bool = "caml_string_equal"
   let (c_alloc @ noalloc_strict) (x : string) = eq_may_alloc x "a"
@@ -340,9 +284,6 @@ Error: The allocation is "local"
 (* Part 4: the application operators                                    *)
 (* ==================================================================== *)
 
-(* [%revapply] and [%apply] compile to a direct application of their function
-   argument. The operator allocates nothing; whatever the callee allocates is
-   accounted for through the callee's own mode. *)
 module Test = struct
   let[@zero_alloc strict] (succ_ @ noalloc_strict) (x : int) = x + 1
   let[@zero_alloc strict] (revapply @ noalloc_strict) (x : int) = x |> succ_
@@ -361,21 +302,10 @@ module Test :
 (* Part 5: where a partial application's closure is accounted for       *)
 (* ==================================================================== *)
 
-(* [collect_apply_args] stops when it runs out of source arguments, so a
-   trailing positional partial application produces no [Omitted] node and never
-   reaches [type_omitted_parameters_and_build_result_type]. The closure it
-   builds is therefore *not* registered by that function's
-   [register_allocation_mode]; it is accounted for by the mode of the primitive
-   identifier itself, which is [alloc]. Only a parameter skipped mid-list --
-   a labelled one commuted past -- becomes [Omitted]. *)
-
-(* A [Prim_local] result is the sharpest case: [register_prim_allocation]
-   registers *nothing* for it, because the primitive's own result goes on the
-   stack. A partial application still builds a heap closure, and the two have
-   genuinely different modes -- the eta-expansion wrapper is
-   [{nlocal = 1} ... : localfloat] inside a [{nlocal = 0}] closure. What
-   rejects this is the identifier's own [alloc] mode, not allocation
-   registration. *)
+(* A trailing positional partial application produces no [Omitted] node, so its
+   closure is not registered by [register_prim_allocation]; what rejects it is
+   the mode of the primitive identifier itself, which is [alloc]. That covers a
+   [Prim_local] result, a bare reference, and a [Prim_global] result. *)
 module Test = struct
   external getl : float array -> int -> local_ float = "%array_unsafe_get"
   let (partial_local_result @ noalloc_strict) (a : float array) =
@@ -391,8 +321,6 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* Same for a bare reference and for a partial application of a primitive with
-   a [Prim_global] result. *)
 module Test = struct
   let (bare_ref @ noalloc_strict) () = ( + )
 end
@@ -405,6 +333,7 @@ Error: The value "(+)" is "alloc"
          because it is used inside the function at line 2, characters 34-44
          which is expected to be "noalloc_strict".
 |}]
+
 module Test = struct
   let (partial @ noalloc_strict) (a : int) = ( + ) a
 end
@@ -433,11 +362,8 @@ Error: The value "mk_poly" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(* A [Prim_poly] primitive partially applied, guarded with [exclave_] so that
-   the result is allowed to be local. That does not rescue it: [exclave_] moves
-   the *result* into the caller's region, but the partial-application closure
-   itself is still built on the heap, so the identifier's own [alloc] mode
-   still rejects the occurrence. *)
+(* [exclave_] moves the result into the caller's region, but the
+   partial-application closure is still built on the heap. *)
 module Test = struct
   external addf :
     (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
@@ -454,27 +380,25 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* The back-end check on the same code, with the mode annotation dropped, and
-   it agrees: the closure really is a heap allocation. *)
+(* The back end agrees. *)
 module Test = struct
   external addf :
     (float[@local_opt]) -> (float[@local_opt]) -> (float[@local_opt])
     = "%addfloat"
-  let[@zero_alloc strict] partial_poly (x : float) = exclave_ addf x
+  let[@zero_alloc strict] partial_poly (x : float) = exclave_ (addf x)
 end
 [%%expect{|
 Line 5, characters 7-17:
-5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ addf x
+5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ stack_ (addf x)
            ^^^^^^^^^^
 Error: Annotation check for zero_alloc strict failed on function TOP26.Test.partial_poly (camlTOP26__partial_poly_76_79_code).
-Line 5, characters 62-68:
-5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ addf x
-                                                                  ^^^^^^
+Line 5, characters 69-77:
+5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ stack_ (addf x)
+                                                                         ^^^^^^^^
 Error: allocation of 40 bytes for closure
 |}]
 
-(* This is not specific to primitives: an ordinary function partially applied
-   under [exclave_] allocates its closure on the heap too. *)
+(* Not specific to primitives. *)
 module Test = struct
   let add3 (x : int) (y : int) = x + y
   let[@zero_alloc strict] partial_ordinary (x : int) = exclave_ add3 x
@@ -490,9 +414,8 @@ Line 3, characters 64-70:
 Error: allocation of 40 bytes for closure
 |}]
 
-(* And the back-end check is not simply counting every allocation: [exclave_]
-   does keep an ordinary block off the heap, and that passes. So the two
-   failures above are really about the closure. *)
+(* [exclave_] on an ordinary block does pass, so the two failures above really
+   are about the closure. *)
 module Test = struct
   let[@zero_alloc strict] make_pair (x : int) = exclave_ (x, x)
 end
@@ -502,10 +425,7 @@ module Test :
   stateless
 |}]
 
-(* The mid-list case, which does go through
-   [type_omitted_parameters_and_build_result_type]: [~b] is supplied but [~a]
-   is not, so [~a] becomes an [Omitted] node and its closure is registered
-   there. *)
+(* The mid-list case, which does produce an [Omitted] node. *)
 module Test = struct
   let (omitted_mid_list @ noalloc_strict) () =
     (fun ~a ~b -> a + b) ~b:2
@@ -524,10 +444,6 @@ Error: The allocation is "local"
 (* Part 6: primitives that really do allocate                           *)
 (* ==================================================================== *)
 
-(* Negative controls: the front end must reject these, and the back end agrees
-   -- see the [zero_alloc strict] failures for the same shapes. *)
-
-(* [%makemutable] builds a block. *)
 module Test = struct
   let (mk_ref @ noalloc_strict) (x : int) = ref x
 end
@@ -541,7 +457,6 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* [%addfloat] boxes its result. *)
 module Test = struct
   let (add_float @ noalloc_strict) (x : float) = x +. 1.0
 end
@@ -555,7 +470,7 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* The back end confirms the same two, independently of the mode axis. *)
+(* The back end confirms the same two. *)
 module Test = struct
   let[@zero_alloc strict] mk_ref (x : int) = ref x
 end
@@ -588,20 +503,8 @@ Error: allocation of 16 bytes for float
 (* Part 7: over-application and [Translcore.can_apply_primitive]        *)
 (* ==================================================================== *)
 
-(* An occurrence of a primitive is compiled to a direct primitive application
-   only when [Translprim.application_kind] answers [Direct]; otherwise
-   [Translcore] eta-expands the primitive, and that wrapper is a heap closure
-   ([Translprim.transl_primitive] passes [~mode:alloc_heap]). Both phases ask
-   the same function, so they cannot disagree about which happens.
-
-   Over-application in tail position with a local result mode is the subtle
-   case. [-dlambda] shows the wrapper:
-
-     over_local_tail = (function x : int
-       (apply (function {nlocal = 1} prim stub : local prim) succ_ x))
-
-   The [zero_alloc strict] check does not catch this by itself -- Flambda2
-   deletes the stub -- so the mode axis is the only thing that rejects it. *)
+(* Over-application in tail position with a local result mode is eta-expanded
+   into a heap closure. *)
 module Test = struct
   external myid_l : (int -> int) -> local_ (int -> int) = "%identity"
   let[@zero_alloc strict] succ_ (x : int) = x + 1
@@ -618,11 +521,8 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* The two neighbouring cases really are direct primitive applications --
-   [-dlambda] shows a plain [(apply succ_ x)] for both -- so they guard against
-   over-correcting into rejecting valid direct applications. Still in tail
-   position, but with a [Prim_global] result, [application_kind] answers
-   [Direct] without consulting any mode variable... *)
+(* The two neighbouring cases really are direct primitive applications, which
+   guards against over-correcting: a [Prim_global] result in tail position... *)
 module Test = struct
   external myid_g : (int -> int) -> (int -> int) = "%identity"
   let[@zero_alloc strict] succ_ (x : int) = x + 1
@@ -638,7 +538,7 @@ module Test :
   end
 |}]
 
-(* ... and so does the same local result out of tail position. *)
+(* ... and the same local result out of tail position. *)
 module Test = struct
   external myid_l : (int -> int) -> local_ (int -> int) = "%identity"
   let[@zero_alloc strict] succ_ (x : int) = x + 1
@@ -656,13 +556,11 @@ module Test :
 |}]
 
 (* ==================================================================== *)
-(* Part 8: arity-0 primitives (see CR below)                            *)
+(* Part 8: arity-0 primitives                                           *)
 (* ==================================================================== *)
 
-(* A primitive of arity 0 is a value, not a function, so [Translcore] never
-   eta-expands it -- [transl_primitive] emits it inline when it has no
-   parameters. [%loc_LINE] and [%loc_FILE] compile to constants and are
-   accepted, which is correct. *)
+(* An arity-0 primitive is a value, never eta-expanded. [%loc_LINE] and
+   [%loc_FILE] compile to constants and are correctly accepted. *)
 module Test = struct
   let[@zero_alloc strict] (line @ noalloc_strict) () = __LINE__
   let[@zero_alloc strict] (file @ noalloc_strict) () = __FILE__
@@ -676,23 +574,19 @@ module Test :
 |}]
 
 (* CR shsong: unsound -- [noalloc_strict] accepts a function that the back end
-   proves allocates. This is the one direction this test exists to catch: see
-   the header, "if a function is accepted at [noalloc_strict] but rejected by
-   [zero_alloc strict], the front-end classification is unsound".
-
-   [Sys.argv] is [external argv : string array = "%sys_argv"], arity 0, and it
-   compiles to a C call declared [~alloc:true]. Nothing catches it. The
-   identifier's own value mode does not, the way it does for a bare reference
-   to a function-typed primitive: [string array] is not a function type, so
-   the [alloc] mode crosses away. And the bare-reference site in
-   [Typecore.type_ident] registers nothing for a [Prim_global] result.
+   proves allocates, which is the one direction this test exists to catch.
+   [Sys.argv] is [external argv : string array = "%sys_argv"], arity 0, and
+   compiles to a C call declared [~alloc:true]. Nothing catches it: the
+   identifier's own value mode does not, because [string array] is not a
+   function type so the [alloc] mode crosses away, and the bare-reference site
+   in [Typecore.type_ident] registers nothing for a [Prim_global] result.
 
    Fix by classifying an arity-0 bare reference through
-   [Translprim.fully_applied_may_allocate] with no arguments -- an arity-0
-   primitive is a value, never eta-expanded, so a bare reference to it is
-   already a full application. That separates [%loc_LINE] and [%loc_FILE],
-   which are constants, from [%sys_argv], which is not. Promote both blocks
-   below when it lands: the first should become a mode error. *)
+   [Translprim.fully_applied_may_allocate] with no arguments: an arity-0
+   primitive is never eta-expanded, so a bare reference to it is already a full
+   application. That separates [%loc_LINE] and [%loc_FILE] from [%sys_argv].
+   Promote both blocks below when it lands; the first should become a mode
+   error. *)
 module Test = struct
   let (argv @ noalloc_strict) () = Sys.argv
 end
@@ -715,38 +609,10 @@ Error: called function may allocate (external call to caml_sys_argv)
 |}]
 
 (* ==================================================================== *)
-(* Part 9: a bare primitive reference costs nothing (known limitation)  *)
+(* Part 9: a bare primitive reference                                   *)
 (* ==================================================================== *)
 
-(* KNOWN LIMITATION -- this block documents current behaviour, not intended
-   behaviour.
-
-   Referencing a primitive without applying it makes [Translcore] eta-expand
-   it, and [-dlambda] does show a closure:
-
-     (let (add = (function {nlocal = 2} prim[L] prim[L] stub : localint32
-                    (%int32_add[L] prim prim)))
-       (ignore (opaque add)))
-
-   That closure's own mode is not the [@local_opt] variable -- it is the
-   constant [alloc_heap] that [Translprim.transl_primitive] passes -- so it is
-   never stack-allocated. It does not have to be: the eta-expansion captures
-   nothing, so it is a *closed* closure and gets lifted to a static symbol.
-   Nothing is allocated at run time. The back-end check below agrees, even
-   when the closure escapes into a mutable global, which rules out its being
-   deleted as dead.
-
-   The front end disagrees: [relax_alloc] only relaxes a primitive's [alloc]
-   mode when [~is_applied], so a bare reference keeps it and cannot appear in
-   a [noalloc_strict] function. This is a false positive, not a soundness
-   problem. Note the rejection comes from the identifier's own value mode, not
-   from allocation registration -- registering the [@local_opt] variable at
-   this site is load-bearing for a different reason, see the comment in
-   [Typecore.type_ident] and [partprim2] in
-   [testsuite/tests/typing-local/alloc.ml]. *)
-
-(* The back end proves it: allocation-free even through [Sys.opaque_identity]
-   and even when stored into a mutable global. *)
+(* Primitive reference is handled conservatively. *)
 module Test = struct
   let[@zero_alloc strict] opaque_ref () =
     let add = Int32.add in
@@ -764,7 +630,6 @@ module Test :
   end
 |}]
 
-(* The front end rejects the same code. Promote when the two agree. *)
 module Test = struct
   let (bare_ref_int32 @ noalloc_strict) () =
     let add = Int32.add in
