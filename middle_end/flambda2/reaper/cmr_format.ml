@@ -18,7 +18,8 @@
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
-    all_code : Exported_code.t
+    all_code : Exported_code.t;
+    deps : Global_flow_graph.graph
   }
 
 module Id_stamp_counters = struct
@@ -89,6 +90,40 @@ module All_code_with_sections = struct
     Exported_code.from_raw ~sections all_code
 end
 
+module Deps_with_fields = struct
+  (** Fields are hashconsed per-process, so the graph is stored with views of
+      them in the style of [table_data]. *)
+  type t =
+    { deps : Global_flow_graph.graph;
+      fields : (Field.t * Field.view) list
+    }
+
+  let create deps =
+    let fields =
+      Field.Set.fold
+        (fun field fields -> (field, Field.view field) :: fields)
+        (Global_flow_graph.fields_for_export deps)
+        []
+    in
+    { deps; fields }
+
+  let deserialise { deps; fields } renaming =
+    let field_map =
+      List.fold_left
+        (fun map (field, view) -> Field.Map.add field (Field.create view) map)
+        Field.Map.empty fields
+    in
+    let rename_field field =
+      match Field.Map.find_opt field field_map with
+      | Some field -> field
+      | None ->
+        Misc.fatal_errorf
+          "Field %a in the stored dependency graph has no view stored"
+          Field.print field
+    in
+    Global_flow_graph.apply_renaming deps renaming ~rename_field
+end
+
 module File_contents = struct
   type cmr_format = t
 
@@ -98,11 +133,12 @@ module File_contents = struct
       used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
-      all_code : All_code_with_sections.t
+      all_code : All_code_with_sections.t;
+      deps : Deps_with_fields.t
     }
 
   let create ~used_value_slots
-      ({ unit_metadata; final_typing_env; all_code } : cmr_format) : t =
+      ({ unit_metadata; final_typing_env; all_code; deps } : cmr_format) : t =
     let final_typing_env, canonicalise =
       match final_typing_env with
       | None -> None, Fun.id
@@ -121,6 +157,7 @@ module File_contents = struct
       Ids_for_export.union_list
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
           all_code_ids;
+          Global_flow_graph.ids_for_export deps;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
@@ -129,7 +166,8 @@ module File_contents = struct
       used_value_slots;
       unit_metadata;
       final_typing_env;
-      all_code
+      all_code;
+      deps = Deps_with_fields.create deps
     }
 
   let deserialise ~machine_width ~resolver
@@ -138,7 +176,8 @@ module File_contents = struct
         used_value_slots;
         unit_metadata;
         final_typing_env;
-        all_code
+        all_code;
+        deps
       } : cmr_format =
     (* Must happen before anything can create an identifier. *)
     Id_stamp_counters.restore id_stamp_counters;
@@ -160,7 +199,8 @@ module File_contents = struct
       All_code_with_sections.deserialise all_code
       |> Exported_code.apply_renaming code_ids renaming
     in
-    { unit_metadata; final_typing_env; all_code }
+    let deps = Deps_with_fields.deserialise deps renaming in
+    { unit_metadata; final_typing_env; all_code; deps }
 end
 
 type error =

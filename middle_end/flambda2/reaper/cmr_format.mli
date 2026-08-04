@@ -20,7 +20,8 @@
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
-    all_code : Exported_code.t
+    all_code : Exported_code.t;
+    deps : Global_flow_graph.graph
   }
 
 type error =
