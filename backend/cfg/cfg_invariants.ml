@@ -651,7 +651,8 @@ let check_dead_cycles t =
     then
       match Cfg.get_block t.cfg label with
       | None ->
-        (* Dangling label: already reported by [check_block]. *)
+        (* Dangling label: already reported, by [check_layout] if [label] is the
+           entry label, and by [check_block] otherwise (dangling successor). *)
         ()
       | Some block ->
         Label.Tbl.replace visited label ();
@@ -676,6 +677,12 @@ let check_dead_cycles t =
         visit label;
         visit_all ()
       | None ->
+        (* Every unvisited block has at least one predecessor. If the
+           predecessor/successor sets are consistent, every such predecessor is
+           itself unvisited, so the unvisited blocks necessarily contain a
+           cycle. If the sets are inconsistent, the message below may be
+           inaccurate, but [check_block] has then already reported the
+           inconsistency. *)
         let remaining =
           Cfg.fold_blocks t.cfg ~init:Label.Set.empty
             ~f:(fun label (_ : Cfg.basic_block) acc ->
