@@ -189,6 +189,7 @@ let translate_unboxed : S.Predef.unboxed -> RS.unboxed = function
   | Unboxed_int32 -> Unboxed_int32
   | Unboxed_int16 -> Unboxed_int16
   | Unboxed_int8 -> Unboxed_int8
+  | Unboxed_mask -> Unboxed_mask
   | Unboxed_simd svs -> Unboxed_simd (translate_simd_vec_split svs)
 
 exception Layout_missing
@@ -223,6 +224,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Void -> Product [||])
@@ -244,6 +246,7 @@ let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
   | Vec128 -> Vec128
   | Vec256 -> Vec256
   | Vec512 -> Vec512
+  | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
 
@@ -550,7 +553,14 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                        S.field_value = arg, layout
                      } ->
                   ( field_name,
-                    type_shape_to_complex_shape ~cache ~rec_env arg layout ))
+                    match layout with
+                    | Some layout ->
+                      type_shape_to_complex_shape ~cache ~rec_env arg layout
+                    | None ->
+                      (* It's an [any] field, so we must determine the layout
+                         from the shape (or fall back to [Rs.unknown Value] via
+                         the exception handler below) *)
+                      type_shape_to_complex_shape_exn ~cache ~rec_env arg None ))
                 args
             in
             let constr_args =
@@ -568,9 +578,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           constructors
       in
       runtime (RS.variant constructors)
-    with Layout_missing ->
-      runtime (RS.unknown Value)
-      (* should only be raised by [lay_out_into_mixed_block_exn] *))
+    with Layout_missing -> runtime (RS.unknown Value))
   | Variant _, Some ((Product _ | Base _) as ly) ->
     err_or_unknown_exn (fun f ->
         f "variant must have value layout, but got: %a" pp_layout ly)
@@ -781,12 +789,13 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
     in
     Lazy_t elem_shape
   | Nativeint, [] -> Nativeint
+  | Mask, [] -> Mask
   | String, [] -> String
   | Simd vec_split, [] -> Simd (translate_simd_vec_split vec_split)
   | Exception, [] -> Exception
   | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
-      | Int | Int8 | Int16 | Int32 | Int64 | Nativeint | String | Simd _
+      | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
       | Exception | Unboxed _ ),
       arg :: args ) ->
     err_exn (fun f ->

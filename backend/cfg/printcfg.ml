@@ -29,7 +29,7 @@
 
 open! Int_replace_polymorphic_compare
 module Array = ArrayLabels
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module List = ListLabels
 
 (* Compose [print_reg] with a [Cfg_colours.argument] colour wrap, so that

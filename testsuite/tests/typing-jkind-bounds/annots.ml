@@ -1,10 +1,10 @@
 (* TEST
  include stdlib_upstream_compatible;
  {
-   flags = "-no-ikinds";
+   flags = "-no-ikinds -w -181";
    expect;
  }{
-   flags = "-extension layouts_beta -no-ikinds";
+   flags = "-extension layouts_beta -no-ikinds -w -181";
    expect;
  }
 *)
@@ -1387,7 +1387,7 @@ type t : bits64 mod portable aliased
 type u = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1396,7 +1396,7 @@ type t : bits64 mod portable aliased
 type u : bits64 = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1406,7 +1406,7 @@ type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1744,13 +1744,20 @@ type packed = T : ('a : float64). 'a -> packed
 val f : packed -> unit = <fun>
 |}]
 
+type ('a : value) boxed = Box of 'a
+
 let bad p =
   match p with
-  | T (type (a : float64)) (x : a) -> Some x
+  | T (type (a : float64)) (x : a) -> Box x
 [%%expect{|
-Line 3, characters 43-44:
-3 |   | T (type (a : float64)) (x : a) -> Some x
-                                               ^
-Error: The value "x" has type "a" but an expression was expected of type "'a"
-       The type constructor "a" would escape its scope
+type 'a boxed = Box of 'a
+Line 5, characters 42-43:
+5 |   | T (type (a : float64)) (x : a) -> Box x
+                                              ^
+Error: The value "x" has type "a" but an expression was expected of type
+         "('a : value)"
+       The layout of a is float64
+         because of the annotation on the existential variable a.
+       But the layout of a must be a value layout
+         because of the definition of boxed at line 1, characters 0-35.
 |}]

@@ -55,6 +55,12 @@ let expect_asm_callbacks = ref []
 
 let asm_collected_for_expect_asm = ref []
 
+(* When set, [record_for_expect_asm] extends the captured body past the hot body
+   to the end of the function's emission, including the trailing out-of-line
+   code (GC jump pads, safety-error calls, the stack-realloc handler). Used by
+   the [%%expect_asm_full] variant. *)
+let expect_asm_whole_function = ref false
+
 let register_expect_asm_callback f =
   (* Reset label counter to make assembly more predictable. *)
   Label.reset ();
@@ -201,6 +207,7 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
+  | Mask -> Misc.fatal_error "avx512 masks not yet implemented"
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -396,6 +403,7 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -414,16 +422,23 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      D.switch_to_section_raw
-        ~names:[Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix]
-        ~flags:(Some "ax") ~args:["@progbits"] ~is_delayed:false;
+      let name =
+        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+      in
+      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
+        ~args:["@progbits"] ~is_delayed:false;
+      Emitaux.enter_code_section name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else D.text ()
+  else (
+    D.text ();
+    (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
+       function boundaries need not break delta chains. *)
+    Emitaux.enter_code_section ".text")
 
 let emit_function_or_basic_block_section_name () =
   let suffix =
@@ -461,7 +476,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
     I.require_vec512 ();
     VEC512
   | Valx2 -> VEC128
-  | Int | Addr | Val -> QWORD
+  | Int | Addr | Val | Mask -> QWORD
   | Float32 -> REAL4
 
 let reg : Reg.t -> X86_ast.arg =
@@ -518,7 +533,7 @@ let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
 let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
-  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regmask _
     | Regf (XMM _)
     | Mem _ | Mem64_RIP _ ) as res ->
     res
@@ -527,8 +542,8 @@ let arg_idx i n : X86_ast.reg_idx =
   match arg i n with
   | Reg64 reg -> Scalar reg
   | Regf reg -> Vector reg
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
-    ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regmask _ | Mem _
+  | Mem64_RIP _ ->
     assert false
 
 let argX i n = narrow_to_xmm (reg i.arg.(n))
@@ -570,7 +585,8 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
         | Vec256 -> v256 := true
         | Vec512 -> v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ())
+        | Val | Addr | Int -> ()
+        | Mask -> Misc.fatal_error "avx512 masks not yet implemented")
     live;
   if !v512
   then (
@@ -614,7 +630,8 @@ let record_frame_label live dbg =
         Misc.fatal_errorf "bad GC root %a" Printreg.reg r
       | { typ = Val | Valx2; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512; _ } -> ())
+      | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask; _ } ->
+        ())
     live;
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
@@ -824,32 +841,32 @@ let instr_for_intop = function
   | Ilsl -> I.sal
   | Ilsr -> I.shr
   | Iasr -> I.sar
-  | Idiv | Imod | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
+  | Idiv _ | Imod _ | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ -> assert false
 
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
-  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
-  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
-  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
-  | Float32, Iaddf -> sse_or_avx3 addss vaddss
-  | Float32, Isubf -> sse_or_avx3 subss vsubss
-  | Float32, Imulf -> sse_or_avx3 mulss vmulss
-  | Float32, Idivf -> sse_or_avx3 divss vdivss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Isubf -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Idivf -> sse_or_avx3 divss vdivss_X_X_Xm32
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
-  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
-  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
-  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
-  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
-  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
-  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
-  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss_X_X_Xm32
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
   | Ceq -> E
@@ -889,8 +906,10 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
   let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
-    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
+    | Float64 ->
+      sse_or_avx ucomisd vucomisd_X_Xm64, sse_or_avx comisd vcomisd_X_Xm64
+    | Float32 ->
+      sse_or_avx ucomiss vucomiss_X_Xm32, sse_or_avx comiss vcomiss_X_Xm32
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -1132,7 +1151,7 @@ let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
     (* otherwise load form needs 3-byte VEX *)
     && regf_index s <= 7
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
+      | Mem _ | Mem64_RIP _ | Regmask _ ),
       _ ) ->
     false
 
@@ -1183,6 +1202,7 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Vec512, _, Vec512, _ ->
     (* CR-soon mslater: avx512 *)
     Misc.fatal_error "avx512 instructions not yet implemented"
+  | Mask, _, Mask, _ -> Misc.fatal_error "avx512 masks not yet implemented"
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
@@ -1195,7 +1215,8 @@ let move (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Vec256 | Vec512 | Int | Val | Addr | Valx2),
+  | ( ( Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Int | Val | Addr
+      | Valx2 ),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1212,7 +1233,7 @@ let stack_to_stack_move (src : Reg.t) (dst : Reg.t) =
       (* Not calling move because r15 is not in int_reg_name. *)
       I.mov (reg src) r15;
       I.mov r15 (reg dst)
-    | Float | Addr | Vec128 | Vec256 | Vec512 | Valx2 | Float32 ->
+    | Float | Addr | Vec128 | Vec256 | Vec512 | Mask | Valx2 | Float32 ->
       Misc.fatal_errorf
         "Unexpected register type for stack to stack move: from %a to %a\n"
         Printreg.reg src Printreg.reg dst
@@ -1350,7 +1371,7 @@ end = struct
       | Byte_unsigned | Byte_signed -> I8
       | Sixteen_unsigned | Sixteen_signed -> I16
       | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> I32
-      | Word_int | Word_val | Double -> I64
+      | Word_int | Word_mask | Word_val | Double -> I64
       | Onetwentyeight_unaligned | Onetwentyeight_aligned -> I128
       | Twofiftysix_unaligned | Twofiftysix_aligned -> I256
       | Fivetwelve_unaligned | Fivetwelve_aligned -> I512
@@ -1384,7 +1405,7 @@ end = struct
     | Mem64_RIP (ty, sym, displ), offset ->
       I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
     | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-        | Regf _ ),
+        | Regf _ | Regmask _ ),
         offset ) ->
       I.lea src dest;
       if offset <> 0 then I.add (int offset) dest
@@ -1474,7 +1495,7 @@ end = struct
     | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
     | Mem { idx = Vector _; _ }
-    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Regf _ | Imm _ | Sym _ | Reg8H _ | Regmask _
     | Mem64_RIP (_, _, _) ->
       false
 
@@ -1584,8 +1605,8 @@ end = struct
         in
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Word_val
-        | Double | Onetwentyeight_aligned ->
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+        | Word_mask | Word_val | Double | Onetwentyeight_aligned ->
           emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
           emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
@@ -1684,8 +1705,10 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float32 ->
     sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
-  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Float_of_float32 ->
+    sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32 (arg i 0) (res i 0)
+  | Float32_of_float ->
+    sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 (arg i 0) (res i 0)
   | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
     if distinct then movsd (argX i 0) (res i 0)
   | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
@@ -1792,14 +1815,14 @@ let to_arg_with_width loc instr i =
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256) | None -> arg instr i
+  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256) | None -> res instr i
+  | Some (R64 | R128 | R256 | R512) | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1809,7 +1832,8 @@ let to_addr_width loc : X86_ast.data_type =
   | M64 -> QWORD
   | M128 -> VEC128
   | M256 -> VEC256
-  | M32X | M32Y | M64X | M64Y ->
+  | M512 -> VEC512
+  | M32X | M32Y | M32Z | M64X | M64Y | M64Z ->
     (* Will not be used by the assembler. *)
     NONE
 
@@ -1825,8 +1849,9 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       (* Conservatively assumes unaligned memory; generates slower checks. *)
       | M128 -> Some Onetwentyeight_unaligned
       | M256 -> Some Twofiftysix_unaligned
+      | M512 -> Some Fivetwelve_unaligned
       (* We do not sanitize gather/scatter instructions. *)
-      | M32X | M32Y | M64X | M64Y -> None
+      | M32X | M32Y | M32Z | M64X | M64Y | M64Z -> None
     in
     match chunk with
     | None -> ()
@@ -1864,7 +1889,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
-          | Implicit | Immediate -> idx, acc
+          | Implicit | Immediate | Mask -> idx, acc
           | RM_r | RM_rm | Vex_v ->
             idx + 1, to_res_with_width loc instr idx :: acc)
         (0, args) rr
@@ -2117,6 +2142,7 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match memory_chunk with
     | Word_int | Word_val -> load ~dest:(res i 0) QWORD I.mov
+    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
     | Byte_unsigned -> load ~dest:(res i 0) BYTE I.movzx
     | Byte_signed -> load ~dest:(res i 0) BYTE I.movsx
     | Sixteen_unsigned -> load ~dest:(res i 0) WORD I.movzx
@@ -2137,7 +2163,7 @@ let emit_instr ~first ~last ~fallthrough i =
       (* CR-soon mslater: avx512 *)
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
-      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32)
     | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
     | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
@@ -2153,6 +2179,7 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match chunk with
     | Word_int | Word_val -> store QWORD arg I.mov
+    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
     | Sixteen_unsigned | Sixteen_signed -> store WORD arg16 I.mov
     | Thirtytwo_signed | Thirtytwo_unsigned -> store DWORD arg32 I.mov
@@ -2167,7 +2194,7 @@ let emit_instr ~first ~last ~fallthrough i =
       Misc.fatal_error "avx512 instructions not yet implemented"
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 src xmm15;
       let address = addressing addr REAL4 i 1 in
       Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
         ~address chunk memory_access;
@@ -2267,16 +2294,22 @@ let emit_instr ~first ~last ~fallthrough i =
       I.movzx al (res i 0)
     end
   | Lop (Intop_imm (Icomp cmp, n)) ->
+    let emit_cmp () =
+      match cmp, n with
+      | (Ceq | Cne), 0 -> output_test_zero i.arg.(0)
+      | (Ceq | Cne | Clt | Cgt | Cle | Cge | Cult | Cugt | Cule | Cuge), _ ->
+        I.cmp (int n) (arg i 0)
+    in
     if
       Reg.is_reg i.res.(0)
       && not (Reg.equal_location i.res.(0).loc i.arg.(0).loc)
     then begin
       I.xor (res32 i 0) (res32 i 0);
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) (res8 i 0)
     end
     else begin
-      I.cmp (int n) (arg i 0);
+      emit_cmp ();
       I.set (cond cmp) al;
       I.movzx al (res i 0)
     end
@@ -2287,9 +2320,12 @@ let emit_instr ~first ~last ~fallthrough i =
     when Reg.equal_location i.arg.(1).loc i.res.(0).loc && Reg.is_reg i.res.(0)
     ->
     I.xor (res32 i 0) (res32 i 0)
-  | Lop (Intop (Idiv | Imod)) ->
+  | Lop (Intop (Idiv { signed = true } | Imod { signed = true })) ->
     I.cqo ();
     I.idiv (arg i 1)
+  | Lop (Intop (Idiv { signed = false } | Imod { signed = false })) ->
+    I.xor (Reg32 RDX) (Reg32 RDX);
+    I.div (arg i 1)
   | Lop (Int128op Iadd128) ->
     I.add (arg i 2) (res i 0);
     I.adc (arg i 3) (res i 1)
@@ -2327,14 +2363,14 @@ let emit_instr ~first ~last ~fallthrough i =
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    cmp_sse_or_avx cmpsd vcmpsd_X_X_Xm64 cond a1 a0 r1;
     movq r1 r0;
     I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    cmp_sse_or_avx cmpss vcmpss_X_X_Xm32 cond a1 a0 r1;
     movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
@@ -2358,7 +2394,8 @@ let emit_instr ~first ~last ~fallthrough i =
       (res i 0)
   | Lop (Floatop (width, ((Iaddf | Isubf | Imulf | Idivf) as floatop))) ->
     instr_for_floatop width floatop (arg i 0) (arg i 1) (res i 0)
-  | Lop Opaque -> assert (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+  | Lop Opaque ->
+    assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
   | Lop (Specific (Ilea addr)) -> I.lea (addressing addr NONE i 0) (res i 0)
   | Lop (Specific (Ioffset_loc (n, addr))) ->
     I.add (int n) (addressing addr QWORD i 0)
@@ -2714,11 +2751,20 @@ let fundecl fundecl =
   let fun_body_end = current_output_pos () in
   List.iter emit_call_gc !call_gc_sites;
   List.iter emit_local_realloc !local_realloc_sites;
-  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
-    ~fun_body_start ~fun_body_end ~gc_jump_pads_start:fun_body_end
-    ~gc_jump_pads_end:(current_output_pos ());
+  let gc_jump_pads_end = current_output_pos () in
   emit_call_safety_errors ();
   emit_stack_realloc ();
+  (* [record_for_expect_asm] runs after the trailing out-of-line code so the
+     [%%expect_asm_full] variant can include it (e.g. the stack-realloc
+     handler). For the plain variant the body still stops at [fun_body_end] and
+     the gc-pad range is unchanged, so its output is identical. *)
+  record_for_expect_asm ~name:fundecl.fun_name ~debug_info:fundecl.fun_dbg
+    ~fun_body_start
+    ~fun_body_end:
+      (if !expect_asm_whole_function
+       then current_output_pos ()
+       else fun_body_end)
+    ~gc_jump_pads_start:fun_body_end ~gc_jump_pads_end;
   (if !frame_required
    then
      let n = frame_size () - 8 - if fp then 8 else 0 in
@@ -2907,7 +2953,8 @@ let size_of_regs regs =
         acc + size_float
       | Vec128 | Valx2 -> acc + size_vec128
       | Vec256 -> acc + size_vec256
-      | Vec512 -> acc + size_vec512)
+      | Vec512 -> acc + size_vec512
+      | Mask -> acc + size_int)
     regs 0
 
 let stack_locations ~offset regs =
@@ -2925,6 +2972,7 @@ let stack_locations ~offset regs =
           | Vec128 | Valx2 -> size_vec128
           | Vec256 -> size_vec256
           | Vec512 -> size_vec512
+          | Mask -> size_int
         in
         next, make_stack_loc n r ~offset :: offsets)
       regs (0, [])
@@ -3016,7 +3064,7 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
         | Stack (Outgoing k) -> (
           match r.typ with
           | Val -> k :: acc
-          | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> acc
+          | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 -> acc
           | Valx2 -> k :: (k + Arch.size_addr) :: acc
           | Addr -> Misc.fatal_errorf "bad GC root %a" Printreg.reg r)
         | Stack (Incoming _ | Reg.Local _ | Domainstate _) | Reg _ | Unknown ->

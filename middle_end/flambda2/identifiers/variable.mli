@@ -30,3 +30,5 @@ val is_renamed_version_of : t -> t -> bool
 val unique_name : t -> string
 
 val raw_name : t -> string
+
+val canonical_name : t -> string

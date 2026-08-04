@@ -12,12 +12,12 @@
  int 108086391056891909)
 (data
  int 2816
- "camlArray_kind__block13":
+ "camlArray_kind__block15":
  addr G:"caml_exn_Invalid_argument"
- addr L:"camlArray_kind__string11")
+ addr L:"camlArray_kind__string13")
 (data
  int 4092
- "camlArray_kind__string11":
+ "camlArray_kind__string13":
  string "index out of bounds"
  skip 4
  byte 4)
@@ -26,7 +26,7 @@
    (if (<u 1 (>>u (<< (load_mut int (+a a/1 -8)) 8) 17)) (load_mut val a/1)
      (exit 5))
  with(5)(cold)
-   (raise_notrace{array_kind.ml:35,14-19} L:"camlArray_kind__block13")) )
+   (raise_notrace{array_kind.ml:35,14-19} L:"camlArray_kind__block15")) )
 
 (function no_cse reduce_code_size linscan camlArray_kind__entry () : val
  (catch (exit 4 G:"camlArray_kind") with(4 *ret*/0: val) 1) )

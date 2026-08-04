@@ -33,7 +33,7 @@ open Misc
 
 (* Declare machtype here to avoid depending on [Cmm]. *)
 type machtype_component =
-  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
+  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
 
 type machtype = machtype_component array
 
@@ -77,7 +77,7 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
-    ui_file_sections: Oxcaml_utils.File_sections.t;
+    ui_file_sections: File_sections.t;
   }
 
 type unit_infos_raw =

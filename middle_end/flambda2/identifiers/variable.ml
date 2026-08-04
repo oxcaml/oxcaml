@@ -31,3 +31,5 @@ let is_renamed_version_of t t' =
 let raw_name = name
 
 let unique_name t = name t ^ string_of_int (name_stamp t)
+
+let canonical_name t = if !Clflags.canonical_ids then name t else unique_name t

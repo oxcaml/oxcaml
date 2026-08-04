@@ -21,7 +21,7 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-40-41-42"]
 
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -175,6 +175,7 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
@@ -191,8 +192,8 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
+  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
@@ -282,6 +283,9 @@ let size_component : machtype_component -> int = function
   | Vec512 ->
     assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
     Arch.size_vec512
+  | Mask ->
+    assert (Int.equal Arch.size_int 8);
+    Arch.size_int
 
 let size_machtype mty =
   let size = ref 0 in
@@ -302,6 +306,7 @@ let size_expr env exp =
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
+    | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (

@@ -561,7 +561,14 @@ let rec of_expression_desc loc = function
   | Texp_exclave e -> of_expression e
   | Texp_idx (block_access, unboxed_access) ->
     of_block_access block_access ** list_fold of_unboxed_access unboxed_access
-  | Texp_atomic_loc (exp, _, _, _, _) -> of_expression exp
+  | Texp_atomic_loc
+      { record;
+        record_sort = _;
+        record_repres = _;
+        lid = _;
+        label = _;
+        alloc_mode = _
+      } -> of_expression record
   | Texp_hole _ -> id_fold
   | Texp_quotation exp -> of_expression exp
   | Texp_antiquotation exp -> of_expression exp
@@ -738,8 +745,10 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
   in
   function
   | Pjk_default -> id_fold
-  | Pjk_abbreviation (_, scannable_axis_annotations) ->
-    list_fold of_scannable_axis_annotation scannable_axis_annotations
+  | Pjk_abbreviation _ -> id_fold
+  | Pjk_operator (jkind, scannable_axis_annotations) ->
+    of_jkind_annotation jkind
+    ** list_fold of_scannable_axis_annotation scannable_axis_annotations
   | Pjk_mod (jkind, mod_bounds) ->
     of_jkind_annotation jkind ** list_fold of_mod_bound mod_bounds
   | Pjk_with (jkind, ct, modalities) ->

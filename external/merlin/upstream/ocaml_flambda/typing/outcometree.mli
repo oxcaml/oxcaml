@@ -62,7 +62,7 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_code of CamlinternalQuote.Code.t
+  | Oval_quote of CamlinternalQuote.Code.t
   | Oval_floatarray of floatarray
 
 type out_modality = string
@@ -166,6 +166,7 @@ and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
+  ocstr_all_void: bool;
 }
 
 and out_package = {

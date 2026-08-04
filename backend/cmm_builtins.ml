@@ -81,6 +81,7 @@ let shift ~bits make_op arg count dbg =
     | Cconst_vec128 (_, _)
     | Cconst_vec256 (_, _)
     | Cconst_vec512 (_, _)
+    | Cconst_mask (_, _)
     | Cconst_symbol (_, _)
     | Cvar _
     | Clet (_, _, _)
@@ -962,6 +963,7 @@ let transl_builtin name args dbg typ_res =
         | Cconst_vec128 (_, _)
         | Cconst_vec256 (_, _)
         | Cconst_vec512 (_, _)
+        | Cconst_mask (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)

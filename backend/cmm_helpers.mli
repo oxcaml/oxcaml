@@ -64,6 +64,8 @@ module Unboxed_or_untagged_array_tags : sig
 
   val unboxed_vec512_array_tag : int
 
+  val unboxed_mask_array_tag : int
+
   (* Given the length of an int8 array, return its tag *)
   val untagged_int8_array_tag : int -> int
 
@@ -163,6 +165,9 @@ val tag_int : expression -> Debuginfo.t -> expression
 (** Integer untagging. [untag_int x = (x asr 1)] *)
 val untag_int : expression -> Debuginfo.t -> expression
 
+(** Unsigned integer untagging. [untag_int x = (x lsr 1)] *)
+val unsigned_untag_int : expression -> Debuginfo.t -> expression
+
 (** signed division of two register-width integers *)
 val div_int :
   ?dividend_cannot_be_min_int:bool ->
@@ -171,6 +176,9 @@ val div_int :
   Debuginfo.t ->
   expression
 
+(** unsigned division of two register-width integers *)
+val unsigned_div_int : expression -> expression -> Debuginfo.t -> expression
+
 (** signed remainder of two register-width integers *)
 val mod_int :
   ?dividend_cannot_be_min_int:bool ->
@@ -178,6 +186,9 @@ val mod_int :
   expression ->
   Debuginfo.t ->
   expression
+
+(** unsigned remainder of two register-width integers *)
+val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
 
 (** Boolean negation *)
 val mk_not : Debuginfo.t -> expression -> expression
@@ -229,6 +240,10 @@ val unbox_vec256 : Debuginfo.t -> expression -> expression
 val box_vec512 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
 
 val unbox_vec512 : Debuginfo.t -> expression -> expression
+
+val box_mask : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_mask : Debuginfo.t -> expression -> expression
 
 (** Make the given expression return a unit value *)
 val return_unit : Debuginfo.t -> expression -> expression
@@ -357,6 +372,7 @@ module Extended_machtype_component : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 end
 
@@ -380,6 +396,8 @@ module Extended_machtype : sig
   val typ_vec256 : t
 
   val typ_vec512 : t
+
+  val typ_mask : t
 
   (** Conversion from a normal Cmm machtype. *)
   val of_machtype : machtype -> t
@@ -655,7 +673,11 @@ val mul_int_caml : binary_primitive
 
 val div_int_caml : binary_primitive
 
+val unsigned_div_int_caml : binary_primitive
+
 val mod_int_caml : binary_primitive
+
+val unsigned_mod_int_caml : binary_primitive
 
 val and_int_caml : binary_primitive
 
@@ -758,6 +780,8 @@ val emit_int64_constant : symbol -> int64 -> data_item list -> data_item list
 val emit_nativeint_constant :
   symbol -> nativeint -> data_item list -> data_item list
 
+val emit_mask_constant : symbol -> int64 -> data_item list -> data_item list
+
 val emit_vec128_constant :
   symbol -> Cmm.vec128_bits -> data_item list -> data_item list
 
@@ -810,6 +834,9 @@ val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
 
 (** Create a constant vec512 expression from eight int64s. *)
 val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
+
+(** Create a constant mask expression from its int64 bit pattern. *)
+val mask : dbg:Debuginfo.t -> int64 -> expression
 
 (** Create a constant int expression from a nativeint. *)
 val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
@@ -1150,6 +1177,14 @@ val cmm_arith_size : expression -> int option
 (* CR lmaurer: Return [Linkage_name.t] instead *)
 val make_symbol : ?compilation_unit:Compilation_unit.t -> string -> string
 
+(** Linkage name of the module initialization ("entry") function of the given
+    compilation unit (default: the current unit). The startup file references
+    this symbol for every linked unit, and the dissector passes it to the linker
+    via -u to select the required archive members. Object files contain the
+    assembler-encoded form of this name (see [Asm_targets.Asm_symbol.encode]).
+*)
+val entry_symbol_name : ?compilation_unit:Compilation_unit.t -> unit -> string
+
 val machtype_of_layout : Lambda.layout -> machtype
 
 val machtype_of_layout_changing_tagged_int_to_val : Lambda.layout -> machtype
@@ -1237,17 +1272,6 @@ val with_stack :
   arg:expression ->
   expression
 
-val with_stack_bind :
-  dbg:Debuginfo.t ->
-  valuec:expression ->
-  exnc:expression ->
-  effc:expression ->
-  dyn:expression ->
-  bind:expression ->
-  f:expression ->
-  arg:expression ->
-  expression
-
 val with_stack_preemptible :
   dbg:Debuginfo.t ->
   valuec:expression ->
@@ -1258,23 +1282,17 @@ val with_stack_preemptible :
   arg:expression ->
   expression
 
-val with_stack_bind_preemptible :
-  dbg:Debuginfo.t ->
-  valuec:expression ->
-  exnc:expression ->
-  effc:expression ->
-  handle_tick:expression ->
-  dyn:expression ->
-  bind:expression ->
-  f:expression ->
-  arg:expression ->
-  expression
+val continue :
+  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
 
-val resume :
+val discontinue :
+  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+
+val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
-  f:expression ->
-  arg:expression ->
+  exn:expression ->
+  bt:expression ->
   expression
 
 val reperform :
@@ -1322,6 +1340,11 @@ val allocate_unboxed_int64_array :
 val allocate_unboxed_nativeint_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an unboxed mask array for the given number of
+    elements. *)
+val allocate_unboxed_mask_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Allocate a block to hold an unboxed vec128 array for the given number of
     elements. *)
 val allocate_unboxed_vec128_array :
@@ -1353,6 +1376,9 @@ val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
     array. *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
   expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed mask array. *)
+val unboxed_mask_array_length : expression -> Debuginfo.t -> expression
 
 (** Compute the length of an unboxed vec128 array. *)
 val unboxed_vec128_array_length : expression -> Debuginfo.t -> expression
@@ -1492,6 +1518,10 @@ val unboxed_mutable_int32_unboxed_product_array_set :
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
+(** Read from an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
 (** Update an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_set :
   expression ->
@@ -1527,6 +1557,14 @@ val unboxed_int32_array_set :
 (** Update an unboxed int64 or unboxed nativeint or untagged int array (without
     bounds check). *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_set :
   expression ->
   index:expression ->
   new_value:expression ->

@@ -1190,10 +1190,10 @@ let unbox_ref : 'a ref -> 'a ref# = unbox
 let ref_0_via_box = box #{ contents = 0 }
 let ref_0_unbox = unbox { contents = 0 }
 [%%expect{|
-val box_ref : 'a ref# -> 'a ref = <fun>
-val unbox_ref : 'a ref -> 'a ref# = <fun>
+val box_ref : ('a : any). 'a ref# -> 'a ref = <fun>
+val unbox_ref : ('a : any). 'a ref -> 'a ref# = <fun>
 val ref_0_via_box : int ref = {contents = 0}
-val ref_0_unbox : int ref# = #{contents = 0}
+val ref_0_unbox : int ref# = #{contents = <unknown>}
 |}]
 
 (* Test 37: Private type abbreviations *)

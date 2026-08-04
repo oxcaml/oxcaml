@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -75,6 +76,8 @@ val typ_vec128 : machtype
 val typ_vec256 : machtype
 
 val typ_vec512 : machtype
+
+val typ_mask : machtype
 
 val typ_int128 : machtype
 
@@ -191,6 +194,31 @@ type coeffects =
   | No_coeffects
   | Has_coeffects
 
+type is_global =
+  | Global
+  | Local
+
+val equal_is_global : is_global -> is_global -> bool
+
+(* Symbols are marked with whether they are local or global, at both definition
+   and use sites.
+
+   Symbols defined as [Local] may only be referenced within the same file, and
+   all such references must also be [Local].
+
+   Symbols defined as [Global] may be referenced from other files. References
+   from other files must be [Global], but references from the same file may be
+   [Local].
+
+   (Marking symbols in this way speeds up linking, as many references can then
+   be resolved early) *)
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
+val equal_symbol : symbol -> symbol -> bool
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -199,7 +227,7 @@ type phantom_defining_expr =
       (** The phantom-let-bound variable is a constant integer. The argument
           must be the tagged representation of an integer within the range of
           type [int] on the target. (Analogously to [Cconst_int].) *)
-  | Cphantom_const_symbol of string
+  | Cphantom_const_symbol of symbol
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
       (** The phantom-let-bound variable is an alias for another variable. The
@@ -218,7 +246,7 @@ type phantom_defining_expr =
           number of words to the pointer contained in the given identifier, then
           dereferencing. *)
   | Cphantom_read_symbol_field of
-      { sym : string;
+      { sym : symbol;
         field : int
       }
       (** As for [Uphantom_read_var_field], but with the pointer specified by a
@@ -291,6 +319,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
+  | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
@@ -360,6 +389,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -371,6 +401,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
 
@@ -390,31 +421,6 @@ val equal_alloc_dbginfo_item : alloc_dbginfo_item -> alloc_dbginfo_item -> bool
 type alloc_dbginfo = alloc_dbginfo_item list
 
 val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
-
-type is_global =
-  | Global
-  | Local
-
-val equal_is_global : is_global -> is_global -> bool
-
-(* Symbols are marked with whether they are local or global, at both definition
-   and use sites.
-
-   Symbols defined as [Local] may only be referenced within the same file, and
-   all such references must also be [Local].
-
-   Symbols defined as [Global] may be referenced from other files. References
-   from other files must be [Global], but references from the same file may be
-   [Local].
-
-   (Marking symbols in this way speeds up linking, as many references can then
-   be resolved early) *)
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
-
-val equal_symbol : symbol -> symbol -> bool
 
 type operation =
   | Capply of
@@ -449,8 +455,8 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
@@ -557,6 +563,7 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression

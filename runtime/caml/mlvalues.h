@@ -588,6 +588,7 @@ CAMLextern void caml_Store_double_val (value,double);
 #define Unboxed_vec512_array_tag 8
 #define Unboxed_nativeint_array_tag 9
 #define Untagged_int_array_tag 10
+#define Unboxed_mask_array_tag 11
 #define Untagged_int16_array_zero_tag 12
 #define Untagged_int16_array_three_tag 13
 #define Untagged_int16_array_two_tag 14

@@ -22,7 +22,7 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
@@ -51,6 +51,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec128 _ -> true
     | Cconst_vec256 _ -> true
     | Cconst_vec512 _ -> true
+    | Cconst_mask _ -> true
     | Cvar _ -> true
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
@@ -70,10 +71,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
-      | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
-      | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccsel _
-      | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
+      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
@@ -101,7 +102,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match exp with
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ ->
+    | Cconst_mask _ | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -127,7 +128,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
         | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -345,8 +346,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
-    | Cdivi -> SU.basic_op (Intop Idiv), args
-    | Cmodi -> SU.basic_op (Intop Imod), args
+    | Cdivi { signed } -> SU.basic_op (Intop (Idiv { signed })), args
+    | Cmodi { signed } -> SU.basic_op (Intop (Imod { signed })), args
     | Caddi128 -> SU.basic_op (Int128op Iadd128), args
     | Csubi128 -> SU.basic_op (Int128op Isub128), args
     | Cmuli64 { signed } -> SU.basic_op (Int128op (Imul64 { signed })), args
@@ -677,6 +678,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
+              | Mask -> Word_mask
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
@@ -736,6 +738,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec512 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
       Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
+    | Cconst_mask (_bits, _dbg) ->
+      Misc.fatal_error "avx512 masks not yet implemented"
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -768,7 +772,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_args, env) ->
         let* rs = emit_tuple env sub_cfg simple_args in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rs))
+        let rd = Reg.createv_with_typs rs in
+        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -826,7 +831,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =
@@ -1196,7 +1201,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
+            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+              ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);
@@ -1479,8 +1485,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
       fun_args
 
   (* Sequentialization of a function definition *)

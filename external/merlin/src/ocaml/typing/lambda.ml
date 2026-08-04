@@ -43,6 +43,7 @@ type array_kind =
   | Punboxedvectorarray of unboxed_vector
   | Pgcscannableproductarray of unit
   | Pgcignorableproductarray of unit
+  | Punspecializedarray
 
 type nullable =
   | Nullable

@@ -251,6 +251,8 @@ let mkappl (func, args, layout) =
          ap_args=args;
          ap_region_close=Rc_normal;
          ap_mode=alloc_heap;
+         (* All OO prims are builtins which do not yield *)
+         ap_yielding=Unyielding;
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
@@ -897,6 +899,9 @@ let transl_class_rebind ~scopes cl vf =
         ap_result_layout=layout_obj;
         ap_region_close=Rc_normal;
         ap_mode=alloc_heap;
+        (* obj_init is a builtin function which does not yield, and does not
+           execute user code. *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -958,7 +963,7 @@ let rec builtin_meths self env env2 body =
         "var", [Lvar n]
     | Lprim(Pfield(n, _, _), [Lvar e], _) when Ident.same e env ->
         "env", [Lvar env2; (tagged_immediate n)]
-    | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
+    | Lsend(Self, met, Lvar s, [], _, _, _, _, _) when List.mem s self ->
         "meth", [met]
     | _ -> raise Not_found
   in
@@ -973,15 +978,15 @@ let rec builtin_meths self env env2 body =
   | Lapply{ap_func = f; ap_args = [p; arg]} when const_path f && const_path p ->
       let s, args = conv arg in
       ("app_const_"^s, f :: p :: args)
-  | Lsend(Self, Lvar n, Lvar s, [arg], _, _, _, _) when List.mem s self ->
+  | Lsend(Self, Lvar n, Lvar s, [arg], _, _, _, _, _) when List.mem s self ->
       let s, args = conv arg in
       ("meth_app_"^s, Lvar n :: args)
-  | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
+  | Lsend(Self, met, Lvar s, [], _, _, _, _, _) when List.mem s self ->
       ("get_meth", [met])
-  | Lsend(Public, met, arg, [], _, _, _, _) ->
+  | Lsend(Public, met, arg, [], _, _, _, _, _) ->
       let s, args = conv arg in
       ("send_"^s, met :: args)
-  | Lsend(Cached, met, arg, [_;_], _, _, _, _) ->
+  | Lsend(Cached, met, arg, [_;_], _, _, _, _, _) ->
       let s, args = conv arg in
       ("send_"^s, met :: args)
   | Lfunction {kind = Curried _; params = [{name = x; _}]; body} ->
@@ -1073,7 +1078,7 @@ let free_methods l =
   let rec free l =
     Lambda.iter_head_constructor free l;
     match l with
-    | Lsend(Self, Lvar meth, _, _, _, _, _, _) ->
+    | Lsend(Self, Lvar meth, _, _, _, _, _, _, _) ->
         fv := Ident.Set.add meth !fv
     | Lsend _ -> ()
     | Lfunction{params} ->
@@ -1093,7 +1098,8 @@ let free_methods l =
     | Lvar _ | Lmutvar _ | Lconst _ | Lapply _
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
-    | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
+    | Levent _ | Lifused _ | Lregion _ | Lexclave _
+    | Lkindtemplate _ | Lkindinstantiate _ -> ()
     | Lsplice _ ->
       fatal_error_invalid_constructor l
   in free l; !fv

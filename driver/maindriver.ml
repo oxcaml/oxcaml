@@ -28,7 +28,7 @@ let main argv ppf =
   match
     Compenv.readenv ppf Before_args;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
-    Compmisc.read_clflags_from_env ();
+    Location.read_clflags_from_env ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     begin try

@@ -564,7 +564,7 @@ module Gen = struct
           List.map choices ~f:(fun choice ->
               Ast_helper.Exp.unboxed_tuple choice)
         | Tvariant row_desc -> variant env rtyp row_desc
-        | Tquote _ | Tsplice _ | Tquote_eval _ -> []
+        | Tquote _ | Tsplice _ | Tquote_eval _ | Tbox _ -> []
         | Trepr (ty, _) ->
           (* CR modes: This isn't quite right, but it's probably good enough. *)
           exp_or_hole env ty

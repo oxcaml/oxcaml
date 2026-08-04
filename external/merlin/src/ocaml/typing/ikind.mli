@@ -13,9 +13,7 @@
 (**************************************************************************)
 
 val type_declaration_ikind_gated :
-  env:Env.t option ->
-  path:Path.t ->
-  Types.type_ikind
+  env:Env.t option -> path:Path.t -> Types.type_ikind
 
 val type_declaration_ikind_of_jkind :
   env:Env.t option ->

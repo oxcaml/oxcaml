@@ -160,7 +160,8 @@ let pseudoregs_for_operation op arg res =
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
-  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour }) ->
+  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
      (rax, rbx, rcx or rdx). Keep it simple, just force the argument in rax. *)
@@ -173,8 +174,8 @@ let pseudoregs_for_operation op arg res =
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
      in rax or rdx respectively. Keep it simple, just force second argument in
      rcx. *)
-  | Intop Idiv -> [| rax; rcx |], [| rax |]
-  | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Intop (Idiv _) -> [| rax; rcx |], [| rax |]
+  | Intop (Imod _) -> [| rax; rcx |], [| rdx |]
   | Int128op (Iadd128 | Isub128) ->
     [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
@@ -218,7 +219,8 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
-      ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
+      ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Iclz
+        | Ictz ),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -230,8 +232,8 @@ let pseudoregs_for_operation op arg res =
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
   | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
+  | End_region | Poll | Dls_get | Tls_get | Domain_index ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -294,6 +296,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
     Rewritten (Specific (Istore_int (n, addr, is_assign)), Ctuple [])
   | Cconst_int _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
   | Cconst_float (_, _)
@@ -328,9 +331,14 @@ let is_offset_out_of_range _byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype _src _dst :
+let insert_move_extcall_arg _exttype src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  Use_default
+  let is_mask_reg (reg : Reg.t) =
+    Cmm.equal_machtype_component reg.typ Cmm.Mask
+  in
+  if Array.exists is_mask_reg src || Array.exists is_mask_reg dst
+  then Misc.fatal_error "avx512 masks not yet implemented"
+  else Use_default
 
 (* Recognize float arithmetic with mem *)
 

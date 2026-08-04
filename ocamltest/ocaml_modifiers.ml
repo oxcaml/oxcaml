@@ -136,6 +136,7 @@ let extension_universe_lib name =
 
 let make_fexpr_dump pass = [
   append Ocaml_variables.fexpr_dump_files [pass ^ ".fl"];
+  append Ocaml_variables.ocamlopt_flags ["-dcanonical-ids"];
   append Ocaml_variables.ocamlopt_flags ["-dfexpr-annot-after="^pass];
 ]
 

@@ -31,6 +31,10 @@
 
 (rule
  (targets bytetop)
+ ; [expunge.bc] (and [topstart.bc]) load the flambda2_floats C stubs at
+ ; startup, found via the [-I] path below.  The shared library must therefore
+ ; be staged into the build/sandbox directory.
+ (deps ../../middle_end/flambda2/numbers/floats/dllflambda2_floats_stubs.so)
  (action (run %{ocaml_where}/../../bin/ocamlrun
               -I ../../middle_end/flambda2/numbers/floats
               %{exe:../expunge.bc} %{dep:../topstart.bc} %{targets}

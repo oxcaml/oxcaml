@@ -141,7 +141,7 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
       { field_kind =
           Flat_suffix
             ( Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
-            | Naked_vec512 );
+            | Naked_vec512 | Naked_mask );
         _
       } ->
     raise Primitive_not_supported
@@ -186,7 +186,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Pc _, _res -> Misc.fatal_error "Block_load on constant"
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
-  | Duplicate_block _ | Duplicate_array _ | Obj_dup ->
+  | Duplicate_block _ | Duplicate_array _ | Obj_dup _ ->
     use_prim' (Extern "caml_obj_dup")
   | Is_int _ -> use_prim' IsInt
   | Is_null ->
@@ -314,8 +314,8 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Peek _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Make_lazy tag ->
-    let tag = Flambda_primitive.Lazy_block_tag.to_tag tag in
+  | Make_lazy { lazy_tag; alloc_region = _ } ->
+    let tag = Flambda_primitive.Lazy_block_tag.to_tag lazy_tag in
     let expr, env, res =
       To_jsir_shared.block ~env ~res ~tag ~mut:Mutable ~fields:[x]
     in
@@ -341,10 +341,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     match kind, load_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks
+        | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
       use_prim' Array_get
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
@@ -388,8 +389,10 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Add -> "add"
       | Sub -> "sub"
       | Mul -> "mul"
-      | Div -> "div"
-      | Mod -> "mod"
+      | Div Signed -> "div"
+      | Div Unsigned -> "unsigned_div"
+      | Mod Signed -> "mod"
+      | Mod Unsigned -> "unsigned_mod"
       | And -> "and"
       | Or -> "or"
       | Xor -> "xor"
@@ -523,10 +526,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     match kind, set_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks
+        | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values _ | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
@@ -623,6 +627,8 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Naked_nativeints ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
+      | Naked_masks ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_mask_array_tag
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
       | Naked_float32s ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag

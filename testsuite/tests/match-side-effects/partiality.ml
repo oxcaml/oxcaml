@@ -527,16 +527,18 @@ let check_results r1 r2 =
 (let
   (check_results/0 =
      (function {nlocal = 0} r1/0 r2/0?
-       : (consts ()) (non_consts ([1: ?] [0: ?]))
+       : (consts ()) (non_consts ([1: *] [0: ?]))
        (let
          (*match*/16 =[value<
                         (consts ())
                          (non_consts ([0:
                                        value<
-                                        (consts ()) (non_consts ([1: ?]
+                                        (consts ())
+                                         (non_consts ([1: value<int>]
                                          [0: ?]))>,
                                        value<
-                                        (consts ()) (non_consts ([1: ?]
+                                        (consts ())
+                                         (non_consts ([1: value<int>]
                                          [0: ?]))>]))>]
             (apply r1/0 r2/0))
          (catch
@@ -562,9 +564,8 @@ let check_results r1 r2 =
                         case tag 1: (exit 51 r/2)))
                     with (53) (exit 51 (field_imm 1 *match*/16))))
                 with (52) (exit 50 (field_imm 1 *match*/16))))
-            with (50 r/3[value<(consts ()) (non_consts ([1: ?] [0: ?]))>])
-             r/3)
-          with (51 r/4[value<(consts ()) (non_consts ([1: ?] [0: ?]))>]) r/4))))
+            with (50 r/3) r/3)
+          with (51 r/4) r/4))))
   (apply (field_imm 1 (global Toploop!)) "check_results" check_results/0))
 val check_results :
   ('a -> ('b, [< `A | `B ]) result * ('b, [< `A | `B ]) result) ->

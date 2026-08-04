@@ -3,7 +3,7 @@ let code f2_1 deleted in
 let code f3_returning_a_2 deleted in
 let code loopify(never) size(11) newer_version_of(f1_0)
       f1_0_1 (b : imm tagged, x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (b) in
@@ -13,10 +13,11 @@ let code loopify(never) size(11) newer_version_of(f1_0)
         | 0 -> k (unboxed_field_0_0)
         | 1 -> k (1)
 in
-let $camlVariant_unboxing__f1_3 = closure f1_0_1 @f1 in
+let $camlVariant_unboxing__f1_3 = closure f1_0_1 @f1 &toplevel.alloc_region
+in
 let code loopify(never) size(94) newer_version_of(f2_1)
       f2_1_1 (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
@@ -39,7 +40,9 @@ let code loopify(never) size(94) newer_version_of(f2_1)
           | 0 -> k4
           | 1 -> k5)
          where k5 =
-           let Pmakeblock = %block.[`0`].`local`[`region`] (a) in
+           let Pmakeblock =
+             %block.[`0`].my_alloc_region.`local`[`region`] (a)
+           in
            cont k3
                   (Pmakeblock,
                    0i,
@@ -54,7 +57,9 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                | 0 -> k4
                | 1 -> k5)
               where k5 =
-                let Pmakeblock = %block.[`0`].`local`[`region`] (b) in
+                let Pmakeblock =
+                  %block.[`0`].my_alloc_region.`local`[`region`] (b)
+                in
                 cont k3
                        (Pmakeblock,
                         0i,
@@ -63,7 +68,9 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                         poison.val.variant_unboxing_field,
                         b)
               where k4 =
-                let Pmakeblock = %block.[`1`].`local`[`region`] (a, b) in
+                let Pmakeblock =
+                  %block.[`1`].my_alloc_region.`local`[`region`] (a, b)
+                in
                 cont k3
                        (Pmakeblock,
                         1i,
@@ -99,11 +106,12 @@ let code loopify(never) size(94) newer_version_of(f2_1)
       let `unit` = %end_region (`region`) in
       cont k (region_return)
 in
-let $camlVariant_unboxing__f2_4 = closure f2_1_1 @f2 in
+let $camlVariant_unboxing__f2_4 = closure f2_1_1 @f2 &toplevel.alloc_region
+in
 let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
       f3_returning_a_2_1
         (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
@@ -134,7 +142,7 @@ let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
       cont k (region_return)
 in
 let $camlVariant_unboxing__f3_returning_a_5 =
-  closure f3_returning_a_2_1 @f3_returning_a
+  closure f3_returning_a_2_1 @f3_returning_a &toplevel.alloc_region
 in
 let $camlVariant_unboxing =
   Block 0 ($camlVariant_unboxing__f1_3,

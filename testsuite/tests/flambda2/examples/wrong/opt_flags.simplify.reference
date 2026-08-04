@@ -1,11 +1,11 @@
-let $camlOpt_flags__immstring26 = "foo" in
+let $camlOpt_flags__immstring29 = "foo" in
 (let try_region = %begin_try_region () in
  let try_ghost_region = %begin_try_ghost_region () in
  cont k3 push(k2)
    where k3 =
      (apply ccall
         ($`*extern*`.caml_sys_getenv : val -> val)
-          ($camlOpt_flags__immstring26)
+          ($camlOpt_flags__immstring29)
           -> k4 * k2
         where k4 (param) =
           cont k3
@@ -21,6 +21,6 @@ let $camlOpt_flags__immstring26 = "foo" in
       | 0 -> k (99)
       | 1 -> k (-1)
   where k (y : imm tagged) =
-    let $camlOpt_flags__Pmakeblock139 = Block 0 (42, y, 1701) in
-    let $camlOpt_flags = Block 0 ($camlOpt_flags__Pmakeblock139) in
+    let $camlOpt_flags__Pmakeblock152 = Block 0 (42, y, 1701) in
+    let $camlOpt_flags = Block 0 ($camlOpt_flags__Pmakeblock152) in
     cont done ($camlOpt_flags)

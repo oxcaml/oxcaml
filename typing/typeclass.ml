@@ -1262,6 +1262,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                            lid = mknoloc (Longident.Lident (Ident.name id));
                            desc = vd; kind = Id_value;
                            unique_use = aliased_many_use;
+                           staticity = Mode.Staticity.(disallow_left legacy);
                            mode = Mode.Value.(disallow_right legacy) };
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
@@ -1473,6 +1474,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                              lid = mknoloc (Longident.Lident (Ident.name id));
                              desc = vd; kind = Id_value;
                              unique_use = aliased_many_use;
+                             staticity =
+                               Mode.Staticity.(disallow_left legacy);
                              mode = Mode.Value.(disallow_right legacy) };
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;
@@ -1573,7 +1576,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
 (* of optional parameters                                         *)
 
 let var_option =
-  Predef.type_option (Btype.newgenvar Predef.option_argument_jkind)
+  Predef.type_option (Btype.newgenvar Predef.optional_argument_jkind)
 
 let rec approx_declaration cl =
   match cl.pcl_desc with
@@ -1715,7 +1718,7 @@ let class_infos define_class kind
         let make_param (sty, v) =
           try
             let jkind = Jkind.Builtin.value ~why:Class_type_argument in
-            let param = transl_type_param env (Pident ty_id) jkind sty in
+            let param, _ = transl_type_param env (Pident ty_id) jkind sty in
             (* CR layouts: we require class type parameters to be values, but
                we should lift this restriction. Doing so causes bad error messages
                today, so we wait for tomorrow. *)

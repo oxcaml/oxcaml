@@ -6,7 +6,7 @@ open! Int_replace_polymorphic_compare
    use vector operations if possible *)
 (* CR gyorsh: how does the info from [reg_map] flow between blocks? *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module State : sig
   type t
@@ -808,8 +808,9 @@ end = struct
                   | Intop_imm (Iadd, n) -> Some (reg, n)
                   | Intop_imm (Isub, n) -> Some (reg, -n)
                   | Intop_imm
-                      ( ( Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-                        | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ ),
+                      ( ( Imul | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
+                        | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz
+                        | Icomp _ ),
                         _ )
                   | Opaque | Begin_region | End_region | Dls_get | Tls_get
                   | Domain_index | Poll | Pause | Const_int _ | Const_float32 _

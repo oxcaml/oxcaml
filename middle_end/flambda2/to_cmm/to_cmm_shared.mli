@@ -51,6 +51,10 @@ val param_machtype_of_kinded_parameter :
 
 val memory_chunk_of_kind : Flambda_kind.With_subkind.t -> Cmm.memory_chunk
 
+(** Same as [memory_chunk_of_kind], but assumes that values are not scannable *)
+val memory_chunk_of_non_scannable_kind :
+  Flambda_kind.With_subkind.t -> Cmm.memory_chunk
+
 (** Create a constant int expression from a targetint. *)
 val targetint : dbg:Debuginfo.t -> Targetint_32_64.t -> Cmm.expression
 
@@ -159,6 +163,9 @@ module Update_kind : sig
 
   (** Tightly packed (eight words each); the byte offset is [index * 64]. *)
   val naked_vec512s : t
+
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
+  val naked_mask_fields : t
 
   (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
       that in this case the index is still based on word-width fields! *)
