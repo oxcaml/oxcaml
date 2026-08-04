@@ -2706,33 +2706,29 @@ let prim_may_allocate ~arity prim =
    translating [Texp_apply]; the type checker needs the same answer to know
    whether that closure gets allocated. *)
 
-type application_kind =
-  | Direct
-      (* Compiles to [transl_primitive_application]: no closure. *)
-  | Eta_expanded
-      (* Compiles to [transl_primitive], which builds a heap closure. *)
-  | Depends_on_poly_result_mode
-      (* The primitive is over-applied in tail position and its result mode is
-         [Prim_poly], so this is [Direct] exactly when that mode resolves to
-         the heap.  Resolving it zaps a mode variable, which is fine after
-         type checking but not during it, so the caller decides. *)
-
 let is_omitted = function
   | Arg _ -> false
   | Omitted _ -> true
 
-let application_kind p pos args =
-  if List.exists (fun (_, arg) -> is_omitted arg) args then Eta_expanded
-  else
+let can_apply_primitive p pmode pos args ~check_poly_mode =
+  if List.exists (fun (_, arg) -> is_omitted arg) args then false
+  else begin
     let nargs = List.length args in
-    if nargs = p.prim_arity then Direct
-    else if nargs < p.prim_arity then Eta_expanded
-    else if pos <> Typedtree.Tail then Direct
-    else
-      match p.prim_native_repr_res with
-      | Prim_global, _ -> Direct
-      | Prim_local, _ -> Eta_expanded
-      | Prim_poly, _ -> Depends_on_poly_result_mode
+    if nargs = p.prim_arity then true
+    else if nargs < p.prim_arity then false
+    else if pos <> Typedtree.Tail then true
+    else begin
+      (* Cannot directly apply primitive under this case if pmode is local *)
+      if check_poly_mode then
+        let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
+        is_heap_mode (transl_locality_mode_l return_mode)
+      else
+        match p.prim_native_repr_res with
+        | Prim_global, _ -> true
+        | Prim_poly, _
+        | Prim_local, _ -> false
+    end
+  end
 
 (* Whether a fully-applied occurrence of [p] allocates.
 
@@ -2762,15 +2758,21 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
         (transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
            None arg_exps)
     with
-    (* Let the bug-indicating exceptions through, ... *)
-    | Misc.Fatal_error | Out_of_memory | Stack_overflow as exn ->
+    (* Let the bug-indicating exceptions through.  [Assert_failure] belongs
+       here with [Misc.Fatal_error]: [Typeopt.layout] reaches an [assert
+       false], and a violated invariant must surface rather than be reported
+       as "may allocate". *)
+    | Misc.Fatal_error | Assert_failure _ | Out_of_memory | Stack_overflow
+      as exn ->
         Btype.backtrack snap;
         raise exn
-    (* ... but swallow every user error: looking a primitive up raises from
-       [lookup_primitive_unspecialized], [Typeopt] and [Typedecl], and
-       reporting any of those here would report them in the wrong phase, and
-       at the location of the primitive rather than of the offending argument.
-       Translation raises them again where they belong. *)
+    (* ... but swallow every user error.  [lookup_primitive_unspecialized]
+       raises [Error], and specializing raises [Error] from
+       [specialize_primitive] and the [glb_array_*] family and [Typeopt.Error]
+       from [Typeopt].  Reporting any of those here would report them in the
+       wrong phase, and at the location of the primitive rather than of the
+       offending argument.  Translation raises them again where they
+       belong. *)
     | _ -> true
   in
   (* [specialize_primitive] calls [Ctype.type_sort] and [Ctype.type_jkind],
@@ -2806,37 +2808,21 @@ let result_allocation p ~poly_mode =
       (* A stack allocation, which does not count on the allocation axis. *)
       No_allocation_to_register
 
-(* [poly_mode] is used only to report the locality to register at.  It is
-   never handed to [lookup_primitive_unspecialized], which would zap it. *)
 let application_allocation env loc p pos args ~poly_mode ~poly_sort ~ty =
-  match application_kind p pos args with
-  | Direct ->
-      (* [Direct] guarantees at least [prim_arity] arguments, none omitted. *)
-      let rec first_args n args =
-        if n = 0 then []
-        else
-          match args with
-          | (_, Arg (arg, _)) :: rest -> arg :: first_args (n - 1) rest
-          | (_, Omitted _) :: _ | [] -> []
-      in
-      let arg_exps = first_args p.prim_arity args in
-      if fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps then
-        result_allocation p ~poly_mode
-      else No_allocation_to_register
-  | Depends_on_poly_result_mode
-      (* CR shsong: handled conservatively.  Answering precisely means
-         resolving the [Prim_poly] result locality, which zaps a mode
-         variable, and type checking must not mutate inference state.  So we
-         assume the closure is built: a [Prim_poly] primitive over-applied in
-         tail position registers an allocation even when its mode would have
-         resolved to global and [Translcore] would have taken the direct
-         path. *)
-  | Eta_expanded ->
-      (* [Translcore] eta-expands the primitive, and [transl_primitive] builds
-         the wrapper with [~mode:alloc_heap]. *)
-      (* CR shsong: consider registering with mode_ret if it is used to decide
-         where the closure for a partial application is allocated. *)
-      Register_heap
+  if can_apply_primitive p poly_mode pos args ~check_poly_mode:false then
+    let rec cut_args n args =
+      match n, args with
+      | 0, _ -> []
+      | _, [] -> failwith "Translprim cut_args"
+      | _, ((_, Arg (x, _)) :: oargs) -> x :: (cut_args (n - 1) oargs)
+      | _, ((_, Omitted _) :: _) -> assert false
+    in
+    let arg_exps = cut_args p.prim_arity args in
+    if fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps then
+      result_allocation p ~poly_mode
+    else No_allocation_to_register
+  else
+    Register_heap
 
 (* Error report *)
 

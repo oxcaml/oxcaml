@@ -59,21 +59,17 @@ val sort_of_native_repr :
 
 (** Whether an application of a primitive compiles to a direct primitive
     application, or whether [Translcore] first has to eta-expand the primitive
-    into a closure. *)
-type application_kind =
-  | Direct  (** No closure. *)
-  | Eta_expanded  (** [Translcore] builds a heap closure. *)
-  | Depends_on_poly_result_mode
-      (** Over-applied in tail position with a [Prim_poly] result: [Direct]
-          exactly when that mode resolves to the heap. Resolving it zaps a
-          mode variable, so the caller decides -- [Translcore] resolves it,
-          the type checker must not and answers conservatively. *)
+    into a closure.
 
-val application_kind :
+    Set [check_poly_mode] to [true] to check zap mode and make precise decision
+    for Prim_poly. *)
+val can_apply_primitive :
   Primitive.description ->
+  Mode.Locality.lr option ->
   Typedtree.apply_position ->
   (Typedtree.arg_label * Typedtree.apply_arg) list ->
-  application_kind
+  check_poly_mode:bool ->
+  bool
 
 (** The allocation an occurrence of a primitive makes, as the registration the
     type checker should perform. *)

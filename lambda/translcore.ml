@@ -318,15 +318,6 @@ let transl_ident loc env ty path desc kind =
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
-let can_apply_primitive p pmode pos args =
-  match Translprim.application_kind p pos args with
-  | Direct -> true
-  | Eta_expanded -> false
-  | Depends_on_poly_result_mode ->
-    (* Type checking is over, so resolving the mode variable is fine here. *)
-    let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
-    is_heap_mode (transl_locality_mode_l return_mode)
-
 let zero_alloc_of_application
       ~num_args (annotation : Zero_alloc.assume option) funct =
   match annotation, funct.exp_desc with
@@ -410,7 +401,8 @@ and transl_exp0 ~in_new_scope ~scopes layout e =
                                         kind = Id_prim (pmode, psort); _ };
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, zero_alloc)
-    when can_apply_primitive p pmode pos oargs ->
+    when Translprim.can_apply_primitive p pmode pos oargs
+          ~check_poly_mode:true ->
       let rec cut_args prim_repr oargs =
         match prim_repr, oargs with
         | [], _ -> [], oargs
