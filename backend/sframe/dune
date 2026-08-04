@@ -1,0 +1,7 @@
+(library
+ (name sframe)
+ (wrapped true)
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
+ (libraries ocamlcommon asm_targets))
