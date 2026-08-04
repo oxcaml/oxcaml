@@ -317,9 +317,9 @@ define prepare_runtest_dir
 	 # replace backend-specific testsuite/tools with their new versions
 	rm -f _runtest/testsuite/tools/*
 	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
+	cp $(test_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
+	chmod 755 _runtest/testsuite/tools/expect
 	if [ -z "$(boot_flow)" ]; then \
-	  cp $(test_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect; \
-	  chmod 755 _runtest/testsuite/tools/expect; \
 	  cp $(test_build)/middle_end/flambda2/tests/tools/fexprc.exe _runtest/testsuite/tools/fexprc; \
 	  chmod 755 _runtest/testsuite/tools/fexprc; \
 	  cp $(test_build)/oxcaml/testsuite/tools/expectnat.exe _runtest/testsuite/tools/expectnat; \
@@ -383,9 +383,7 @@ define prepare_runtest_dir
 		mkdir -p otherlibs/{stdlib_,}$${universe}; \
 		$(cpl) stdlib/stdlib_$${universe}/* otherlibs/stdlib_$${universe}; \
 	 done; \
-	 if [ -z "$(boot_flow)" ]; then \
-	   ln -s ../$(test_build)/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
-	 fi; \
+	 ln -s ../$(test_build)/$(ocamldir)/toplevel/byte/.ocamltoplevel.objs/byte toplevel; \
 	)
 
 	# Various directories are put on the -I paths by tools/Makefile;
@@ -393,9 +391,7 @@ define prepare_runtest_dir
 	# various things.
 	mkdir _runtest/utils
 	cp _install/lib/ocaml/compiler-libs/*.cmi _runtest/utils
-	if [ -z "$(boot_flow)" ]; then \
-	  cp $(test_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils; \
-	fi
+	cp $(test_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
 	if [ -z "$(boot_flow)" ]; then \
@@ -437,6 +433,7 @@ define prepare_runtest_dir
               _runtest/tools/$$tool; \
 	    ln -s ../_install/bin/$$tool.opt _runtest/tools/$$tool.opt; \
 	  done; \
+	  ln -s ../_install/bin/dumpobj.byte _runtest/tools/dumpobj; \
 	fi
         # ocamldoc
 	# rm _runtest/ocamldoc
@@ -454,20 +451,30 @@ install_for_test: boot_flow =
 install_for_test: install
 	$(prepare_runtest_dir)
 
-# Support libraries and tools needed to run the stdlib-only subset of the
-# upstream testsuite with the boot compiler, built in the main context
-# (that is, by the boot compiler, against the runtime and stdlib produced
-# by [runtime-stdlib]). The compilers that the testsuite exercises are the
-# boot compiler's own native binaries (see [boot-_install]), so everything
-# here is cheap: the testsuite support libraries, the stdlib_* universes
-# (part of the stdlib, they only take seconds to build), ocamlyacc and the
-# bytecode shim standing in for the ".byte" tools. In particular the
-# compiler-libs are not built at all, in any mode; tests that need them at
-# test time (the expect tool, the toplevels) are skipped, see
-# OCAMLTEST_SKIP_MISSING_TOOLS in ocamltest/ocaml_actions.ml.
+# Support libraries and tools needed to run the upstream testsuite with the
+# boot compiler, built in the main context (that is, by the boot compiler,
+# against the runtime and stdlib produced by [runtime-stdlib]). The
+# compilers that the testsuite exercises are the boot compiler's own native
+# binaries (see [boot-_install]); ".byte" compiler requests are served by
+# the bytecode shim, so the native middle end (in particular flambda2,
+# i.e. ocamloptcomp — by far the largest library) is never compiled to
+# bytecode. The bytecode compiler-libs (ocamlcommon, ocamlbytecomp,
+# ocamltoplevel) *are* built: they are cheap (bytecode produced by the
+# native boot compiler) and provide the expect tool, the byte toplevel and
+# dumpobj, which large parts of the testsuite need. Tests that need the
+# remaining, expensive tools (expectnat, codegen, ocamlnat: all native
+# compiler-libs) are skipped, see OCAMLTEST_SKIP_MISSING_TOOLS in
+# ocamltest/ocaml_actions.ml.
 boot_test_targets = \
   ocamlyacc \
   oxcaml/testsuite/tools/compiler_shim.bc \
+  oxcaml/testsuite/tools/expect.exe \
+  toplevel/byte/bytetop \
+  toplevel/expunge.bc \
+  tools/dumpobj.bc \
+  ocamlcommon.cma \
+  ocamlbytecomp.cma \
+  toplevel/byte/ocamltoplevel.cma \
   testsuite/lib/lib.cm{,x}a \
   testsuite/lib/testing.cm{,x}a \
   otherlibs/stdlib_upstream_compatible/stdlib_upstream_compatible.cm{,x}a \
@@ -495,8 +502,27 @@ boot-test-install: boot-_install boot-test-artifacts
 	$(cpl) $(main_build)/oxcaml/testsuite/tools/compiler_shim.bc \
           _install/bin/ocamllex.byte
 	$(cpl) $(main_build)/ocamlyacc _install/bin/ocamlyacc
+	$(cpl) $(main_build)/toplevel/byte/bytetop _install/bin/ocaml
+	$(cpl) $(main_build)/tools/dumpobj.bc _install/bin/dumpobj.byte
+	$(cpl) $(main_build)/toplevel/expunge.bc _install/lib/ocaml/expunge
 	mkdir -p _install/lib/ocaml/stublibs
 	$(cpl) -f _install/lib/stublibs/*.so _install/lib/ocaml/stublibs/
+	$(cpl) $(main_build)/ocamlcommon.cma $(main_build)/ocamlbytecomp.cma \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) $(main_build)/toplevel/byte/ocamltoplevel.cma \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) -f $(main_build)/.ocamlcommon.objs/byte/*.cmi \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) -f $(main_build)/.ocamlbytecomp.objs/byte/*.cmi \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) -f $(main_build)/toplevel/byte/.ocamltoplevel.objs/byte/*.cmi \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) -f $(main_build)/toplevel/byte/.ocamltoplevel.objs/byte/topdirs.{cmt,cmti} \
+          _install/lib/ocaml/compiler-libs/
+	$(cpl) -f $(main_build)/toplevel/byte/topdirs.mli \
+          _install/lib/ocaml/compiler-libs/
+	cp -f _install/lib/ocaml/compiler-libs/topdirs.{cmi,mli,cmt,cmti} \
+          _install/lib/ocaml
 	for universe in upstream_compatible stable beta alpha ; do \
 	  mkdir -p _install/lib/ocaml/stdlib_$$universe; \
 	  $(cpl) $(main_build)/otherlibs/stdlib_$$universe/stdlib_$$universe.{cma,cmxa,a} \
@@ -509,13 +535,14 @@ boot-test-install: boot-_install boot-test-artifacts
 
 # Like [install_for_test], but for testing the boot compiler: the compilers
 # that the testsuite exercises are the boot compiler's own native binaries,
-# and nothing is built beyond the stdlib, the stdlib_* universes and the
-# testsuite support libraries — in particular no compiler-libs, in any
-# mode. Tests that request the ".byte" compilers transparently run the
-# native ones through the compiler shim; tests that need tools that cannot
-# exist in this mode (expect, the toplevels, ocamldebug, ...) are skipped
-# by ocamltest, and whole directories that cannot work are excluded via
-# oxcaml/testsuite/boot-test-list. Note also that unlike
+# and nothing expensive is built — only the stdlib, the stdlib_* universes,
+# the testsuite support libraries and the *bytecode* compiler-libs (for the
+# expect tool, the byte toplevel and dumpobj); never the native middle end
+# in bytecode. Tests that request the ".byte" compilers transparently run
+# the native ones through the compiler shim; tests that need tools that
+# cannot exist in this mode (expectnat, codegen, ocamlnat, ocamldebug, ...)
+# are skipped by ocamltest, and whole directories that cannot work are
+# excluded via oxcaml/testsuite/boot-test-list. Note also that unlike
 # [install_for_test], nothing is installed to the configured prefix, so the
 # rare tests that look outside of _runtest (e.g. via +compiler-libs, which
 # expands to the configured standard library path) can fail.

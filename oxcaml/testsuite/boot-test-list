@@ -1,12 +1,13 @@
 # Tests excluded from [make runtest-upstream-boot], which tests the boot
 # compiler's native binaries and only builds the stdlib (and the stdlib_*
-# universes) and the testsuite support libraries: neither the otherlibs
-# (unix, str, threads, runtime_events, dynlink, eval) nor the compiler-libs
-# (needed by the expect tool, the toplevels, expectnat, codegen, fexprc and
-# the byte tools) are available. Tests that request the missing expect tool
-# or toplevels are skipped by ocamltest itself (see
-# OCAMLTEST_SKIP_MISSING_TOOLS in ocamltest/ocaml_actions.ml), so this list
-# only excludes directories whose tests fail for other reasons.
+# universes), the bytecode compiler-libs (for the expect tool, the byte
+# toplevel and the byte tools) and the testsuite support libraries: neither
+# the otherlibs (unix, str, threads, runtime_events, dynlink, eval) nor the
+# native compiler-libs (needed by expectnat, codegen, fexprc and ocamlnat)
+# are available. Tests that request the missing expectnat or ocamlnat are
+# skipped by ocamltest itself (see OCAMLTEST_SKIP_MISSING_TOOLS in
+# ocamltest/ocaml_actions.ml), so this list only excludes directories whose
+# tests fail for other reasons.
 #
 # Only directories where most tests require the missing pieces are excluded;
 # directories where only a few tests do are kept, so a small number of
@@ -38,14 +39,7 @@
   tests/lib-unix                 | requires unix
   tests/manifests                | links the native compiler-libs
   tests/parallel                 | requires unix and threads
-  tests/ppx-contexts             | builds a ppx against the bytecode compiler-libs
-  tests/ppx-empty-cases          | builds a ppx against the bytecode compiler-libs
-  tests/ppx-error-message        | builds a ppx against the bytecode compiler-libs
   tests/quotation                | requires the eval library (ocaml-jit)
   tests/tool-debugger            | requires ocamldebug
-  tests/tool-dumpobj             | requires dumpobj, which is bytecode-only
-  tests/tool-dumpobj-events      | requires dumpobj, which is bytecode-only
   tests/tool-expect-test         | requires expectnat and unix
-  tests/tool-ocamlc-locations    | builds a ppx against the bytecode compiler-libs
   tests/tool-ocamlfilt           | requires the native ocamlfilt
-  tests/utils                    | links the bytecode compiler-libs objects
