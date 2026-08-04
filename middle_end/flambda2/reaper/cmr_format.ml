@@ -17,7 +17,8 @@
 
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
-    final_typing_env : Typing_env.t option
+    final_typing_env : Typing_env.t option;
+    all_code : Exported_code.t
   }
 
 module Id_stamp_counters = struct
@@ -48,6 +49,46 @@ module Id_stamp_counters = struct
     Value_slot.restore_stamp_counter value_slots
 end
 
+module All_code_with_sections = struct
+  type t =
+    { all_code : Exported_code.raw;
+      sections : string array
+    }
+
+  let create ~used_value_slots ~canonicalise all_code =
+    let all_code =
+      let all_names =
+        Code_id.Set.fold
+          (fun code_id names ->
+            Name_occurrences.add_code_id names code_id Name_mode.normal)
+          (Exported_code.ids_for_export all_code).code_ids
+          Name_occurrences.empty
+      in
+      Exported_code.prepare_for_export all_code ~reachable_names:all_names
+        ~used_value_slots ~canonicalise
+    in
+    let ids_for_export = Exported_code.ids_for_export all_code in
+    let sections_builder = File_sections.Builder.create 0 in
+    let all_code =
+      Exported_code.to_raw
+        ~add_section:(File_sections.Builder.add sections_builder)
+        all_code
+    in
+    let sections, _toc, _total_length =
+      File_sections.serialize (File_sections.Builder.build sections_builder)
+    in
+    { all_code; sections }, ids_for_export
+
+  let deserialise { all_code; sections } =
+    let sections =
+      File_sections.from_array
+        (Array.map
+           (fun section : Obj.t -> Marshal.from_string section 0)
+           sections)
+    in
+    Exported_code.from_raw ~sections all_code
+end
+
 module File_contents = struct
   type cmr_format = t
 
@@ -56,25 +97,30 @@ module File_contents = struct
       table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
-      final_typing_env : Typing_env.Serializable.t option
+      final_typing_env : Typing_env.Serializable.t option;
+      all_code : All_code_with_sections.t
     }
 
   let create ~used_value_slots
-      ({ unit_metadata; final_typing_env } : cmr_format) : t =
-    let final_typing_env =
-      Option.map
-        (fun typing_env ->
-          (* CR mvellacott: the returned [canonicalise] must be applied to any
-             code stored alongside the environment, once the CMR stores code. *)
-          let env, _canonicalise =
-            Typing_env.Pre_serializable.create typing_env ~used_value_slots
-          in
-          Typing_env.Serializable.create_without_pruning env)
-        final_typing_env
+      ({ unit_metadata; final_typing_env; all_code } : cmr_format) : t =
+    let final_typing_env, canonicalise =
+      match final_typing_env with
+      | None -> None, Fun.id
+      | Some typing_env ->
+        let env, canonicalise =
+          Typing_env.Pre_serializable.create typing_env ~used_value_slots
+        in
+        Some (Typing_env.Serializable.create_without_pruning env), canonicalise
     in
+    let all_code, all_code_ids =
+      All_code_with_sections.create ~used_value_slots ~canonicalise all_code
+    in
+    (* Must happen after any identifiers change, in particular, after
+       canonicalisation. *)
     let exported_ids =
       Ids_for_export.union_list
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
+          all_code_ids;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
@@ -82,7 +128,8 @@ module File_contents = struct
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
       unit_metadata;
-      final_typing_env
+      final_typing_env;
+      all_code
     }
 
   let deserialise ~machine_width ~resolver
@@ -90,11 +137,12 @@ module File_contents = struct
         table_data;
         used_value_slots;
         unit_metadata;
-        final_typing_env
+        final_typing_env;
+        all_code
       } : cmr_format =
     (* Must happen before anything can create an identifier. *)
     Id_stamp_counters.restore id_stamp_counters;
-    let renaming, _code_ids =
+    let renaming, code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit:(Compilation_unit.get_current_exn ())
     in
@@ -108,7 +156,11 @@ module File_contents = struct
     let unit_metadata =
       Flambda_unit.Metadata.apply_renaming unit_metadata renaming
     in
-    { unit_metadata; final_typing_env }
+    let all_code =
+      All_code_with_sections.deserialise all_code
+      |> Exported_code.apply_renaming code_ids renaming
+    in
+    { unit_metadata; final_typing_env; all_code }
 end
 
 type error =

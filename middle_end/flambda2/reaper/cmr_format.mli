@@ -19,7 +19,8 @@
 (* CR mvellacott: (short term) store complete data in CMR files *)
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
-    final_typing_env : Typing_env.t option
+    final_typing_env : Typing_env.t option;
+    all_code : Exported_code.t
   }
 
 type error =

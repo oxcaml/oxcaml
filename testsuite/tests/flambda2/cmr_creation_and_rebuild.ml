@@ -23,4 +23,8 @@
    written and read back without error. It will be replaced as the resume path
    is implemented. *)
 
-let () = ()
+(* [f] contributes two code ids: one from closure conversion, and the newer
+   version of it minted by simplify. *)
+let[@inline never] f x = x + 1
+
+let () = ignore (Sys.opaque_identity (f 1) : int)

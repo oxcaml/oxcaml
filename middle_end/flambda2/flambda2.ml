@@ -253,7 +253,8 @@ let flambda_to_flambda0 : type m.
           Some
             { Flambda2_reaper.Cmr_format.unit_metadata =
                 Flambda_unit.metadata flambda;
-              final_typing_env
+              final_typing_env;
+              all_code
             }
         else None
       in
@@ -372,7 +373,7 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables:_ ~cmr_filename =
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  let { Flambda2_reaper.Cmr_format.unit_metadata; final_typing_env } =
+  let { Flambda2_reaper.Cmr_format.unit_metadata; final_typing_env; all_code } =
     Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
   in
@@ -392,4 +393,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         (Flambda2_types.Typing_env.mem typing_env
            (Flambda2_identifiers.Name.symbol module_symbol)))
     final_typing_env;
+  Printf.eprintf "Restored code for %d code ids\n"
+    (Flambda2_identifiers.Code_id.Set.cardinal
+       (Exported_code.ids_for_export all_code).code_ids);
   Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"
