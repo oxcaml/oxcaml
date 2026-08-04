@@ -791,8 +791,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_closure;
     any_source my_depth;
     (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region } -> any_source alloc_region
-    | Local { alloc_region; region; ghost_region } ->
+    | Not_alloc_stack { alloc_region } -> any_source alloc_region
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       any_source alloc_region;
       any_source region;
       any_source ghost_region);
