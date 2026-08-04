@@ -112,3 +112,5 @@ let symbols (type a r)
        and type Relocation.t = r)
     { address; value = t } =
   Symbols.from_binary_section (module E) { address; value = t.binary_section }
+
+let binary_section t = t.binary_section

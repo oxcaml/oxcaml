@@ -19,3 +19,8 @@ open! Import
 let symbols = ref Symbols.empty
 
 let debug = ref false
+
+(* Handles for in-memory ELF symfiles registered with GDB. Kept alive here
+   so the underlying buffers and C-allocated jit_code_entry records are not
+   freed for the duration of the process. *)
+let gdb_jit_handles : Gdb_jit.handle list ref = ref []
