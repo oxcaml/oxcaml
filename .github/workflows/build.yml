@@ -245,7 +245,7 @@ jobs:
 
     steps:
       - name: Checkout the OxCaml repo
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -530,7 +530,7 @@ jobs:
 
       - name: Upload test diffs
         if: failure() && env.DIFF_CREATED == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         continue-on-error: true
         with:
           name: test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
@@ -635,14 +635,14 @@ jobs:
           git push || (git pull --rebase && git push)
 
       - name: Upload core dumps
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
           path: /cores
 
       - name: Upload DiagnosticReports (macOS)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure() && runner.os == 'macOS'
         with:
           name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
