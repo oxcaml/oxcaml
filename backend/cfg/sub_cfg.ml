@@ -124,12 +124,13 @@ let join_tail ~from ~to_ =
   List.iter (fun from -> transfer ~from ~to_) from;
   add_never_block to_ ~label:(Cmm.new_label ())
 
-let update_exit_terminator ?arg sub_cfg desc =
+let update_exit_terminator ?arg ?dbg sub_cfg desc =
   sub_cfg.exit.terminator
     <- { sub_cfg.exit.terminator with
          desc;
          id = next_instr_id ();
-         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg
+         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg;
+         dbg = Option.value dbg ~default:sub_cfg.exit.terminator.dbg
        }
 
 let mark_as_trap_handler sub_cfg = sub_cfg.entry.is_trap_handler <- true

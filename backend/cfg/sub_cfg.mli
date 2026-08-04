@@ -80,7 +80,8 @@ val join : from:t list -> to_:t -> unit
 
 val join_tail : from:t list -> to_:t -> unit
 
-val update_exit_terminator : ?arg:Reg.t array -> t -> Cfg.terminator -> unit
+val update_exit_terminator :
+  ?arg:Reg.t array -> ?dbg:Debuginfo.t -> t -> Cfg.terminator -> unit
 
 val start_label : t -> Label.t
 
