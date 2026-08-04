@@ -11,7 +11,7 @@ fi
 absolute_path () {
   path=$1
   dir=$(dirname $path)
-  dir_abs=$(cd $dir && pwd)
+  dir_abs=$(cd $dir >/dev/null && pwd)
   file=$(basename $path)
   echo $dir_abs/$file
 }
