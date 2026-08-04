@@ -1,0 +1,142 @@
+(* TEST
+ flambda2;
+ setup-simple-build-env;
+ ocamlopt_flags = "-run";
+ fexpr;
+*)
+
+(* KNOWN-FAILURE test for a To_cmm bug with statically-allocated boxed numbers
+   whose payload is an [Or_variable.Var] (found by the Flambda 2 formalism
+   effort).
+
+   [To_cmm_static.static_boxed_number] emits the deferred update for a static
+   [Boxed_int32]/[Boxed_int64]/[Boxed_nativeint]/[Boxed_float32] with a
+   variable payload at field index 0 of the block. These four are custom
+   blocks: word 0 is the custom_operations pointer and the payload lives at
+   offset 8. The update therefore clobbers the ops pointer (with the boxed
+   value of the variable) and never writes the payload, which keeps its
+   default value 0. ([Boxed_float] is unaffected: its payload really is at
+   field 0.)
+
+   No production pass currently creates [Var] payloads for these four kinds
+   (lifting always produces [Const]), so the bug is latent in ordinary
+   compilation, but it is reachable through fexpr, as this test demonstrates.
+
+   The reference file INTENTIONALLY records the current buggy behaviour
+   ("payload=0" followed by the MISMATCH line). Once the bug is fixed, this
+   test will start failing; update the reference to the correct output:
+
+     payload=42
+     caml_compare=0
+
+   The program binds a static boxed int64 symbol [b] whose payload is the
+   variable [xv] (an opaque boxed 42L), reads the payload back through an
+   opaque copy of [b], and prints it. Only if the payload matches the input
+   (i.e. only once the bug is fixed) does it call [caml_compare] on [b] and
+   the boxed input, which exercises the custom_operations pointer; in the
+   buggy case that pointer is clobbered, so following it could crash. *)
+
+let $fmt = "%d" in
+let $msg_payload = "payload=" in
+let $msg_mismatch = "MISMATCH: deferred update did not write the payload" in
+let $msg_cmp = "caml_compare=" in
+let $c = 42L in
+let xv = %opaque ($c) in
+let $b = xv : int64 boxed in
+let bv = %opaque ($b) in
+let p = %unbox_num.`int64` (bv) in
+let x = %unbox_num.`int64` (xv) in
+(apply ccall &toplevel.alloc_region
+   ($`*extern*`.caml_ml_open_descriptor_out : val -> val)
+   (1)
+   -> k_ch * error
+ where k_ch (ch) =
+   let len1 = %string_length ($msg_payload) in
+   let len1t = %tag_imm (len1) in
+   (apply ccall &toplevel.alloc_region
+      ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+      (ch, $msg_payload, 0, len1t)
+      -> k1 * error
+    where k1 (u1) =
+      (apply ccall &toplevel.alloc_region
+         ($`*extern*`.caml_int64_format : val * val -> val)
+         ($fmt, bv)
+         -> k2 * error
+       where k2 (s2) =
+         let len2 = %string_length (s2) in
+         let len2t = %tag_imm (len2) in
+         (apply ccall &toplevel.alloc_region
+            ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+            (ch, s2, 0, len2t)
+            -> k3 * error
+          where k3 (u3) =
+            (apply ccall &toplevel.alloc_region
+               ($`*extern*`.caml_ml_output_char : val * val -> val)
+               (ch, 10)
+               -> k4 * error
+             where k4 (u4) =
+               let eq = %int_comp.`int64`.eq (p, x) in
+               (switch eq
+                | 0 -> k_bad
+                | 1 -> k_good
+                where k_bad =
+                  let len5 = %string_length ($msg_mismatch) in
+                  let len5t = %tag_imm (len5) in
+                  (apply ccall &toplevel.alloc_region
+                     ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+                     (ch, $msg_mismatch, 0, len5t)
+                     -> k5 * error
+                   where k5 (u5) =
+                     cont k_nl
+                  )
+                where k_good =
+                  let len6 = %string_length ($msg_cmp) in
+                  let len6t = %tag_imm (len6) in
+                  (apply ccall &toplevel.alloc_region
+                     ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+                     (ch, $msg_cmp, 0, len6t)
+                     -> k6 * error
+                   where k6 (u6) =
+                     (apply ccall &toplevel.alloc_region
+                        ($`*extern*`.caml_compare : val * val -> val)
+                        (bv, xv)
+                        -> k7 * error
+                      where k7 (r7) =
+                        (apply ccall &toplevel.alloc_region
+                           ($`*extern*`.caml_format_int : val * val -> val)
+                           ($fmt, r7)
+                           -> k8 * error
+                         where k8 (s8) =
+                           let len8 = %string_length (s8) in
+                           let len8t = %tag_imm (len8) in
+                           (apply ccall &toplevel.alloc_region
+                              ($`*extern*`.caml_ml_output : val * val * val * val -> val)
+                              (ch, s8, 0, len8t)
+                              -> k9 * error
+                            where k9 (u9) =
+                              cont k_nl
+                           )
+                        )
+                     )
+                  )
+                where k_nl =
+                  (apply ccall &toplevel.alloc_region
+                     ($`*extern*`.caml_ml_output_char : val * val -> val)
+                     (ch, 10)
+                     -> k10 * error
+                   where k10 (u10) =
+                     (apply ccall &toplevel.alloc_region
+                        ($`*extern*`.caml_ml_flush : val -> val)
+                        (ch)
+                        -> k11 * error
+                      where k11 (u11) =
+                        let $camlStatic_boxed_int64_var_payload = Block 0 () in
+                        cont done ($camlStatic_boxed_int64_var_payload)
+                     )
+                  )
+               )
+            )
+         )
+      )
+   )
+)
