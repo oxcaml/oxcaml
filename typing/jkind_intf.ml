@@ -129,7 +129,7 @@ module type Sort = sig
 
     val for_array_comprehension_element : t
 
-    val for_list_element : t
+    val for_list_comprehension_element : t
 
     (** These are sorts for the types of ocaml expressions that we expect will
         always be "value". These names are used in the translation to lambda to
@@ -398,6 +398,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | List_comprehension_element
     | Idx_base
     | Optional_argument
 

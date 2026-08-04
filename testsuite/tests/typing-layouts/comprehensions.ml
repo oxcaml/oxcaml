@@ -38,14 +38,19 @@ Error: The value "a" has type "('a : value_or_null)"
          because it's the element type of an array that is iterated over in a comprehension.
 |}]
 
-(* List cases are less interesting because we don't allow unboxed types in lists
-   at all.  These tests are here just so we remember to think about
-   comprehensions when that changes. *)
-(* XXX Remember to think about this now *)
+(* Although [list] takes an [any] parameter, list comprehensions require value
+   elements, just as array comprehensions do. *)
 let unbox_list x = [ Float_u.of_float a for a in x ]
 [%%expect{|
-val unbox_list : float list -> Stdlib_upstream_compatible.Float_u.t list =
-  <fun>
+Line 1, characters 21-39:
+1 | let unbox_list x = [ Float_u.of_float a for a in x ]
+                         ^^^^^^^^^^^^^^^^^^
+Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
+       but an expression was expected of type "('a : value_or_null)"
+       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
+         a value layout
+         because it's the element type of list comprehension.
 |}]
 
 let box_list x = [ Float_u.to_float a for a in x ]

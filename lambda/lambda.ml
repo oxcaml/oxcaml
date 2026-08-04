@@ -1589,7 +1589,7 @@ let layout_instance_var = nullable_value Pgenval
 let layout_method = nullable_value Pgenval
 let layout_initializer = nullable_value Pgenval
 let layout_array_comprehension_element = nullable_value Pgenval
-let layout_list_element = nullable_value Pgenval
+let layout_list_comprehension_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
 let layout_block_idx = layout_unboxed_nativeint
 

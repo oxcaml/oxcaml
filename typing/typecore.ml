@@ -11963,7 +11963,11 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.type_list,
         (fun tcomp -> Texp_list_comprehension tcomp),
         comp,
-        Predef.list_argument_jkind
+        (* Although [list] takes an [any] parameter, list comprehensions
+           require value elements (see [transl_list_comprehension.ml]). *)
+        (* CR layouts: Lift this. *)
+        Jkind.Builtin.value_or_null
+          ~why:Jkind.History.List_comprehension_element
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
         | Mutable   ->
