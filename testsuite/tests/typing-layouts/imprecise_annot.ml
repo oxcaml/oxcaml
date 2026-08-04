@@ -158,10 +158,21 @@ Warning 181 [imprecise-kind-annotation]: The type variable `'a'
 type ('a : immediate) t6 = 'a imm_t
 |}]
 
+(* Needed for testing because [list] now takes an [any] parameter *)
+type ('a : value_or_null) value_list = 'a list
+
 (* any -> value in structure *)
-type ('a : any) t6b = 'a list
+type ('a : any) t6b = 'a value_list
 [%%expect{|
-type ('a : any) t6b = 'a list
+type ('a : value_or_null) value_list = 'a list
+Line 4, characters 6-14:
+4 | type ('a : any) t6b = 'a value_list
+          ^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `any'
+  but was inferred to have kind `value_or_null'.
+
+type ('a : value_or_null) t6b = 'a value_list
 |}]
 
 (*********************************************************)
@@ -305,9 +316,16 @@ type ('a : value) record10 = { field : 'a list }
 type 'a record10 = { field : 'a list; }
 |}]
 
-type ('a : any) variant10 = A of 'a list | B
+type ('a : any) variant10 = A of 'a value_list | B
 [%%expect{|
-type ('a : any) variant10 = A of 'a list | B
+Line 1, characters 6-14:
+1 | type ('a : any) variant10 = A of 'a value_list | B
+          ^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `any'
+  but was inferred to have kind `value_or_null'.
+
+type ('a : value_or_null) variant10 = A of 'a value_list | B
 |}]
 
 (*********************************************************)
