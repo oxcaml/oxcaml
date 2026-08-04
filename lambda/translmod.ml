@@ -1688,7 +1688,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
         ap_inlined = Always_inlined;
         ap_tailcall = Default_tailcall;
         ap_specialised = Default_specialise;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
         ap_region_close = Rc_normal;
         ap_yielding = Unyielding;
         ap_probe = None
@@ -1768,7 +1768,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
       ~kind:(Curried { nlocal = 0 })
       ~return:layout_module
       ~attr:attrs
-      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
   in
   (func, required_globals)
 
@@ -1801,7 +1801,7 @@ let transl_functorization_intf ~params =
     ~kind:(Curried { nlocal = 0 })
     ~return:layout_module
     ~attr:attrs
-    ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+    ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:not_alloc_stack
 
 let transl_functorization compilation_unit
       (params : Global_module.Parameter_name.t list)
