@@ -339,7 +339,7 @@ module Shallow = struct
   let fiber : type a b. (a -> b) -> (a, b) continuation = fun f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
     let exception E of (a,b) continuation in
-    let f' () = f (perform M.Initial_setup__) in
+    let f () = Safe.perform (Handler.unsafe_make ()) M.Initial_setup__ in
     let error _ = failwith "impossible" in
     let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with
@@ -350,7 +350,7 @@ module Shallow = struct
           continue (Handler.unsafe_make ()) k ()
       | _ -> error ()
     in
-    match Prim.with_stack error error effc f' () with
+    match Prim.with_stack error error effc f () with
     | exception E k -> k
     | _ -> error ()
 
