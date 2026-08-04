@@ -358,6 +358,17 @@ let save_resumed_unit_info filename ~paused =
       ui_quoted_cmx = paused.ui_quoted_cmx
     }
   in
+  (* We want .reaped.cmx files to link against each other, not against the
+     .cmx files they saw during compilation, and we don't know those CRCs. *)
+  let info =
+    { info with
+      ui_imports_cmx =
+        List.map
+          (fun import ->
+            Import_info.create_normal (Import_info.cu import) ~crc:None)
+          info.ui_imports_cmx
+    }
+  in
   write_unit_info info filename
 
 let new_const_symbol () =
