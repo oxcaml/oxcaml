@@ -2637,118 +2637,92 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
   in
   lam
 
-(* Whether a primitive allocates when fully applied. *)
+(* Whether a primitive allocates when fully applied.
+   Exception should be raised at later stage, so here we just be conservative
+   when there are exceptions.
 
-(* This mirrors, for the allocation axis only, what [lambda_of_prim] above
-   builds for each [prim].  Keep the two in step.
-
-   [arity] is how many arguments the occurrence supplies, which for a fully
-   applied primitive is [p.prim_arity]; only [Loc] needs it.  There are three
-   kinds of answer folded into the [bool]: cases that provably allocate, cases
-   that provably do not, and cases we cannot classify -- the latter answer
-   [true], which is the conservative direction, and say so in a comment. *)
+   This mirrors, for the allocation axis only, what [lambda_of_prim] above
+   builds for each [prim].  Keep the two in step. *)
 let prim_may_allocate ~arity prim =
-  let of_lambda_prim prim =
-    match Lambda.primitive_may_allocate_opt prim with
-    | Some alloc -> Option.is_some alloc
-    | None ->
-        (* Cannot classify: [specialize_primitive] resolves array kinds from
-           the type at the occurrence, and when that type is not yet known --
-           which can happen when this is reached from the type checker rather
-           than from the translation -- the kind is still unspecialized and
-           for a read the answer depends on how it resolves. *)
-        true
+  let primitive_may_allocate prim =
+    try Option.is_some (Lambda.primitive_may_allocate prim) with
+    | _ -> true
   in
   match prim with
-  | Primitive (prim, _) -> of_lambda_prim prim
-  | External descr ->
-      Option.is_some (Lambda.locality_mode_of_primitive_description descr)
-  | Comparison (comp, knd) -> of_lambda_prim (comparison_primitive comp knd)
-  | Sys_argv ->
-      Option.is_some
-        (Lambda.locality_mode_of_primitive_description prim_sys_argv)
-  | Atomic (op, _, immediate_or_pointer) ->
-      of_lambda_prim (atomic_lambda_primitive op immediate_or_pointer)
-  | Loc _ ->
-      (* With no argument this is a constant; with one, [lambda_of_prim] pairs
-         the location with the argument in a heap block. *)
-      arity > 0
-  | Identity ->
-      (* Compiles to the argument itself. *)
-      false
-  | Frame_pointers ->
-      (* Compiles to a constant. *)
-      false
+  | Primitive (prim, _) -> primitive_may_allocate prim
+  | Sys_argv -> primitive_may_allocate (Pccall prim_sys_argv)
+  | External prim -> primitive_may_allocate (Pccall prim)
+  | Comparison (comp, knd) ->
+      primitive_may_allocate (comparison_primitive comp knd)
   | Raise _ ->
       (* [Praise] does not allocate; the exception value is allocated by
          whoever built it. *)
       false
   | Raise_with_backtrace ->
-      (* [caml_restore_raw_backtrace] is declared [~alloc:false]. *)
+      (* [caml_restore_raw_backtrace] is declared [~alloc:false], and the
+         [Praise] it is sequenced with does not allocate either. *)
       false
-  | Peek (Some _) | Poke (Some _) -> false
+  | Lazy_force _ ->
+      (* Cannot classify: [Matching.inline_lazy_force] is not a single
+         primitive. *)
+      true
+  | Loc _ ->
+      (* With no argument this is a constant; with one, [lambda_of_prim] pairs
+         the location with the argument in a heap block. *)
+      arity > 0
+  | Send _ | Send_self _ | Send_cache _ ->
+      (* Cannot classify: these compile to an [Lsend], a method call. *)
+      true
+  | Frame_pointers ->
+      (* Compiles to a constant. *)
+      false
+  | Identity ->
+      (* Compiles to the argument itself. *)
+      false
   | Apply _ | Revapply _ ->
       (* These compile to an [Lapply] of the function argument.  The operator
          itself allocates nothing; whatever the callee allocates is accounted
          for through the callee's own mode. *)
       false
   | Peek None | Poke None ->
-      (* Cannot classify: layout not resolved yet. *)
+      (* Cannot classify: the layout is not resolved, and [lambda_of_prim]
+         raises rather than building anything. *)
       true
-  | Send _ | Send_self _ | Send_cache _ | Lazy_force _ | Unsupported _ ->
-      (* Cannot classify: a method call, the lazy forcing machinery, or a
-         raise of [Invalid_argument] -- not a single primitive. *)
+  | Peek (Some _) ->
+      (* [Ppeek] does not allocate. *)
+      false
+  | Poke (Some _) ->
+      (* [Ppoke] does not allocate. *)
+      false
+  | Unsupported _ ->
+      (* Raises [Invalid_argument], whose argument is built in a heap
+         block. *)
       true
+  | Atomic (op, _, immediate_or_pointer) ->
+      primitive_may_allocate (atomic_lambda_primitive op immediate_or_pointer)
 
-(* Whether a fully-applied occurrence of [p] allocates.
-
-   Unlike the functions above this one is total: it answers [true] rather than
-   raising, and it leaves no trace on type, mode or sort inference variables.
-   It is meant to be called from the type checker, where a primitive-related
-   error must not be reported early -- translating the same primitive raises
-   it again later, in the right phase and with the right location. *)
 let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
-  (* [lookup_primitive_unspecialized] needs a locality to build the
-     [Lambda.primitive] with, and for a [Prim_poly] primitive taking the
-     caller's mode would mean zapping its mode variable.  Pass a constant
-     instead: [Lambda.primitive_may_allocate_opt] dispatches on the
-     primitive's constructor and never on the locality it carries, so the
-     allocates-or-not answer is unaffected -- only the locality it reports,
-     which this function discards anyway.  A constant keeps
-     [to_locality] and [to_modify_mode] on [zap_to_floor]'s constant path, so
-     no mode variable is touched. *)
-  let poly_mode = Some (Mode.Locality.disallow_right Mode.Locality.global) in
   let snap = Btype.snapshot () in
   let result =
     try
+      let sloc = of_location ~scopes:empty_scopes loc in
+      (* Pass constant for [poly_mode] to avoid zapping mode variables. *)
+      let poly_mode = Some (Mode.Locality.disallow_right Mode.Locality.global) in
       (* [path = None] keeps [add_used_primitive] a no-op, so this records no
          cross-unit use of an [external]. *)
-      let sloc = of_location ~scopes:empty_scopes loc in
-      prim_may_allocate ~arity:p.prim_arity
-        (transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
-           None arg_exps)
+      let prim =
+        transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
+          None arg_exps
+      in
+      prim_may_allocate ~arity:p.prim_arity prim
     with
-    (* Let the bug-indicating exceptions through.  [Assert_failure] belongs
-       here with [Misc.Fatal_error]: [Typeopt.layout] reaches an [assert
-       false], and a violated invariant must surface rather than be reported
-       as "may allocate". *)
-    | Misc.Fatal_error | Assert_failure _ | Out_of_memory | Stack_overflow
-      as exn ->
-        Btype.backtrack snap;
-        raise exn
-    (* ... but swallow every user error.  [lookup_primitive_unspecialized]
-       raises [Error], and specializing raises [Error] from
-       [specialize_primitive] and the [glb_array_*] family and [Typeopt.Error]
-       from [Typeopt].  Reporting any of those here would report them in the
-       wrong phase, and at the location of the primitive rather than of the
-       offending argument.  Translation raises them again where they
-       belong. *)
     | _ -> true
   in
-  (* [specialize_primitive] calls [Ctype.type_sort] and [Ctype.type_jkind],
-     which default sort and jkind variables.  Those are recorded in the trail,
-     so this undoes them.  No mode variable is touched: see the constant
-     locality above. *)
+  (* [specialize_primitive] in [transl_primitive_common] calls
+     [Ctype.type_sort] and [Ctype.type_jkind], which default sort and
+     jkind variables.  Those are recorded in the trail, so this undoes
+     them.  No mode variable is touched: see the constant locality
+     above. *)
   Btype.backtrack snap;
   result
 

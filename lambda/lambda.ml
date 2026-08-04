@@ -2609,18 +2609,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
          to be native. *)
       Some alloc_heap
 
-let primitive_may_allocate_opt p =
-  match p with
-  (* Exactly the cases on which [primitive_may_allocate] raises: the array kind
-     has not been resolved, and the answer depends on how it resolves
-     ([Pintarray_ref] does not allocate, [Pfloatarray_ref] does).  Every other
-     primitive carrying an unspecialized array kind has a definite answer --
-     making, duplicating and blitting arrays always allocate, or never do,
-     whatever the kind. *)
-  | Parrayrefu (Punspecializedarray_ref _, _, _)
-  | Parrayrefs (Punspecializedarray_ref _, _, _) -> None
-  | _ -> Some (primitive_may_allocate p)
-
 let primitive_can_raise prim =
   match prim with
   | Pscalar op -> (Scalar.Operation.info op).can_raise
