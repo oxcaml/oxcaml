@@ -565,6 +565,20 @@ let rec global_of_global_name penv ~check name ~allow_excess_args =
   | exception Not_found -> load ()
 
 and compute_global penv modname ~params ~check ~allow_excess_args =
+  let args =
+    if allow_excess_args then
+      (* An argument for a parameter that [modname]'s base doesn't take
+         contributes nothing to the elaborated global (only arguments matching
+         [params] are substituted below). It may also be an approximation
+         artifact - a phantom hidden argument revealed into a visible one by
+         substitution - in which case its value need not even be resolvable
+         here. Drop excess arguments before resolving values. *)
+      List.filter
+        (fun ({ param; _ } : Global_module.Name.argument) ->
+           List.exists (Global_module.Parameter_name.equal param) params)
+        modname.Global_module.Name.args
+    else modname.Global_module.Name.args
+  in
   let arg_global_by_param_name =
     List.map
       (fun ({ param = name; value } : Global_module.Name.argument) ->
@@ -573,12 +587,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
          | exception Not_found ->
              error
                (Unbound_module_as_argument_value { instance = modname; value }))
-      modname.Global_module.Name.args
+      args
   in
   let subst : Global_module.subst =
     Global_module.Parameter_name.Map.of_list arg_global_by_param_name
   in
-  if check && modname.Global_module.Name.args <> [] then begin
+  if check && args <> [] then begin
     let compare_by_param param1 (param2, _) =
       Global_module.Parameter_name.compare param1 param2
     in

@@ -184,7 +184,6 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
   match prec with
   | Approximate ->
       let gm, swg = load_approx ~chain gm in
-
       if GM.is_complete gm then state
       else maybe_insert_module_exact ~chain gm swg state
   | Exact ->
