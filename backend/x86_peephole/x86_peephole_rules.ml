@@ -200,22 +200,15 @@ let remove_redundant_extension stats cell =
   match U.get_cells cell 2 with
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
-    | Ins ins1, Ins ins2 -> (
-      | Ins (MOVSX (src1, dst1)), Ins (MOVSX (src2, dst2))
-      | Ins (MOVSXD (src1, dst1)), Ins (MOVSXD (src2, dst2))
-      | Ins (MOVZX (src1, dst1)), Ins (MOVZX (src2, dst2))
-        when ... -> ...
-      | _, _ -> U.No_match
-      | MOVSX (src1, dst1), MOVSX (src2, dst2)
-      | MOVSXD (src1, dst1), MOVSXD (src2, dst2)
-      | MOVZX (src1, dst1), MOVZX (src2, dst2)
-        when equal_arg src1 src2 && equal_arg dst1 dst2
-             && is_low_part_register src1 ->
-        DLL.delete_curr cell2;
-        stats.remove_redundant_extension <- stats.remove_redundant_extension + 1;
-        (* Return cell1 so that a third identical extension is also removed *)
-        U.Matched (Some cell1)
-      | _, _ -> U.No_match)
+    | Ins (MOVSX (src1, dst1)), Ins (MOVSX (src2, dst2))
+    | Ins (MOVSXD (src1, dst1)), Ins (MOVSXD (src2, dst2))
+    | Ins (MOVZX (src1, dst1)), Ins (MOVZX (src2, dst2))
+      when equal_arg src1 src2 && equal_arg dst1 dst2
+           && is_low_part_register src1 ->
+      DLL.delete_curr cell2;
+      stats.remove_redundant_extension <- stats.remove_redundant_extension + 1;
+      (* Return cell1 so that a third identical extension is also removed *)
+      U.Matched (Some cell1)
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
