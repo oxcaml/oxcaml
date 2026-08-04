@@ -702,13 +702,12 @@ let asm_filename output_prefix =
   then output_prefix ^ ext_asm
   else Filename.temp_file "camlasm" ext_asm
 
-let compile_implementation_from_cmm unix ?toplevel ~required_globals ~sourcefile
-    ~prefixname ~ppf_dump (make_cmm : cmm_generator) =
+let compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
+    ~ppf_dump (make_cmm : cmm_generator) =
   compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
-      Compilation_unit.Set.iter Compilenv.require_global required_globals;
       Compilenv.record_external_symbols ();
       let cmm_phrases = make_cmm ~ppf_dump ~prefixname in
       end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
@@ -719,9 +718,9 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
   let make_cmm =
     match pipeline with Direct_to_cmm direct_to_cmm -> direct_to_cmm program
   in
-  compile_implementation_from_cmm unix ?toplevel
-    ~required_globals:program.required_globals ~sourcefile ~prefixname ~ppf_dump
-    make_cmm
+  Compilation_unit.Set.iter Compilenv.require_global program.required_globals;
+  compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
+    ~ppf_dump make_cmm
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in

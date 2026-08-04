@@ -339,10 +339,9 @@ let native unix
       Some
         (fun ~keep_symbol_tables ~cmr_file (info : Compile_common.info) ->
           let machine_width = Target_system.Machine_width.Sixty_four in
-          (* CR mvellacott: the required globals should be read from the .cmx
-             rather than assumed empty. *)
+          (* CR mvellacott: the paused compilation's imports must be reloaded so
+             that the reaped cmx records its link dependencies. *)
           Asmgen.compile_implementation_from_cmm unix
-            ~required_globals:Compilation_unit.Set.empty
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)
             ~ppf_dump:info.ppf_dump
