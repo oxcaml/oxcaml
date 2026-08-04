@@ -196,6 +196,7 @@ end
 module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
+  val _g_no_ocamldebug_types : unit -> unit
   val _compat_32 : unit -> unit
   val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
