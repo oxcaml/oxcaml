@@ -1,0 +1,17 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# first, run the program to make sure it doesn't crash
+${program}
+
+# now check the assembly file produced during compilation: look for a
+# 16-byte alignment directive immediately preceding a numeric local
+# label (a loop head). Function entries are also aligned to 16 bytes,
+# but are followed by symbol names rather than .L<n> labels.
+asm=${test_build_directory}/align_loops.s
+count=$(grep -A1 -E '\.align[[:space:]]+16' "$asm" | grep -cE '^\.L[0-9]+:')
+if [ "$count" -gt 0 ]
+then echo "aligned loop head: yes"
+else echo "aligned loop head: no"
+fi
