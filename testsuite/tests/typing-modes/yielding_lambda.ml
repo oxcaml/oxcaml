@@ -1084,7 +1084,7 @@ let (_ : int) = Yielding.with_ (fun y -> o#uses y)
 [%%expect{|
 (let
   (o =? (apply (field_imm 0 (global Toploop!)) "o")
-   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/296"))
+   Yielding =? (apply (field_imm 0 (global Toploop!)) "Yielding/332"))
   (apply (field_imm 0 Yielding)
     (function {nlocal = 0} y : int (send[yielding] o -844262836 y))))
 - : int = 0
@@ -1124,6 +1124,6 @@ end
                       class)))))))
        (opaque
          (apply (field_imm 18 (global CamlinternalOO!)) shared c2_init))))
-  (apply (field_imm 1 (global Toploop!)) "c2/928" c2))
+  (apply (field_imm 1 (global Toploop!)) "c2/1096" c2))
 class c2 : object method call_m : int method m : int -> int end
 |}]
