@@ -599,14 +599,16 @@ module type S =
   sig val poly_ baz7 : 'a 'b. 'a -> #('a * 'b * 'c) -> #('a * 'b * 'c) end
 |}]
 
-(* On this branch [list] takes [any], so ['c list] does not force ['c] to be a
-   value and ['c] is layout-polymorphic. *)
+type ('a : value) value_list = 'a list
+
+(* "'c is a value and not layout-polymorphic" *)
 module type S = sig
-  val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c)
+  val poly_ baz8 : 'a -> 'b -> 'c value_list -> #('a * 'b * 'c)
 end
 [%%expect {|
+type 'a value_list = 'a list
 module type S =
-  sig val poly_ baz8 : 'a -> 'b -> 'c list -> #('a * 'b * 'c) end
+  sig val poly_ baz8 : 'c. 'a -> 'b -> 'c value_list -> #('a * 'b * 'c) end
 |}]
 
 (* The shorthand omits the layout binders, so it is only used when the layout
