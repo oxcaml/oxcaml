@@ -1,0 +1,2 @@
+File "consumer.ml", line 1:
+Error: Unbound module P_int in instance Clk[P:P_int]
