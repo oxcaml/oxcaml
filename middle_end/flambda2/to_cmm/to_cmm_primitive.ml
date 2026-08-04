@@ -738,6 +738,7 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     C.aligned_load_512 ~ptr_out_of_heap str index dbg
   | Five_twelve { aligned = false } ->
     C.unaligned_load_512 ~ptr_out_of_heap str index dbg
+  | Mask -> C.load_mask ~ptr_out_of_heap str index dbg
 
 let string_like_load ~dbg kind width ~str ~index =
   match (kind : P.string_like_value) with
@@ -774,6 +775,7 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
     C.unaligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
   | Five_twelve { aligned = true } ->
     C.aligned_set_512 ~ptr_out_of_heap bytes index new_value dbg
+  | Mask -> C.set_mask ~ptr_out_of_heap bytes index new_value dbg
 
 let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
   let expr =

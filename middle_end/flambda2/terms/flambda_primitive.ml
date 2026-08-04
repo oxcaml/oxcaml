@@ -1011,6 +1011,7 @@ type string_accessor_width =
   | One_twenty_eight of { aligned : bool }
   | Two_fifty_six of { aligned : bool }
   | Five_twelve of { aligned : bool }
+  | Mask
 
 let print_string_accessor_width ppf w =
   let fprintf = Format.fprintf in
@@ -1028,6 +1029,7 @@ let print_string_accessor_width ppf w =
   | Two_fifty_six { aligned = true } -> fprintf ppf "256a"
   | Five_twelve { aligned = false } -> fprintf ppf "512u"
   | Five_twelve { aligned = true } -> fprintf ppf "512a"
+  | Mask -> fprintf ppf "mask"
 
 let byte_width_of_string_accessor_width width =
   match width with
@@ -1039,6 +1041,7 @@ let byte_width_of_string_accessor_width width =
   | One_twenty_eight _ -> 16
   | Two_fifty_six _ -> 32
   | Five_twelve _ -> 64
+  | Mask -> 8
 
 type float_bitwidth =
   | Float32
@@ -2102,6 +2105,7 @@ let result_kind_of_binary_primitive p : result_kind =
   | String_or_bigstring_load (_, One_twenty_eight _) -> Singleton K.naked_vec128
   | String_or_bigstring_load (_, Two_fifty_six _) -> Singleton K.naked_vec256
   | String_or_bigstring_load (_, Five_twelve _) -> Singleton K.naked_vec512
+  | String_or_bigstring_load (_, Mask) -> Singleton K.naked_mask
   | Bigarray_load (_, kind, _) -> Singleton (Bigarray_kind.element_kind kind)
   | Int_arith (kind, _) | Int_shift (kind, _) ->
     Singleton (K.Standard_int.to_kind kind)
@@ -2399,6 +2403,8 @@ let args_kind_of_ternary_primitive p =
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec256
   | Bytes_or_bigstring_set (Bytes, Five_twelve _) ->
     string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_vec512
+  | Bytes_or_bigstring_set (Bytes, Mask) ->
+    string_or_bytes_kind, bytes_or_bigstring_index_kind, K.naked_mask
   | Bytes_or_bigstring_set (Bigstring, (Eight | Eight_signed)) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_int8
   | Bytes_or_bigstring_set (Bigstring, (Sixteen | Sixteen_signed)) ->
@@ -2415,6 +2421,8 @@ let args_kind_of_ternary_primitive p =
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_vec256
   | Bytes_or_bigstring_set (Bigstring, Five_twelve _) ->
     bigstring_kind, bytes_or_bigstring_index_kind, K.naked_vec512
+  | Bytes_or_bigstring_set (Bigstring, Mask) ->
+    bigstring_kind, bytes_or_bigstring_index_kind, K.naked_mask
   | Bigarray_set (_, kind, _) ->
     bigarray_kind, bigarray_index_kind, Bigarray_kind.element_kind kind
   | Atomic_field_int_arith _

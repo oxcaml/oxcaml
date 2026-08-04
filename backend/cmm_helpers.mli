@@ -635,6 +635,17 @@ val aligned_set_512 :
   Debuginfo.t ->
   expression
 
+val load_mask :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val set_mask :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
 (** Primitives *)
 
 type unary_primitive = expression -> Debuginfo.t -> expression

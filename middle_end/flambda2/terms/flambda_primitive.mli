@@ -329,6 +329,7 @@ type string_accessor_width =
   | One_twenty_eight of { aligned : bool }
   | Two_fifty_six of { aligned : bool }
   | Five_twelve of { aligned : bool }
+  | Mask
 
 val byte_width_of_string_accessor_width : string_accessor_width -> int
 

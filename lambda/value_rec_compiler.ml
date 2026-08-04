@@ -466,7 +466,9 @@ let compute_static_size lam =
 
     | Psetufloatfield (_, _)
     | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
@@ -493,8 +495,11 @@ let compute_static_size lam =
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
