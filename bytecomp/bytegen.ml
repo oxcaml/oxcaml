@@ -212,6 +212,13 @@ let add_event ev = function
   | Kevent ev' :: cont -> weaken_event (merge_events ev ev') cont
   | cont -> weaken_event ev cont
 
+let strip_event_kind =
+  let dummy_ty = Btype.newgenvar (Jkind.Builtin.any ~why:Dummy_jkind) in
+  let event_after = Event_after dummy_ty in
+  function
+  | Event_after _ -> event_after
+  | (Event_before | Event_pseudo) as k -> k
+
 (**** Compilation of a lambda expression ****)
 
 type stack_info =
@@ -705,14 +712,19 @@ and comp_expr stack_info env exp sz cont =
       string_of_scoped_location ~include_zero_alloc:false lev.lev_loc
     in
     let event kind info =
+      let ev_typenv, ev_kind =
+        if !Clflags.debug_ocamldebug_types
+        then Env.summary lev.lev_env, kind
+        else Env.Env_empty, strip_event_kind kind
+      in
       { ev_pos = 0;
         (* patched in emitcode *)
         ev_module = Compilation_unit.full_path_as_string !compunit_name;
         ev_loc = to_location lev.lev_loc;
-        ev_kind = kind;
+        ev_kind;
         ev_defname;
         ev_info = info;
-        ev_typenv = Env.summary lev.lev_env;
+        ev_typenv;
         ev_typsubst = Subst.identity;
         ev_compenv = env;
         ev_stacksize = sz;
