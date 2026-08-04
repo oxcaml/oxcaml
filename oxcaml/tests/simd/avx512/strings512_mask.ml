@@ -421,6 +421,72 @@ module _ = String_tests (struct
 end)
 
 module _ = String_tests (struct
+  external get_mask_prim : string -> int8# -> mask
+    = "%caml_string_getmask_indexed_by_int8#"
+
+  let get_mask b i = (get_mask_prim b (Stdlib_stable.Int8_u.of_int i))
+
+  external get_mask_unsafe_prim : string -> int8# -> mask
+    = "%caml_string_getmasku_indexed_by_int8#"
+
+  let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_stable.Int8_u.of_int i))
+
+  let extra_checks data =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int8_u.of_int8 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_mask_prim data index in
+          ()))
+      Stdlib_stable.Int8.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_tests (struct
+  external get_mask_prim : string -> int16# -> mask
+    = "%caml_string_getmask_indexed_by_int16#"
+
+  let get_mask b i = (get_mask_prim b (Stdlib_stable.Int16_u.of_int i))
+
+  external get_mask_unsafe_prim : string -> int16# -> mask
+    = "%caml_string_getmasku_indexed_by_int16#"
+
+  let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_stable.Int16_u.of_int i))
+
+  let extra_checks data =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int16_u.of_int16 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_mask_prim data index in
+          ()))
+      Stdlib_stable.Int16.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_tests (struct
+  external get_mask_prim : string -> int32# -> mask
+    = "%caml_string_getmask_indexed_by_int32#"
+
+  let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
+
+  external get_mask_unsafe_prim : string -> int32# -> mask
+    = "%caml_string_getmasku_indexed_by_int32#"
+
+  let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
+
+  let extra_checks data =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Int32_u.of_int32 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_mask_prim data index in
+          ()))
+      Int32.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_tests (struct
   external get_mask_prim : string -> int64# -> mask
     = "%caml_string_getmask_indexed_by_int64#"
 
@@ -439,6 +505,28 @@ module _ = String_tests (struct
           let _ = get_mask_prim data index in
           ()))
       Int64.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_tests (struct
+  external get_mask_prim : string -> nativeint# -> mask
+    = "%caml_string_getmask_indexed_by_nativeint#"
+
+  let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
+
+  external get_mask_unsafe_prim : string -> nativeint# -> mask
+    = "%caml_string_getmasku_indexed_by_nativeint#"
+
+  let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
+
+  let extra_checks data =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_mask_prim data index in
+          ()))
+      Nativeint.[ min_int; add min_int one; sub zero one; max_int ]
   ;;
 end)
 
@@ -565,6 +653,76 @@ open struct
 
 
   module _ = Bigstring_tests (struct
+    external get_mask_prim : bigstring -> int8# -> mask
+      = "%caml_bigstring_getmask_indexed_by_int8#"
+
+    let get_mask b i = (get_mask_prim b (Stdlib_stable.Int8_u.of_int i))
+
+    external get_mask_unsafe_prim : bigstring -> int8# -> mask
+      = "%caml_bigstring_getmasku_indexed_by_int8#"
+
+    let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_stable.Int8_u.of_int i))
+
+    external set_mask_prim : bigstring -> int8# -> mask -> unit
+      = "%caml_bigstring_setmask_indexed_by_int8#"
+
+    let set_mask b i v = set_mask_prim b (Stdlib_stable.Int8_u.of_int i) v
+
+    external set_mask_unsafe_prim : bigstring -> int8# -> mask -> unit
+      = "%caml_bigstring_setmasku_indexed_by_int8#"
+
+    let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_stable.Int8_u.of_int i) v
+
+    let extra_checks data =
+      List.iter
+        (fun index ->
+          let index = Stdlib_stable.Int8_u.of_int8 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_mask_prim data index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_mask_prim data index (mask_of_int64 1L)))
+        Stdlib_stable.Int8.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+
+  module _ = Bigstring_tests (struct
+    external get_mask_prim : bigstring -> int16# -> mask
+      = "%caml_bigstring_getmask_indexed_by_int16#"
+
+    let get_mask b i = (get_mask_prim b (Stdlib_stable.Int16_u.of_int i))
+
+    external get_mask_unsafe_prim : bigstring -> int16# -> mask
+      = "%caml_bigstring_getmasku_indexed_by_int16#"
+
+    let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_stable.Int16_u.of_int i))
+
+    external set_mask_prim : bigstring -> int16# -> mask -> unit
+      = "%caml_bigstring_setmask_indexed_by_int16#"
+
+    let set_mask b i v = set_mask_prim b (Stdlib_stable.Int16_u.of_int i) v
+
+    external set_mask_unsafe_prim : bigstring -> int16# -> mask -> unit
+      = "%caml_bigstring_setmasku_indexed_by_int16#"
+
+    let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_stable.Int16_u.of_int i) v
+
+    let extra_checks data =
+      List.iter
+        (fun index ->
+          let index = Stdlib_stable.Int16_u.of_int16 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_mask_prim data index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_mask_prim data index (mask_of_int64 1L)))
+        Stdlib_stable.Int16.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+
+  module _ = Bigstring_tests (struct
     external get_mask_prim : bigstring -> int32# -> mask
       = "%caml_bigstring_getmask_indexed_by_int32#"
 
@@ -630,6 +788,41 @@ open struct
           assert_raises_out_of_bounds (fun () ->
             set_mask_prim data index (mask_of_int64 1L)))
         Int64.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+
+  module _ = Bigstring_tests (struct
+    external get_mask_prim : bigstring -> nativeint# -> mask
+      = "%caml_bigstring_getmask_indexed_by_nativeint#"
+
+    let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
+
+    external get_mask_unsafe_prim : bigstring -> nativeint# -> mask
+      = "%caml_bigstring_getmasku_indexed_by_nativeint#"
+
+    let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
+
+    external set_mask_prim : bigstring -> nativeint# -> mask -> unit
+      = "%caml_bigstring_setmask_indexed_by_nativeint#"
+
+    let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+    external set_mask_unsafe_prim : bigstring -> nativeint# -> mask -> unit
+      = "%caml_bigstring_setmasku_indexed_by_nativeint#"
+
+    let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+    let extra_checks data =
+      List.iter
+        (fun index ->
+          let index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_mask_prim data index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_mask_prim data index (mask_of_int64 1L)))
+        Nativeint.[ min_int; add min_int one; sub zero one; max_int ]
     ;;
   end)
 end
