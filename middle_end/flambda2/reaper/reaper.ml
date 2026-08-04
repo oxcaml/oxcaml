@@ -142,6 +142,16 @@ module Staged = struct
                    Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
             all_sets_of_closures
       }
+
+    let map_result_types t ~f =
+      (* [code] is the only part of the rebuild data holding Flambda types. *)
+      let map_rev_code (rev_code : Rev_expr.rev_code) =
+        { rev_code with
+          code_metadata =
+            Code_metadata.map_result_types rev_code.code_metadata ~f
+        }
+      in
+      { t with code = Code_id.Map.map map_rev_code t.code }
   end
 
   let traverse unit =

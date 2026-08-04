@@ -19,7 +19,8 @@ type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
-    deps : Global_flow_graph.graph
+    deps : Global_flow_graph.graph;
+    rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
 module Id_stamp_counters = struct
@@ -134,11 +135,13 @@ module File_contents = struct
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
       all_code : All_code_with_sections.t;
-      deps : Deps_with_fields.t
+      deps : Deps_with_fields.t;
+      rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
   let create ~used_value_slots
-      ({ unit_metadata; final_typing_env; all_code; deps } : cmr_format) : t =
+      ({ unit_metadata; final_typing_env; all_code; deps; rebuild_data } :
+        cmr_format) : t =
     let final_typing_env, canonicalise =
       match final_typing_env with
       | None -> None, Fun.id
@@ -148,8 +151,15 @@ module File_contents = struct
         in
         Some (Typing_env.Serializable.create_without_pruning env), canonicalise
     in
+    (* Code metadata is stored twice ([all_code] and [rebuild_data]); both must
+       have their types canonicalised. *)
     let all_code, all_code_ids =
       All_code_with_sections.create ~used_value_slots ~canonicalise all_code
+    in
+    let rebuild_data =
+      Reaper.Staged.Traverse_rebuild.map_result_types rebuild_data ~f:(fun ty ->
+          Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
+            ~used_value_slots ~canonicalise)
     in
     (* Must happen after any identifiers change, in particular, after
        canonicalisation. *)
@@ -158,6 +168,7 @@ module File_contents = struct
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
           all_code_ids;
           Global_flow_graph.ids_for_export deps;
+          Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
@@ -167,7 +178,8 @@ module File_contents = struct
       unit_metadata;
       final_typing_env;
       all_code;
-      deps = Deps_with_fields.create deps
+      deps = Deps_with_fields.create deps;
+      rebuild_data
     }
 
   let deserialise ~machine_width ~resolver
@@ -177,7 +189,8 @@ module File_contents = struct
         unit_metadata;
         final_typing_env;
         all_code;
-        deps
+        deps;
+        rebuild_data
       } : cmr_format =
     (* Must happen before anything can create an identifier. *)
     Id_stamp_counters.restore id_stamp_counters;
@@ -200,7 +213,10 @@ module File_contents = struct
       |> Exported_code.apply_renaming code_ids renaming
     in
     let deps = Deps_with_fields.deserialise deps renaming in
-    { unit_metadata; final_typing_env; all_code; deps }
+    let rebuild_data =
+      Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
+    in
+    { unit_metadata; final_typing_env; all_code; deps; rebuild_data }
 end
 
 type error =

@@ -2,5 +2,6 @@ Restored unit metadata matches module symbol: true
 Restored typing env defines module symbol: true
 Restored code for 2 code ids
 Restored dep graph mentions module symbol: true
+Restored rebuild data mentions module symbol: true
 >> Fatal error: reaped_flambda2_to_cmm unimplemented
 Fatal error: exception Misc.Fatal_error

@@ -20,6 +20,10 @@ module Staged : sig
     val ids_for_export : t -> Ids_for_export.t
 
     val apply_renaming : t -> Renaming.t -> t
+
+    (** Map over the result types of the stored code metadata. Used for
+        canonicalisation. *)
+    val map_result_types : t -> f:(Flambda2_types.t -> Flambda2_types.t) -> t
   end
 
   (** Traverse the compilation unit in preparation for Reaper analysis. *)

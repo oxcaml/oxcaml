@@ -246,8 +246,7 @@ let flambda_to_flambda0 : type m.
            here. *)
         if Flambda_features.support_lto () && Flambda_features.enable_reaper ()
         then
-          (* CR mvellacott: store the rebuild data in the CMR *)
-          let deps, _traverse_rebuild =
+          let deps, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse flambda
           in
           Some
@@ -255,7 +254,8 @@ let flambda_to_flambda0 : type m.
                 Flambda_unit.metadata flambda;
               final_typing_env;
               all_code;
-              deps
+              deps;
+              rebuild_data
             }
         else None
       in
@@ -377,7 +377,8 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
         all_code;
-        deps
+        deps;
+        rebuild_data
       } =
     Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
@@ -404,4 +405,9 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   Printf.eprintf "Restored dep graph mentions module symbol: %b\n"
     (Flambda2_identifiers.Symbol.Set.mem module_symbol
        (Flambda2_reaper.Global_flow_graph.ids_for_export deps).symbols);
+  Printf.eprintf "Restored rebuild data mentions module symbol: %b\n"
+    (Flambda2_identifiers.Symbol.Set.mem module_symbol
+       (Flambda2_reaper.Reaper.Staged.Traverse_rebuild.ids_for_export
+          rebuild_data)
+         .symbols);
   Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"
