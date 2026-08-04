@@ -459,6 +459,57 @@ CAMLprim value caml_dynamic_make(value unit)
   CAMLreturn(hash);
 }
 
+/* Return the current fiber's node, allocating it on first use.
+   May raise Out_of_memory. */
+static dynamic_node_t dynamic_node(struct stack_info *stack)
+{
+  dynamic_node_t node = stack->dyn_node;
+  if(node == NULL) {
+    node = caml_stat_alloc_noexc(sizeof(dynamic_node_s));
+    if(node == NULL) {
+      caml_raise_out_of_memory();
+    }
+    caml_dynamic_table_init(&node->table);
+    stack->dyn_node = node;
+  }
+  return node;
+}
+
+CAMLexport void caml_dynamic_node_free(struct stack_info *stack)
+{
+  dynamic_node_t node = stack->dyn_node;
+  if(node != NULL) {
+    caml_dynamic_table_free(&node->table);
+    caml_stat_free(node);
+    stack->dyn_node = NULL;
+  }
+}
+
+static bool dynamic_node_find(dynamic_node_t node, value dyn, value *val)
+{
+  dynamic_stack_t bindings;
+  if(node != NULL
+     && dynamic_table_find(&node->table, dyn, &bindings)
+     && bindings->count > 0) {
+    *val = bindings->vals[bindings->count - 1];
+    return true;
+  }
+  return false;
+}
+
+/* Walk the fiber's parent chain for the innermost binding. */
+static value dynamic_lookup(struct stack_info *stack, value dyn)
+{
+  value val;
+
+  for(; stack != NULL; stack = Stack_parent(stack)) {
+    if(dynamic_node_find(stack->dyn_node, dyn, &val)) {
+      return val;
+    }
+  }
+  return Val_null;
+}
+
 CAMLprim value caml_dynamic_get(value dyn)
 {
   CAMLnoalloc;
@@ -472,17 +523,7 @@ CAMLprim value caml_dynamic_get(value dyn)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  value val = Val_null;
-  while(stack) {
-    dynamic_stack_t bindings;
-    if(dynamic_table_find(&stack->dyn, dyn, &bindings)) {
-      if(bindings->count > 0) {
-        val = bindings->vals[bindings->count - 1];
-        break;
-      }
-    }
-    stack = Stack_parent(stack);
-  }
+  value val = dynamic_lookup(stack, dyn);
 
   entry->dyn = dyn;
   entry->val = val;
@@ -496,7 +537,7 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  if(!dynamic_table_push(&stack->dyn, dyn, val)) {
+  if(!dynamic_table_push(&dynamic_node(stack)->table, dyn, val)) {
     caml_raise_out_of_memory();
   }
 
@@ -514,7 +555,11 @@ CAMLprim value caml_dynamic_pop(value dyn)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  dynamic_table_pop(&stack->dyn, dyn);
+  /* Pops are paired with pushes on the same fiber, so the node exists */
+  CAMLassert(stack->dyn_node);
+  if(stack->dyn_node != NULL) {
+    dynamic_table_pop(&stack->dyn_node->table, dyn);
+  }
 
   dynamic_binding_t entry = dynamic_cache_entry(dyn);
   if(entry->dyn == dyn) {

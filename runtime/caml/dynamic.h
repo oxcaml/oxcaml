@@ -20,6 +20,8 @@
 #include "mlvalues.h"
 #include "roots.h"
 
+struct stack_info;
+
 /* Define a new dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit);
 
@@ -108,6 +110,20 @@ extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action,
                                           scanning_action_flags,
                                           void *);
+
+
+/* Per-fiber dynamic-binding state. Allocated lazily, owned by exactly one
+   fiber ([stack_info.dyn_node]) and freed with it, but allocated separately
+   from the stack block: stack reallocation moves [stack_info], not this
+   node, so the node stays stable for the fiber's whole lifetime.
+
+   The GC scans each node's table via its owning fiber only. */
+typedef struct dynamic_node_s {
+  dynamic_table_s table;
+} dynamic_node_s, *dynamic_node_t;
+
+/* Free a fiber's dynamic-binding state, if any. */
+extern void caml_dynamic_node_free(struct stack_info* stack);
 
 #endif /* CAML_INTERNALS */
 
