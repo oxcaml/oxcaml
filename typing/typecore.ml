@@ -807,7 +807,7 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_for_optimisation alloc_mode =
+let register_mode_for_optimisation alloc_mode =
   let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
@@ -816,7 +816,7 @@ let register_allocation_mode ~env ~loc alloc_mode =
     Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
   in
   Value.submode_err (loc, Allocation) min_mode (alloc_as_value alloc_mode);
-  register_allocation_for_optimisation alloc_mode
+  register_mode_for_optimisation alloc_mode
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -9140,7 +9140,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_for_optimisation
+           register_mode_for_optimisation
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
         end;
