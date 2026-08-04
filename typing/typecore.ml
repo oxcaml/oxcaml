@@ -6497,10 +6497,8 @@ let register_prim_application_allocation ~env ~pos funct args =
         Translprim.application_allocation env lid.loc prim pos args
           ~poly_mode ~poly_sort ~ty:funct.exp_type
       with
-      | No_allocation_to_register -> ()
-      | Register_heap ->
-          register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
-      | Register_at_locality mode ->
+      | No_allocation -> ()
+      | Allocation_at_locality mode ->
           register_allocation_mode ~env ~loc:lid.loc
             (Alloc.max_with_comonadic Areality mode)
       end

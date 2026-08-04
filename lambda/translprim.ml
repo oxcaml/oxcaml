@@ -2782,31 +2782,16 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
   Btype.backtrack snap;
   result
 
-
-(* The allocation an occurrence of a primitive makes, as the registration the
-   type checker should perform.  Everything that decides whether a primitive
-   occurrence allocates, and at which locality, lives below; [Typecore] only
-   turns the answer into a call to [register_allocation_mode]. *)
-
 type allocation_registration =
-  | No_allocation_to_register
-  | Register_heap
-  | Register_at_locality of Mode.Locality.lr
+  | No_allocation
+  | Allocation_at_locality of Mode.Locality.lr
 
-(* The allocation of the primitive's own result, once we know it makes one. *)
 let result_allocation p ~poly_mode =
   match p.prim_native_repr_res, poly_mode with
-  | (Prim_poly, _), Some mode ->
-      (* Register at the result's locality, for further optimization. *)
-      Register_at_locality mode
-  | (Prim_poly, _), None ->
-      (* Unreachable: a poly result implies [poly_mode = Some].  Register a
-         heap allocation rather than silently skip it. *)
-      Register_heap
-  | (Prim_global, _), _ -> Register_heap
-  | (Prim_local, _), _ ->
-      (* A stack allocation, which does not count on the allocation axis. *)
-      No_allocation_to_register
+  | (Prim_poly, _), Some mode -> Allocation_at_locality mode
+  | (Prim_poly, _), None -> assert false
+  | (Prim_global, _), _ -> Allocation_at_locality Mode.Locality.global
+  | (Prim_local, _), _ -> No_allocation
 
 let application_allocation env loc p pos args ~poly_mode ~poly_sort ~ty =
   if can_apply_primitive p poly_mode pos args ~check_poly_mode:false then
@@ -2820,9 +2805,9 @@ let application_allocation env loc p pos args ~poly_mode ~poly_sort ~ty =
     let arg_exps = cut_args p.prim_arity args in
     if fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps then
       result_allocation p ~poly_mode
-    else No_allocation_to_register
+    else No_allocation
   else
-    Register_heap
+    Allocation_at_locality Mode.Locality.global
 
 (* Error report *)
 
