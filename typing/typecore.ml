@@ -302,7 +302,7 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
   | Block_index_atomic_unsupported
-  | Block_index_polymorphic_field of Longident.t
+  | Mutable_block_index_polymorphic_field of Longident.t
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -1353,7 +1353,8 @@ let check_atomic_loc ~loc ~env record_repres label lid =
 let check_index_not_to_poly_field ~env ba uas =
   let check lid lbl_arg =
     if is_poly_Tpoly lbl_arg then
-      raise (Error (lid.loc, env, Block_index_polymorphic_field lid.txt))
+      raise
+        (Error (lid.loc, env, Mutable_block_index_polymorphic_field lid.txt))
   in
   begin match ba with
   | Baccess_field (lid, label, _) -> check lid label.lbl_arg
@@ -13091,7 +13092,7 @@ let report_error ~loc env =
         quoted_longident lid
   | Polymorphic_atomic_loc lid ->
       Location.errorf ~loc
-        "Use of %a (here %a)@ for polymorphic record fields is forbidden."
+        "Use of %a with polymorphic record fields@ (here %a) is forbidden."
         Style.inline_code "[%atomic.loc]"
         quoted_longident lid
   | Literal_overflow ty ->
@@ -13281,7 +13282,7 @@ let report_error ~loc env =
   | Block_index_atomic_unsupported ->
     Location.error ~loc
       "Block indices do not yet support [@atomic] record fields."
-  | Block_index_polymorphic_field lid ->
+  | Mutable_block_index_polymorphic_field lid ->
     Location.errorf ~loc
       "Mutable block indices to polymorphic record fields@ (here %a) are \
        forbidden."

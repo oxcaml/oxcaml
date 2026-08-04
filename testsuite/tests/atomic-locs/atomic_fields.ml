@@ -197,8 +197,8 @@ let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
 Line 1, characters 45-71:
 1 | let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Use of "[%atomic.loc]" (here "poly_field")
-       for polymorphic record fields is forbidden.
+Error: Use of "[%atomic.loc]" with polymorphic record fields
+       (here "poly_field") is forbidden.
 |}]
 
 (* Test Invalid_atomic_loc_payload errors *)
