@@ -389,12 +389,12 @@ module Test = struct
 end
 [%%expect{|
 Line 5, characters 7-17:
-5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ stack_ (addf x)
+5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ (addf x)
            ^^^^^^^^^^
 Error: Annotation check for zero_alloc strict failed on function TOP26.Test.partial_poly (camlTOP26__partial_poly_76_79_code).
-Line 5, characters 69-77:
-5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ stack_ (addf x)
-                                                                         ^^^^^^^^
+Line 5, characters 62-70:
+5 |   let[@zero_alloc strict] partial_poly (x : float) = exclave_ (addf x)
+                                                                  ^^^^^^^^
 Error: allocation of 40 bytes for closure
 |}]
 
@@ -559,39 +559,54 @@ module Test :
 (* Part 8: arity-0 primitives                                           *)
 (* ==================================================================== *)
 
-(* An arity-0 primitive is a value, never eta-expanded. [%loc_LINE] and
-   [%loc_FILE] compile to constants and are correctly accepted. *)
+(* An arity-0 primitive is a value, never eta-expanded. Seven of the eight
+   compile to constants and are correctly accepted. [%loc_POS] is the
+   interesting one: its type is a tuple, but it compiles to a static constant
+   block rather than a run-time allocation. *)
 module Test = struct
+  external fp : bool = "%frame_pointers"
   let[@zero_alloc strict] (line @ noalloc_strict) () = __LINE__
   let[@zero_alloc strict] (file @ noalloc_strict) () = __FILE__
+  let[@zero_alloc strict] (loc @ noalloc_strict) () = __LOC__
+  let[@zero_alloc strict] (pos @ noalloc_strict) () = __POS__
+  let[@zero_alloc strict] (module_ @ noalloc_strict) () = __MODULE__
+  let[@zero_alloc strict] (function_ @ noalloc_strict) () = __FUNCTION__
+  let[@zero_alloc strict] (frame_pointers @ noalloc_strict) () = fp
 end
 [%%expect{|
 module Test :
   sig
-    val line : unit -> int [@@zero_alloc strict]
-    val file : unit -> string [@@zero_alloc strict]
-  end @@ stateless noalloc_strict
+    external fp : bool = "%frame_pointers"
+    val line : unit -> int @@ stateless noalloc_strict [@@zero_alloc strict]
+    val file : unit -> string @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+    val loc : unit -> string @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+    val pos : unit -> string * int * int * int @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+    val module_ : unit -> string @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+    val function_ : unit -> string @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+    val frame_pointers : unit -> bool @@ stateless noalloc_strict
+      [@@zero_alloc strict]
+  end
 |}]
 
-(* CR shsong: unsound -- [noalloc_strict] accepts a function that the back end
-   proves allocates, which is the one direction this test exists to catch.
-   [Sys.argv] is [external argv : string array = "%sys_argv"], arity 0, and
-   compiles to a C call declared [~alloc:true]. Nothing catches it: the
-   identifier's own value mode does not, because [string array] is not a
-   function type so the [alloc] mode crosses away, and the bare-reference site
-   in [Typecore.type_ident] registers nothing for a [Prim_global] result.
-
-   Fix by classifying an arity-0 bare reference through
-   [Translprim.fully_applied_may_allocate] with no arguments: an arity-0
-   primitive is never eta-expanded, so a bare reference to it is already a full
-   application. That separates [%loc_LINE] and [%loc_FILE] from [%sys_argv].
-   Promote both blocks below when it lands; the first should become a mode
-   error. *)
+(* [Sys.argv] is [external argv : string array = "%sys_argv"], arity 0.
+   It is not a function type, but compiles to a C call declared
+   [~alloc:true]. *)
 module Test = struct
   let (argv @ noalloc_strict) () = Sys.argv
 end
 [%%expect{|
-module Test : sig val argv : unit -> string array end @@ noalloc_strict
+Line 2, characters 35-43:
+2 |   let (argv @ noalloc_strict) () = Sys.argv
+                                       ^^^^^^^^
+Error: The value "Sys.argv" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 30-43
+         which is expected to be "noalloc_strict".
 |}]
 
 module Test = struct
@@ -601,11 +616,25 @@ end
 Line 2, characters 7-17:
 2 |   let[@zero_alloc strict] argv () = Sys.argv
            ^^^^^^^^^^
-Error: Annotation check for zero_alloc strict failed on function TOP39.Test.argv (camlTOP39__argv_106_106_code).
+Error: Annotation check for zero_alloc strict failed on function TOP39.Test.argv (camlTOP39__argv_114_114_code).
 Line 2, characters 36-44:
 2 |   let[@zero_alloc strict] argv () = Sys.argv
                                         ^^^^^^^^
 Error: called function may allocate (external call to caml_sys_argv)
+|}]
+
+(* And the set is closed at those eight: [Typedecl.transl_value_decl] allows
+   arity 0 only for a [%]-primitive, so a C external -- which is assumed to
+   allocate unless it carries [[@@noalloc]] -- can never have a non-arrow type
+   and can never reach this hole. *)
+module Test = struct
+  external c0 : string array = "caml_sys_argv"
+end
+[%%expect{|
+Line 2, characters 16-28:
+2 |   external c0 : string array = "caml_sys_argv"
+                    ^^^^^^^^^^^^
+Error: External identifiers must be functions
 |}]
 
 (* ==================================================================== *)

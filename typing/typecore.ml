@@ -6516,6 +6516,14 @@ let unrelax_alloc orig_mode actual_mode =
       Value.min_with_comonadic Allocation
         (Value.proj_comonadic Allocation orig_mode) ]
 
+(* [%sys_argv] triggers allocation but is not a funciton, so we prevent
+   mode crossing for Allocation axis.*)
+let strengthen_sys_argv_alloc desc mode =
+  match desc.val_kind with
+  | Val_prim { prim_name = "%sys_argv"; _ } ->
+    Value.join [mode; Value.min_with_comonadic Allocation Allocation.alloc]
+  | _ -> mode
+
 let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(is_applied=false)
       env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -9099,6 +9107,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
+  let mode = strengthen_sys_argv_alloc desc mode in
   let relax_mode = relax_alloc desc ~is_applied mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
