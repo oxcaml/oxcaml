@@ -2654,50 +2654,18 @@ let prim_may_allocate ~arity prim =
   | External prim -> primitive_may_allocate (Pccall prim)
   | Comparison (comp, knd) ->
       primitive_may_allocate (comparison_primitive comp knd)
-  | Raise _ ->
-      (* [Praise] does not allocate; the exception value is allocated by
-         whoever built it. *)
-      false
-  | Raise_with_backtrace ->
-      (* [caml_restore_raw_backtrace] is declared [~alloc:false], and the
-         [Praise] it is sequenced with does not allocate either. *)
-      false
-  | Lazy_force _ ->
-      (* Cannot classify: [Matching.inline_lazy_force] is not a single
-         primitive. *)
-      true
-  | Loc _ ->
-      (* With no argument this is a constant; with one, [lambda_of_prim] pairs
-         the location with the argument in a heap block. *)
-      arity > 0
-  | Send _ | Send_self _ | Send_cache _ ->
-      (* Cannot classify: these compile to an [Lsend], a method call. *)
-      true
-  | Frame_pointers ->
-      (* Compiles to a constant. *)
-      false
-  | Identity ->
-      (* Compiles to the argument itself. *)
-      false
-  | Apply _ | Revapply _ ->
-      (* These compile to an [Lapply] of the function argument.  The operator
-         itself allocates nothing; whatever the callee allocates is accounted
-         for through the callee's own mode. *)
-      false
-  | Peek None | Poke None ->
-      (* Cannot classify: the layout is not resolved, and [lambda_of_prim]
-         raises rather than building anything. *)
-      true
-  | Peek (Some _) ->
-      (* [Ppeek] does not allocate. *)
-      false
-  | Poke (Some _) ->
-      (* [Ppoke] does not allocate. *)
-      false
-  | Unsupported _ ->
-      (* Raises [Invalid_argument], whose argument is built in a heap
-         block. *)
-      true
+  | Raise _ -> false
+  | Raise_with_backtrace -> false
+  | Lazy_force _ -> true
+  | Loc _ -> arity > 0
+  | Send _ | Send_self _ | Send_cache _ -> true
+  | Frame_pointers -> false
+  | Identity -> false
+  | Apply _ | Revapply _ -> false
+  | Peek None | Poke None -> true
+  | Peek (Some _) -> false
+  | Poke (Some _) -> false
+  | Unsupported _ -> true
   | Atomic (op, _, immediate_or_pointer) ->
       primitive_may_allocate (atomic_lambda_primitive op immediate_or_pointer)
 
@@ -2706,12 +2674,9 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
   let result =
     try
       let sloc = of_location ~scopes:empty_scopes loc in
-      (* Pass constant for [poly_mode] to avoid zapping mode variables. *)
       let poly_mode =
         Some (Mode.Locality.disallow_right Mode.Locality.global)
       in
-      (* [path = None] keeps [add_used_primitive] a no-op, so this records no
-         cross-unit use of an [external]. *)
       let prim =
         transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
           None arg_exps
@@ -2720,11 +2685,6 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
     with
     | _ -> true
   in
-  (* [specialize_primitive] in [transl_primitive_common] calls
-     [Ctype.type_sort] and [Ctype.type_jkind], which default sort and
-     jkind variables.  Those are recorded in the trail, so this undoes
-     them.  No mode variable is touched: see the constant locality
-     above. *)
   Btype.backtrack snap;
   result
 
@@ -2747,7 +2707,7 @@ let can_apply_primitive p pmode pos args ~check_poly_mode =
       else
         match p.prim_native_repr_res with
         | Prim_global, _ -> true
-        | Prim_poly, _
+        | Prim_poly, (* Being conservative if not checking pmode *)
         | Prim_local, _ -> false
     end
   end
