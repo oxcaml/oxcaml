@@ -196,6 +196,8 @@ module Expert : sig
 
   val cont_lifting_budget : unit -> int
 
+  val cont_spec_budget : unit -> int
+
   val cont_spec_threshold : unit -> float
 end
 
