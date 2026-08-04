@@ -807,13 +807,16 @@ let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
+let register_allocation_for_optimisation alloc_mode =
+  let alloc_mode = Alloc.disallow_left alloc_mode in
+  allocations := alloc_mode :: !allocations
+
 let register_allocation_mode ~env ~loc alloc_mode =
   let min_mode =
     Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
   in
   Value.submode_err (loc, Allocation) min_mode (alloc_as_value alloc_mode);
-  let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := alloc_mode :: !allocations
+  register_allocation_for_optimisation alloc_mode
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -9131,19 +9134,16 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
-       if not is_applied then
-         begin match prim.prim_native_repr_res, mode with
-         (* Optimization only (Allocation axis do not rely on this
-            register_allocation_mode to guarantee soundness):
-            if the locality of returned value of the primitive is poly
-            we then register allocation for further optimization;
-            regstier_allocation_mode for is_applied=true case
-            is handled at the application site. *)
-         | (Prim_poly, _), Some mode ->
-             register_allocation_mode ~env ~loc:lid.loc
-               (Alloc.max_with_comonadic Areality mode)
-         | _ -> ()
-         end;
+       begin match prim.prim_native_repr_res, mode with
+       (* Optimization only (Allocation axis do not rely on this
+          register_allocation_mode to guarantee soundness):
+          if the locality of returned value of the primitive is poly
+          we then register allocation for further optimization *)
+       | (Prim_poly, _), Some mode ->
+           register_allocation_for_optimisation
+             (Alloc.max_with_comonadic Areality mode)
+       | _ -> ()
+        end;
        [], ty, Id_prim (mode, sort)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
