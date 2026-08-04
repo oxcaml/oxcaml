@@ -843,17 +843,19 @@ and is_useful_expanded_head_descr full_kind env (descr : ET.descr) =
     is_useful_head_of_kind_naked_vec256 env head
   | Naked_vec512 head, Naked_number Naked_vec512 ->
     is_useful_head_of_kind_naked_vec512 env head
+  | Naked_mask head, Naked_number Naked_mask ->
+    is_useful_head_of_kind_naked_mask env head
   | Rec_info head, Rec_info -> is_useful_head_of_kind_rec_info env head
   | Region head, Region -> is_useful_head_of_kind_region env head
   | ( ( Value _ | Naked_immediate _ | Naked_float32 _ | Naked_float _
       | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
       | Naked_nativeint _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-      | Rec_info _ | Region _ ),
+      | Rec_info _ | Region _ | Naked_mask _ ),
       ( Value
       | Naked_number
           ( Naked_immediate | Naked_float32 | Naked_float | Naked_int8
           | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
-          | Naked_vec128 | Naked_vec256 | Naked_vec512 )
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask )
       | Rec_info | Region ) ) ->
     false
 
@@ -875,7 +877,8 @@ and is_useful_head_of_kind_value_non_null env
   | ( Anything,
       ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
       | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
-      | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
+      | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | Closures _ | String _
+      | Array _ ) ) ->
     true
   | Boxed_float32, Boxed_float32 (ty, _alloc_mode) ->
     is_useful K.With_subkind.naked_float32 env ty
@@ -893,6 +896,8 @@ and is_useful_head_of_kind_value_non_null env
     is_useful K.With_subkind.naked_vec256 env ty
   | Boxed_vec512, Boxed_vec512 (ty, _alloc_mode) ->
     is_useful K.With_subkind.naked_vec512 env ty
+  | Boxed_mask, Boxed_mask (ty, _alloc_mode) ->
+    is_useful K.With_subkind.naked_mask env ty
   | Tagged_immediate, Variant { immediates; _ } -> (
     match immediates with
     | Unknown -> false
@@ -951,18 +956,21 @@ and is_useful_head_of_kind_value_non_null env
     ->
     is_useful_array (Or_unknown.Known K.With_subkind.naked_vec512) env
       ~element_kind ~length ~contents ~alloc_mode
+  | Unboxed_mask_array, Array { element_kind; length; contents; alloc_mode } ->
+    is_useful_array (Or_unknown.Known K.With_subkind.naked_mask) env
+      ~element_kind ~length ~contents ~alloc_mode
   | Unboxed_product_array, Array { element_kind; length; contents; alloc_mode }
     ->
     is_useful_array Or_unknown.Unknown env ~element_kind ~length ~contents
       ~alloc_mode
   | ( ( Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64
       | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
-      | Tagged_immediate | Variant _ | Float_block _ | Float_array
+      | Boxed_mask | Tagged_immediate | Variant _ | Float_block _ | Float_array
       | Immediate_array | Value_array | Generic_array | Unboxed_float32_array
       | Untagged_int_array | Untagged_int8_array | Untagged_int16_array
       | Unboxed_int32_array | Unboxed_int64_array | Unboxed_nativeint_array
       | Unboxed_vec128_array | Unboxed_vec256_array | Unboxed_vec512_array
-      | Unboxed_product_array ),
+      | Unboxed_mask_array | Unboxed_product_array ),
       _ ) ->
     false
 
@@ -987,8 +995,8 @@ and is_useful_tagged_immediate ~consts env ~immediates =
       | Ok
           ( Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
           | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-          | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _
-          | Region _ ) ->
+          | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+          | Rec_info _ | Region _ ) ->
         false)
 
 and is_useful_block ~non_consts env ~blocks =
@@ -1158,6 +1166,12 @@ and is_useful_head_of_kind_naked_vec512 env head =
     (head
       : TG.head_of_kind_naked_vec512
       :> Vector_types.Vec512.Bit_pattern.Set.t)
+
+and is_useful_head_of_kind_naked_mask env head =
+  is_useful_set
+    (module Vector_types.Mask.Bit_pattern.Set)
+    env
+    (head : TG.head_of_kind_naked_mask :> Vector_types.Mask.Bit_pattern.Set.t)
 
 and is_useful_head_of_kind_rec_info _env _head = false
 
