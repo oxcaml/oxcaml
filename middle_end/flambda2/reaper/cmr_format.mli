@@ -15,8 +15,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* CR mvellacott: (long term) get rid of CMR files, and put the data in CMX instead *)
-(* CR mvellacott: (short term) store complete data in CMR files *)
+(* CR mvellacott: get rid of CMR files, and put the data in CMX instead *)
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
