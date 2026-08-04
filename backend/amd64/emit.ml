@@ -3270,41 +3270,6 @@ let end_assembly () =
   let frametable_section : Asm_targets.Asm_section.t =
     if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
   in
-  (* Mergeable string section for debuginfo filename and defname strings (so the
-     linker will de-dupe). On macOS they go to __cstring under l-prefixed
-     private symbols, since Mach-O relocations cannot target L temporaries;
-     under the internal assembler they stay in the frametable section as
-     same-section label differences. *)
-  let macos_cstrings =
-    is_macosx system && Option.is_none !X86_proc.internal_assembler
-  in
-  let debuginfo_strings_section : Asm_targets.Asm_section.t =
-    if macos_cstrings
-    then
-      Custom
-        { names = ["__TEXT"; "__cstring"];
-          flags = None;
-          args = ["cstring_literals"];
-          is_delayed = false
-        }
-    else if is_macosx system
-    then frametable_section
-    else
-      Custom
-        { names = [".rodata.str1.1"];
-          flags = Some "aMS";
-          args = ["@progbits"; "1"];
-          is_delayed = false
-        }
-  in
-  (* References carry the frametable section (the directive layer requires a
-     referenced label's section to match the current one); definitions carry the
-     strings section. The encoded name is the same either way. *)
-  let string_label ~section lbl =
-    if macos_cstrings
-    then L.create_private_int section (Label.to_int lbl)
-    else label_to_asm_label ~section lbl
-  in
   D.switch_to_section frametable_section;
   I.ud2 ();
   D.align
@@ -3317,6 +3282,8 @@ let end_assembly () =
   Emitaux.disable_short_descriptors := X86_proc.masm;
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames
+    ~binary_emitter:(Option.is_some !X86_proc.internal_assembler)
+    ~frametable_section
     { efa_code_label =
         (fun l ->
           let l = label_to_asm_label ~section:Text l in
@@ -3353,20 +3320,7 @@ let end_assembly () =
       efa_def_label =
         (fun l ->
           let lbl = label_to_asm_label ~section:frametable_section l in
-          D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"));
-      efa_open_string_section =
-        (fun () -> D.switch_to_section debuginfo_strings_section);
-      efa_close_string_section =
-        (fun () -> D.switch_to_section frametable_section);
-      efa_def_string_label =
-        (fun l ->
-          D.define_label (string_label ~section:debuginfo_strings_section l));
-      efa_string_label_rel =
-        (fun lbl ofs ->
-          D.between_this_and_label_offset_32bit_expr
-            ~upper:(string_label ~section:frametable_section lbl)
-            ~offset_upper:(Targetint.of_int32 ofs))
+          D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
