@@ -201,7 +201,11 @@ let remove_redundant_extension stats cell =
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins ins1, Ins ins2 -> (
-      match ins1, ins2 with
+      | Ins (MOVSX (src1, dst1)), Ins (MOVSX (src2, dst2))
+      | Ins (MOVSXD (src1, dst1)), Ins (MOVSXD (src2, dst2))
+      | Ins (MOVZX (src1, dst1)), Ins (MOVZX (src2, dst2))
+        when ... -> ...
+      | _, _ -> U.No_match
       | MOVSX (src1, dst1), MOVSX (src2, dst2)
       | MOVSXD (src1, dst1), MOVSXD (src2, dst2)
       | MOVZX (src1, dst1), MOVZX (src2, dst2)
