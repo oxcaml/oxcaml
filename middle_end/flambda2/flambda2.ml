@@ -374,7 +374,7 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   Profile.record_call "flambda2" run
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables:_ ~cmr_filename ~cmx_imports_to_reload =
+    ~keep_symbol_tables ~cmr_filename ~cmx_imports_to_reload =
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
@@ -394,31 +394,25 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         (Flambda_cmx.load_cmx_file_contents cmx_loader (Import_info.cu import)
           : Flambda2_types.Typing_env.Serializable.t option))
     cmx_imports_to_reload;
-  (* CR mvellacott: The following prints are for a temporary test, and should be
-     replaced with an actual implementation. *)
-  let module_symbol =
-    Flambda2_identifiers.Symbol.for_compilation_unit
-      (Compilation_unit.get_current_exn ())
+  (* CR mvellacott: add profiling and debug printing code. *)
+  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
+  let flambda, free_names, all_code, slot_offsets, final_typing_env =
+    Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+      ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
+      ~all_code ~final_typing_env
   in
-  Printf.eprintf "Restored unit metadata matches module symbol: %b\n"
-    (Flambda2_identifiers.Symbol.equal
-       (Flambda_unit.Metadata.module_symbol unit_metadata)
-       module_symbol);
-  Option.iter
-    (fun typing_env ->
-      Printf.eprintf "Restored typing env defines module symbol: %b\n"
-        (Flambda2_types.Typing_env.mem typing_env
-           (Flambda2_identifiers.Name.symbol module_symbol)))
-    final_typing_env;
-  Printf.eprintf "Restored code for %d code ids\n"
-    (Flambda2_identifiers.Code_id.Set.cardinal
-       (Exported_code.ids_for_export all_code).code_ids);
-  Printf.eprintf "Restored dep graph mentions module symbol: %b\n"
-    (Flambda2_identifiers.Symbol.Set.mem module_symbol
-       (Flambda2_reaper.Global_flow_graph.ids_for_export deps).symbols);
-  Printf.eprintf "Restored rebuild data mentions module symbol: %b\n"
-    (Flambda2_identifiers.Symbol.Set.mem module_symbol
-       (Flambda2_reaper.Reaper.Staged.Traverse_rebuild.ids_for_export
-          rebuild_data)
-         .symbols);
-  Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"
+  let { unit = flambda;
+        exported_offsets = offsets;
+        cmx;
+        all_code;
+        used_value_slots = _;
+        reachable_names
+      } =
+    build_run_result flambda ~free_names ~final_typing_env
+      ~sections:(Compilenv.current_sections ())
+      ~all_code slot_offsets
+  in
+  Option.iter Compilenv.set_export_info cmx;
+  Compiler_hooks.execute Reaped_flambda2 flambda;
+  flambda_result_to_cmm ~keep_symbol_tables
+    { flambda; all_code; offsets; reachable_names }
