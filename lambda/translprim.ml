@@ -2707,7 +2707,9 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
     try
       let sloc = of_location ~scopes:empty_scopes loc in
       (* Pass constant for [poly_mode] to avoid zapping mode variables. *)
-      let poly_mode = Some (Mode.Locality.disallow_right Mode.Locality.global) in
+      let poly_mode =
+        Some (Mode.Locality.disallow_right Mode.Locality.global)
+      in
       (* [path = None] keeps [add_used_primitive] a no-op, so this records no
          cross-unit use of an [external]. *)
       let prim =
