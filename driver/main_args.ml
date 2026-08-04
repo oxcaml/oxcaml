@@ -595,6 +595,10 @@ let mk_safer_matching f =
   "-safer-matching", Arg.Unit f,
   " Do not use type information to optimize pattern-matching"
 
+let mk_skip_lambda_switch_compilation f =
+  "-skip-lambda-switch-compilation", Arg.Unit f,
+  " Keep integer switches untouched before the middle-end"
+
 let mk_shared f =
   "-shared", Arg.Unit f, " Produce a dynlinkable plugin"
 
@@ -1178,6 +1182,7 @@ module type Common_options = sig
   val _rectypes : unit -> unit
   val _no_rectypes : unit -> unit
   val _safer_matching : unit -> unit
+  val _skip_lambda_switch_compilation : unit -> unit
   val _short_paths : unit -> unit
   val _strict_sequence : unit -> unit
   val _no_strict_sequence : unit -> unit
@@ -1575,6 +1580,7 @@ struct
     mk_without_runtime F._without_runtime;
     mk_safe_string;
     mk_safer_matching F._safer_matching;
+    mk_skip_lambda_switch_compilation F._skip_lambda_switch_compilation;
     mk_short_paths F._short_paths;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
@@ -1690,6 +1696,7 @@ struct
     mk_no_rectypes F._no_rectypes;
     mk_safe_string;
     mk_safer_matching F._safer_matching;
+    mk_skip_lambda_switch_compilation F._skip_lambda_switch_compilation;
     mk_short_paths F._short_paths;
     mk_stdin F._stdin;
     mk_strict_sequence F._strict_sequence;
@@ -1869,6 +1876,7 @@ struct
     mk_S F._S;
     mk_safe_string;
     mk_safer_matching F._safer_matching;
+    mk_skip_lambda_switch_compilation F._skip_lambda_switch_compilation;
     mk_shared F._shared;
     mk_short_paths F._short_paths;
     mk_strict_sequence F._strict_sequence;
@@ -2036,6 +2044,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_S F._S;
     mk_safe_string;
     mk_safer_matching F._safer_matching;
+    mk_skip_lambda_switch_compilation F._skip_lambda_switch_compilation;
     mk_short_paths F._short_paths;
     mk_stdin F._stdin;
     mk_strict_sequence F._strict_sequence;
@@ -2189,6 +2198,7 @@ struct
     mk_without_runtime F._without_runtime;
     mk_safe_string;
     mk_safer_matching F._safer_matching;
+    mk_skip_lambda_switch_compilation F._skip_lambda_switch_compilation;
     mk_short_paths F._short_paths;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
@@ -2427,6 +2437,7 @@ module Default = struct
     let _principal = set principal
     let _rectypes = set recursive_types
     let _safer_matching = set safer_matching
+    let _skip_lambda_switch_compilation = set skip_lambda_switch_compilation
     let _short_paths = clear real_paths
     let _strict_formats = set strict_formats
     let _strict_sequence = set strict_sequence

@@ -122,6 +122,7 @@ val classic : bool ref
 val nopervasives : bool ref
 val match_context_rows : int ref
 val safer_matching : bool ref
+val skip_lambda_switch_compilation : bool ref
 type open_arg =
   | Open of string
   | Open_cmi of string

@@ -135,6 +135,7 @@ and classic = ref false                 (* -nolabels *)
 and nopervasives = ref false            (* -nopervasives *)
 and match_context_rows = ref 32         (* -match-context-rows *)
 and safer_matching = ref false          (* -safer-matching *)
+and skip_lambda_switch_compilation = ref false
 and preprocessor = ref(None : string option) (* -pp *)
 and all_ppx = ref ([] : string list)        (* -ppx *)
 let absname = ref false                 (* -absname *)
