@@ -196,3 +196,7 @@ val bump_current_level_scope : t -> t
 val compute_joined_aliases : t -> Name.Set.t -> t list -> t
 
 val defined_symbols : t -> Symbol.Set.t
+
+val add_param_projection : t -> Name.t -> Param_projection.t -> t
+
+val is_param_projection : t -> Name.t -> Param_projection.t option

@@ -103,6 +103,8 @@ end = struct
   let bump_scope t = { t with scope = Scope.next t.scope }
 end
 
+type name_info = { param_projection : Param_projection.t } [@@unboxed]
+
 type t =
   { machine_width : Target_system.Machine_width.t;
     resolver : Compilation_unit.t -> serializable option;
@@ -116,7 +118,10 @@ type t =
     next_binding_time : Binding_time.t;
     min_binding_time : Binding_time.t;
         (* Earlier variables have mode In_types *)
-    is_bottom : bool
+    is_bottom : bool;
+    name_info : name_info Name.Map.t
+        (* [name_info] should contain entries only for true canonical elements
+           (in any name mode) *)
   }
 
 and serializable =
@@ -144,7 +149,7 @@ let [@ocamlformat "disable"] print ppf
       ({ resolver = _; binding_time_resolver = _;
          prev_levels; current_level; next_binding_time = _;
          defined_symbols; code_age_relation; min_binding_time;
-         is_bottom; machine_width = _
+         is_bottom; machine_width = _; name_info
        } as t) =
   if is_empty t then
     Format.pp_print_string ppf "Empty"
@@ -163,7 +168,8 @@ let [@ocamlformat "disable"] print ppf
          @[<hov 1>(defined_symbols@ %a)@]@ \
          @[<hov 1>(code_age_relation@ %a)@]@ \
          @[<hov 1>(levels@ %a)@]@ \
-         @[<hov 1>(aliases@ %a)@]\
+         @[<hov 1>(aliases@ %a)@]@ \
+         @[<hov 1>(name_info@ %a)@]\
        )@]"
       Symbol.Set.print defined_symbols
       Code_age_relation.print code_age_relation
@@ -171,6 +177,9 @@ let [@ocamlformat "disable"] print ppf
          (One_level.print ~min_binding_time))
       levels
       Aliases.print (aliases t)
+      (Name.Map.print (fun ppf { param_projection } ->
+           Param_projection.print ppf param_projection))
+      name_info
 
 let [@ocamlformat "disable"] print_serializable ppf
     { defined_symbols_without_equations; code_age_relation; just_after_level } =
@@ -361,8 +370,27 @@ let create ~machine_width ~resolver =
     defined_symbols = Symbol.Set.empty;
     code_age_relation = Code_age_relation.empty;
     min_binding_time = Binding_time.earliest_var;
-    is_bottom = false
+    is_bottom = false;
+    name_info = Name.Map.empty
   }
+
+let add_param_projection t name param_projection =
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> t)
+    ~name:(fun canonical ~coercion:_ ->
+      { t with
+        name_info = Name.Map.add canonical { param_projection } t.name_info
+      })
+
+let is_param_projection t name =
+  Simple.pattern_match
+    (Aliases.get_canonical_ignoring_name_mode (aliases t) name)
+    ~const:(fun _ -> None)
+    ~name:(fun canonical ~coercion:_ ->
+      Option.map
+        (fun (x : name_info) -> x.param_projection)
+        (Name.Map.find_opt canonical t.name_info))
 
 let machine_width t = t.machine_width
 
@@ -849,7 +877,18 @@ let add_alias t ~canonical_element1 ~canonical_element2 :
        equation. *)
     Unknown
   | Ok { canonical_element; demoted_name; t = aliases } ->
-    Ok { canonical_element; demoted_name; t = with_aliases t ~aliases }
+    let name_info =
+      match Name.Map.find_opt demoted_name t.name_info with
+      | None -> t.name_info
+      | Some prev_info ->
+        let name_info = Name.Map.remove demoted_name t.name_info in
+        Simple.pattern_match canonical_element
+          ~name:(fun canonical ~coercion:_ ->
+            Name.Map.add canonical prev_info name_info)
+          ~const:(fun _ -> name_info)
+    in
+    let t = with_aliases t ~aliases in
+    Ok { canonical_element; demoted_name; t = { t with name_info } }
 
 let add_definitions_of_params t ~params =
   List.fold_left
