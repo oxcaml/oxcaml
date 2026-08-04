@@ -232,6 +232,10 @@ module type Solver_mono = sig
       Raises exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
+  (** Composes [to_const] and [of_const] while preserving the original hint *)
+  val to_of_const_exn :
+    'a obj -> ('a, allowed * allowed) mode -> ('a, allowed * allowed) mode
+
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 
