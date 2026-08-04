@@ -43,14 +43,18 @@ module type Forward_S = sig
 
   (** Perform the dataflow analysis on the passed CFG, returning [OK _] if a
       fix-point has been reached and [Error _] otherwise, where the nested value
-      is a partial map from labels to the domain values at the start of the
-      corresponding blocks. If [Error _] is returned then the contents of the
-      map is not guaranteed to be sound.
+      is a map binding each label of the CFG to the domain value at the start of
+      the corresponding block. The map has an entry for every block: entry
+      points are initially bound to [init], all other blocks to the domain's
+      [bot] value, and blocks never reached by the analysis keep their initial
+      binding. If [Error _] is returned then the contents of the map is not
+      guaranteed to be sound.
 
       A fix-point is not reached if there is still pending work after
-      [max_iteration] (defaulting to [max_int]) have been executed, and
-      iteration being the processing of one element from the working set. The
-      [init] value is the initial value of entry points. *)
+      [max_iteration] (defaulting to [max_int]) have been executed, an iteration
+      being the processing of one element from the working set. The [init] value
+      is the initial value of entry points: the entry block and, if
+      [handlers_are_entry_points] is [true], all trap handler blocks. *)
   val run :
     Cfg.t ->
     ?max_iteration:int ->

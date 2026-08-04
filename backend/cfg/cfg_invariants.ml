@@ -137,6 +137,27 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
+let check_entry_predecessors t =
+  (* The only expected edges into the entry block are self tail calls, which can
+     occur when the tailrec entry point is the entry block itself. Passes such
+     as [Cfg_simplify.Merge_straightline_blocks] rely on the absence of other
+     kinds of edges into the entry block: they may delete a block whose unique
+     predecessor jumps to it, and the entry block must never be deleted. *)
+  let entry_block = Cfg.get_block_exn t.cfg t.cfg.entry_label in
+  List.iter
+    (fun predecessor ->
+      let pred_block = Cfg.get_block_exn t.cfg predecessor in
+      match pred_block.terminator.desc with
+      | Tailcall_self _ -> ()
+      | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+      | Int_test _ | Switch _ | Return | Raise _ | Tailcall_func _
+      | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+        report t
+          "Block %a is a predecessor of the entry block, but its terminator is \
+           not a self tail call"
+          Label.print predecessor)
+    (Cfg.predecessor_labels entry_block)
+
 let check_terminator_arity t label block =
   let term = block.Cfg.terminator in
   let args = term.arg in
@@ -580,6 +601,7 @@ let run ppf cfg_with_layout =
   in
   check_layout t layout;
   Cfg.iter_blocks ~f:(check_block t) cfg;
+  check_entry_predecessors t;
   check_tailrec_position t;
   let cfg_with_infos = Cfg_with_infos.make cfg_with_layout in
   check_reducibility t cfg_with_infos;
