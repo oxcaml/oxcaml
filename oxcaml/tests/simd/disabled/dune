@@ -1,4 +1,8 @@
-; Test disabling extensions required for 256/512 bit vectors
+; Test disabling extensions required for 256/512 bit vectors.
+;
+; Run twice with each name-mangling scheme via the per-unit
+; -name-mangling-scheme override (#5963), and compare against fixed
+; per-scheme expected outputs.
 
 (rule
  (alias runtest)
@@ -6,35 +10,66 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")))
- (deps disabled256.expected disabled256.corrected)
  (action
-  (progn
-   (diff disabled256.expected disabled256.corrected))))
+  (diff disabled256.flat.expected disabled256.flat.corrected)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (action
+  (diff disabled256.structured.expected disabled256.structured.corrected)))
 
 (rule
  (enabled_if
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")))
- (targets disabled256.corrected)
+ (targets disabled256.flat.corrected)
  (deps
   (:ml disabled256.ml))
  (action
   (setenv
    OCAMLRUNPARAM b=0
    (with-outputs-to
-    disabled256.corrected
+    disabled256.flat.corrected
     (pipe-outputs
      (with-accepted-exit-codes
       2
       (run
        %{bin:ocamlopt.opt}
        %{ml}
-       -extension
-       simd
-       -color
-       never
-       -error-style
-       short
-       -fno-avx))
+       -extension simd
+       -color never
+       -error-style short
+       -fno-avx
+       -name-mangling-scheme=flat))
+     (run head -n 1))))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (targets disabled256.structured.corrected)
+ (deps
+  (:ml disabled256.ml))
+ (action
+  (setenv
+   OCAMLRUNPARAM b=0
+   (with-outputs-to
+    disabled256.structured.corrected
+    (pipe-outputs
+     (with-accepted-exit-codes
+      2
+      (run
+       %{bin:ocamlopt.opt}
+       %{ml}
+       -extension simd
+       -color never
+       -error-style short
+       -fno-avx
+       -name-mangling-scheme=structured))
      (run head -n 1))))))

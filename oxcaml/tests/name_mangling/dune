@@ -1,0 +1,29 @@
+; Test that both name-mangling schemes produce the expected symbols.
+;
+; Compiles symbols.ml twice using the per-unit -name-mangling-scheme override
+; (added in #5963), normalises the linear output via filter.sh (which takes the
+; scheme name as an argument), and compares against fixed expected outputs.
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (with-stdout-to
+    symbols.flat.output
+    (pipe-outputs
+     (run %{bin:ocamlopt.opt}
+       -dlinear -c -name-mangling-scheme=flat %{dep:symbols.ml})
+     (run ./filter.sh flat)))
+   (diff symbols.flat symbols.flat.output))))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (with-stdout-to
+    symbols.structured.output
+    (pipe-outputs
+     (run %{bin:ocamlopt.opt}
+       -dlinear -c -name-mangling-scheme=structured %{dep:symbols.ml})
+     (run ./filter.sh structured)))
+   (diff symbols.structured symbols.structured.output))))
