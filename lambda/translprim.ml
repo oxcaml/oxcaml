@@ -2707,7 +2707,8 @@ let can_apply_primitive p pmode pos args ~check_poly_mode =
       else
         match p.prim_native_repr_res with
         | Prim_global, _ -> true
-        | Prim_poly, (* Being conservative if not checking pmode *)
+        (* Being conservative if not checking pmode *)
+        | Prim_poly, _
         | Prim_local, _ -> false
     end
   end
