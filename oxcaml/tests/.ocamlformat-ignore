@@ -47,3 +47,5 @@ dissector/huge_module*.ml
 dissector/module_a.ml
 dissector/module_b.ml
 dissector/module_c.ml
+simd/avx512/intrins/mem.ml
+simd/avx512/intrins/gen512.ml

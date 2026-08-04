@@ -68,6 +68,7 @@ do
     middle_end/flambda2/parser/flambda_parser.ml | \
     middle_end/flambda2/parser/flambda_lex.ml | \
     tools/simdgen/amd64_simd_instrs.ml | \
+    tools/simdgen/amd64_simd_intrins.ml | \
     tools/debug_printers.ml)
       continue ;;
   esac

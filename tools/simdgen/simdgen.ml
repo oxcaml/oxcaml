@@ -19,36 +19,8 @@
    Instruction data was originally derived from the Intel SDM Vol 2. *)
 
 open Amd64_simd_defs
+open Simdgen_types
 open Printf
-
-type evex_rnd =
-  | Rnd_none
-  | Rnd_er
-  | Rnd_sae
-
-type evex_bcst =
-  | Bcst_none
-  | Bcst_32
-  | Bcst_64
-
-type evex_flags =
-  { mutable z : bool; (* Supports zeroing *)
-    mutable b : evex_bcst; (* Supports broadcasting *)
-    mutable r : evex_rnd; (* Supports rounding *)
-    mutable k : bool (* Expects write mask *)
-  }
-
-type instr_emit =
-  { ext : ext array; (* Multiple extensions may be required. *)
-    args : arg array;
-    res : res;
-    imm : imm;
-    mnemonic : string;
-    enc : enc;
-    flags : evex_flags
-  }
-
-exception Unsupported
 
 let all_mnemonics = Hashtbl.create 1024
 
@@ -594,6 +566,20 @@ let print_one bind instr =
       args
     |> Array.to_list |> String.concat ";"
   in
+  let print_register_args args =
+    Array.map
+      (fun ({ loc; _ } as arg : arg) ->
+        match loc with
+        | Pin _ -> arg
+        | Temp temps ->
+          let temps =
+            Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+          in
+          if Array.length temps = 0 then failwith instr.mnemonic;
+          { arg with loc = Temp temps })
+      args
+    |> print_args
+  in
   let print_idxs idxs =
     Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
   in
@@ -683,12 +669,15 @@ let print_one bind instr =
     match instr.res with
     | Res rr when instr.flags.z ->
       (* Without zeroing, masked-off lanes of the destination are preserved, so
-         the destination must also be an input operand. *)
+         the destination must also be an input operand. With zeroing, the
+         destination must be a register because EVEX.z is invalid with a memory
+         destination. *)
       let args = print_args instr.args in
       let res_args = print_args rr in
+      let zeroing_res_args = print_register_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
       ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
-        sprintf "(if z then Res [|%s|] else Arg [|%s|])" res_args idxs )
+        sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
     | (Res_none | Arg _ | Res _) as res ->
       sprintf "[|%s|]" (print_args instr.args), print_res res
   in
@@ -718,25 +707,29 @@ let %s = {
 }|}
     fun_ constructor ext args res imm instr.mnemonic enc
 
+module Bind_map = Map.Make (String)
+
+let all_bindings () =
+  Hashtbl.to_seq_keys all_instructions
+  |> Seq.fold_left
+       (fun acc instr ->
+         Bind_map.update (binding instr)
+           (function
+             (* Prefer VEX over EVEX upon collisions. *)
+             | Some other when is_evex instr && not (is_evex other) ->
+               Some other
+             | Some _ | None -> Some instr)
+           acc)
+       Bind_map.empty
+
 let print_all () =
-  let module Map = Map.Make (String) in
-  let all =
-    Hashtbl.to_seq_keys all_instructions
-    |> Seq.fold_left
-         (fun acc instr ->
-           Map.update (binding instr)
-             (function
-               (* Prefer VEX over EVEX upon collisions. *)
-               | Some other when is_evex instr && not (is_evex other) ->
-                 Some other
-               | Some _ | None -> Some instr)
-             acc)
-         Map.empty
-  in
+  let all = all_bindings () in
   print_endline "type id = ";
-  Map.iter (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind)) all;
+  Bind_map.iter
+    (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind))
+    all;
   print_endline "\ntype nonrec instr = id instr";
-  Map.iter (fun bind instr -> print_one bind instr) all
+  Bind_map.iter (fun bind instr -> print_one bind instr) all
 
 let parse_ext = function
   | "SSE" -> Some SSE
@@ -839,6 +832,7 @@ let expand_modifiers instr =
     if not instr.flags.k
     then [instr]
     else
+      let k_index = Array.length instr.args in
       let masked =
         { instr with
           args =
@@ -846,7 +840,20 @@ let expand_modifiers instr =
         }
       in
       if Array.exists arg_is_vm instr.args
-      then [masked]
+      then
+        (* Gathers/scatters use the mask as a completion mask and zero it as
+           elements finish; model the clobber as a modified argument so the
+           register allocator does not reuse the stale value. *)
+        let res =
+          match masked.res with
+          | Arg rr -> Arg (Array.append rr [| k_index |])
+          | Res_none -> Arg [| k_index |]
+          | Res _ ->
+            failwith
+              (instr.mnemonic
+             ^ ": gather/scatter with a non-argument result operand")
+        in
+        [{ masked with res }]
       else [masked; { instr with flags = { instr.flags with z = false } }]
   in
   [instr]
@@ -854,8 +861,8 @@ let expand_modifiers instr =
   |> List.concat_map expand_rounding
   |> List.concat_map expand_mask
 
-let amd64 () =
-  let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
+let load_amd64 ?(csv = "amd64/amd64.csv") () =
+  let csv = In_channel.with_open_text csv parse in
   let lines =
     csv
     |> List.concat_map (function
@@ -877,15 +884,43 @@ let amd64 () =
         with Unsupported -> [])
       | _ -> [])
   in
+  List.iter register lines
+
+let amd64 () =
+  load_amd64 ();
   print_endline "(* Generated by tools/simdgen/simdgen.ml *)\n";
   print_endline "open Amd64_simd_defs\n";
-  List.iter register lines;
   print_all ()
 
+(* [(binding_name, instr_emit)] for every registered instruction, using the same
+   binding/mangling as [print_all] so the intrinsics generator cannot drift from
+   the emitted descriptors. *)
+let bindings_assoc () = all_bindings () |> Bind_map.bindings
+
 let arm64 () = print_endline "(* Generated by tools/simdgen/simdgen.ml *)\n"
+
+(* The data files default to the paths used by the rules in this directory; the
+   test rules in [oxcaml/tests/simd/avx512/intrins] pass them explicitly. *)
+let intrins subcommand =
+  let csv = if Array.length Sys.argv > 3 then Some Sys.argv.(3) else None in
+  let xml =
+    if Array.length Sys.argv > 4 then Sys.argv.(4) else "x86-intel.xml"
+  in
+  load_amd64 ?csv ();
+  let bindings = bindings_assoc () in
+  let intrinsics = Simdgen_intrins.parse_intrinsics xml in
+  match subcommand with
+  | "report" -> Simdgen_intrins.report ~bindings intrinsics
+  | "skiplist" -> Simdgen_intrins.print_skiplist ~bindings intrinsics
+  | "selection" -> Simdgen_intrins.print_selection ~bindings intrinsics
+  | "tests-ml" -> Simdgen_intrins.tests_ml ~bindings intrinsics
+  | "tests-c" -> Simdgen_intrins.tests_c ~bindings intrinsics
+  | "dump" -> Simdgen_intrins.print_dump ~bindings intrinsics
+  | other -> failwith ("unknown intrins subcommand: " ^ other)
 
 let () =
   match Sys.argv.(1) with
   | "amd64" -> amd64 ()
   | "arm64" -> arm64 ()
+  | "intrins" -> intrins Sys.argv.(2)
   | _ -> assert false

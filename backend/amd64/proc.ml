@@ -507,7 +507,8 @@ let destroyed_by_simd_op (op : Simd.operation) =
        | Pcompare_string _ | Vpcompare_string _
        | Ptestz | Ptestc | Ptestnzc
        | Vptestz_X  | Vptestc_X  | Vptestnzc_X
-       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y -> [||])
+       | Vptestz_Y  | Vptestc_Y  | Vptestnzc_Y
+       | Kflag _ -> [||])
 
 let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
