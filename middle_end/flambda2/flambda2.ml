@@ -357,17 +357,19 @@ let reset_symbol_tables () =
   Flambda2_identifiers.Continuation.reset ();
   Flambda2_identifiers.Int_ids.reset ()
 
+let flambda_result_to_cmm ~keep_symbol_tables
+    ({ flambda; all_code; offsets; reachable_names } : flambda_result) =
+  let cmm =
+    Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+  in
+  if not keep_symbol_tables then reset_symbol_tables ();
+  cmm
+
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
-    let { flambda; all_code; offsets; reachable_names } =
-      lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
-    in
-    let cmm =
-      Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
-    in
-    if not keep_symbol_tables then reset_symbol_tables ();
-    cmm
+    lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
+    |> flambda_result_to_cmm ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
