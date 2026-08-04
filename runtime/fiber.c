@@ -662,7 +662,7 @@ void caml_scan_stack(
 
     /* Scan dynamic bindings */
     if (stack->dyn_node != NULL)
-      caml_dynamic_table_scan_roots(&stack->dyn_node->table, f, fflags, fdata);
+      caml_dynamic_node_scan_roots(stack->dyn_node, f, fflags, fdata);
 
     f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
@@ -805,7 +805,7 @@ void caml_scan_stack(
 
     /* Scan dynamic bindings */
     if (stack->dyn_node != NULL)
-      caml_dynamic_table_scan_roots(&stack->dyn_node->table, f, fflags, fdata);
+      caml_dynamic_node_scan_roots(stack->dyn_node, f, fflags, fdata);
 
     if (is_scannable(fflags, Stack_handle_value(stack)))
       f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));

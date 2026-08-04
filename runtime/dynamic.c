@@ -229,6 +229,8 @@ CAMLexport void caml_dynamic_table_init(dynamic_table_t table)
   table->mask = (size_t)-1;
   table->count = 0;
   table->bindings = NULL;
+  table->frozen = 0;
+  table->prev = NULL;
 }
 
 CAMLexport void caml_dynamic_table_free(dynamic_table_t table)
@@ -392,6 +394,128 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
   }
 }
 
+// Returns NULL if allocation fails.
+CAMLexport dynamic_table_t caml_dynamic_table_node_new(void)
+{
+  dynamic_table_t table = caml_stat_alloc_noexc(sizeof(dynamic_table_s));
+  if(table) {
+    caml_dynamic_table_init(table);
+  }
+  return table;
+}
+
+CAMLexport void caml_dynamic_table_node_delete(dynamic_table_t table)
+{
+  caml_dynamic_table_free(table);
+  caml_stat_free(table);
+}
+
+/* Free a node's entire chain of dynamic tables (not the node itself). */
+static void dynamic_node_free_tables(dynamic_node_t node)
+{
+  dynamic_table_t table = node->top;
+  while(table != NULL) {
+    dynamic_table_t prev = table->prev;
+    caml_dynamic_table_node_delete(table);
+    table = prev;
+  }
+  node->top = NULL;
+  caml_dynamic_table_free(&node->table);
+}
+
+CAMLexport void caml_dynamic_node_scan_roots(dynamic_node_t node,
+                                             scanning_action f,
+                                             scanning_action_flags fflags,
+                                             void *fdata)
+{
+  for(dynamic_table_t table = node->top;
+      table != NULL;
+      table = table->prev) {
+    caml_dynamic_table_scan_roots(table, f, fflags, fdata);
+  }
+  caml_dynamic_table_scan_roots(&node->table, f, fflags, fdata);
+}
+
+static void dynamic_state_free(dynamic_saved_state_s *state)
+{
+  dynamic_table_t table = state->top;
+  while(table != NULL) {
+    dynamic_table_t prev = table->prev;
+    caml_dynamic_table_node_delete(table);
+    table = prev;
+  }
+  state->top = NULL;
+  caml_dynamic_table_free(&state->base);
+}
+
+CAMLexport bool caml_dynamic_state_save(struct stack_info *stack,
+                                        dynamic_saved_state_s *out)
+{
+  caml_dynamic_table_init(&out->base);
+  out->top = NULL;
+
+  dynamic_node_t node = stack->dyn_node;
+  if(node == NULL) {
+    return true; /* no bindings to save */
+  }
+  if(!caml_dynamic_table_copy(&out->base, &node->table)) {
+    return false;
+  }
+
+  dynamic_table_t *dst = &out->top;
+  for(dynamic_table_t src = node->top; src != NULL; src = src->prev) {
+    dynamic_table_t copy = caml_stat_alloc_noexc(sizeof(dynamic_table_s));
+    if(copy == NULL || !caml_dynamic_table_copy(copy, src)) {
+      caml_stat_free(copy);
+      dynamic_state_free(out);
+      return false;
+    }
+    *dst = copy;
+    dst = &copy->prev;
+  }
+  return true;
+}
+
+CAMLexport void caml_dynamic_state_restore(struct stack_info *stack,
+                                           dynamic_saved_state_s *saved)
+{
+  /* Re-read the node: it may have been created since the save (the node
+     itself is stable across stack reallocation). Only the tables are
+     restored; lexical edges belong to the fiber, not to the unwound
+     bindings. */
+  dynamic_node_t node = stack->dyn_node;
+  if(node == NULL) {
+    /* No bindings before or during the body, so nothing to restore. */
+    CAMLassert(saved->base.bindings == NULL && saved->top == NULL);
+    return;
+  }
+  dynamic_node_free_tables(node);
+  node->table = saved->base;
+  node->top = saved->top;
+  saved->top = NULL;
+}
+
+CAMLexport void caml_dynamic_state_register_roots(dynamic_saved_state_s *state)
+{
+  caml_dynamic_table_register_roots(&state->base);
+  for(dynamic_table_t table = state->top;
+      table != NULL;
+      table = table->prev) {
+    caml_dynamic_table_register_roots(table);
+  }
+}
+
+CAMLexport void
+caml_dynamic_state_unregister_roots(dynamic_saved_state_s *state)
+{
+  caml_dynamic_table_unregister_roots(&state->base);
+  for(dynamic_table_t table = state->top;
+      table != NULL;
+      table = table->prev) {
+    caml_dynamic_table_unregister_roots(table);
+  }
+}
+
 // Returns false if allocation fails.
 CAMLexport bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src)
 {
@@ -399,6 +523,8 @@ CAMLexport bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src
 
   dst->mask = src->mask;
   dst->count = src->count;
+  dst->frozen = src->frozen;
+  dst->prev = NULL;
 
   if(src->bindings) {
     dst->bindings = caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * capacity);
@@ -470,8 +596,10 @@ static dynamic_node_t dynamic_node(struct stack_info *stack)
       caml_raise_out_of_memory();
     }
     caml_dynamic_table_init(&node->table);
+    node->top = NULL;
     node->lexical_parent = NULL;
     node->span_next = NULL;
+    node->lexical_bound = NULL;
     node->lexical_root = false;
     stack->dyn_node = node;
   }
@@ -482,20 +610,47 @@ CAMLexport void caml_dynamic_node_free(struct stack_info *stack)
 {
   dynamic_node_t node = stack->dyn_node;
   if(node != NULL) {
-    caml_dynamic_table_free(&node->table);
+    dynamic_node_free_tables(node);
     caml_stat_free(node);
     stack->dyn_node = NULL;
   }
 }
 
-static bool dynamic_node_find(dynamic_node_t node, value dyn, value *val)
+static bool dynamic_table_find_bound(dynamic_table_t table, value dyn,
+                                     value *val)
 {
   dynamic_stack_t bindings;
-  if(node != NULL
-     && dynamic_table_find(&node->table, dyn, &bindings)
-     && bindings->count > 0) {
+  if(dynamic_table_find(table, dyn, &bindings) && bindings->count > 0) {
     *val = bindings->vals[bindings->count - 1];
     return true;
+  }
+  return false;
+}
+
+/* Search [node]'s tables newest-first, starting at [start] — a table of
+   [node]'s chain, or NULL for the whole chain. */
+static bool dynamic_node_find_from(dynamic_node_t node,
+                                   dynamic_table_t start,
+                                   value dyn, value *val)
+{
+  if(node == NULL) {
+    return false;
+  }
+  dynamic_table_t table = start;
+  if(table == NULL) {
+    table = node->top != NULL ? node->top : &node->table;
+  }
+  while(table != NULL) {
+    if(dynamic_table_find_bound(table, dyn, val)) {
+      return true;
+    }
+    if(table == &node->table) {
+      table = NULL;
+    } else if(table->prev != NULL) {
+      table = table->prev;
+    } else {
+      table = &node->table; /* the base follows the oldest heap table */
+    }
   }
   return false;
 }
@@ -523,7 +678,14 @@ static bool dynamic_node_find(dynamic_node_t node, value dyn, value *val)
 
    Both walks are linear. Within a detour each node has a single successor
    (fork edge or span link), so detours never branch and no recursion is
-   needed. */
+   needed.
+
+   Within each node, tables are searched newest-first. A detour reads the
+   fork point's tables starting at the edge's [lexical_bound] — the table
+   frozen when the pinned fiber was forked — so it sees exactly the
+   bindings visible at its fork point and never touches the (unfrozen)
+   tables the forking fiber may be mutating above them. Each nested fork
+   edge carries its own bound. */
 static value dynamic_lookup(struct stack_info *stack, value dyn)
 {
   value val;
@@ -533,7 +695,7 @@ static value dynamic_lookup(struct stack_info *stack, value dyn)
     if(node == NULL) {
       continue;
     }
-    if(dynamic_node_find(node, dyn, &val)) {
+    if(dynamic_node_find_from(node, NULL, dyn, &val)) {
       return val;
     }
     /* Skip the detour when the fork point is also the dynamic parent (a
@@ -543,14 +705,17 @@ static value dynamic_lookup(struct stack_info *stack, value dyn)
        && (Stack_parent(stack) == NULL
            || node->lexical_parent != Stack_parent(stack)->dyn_node)) {
       dynamic_node_t p = node->lexical_parent;
+      dynamic_table_t bound = node->lexical_bound;
       while(p != NULL) { /* lexical detour */
-        if(dynamic_node_find(p, dyn, &val)) {
+        if(dynamic_node_find_from(p, bound, dyn, &val)) {
           return val;
         }
         if(p->lexical_parent != NULL) {
-          p = p->lexical_parent; /* nested fork ancestry */
+          bound = p->lexical_bound; /* nested fork ancestry */
+          p = p->lexical_parent;
         } else {
-          p = p->span_next; /* enclosing fiber; NULL at the task base */
+          bound = NULL; /* enclosing fiber; NULL at the task base */
+          p = p->span_next;
         }
       }
     }
@@ -588,7 +753,22 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  if(!dynamic_table_push(&dynamic_node(stack)->table, dyn, val)) {
+  dynamic_node_t node = dynamic_node(stack);
+  dynamic_table_t table = node->top != NULL ? node->top : &node->table;
+  if(table->frozen > 0) {
+    /* Frozen tables are immutable; push a fresh table on the chain. Only
+       the outermost binding scope opened above a freeze allocates: nested
+       scopes find the fresh table unfrozen. */
+    dynamic_table_t fresh = caml_dynamic_table_node_new();
+    if(fresh == NULL) {
+      caml_raise_out_of_memory();
+    }
+    fresh->prev = node->top;
+    node->top = fresh;
+    table = fresh;
+  }
+
+  if(!dynamic_table_push(table, dyn, val)) {
     caml_raise_out_of_memory();
   }
 
@@ -606,10 +786,28 @@ CAMLprim value caml_dynamic_pop(value dyn)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  /* Pops are paired with pushes on the same fiber, so the node exists */
-  CAMLassert(stack->dyn_node);
-  if(stack->dyn_node != NULL) {
-    dynamic_table_pop(&stack->dyn_node->table, dyn);
+  /* Pops are paired with pushes on the same fiber, so the node exists.
+     Binding scopes nest, so the binding being popped was pushed to the
+     newest table: scopes opened below a freeze cannot close until the
+     fork/join that froze the table returns and unfreezes it. */
+  dynamic_node_t node = stack->dyn_node;
+  CAMLassert(node);
+  if(node != NULL) {
+    dynamic_table_t table = node->top != NULL ? node->top : &node->table;
+    CAMLassert(table->frozen == 0);
+#ifdef DEBUG
+    {
+      dynamic_stack_t bindings;
+      CAMLassert(dynamic_table_find(table, dyn, &bindings));
+    }
+#endif
+    dynamic_table_pop(table, dyn);
+
+    if(table != &node->table && table->count == 0) {
+      /* The outermost binding scope above a freeze closed; pop its table */
+      node->top = table->prev;
+      caml_dynamic_table_node_delete(table);
+    }
   }
 
   dynamic_binding_t entry = dynamic_cache_entry(dyn);
@@ -676,6 +874,50 @@ CAMLprim value caml_dynamic_set_lexical_root(value unit)
   dynamic_node_t node = dynamic_node(Caml_state->current_stack);
   node->lexical_root = true;
   node->span_next = NULL; /* span freezing and detours stop here */
+
+  /* Cached lookups may now resolve differently */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_freeze(value unit)
+{
+  dynamic_node_t node = dynamic_node(Caml_state->current_stack);
+  dynamic_table_t table = node->top != NULL ? node->top : &node->table;
+  table->frozen++;
+  return Val_ptr(table);
+}
+
+CAMLprim value caml_dynamic_unfreeze(value unit)
+{
+  CAMLnoalloc;
+
+  /* Freeze/unfreeze pairs nest LIFO, and binding scopes opened between a
+     freeze/unfreeze pair close between them, so the newest table is the
+     one the matching freeze marked (and the matching freeze created the
+     node). */
+  dynamic_node_t node = Caml_state->current_stack->dyn_node;
+  CAMLassert(node);
+  if(node != NULL) {
+    dynamic_table_t table = node->top != NULL ? node->top : &node->table;
+    CAMLassert(table->frozen > 0);
+    table->frozen--;
+  }
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_set_lexical_bound(value bound)
+{
+  /* Val_ptr(NULL) == Val_unit, so passing () clears the bound */
+  dynamic_table_t table = Ptr_val(bound);
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  if(table == NULL && stack->dyn_node == NULL) {
+    return Val_unit; /* nothing to clear */
+  }
+  dynamic_node(stack)->lexical_bound = table;
 
   /* Cached lookups may now resolve differently */
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);

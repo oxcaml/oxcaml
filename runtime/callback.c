@@ -579,29 +579,17 @@ CAMLprim value caml_with_async_exns(value body_callback)
 {
   // Save and restore the current dynamic binding state so that local bindings
   // are not leaked upon raising an async exception.
-  dynamic_table_s tbl;
-  caml_dynamic_table_init(&tbl);
-  dynamic_node_t node = Caml_state->current_stack->dyn_node;
-  if(node != NULL && !caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&node->table)) {
+  dynamic_saved_state_s saved;
+  if(!caml_dynamic_state_save(Caml_state->current_stack, &saved)) {
     caml_raise_out_of_memory();
   }
 
-  // The saved table must be updated if its contents are promoted.
-  caml_dynamic_table_register_roots(&tbl);
+  // The saved tables must be updated if their contents are promoted.
+  caml_dynamic_state_register_roots(&saved);
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
-  caml_dynamic_table_unregister_roots(&tbl);
+  caml_dynamic_state_unregister_roots(&saved);
 
-  // Re-read the node: the body may have created it (the node itself is
-  // stable across stack reallocation). Only the table is restored; lexical
-  // edges belong to the fiber, not to the unwound bindings.
-  node = Caml_state->current_stack->dyn_node;
-  if(node != NULL) {
-    caml_dynamic_table_free(&node->table);
-    node->table = tbl;
-  } else {
-    // No bindings before or during the body, so nothing to restore.
-    CAMLassert(tbl.bindings == NULL);
-  }
+  caml_dynamic_state_restore(Caml_state->current_stack, &saved);
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   /* raised as a normal exn, even if it was asynchronous */
