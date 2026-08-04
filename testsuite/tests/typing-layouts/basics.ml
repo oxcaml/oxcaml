@@ -1352,11 +1352,21 @@ and foo14 = string
 
 (* CR layouts v5: Bring back void version from basics_alpha. *)
 
-type t14 = foo14 list
+(* Needed for testing because [list] now takes an [any] parameter *)
+type ('a : value_or_null) value_list = 'a list
+
+type t14 = foo14 value_list
 and foo14 = t_float64;;
 [%%expect{|
-type t14 = foo14 list
-and foo14 = t_float64
+type ('a : value_or_null) value_list = 'a list
+Line 4, characters 0-21:
+4 | and foo14 = t_float64;;
+    ^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of foo14 is float64
+         because of the definition of t_float64 at line 4, characters 0-24.
+       But the layout of foo14 must be a value layout
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 (****************************************************)

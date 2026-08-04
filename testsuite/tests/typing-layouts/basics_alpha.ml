@@ -1156,11 +1156,21 @@ type t14 = foo14 list
 and foo14 = string
 |}];;
 
-type t14 = foo14 list
+(* Needed for testing because [list] now takes an [any] parameter *)
+type ('a : value_or_null) value_list = 'a list
+
+type t14 = foo14 value_list
 and foo14 = t_void;;
 [%%expect{|
-type t14 = foo14 list
-and foo14 = t_void
+type ('a : value_or_null) value_list = 'a list
+Line 4, characters 0-18:
+4 | and foo14 = t_void;;
+    ^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of foo14 is void
+         because of the definition of t_void at line 6, characters 0-19.
+       But the layout of foo14 must be a value layout
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 (****************************************************)
