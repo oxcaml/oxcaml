@@ -287,6 +287,7 @@ let native unix
        machine_width:Target_system.Machine_width.t ->
        keep_symbol_tables:bool ->
        cmr_filename:string ->
+       cmx_imports_to_reload:Import_info.t list ->
        Cmm.phrase list) =
   (module Make (struct
     let backend = Compile_common.Native
@@ -339,14 +340,18 @@ let native unix
       Some
         (fun ~keep_symbol_tables ~cmr_file (info : Compile_common.info) ->
           let machine_width = Target_system.Machine_width.Sixty_four in
-          (* CR mvellacott: the paused compilation's imports must be reloaded so
-             that the reaped cmx records its link dependencies. *)
+          let paused_unit_infos, (_ : Digest.t) =
+            Compilenv.read_unit_info
+              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
+          in
           Asmgen.compile_implementation_from_cmm unix
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)
             ~ppf_dump:info.ppf_dump
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
-               ~cmr_filename:cmr_file))
+               ~cmr_filename:cmr_file
+               ~cmx_imports_to_reload:
+                 paused_unit_infos.Cmx_format.ui_imports_cmx))
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 

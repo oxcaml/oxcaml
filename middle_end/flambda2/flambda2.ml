@@ -372,7 +372,7 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   Profile.record_call "flambda2" run
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables:_ ~cmr_filename =
+    ~keep_symbol_tables:_ ~cmr_filename ~cmx_imports_to_reload =
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
@@ -383,6 +383,15 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
   in
+  (* Reload all cmx files used in the paused compilation. This registers their
+     slot offsets for [finalize_offsets] and populates [Compilenv]'s imports for
+     writing the cmx. *)
+  List.iter
+    (fun import ->
+      ignore
+        (Flambda_cmx.load_cmx_file_contents cmx_loader (Import_info.cu import)
+          : Flambda2_types.Typing_env.Serializable.t option))
+    cmx_imports_to_reload;
   (* CR mvellacott: The following prints are for a temporary test, and should be
      replaced with an actual implementation. *)
   let module_symbol =
