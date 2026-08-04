@@ -419,6 +419,14 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
         Apply_cont_with_acc.create acc join_point_cont ~args:result_simples ~dbg
       in
       let acc, body = Expr_with_acc.create_apply_cont acc apply_cont in
+      if List.compare_lengths result_kinds ifso_or_ifnot <> 0
+      then
+        Misc.fatal_errorf
+          "If_then_else: %s branch produces %d result(s) but %d result kind(s) \
+           were declared:@ %a"
+          name
+          (List.length ifso_or_ifnot)
+          (List.length result_kinds) Debuginfo.print_compact dbg;
       List.fold_left2
         (fun (acc, body) result_pat ifso_or_ifnot ->
           Let_with_acc.create acc
