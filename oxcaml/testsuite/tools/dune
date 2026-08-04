@@ -14,7 +14,7 @@
 (executable
  (name expectnat)
  (modes native)
- (libraries expectcommon ocamlopttoplevel)
+ (libraries expectcommon ocamlopttoplevel jit)
  (flags (:standard -linkall))
  (modules expectnat))
 

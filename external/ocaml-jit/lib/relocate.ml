@@ -84,19 +84,36 @@ let one (type a r)
   let place_address =
     Int64.add (Address.to_int64 binary_section.address) (Int64.of_int offset)
   in
-  (* Provide a callback to read the 32-bit instruction at the relocation site.
-     This is needed for ARM64 to read-modify-write instruction bit fields. *)
-  let read_instruction () =
+  (* Provide callbacks to read the existing data at the relocation site.
+     [read_instruction] reads 32 bits (used by ARM64 to read-modify-write
+     instruction bit fields). [read_int64] reads 64 bits (used by ARM64
+     ABS64 relocations on Mach-O, where the addend for a local-label target
+     is stored in the data slot). *)
+  let read_byte i =
     let contents = E.Assembled_section.contents binary_section.value in
-    let b0 = Char.code (String.get contents offset) in
-    let b1 = Char.code (String.get contents (offset + 1)) in
-    let b2 = Char.code (String.get contents (offset + 2)) in
-    let b3 = Char.code (String.get contents (offset + 3)) in
+    Char.code (String.get contents (offset + i))
+  in
+  let read_instruction () =
+    let b0 = read_byte 0 in
+    let b1 = read_byte 1 in
+    let b2 = read_byte 2 in
+    let b3 = read_byte 3 in
     (* Little-endian: b0 is least significant *)
     Int32.(logor (logor (of_int b0) (shift_left (of_int b1) 8))
       (logor (shift_left (of_int b2) 16) (shift_left (of_int b3) 24)))
   in
-  let* data = E.Relocation.compute_value reloc ~place_address ~lookup_target ~read_instruction in
+  let read_int64 () =
+    let acc = ref 0L in
+    for i = 7 downto 0 do
+      acc := Int64.logor (Int64.shift_left !acc 8)
+        (Int64.of_int (read_byte i))
+    done;
+    !acc
+  in
+  let* data =
+    E.Relocation.compute_value reloc ~place_address ~lookup_target
+      ~read_instruction ~read_int64
+  in
   let size = E.Relocation.size reloc in
   E.Assembled_section.add_patch binary_section.value ~offset ~size ~data;
   Ok ()

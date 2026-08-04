@@ -63,7 +63,7 @@ module Relocation = struct
     | _ -> false
 
   let compute_value (r : Relocation.t) ~place_address ~lookup_target
-      ~read_instruction =
+      ~read_instruction ~read_int64 =
     let target = Relocation.primary_target r in
     let target_name =
       if jit_debug then Relocation.target_to_string target else ""
@@ -94,7 +94,7 @@ module Relocation = struct
       let addend = Relocation.get_addend r.kind in
       let target_addr = Int64.add sym_addr (Int64.of_int addend) in
       Relocation.compute_value r ~target_addr ~place_address ~read_instruction
-        ~lookup_target:lookup_target_inner
+        ~read_int64 ~lookup_target:lookup_target_inner
 end
 
 module Assembled_section = struct

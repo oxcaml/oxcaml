@@ -1,7 +1,7 @@
 (* TEST
  include eval;
  modules = "miscs_types.ml util.ml";
- flags = "-extension runtime_metaprogramming -uses-metaprogramming";
+ flags = "-extension runtime_metaprogramming";
  native;
 *)
 

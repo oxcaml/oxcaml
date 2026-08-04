@@ -713,6 +713,62 @@ let set_o2 () = (!Opt_flag_handler.current).set_o2 ()
 let set_o3 () = (!Opt_flag_handler.current).set_o3 ()
 let set_o4 () = (!Opt_flag_handler.current).set_o4 ()
 
+module Optimization_state = struct
+  (* All global state mutated by [Opt_flag_handler.set] and by the
+     [set_oclassic]/[set_o2]/[set_o3]/[set_o4] setters (the latter via
+     [use_inlining_arguments_set]). *)
+  type t = {
+    opt_flag_handler : Opt_flag_handler.t;
+    default_simplify_rounds : int;
+    inline_threshold : Float_arg_helper.parsed;
+    inline_toplevel_threshold : Int_arg_helper.parsed;
+    inline_call_cost : Int_arg_helper.parsed;
+    inline_alloc_cost : Int_arg_helper.parsed;
+    inline_prim_cost : Int_arg_helper.parsed;
+    inline_branch_cost : Int_arg_helper.parsed;
+    inline_indirect_cost : Int_arg_helper.parsed;
+    inline_lifting_benefit : Int_arg_helper.parsed;
+    inline_branch_factor : Float_arg_helper.parsed;
+    inline_max_depth : Int_arg_helper.parsed;
+    inline_max_unroll : Int_arg_helper.parsed;
+  }
+
+  let snapshot () = {
+    opt_flag_handler = !Opt_flag_handler.current;
+    default_simplify_rounds = !default_simplify_rounds;
+    inline_threshold = !inline_threshold;
+    inline_toplevel_threshold = !inline_toplevel_threshold;
+    inline_call_cost = !inline_call_cost;
+    inline_alloc_cost = !inline_alloc_cost;
+    inline_prim_cost = !inline_prim_cost;
+    inline_branch_cost = !inline_branch_cost;
+    inline_indirect_cost = !inline_indirect_cost;
+    inline_lifting_benefit = !inline_lifting_benefit;
+    inline_branch_factor = !inline_branch_factor;
+    inline_max_depth = !inline_max_depth;
+    inline_max_unroll = !inline_max_unroll;
+  }
+
+  let restore s =
+    Opt_flag_handler.current := s.opt_flag_handler;
+    default_simplify_rounds := s.default_simplify_rounds;
+    inline_threshold := s.inline_threshold;
+    inline_toplevel_threshold := s.inline_toplevel_threshold;
+    inline_call_cost := s.inline_call_cost;
+    inline_alloc_cost := s.inline_alloc_cost;
+    inline_prim_cost := s.inline_prim_cost;
+    inline_branch_cost := s.inline_branch_cost;
+    inline_indirect_cost := s.inline_indirect_cost;
+    inline_lifting_benefit := s.inline_lifting_benefit;
+    inline_branch_factor := s.inline_branch_factor;
+    inline_max_depth := s.inline_max_depth;
+    inline_max_unroll := s.inline_max_unroll
+end
+
+let protect_optimization_state f =
+  let snap = Optimization_state.snapshot () in
+  Fun.protect ~finally:(fun () -> Optimization_state.restore snap) f
+
 (* This is used by the -stop-after option. *)
 module Compiler_pass = struct
   (* If you add a new pass, the following must be updated:
