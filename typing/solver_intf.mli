@@ -238,6 +238,9 @@ module type Solver_mono = sig
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
 
+  (** The level of generic variables *)
+  val generic_level : int
+
   (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
      the source code where zapping happens *)
 
@@ -293,6 +296,26 @@ module type Solver_mono = sig
   (** Lowers a level of a variable. *)
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
+
+  (** Generalizes a variable whose level is above [current_level], by putting
+      its level to [generic_level], and all its children above [current_level]
+      to [generic_level + i] for some nonzero [i]. *)
+  val generalize :
+    current_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    log:changes ref option ->
+    unit
+
+  (** Generalizes all reachable variables whose level is above [current_level],
+      whose value is fully determined, by putting their level to
+      [generic_level].*)
+  val generalize_structure :
+    current_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    log:changes ref option ->
+    unit
 
   (** Creates a new mode variable above the given mode and returns [true]. In
       the speical case where the given mode is top, returns the constant top and
