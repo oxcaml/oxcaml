@@ -4244,9 +4244,6 @@ let type_module_type_of env smod =
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
         in
-        (* A persistent-rooted path denotes [.cmi] content, whose value types
-           carry no weak, mode or jkind variables, so [check_nongen_modtype]
-           below has nothing to find and nothing to zap. *)
         let skip_nongen_check =
           List.for_all Ident.is_global (Path.heads path)
         in
