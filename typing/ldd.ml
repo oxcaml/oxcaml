@@ -502,7 +502,7 @@ module Make (V : Ordered) = struct
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
   let solve_lfp (var : var) (rhs_raw : node) : unit =
-    (* Solve the least fixpoint equation var := rhs_raw. 
+    (* Solve the least fixpoint equation var := rhs_raw.
        The rhs in general contains the var itself, and the
        fixpoint solution is var := rhs_raw[var := bot].
        We must also inline solved vars, because var itself
@@ -512,12 +512,12 @@ module Make (V : Ordered) = struct
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
-      (* For efficiency, we use assign_bot_inline to 
+      (* For efficiency, we use assign_bot_inline to
          simultaneously inline solved vars and assign bot. *)
       var.state <- Solved (assign_bot_inline ~var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
-    (* Solve the greatest fixpoint equation var := rhs_raw. 
+    (* Solve the greatest fixpoint equation var := rhs_raw.
        The rhs in general contains the var itself, and the
        fixpoint solution is var := rhs_raw[var := top].
        We must also inline solved vars, because var itself
@@ -527,7 +527,7 @@ module Make (V : Ordered) = struct
     | Rigid _ -> invalid_arg "solve_gfp: rigid variable"
     | Solved _ -> invalid_arg "solve_gfp: solved variable"
     | Unsolved ->
-      (* gfp's are less performance critical, so we use two 
+      (* gfp's are less performance critical, so we use two
          separate steps to inline solved vars and assign top. *)
       let rhs_forced = inline_solved_vars rhs_raw in
       var.state <- Solved (assign_top ~var rhs_forced)
