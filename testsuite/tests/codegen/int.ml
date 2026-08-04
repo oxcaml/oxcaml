@@ -51,9 +51,9 @@ mul_3:
 let div x y = x / y
 [%%expect_asm X86_64{|
 div:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -104,9 +104,9 @@ div_2:
 let rem x y = x mod y
 [%%expect_asm X86_64{|
 rem:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -183,14 +183,13 @@ pred:
 let abs x = abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $1, %rbx
+  cmpq  $1, %rax
   jl    .L0
-  movq  %rbx, %rax
   ret
 .L0:
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -268,13 +267,13 @@ shift_right_logical:
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -295,13 +294,13 @@ let equal_using_compare (x : int) (y : int) =
   Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   cmpq  $1, %rax
   sete  %al
   movzbq %al, %rax
@@ -314,13 +313,11 @@ equal_using_compare:
 let min (x : int) (y : int) = min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -328,13 +325,11 @@ min:
 let max (x : int) (y : int) = max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jl    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -362,8 +357,9 @@ let collatz n =
 ;;
 [%%expect_asm X86_64{|
 collatz:
+  movl  $1, %edi
   movq  %rax, %rbx
-  movl  $1, %eax
+  movq  %rdi, %rax
   cmpq  $3, %rbx
   jg    .L1
 .L0:

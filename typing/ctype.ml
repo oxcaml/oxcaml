@@ -493,7 +493,7 @@ let decr_stage env =
   Env.enter_splice ~loc:Location.none env
 
 let incr_stage env =
-  Env.enter_quotation env
+  Env.enter_quote env
 
 let iter_type_expr_with_stages f env ty =
   match get_desc ty with

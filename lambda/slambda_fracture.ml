@@ -335,8 +335,9 @@ let rec fracture_lam lambda : slambda =
       { ktmpl_params;
         ktmpl_return;
         ktmpl_body;
-        ktmpl_mode;
+        ktmpl_ret_mode;
         ktmpl_env;
+        ktmpl_env_mode;
         ktmpl_loc
       } ->
     let env = Ident.Map.to_list ktmpl_env in
@@ -358,7 +359,9 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_block;
               attributes = default_param_attribute;
-              mode = ktmpl_mode
+              (* The env parameter can be local because we immediately
+                 destructure it. *)
+              mode = alloc_local
             }
           in
           let _, body =
@@ -385,16 +388,13 @@ let rec fracture_lam lambda : slambda =
             { sval_comptime = body_c;
               sval_runtime =
                 lfunction
-                  ~kind:
-                    (Curried
-                       { nlocal =
-                           (match ktmpl_mode with
-                           | Alloc_heap -> 0
-                           | Alloc_local -> 1)
-                       })
+                  ~kind:(Curried { nlocal = 1 })
                   ~params:[closure_param] ~return:ktmpl_return ~body
-                  ~attr:default_function_attribute ~loc:ktmpl_loc
-                  ~mode:ktmpl_mode ~ret_mode:ktmpl_mode
+                  ~attr:default_function_attribute
+                  ~loc:ktmpl_loc
+                    (* This closure has no free variables and will always be
+                     statically allocated. alloc_heap is an safe choice. *)
+                  ~mode:alloc_heap ~ret_mode:ktmpl_ret_mode
             })
     in
     let free_var_capture =
@@ -411,7 +411,8 @@ let rec fracture_lam lambda : slambda =
               };
           sval_runtime =
             Lprim
-              ( Pmakeblock (0, Immutable, Shape free_vars_shape_unit, ktmpl_mode),
+              ( Pmakeblock
+                  (0, Immutable, Shape free_vars_shape_unit, ktmpl_env_mode),
                 free_var_capture,
                 ktmpl_loc )
         }

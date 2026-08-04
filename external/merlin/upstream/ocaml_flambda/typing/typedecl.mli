@@ -123,7 +123,7 @@ val update_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
+    (Jkind.sort list * 'rep, unrepresentable_record) Result.t
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option

@@ -1,0 +1,63 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# (This workflow complies: `security-events: write` only permits uploading
+# code-scanning results, not modifying repository contents.)
+#
+# --------------------------------------------------------------------------
+#
+# zizmor: static security analysis of our GitHub Actions workflows
+# (https://docs.zizmor.sh). Findings are uploaded as SARIF to GitHub code
+# scanning: see the repository Security tab, and annotations on PRs that
+# touch the flagged lines.
+#
+# Note that findings do NOT fail this workflow (that is how code scanning
+# integrations are meant to behave). To make findings block merges, use a
+# repository ruleset gated on code-scanning alerts.
+#
+# Deliberate exceptions are suppressed inline with `# zizmor: ignore[rule]`
+# comments next to prose explaining each exception; add a zizmor.yml config
+# at the repo root if broader suppressions become necessary.
+
+name: zizmor
+
+on:
+  push:
+    branches:
+      - main
+      - '*microbranch'
+    tags:
+      - '*'
+  pull_request:
+    paths:
+      - '.github/**'
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: Workflow security analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write # upload SARIF results to code scanning
+      actions: read # needed by zizmor-action's SARIF upload (github/codeql-action)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor 🌈
+        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          inputs: .github
+          advanced-security: true
+          persona: auditor # strictest: report pedantic and auditor-level findings too

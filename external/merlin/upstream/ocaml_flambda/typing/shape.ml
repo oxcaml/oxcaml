@@ -287,6 +287,7 @@ module Predef = struct
       | Unboxed_int32
       | Unboxed_int16
       | Unboxed_int8
+      | Unboxed_mask
       | Unboxed_simd of simd_vec_split
 
     type t =
@@ -303,6 +304,7 @@ module Predef = struct
       | Int32
       | Int64
       | Lazy_t
+      | Mask
       | Nativeint
       | String
       | Simd of simd_vec_split
@@ -365,6 +367,7 @@ module Predef = struct
       | Unboxed_int32 -> "int32"
       | Unboxed_int16 -> "int16"
       | Unboxed_int8 -> "int8"
+      | Unboxed_mask -> "mask"
       | Unboxed_simd s -> simd_vec_split_to_string s
 
     let to_string : t -> string = function
@@ -381,6 +384,7 @@ module Predef = struct
       | Int32 -> "int32"
       | Int64 -> "int64"
       | Lazy_t -> "lazy_t"
+      | Mask -> "mask"
       | Nativeint -> "nativeint"
       | String -> "string"
       | Simd s -> simd_vec_split_to_string s
@@ -423,13 +427,14 @@ module Predef = struct
       | Unboxed_int32 -> Bits32
       | Unboxed_int16 -> Bits16
       | Unboxed_int8 -> Bits8
+      | Unboxed_mask -> Mask
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_base_layout : t -> base_layout =
       function
       | Array | Bytes | Char | Extension_constructor | Float | Float32
-      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-      | String | Simd _ | Exception ->
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+      | Nativeint | String | Simd _ | Exception ->
         Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
@@ -472,11 +477,12 @@ module Predef = struct
       | Unboxed_int64, Unboxed_int64
       | Unboxed_int32, Unboxed_int32
       | Unboxed_int16, Unboxed_int16
-      | Unboxed_int8, Unboxed_int8 -> true
+      | Unboxed_int8, Unboxed_int8
+      | Unboxed_mask, Unboxed_mask -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
         | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
-        | Unboxed_simd _), _ -> false
+        | Unboxed_mask | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -493,14 +499,15 @@ module Predef = struct
       | Int32, Int32
       | Int64, Int64
       | Lazy_t, Lazy_t
+      | Mask, Mask
       | Nativeint, Nativeint
       | String, String -> true
       | Simd s1, Simd s2 -> equal_simd_vec_split s1 s2
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
       | (Array | Bytes | Char | Extension_constructor | Float | Float32
-        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-        | String | Simd _ | Exception | Unboxed _), _ -> false
+        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+        | Nativeint | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 type var = Ident.t
@@ -527,7 +534,7 @@ and desc =
   | Rec_var of int
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
+  | Variant of (t * Layout.t option) complex_constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -574,7 +581,7 @@ and 'a complex_constructor_argument =
     field_value : 'a
   }
 
-and constructor_representation = mixed_product_shape
+and constructor_representation = Layout.t option array
 
 and mixed_product_shape = Layout.t array
 
@@ -604,7 +611,7 @@ let equal_complex_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
-  Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
+  Misc.Stdlib.Array.equal (Option.equal Layout.equal) kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
@@ -648,7 +655,7 @@ let rec equal_desc0 d1 d2 =
   | Variant c1, Variant c2 ->
     List.equal
          (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
-           equal t1 t2 && Layout.equal l1 l2))
+           equal t1 t2 && Option.equal Layout.equal l1 l2))
          c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
     String.equal c1.name c2.name
