@@ -170,6 +170,9 @@ let mk_for_pack_opt f =
 let mk_g_byt f =
   "-g", Arg.Unit f, " Save debugging information"
 
+let mk_g_no_ocamldebug_types f =
+  "-gno-ocamldebug-types", Arg.Unit f, " Omit type information used only for ocamldebug"
+
 let mk_g_opt f =
   "-g", Arg.Unit f, " Record debugging information for exception backtrace"
 
@@ -1319,6 +1322,7 @@ end
 module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
+  val _g_no_ocamldebug_types : unit -> unit
   val _compat_32 : unit -> unit
   val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
@@ -1515,6 +1519,7 @@ struct
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
+    mk_g_no_ocamldebug_types F._g_no_ocamldebug_types;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_i_variance F._i_variance;
@@ -2807,6 +2812,7 @@ third-party libraries such as Lwt, but with a different API."
 
     include Core
     include Compiler
+    let _g_no_ocamldebug_types = clear debug_ocamldebug_types
     let _compat_32 = set bytecode_compatible_32
     let _thunkify_cu_init = set thunkify_cu_init
     let _custom = set custom_runtime
