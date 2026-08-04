@@ -102,7 +102,7 @@ module Die_gen_ctx = struct
       Tbl.find_opt cache { runtime_shape = inp; rec_env }
 
     let add cache ~inp ~rec_env ~outp =
-      Tbl.add cache { runtime_shape = inp; rec_env } outp
+      Tbl.replace cache { runtime_shape = inp; rec_env } outp
   end
 
   (* DWARF DIE cache for named type shapes. *)

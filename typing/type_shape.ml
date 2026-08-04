@@ -948,7 +948,7 @@ end = struct
 
   let create ~initial_size = Cache.create initial_size
 
-  let add eval_cache ~inp ~env ~outp = Cache.add eval_cache (inp, env) outp
+  let add eval_cache ~inp ~env ~outp = Cache.replace eval_cache (inp, env) outp
 
   let find eval_cache ~inp ~env = Cache.find_opt eval_cache (inp, env)
 end

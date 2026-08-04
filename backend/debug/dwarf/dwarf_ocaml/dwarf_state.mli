@@ -17,7 +17,6 @@
 open Asm_targets
 open Dwarf_low
 open Dwarf_high
-module RS = Runtime_shape
 
 type function_range =
   { start_label : Asm_label.t;
@@ -62,7 +61,9 @@ module Die_gen_ctx : sig
     include Hashtbl.HashedType with type t := t
 
     val get_opt :
-      t -> de_bruijn_index:RS.DeBruijn_index.t -> Proto_die.reference option
+      t ->
+      de_bruijn_index:Runtime_shape.DeBruijn_index.t ->
+      Proto_die.reference option
   end
 
   (** Cache memoizing [runtime_shape_to_dwarf_die] results. *)
@@ -72,10 +73,17 @@ module Die_gen_ctx : sig
     val create : initial_size:int -> t
 
     val find :
-      t -> inp:RS.t -> rec_env:Rec_var_env.t -> Proto_die.reference option
+      t ->
+      inp:Runtime_shape.t ->
+      rec_env:Rec_var_env.t ->
+      Proto_die.reference option
 
     val add :
-      t -> inp:RS.t -> rec_env:Rec_var_env.t -> outp:Proto_die.reference -> unit
+      t ->
+      inp:Runtime_shape.t ->
+      rec_env:Rec_var_env.t ->
+      outp:Proto_die.reference ->
+      unit
   end
 
   (** DWARF DIE cache for named type shapes. *)
@@ -89,9 +97,9 @@ module Die_gen_ctx : sig
         already associated with [runtime_shape], or [Right name'] with the first
         unused suffix-numbered version of [name] otherwise. *)
     val find_unused_name_or_cached :
-      t -> string -> RS.t -> (Proto_die.reference, string) Either.t
+      t -> string -> Runtime_shape.t -> (Proto_die.reference, string) Either.t
 
-    val add : t -> string -> RS.t -> Proto_die.reference -> unit
+    val add : t -> string -> Runtime_shape.t -> Proto_die.reference -> unit
   end
 
   type t
