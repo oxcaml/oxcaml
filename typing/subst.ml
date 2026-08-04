@@ -803,9 +803,23 @@ let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
 
+(* For idents that are guaranteed to be local/scoped, such as bound
+   signature items and functor parameters. *)
+let rename_ident s id =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_ident; _ } -> prepare_ident id
+  | Duplicate_variables | No_action -> Ident.rename id
+
+(* For constructor/label idents, which may be predef (e.g. the constructors
+   of [bool] or [or_null], whose declarations can appear in a substituted
+   signature). Predef and global idents are kept: they cannot be renamed,
+   and they carry no volatile stamp. *)
+let rename_decl_ident s id =
+  if Ident.is_global_or_predef id then id else rename_ident s id
+
 let label_declaration copy_scope s l =
   {
-    ld_id = l.ld_id;
+    ld_id = rename_decl_ident s l.ld_id;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
@@ -831,7 +845,7 @@ let constructor_arguments copy_scope s = function
 
 let constructor_declaration copy_scope s c =
   {
-    cd_id = c.cd_id;
+    cd_id = rename_decl_ident s c.cd_id;
     cd_args = constructor_arguments copy_scope s c.cd_args;
     cd_res = Option.map (typexp copy_scope s c.cd_loc) c.cd_res;
     cd_loc = loc s c.cd_loc;
@@ -1099,11 +1113,6 @@ end
 
 module Lazy_types = Types.Make_wrapped(Wrap)
 open Lazy_types
-
-let rename_ident s id =
-  match s.additional_action with
-  | Prepare_for_saving { prepare_ident; _ } -> prepare_ident id
-  | Duplicate_variables | No_action -> Ident.rename id
 
 let rename_bound_idents scoping s sg =
   let rename =
