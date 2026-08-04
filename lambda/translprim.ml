@@ -2700,36 +2700,6 @@ let prim_may_allocate ~arity prim =
          raise of [Invalid_argument] -- not a single primitive. *)
       true
 
-(* Whether an application of a primitive compiles to a direct primitive
-   application, or whether [Translcore] first has to eta-expand the primitive
-   into a closure.  This is the classification [Translcore] makes when
-   translating [Texp_apply]; the type checker needs the same answer to know
-   whether that closure gets allocated. *)
-
-let is_omitted = function
-  | Arg _ -> false
-  | Omitted _ -> true
-
-let can_apply_primitive p pmode pos args ~check_poly_mode =
-  if List.exists (fun (_, arg) -> is_omitted arg) args then false
-  else begin
-    let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
-    else if pos <> Typedtree.Tail then true
-    else begin
-      (* Cannot directly apply primitive under this case if pmode is local *)
-      if check_poly_mode then
-        let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
-        is_heap_mode (transl_locality_mode_l return_mode)
-      else
-        match p.prim_native_repr_res with
-        | Prim_global, _ -> true
-        | Prim_poly, _
-        | Prim_local, _ -> false
-    end
-  end
-
 (* Whether a fully-applied occurrence of [p] allocates.
 
    Unlike the functions above this one is total: it answers [true] rather than
@@ -2781,6 +2751,30 @@ let fully_applied_may_allocate env loc p ~poly_sort ~ty ~arg_exps =
      locality above. *)
   Btype.backtrack snap;
   result
+
+let is_omitted = function
+  | Arg _ -> false
+  | Omitted _ -> true
+
+let can_apply_primitive p pmode pos args ~check_poly_mode =
+  if List.exists (fun (_, arg) -> is_omitted arg) args then false
+  else begin
+    let nargs = List.length args in
+    if nargs = p.prim_arity then true
+    else if nargs < p.prim_arity then false
+    else if pos <> Typedtree.Tail then true
+    else begin
+      (* Cannot directly apply primitive under this case if pmode is local *)
+      if check_poly_mode then
+        let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
+        is_heap_mode (transl_locality_mode_l return_mode)
+      else
+        match p.prim_native_repr_res with
+        | Prim_global, _ -> true
+        | Prim_poly, _
+        | Prim_local, _ -> false
+    end
+  end
 
 type allocation_registration =
   | No_allocation
