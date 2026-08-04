@@ -250,8 +250,8 @@ module type Solver_mono = sig
   val zap_to_ceil :
     'a obj -> ('a, 'l * allowed) mode -> log:changes ref option -> 'a
 
-  (** Create a new mode variable of the full range. *)
-  val newvar : 'a obj -> ('a, 'l * 'r) mode
+  (** Create a new mode variable of the full range at given level. *)
+  val newvar : 'a obj -> int -> ('a, 'l * 'r) mode
 
   (** Remove hints from all vars that have been created. This doesn't affect
       hints that were applied on top of vars. For example:
@@ -294,13 +294,13 @@ module type Solver_mono = sig
       the speical case where the given mode is top, returns the constant top and
       [false]. *)
   val newvar_above :
-    'a obj -> ('a, allowed * 'r_) mode -> ('a, 'l * 'r) mode * bool
+    'a obj -> int -> ('a, allowed * 'r_) mode -> ('a, 'l * 'r) mode * bool
 
   (** Creates a new mode variable below the given mode and returns [true]. In
       the speical case where the given mode is bottom, returns the constant
       bottom and [false]. *)
   val newvar_below :
-    'a obj -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
+    'a obj -> int -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
 
   (** Returns the join of the list of modes. *)
   val join : 'a obj -> ('a, allowed * 'r) mode list -> ('a, left_only) mode
