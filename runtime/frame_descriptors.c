@@ -1226,8 +1226,8 @@ frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
   h = Hash_retaddr(pc, fds->mask);
   while (1) {
     frame_descr_entry e = fds->descriptors[h];
-    if (e.fd == NULL)
-      return NULL; /* can happen if some code compiled without -g */
+    /* On stack overflow (via guard page/SEGV) the PC is not in frame tables */
+    if (e.fd == NULL) return NULL;
     if (e.retaddr == pc) return e.fd;
     h = (h+1) & fds->mask;
   }

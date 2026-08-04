@@ -133,21 +133,35 @@ type emit_frame_actions =
     efa_label_delta : Label.t -> Label.t -> unit;
     (* [efa_label_delta upper lower] emits the variable-width return-address
        delta of a "short" frame descriptor, as a ULEB128 constant. *)
-    efa_def_label : Label.t -> unit;
-    efa_string : string -> unit;
-    (* Switch to / from mergeable string section, used for debuginfo filename
-       and defname strings. While it is open, [efa_def_string_label] defines a
-       label and [efa_string] emits a string; references from frametables to
-       those labels use [efa_label_rel]. *)
-    efa_open_string_section : unit -> unit;
-    efa_close_string_section : unit -> unit;
-    efa_def_string_label : Label.t -> unit;
-    (* Like [efa_label_rel], for labels defined via [efa_def_string_label]
-       (which the backends may render in a different form). *)
-    efa_string_label_rel : Label.t -> int32 -> unit
+    efa_def_label : Label.t -> unit
   }
 
-let emit_frames a =
+let emit_frames ~binary_emitter ~frametable_section a =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  (* Debuginfo filename and defname strings go in [Debuginfo_strings] so the
+     linker de-duplicates them. On MacOS the assembler discards L<n> labels as
+     temporaries; to make it into the symbol table we use l_caml<n> _private
+     symbols_ instead (which the linker treats as local and strips). The binary
+     emitter cannot dedupe strings and keeps them in the frametable section, as
+     same-section label differences. *)
+  let macos_cstrings = Target_system.is_macos () && not binary_emitter in
+  let strings_section : Asm_targets.Asm_section.t =
+    if binary_emitter then frametable_section else Debuginfo_strings
+  in
+  (* References carry the frametable section (the directive layer requires a
+     referenced label's section to match the current one); definitions carry the
+     strings section. The encoded name is the same either way. *)
+  let string_label ~section lbl =
+    if macos_cstrings
+    then L.create_private_int section (Label.to_int lbl)
+    else L.create_int section (Label.to_int lbl)
+  in
+  let string_label_rel lbl ofs =
+    D.between_this_and_label_offset_32bit_expr
+      ~upper:(string_label ~section:frametable_section lbl)
+      ~offset_upper:(Targetint.of_int32 ofs)
+  in
   (* The emit functions below perform bounds checks for the corresponding ranges
      via the conversion functions that raise exceptions. [int32] does not have
      such a function so we perform the check manually here. *)
@@ -290,8 +304,8 @@ let emit_frames a =
           dbg
   in
   let emit_merged_string str lbl =
-    a.efa_def_string_label lbl;
-    a.efa_string str
+    D.define_label (string_label ~section:strings_section lbl);
+    D.string (str ^ "\000")
   in
   (* Partition live offsets into live registers (low bit 1, value >>1 is the
      register number) and live stack-slot byte offsets (low bit 0). See
@@ -305,16 +319,8 @@ let emit_frames a =
      [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h; the compiler and
      the runtime MUST agree exactly or the GC scans the wrong registers (silent
      heap corruption). *)
-  let hot_regs = Arch.frame_hot_regs in
   let hot_reg_bit reg =
-    let rec find i =
-      if i >= Array.length hot_regs
-      then None
-      else if hot_regs.(i) = reg
-      then Some i
-      else find (i + 1)
-    in
-    find 0
+    Array.find_index (fun r -> r = reg) Arch.frame_hot_regs
   in
   (* Compute the short-format encoding of a descriptor, or [None] if it must
      escape. Result: [(size_units, num_allocs, alloc_nibbles, reg_bitmap,
@@ -324,21 +330,19 @@ let emit_frames a =
     let flags = get_flags fd.fd_debuginfo in
     let has_alloc = flags land 2 <> 0 in
     let size = fd.fd_frame_size in
-    if fd.fd_long || size <= 0 || size > 1008 || size land 15 <> 0
+    if fd.fd_long || size <= 0 || size > 63 * 16 || size land 15 <> 0
     then None
     else
       let frame_words = size / Arch.size_addr in
       let regs, slots = partition_live_offset fd.fd_live_offset in
       let word_slots =
-        List.filter_map
+        List.map
           (fun byte_ofs ->
-            if byte_ofs land (Arch.size_addr - 1) <> 0
-            then Some None (* not word-aligned *)
-            else
-              let w = byte_ofs / Arch.size_addr in
-              (* A live slot outside the frame (an incoming stack parameter)
-                 cannot be represented in the frame-sized bitmap. *)
-              Some (if w >= frame_words then None else Some w))
+            assert (byte_ofs land (Arch.size_addr - 1) = 0);
+            let w = byte_ofs / Arch.size_addr in
+            (* A live slot outside the frame (an incoming stack parameter)
+               cannot be represented in the frame-sized bitmap. *)
+            if w >= frame_words then None else Some w)
           slots
       in
       let bad_slot = List.exists Option.is_none word_slots in
@@ -419,9 +423,9 @@ let emit_frames a =
        the low 2 bits of its address are used for flags in debuginfo *)
     a.efa_align 4;
     a.efa_def_label lbl;
-    a.efa_string_label_rel file_lbl 0l;
+    string_label_rel file_lbl 0l;
     (* [defname_offs] relative to the start of the struct, so offset by 4 *)
-    a.efa_string_label_rel (label_defstring defname) 4l;
+    string_label_rel (label_defstring defname) 4l;
     (* Then the extra 64 bits of location info that didn't pack into the main
        debuginfo word (name_and_loc_info only). *)
     Option.iter emit_loc loc
@@ -471,6 +475,8 @@ let emit_frames a =
      ends with a 4-byte jump word to it instead of repeating the elements (see
      the jump-word comment in runtime/backtrace_nat.c). *)
   let emitted_suffixes = Hashtbl.create 7 in
+  (* Matches [Debuginfo_jump_bias] in runtime/backtrace_nat.c. *)
+  let debuginfo_jump_bias = 0x0300_0000l in
   let emit_debuginfo (rs, dbg) lbl =
     let rdbg = dbg |> Debuginfo.Dbg.to_list |> List.rev in
     (* Due to inlined functions, a single debuginfo may have multiple locations.
@@ -522,7 +528,7 @@ let emit_frames a =
         match Hashtbl.find_opt emitted_suffixes elts with
         | Some target ->
           (* The whole remaining suffix was already emitted: jump to it. *)
-          a.efa_label_rel target 0x0300_0000l
+          a.efa_label_rel target debuginfo_jump_bias
         | None ->
           let start_lbl =
             match start_lbl with
@@ -584,11 +590,10 @@ let emit_frames a =
      Emitting them also populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
-  (* Strings go into a mergeable string section to be de-duped by the linker *)
-  a.efa_open_string_section ();
+  D.switch_to_section strings_section;
   Hashtbl.iter emit_merged_string filenames;
   Hashtbl.iter emit_merged_string defstrings;
-  a.efa_close_string_section ();
+  D.switch_to_section frametable_section;
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main

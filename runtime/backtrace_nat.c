@@ -83,18 +83,27 @@ void caml_free_backtrace_buffer(backtrace_slot *backtrace_buffer) {
     caml_stat_free(backtrace_buffer);
 }
 
+#if defined(__aarch64__) || defined(__x86_64__)
+
 /* A backtrace_slot is either a frame_descr* or a debuginfo. Both are encoded
    with the address shifted left two bits, leaving the low two bits free for a
    tag: bit 1 distinguishes a debuginfo (set) from a frame_descr (clear), and
    bit 0 is kept clear so the [>>1] in [Val_backtrace_slot] still round-trips
    (and the bytecode backtrace encoding is unaffected). The shift means frame
-   descriptors no longer need to be aligned. 64-bit only: there are ample
+   descriptors no longer need to be aligned. On AMD64 and AArch64 there are
    spare high bits for the shift. */
 #define Slot_is_debuginfo(s) ((uintnat)(s) & 2)
 #define Debuginfo_slot(s) ((debuginfo)((uintnat)(s) >> 2))
 #define Slot_debuginfo(d) ((backtrace_slot)(((uintnat)(d) << 2) | 2))
 #define Frame_descr_slot(s) ((frame_descr*)((uintnat)(s) >> 2))
 #define Slot_frame_descr(f) ((backtrace_slot)((uintnat)(f) << 2))
+
+#else
+/* On other architectures there may not be spare bits (e.g. on Power
+   or SPARC, virtual addresses can be the full 64 bits wide), so this
+   might not work and we need a different hack. */
+#error Neither AMD64 nor ARM64: cannot encode debuginfo
+#endif
 
 static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx);
 
@@ -446,6 +455,7 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
      b (  0/7 bits): end of character range (relative to end bol)
      l (19/12 bits): start line number
    */
+  CAMLassert((info1 & Debuginfo_jump_bit) == 0);
   li->loc_valid = 1;
   li->loc_is_raise = (info1 & 2) == 2;
   li->loc_is_inlined = caml_debuginfo_next(dbg) != NULL;

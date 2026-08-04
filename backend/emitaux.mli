@@ -82,21 +82,18 @@ type emit_frame_actions =
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
     efa_label_delta : Label.t -> Label.t -> unit;
-    efa_def_label : Label.t -> unit;
-    efa_string : string -> unit;
-    (* Switch to / from mergeable string section, used for debuginfo filename
-       and defname strings. While it is open, [efa_def_string_label] defines a
-       label and [efa_string] emits a string; references from frametables to
-       those labels use [efa_label_rel]. *)
-    efa_open_string_section : unit -> unit;
-    efa_close_string_section : unit -> unit;
-    efa_def_string_label : Label.t -> unit;
-    (* Like [efa_label_rel], for labels defined via [efa_def_string_label]
-       (which the backends may render in a different form). *)
-    efa_string_label_rel : Label.t -> int32 -> unit
+    efa_def_label : Label.t -> unit
   }
 
-val emit_frames : emit_frame_actions -> unit
+(* Emits the frame table, with the debuginfo strings in
+   [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, except
+   under the binary emitter, which keeps them in [frametable_section] as
+   same-section label differences. *)
+val emit_frames :
+  binary_emitter:bool ->
+  frametable_section:Asm_targets.Asm_section.t ->
+  emit_frame_actions ->
+  unit
 
 val is_generic_function : string -> bool
 
