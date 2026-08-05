@@ -171,7 +171,8 @@ let mk_g_byt f =
   "-g", Arg.Unit f, " Save debugging information"
 
 let mk_g_no_ocamldebug_types f =
-  "-gno-ocamldebug-types", Arg.Unit f, " Omit type information used only for ocamldebug"
+  "-gno-ocamldebug-types", Arg.Unit f,
+  " Omit type information used only for ocamldebug"
 
 let mk_g_opt f =
   "-g", Arg.Unit f, " Record debugging information for exception backtrace"
