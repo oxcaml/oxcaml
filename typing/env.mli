@@ -328,11 +328,9 @@ val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
 (** Registers a use of an allocation at the given pinpoint.
 
-    Returns the allocation mode of every enclosing closure, each paired with
-    the pinpoint of that closure. The list is ordered from the innermost
-    closure to the outermost one, so that error messages blame the closure
-    nearest to the allocation. Constraining one of those modes to [alloc]
-    forces the corresponding closure to be [alloc]. *)
+    Returns the pinpoint and allocation mode of every enclosing closure.
+    The list is ordered from the innermost closure to the outermost one,
+    so that error messages blame the closure nearest to the allocation. *)
 val walk_locks_for_allocation :
   env:t -> Mode.Hint.pinpoint -> (Mode.Hint.pinpoint * Mode.Allocation.r) list
 

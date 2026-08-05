@@ -6,12 +6,9 @@ type t =
   { alloc_mode : Alloc.r;
     (** The mode of the allocation. *)
     closures : (Hint.pinpoint * Allocation.r) list;
-    (** The allocation mode of every closure enclosing the allocation, paired
-        with the pinpoint of that closure, from the innermost closure to the
-        outermost one. Constraining one of them to [alloc] forces that closure
-        to be [alloc]. *)
+    (** Closures enclosing the allocation, from the innermost
+        to the outermost one. *)
     pp : Hint.pinpoint
-    (** Points at the allocation, for error messages. *)
   }
 
 let allocations : t list ref = Local_store.s_ref []

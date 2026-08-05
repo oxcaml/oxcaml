@@ -7986,7 +7986,6 @@ and type_expect_
         exp_env = env }
   | Pexp_override lst ->
       submode ~loc ~env Value.legacy expected_mode;
-      (* Allocation axis check: [{< ... >}] copies [self], which allocates *)
       Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let _ =
        List.fold_right
@@ -8128,7 +8127,6 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      (* Allocation axis check: constructing a lazy block allocates *)
       Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
@@ -8142,7 +8140,6 @@ and type_expect_
   | Pexp_object s ->
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
-      (* Allocation axis check: constructing an object block allocates *)
       Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let desc, meths = !type_object env loc s in
       rue {
@@ -11869,7 +11866,6 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
        "What modes should comprehensions use?", above *)
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
-  (* Allocation axis check: comprehension expr allocates *)
   Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
