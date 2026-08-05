@@ -4795,7 +4795,7 @@ let check_curried_application_complete ~env ~app_loc args =
           raise (Error(loc, env, Curried_application_complete (lbl, e, loc_kind)))
       in
       submode (Alloc.partial_apply mode_fun) mode_ret;
-      submode (Alloc.close_over mode_arg) mode_ret;
+      submode (Alloc.partial_apply mode_arg) mode_ret;
       loop has_commuted rest
   in
   loop false args
