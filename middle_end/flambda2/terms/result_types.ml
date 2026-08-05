@@ -143,6 +143,7 @@ let free_names t =
   Name_abstraction.free_names
     (module Bound)
     t ~free_names_of_term:TEEV.free_names
+    ~apply_renaming_to_term:TEEV.apply_renaming
 
 let apply_renaming = A.apply_renaming
 
