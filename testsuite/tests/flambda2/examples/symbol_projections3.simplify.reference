@@ -21,7 +21,7 @@ let $camlSymbol_projections3__immstring_0 = "FOO" in
     let foo_1 = foo in
     let set_of_closures
           $camlSymbol_projections3__f_1 =
-          closure f_0_1 @f &toplevel.alloc_region
+          closure f_0_1 @f &toplevel
           with { foo = foo }
         end
     and code loopify(never) size(9) newer_version_of(f_0)
@@ -38,7 +38,7 @@ let $camlSymbol_projections3__immstring_0 = "FOO" in
       cont k (Pmakeblock)
     and set_of_closures
           $camlSymbol_projections3__g_2 =
-          closure g_1_1 @g &toplevel.alloc_region
+          closure g_1_1 @g &toplevel
           with { foo_1 = foo_1 }
         end
     and code loopify(never) size(15) newer_version_of(g_1)
