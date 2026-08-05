@@ -1145,7 +1145,10 @@ module type S = sig
 
     (** The mode crossing capability on all axes, split into monadic and
         comonadic fragments. *)
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+    type t =
+      { crossing : (Monadic.t, Comonadic.t) monadic_comonadic;
+        unique_implies_uncontended : bool
+      }
 
     module Axis : sig
       (** ['a t] specifies an axis whose mode crossing capability is represented
@@ -1168,7 +1171,8 @@ module type S = sig
     (** Convenience for creating a mode crossing capability on all axes, using a
         boolean for each axis where [true] means full crossing and [false] means
         no crossing. Alternatively, call [Monadic.create] and [Comonadic.create]
-        and pack the results into a record of type [t]. *)
+        and pack the results into the [crossing] field of a record of type [t].
+    *)
     val create :
       regionality:bool ->
       linearity:bool ->
@@ -1181,6 +1185,8 @@ module type S = sig
       visibility:bool ->
       staticity:bool ->
       t
+
+    val unique_implies_uncontended : t -> bool
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
     val proj : 'a Axis.t -> t -> 'a

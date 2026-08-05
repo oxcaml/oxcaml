@@ -71,6 +71,8 @@ module type S = sig
 
   val round_up : node -> Axis_lattice.t
 
+  val round_down : node -> Axis_lattice.t
+
   val is_const : node -> bool
 
   val map_rigid : (Name.t -> node) -> node -> node
