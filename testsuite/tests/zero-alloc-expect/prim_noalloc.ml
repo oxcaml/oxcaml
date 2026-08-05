@@ -122,13 +122,13 @@ module Test = struct
   let (copy @ noalloc_strict) (r : int ref) = ref !r
 end
 [%%expect{|
-Line 2, characters 46-52:
+Line 2, characters 46-49:
 2 |   let (copy @ noalloc_strict) (r : int ref) = ref !r
-                                                  ^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+                                                  ^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 30-52,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* CR shsong: conservatism on mode inference - will be fixed later *)
@@ -312,6 +312,12 @@ module Test = struct
     ignore (getl a)
 end
 [%%expect{|
+Line 4, characters 11-19:
+4 |     ignore (getl a)
+               ^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
 Line 4, characters 12-16:
 4 |     ignore (getl a)
                 ^^^^
@@ -422,7 +428,7 @@ end
 [%%expect{|
 module Test :
   sig val make_pair : int -> int * int @ local [@@zero_alloc strict] end @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 (* The mid-list case, which does produce an [Omitted] node. *)
@@ -437,7 +443,10 @@ Line 3, characters 4-24:
 Error: The allocation is "local"
          because it is allocated inside the function at lines 2-3, characters 42-29,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is the function in a tail call.
 |}]
 
 (* ==================================================================== *)
@@ -448,26 +457,26 @@ module Test = struct
   let (mk_ref @ noalloc_strict) (x : int) = ref x
 end
 [%%expect{|
-Line 2, characters 44-49:
+Line 2, characters 44-47:
 2 |   let (mk_ref @ noalloc_strict) (x : int) = ref x
-                                                ^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+                                                ^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 32-49,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 module Test = struct
   let (add_float @ noalloc_strict) (x : float) = x +. 1.0
 end
 [%%expect{|
-Line 2, characters 49-57:
+Line 2, characters 51-53:
 2 |   let (add_float @ noalloc_strict) (x : float) = x +. 1.0
-                                                     ^^^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+                                                       ^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 35-57,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* The back end confirms the same two. *)
