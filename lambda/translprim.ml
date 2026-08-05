@@ -2310,19 +2310,22 @@ let lambda_of_prim prim_name prim loc args arg_exps =
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
-let check_primitive_arity loc p =
+let get_default_poly_mode_sort p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
-      (* We assume all primitives are compiled to have the same arity for
-         different modes and types, so just pick one of the modes in the
-         [Prim_poly] case. *)
-      Some Mode.Locality.global
+    | Prim_global, _ | Prim_poly, _ -> Some Mode.Locality.global
     | Prim_local, _ -> Some Mode.Locality.local
   in
-  (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
-     to lie here. *)
   let sort = Some (Jkind.Sort.of_base Scannable) in
+  mode, sort
+
+let check_primitive_arity loc p =
+  (* We assume all primitives are compiled to have the same arity for
+     different modes and types, so just pick one of the modes in the
+     [Prim_poly] case.
+     By a similar assumption, the sort shouldn't change the arity.  So it's ok
+     to lie here. *)
+  let mode, sort = get_default_poly_mode_sort p in
   let prim =
     lookup_primitive_unspecialized loc
       ~poly_mode:mode ~poly_sort:sort Rc_normal p
@@ -2674,14 +2677,7 @@ let fully_applied_may_allocate env loc p ~ty ~arg_exps =
   let result =
     try
       let sloc = of_location ~scopes:empty_scopes loc in
-      let poly_mode =
-        match p.prim_native_repr_res with
-        | Prim_global, _ | Prim_poly, _ -> Some Mode.Locality.global
-        | Prim_local, _ -> Some Mode.Locality.local
-      in
-      let poly_sort = Some (Jkind.Sort.of_base Scannable) in
-      (* CR shsong: Can I use lookup_primitive_unspecialized instead of transl_primitive_common here?
-      What will be the major difference? *)
+      let poly_mode, poly_sort = get_default_poly_mode_sort p in
       let prim =
         transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
           None arg_exps
@@ -2746,12 +2742,7 @@ let application_allocation env loc p pos args ~poly_mode ~ty =
     Allocation_at_locality Mode.Locality.global
 
 let non_arrow_prim_allocates loc p =
-  let poly_mode =
-    match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ -> Some Mode.Locality.global
-    | Prim_local, _ -> Some Mode.Locality.local
-  in
-  let poly_sort = Some (Jkind.Sort.of_base Scannable) in
+  let poly_mode, poly_sort = get_default_poly_mode_sort p in
   lookup_primitive_unspecialized loc ~poly_mode ~poly_sort Rc_normal p
     = Sys_argv
 
