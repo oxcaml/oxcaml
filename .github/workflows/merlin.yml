@@ -10,6 +10,9 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    # The first three are the defaults. [labeled] and [unlabeled] are added so
+    # that adding or removing the merlin-emergency-skip label re-runs the check.
+    types: [ opened, synchronize, reopened, labeled, unlabeled ]
   merge_group:
   workflow_dispatch:
 
@@ -27,6 +30,9 @@ jobs:
   build:
     # The type of runner that the job will run on
     name: merlin
+    # Skip the check if the merlin-emergency-skip label is present on the PR.
+    if: github.event_name != 'pull_request'
+      || !contains(github.event.pull_request.labels.*.name, 'merlin-emergency-skip')
     runs-on: ${{ matrix.os }}
 
     strategy:
