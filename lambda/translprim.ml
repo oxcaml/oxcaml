@@ -1124,16 +1124,24 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_set" -> Atomic(Set (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_set_field" -> Atomic(Set (get_first_arg_mode ()), Field, Pointer)
     | "%atomic_set_loc" -> Atomic(Set (get_first_arg_mode ()), Loc, Pointer)
-    | "%atomic_exchange" -> Atomic(Exchange (get_first_arg_mode ()), Ref, Pointer)
-    | "%atomic_exchange_field" -> Atomic(Exchange (get_first_arg_mode ()), Field, Pointer)
-    | "%atomic_exchange_loc" -> Atomic(Exchange (get_first_arg_mode ()), Loc, Pointer)
-    | "%atomic_compare_exchange" -> Atomic(Compare_exchange (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_exchange" ->
+      Atomic(Exchange (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_exchange_field" ->
+      Atomic(Exchange (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_exchange_loc" ->
+      Atomic(Exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_compare_exchange" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_compare_exchange_field" ->
       Atomic(Compare_exchange (get_first_arg_mode ()), Field, Pointer)
-    | "%atomic_compare_exchange_loc" -> Atomic(Compare_exchange (get_first_arg_mode ()), Loc, Pointer)
-    | "%atomic_cas" -> Atomic(Compare_and_set (get_first_arg_mode ()), Ref, Pointer)
-    | "%atomic_cas_field" -> Atomic(Compare_and_set (get_first_arg_mode ()), Field, Pointer)
-    | "%atomic_cas_loc" -> Atomic(Compare_and_set (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_compare_exchange_loc" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_cas" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_cas_field" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_cas_loc" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Loc, Pointer)
     | "%atomic_fetch_add" -> Atomic(Fetch_add, Ref, Immediate)
     | "%atomic_fetch_add_field" -> Atomic(Fetch_add, Field, Immediate)
     | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Loc, Immediate)
