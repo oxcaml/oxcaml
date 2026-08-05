@@ -247,3 +247,7 @@ let eval code =
         let backtrace = Printexc.get_raw_backtrace () in
         Location.report_exception Format.std_formatter exn;
         Printexc.raise_with_backtrace exn backtrace)
+
+let string_of_expr expr =
+  expr |> Quote.string_of_expr |> Lexing.from_string |> Parse.expression
+  |> Format.asprintf "%a" Pprintast.expression

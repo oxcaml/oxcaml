@@ -30,7 +30,7 @@
 
 let () =
   let e = Obj.magic_many <[ B.x / A.x ]> in
-  print_string (Quote.string_of_expr e);
+  print_string (Eval.string_of_expr e);
   print_newline ();
   print_int (Eval.eval e);
   print_newline ()

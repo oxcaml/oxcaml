@@ -415,19 +415,19 @@ type _ t_param_re_staged_gadt =
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
+<[fun (f : 'a . 'a -> 'a) (x : 'b) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('a) -> $('a)]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
+<[fun (f : 'a . 'a -> 'a) (x : 'a__1) -> f x]>
 |}];;
 
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
 - : <[$('a) -> ('a0. 'a0 -> 'a0) -> $('a)]> expr =
-<[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
+<[fun (x : 'a) (f : 'a__1 . 'a__1 -> 'a__1) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (g: 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g]>;;
@@ -438,8 +438,8 @@ type _ t_param_re_staged_gadt =
      $('d) list -> ($('d) -> $('e)) -> $('e) list]>
     expr
 =
-<[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g
-]>
+<[fun (f : 'a . 'a -> 'a) (g : 'b 'c . 'b list -> ('b -> 'c) -> 'c list) ->
+    f g]>
 |}];;
 
 let bar (f : <[int -> int]>) = f 42;;

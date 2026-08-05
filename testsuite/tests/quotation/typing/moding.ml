@@ -356,8 +356,7 @@ let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
     <[ $(x ()) + $(x ()) ]> ) ]>
 [%%expect{|
 - : <[int]> expr =
-<[let r = (Stdlib.ref 0) in (r := ((! r) + 1); ! r) + (r := ((! r) + 1); ! r)
-]>
+<[let r = Stdlib.ref 0 in (r := ((!r) + 1); !r) + (r := ((!r) + 1); !r)]>
 |}];;
 
 (** Duplication of [once] quotes *)

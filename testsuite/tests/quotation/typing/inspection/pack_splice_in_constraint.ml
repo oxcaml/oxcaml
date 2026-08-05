@@ -23,10 +23,10 @@ module type S = sig type t val x : t val i : int end
 let _ = <[ fun (module M : S with type t = T.t) -> M.x ]>
 [%%expect {|
 - : <[(module S with type t = T.t) -> T.t]> expr =
-<[
-  fun (((module M) : (module S with type t = T.t)) : (module
-    S with type t = T.t)) -> M.x
-]>
+<[fun
+    (((module M)  : (module S with type t = T.t)) :
+       (module S with type t = T.t))
+    -> M.x]>
 |}]
 
 (* Not fine -- there's a wildcard, which is a type variable under the hood,

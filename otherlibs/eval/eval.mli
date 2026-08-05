@@ -27,3 +27,6 @@
 
 (** Evaluate a quoted OCaml expression at runtime. *)
 val eval : 'a expr @ once -> 'a eval
+
+(** Temporary helper for using [Pprintast] output in tests *)
+val string_of_expr : 'a expr -> string

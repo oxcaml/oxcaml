@@ -400,7 +400,7 @@ let e = <[ fun (x : int) -> x ]> in <[ fun (type int) () -> $e ]>
 let e = <[ Stdlib.raise (Failure "") ]> in
 <[ let exception Failure of string in $e ]>
 [%%expect {|
-- : 'a expr = <[let exception Failure in Stdlib.raise (Failure "")]>
+- : 'a expr = <[let exception Failure  in Stdlib.raise (Failure "")]>
 |}];;
 (* We can avoid the following two bugs by banning [let exception],
    but they seem unlikely enough. *)
@@ -410,10 +410,8 @@ let e = Stdlib.Obj.magic_many <[ Stdlib.raise (Failure "") ]> in
 <[ fun (module Stdlib : S) -> $e ]>
 [%%expect {|
 - : <[(module S) -> $('a)]> expr =
-<[
-  fun (((module Stdlib) : (module S)) : (module S)) ->
-    Stdlib.raise (Failure "")
-]>
+<[fun (((module Stdlib)  : (module S)) : (module S)) ->
+    Stdlib.raise (Failure "")]>
 |}];;
 (* CR jbachurski: This is wrong -- the inner exn should refer to the
    global [Stdlib], not the extension.
@@ -421,10 +419,8 @@ let e = Stdlib.Obj.magic_many <[ Stdlib.raise (Failure "") ]> in
 let e = <[ Stdlib.raise Continuation_already_taken ]> in <[ let exception Continuation_already_taken in $e ]>
 [%%expect {|
 - : 'a expr =
-<[
-  let exception Continuation_already_taken in
-    Stdlib.raise Continuation_already_taken
-]>
+<[let exception Continuation_already_taken  in
+    Stdlib.raise Continuation_already_taken]>
 |}];;
 
 (* Similar examples to the above could be constructed for locally declared

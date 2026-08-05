@@ -109,7 +109,7 @@ Hint: Constructor "X" is defined outside any quotations.
 
 let r = <[ { x = 42 } ]>
 [%%expect {|
-val r : <[M.r]> expr = <[{ M.x = 42; }]>
+val r : <[M.r]> expr = <[{ M.x = 42 }]>
 |}];;
 let v = <[ X 42 ]>
 [%%expect {|

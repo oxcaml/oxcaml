@@ -15,7 +15,7 @@ let answer = 42
 
 let () =
   let e = <[ answer ]> in
-  print_string (Quote.string_of_expr e);
+  print_string (Eval.string_of_expr e);
   print_newline ();
   print_int (Eval.eval e);
   print_newline ();

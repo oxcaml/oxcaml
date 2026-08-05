@@ -9,7 +9,7 @@
 let test e =
   let e = Obj.magic_many e in
   print_endline "generated program:";
-  print_endline (Quote.string_of_expr e); print_newline ();
+  print_endline (Eval.string_of_expr e); print_newline ();
   try
     ignore (Eval.eval e)
   with e ->
