@@ -13,12 +13,9 @@ in
 let code rec loopify(never) size(9) newer_version_of(g_2_1)
       g_2 (y) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
   let f = %project_value_slot.[g].[f] (my_closure) in
-  let my_depth_1 = rec_info my_depth in
   let y_1 = %project_value_slot.[f].[y] (f) in
   apply direct(f_1 &my_alloc_region) inlining_state(depth(1))
-    (f ~ depth my_depth_1 -> succ my_depth_1 : _ -> imm tagged)
-      (y)
-      -> k2 * k1
+    (f ~ depth my_depth -> succ my_depth : _ -> imm tagged) (y) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       let int_add = %int_barith.add (y_1, apply_result) in
       cont k (int_add)
