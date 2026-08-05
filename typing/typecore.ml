@@ -6510,12 +6510,6 @@ let relax_alloc desc ~is_applied mode =
     Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
   | _ -> mode
 
-let unrelax_alloc orig_mode actual_mode =
-  Value.join
-    [ actual_mode;
-      Value.min_with_comonadic Allocation
-        (Value.proj_comonadic Allocation orig_mode) ]
-
 let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(is_applied=false)
       env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -7249,11 +7243,9 @@ and type_expect_
       let type_sfunct_args sfunct extra_args =
         match sfunct.pexp_desc with
         | Pexp_apply (sfunct, args) ->
-           let all_args = args @ extra_args in
-           type_sfunct sfunct, all_args
+           type_sfunct sfunct, args @ extra_args
         | _ ->
-           type_sfunct sfunct,
-           extra_args
+           type_sfunct sfunct, extra_args
       in
       let (rt, funct), sargs =
         let rt, funct = type_sfunct sfunct in
@@ -9104,7 +9096,6 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (relax_mode, locks)
   in
-  let actual_mode = unrelax_alloc mode actual_mode in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
   and the second only deals with monadic. *)
