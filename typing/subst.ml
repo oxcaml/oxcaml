@@ -557,6 +557,10 @@ let rec sort s srt =
     let var' = sort_var s var in
     if var == var' then srt
     else Var var'
+  | Addressable srt' ->
+    let srt'' = sort s srt' in
+    if srt' == srt'' then srt
+    else Addressable srt''
 
 let rec layout s l =
   let open Jkind_types.Layout in
@@ -570,6 +574,10 @@ let rec layout s l =
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
     else Sort (sort_l', ax)
+  | Addressable l' ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Addressable l''
 
 let jkind_desc s jkind =
   match jkind.base with

@@ -1260,15 +1260,20 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze a product before calling [get_const]: the machinery in
-     [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
-     products. *)
+  (* Analyze structure (products and addressability) before calling
+     [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
+     better for atomic layouts. *)
   | Layout (Product lays) ->
     Ojkind_product
       (List.map
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+  | Layout (Addressable lay) ->
+    if Jkind.Layout.is_surely_addressable_flat lay then
+      out_jkind_of_desc env { desc with base = Layout lay }
+    else
+      Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
