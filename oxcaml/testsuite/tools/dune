@@ -18,6 +18,12 @@
  (flags (:standard -linkall))
  (modules expectnat))
 
+; Used only by [make runtest-upstream-boot]; see compiler_shim.ml.
+(executable
+ (name compiler_shim)
+ (modes byte)
+ (modules compiler_shim))
+
 (ocamllex
  (modules lexcmm))
 

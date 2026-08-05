@@ -1,0 +1,45 @@
+# Tests excluded from [make runtest-upstream-boot], which tests the boot
+# compiler's native binaries and only builds the stdlib (and the stdlib_*
+# universes), the bytecode compiler-libs (for the expect tool, the byte
+# toplevel and the byte tools) and the testsuite support libraries: neither
+# the otherlibs (unix, str, threads, runtime_events, dynlink, eval) nor the
+# native compiler-libs (needed by expectnat, codegen, fexprc and ocamlnat)
+# are available. Tests that request the missing expectnat or ocamlnat are
+# skipped by ocamltest itself (see OCAMLTEST_SKIP_MISSING_TOOLS in
+# ocamltest/ocaml_actions.ml), so this list only excludes directories whose
+# tests fail for other reasons.
+#
+# Only directories where most tests require the missing pieces are excluded;
+# directories where only a few tests do are kept, so a small number of
+# failures is expected in this mode.
+#
+# excluded test                  | reason for not running
+# ------------------------------------------------------------------------------------------------
+  tests/asmgen                   | requires the codegen tool (native compiler-libs)
+  tests/ast-invariants           | links the native compiler-libs
+  tests/codegen                  | requires the codegen tool (native compiler-libs)
+  tests/language-extensions      | links the native compiler-libs
+  tests/lib-bigarray-file        | requires unix
+  tests/lib-domain               | requires threads
+  tests/lib-dynlink-bytecode     | requires dynlink
+  tests/lib-dynlink-init-info    | requires dynlink
+  tests/lib-dynlink-initializers | requires dynlink
+  tests/lib-dynlink-native       | requires dynlink
+  tests/lib-dynlink-packed       | requires dynlink
+  tests/lib-dynlink-private      | requires dynlink
+  tests/lib-dynlink-pr4229       | requires dynlink
+  tests/lib-dynlink-pr4839       | requires dynlink
+  tests/lib-dynlink-pr6950       | requires dynlink
+  tests/lib-dynlink-pr9209       | requires dynlink
+  tests/lib-runtime-events       | requires runtime_events
+  tests/lib-scanf-2              | requires unix
+  tests/lib-str                  | requires str
+  tests/lib-systhreads           | requires threads
+  tests/lib-threads              | requires threads
+  tests/lib-unix                 | requires unix
+  tests/manifests                | links the native compiler-libs
+  tests/parallel                 | requires unix and threads
+  tests/quotation                | requires the eval library (ocaml-jit)
+  tests/tool-debugger            | requires ocamldebug
+  tests/tool-expect-test         | requires expectnat and unix
+  tests/tool-ocamlfilt           | requires the native ocamlfilt
