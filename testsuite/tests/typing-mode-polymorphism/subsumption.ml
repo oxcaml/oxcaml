@@ -516,8 +516,37 @@ end = struct
   let f x apply = apply x
 end
 [%%expect{|
-module Self_simplified :
-  sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   let run () = ()
+5 |   let run = run
+6 |
+7 |   let f x apply = apply x
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val run : unit @ 'n -> unit @ 'm
+           val f :
+             'a @ [< 'n & global] ->
+             ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'o ->
+             'b @ [> 'm | dynamic]
+         end
+       is not included in
+         sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
+       Values do not match:
+         val f :
+           'a @ [< 'n & global] ->
+           ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'o ->
+           'b @ [> 'm | dynamic]
+       is not included in
+         val f : 'a @ local -> ('a @ local -> unit) -> unit
+       The type
+         "'a @ [< 'n & global many read_write] ->
+         ('a @ [< many read_write > 'n] -> unit @ [< 'm & global > dynamic]) @ [> stateful dynamic] ->
+         unit @ [< global > 'm | dynamic]"
+       is not compatible with the type
+         "'a @ local -> ('a @ local -> unit) -> unit"
 |}]
 
 module Self_simplified_self : sig
@@ -528,6 +557,33 @@ end = struct
   let f x apply = apply x
 end
 [%%expect{|
-module Self_simplified_self :
-  sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
+Lines 3-7, characters 6-3:
+3 | ......struct
+4 |   let f () = ()
+5 |
+6 |   let f x apply = apply x
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f :
+             'a @ [< 'n & global] ->
+             ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'o ->
+             'b @ [> 'm | dynamic]
+         end
+       is not included in
+         sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
+       Values do not match:
+         val f :
+           'a @ [< 'n & global] ->
+           ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'o ->
+           'b @ [> 'm | dynamic]
+       is not included in
+         val f : 'a @ local -> ('a @ local -> unit) -> unit
+       The type
+         "'a @ [< 'n & global many read_write] ->
+         ('a @ [< many read_write > 'n] -> unit @ [< 'm & global > dynamic]) @ [> stateful dynamic] ->
+         unit @ [< global > 'm | dynamic]"
+       is not compatible with the type
+         "'a @ local -> ('a @ local -> unit) -> unit"
 |}]
