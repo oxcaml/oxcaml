@@ -795,145 +795,15 @@ let dynamic_pat_mode pat_mode =
   in
   {pat_mode with mode}
 
-type allocation =
-  { alloc_mode : Alloc.r;
-    (** The mode of the allocation. *)
-    closures : (Hint.pinpoint * Allocation.r) list;
-    (** The allocation mode of every closure enclosing the allocation, paired
-        with the pinpoint of that closure, from the innermost closure to the
-        outermost one. Constraining one of them to [alloc] forces that closure
-        to be [alloc]. *)
-    pp : Hint.pinpoint
-    (** Points at the allocation, for error messages. *)
-  }
-
-let allocations : allocation list ref = Local_store.s_ref []
-
-let reset_allocations () = allocations := []
-
-let register_mode_for_optimisation pp ?(closures=[]) alloc_mode =
-  let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := {alloc_mode; closures; pp} :: !allocations
-
-let register_allocation_mode ~env ~loc alloc_mode =
-  let pp : Hint.pinpoint = (loc, Allocation) in
-  let closures = Env.walk_locks_for_allocation ~env pp in
-  register_mode_for_optimisation pp ~closures alloc_mode
-
-let register_allocation_value_mode ~env ~loc
-    ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
-  let alloc_mode = value_to_alloc_r2g mode in
-  register_allocation_mode ~env ~loc alloc_mode;
-  (* We must apply each morphism separately so that their hints correspond to
-     the correct morphism *)
-  let mode =
-    value_to_alloc_r2g ~allocation:({loc; txt = desc})
-      (Mode.Value.disallow_left mode)
-  in
-  let mode = alloc_as_value ~allocation:({loc; txt = desc}) mode in
-  alloc_mode, mode
-
-(* Unlike most allocations, which can be the highest mode allowed by
-   [expected_mode], functions have more constraints. For example, a two
-   parameter function needs to be made global if its partial application
-   to one argument must be global. As a result, a function gets an
-   [Alloc.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation ~env (mode : Value.r) ~loc
-    : Alloc.lr * Value.r =
-  let allocation : Hint.allocation = {loc; txt = Unknown} in
-  let (alloc_mode : Alloc.lr), _ =
-    Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
-  in
-  register_allocation_mode ~env ~loc (Alloc.disallow_left alloc_mode);
-  let closed_over_mode =
-    alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
-  in
-  alloc_mode, closed_over_mode
-
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
     of potential subcomponents. *)
 let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    register_allocation_value_mode ~env ~loc
+    Typeallocation.register_allocation_value_mode ~env ~loc
       ?desc (as_single_mode expected_mode)
   in
   alloc_mode, mode_default mode
-
-let constrain_enclosing_closures pp closures =
-  List.iter
-    (fun (_, closure_mode) ->
-      Allocation.submode_err pp
-        (Allocation.of_const ~hint:Allocated_on_heap Alloc)
-        closure_mode)
-    closures
-
-let enclosing_noalloc_closure closures =
-  List.find_map
-    (fun (closure_pp, closure_mode) ->
-      match Allocation.Guts.get_ceil closure_mode with
-      | Noalloc -> Some (closure_pp, Hint.Noalloc)
-      | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
-      | Alloc -> None)
-    closures
-
-let constrain_closures () =
-  let heap, pending =
-    !allocations
-    |> List.partition (fun {alloc_mode; _} ->
-      match
-        Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
-      with
-      | Global -> true
-      | Local -> false)
-  in
-  allocations := pending;
-  (* Visited in registration (i.e. source) order, so that the first offending
-     allocation is the one reported. *)
-  List.iter (fun {closures; pp; _} -> constrain_enclosing_closures pp closures)
-    (List.rev heap)
-
-let constrain_allocations () =
-  let local, pending =
-    !allocations
-    |> List.partition_map (fun ({closures; _} as allocation) ->
-      match enclosing_noalloc_closure closures with
-      | Some closure -> Left (allocation, closure)
-      | None -> Right allocation)
-  in
-  allocations := pending;
-  (* Visited in registration (i.e. source) order, so that the first offending
-     allocation is the one reported. *)
-  List.iter
-    (fun ({alloc_mode; pp; _}, (closure_pp, closure_mode)) ->
-      let stack_allocated =
-        Locality.of_const
-          ~hint:(Allocated_in_noalloc_closure (closure_pp, closure_mode))
-          Local
-      in
-      Locality.submode_err pp stack_allocated
-        (Alloc.proj_comonadic Areality alloc_mode))
-    (List.rev local)
-
-let optimise_allocations () =
-  (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
-  example, pushing an allocation to [contended] is useful to the middle-end.
-  However, a [contended] value in a module causes extra modality in printing.
-  Therefore, here we only optimise allocation for stack/heap. Proper solutions:
-  - Remove [Contention] axis from [Alloc].
-  - Add it back when middle-end can really utilize this information. *)
-  (* Allocations are visited in registration (i.e. source) order, so that the
-     first offending allocation is the one reported. *)
-  let allocations = List.rev !allocations in
-  (* Reset first: the loop below can raise. *)
-  reset_allocations ();
-  List.iter
-    (fun {alloc_mode; closures; pp} ->
-      match Locality.zap_to_ceil (Alloc.proj_comonadic Areality alloc_mode)
-      with
-      | Local -> ()
-      | Global -> constrain_enclosing_closures pp closures)
-    allocations
 
 (** We keep this state which is passed as an optional argument throughout
     the typechecker. It goes through the following life-cycle:
@@ -5162,7 +5032,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             register_allocation_mode ~env ~loc mode_closure;
+             Typeallocation.register_allocation_mode ~env ~loc mode_closure;
              let arg =
               Omitted {
                 mode_closure = Alloc.disallow_left mode_closure;
@@ -6281,7 +6151,8 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closed_over_mode =
-    register_closure_allocation ~env ~loc (as_single_mode expected_mode)
+    Typeallocation.register_closure_allocation ~env ~loc
+      (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
@@ -6549,7 +6420,7 @@ let register_prim_application_allocation ~env ~pos funct args =
       with
       | No_allocation -> ()
       | Allocation_at_locality mode ->
-          register_allocation_mode ~env ~loc:lid.loc
+          Typeallocation.register_allocation_mode ~env ~loc:lid.loc
             (Alloc.max_with_comonadic Areality mode)
       end
   | _ -> ()
@@ -8068,7 +7939,7 @@ and type_expect_
          registration is currently redundant -- [Env.lookup_class] above
          already walks the locks and forces enclosing closures to [alloc] --
          but we register it anyway so every allocation site is covered. *)
-      register_allocation_mode ~env ~loc Alloc.legacy;
+      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       Value.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
         cl_mode Value.legacy;
       let pm = position_and_mode env expected_mode sexp in
@@ -8116,7 +7987,7 @@ and type_expect_
   | Pexp_override lst ->
       submode ~loc ~env Value.legacy expected_mode;
       (* Allocation axis check: [{< ... >}] copies [self], which allocates *)
-      register_allocation_mode ~env ~loc Alloc.legacy;
+      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let _ =
        List.fold_right
         (fun (lab, _) l ->
@@ -8258,7 +8129,7 @@ and type_expect_
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
       (* Allocation axis check: constructing a lazy block allocates *)
-      register_allocation_mode ~env ~loc Alloc.legacy;
+      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
@@ -8272,7 +8143,7 @@ and type_expect_
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
       (* Allocation axis check: constructing an object block allocates *)
-      register_allocation_mode ~env ~loc Alloc.legacy;
+      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
       let desc, meths = !type_object env loc s in
       rue {
         exp_desc = Texp_object (desc, meths);
@@ -9179,7 +9050,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_mode_for_optimisation
+           Typeallocation.register_mode_for_optimisation
              (lid.loc, Ident {category = Value; lid = lid.txt})
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
@@ -9188,7 +9059,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           referenced are considered [noalloc_strict] by mode crossing,
           so we manually register allocation for them. *)
        if Translprim.non_arrow_prim_allocates lid.loc prim then
-         register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
+         Typeallocation.register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
        [], ty, Id_prim (mode, sort)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
@@ -10446,7 +10317,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
-    register_allocation_value_mode ~env ~loc expected_mode.mode
+    Typeallocation.register_allocation_value_mode ~env ~loc expected_mode.mode
   in
   let argument_mode =
     value_mode
@@ -10477,7 +10348,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
           List.map (fun (mode, _) ->
-            snd (register_allocation_value_mode ~env ~loc mode)) tuple_modes
+            snd (Typeallocation.register_allocation_value_mode ~env ~loc mode))
+            tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
@@ -11998,7 +11870,7 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
   (* Allocation axis check: comprehension expr allocates *)
-  register_allocation_mode ~env ~loc Alloc.legacy;
+  Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
      ; exp_extra      = []

@@ -264,6 +264,7 @@
   typedecl
   typeopt
   value_rec_check
+  typeallocation
   typecore
   solver_intf
   solver
