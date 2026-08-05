@@ -27,19 +27,19 @@ open! Stdlib
 
 (** {1:results Results} *)
 
-type ('a : value_or_null, 'e : value_or_null) t = ('a, 'e) result = Ok of 'a | Error of 'e (**)
+type ('a : any, 'e : any) t = ('a, 'e) result = Ok of 'a | Error of 'e (**)
 (** The type for result values. Either a value [Ok v] or an error [Error e]. *)
 
-val ok : ('a : value_or_null) ('e : value_or_null). 'a -> ('a, 'e) result
+val ok : ('a : value_or_null) ('e : any). 'a -> ('a, 'e) result
 (** [ok v] is [Ok v]. *)
 
-val error : ('a : value_or_null) ('e : value_or_null). 'e -> ('a, 'e) result
+val error : ('a : any) ('e : value_or_null). 'e -> ('a, 'e) result
 (** [error e] is [Error e]. *)
 
-val value : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> default:'a -> 'a
+val value : ('a : value_or_null) ('e : any). ('a, 'e) result -> default:'a -> 'a
 (** [value r ~default] is [v] if [r] is [Ok v] and [default] otherwise. *)
 
-val get_ok : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'a
+val get_ok : ('a : value_or_null) ('e : any). ('a, 'e) result -> 'a
 (** [get_ok r] is [v] if [r] is [Ok v] and raise otherwise.
 
     @raise Invalid_argument if [r] is [Error _]. *)
@@ -50,7 +50,7 @@ val get_ok' : ('a : value_or_null). ('a, string) result -> 'a
 
     @since 5.4 *)
 
-val get_error : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'e
+val get_error : ('a : any) ('e : value_or_null). ('a, 'e) result -> 'e
 (** [get_error r] is [e] if [r] is [Error e] and raise otherwise.
 
     @raise Invalid_argument if [r] is [Ok _]. *)
@@ -131,16 +131,16 @@ val compare :
 
 (** {1:convert Converting} *)
 
-val to_option : ('a : value_or_null) ('e : value_or_null)
+val to_option : ('a : value_or_null) ('e : any)
   . ('a, 'e) result -> 'a option
 (** [to_option r] is [r] as an option, mapping [Ok v] to [Some v] and
     [Error _] to [None]. *)
 
-val to_list : ('a : value_or_null) ('e : value_or_null)
+val to_list : ('a : value_or_null) ('e : any)
   . ('a, 'e) result -> 'a list
 (** [to_list r] is [[v]] if [r] is [Ok v] and [[]] otherwise. *)
 
-val to_seq : ('a : value_or_null) ('e : value_or_null)
+val to_seq : ('a : value_or_null) ('e : any)
   . ('a, 'e) result -> 'a Seq.t
 (** [to_seq r] is [r] as a sequence. [Ok v] is the singleton sequence
     containing [v] and [Error _] is the empty sequence. *)

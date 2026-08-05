@@ -1,0 +1,35 @@
+--- Monomorphic_immutable ---
+1.
+1.
+2.
+2.
+
+--- Monomorphic_mutable ---
+#(1., 1)
+#(1., 1)
+#(10., 10)
+#(2., 2)
+#(2., 2)
+#(20., 20)
+
+--- Polymorphic_immutable ---
+1
+1
+2
+2
+
+--- Polymorphic_mutable ---
+#(1, #(), one)
+#(1, #(), one)
+#(10, #(), one times ten)
+#(2, #(), two)
+#(2, #(), two)
+#(20, #(), two times ten)
+
+--- Ref ---
+#(1, 2)
+#(1, 2)
+#(10, 20)
+#(3, 4)
+#(3, 4)
+#(30, 40)

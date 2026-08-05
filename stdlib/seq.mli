@@ -92,14 +92,14 @@ open! Stdlib
 
     @since 4.07 *)
 
-type ('a : value_or_null) t = unit -> 'a node
+type ('a : any) t = unit -> 'a node
 (** A sequence [xs] of type ['a t] is a delayed list of elements of
     type ['a]. Such a sequence is queried by performing a function
     application [xs()]. This function application returns a node,
     allowing the caller to determine whether the sequence is empty
     or nonempty, and in the latter case, to obtain its head and tail. *)
 
-and ('a : value_or_null) node =
+and ('a : any) node =
   | Nil
   | Cons of 'a * 'a t (**)
 (** A node is either [Nil], which means that the sequence is empty,
@@ -134,7 +134,7 @@ and ('a : value_or_null) node =
    None of the functions in this section is lazy. These functions
    are consumers: they force some computation to take place. *)
 
-val is_empty : ('a : value_or_null). 'a t -> bool
+val is_empty : ('a : any). 'a t -> bool
 (** [is_empty xs] determines whether the sequence [xs] is empty.
 
     It is recommended that the sequence [xs] be persistent.

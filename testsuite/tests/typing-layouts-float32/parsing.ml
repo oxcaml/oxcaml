@@ -34,50 +34,22 @@ type t = C : float32# -> t
 *)
 type t = float32# list;;
 [%%expect {|
-Line 1, characters 9-17:
-1 | type t = float32# list;;
-             ^^^^^^^^
-Error: This type "float32#" should be an instance of type "('a : value_or_null)"
-       The layout of float32# is float32
-         because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = float32# list
 |}];;
 
 let f (_ : float32# list) = ();;
 [%%expect {|
-Line 1, characters 11-19:
-1 | let f (_ : float32# list) = ();;
-               ^^^^^^^^
-Error: This type "float32#" should be an instance of type "('a : value_or_null)"
-       The layout of float32# is float32
-         because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : float32# list -> unit = <fun>
 |}];;
 
 type t = C of float32# list;;
 [%%expect {|
-Line 1, characters 14-22:
-1 | type t = C of float32# list;;
-                  ^^^^^^^^
-Error: This type "float32#" should be an instance of type "('a : value_or_null)"
-       The layout of float32# is float32
-         because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of float32# list
 |}];;
 
 type t = C : float32# list -> t;;
 [%%expect {|
-Line 1, characters 13-21:
-1 | type t = C : float32# list -> t;;
-                 ^^^^^^^^
-Error: This type "float32#" should be an instance of type "('a : value_or_null)"
-       The layout of float32# is float32
-         because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : float32# list -> t
 |}];;
 
 (* Syntax: float32#c

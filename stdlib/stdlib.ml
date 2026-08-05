@@ -248,16 +248,22 @@ external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ portable = "%field1_
 
 (* References *)
 
-type ('a : value_or_null) ref = { mutable contents : 'a }
-external ref : ('a : value_or_null) . 'a -> ('a ref[@local_opt]) @@ portable = "%makemutable"
-external ( ! ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a @@ portable = "%field0"
-external ( := ) : ('a : value_or_null) . ('a ref[@local_opt]) -> 'a -> unit @@ portable = "%setfield0"
+type ('a : any) ref = { mutable contents : 'a }
+external ref : ('a : any) . 'a -> ('a ref[@local_opt]) @@ portable =
+  "%makemutable"
+[@@layout_poly]
+external ( ! ) : ('a : any) . ('a ref[@local_opt]) -> 'a @@ portable =
+  "%field0_of_1"
+[@@layout_poly]
+external ( := ) : ('a : any) . ('a ref[@local_opt]) -> 'a -> unit @@ portable =
+  "%setfield0_of_1"
+[@@layout_poly]
 external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
 external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"
 
 (* Result type *)
 
-type ('a : value_or_null, 'b : value_or_null) result = Ok of 'a | Error of 'b
+type ('a : any, 'b : any) result = Ok of 'a | Error of 'b
 
 (* String conversion functions *)
 

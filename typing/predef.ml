@@ -633,8 +633,8 @@ let list_jkind param =
   Jkind.mark_best
 
 let list_sort = Jkind_types.Sort.Const.(some scannable)
-let list_argument_sort = Jkind_types.Sort.Const.(some scannable)
-let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
+let list_argument_sort = None
+let list_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
 let ikind_of_jkind_ref :

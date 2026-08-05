@@ -113,6 +113,11 @@ let ( rev_list_to_list,
     building the intermediate restults of list comprehensions; see the
     documentation for [CamlinternalComprehension.rev_list] for more details. *)
 let rev_list_snoc_local ~loc ~init ~last =
+  (* CR layouts: Support non-values. Currently the typechecker guarantees that
+     the comprehension body is a value (see [type_comprehension_expr]) but this
+     will be lifted. See also [CamlinternalComprehension] (note that
+     straightforwardly generalizing that will require layout polymorphism to
+     land first). *)
   Lprim (Pmakeblock (0, Immutable, All_value, alloc_local), [init; last], loc)
 
 (** The [CamlinternalComprehension.Nil] constructor, for building the
@@ -204,10 +209,11 @@ let iterator ~transl_exp ~scopes = function
       element_debug_uid;
       element_kind =
         Typeopt.layout pattern.pat_env pattern.pat_loc
-          Jkind.Sort.Const.for_list_element pattern.pat_type;
+          Jkind.Sort.Const.for_list_comprehension_element pattern.pat_type;
       add_bindings =
         (* CR layouts: to change when we allow non-values in sequences *)
-        Matching.for_let ~scopes ~arg_sort:Jkind.Sort.Const.for_list_element
+        Matching.for_let ~scopes
+          ~arg_sort:Jkind.Sort.Const.for_list_comprehension_element
           ~return_layout:layout_any_value pattern.pat_loc (Lvar element)
           Immutable pattern
     }
@@ -317,7 +323,9 @@ let comprehension ~transl_exp ~scopes ~loc { comp_body; comp_clauses } =
     translate_clauses ~transl_exp ~scopes ~loc
       ~comprehension_body:(fun ~accumulator ->
         rev_list_snoc_local ~loc ~init:accumulator
-          ~last:(transl_exp ~scopes Lambda.layout_list_element comp_body))
+          ~last:
+            (transl_exp ~scopes Lambda.layout_list_comprehension_element
+               comp_body))
       ~accumulator:rev_list_nil comp_clauses
   in
   Lambda_utils.apply ~loc ~mode:alloc_heap

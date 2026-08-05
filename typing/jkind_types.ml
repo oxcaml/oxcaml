@@ -282,7 +282,7 @@ module Sort = struct
 
     let for_array_comprehension_element = scannable
 
-    let for_list_element = scannable
+    let for_list_comprehension_element = scannable
 
     let for_loop_index = scannable
 

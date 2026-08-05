@@ -1289,7 +1289,7 @@ val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout
 val layout_array_comprehension_element : layout
-val layout_list_element : layout
+val layout_list_comprehension_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 val layout_block_idx : layout

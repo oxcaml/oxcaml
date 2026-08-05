@@ -3108,6 +3108,15 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
+let keep_scopes tys ~f =
+  let old_scopes = List.map (fun ty -> ty, get_scope ty) tys in
+  let result = f () in
+  List.iter
+    (fun (ty, old_scope) ->
+       if get_scope ty > old_scope then set_scope ty old_scope)
+    old_scopes;
+  result
+
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
@@ -3121,7 +3130,10 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
   | Constructor_variable ->
-      begin match
+      (* XXX Claude suggested keeping the scopes as a fix, and it works, but its
+         explanation for the correctness was not good. Need to be convinced that
+         it's safe to poke these holes in the scopes. *)
+      keep_scopes (List.map fst types) ~f:(fun () : _ Result.t -> match
         Misc.Stdlib.List.mapi_result
           (fun _ (ty, loc) ->
              type_jkind_and_sort env ty ~why ~fixed:false
@@ -3146,8 +3158,7 @@ let representation_for_tuple_constructor env constr ty_args ~loc ~types
                 Misc.fatal_error
                   "Unrepresentable_argument_field with Cstr_tuple"
             end
-        | Error err -> Error err
-      end
+        | Error err -> Error err)
 
 (* Typing of patterns *)
 
@@ -11952,7 +11963,11 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.type_list,
         (fun tcomp -> Texp_list_comprehension tcomp),
         comp,
-        Predef.list_argument_jkind
+        (* Although [list] takes an [any] parameter, list comprehensions
+           require value elements (see [transl_list_comprehension.ml]). *)
+        (* CR layouts: Lift this. *)
+        Jkind.Builtin.value_or_null
+          ~why:Jkind.History.List_comprehension_element
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
         | Mutable   ->

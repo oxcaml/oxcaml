@@ -651,6 +651,49 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       (fun (_, repr) -> Lambda.layout_of_extern_repr repr)
       lambda_prim.prim_native_repr_args
   in
+  let get_res_layout () =
+    let _, repr = lambda_prim.prim_native_repr_res in
+    Lambda.layout_of_extern_repr repr
+  in
+  let mixed_block_shape_of_layouts layouts =
+    if List.for_all (function Pvalue _ -> true | _ -> false) layouts
+    then None
+    else Some (List.map mixed_block_element_of_layout layouts |> Array.of_list)
+  in
+  let get_shape_of_all_args () =
+    match get_arg_layouts () |> mixed_block_shape_of_layouts with
+    | None -> All_value
+    | Some shape -> Shape shape
+  in
+  let field0_of_1 sem =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the result. *)
+      [ get_res_layout () ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      match mixed_block_shape with
+      | None -> Pfield (0, Pointer, sem)
+      | Some shape -> Pmixedfield ([0], shape, sem)
+    in
+    Primitive (prim, 1)
+  in
+  let setfield0_of_1 () =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the second argument (the new
+         value for the field). *)
+      let second_arg_layout = List.nth (get_arg_layouts ()) 1 in
+      [ second_arg_layout ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      let mode = get_first_arg_mode () in
+      match mixed_block_shape with
+      | None -> Psetfield (0, Pointer, Assignment mode)
+      | Some shape -> Psetmixedfield ([0], shape, Assignment mode)
+    in
+    Primitive (prim, 2)
+  in
   let prim = match p.prim_name with
     | "%identity" -> Identity
     | "%bytes_to_string" -> Primitive (Pbytes_to_string, 1)
@@ -666,18 +709,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
     | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
     | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
+    | "%field0_of_1" -> field0_of_1 Reads_vary
     | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
     | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%field0_of_1_immut" -> field0_of_1 Reads_agree
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+    | "%setfield0_of_1" -> setfield0_of_1 ()
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable, get_shape_of_all_args (), mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, get_shape_of_all_args (), mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1682,6 +1728,27 @@ let layout_of_ty_for_idx_set env loc ty =
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
 
+(* Compute the mixed-block shape element for a type, or [None] if the type's
+   jkind gives no usable shape. *)
+let mixed_block_element_of_ty env loc ty =
+  let jkind = Ctype.type_jkind env ty in
+  Typedecl.mixed_block_element env ty jkind
+  |> Option.map (transl_mixed_block_element env loc ty)
+
+(* A shape element computed from a type never contains [Float_boxed], which
+   arises only from a record declaration's [@@flatten_floats], so it can be
+   converted to any mode parameter. *)
+let rec mixed_block_element_with_any_mode
+  : unit Lambda.mixed_block_element -> _ Lambda.mixed_block_element = function
+  | Value vk -> Value vk
+  | Product elts -> Product (Array.map mixed_block_element_with_any_mode elts)
+  | Float_boxed () ->
+    Misc.fatal_error
+      "Translprim.mixed_block_element_with_any_mode: unexpected [Float_boxed]"
+  | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Mask | Word | Untagged_immediate | Splice_variable _ ) as elt ->
+    elt
+
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
@@ -1712,6 +1779,22 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
+  | Primitive (Psetmixedfield ([0], [| _ |], init), arity), [_; p2] -> begin
+      match mixed_block_element_of_ty env (to_location loc) p2 with
+      | None -> None
+      | Some elt ->
+        Some (Primitive (Psetmixedfield ([0], [| elt |], init), arity))
+    end
+  | Primitive (Pmixedfield ([0], [| _ |], sem), arity), _ -> begin
+      match is_function_type env ty with
+      | None -> None
+      | Some (_p1, rhs) ->
+        match mixed_block_element_of_ty env (to_location loc) rhs with
+        | None -> None
+        | Some elt ->
+          let elt = mixed_block_element_with_any_mode elt in
+          Some (Primitive (Pmixedfield ([0], [| elt |], sem), arity))
+    end
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =
@@ -1938,9 +2021,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     let ak =
       Typeopt.array_type_kind ~elt_ty:None env loc array_ty
     in
-    let jkind = Ctype.type_jkind env elt_ty in
-    let mbe = Typedecl.mixed_block_element env elt_ty jkind in
-    let mbe = Option.map (transl_mixed_block_element env loc elt_ty) mbe in
+    let mbe = mixed_block_element_of_ty env loc elt_ty in
     begin match mbe with
     | Some mbe when not (Lambda.will_be_reordered mbe) ->
       Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
