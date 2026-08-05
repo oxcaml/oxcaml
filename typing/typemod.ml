@@ -145,7 +145,7 @@ let location_of_structure sstr =
 
 let apply_is_contained_by ~loc_md item ?modalities mode =
   let is_contained_by : Hint.is_contained_by =
-    { containing = Structure (item, Modality);
+    { containing = Structure (item, Unknown_modality);
       container = (loc_md, Structure) }
   in
   Ctype.apply_right_is_contained_by is_contained_by ?modalities mode
@@ -192,7 +192,7 @@ in the enclosing structure which is at [md_mode] and [loc_md]. *)
 let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
   let pp : Hint.pinpoint = (loc, Structure_item item) in
   let is_contained_by : Hint.is_contained_by =
-    { containing = Structure (item, Modality);
+    { containing = Structure (item, Unknown_modality);
       container = (loc, Structure)}
   in
   let mode = Modality.apply_left ~is_contained_by modalities mode in
