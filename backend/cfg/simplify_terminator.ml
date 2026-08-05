@@ -266,12 +266,13 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         begin match find_opt instr.res.(0) with
         | Some (Const_int c') ->
           (* Deleting the move makes the (unchanged) `live` fields an
-             under-approximation of actual liveness: the destination register
+             under-approximation of actual liveness: the destination location
              now carries its value from the previous write of the constant,
              across instructions whose `live` sets do not mention it. This is
-             safe for the current consumers of `live`: the register is an
-             integer register holding a compile-time integer constant, so
-             omitting it from the frame descriptors of the GC points it now
+             safe for the current consumers of `live`: the destination - an
+             integer register, or a stack slot if register allocation rewrote
+             the result to a spill slot - holds a compile-time integer constant,
+             so omitting it from the frame descriptors of the GC points it now
              crosses is harmless (its value is never a heap pointer), and its
              liveness cannot change the decision to save SIMD registers at such
              points. Extending the deletion to other kinds of constants requires
