@@ -1182,6 +1182,22 @@ module Sort = struct
   end
 end
 
+module Kind_operator = struct
+  type t =
+    | Id
+    | Addressable
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Id, Id | Addressable, Addressable -> true
+    | (Id | Addressable), _ -> false
+
+  let compose t1 t2 =
+    match t1, t2 with
+    | Id, t | t, Id -> t
+    | Addressable, Addressable -> Addressable
+end
+
 module Scannable_axes = struct
   open Jkind_axis
 
@@ -1284,6 +1300,10 @@ module Layout = struct
       | Addressable _ -> true
 
     let addressable c = if is_surely_addressable c then c else Addressable c
+
+    let apply_operator c : Kind_operator.t -> t = function
+      | Id -> c
+      | Addressable -> addressable c
 
     let rec get_root_scannable_axes t =
       match t with
