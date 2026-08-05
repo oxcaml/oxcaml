@@ -43,7 +43,7 @@
  int 180143985094819847
  addr G:"camlCmm__standard_atomic_get_1_8_code")
 (function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
- (extcall "caml_atomic_exchange_field_local" r 1 v ->val) 1 )
+ (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
 (function camlCmm__get_2_9_code (r: val) : val
  (load_mut_atomic val (+a r 8)) )
