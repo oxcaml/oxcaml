@@ -632,8 +632,8 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = None
-let list_argument_sort = Jkind_types.Sort.Const.(some scannable)
+let list_sort = Jkind_types.Sort.Const.(some scannable)
+let list_argument_sort = None
 let list_argument_jkind = Jkind.Builtin.any ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
