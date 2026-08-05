@@ -603,10 +603,10 @@ end
 Line 2, characters 35-43:
 2 |   let (argv @ noalloc_strict) () = Sys.argv
                                        ^^^^^^^^
-Error: The value "Sys.argv" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 30-43
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 30-43,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 module Test = struct

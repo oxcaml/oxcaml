@@ -83,9 +83,11 @@ val application_allocation :
   Typedtree.apply_position ->
   (Typedtree.arg_label * Typedtree.apply_arg) list ->
   poly_mode:Mode.Locality.lr option ->
-  poly_sort:Jkind.Sort.t option ->
   ty:Types.type_expr ->
   allocation_registration
+
+(** Whether the primitive is non-arrow type but still allocates. *)
+val non_arrow_prim_allocates : Location.t -> Primitive.description -> bool
 
 (* Errors *)
 

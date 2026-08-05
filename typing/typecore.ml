@@ -6491,11 +6491,11 @@ let add_zero_alloc_attribute expr attributes =
 let register_prim_application_allocation ~env ~pos funct args =
   match funct.exp_desc with
   | Texp_ident { desc = { val_kind = Val_prim prim; _ };
-                 kind = Id_prim (poly_mode, poly_sort); lid; _ } ->
+                 kind = Id_prim (poly_mode, _); lid; _ } ->
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       begin match
         Translprim.application_allocation env lid.loc prim pos args
-          ~poly_mode ~poly_sort ~ty:funct.exp_type
+          ~poly_mode ~ty:funct.exp_type
       with
       | No_allocation -> ()
       | Allocation_at_locality mode ->
@@ -6515,14 +6515,6 @@ let unrelax_alloc orig_mode actual_mode =
     [ actual_mode;
       Value.min_with_comonadic Allocation
         (Value.proj_comonadic Allocation orig_mode) ]
-
-(* [%sys_argv] triggers allocation but is not a funciton, so we prevent
-   mode crossing for Allocation axis.*)
-let strengthen_sys_argv_alloc desc mode =
-  match desc.val_kind with
-  | Val_prim { prim_name = "%sys_argv"; _ } ->
-    Value.join [mode; Value.min_with_comonadic Allocation Allocation.alloc]
-  | _ -> mode
 
 let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(is_applied=false)
       env expected_mode sexp =
@@ -9107,7 +9099,6 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  let mode = strengthen_sys_argv_alloc desc mode in
   let relax_mode = relax_alloc desc ~is_applied mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
@@ -9150,7 +9141,12 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
            register_mode_for_optimisation
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
-        end;
+       end;
+       (* Non-arrow type primitives that trigger allocation when
+          referenced are considered [noalloc_strict] by mode crossing,
+          so we manually register allocation for them. *)
+       if Translprim.non_arrow_prim_allocates lid.loc prim then
+         register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
        [], ty, Id_prim (mode, sort)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
