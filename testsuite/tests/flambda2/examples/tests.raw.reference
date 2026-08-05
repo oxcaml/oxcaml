@@ -70,10 +70,8 @@ let $camlTests__first_const = Block 0 () in
                           (int_add_1, int_add)
                           -> k1 * k2)))
  in
- let to_inline = closure to_inline_0 @to_inline &toplevel.alloc_region in
- let f = closure f_1 @f &toplevel.alloc_region
- with { to_inline = to_inline }
- in
+ let to_inline = closure to_inline_0 @to_inline &toplevel in
+ let f = closure f_1 @f &toplevel with { to_inline = to_inline } in
  let Pmakeblock = %block.[`0`].`toplevel` (to_inline, f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

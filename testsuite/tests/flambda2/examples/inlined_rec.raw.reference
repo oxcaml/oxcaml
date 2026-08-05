@@ -29,11 +29,9 @@ let $camlInlined_rec__first_const = Block 0 () in
             let int_mul = %int_barith.mul (n, apply_result) in
             cont k1 (int_mul))
  in
- let `apply` = closure apply_0 @`apply` &toplevel.alloc_region in
- let fact = closure fact_1 @fact &toplevel.alloc_region
- with { `apply` = `apply` }
- in
- apply direct(fact_1 &toplevel.alloc_region)
+ let `apply` = closure apply_0 @`apply` &toplevel in
+ let fact = closure fact_1 @fact &toplevel with { `apply` = `apply` } in
+ apply direct(fact_1 &toplevel)
    (fact : _ -> imm tagged) (1000000) -> k1 * error
    where k1 (i : imm tagged) =
      let Pmakeblock = %block.[`0`].`toplevel` (`apply`, fact, i) in

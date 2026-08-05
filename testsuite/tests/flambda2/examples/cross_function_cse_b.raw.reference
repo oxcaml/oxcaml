@@ -58,11 +58,11 @@ let $camlCross_function_cse_b__first_const = Block 0 () in
    in
    apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
  in
- let some = closure some_0 @some &toplevel.alloc_region in
- let f = closure f_1 @f &toplevel.alloc_region with { some = some } in
- let g = closure g_2 @g &toplevel.alloc_region with { some_1 = some } in
- let f_classic = closure f_classic_3 @f_classic &toplevel.alloc_region in
- let g_classic = closure g_classic_4 @g_classic &toplevel.alloc_region in
+ let some = closure some_0 @some &toplevel in
+ let f = closure f_1 @f &toplevel with { some = some } in
+ let g = closure g_2 @g &toplevel with { some_1 = some } in
+ let f_classic = closure f_classic_3 @f_classic &toplevel in
+ let g_classic = closure g_classic_4 @g_classic &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (some, f, g, f_classic, g_classic)
  in
  cont k (Pmakeblock))

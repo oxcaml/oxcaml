@@ -25,8 +25,8 @@ let $camlTests6__first_const = Block 0 () in
  in
  (let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let f = closure f_0 @f &toplevel.alloc_region &`region` in
-   apply direct(f_0 &toplevel.alloc_region) unroll(10)
+  (let f = closure f_0 @f &toplevel &`region` in
+   apply direct(f_0 &toplevel) unroll(10)
      (f : _ -> imm tagged) (3) -> k2 * error)
     where k2 (region_return : imm tagged) =
       let `unit` = %end_region (`region`) in

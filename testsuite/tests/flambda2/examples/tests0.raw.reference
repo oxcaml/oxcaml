@@ -22,7 +22,7 @@ let $camlTests0__first_const = Block 0 () in
          | 0 -> k1 (1)
          | 1 -> k1 (2)
  in
- let f = closure f_0 @f &toplevel.alloc_region in
+ let f = closure f_0 @f &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

@@ -68,7 +68,7 @@ let $camlTests8__first_const = Block 0 () in
                  in
                  cont k1 (Pmakeblock)))
  in
- let map_foo = closure map_foo_0 @map_foo &toplevel.alloc_region in
+ let map_foo = closure map_foo_0 @map_foo &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (map_foo) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

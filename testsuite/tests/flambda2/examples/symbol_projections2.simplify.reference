@@ -8,14 +8,13 @@ let code inline(never) loopify(never) size(1) newer_version_of(ignore_0)
         : imm tagged =
   cont k (0)
 in
-let $camlSymbol_projections2__ignore_3 =
-  closure ignore_0_1 @ignore &toplevel.alloc_region
+let $camlSymbol_projections2__ignore_3 = closure ignore_0_1 @ignore &toplevel
 in
 let v = %opaque (33) in
 let v_1 = v in
 let set_of_closures
       $camlSymbol_projections2__g_4 =
-      closure g_1_1 @g &toplevel.alloc_region
+      closure g_1_1 @g &toplevel
       with { v = v }
     end
 and code loopify(never) size(5) newer_version_of(g_1)
@@ -31,7 +30,7 @@ and code loopify(never) size(5) newer_version_of(g_1)
 and set_of_closures
       $`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5` =
       closure `fn[symbol_projections2.ml:21,8--17]_2_1`
-        @`fn[symbol_projections2.ml:21,8--17]` &toplevel.alloc_region
+        @`fn[symbol_projections2.ml:21,8--17]` &toplevel
       with { v_1 = v_1 }
     end
 and code loopify(never) size(4) newer_version_of(`fn[symbol_projections2.ml:21,8--17]_2`)

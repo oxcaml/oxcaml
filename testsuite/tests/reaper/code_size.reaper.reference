@@ -7,7 +7,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(h_2)
         -> k * k1 =
   cont k (Pmakeblock_into_u_field_0)
 in
-let $camlCode_size__h_4 = closure h_2_1 @h &toplevel.alloc_region in
+let $camlCode_size__h_4 = closure h_2_1 @h &toplevel in
 let code loopify(never) size(6) newer_version_of(g_1)
       g_1_1 (y) my_closure &my_alloc_region my_depth -> k * k1 =
   let x = %project_value_slot.[g].[unboxed_field_x] (my_closure) in
@@ -23,6 +23,6 @@ let code loopify(never) size(15) newer_version_of(f_0)
   let g = closure g_1_1 @g &my_alloc_region with { unboxed_field_x = x } in
   cont k (g)
 in
-let $camlCode_size__f_3 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlCode_size__f_3 = closure f_0_1 @f &toplevel in
 let $camlCode_size = Block 0 ($camlCode_size__f_3) in
 cont done ($camlCode_size)

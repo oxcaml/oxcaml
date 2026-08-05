@@ -34,11 +34,9 @@
        let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
        cont k1 (Pmakeblock)
  in
- let $camlCross_function_cse_a__s0 =
-   closure some_0 @some &toplevel.alloc_region
- in
- let $camlCross_function_cse_a__s1 = closure f_1 @f &toplevel.alloc_region in
- let $camlCross_function_cse_a__s2 = closure g_2 @g &toplevel.alloc_region in
+ let $camlCross_function_cse_a__s0 = closure some_0 @some &toplevel in
+ let $camlCross_function_cse_a__s1 = closure f_1 @f &toplevel in
+ let $camlCross_function_cse_a__s2 = closure g_2 @g &toplevel in
  let $camlCross_function_cse_a__s3 =
    Block 0 ($camlCross_function_cse_a__s0,
             $camlCross_function_cse_a__s1,

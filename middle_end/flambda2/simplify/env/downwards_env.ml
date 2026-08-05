@@ -224,49 +224,38 @@ let define_extra_variable t var kind =
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region =
+    ~toplevel_my_alloc_region =
   let typing_env = TE.create ~machine_width ~resolver in
-  let t =
-    { round;
-      machine_width;
-      typing_env;
-      inlined_debuginfo = Inlined_debuginfo.none;
-      disable_inlining = Do_not_disable_inlining;
-      disable_partial_application_stub_generation = false;
-      inlining_state = Inlining_state.default ~round;
-      propagating_float_consts;
-      at_unit_toplevel = true;
-      unit_toplevel_return_continuation;
-      unit_toplevel_exn_continuation;
-      unit_toplevel_alloc_region = toplevel_my_alloc_region;
-      variables_defined_at_toplevel = Variable.Set.empty;
-      cse = CSE.empty;
-      comparison_results = Variable.Map.empty;
-      are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
-      closure_info = Closure_info.not_in_a_closure;
-      all_code = Code_id.Map.empty;
-      get_imported_code;
-      inlining_history_tracker =
-        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
-      loopify_state = Loopify_state.do_not_loopify;
-      replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
-      defined_variables_by_scope = [Lifted_cont_params.empty];
-      lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0;
-      has_seen_a_non_liftable_continuation = false;
-      join_analysis = None
-    }
-  in
-  let my_region_duid = Flambda_debug_uid.none in
-  let my_ghost_region_duid = Flambda_debug_uid.none in
-  define_variable
-    (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
-       K.region)
-    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
-       Name_mode.normal)
-    K.region
+  { round;
+    machine_width;
+    typing_env;
+    inlined_debuginfo = Inlined_debuginfo.none;
+    disable_inlining = Do_not_disable_inlining;
+    disable_partial_application_stub_generation = false;
+    inlining_state = Inlining_state.default ~round;
+    propagating_float_consts;
+    at_unit_toplevel = true;
+    unit_toplevel_return_continuation;
+    unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region = toplevel_my_alloc_region;
+    variables_defined_at_toplevel = Variable.Set.empty;
+    cse = CSE.empty;
+    comparison_results = Variable.Map.empty;
+    are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
+    closure_info = Closure_info.not_in_a_closure;
+    all_code = Code_id.Map.empty;
+    get_imported_code;
+    inlining_history_tracker =
+      Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
+    loopify_state = Loopify_state.do_not_loopify;
+    replay_history = Replay_history.first_pass;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
+    defined_variables_by_scope = [Lifted_cont_params.empty];
+    lifted = Variable.Set.empty;
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    has_seen_a_non_liftable_continuation = false;
+    join_analysis = None
+  }
 
 let all_code t = t.all_code
 

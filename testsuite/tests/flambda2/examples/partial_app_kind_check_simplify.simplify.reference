@@ -15,11 +15,9 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
         : imm tagged =
   cont k (0)
 in
-let $camlPartial_app_kind_check_simplify__f_4 =
-  closure f_1_1 @f &toplevel.alloc_region
-in
+let $camlPartial_app_kind_check_simplify__f_4 = closure f_1_1 @f &toplevel in
 let $camlPartial_app_kind_check_simplify__partial_f_5 =
-  closure partial_f_2 @partial_f &toplevel.alloc_region
+  closure partial_f_2 @partial_f &toplevel
   with { f = $camlPartial_app_kind_check_simplify__f_4 }
 in
 let code loopify(never) size(1) newer_version_of(test_0)
@@ -30,7 +28,7 @@ let code loopify(never) size(1) newer_version_of(test_0)
   cont k ($camlPartial_app_kind_check_simplify__partial_f_5)
 in
 let $camlPartial_app_kind_check_simplify__test_3 =
-  closure test_0_1 @test &toplevel.alloc_region
+  closure test_0_1 @test &toplevel
 in
 let $camlPartial_app_kind_check_simplify =
   Block 0 ($camlPartial_app_kind_check_simplify__test_3)

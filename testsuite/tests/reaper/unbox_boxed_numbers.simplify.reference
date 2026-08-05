@@ -27,7 +27,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(add_int64_0)
   cont k (int64_add)
 in
 let $camlUnbox_boxed_numbers__add_int64_17 =
-  closure add_int64_0_1 @add_int64 &toplevel.alloc_region
+  closure add_int64_0_1 @add_int64 &toplevel
 in
 let code inline(never) loopify(never) size(12) newer_version_of(add_int32_1)
       add_int32_1_1 (x : int32 boxed, y : int32 boxed)
@@ -41,7 +41,7 @@ let code inline(never) loopify(never) size(12) newer_version_of(add_int32_1)
   cont k (int32_add)
 in
 let $camlUnbox_boxed_numbers__add_int32_18 =
-  closure add_int32_1_1 @add_int32 &toplevel.alloc_region
+  closure add_int32_1_1 @add_int32 &toplevel
 in
 let code inline(never) loopify(never) size(11) newer_version_of(add_nativeint_2)
       add_nativeint_2_1 (x : nativeint boxed, y : nativeint boxed)
@@ -55,7 +55,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(add_nativeint_2)
   cont k (nativeint_add)
 in
 let $camlUnbox_boxed_numbers__add_nativeint_19 =
-  closure add_nativeint_2_1 @add_nativeint &toplevel.alloc_region
+  closure add_nativeint_2_1 @add_nativeint &toplevel
 in
 let code loopify(never) size(21) newer_version_of(test_int64_3)
       test_int64_3_1 (a : imm tagged, b : imm tagged)
@@ -79,7 +79,7 @@ let code loopify(never) size(21) newer_version_of(test_int64_3)
       cont k (int_of_int64)
 in
 let $camlUnbox_boxed_numbers__test_int64_20 =
-  closure test_int64_3_1 @test_int64 &toplevel.alloc_region
+  closure test_int64_3_1 @test_int64 &toplevel
 in
 let code loopify(never) size(25) newer_version_of(test_int32_4)
       test_int32_4_1 (a : imm tagged, b : imm tagged)
@@ -103,7 +103,7 @@ let code loopify(never) size(25) newer_version_of(test_int32_4)
       cont k (int_of_int32)
 in
 let $camlUnbox_boxed_numbers__test_int32_21 =
-  closure test_int32_4_1 @test_int32 &toplevel.alloc_region
+  closure test_int32_4_1 @test_int32 &toplevel
 in
 let code loopify(never) size(22) newer_version_of(test_nativeint_5)
       test_nativeint_5_1 (a : imm tagged, b : imm tagged)
@@ -127,7 +127,7 @@ let code loopify(never) size(22) newer_version_of(test_nativeint_5)
       cont k (int_of_nativeint)
 in
 let $camlUnbox_boxed_numbers__test_nativeint_22 =
-  closure test_nativeint_5_1 @test_nativeint &toplevel.alloc_region
+  closure test_nativeint_5_1 @test_nativeint &toplevel
 in
 let code inline(never) loopify(never) size(10) newer_version_of(add_float_6)
       add_float_6_1 (x : float boxed, y : float boxed)
@@ -141,7 +141,7 @@ let code inline(never) loopify(never) size(10) newer_version_of(add_float_6)
   cont k (float_add)
 in
 let $camlUnbox_boxed_numbers__add_float_23 =
-  closure add_float_6_1 @add_float &toplevel.alloc_region
+  closure add_float_6_1 @add_float &toplevel
 in
 let code inline(never) loopify(never) size(10) newer_version_of(add_float32_7)
       add_float32_7_1 (x : float32 boxed, y : float32 boxed)
@@ -155,7 +155,7 @@ let code inline(never) loopify(never) size(10) newer_version_of(add_float32_7)
   cont k (float32_add)
 in
 let $camlUnbox_boxed_numbers__add_float32_24 =
-  closure add_float32_7_1 @add_float32 &toplevel.alloc_region
+  closure add_float32_7_1 @add_float32 &toplevel
 in
 let code loopify(never) size(23) newer_version_of(test_float_8)
       test_float_8_1 (a : imm tagged, b : imm tagged)
@@ -179,7 +179,7 @@ let code loopify(never) size(23) newer_version_of(test_float_8)
       cont k (int_of_float)
 in
 let $camlUnbox_boxed_numbers__test_float_25 =
-  closure test_float_8_1 @test_float &toplevel.alloc_region
+  closure test_float_8_1 @test_float &toplevel
 in
 let code loopify(never) size(23) newer_version_of(test_float32_9)
       test_float32_9_1 (a : imm tagged, b : imm tagged)
@@ -203,7 +203,7 @@ let code loopify(never) size(23) newer_version_of(test_float32_9)
       cont k (int_of_float32)
 in
 let $camlUnbox_boxed_numbers__test_float32_26 =
-  closure test_float32_9_1 @test_float32 &toplevel.alloc_region
+  closure test_float32_9_1 @test_float32 &toplevel
 in
 let code inline(never) loopify(never) size(6) newer_version_of(read_11)
       read_11_1 (param : imm tagged)
@@ -236,7 +236,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_10)
       cont k (int_add)
 in
 let $camlUnbox_boxed_numbers__test_value_slot_27 =
-  closure test_value_slot_10_1 @test_value_slot &toplevel.alloc_region
+  closure test_value_slot_10_1 @test_value_slot &toplevel
 in
 let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
       indirect_14_1 (read : val)
@@ -245,7 +245,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
   apply &my_alloc_region read (0) -> k * k1
 in
 let $camlUnbox_boxed_numbers__indirect_29 =
-  closure indirect_14_1 @indirect &toplevel.alloc_region
+  closure indirect_14_1 @indirect &toplevel
 in
 let code inline(never) loopify(never) size(6) newer_version_of(read_13)
       read_13_1 (param : imm tagged)
@@ -281,7 +281,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_not_unboxed_12
 in
 let $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_28 =
   closure test_value_slot_not_unboxed_12_1 @test_value_slot_not_unboxed
-    &toplevel.alloc_region
+    &toplevel
 in
 let code inline(never) loopify(never) size(6) newer_version_of(pair_first_15)
       pair_first_15_1 (p : [ 0 of int64 boxed * int64 boxed ])
@@ -295,7 +295,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(pair_first_15)
   cont k (int_of_int64)
 in
 let $camlUnbox_boxed_numbers__pair_first_30 =
-  closure pair_first_15_1 @pair_first &toplevel.alloc_region
+  closure pair_first_15_1 @pair_first &toplevel
 in
 let code loopify(never) size(23) newer_version_of(test_pair_16)
       test_pair_16_1 (a : imm tagged, b : imm tagged)
@@ -317,7 +317,7 @@ let code loopify(never) size(23) newer_version_of(test_pair_16)
       -> k * k1
 in
 let $camlUnbox_boxed_numbers__test_pair_31 =
-  closure test_pair_16_1 @test_pair &toplevel.alloc_region
+  closure test_pair_16_1 @test_pair &toplevel
 in
 let $camlUnbox_boxed_numbers =
   Block 0 ($camlUnbox_boxed_numbers__test_int64_20,

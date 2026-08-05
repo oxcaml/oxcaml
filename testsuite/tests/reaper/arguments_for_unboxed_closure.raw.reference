@@ -64,7 +64,7 @@ let $camlArguments_for_unboxed_closure__first_const = Block 0 () in
        let unit_1 = %end_ghost_region (ghost_region) in
        cont k1 (region_return)
  in
- let f = closure f_0 @f &toplevel.alloc_region in
+ let f = closure f_0 @f &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

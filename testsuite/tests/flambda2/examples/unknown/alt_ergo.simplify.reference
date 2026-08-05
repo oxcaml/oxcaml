@@ -1,30 +1,30 @@
-let $camlAlt_ergo__immstring45 = "alt_ergo.ml" in
-let $camlAlt_ergo__const_block47 =
-  Block 0 ($camlAlt_ergo__immstring45, 23, 4)
+let $camlAlt_ergo__immstring43 = "alt_ergo.ml" in
+let $camlAlt_ergo__const_block45 =
+  Block 0 ($camlAlt_ergo__immstring43, 23, 4)
 in
-let $camlAlt_ergo__Pmakeblock50 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block47)
+let $camlAlt_ergo__Pmakeblock48 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block45)
 in
-let $camlAlt_ergo__const_block53 =
-  Block 0 ($camlAlt_ergo__immstring45, 21, 14)
+let $camlAlt_ergo__const_block51 =
+  Block 0 ($camlAlt_ergo__immstring43, 21, 14)
 in
-let $camlAlt_ergo__Pmakeblock56 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block53)
+let $camlAlt_ergo__Pmakeblock54 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block51)
 in
 let code inv_borne_sup_1 deleted in
 let code inv_bornes_2 deleted in
-let $camlAlt_ergo__const_block94 =
-  Block 0 ($camlAlt_ergo__immstring45, 35, 24)
+let $camlAlt_ergo__const_block92 =
+  Block 0 ($camlAlt_ergo__immstring43, 35, 24)
 in
-let $camlAlt_ergo__Pmakeblock97 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block94)
+let $camlAlt_ergo__Pmakeblock95 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block92)
 in
 let code inv_3 deleted in
-let $camlAlt_ergo__const_block109 =
-  Block 0 ($camlAlt_ergo__immstring45, 40, 2)
+let $camlAlt_ergo__const_block107 =
+  Block 0 ($camlAlt_ergo__immstring43, 40, 2)
 in
-let $camlAlt_ergo__Pmakeblock112 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block109)
+let $camlAlt_ergo__Pmakeblock110 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block107)
 in
 let code div_4 deleted in
 let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
@@ -45,8 +45,8 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
     where k3 =
       let untagged = %untag_imm (b) in
       switch untagged
-        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock50)
-        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock56)
+        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock48)
+        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock54)
     where k2 =
       ((let Pfield = %block_load.[`0`] (b) in
         let Pfield_1 = %block_load.[`0`] (Pfield) in
@@ -92,7 +92,7 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
                      cont k (Pmakeblock_1))))
 in
 let $camlAlt_ergo__inv_borne_sup_6 =
-  closure inv_borne_sup_1_1 @inv_borne_sup &toplevel.alloc_region
+  closure inv_borne_sup_1_1 @inv_borne_sup &toplevel
 in
 let code loopify(never) size(14) newer_version_of(inv_bornes_2)
       inv_bornes_2_1
@@ -119,7 +119,7 @@ let code loopify(never) size(14) newer_version_of(inv_bornes_2)
       cont k (Pmakeblock)
 in
 let $camlAlt_ergo__inv_bornes_7 =
-  closure inv_bornes_2_1 @inv_bornes &toplevel.alloc_region
+  closure inv_bornes_2_1 @inv_bornes &toplevel
 in
 let code loopify(never) size(45) newer_version_of(inv_3) tupled 
       inv_3_1 (param : [ 0 | 0 of val * val ], param_1, param_2)
@@ -129,12 +129,12 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock95)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
       let prim_1 = %is_int (Pfield) in
       (switch prim_1
-         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock95)
          | 1 -> k2
          where k2 =
            let `*match*` = %block_load.[`0`] (param) in
@@ -160,7 +160,7 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
                 in
                 cont k (Pmakeblock)))
 in
-let $camlAlt_ergo__inv_8 = closure inv_3_1 @inv &toplevel.alloc_region in
+let $camlAlt_ergo__inv_8 = closure inv_3_1 @inv &toplevel in
 let code loopify(never) size(11) newer_version_of(div_4)
       div_4_1 (i1, i2 : [ 0 of [ 0 | 0 of val * val ] * val * val ])
         my_closure &my_alloc_region my_depth
@@ -175,8 +175,8 @@ let code loopify(never) size(11) newer_version_of(div_4)
      where k3 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
        cont k2)
     where k2 =
-      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock112)
+      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock110)
 in
-let $camlAlt_ergo__div_9 = closure div_4_1 @div &toplevel.alloc_region in
+let $camlAlt_ergo__div_9 = closure div_4_1 @div &toplevel in
 let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_9) in
 cont done ($camlAlt_ergo)

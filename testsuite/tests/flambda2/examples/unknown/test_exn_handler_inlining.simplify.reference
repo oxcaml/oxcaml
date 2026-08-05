@@ -6,9 +6,7 @@ let code loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (x)
 in
-let $camlTest_exn_handler_inlining__id_4 =
-  closure id_0_1 @`id` &toplevel.alloc_region
-in
+let $camlTest_exn_handler_inlining__id_4 = closure id_0_1 @`id` &toplevel in
 let code loopify(never) size(19) newer_version_of(p_2)
       p_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -26,9 +24,7 @@ let code loopify(never) size(19) newer_version_of(p_2)
       let Popaque = %opaque ($camlTest_exn_handler_inlining__id_4) in
       apply &my_alloc_region Popaque (Pfield) -> k * k1
 in
-let $camlTest_exn_handler_inlining__p_6 =
-  closure p_2_1 @p &toplevel.alloc_region
-in
+let $camlTest_exn_handler_inlining__p_6 = closure p_2_1 @p &toplevel in
 let code loopify(never) size(4) newer_version_of(g_1)
       g_1_1 (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -40,9 +36,7 @@ let code loopify(never) size(4) newer_version_of(g_1)
       (y)
       -> k * k1
 in
-let $camlTest_exn_handler_inlining__g_5 =
-  closure g_1_1 @g &toplevel.alloc_region
-in
+let $camlTest_exn_handler_inlining__g_5 = closure g_1_1 @g &toplevel in
 let code loopify(never) size(18) newer_version_of(f_3)
       f_3_1 (x : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -74,9 +68,7 @@ let code loopify(never) size(18) newer_version_of(f_3)
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       cont k (c_unboxed0_1)
 in
-let $camlTest_exn_handler_inlining__f_7 =
-  closure f_3_1 @f &toplevel.alloc_region
-in
+let $camlTest_exn_handler_inlining__f_7 = closure f_3_1 @f &toplevel in
 let $camlTest_exn_handler_inlining =
   Block 0 ($camlTest_exn_handler_inlining__id_4,
            $camlTest_exn_handler_inlining__g_5,

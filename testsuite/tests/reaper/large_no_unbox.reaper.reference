@@ -16,9 +16,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(large_2)
   let int_add_2 = %int_barith.add (int_add_1, Pfield) in
   cont k (int_add_2)
 in
-let $camlLarge_no_unbox__large_5 =
-  closure large_2_1 @large &toplevel.alloc_region
-in
+let $camlLarge_no_unbox__large_5 = closure large_2_1 @large &toplevel in
 let code inline(never) loopify(never) size(5) newer_version_of(small_1)
       small_1_1
         (Pmakeblock_into_param_field_0,
@@ -34,9 +32,7 @@ let code inline(never) loopify(never) size(5) newer_version_of(small_1)
   let int_add_1 = %int_barith.add (int_add, Pfield) in
   cont k (int_add_1)
 in
-let $camlLarge_no_unbox__small_4 =
-  closure small_1_1 @small &toplevel.alloc_region
-in
+let $camlLarge_no_unbox__small_4 = closure small_1_1 @small &toplevel in
 let code loopify(never) size(36) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -71,6 +67,6 @@ let code loopify(never) size(36) newer_version_of(f_0)
            let `unit` = %end_region (`region`) in
            cont k (int_add))
 in
-let $camlLarge_no_unbox__f_3 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlLarge_no_unbox__f_3 = closure f_0_1 @f &toplevel in
 let $camlLarge_no_unbox = Block 0 ($camlLarge_no_unbox__f_3) in
 cont done ($camlLarge_no_unbox)

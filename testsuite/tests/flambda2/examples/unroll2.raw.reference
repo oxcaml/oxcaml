@@ -26,8 +26,8 @@ let $camlUnroll2__first_const = Block 0 () in
    let foo = %project_value_slot.[bar].[foo] (my_closure) in
    apply direct(foo_0 &my_alloc_region) unroll(2) foo (x) -> k1 * k2
  in
- let foo = closure foo_0 @foo &toplevel.alloc_region in
- let bar = closure bar_1 @bar &toplevel.alloc_region with { foo = foo } in
+ let foo = closure foo_0 @foo &toplevel in
+ let bar = closure bar_1 @bar &toplevel with { foo = foo } in
  let Pmakeblock = %block.[`0`].`toplevel` (foo, bar) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

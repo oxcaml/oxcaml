@@ -4,11 +4,9 @@ let code inline(always) loopify(never) size(6) newer_version_of(apply_0)
       apply_0_1 (f : val, i) my_closure &my_alloc_region my_depth -> k * k1 =
   apply &my_alloc_region inlined(hint) f (i) -> k * k1
 in
-let $camlInlined_rec__apply_2 =
-  closure apply_0_1 @`apply` &toplevel.alloc_region
-in
+let $camlInlined_rec__apply_2 = closure apply_0_1 @`apply` &toplevel in
 let $camlInlined_rec__fact_3 =
-  closure fact_1_1 @fact &toplevel.alloc_region
+  closure fact_1_1 @fact &toplevel
 and code rec loopify(never) size(42) newer_version_of(fact_1)
       fact_1_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -38,7 +36,7 @@ and code rec loopify(never) size(42) newer_version_of(fact_1)
            let int_mul = %int_barith.mul (n, apply_result) in
            cont k (int_mul))
 in
-apply direct(fact_1_1 &toplevel.alloc_region)
+apply direct(fact_1_1 &toplevel)
   ($camlInlined_rec__fact_3 : _ -> imm tagged) (1000000) -> k * error
   where k (i : imm tagged) =
     let $camlInlined_rec =

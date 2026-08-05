@@ -1,11 +1,11 @@
 let code length_aux_0 deleted in
 let code length_1 deleted in
 let code rev_append_2 deleted in
-let $camlTests9__immstring53 = "tests9.ml" in
-let $camlTests9__const_block55 = Block 0 ($camlTests9__immstring53, 39, 52)
+let $camlTests9__immstring51 = "tests9.ml" in
+let $camlTests9__const_block53 = Block 0 ($camlTests9__immstring51, 39, 52)
 in
-let $camlTests9__Pmakeblock58 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block55)
+let $camlTests9__Pmakeblock56 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block53)
 in
 let code chop_3 deleted in
 let code rev_merge_5 deleted in
@@ -33,8 +33,7 @@ let code loopify(done) size(16) newer_version_of(length_aux_0)
            let int_add = %int_barith.add (len_1, 1) in
            cont `self` (int_add, Pfield))
 in
-let $camlTests9__length_aux_12 =
-  closure length_aux_0_1 @length_aux &toplevel.alloc_region
+let $camlTests9__length_aux_12 = closure length_aux_0_1 @length_aux &toplevel
 in
 let code loopify(never) size(4) newer_version_of(length_1)
       length_1_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -44,9 +43,7 @@ let code loopify(never) size(4) newer_version_of(length_1)
   apply direct(length_aux_0_1 &my_alloc_region)
     ($camlTests9__length_aux_12 : _ -> imm tagged) (0, l) -> k * k1
 in
-let $camlTests9__length_13 =
-  closure length_1_1 @length &toplevel.alloc_region
-in
+let $camlTests9__length_13 = closure length_1_1 @length &toplevel in
 let code loopify(done) size(22) newer_version_of(rev_append_2)
       rev_append_2_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -68,8 +65,7 @@ let code loopify(done) size(22) newer_version_of(rev_append_2)
            let Pfield_1 = %block_load.[`1`] (l1_1) in
            cont `self` (Pfield_1, Pmakeblock))
 in
-let $camlTests9__rev_append_14 =
-  closure rev_append_2_1 @rev_append &toplevel.alloc_region
+let $camlTests9__rev_append_14 = closure rev_append_2_1 @rev_append &toplevel
 in
 let code loopify(done) size(28) newer_version_of(chop_3)
       chop_3_1
@@ -89,13 +85,13 @@ let code loopify(done) size(28) newer_version_of(chop_3)
            let prim_1 = %is_int (l_1) in
            (switch prim_1
               | 0 -> k2
-              | 1 -> k1 pop(regular k1) ($camlTests9__Pmakeblock58)
+              | 1 -> k1 pop(regular k1) ($camlTests9__Pmakeblock56)
               where k2 =
                 let Pfield = %block_load.[`1`] (l_1) in
                 let int_sub = %int_barith.sub (k_1, 1) in
                 cont `self` (int_sub, Pfield)))
 in
-let $camlTests9__chop_15 = closure chop_3_1 @chop &toplevel.alloc_region in
+let $camlTests9__chop_15 = closure chop_3_1 @chop &toplevel in
 let code loopify(done) size(90) newer_version_of(rev_merge_5)
       rev_merge_5_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -1077,9 +1073,7 @@ let code loopify(never) size(1411) newer_version_of(sort_uniq_4)
                (len, l)
                -> k * k1)
 in
-let $camlTests9__sort_uniq_16 =
-  closure sort_uniq_4_1 @sort_uniq &toplevel.alloc_region
-in
+let $camlTests9__sort_uniq_16 = closure sort_uniq_4_1 @sort_uniq &toplevel in
 let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
       rev_sort_11_1
         (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -1153,7 +1147,7 @@ let code loopify(never) size(98) newer_version_of(foo_9)
   apply direct(sort_10_1 &my_alloc_region)
     (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) (42, l) -> k * k1
 in
-let $camlTests9__foo_17 = closure foo_9_1 @foo &toplevel.alloc_region in
+let $camlTests9__foo_17 = closure foo_9_1 @foo &toplevel in
 let $camlTests9 =
   Block 0 ($camlTests9__length_aux_12,
            $camlTests9__length_13,

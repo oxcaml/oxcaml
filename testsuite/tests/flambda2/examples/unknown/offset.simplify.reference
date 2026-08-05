@@ -94,16 +94,14 @@ let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
            in
            cont k (h))
 in
-let $camlOffset__inline_5 =
-  closure inline_0_1 @`inline` &toplevel.alloc_region
-in
-apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
+let $camlOffset__inline_5 = closure inline_0_1 @`inline` &toplevel in
+apply direct(partial_apply1_44 &toplevel) inlined(never)
        inlining_state(depth(11))
   ($Stdlib__Random.camlStdlib__Random__partial_apply1_104 : _ -> imm tagged)
     (10)
     -> k * error
   where k (r : imm tagged) =
-    (apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
+    (apply direct(partial_apply1_44 &toplevel) inlined(never)
             inlining_state(depth(11))
        ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
         : _ -> imm tagged)
@@ -118,11 +116,11 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
            cont k (0)
          in
          let $camlOffset__f_7 =
-           closure f_2_2 @f &toplevel.alloc_region
+           closure f_2_2 @f &toplevel
          and $camlOffset__g_8 =
-           closure g_3_2 @g &toplevel.alloc_region
+           closure g_3_2 @g &toplevel
          and $camlOffset__h_9 =
-           closure h_4_2 @h &toplevel.alloc_region
+           closure h_4_2 @h &toplevel
          and code rec loopify(never) size(6) newer_version_of(h_4_1)
                h_4_2 (x : imm tagged, y : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -144,15 +142,15 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
            cont k (int_add)
            with { a = 1; b = 0; r = r; s = s }
          in
-         (apply direct(partial_apply1_44 &toplevel.alloc_region)
-                 inlined(never) inlining_state(depth(11))
+         (apply direct(partial_apply1_44 &toplevel) inlined(never)
+                 inlining_state(depth(11))
             ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
              : _ -> imm tagged)
               (10)
               -> k * error
             where k (r_1 : imm tagged) =
-              (apply direct(partial_apply1_44 &toplevel.alloc_region)
-                      inlined(never) inlining_state(depth(11))
+              (apply direct(partial_apply1_44 &toplevel) inlined(never)
+                      inlining_state(depth(11))
                  ($Stdlib__Random.camlStdlib__Random__partial_apply1_104
                   : _ -> imm tagged)
                    (10)
@@ -180,11 +178,11 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                      cont k (0)
                    in
                    let $camlOffset__f_10 =
-                     closure f_2_3 @f &toplevel.alloc_region
+                     closure f_2_3 @f &toplevel
                    and $camlOffset__g_11 =
-                     closure g_3_3 @g &toplevel.alloc_region
+                     closure g_3_3 @g &toplevel
                    and $camlOffset__h_12 =
-                     closure h_4_3 @h &toplevel.alloc_region
+                     closure h_4_3 @h &toplevel
                      with { a = 0; b = 0; r = r_1; s = s_1 }
                    in
                    let $camlOffset =

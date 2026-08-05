@@ -5,7 +5,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(merge_usages_1)
   cont k (u)
 in
 let $camlBoxed_number_subkind_erasure__merge_usages_3 =
-  closure merge_usages_1_1 @merge_usages &toplevel.alloc_region
+  closure merge_usages_1_1 @merge_usages &toplevel
 in
 let code loopify(never) size(50) newer_version_of(f_0)
       f_0_1 (b : imm tagged, x : int32 boxed, y : int64 boxed)
@@ -46,9 +46,7 @@ let code loopify(never) size(50) newer_version_of(f_0)
                 let int64_add = %box_num.`int64`.my_alloc_region (prim_1) in
                 cont k (int64_add)))
 in
-let $camlBoxed_number_subkind_erasure__f_2 =
-  closure f_0_1 @f &toplevel.alloc_region
-in
+let $camlBoxed_number_subkind_erasure__f_2 = closure f_0_1 @f &toplevel in
 let $camlBoxed_number_subkind_erasure =
   Block 0 ($camlBoxed_number_subkind_erasure__f_2)
 in

@@ -1,6 +1,6 @@
-let $camlLocal__const_block13 = Block 0 (3, 0) in
-let $camlLocal__const_block15 = Block 0 (2, $camlLocal__const_block13) in
-let $camlLocal__const_block17 = Block 0 (1, $camlLocal__const_block15) in
+let $camlLocal__const_block11 = Block 0 (3, 0) in
+let $camlLocal__const_block13 = Block 0 (2, $camlLocal__const_block11) in
+let $camlLocal__const_block15 = Block 0 (1, $camlLocal__const_block13) in
 let code return_local_0 deleted in
 let code map_local_1 deleted in
 let code length_2 deleted in
@@ -9,41 +9,41 @@ let code rev_app_4 deleted in
 let code find_span_6 deleted in
 let code spans_5 deleted in
 let code is_even_7 deleted in
-let $camlLocal__immstring56 = "local.ml" in
-let $camlLocal__const_block192 = Block 0 ($camlLocal__immstring56, 58, 2) in
-let $camlLocal__Pmakeblock195 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block192)
+let $camlLocal__immstring54 = "local.ml" in
+let $camlLocal__const_block190 = Block 0 ($camlLocal__immstring54, 58, 2) in
+let $camlLocal__Pmakeblock193 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block190)
 in
-let $camlLocal__const_block177 = Block 0 (4, 0) in
-let $camlLocal__const_block179 = Block 0 (3, $camlLocal__const_block177) in
-let $camlLocal__const_block181 = Block 0 (2, $camlLocal__const_block179) in
-let $camlLocal__const_block183 = Block 0 (1, $camlLocal__const_block181) in
-let $camlLocal__const_block185 = Block 0 (0, $camlLocal__const_block183) in
-let $camlLocal__const_block98 = Block 0 ($camlLocal__immstring56, 33, 2) in
-let $camlLocal__Pmakeblock101 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block98)
+let $camlLocal__const_block175 = Block 0 (4, 0) in
+let $camlLocal__const_block177 = Block 0 (3, $camlLocal__const_block175) in
+let $camlLocal__const_block179 = Block 0 (2, $camlLocal__const_block177) in
+let $camlLocal__const_block181 = Block 0 (1, $camlLocal__const_block179) in
+let $camlLocal__const_block183 = Block 0 (0, $camlLocal__const_block181) in
+let $camlLocal__const_block96 = Block 0 ($camlLocal__immstring54, 33, 2) in
+let $camlLocal__Pmakeblock99 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block96)
 in
-let $camlLocal__const_block73 = Block 0 ($camlLocal__immstring56, 28, 9) in
-let $camlLocal__Pmakeblock76 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block73)
+let $camlLocal__const_block71 = Block 0 ($camlLocal__immstring54, 28, 9) in
+let $camlLocal__Pmakeblock74 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block71)
 in
-let $camlLocal__const_block58 = Block 0 ($camlLocal__immstring56, 26, 9) in
-let $camlLocal__Pmakeblock61 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block58)
+let $camlLocal__const_block56 = Block 0 ($camlLocal__immstring54, 26, 9) in
+let $camlLocal__Pmakeblock59 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlLocal__const_block56)
 in
-let $camlLocal__const_block50 = Block 0 (1, 0) in
+let $camlLocal__const_block48 = Block 0 (1, 0) in
 let code loopify(never) size(1) newer_version_of(return_local_0)
       return_local_0_1 (param : imm tagged)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] stack =
-  cont k ($camlLocal__const_block17)
+  cont k ($camlLocal__const_block15)
 in
 let $camlLocal__return_local_8 =
-  closure return_local_0_1 @return_local &toplevel.alloc_region
+  closure return_local_0_1 @return_local &toplevel
 in
 let $camlLocal__map_local_9 =
-  closure map_local_1_1 @map_local &toplevel.alloc_region
+  closure map_local_1_1 @map_local &toplevel
 and code rec loopify(never) size(31) newer_version_of(map_local_1)
       map_local_1_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
@@ -73,7 +73,7 @@ and code rec loopify(never) size(31) newer_version_of(map_local_1)
                 cont k (Pmakeblock)))
 in
 let $camlLocal__length_10 =
-  closure length_2_1 @length &toplevel.alloc_region
+  closure length_2_1 @length &toplevel
 and code rec loopify(never) size(19) newer_version_of(length_2)
       length_2_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -94,18 +94,17 @@ and code rec loopify(never) size(19) newer_version_of(length_2)
            let int_add = %int_barith.add (1, apply_result) in
            cont k (int_add))
 in
-apply direct(length_2_1 &toplevel.alloc_region)
+apply direct(length_2_1 &toplevel)
   ($camlLocal__length_10 : _ -> imm tagged)
-    ($camlLocal__const_block50)
+    ($camlLocal__const_block48)
     -> k1 * error
   where k1 (apply_result : imm tagged) =
     let prim = %phys_eq (apply_result, 1) in
     switch prim
-      | 0 -> error pop(regular error) ($camlLocal__Pmakeblock61)
+      | 0 -> error pop(regular error) ($camlLocal__Pmakeblock59)
       | 1 -> k
   where k =
-    (apply direct(length_2_1 &toplevel.alloc_region)
-            inlining_state(depth(30))
+    (apply direct(length_2_1 &toplevel) inlining_state(depth(30))
        ($camlLocal__length_10 ~ depth unroll 1 2 -> unroll 0 3
         : _ -> imm tagged)
          (0)
@@ -116,7 +115,7 @@ apply direct(length_2_1 &toplevel.alloc_region)
          let int_add_2 = %int_barith.add (1, int_add_1) in
          let prim = %phys_eq (int_add_2, 3) in
          switch prim
-           | 0 -> error pop(regular error) ($camlLocal__Pmakeblock76)
+           | 0 -> error pop(regular error) ($camlLocal__Pmakeblock74)
            | 1 -> k
        where k =
          let `region` = %begin_region () in
@@ -131,24 +130,22 @@ apply direct(length_2_1 &toplevel.alloc_region)
            in
            let $`camlLocal__fn[local.ml:32,27--43]_11` =
              closure `fn[local.ml:32,27--43]_3_1` @`fn[local.ml:32,27--43]`
-               &toplevel.alloc_region
+               &toplevel
            in
-           apply
-                  direct(map_local_1_1
-                  &toplevel.alloc_region &`region` &ghost_region)
+           apply direct(map_local_1_1 &toplevel &`region` &ghost_region)
              ($camlLocal__map_local_9
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                ($`camlLocal__fn[local.ml:32,27--43]_11`,
-                $camlLocal__const_block17)
+                $camlLocal__const_block15)
                -> k1 * error)
             where k1 (ms : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-              (apply direct(length_2_1 &toplevel.alloc_region)
+              (apply direct(length_2_1 &toplevel)
                  ($camlLocal__length_10 : _ -> imm tagged) (ms) -> k1 * error
                  where k1 (apply_result : imm tagged) =
                    let prim = %phys_eq (apply_result, 3) in
                    switch prim
                      | 0 ->
-                       error pop(regular error) ($camlLocal__Pmakeblock101)
+                       error pop(regular error) ($camlLocal__Pmakeblock99)
                      | 1 -> k)
             where k =
               let `unit` = %end_region (`region`) in
@@ -181,12 +178,12 @@ apply direct(length_2_1 &toplevel.alloc_region)
                          cont `self` (Pfield_1, Pmakeblock))
               in
               let $camlLocal__rev_app_12 =
-                closure rev_app_4_1 @rev_app &toplevel.alloc_region
+                closure rev_app_4_1 @rev_app &toplevel
               in
               let $camlLocal__spans_13 =
-                closure spans_5_1 @spans &toplevel.alloc_region
+                closure spans_5_1 @spans &toplevel
               and $camlLocal__find_span_14 =
-                closure find_span_6_1 @find_span &toplevel.alloc_region
+                closure find_span_6_1 @find_span &toplevel
               and code rec loopify(never) size(58) newer_version_of(find_span_6)
                     find_span_6_1
                       (break_here : val,
@@ -312,21 +309,19 @@ apply direct(length_2_1 &toplevel.alloc_region)
                 cont k (eq)
               in
               let $camlLocal__is_even_15 =
-                closure is_even_7_1 @is_even &toplevel.alloc_region
+                closure is_even_7_1 @is_even &toplevel
               in
               let region_1 = %begin_region () in
               let ghost_region_1 = %begin_ghost_region () in
-              (apply
-                      direct(spans_5_1
-                      &toplevel.alloc_region &region_1 &ghost_region_1)
+              (apply direct(spans_5_1 &toplevel &region_1 &ghost_region_1)
                  ($camlLocal__spans_13
                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-                   ($camlLocal__is_even_15, $camlLocal__const_block185)
+                   ($camlLocal__is_even_15, $camlLocal__const_block183)
                    -> k1 * error
                  where k1
                          (even_spans :
                             [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
-                   (apply direct(length_2_1 &toplevel.alloc_region)
+                   (apply direct(length_2_1 &toplevel)
                       ($camlLocal__length_10 : _ -> imm tagged)
                         (even_spans)
                         -> k1 * error
@@ -336,7 +331,7 @@ apply direct(length_2_1 &toplevel.alloc_region)
                           | 0 ->
                             error
                               pop(regular error)
-                              ($camlLocal__Pmakeblock195)
+                              ($camlLocal__Pmakeblock193)
                           | 1 -> k)
                  where k =
                    let unit_2 = %end_region (region_1) in

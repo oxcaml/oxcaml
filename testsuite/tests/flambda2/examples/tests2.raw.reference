@@ -23,8 +23,8 @@ let $camlTests2__first_const = Block 0 () in
             let int_add = %int_barith.add (1, apply_result) in
             cont k1 (int_add))
  in
- let f = closure f_0 @f &toplevel.alloc_region in
- apply direct(f_0 &toplevel.alloc_region) unroll(10)
+ let f = closure f_0 @f &toplevel in
+ apply direct(f_0 &toplevel) unroll(10)
    (f : _ -> imm tagged) (5) -> k1 * error
    where k1 (n : imm tagged) =
      let Pmakeblock = %block.[`0`].`toplevel` (f, n) in

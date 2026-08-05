@@ -2,7 +2,7 @@ let code f_0 deleted in
 let code g_1 deleted in
 let r = %block.mut.[`0`].`toplevel` (42) in
 let $camlToplevel_closures__f_2 =
-  closure f_0_1 @f &toplevel.alloc_region
+  closure f_0_1 @f &toplevel
 and code loopify(never) size(5) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -15,7 +15,7 @@ and code loopify(never) size(5) newer_version_of(f_0)
   with { r = r }
 in
 let $camlToplevel_closures__g_3 =
-  closure g_1_1 @g &toplevel.alloc_region
+  closure g_1_1 @g &toplevel
 and code loopify(never) size(8) newer_version_of(g_1)
       g_1_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth

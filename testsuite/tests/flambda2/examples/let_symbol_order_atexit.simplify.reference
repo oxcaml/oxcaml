@@ -8,14 +8,12 @@ let code loopify(never) size(1) newer_version_of(id_0)
         : imm tagged =
   cont k (0)
 in
-let $camlLet_symbol_order_atexit__id_4 =
-  closure id_0_1 @`id` &toplevel.alloc_region
-in
+let $camlLet_symbol_order_atexit__id_4 = closure id_0_1 @`id` &toplevel in
 let exit_function =
   %block.mut.[`0`].`toplevel` ($camlLet_symbol_order_atexit__id_4)
 in
 let $camlLet_symbol_order_atexit__do_at_exit_5 =
-  closure do_at_exit_1_1 @do_at_exit &toplevel.alloc_region
+  closure do_at_exit_1_1 @do_at_exit &toplevel
 and code loopify(never) size(8) newer_version_of(do_at_exit_1)
       do_at_exit_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -46,8 +44,7 @@ let code loopify(never) size(19) newer_version_of(exit_3)
       apply ccall
         ($`*extern*`.caml_sys_exit : val -> val) (retcode) -> k * k1
 in
-let $camlLet_symbol_order_atexit__exit_7 =
-  closure exit_3_1 @exit &toplevel.alloc_region
+let $camlLet_symbol_order_atexit__exit_7 = closure exit_3_1 @exit &toplevel
 in
 let $camlLet_symbol_order_atexit =
   Block 0 ($camlLet_symbol_order_atexit__exit_7,

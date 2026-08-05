@@ -9,8 +9,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,49--61]_3`)
   cont k (x)
 in
 let $`camlTests8__fn[tests8.ml:20,49--61]_6` =
-  closure `fn[tests8.ml:20,49--61]_3_1` @`fn[tests8.ml:20,49--61]`
-    &toplevel.alloc_region
+  closure `fn[tests8.ml:20,49--61]_3_1` @`fn[tests8.ml:20,49--61]` &toplevel
 in
 let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,62--77]_2`)
       `fn[tests8.ml:20,62--77]_2_1` (param : imm tagged)
@@ -20,11 +19,10 @@ let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,62--77]_2`)
   cont k (0)
 in
 let $`camlTests8__fn[tests8.ml:20,62--77]_5` =
-  closure `fn[tests8.ml:20,62--77]_2_1` @`fn[tests8.ml:20,62--77]`
-    &toplevel.alloc_region
+  closure `fn[tests8.ml:20,62--77]_2_1` @`fn[tests8.ml:20,62--77]` &toplevel
 in
 let $camlTests8__map_foo_4 =
-  closure map_foo_0_1 @map_foo &toplevel.alloc_region
+  closure map_foo_0_1 @map_foo &toplevel
 and code rec loopify(never) size(44) newer_version_of(map_foo_0)
       map_foo_0_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth

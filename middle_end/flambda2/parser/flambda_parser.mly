@@ -711,13 +711,7 @@ loopify:
 
 region:
   | v = variable { Named v }
-  | KWD_TOPLEVEL; DOT; i = IDENT {
-    match i with
-    | "alloc_region" -> Toplevel_alloc_region
-    | "region" -> Toplevel_region
-    | "ghost_region" -> Toplevel_ghost_region
-    | _ -> Misc.fatal_errorf "toplevel. must be followed \
-      by alloc_region, region or ghost_region" }
+  | KWD_TOPLEVEL { Toplevel_alloc_region }
 ;
 
 result_continuation:

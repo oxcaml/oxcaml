@@ -20,7 +20,7 @@ let $camlTests4a__first_const = Block 0 () in
        cont k1 (eq)
  in
  let pr2162_3_as_int64 =
-   closure pr2162_3_as_int64_0 @pr2162_3_as_int64 &toplevel.alloc_region
+   closure pr2162_3_as_int64_0 @pr2162_3_as_int64 &toplevel
  in
  let Pmakeblock = %block.[`0`].`toplevel` (pr2162_3_as_int64) in
  cont k (Pmakeblock))

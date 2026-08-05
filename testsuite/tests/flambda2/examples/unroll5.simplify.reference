@@ -3,7 +3,7 @@ let code test1_1 deleted in
 let code test2_2 deleted in
 let code test3_3 deleted in
 let $camlUnroll5__foo_4 =
-  closure foo_0_1 @foo &toplevel.alloc_region
+  closure foo_0_1 @foo &toplevel
 and code rec loopify(never) size(80) newer_version_of(foo_0)
       foo_0_1 (x : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 =
   let Popaque = %opaque (1) in
@@ -73,8 +73,7 @@ let code loopify(never) size(4) newer_version_of(test1_1)
         -> k * k1 =
   apply direct(foo_0_1 &my_alloc_region) $camlUnroll5__foo_4 (x) -> k * k1
 in
-let $camlUnroll5__test1_5 = closure test1_1_1 @test1 &toplevel.alloc_region
-in
+let $camlUnroll5__test1_5 = closure test1_1_1 @test1 &toplevel in
 let code loopify(never) size(80) newer_version_of(test2_2)
       test2_2_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -140,8 +139,7 @@ let code loopify(never) size(80) newer_version_of(test2_2)
           (int_sub)
           -> k * k1
 in
-let $camlUnroll5__test2_6 = closure test2_2_1 @test2 &toplevel.alloc_region
-in
+let $camlUnroll5__test2_6 = closure test2_2_1 @test2 &toplevel in
 let code loopify(never) size(232) newer_version_of(test3_3)
       test3_3_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -320,8 +318,7 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                     (int_sub_2)
                     -> k * k1))
 in
-let $camlUnroll5__test3_7 = closure test3_3_1 @test3 &toplevel.alloc_region
-in
+let $camlUnroll5__test3_7 = closure test3_3_1 @test3 &toplevel in
 let $camlUnroll5 =
   Block 0 ($camlUnroll5__foo_4,
            $camlUnroll5__test1_5,
