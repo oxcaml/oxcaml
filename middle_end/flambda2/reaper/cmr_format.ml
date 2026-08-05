@@ -281,8 +281,8 @@ let report_error ppf = function
   | Corrupted filename ->
     fprintf ppf "Corrupted format@ %a" Location.Doc.quoted_filename filename
   | Marshal_failed filename ->
-    fprintf ppf "Failed to marshal Ltosol to file@ %a"
-      Location.Doc.quoted_filename filename
+    fprintf ppf "Failed to marshal Cmr to file@ %a" Location.Doc.quoted_filename
+      filename
 
 let () =
   Location.register_error_of_exn (function
