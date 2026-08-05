@@ -50,7 +50,9 @@ CAMLextern void caml_leave_blocking_section (void);
    use the runtime system (typically, a blocking I/O operation).
 */
 
-/* These functions are defined in the threads library, not the runtime */
+/* These functions are defined in the runtime (threads.c).
+   CAMLextern_libthreads is kept for compatibility with code that
+   defined it when the functions lived in the threads library. */
 #ifndef CAMLextern_libthreads
 #define CAMLextern_libthreads CAMLextern
 #endif

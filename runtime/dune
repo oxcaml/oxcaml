@@ -61,7 +61,9 @@
    cpu.c
    blake2.c
    misc.c
-   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl
+   threads.c
+   build_config.h sync_posix.h st_posix.h st_pthreads.h
+   caml/jumptbl.h caml/domain_state.tbl
    ../Makefile.config
    (glob_files caml/*.h))
  (action
