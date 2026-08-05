@@ -125,7 +125,19 @@ module Deps_with_fields = struct
     Global_flow_graph.apply_renaming deps renaming ~rename_field
 end
 
-module File_contents = struct
+module File_contents : sig
+  type cmr_format = t
+
+  type t
+
+  val create : used_value_slots:Value_slot.Set.t -> cmr_format -> t
+
+  val deserialise :
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+    t ->
+    cmr_format
+end = struct
   type cmr_format = t
 
   type t =
