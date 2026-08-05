@@ -55,7 +55,7 @@ end = struct
      (instead of raising) and do nothing else. Each dangling label is reported
      at most once, on its first lookup. [referrer] is the block referencing
      [label], if any. *)
-  let iter_block t ~kind ?referrer label ~f =
+  let iter_block t ~kind ?referrer label f =
     match Cfg.get_block t.cfg label with
     | Some block -> f block
     | None ->
@@ -69,6 +69,10 @@ end = struct
         | None ->
           report t "%s %a is not present in the cfg" kind Label.print label
       end
+
+  let ( let@ ) (f : (Cfg.basic_block -> unit) -> unit)
+      (x : Cfg.basic_block -> unit) : unit =
+    f x
 
   (* [Proc.types_are_compatible] can itself fatal-error on register types that
      are invalid for the target (e.g. 256/512-bit vectors on arm64). Treat such
@@ -170,21 +174,20 @@ end = struct
     | Some tailrec_label ->
       if not (Label.equal tailrec_label t.cfg.entry_label)
       then
-        iter_block t ~kind:"entry block" t.cfg.entry_label
-          ~f:(fun entry_block ->
-            let successors =
-              Cfg.successor_labels ~normal:true ~exn:false entry_block
-            in
-            if
-              not
-                (Label.Set.cardinal successors = 1
-                && Label.equal tailrec_label (Label.Set.min_elt successors))
-            then
-              report t
-                "Expected tailrec block %a to be the entry block or the only \
-                 successor of the entry block but entry block the \
-                 followingsuccessors:@.%a@."
-                Label.print tailrec_label Label.Set.print successors)
+        let@ entry_block = iter_block t ~kind:"entry block" t.cfg.entry_label in
+        let successors =
+          Cfg.successor_labels ~normal:true ~exn:false entry_block
+        in
+        if
+          not
+            (Label.Set.cardinal successors = 1
+            && Label.equal tailrec_label (Label.Set.min_elt successors))
+        then
+          report t
+            "Expected tailrec block %a to be the entry block or the only \
+             successor of the entry block but entry block the \
+             followingsuccessors:@.%a@."
+            Label.print tailrec_label Label.Set.print successors
 
   let check_terminator_arity t label block =
     let term = block.Cfg.terminator in
@@ -450,28 +453,28 @@ end = struct
        let stack_offset = block.stack_offset in
        List.iter
          (fun predecessor ->
-           iter_block t ~kind:"predecessor" ~referrer:label predecessor
-             ~f:(fun pred_block ->
-               let pred_terminator_stack_offset =
-                 pred_block.terminator.stack_offset
-               in
-               if not (Int.equal stack_offset pred_terminator_stack_offset)
-               then
-                 report_edge_stack_offset_mismatch t ~pred:predecessor
-                   ~succ:label
-                   ~terminator_stack_offset:pred_terminator_stack_offset
-                   ~block_stack_offset:stack_offset))
+           let@ pred_block =
+             iter_block t ~kind:"predecessor" ~referrer:label predecessor
+           in
+           let pred_terminator_stack_offset =
+             pred_block.terminator.stack_offset
+           in
+           if not (Int.equal stack_offset pred_terminator_stack_offset)
+           then
+             report_edge_stack_offset_mismatch t ~pred:predecessor ~succ:label
+               ~terminator_stack_offset:pred_terminator_stack_offset
+               ~block_stack_offset:stack_offset)
          (Cfg.predecessor_labels block));
     let terminator_stack_offset = block.terminator.stack_offset in
     Label.Set.iter
       (fun successor ->
-        iter_block t ~kind:"successor" ~referrer:label successor
-          ~f:(fun succ_block ->
-            if not (Int.equal terminator_stack_offset succ_block.stack_offset)
-            then
-              report_edge_stack_offset_mismatch t ~pred:label ~succ:successor
-                ~terminator_stack_offset
-                ~block_stack_offset:succ_block.stack_offset))
+        let@ succ_block =
+          iter_block t ~kind:"successor" ~referrer:label successor
+        in
+        if not (Int.equal terminator_stack_offset succ_block.stack_offset)
+        then
+          report_edge_stack_offset_mismatch t ~pred:label ~succ:successor
+            ~terminator_stack_offset ~block_stack_offset:succ_block.stack_offset)
       (Cfg.successor_labels ~normal:true ~exn:false block);
     let stack_offset_after_body =
       DLL.fold_left block.body ~init:block.stack_offset
@@ -496,7 +499,7 @@ end = struct
           match basic.desc with
           | Pushtrap { lbl_handler } ->
             iter_block t ~kind:"trap handler" ~referrer:label lbl_handler
-              ~f:(fun handler_block ->
+              (fun handler_block ->
                 if not (Int.equal cur_stack_offset handler_block.stack_offset)
                 then
                   report t
@@ -547,45 +550,43 @@ end = struct
     (* successors and predecessors agree *)
     Label.Set.iter
       (fun successor ->
-        iter_block t ~kind:"successor" ~referrer:label successor
-          ~f:(fun succ_block ->
-            if
-              not
-                (List.exists (Label.equal label)
-                   (Cfg.predecessor_labels succ_block))
-            then
-              report t "%s in successors(%s) but %s is not in predecessors(%s)"
-                (Label.to_string successor)
-                (Label.to_string label) (Label.to_string label)
-                (Label.to_string successor)))
+        let@ succ_block =
+          iter_block t ~kind:"successor" ~referrer:label successor
+        in
+        if
+          not
+            (List.exists (Label.equal label)
+               (Cfg.predecessor_labels succ_block))
+        then
+          report t "%s in successors(%s) but %s is not in predecessors(%s)"
+            (Label.to_string successor)
+            (Label.to_string label) (Label.to_string label)
+            (Label.to_string successor))
       successors;
     List.iter
       (fun predecessor ->
-        iter_block t ~kind:"predecessor" ~referrer:label predecessor
-          ~f:(fun pred_block ->
-            (* trap handler block is reachable through exceptional edges
-               only. *)
-            let exn = Cfg.successor_labels ~normal:false ~exn:true pred_block in
-            let normal =
-              Cfg.successor_labels ~normal:true ~exn:false pred_block
-            in
-            let check_edge ~must ~must_not =
-              if Label.Set.mem label must_not
-              then
-                report t "Unexpected edge from %s to block %s"
-                  (Label.to_string predecessor)
-                  (Label.to_string label);
-              if not (Label.Set.mem label must)
-              then
-                report t
-                  "%s in predecessors of %s but %s not in successors of %s"
-                  (Label.to_string predecessor)
-                  (Label.to_string label) (Label.to_string label)
-                  (Label.to_string predecessor)
-            in
-            if block.is_trap_handler
-            then check_edge ~must:exn ~must_not:normal
-            else check_edge ~must:normal ~must_not:exn))
+        let@ pred_block =
+          iter_block t ~kind:"predecessor" ~referrer:label predecessor
+        in
+        (* trap handler block is reachable through exceptional edges only. *)
+        let exn = Cfg.successor_labels ~normal:false ~exn:true pred_block in
+        let normal = Cfg.successor_labels ~normal:true ~exn:false pred_block in
+        let check_edge ~must ~must_not =
+          if Label.Set.mem label must_not
+          then
+            report t "Unexpected edge from %s to block %s"
+              (Label.to_string predecessor)
+              (Label.to_string label);
+          if not (Label.Set.mem label must)
+          then
+            report t "%s in predecessors of %s but %s not in successors of %s"
+              (Label.to_string predecessor)
+              (Label.to_string label) (Label.to_string label)
+              (Label.to_string predecessor)
+        in
+        if block.is_trap_handler
+        then check_edge ~must:exn ~must_not:normal
+        else check_edge ~must:normal ~must_not:exn)
       (Cfg.predecessor_labels block);
     (* [stack_offset] consistent across edges and calculated correctly within
        blocks *)
@@ -632,13 +633,12 @@ end = struct
     let visited = Label.Tbl.create num_blocks in
     let rec visit ~kind ?referrer label =
       if not (Label.Tbl.mem visited label)
-      then
-        iter_block t ~kind ?referrer label ~f:(fun block ->
-            Label.Tbl.replace visited label ();
-            Label.Set.iter
-              (fun successor ->
-                visit ~kind:"successor" ~referrer:label successor)
-              (Cfg.successor_labels ~normal:true ~exn:true block))
+      then (
+        let@ block = iter_block t ~kind ?referrer label in
+        Label.Tbl.replace visited label ();
+        Label.Set.iter
+          (fun successor -> visit ~kind:"successor" ~referrer:label successor)
+          (Cfg.successor_labels ~normal:true ~exn:true block))
     in
     let find_unvisited_pseudo_entry () =
       Cfg.fold_blocks t.cfg ~init:None ~f:(fun label block acc ->
