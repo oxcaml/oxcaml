@@ -4186,7 +4186,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol ~used_value_slots:Unknown
+        ~body ~module_symbol
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4221,7 +4221,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol ~used_value_slots:(Known used_value_slots)
+        ~body ~module_symbol
     in
     { unit;
       code_slot_offsets;

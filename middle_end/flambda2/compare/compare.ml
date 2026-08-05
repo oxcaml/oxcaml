@@ -1409,5 +1409,4 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~used_value_slots:Unknown ~toplevel_my_alloc_region ~toplevel_my_region
-        ~toplevel_my_ghost_region)
+        ~toplevel_my_alloc_region ~toplevel_my_region ~toplevel_my_ghost_region)
