@@ -35,7 +35,8 @@ type t =
     ppf : Format.formatter;
     fun_name : string;
     cfg : Cfg.t;
-    mutable tailrec_entry_label : Label.t option
+    mutable tailrec_entry_label : Label.t option;
+    mutable reported_dangling : Label.Set.t
   }
 
 let report t =
@@ -50,14 +51,24 @@ let report t =
 module Checks_not_assuming_structural_soundness : sig
   val check_all : t -> layout:Label.t DLL.t -> bool
 end = struct
-  (* Look up a block referenced by another block, reporting (instead of raising)
-     if the referenced label is dangling. Returns [None] if not present. *)
-  let lookup_block t ~kind ~referrer label =
+  (* Look up a block, reporting (instead of raising) if the label is dangling.
+     Each dangling label is reported at most once, on its first lookup, so
+     callers can always simply ignore a [None] result. [referrer] is the block
+     referencing [label], if any. *)
+  let lookup_block t ~kind ?referrer label =
     match Cfg.get_block t.cfg label with
     | Some _ as block -> block
     | None ->
-      report t "%s %a (referenced from block %a) is not present in the cfg" kind
-        Label.print label Label.print referrer;
+      if not (Label.Set.mem label t.reported_dangling)
+      then begin
+        t.reported_dangling <- Label.Set.add label t.reported_dangling;
+        match referrer with
+        | Some referrer ->
+          report t "%s %a (referenced from block %a) is not present in the cfg"
+            kind Label.print label Label.print referrer
+        | None ->
+          report t "%s %a is not present in the cfg" kind Label.print label
+      end;
       None
 
   (* [Proc.types_are_compatible] can itself fatal-error on register types that
@@ -160,7 +171,7 @@ end = struct
     | Some tailrec_label -> (
       if not (Label.equal tailrec_label t.cfg.entry_label)
       then
-        match Cfg.get_block t.cfg t.cfg.entry_label with
+        match lookup_block t ~kind:"entry block" t.cfg.entry_label with
         | None -> ()
         | Some entry_block ->
           let successors =
@@ -629,18 +640,15 @@ end = struct
   let check_dead_cycles t =
     let num_blocks = Label.Tbl.length t.cfg.blocks in
     let visited = Label.Tbl.create num_blocks in
-    let rec visit label =
+    let rec visit ~kind ?referrer label =
       if not (Label.Tbl.mem visited label)
       then
-        match Cfg.get_block t.cfg label with
-        | None ->
-          (* Dangling label: already reported, by [check_layout] if [label] is
-             the entry label, and by [check_block] otherwise (dangling
-             successor). *)
-          ()
+        match lookup_block t ~kind ?referrer label with
+        | None -> ()
         | Some block ->
           Label.Tbl.replace visited label ();
-          Label.Set.iter visit
+          Label.Set.iter
+            (fun successor -> visit ~kind:"successor" ~referrer:label successor)
             (Cfg.successor_labels ~normal:true ~exn:true block)
     in
     let find_unvisited_pseudo_entry () =
@@ -659,7 +667,7 @@ end = struct
       then
         match find_unvisited_pseudo_entry () with
         | Some label ->
-          visit label;
+          visit ~kind:"block" label;
           visit_all ()
         | None ->
           (* Every unvisited block has at least one predecessor. If the
@@ -680,7 +688,7 @@ end = struct
              with no predecessors (dead blocks form a cycle)"
             Label.Set.print remaining
     in
-    visit t.cfg.entry_label;
+    visit ~kind:"entry block" t.cfg.entry_label;
     visit_all ()
 
   let check_all t ~layout =
@@ -741,7 +749,8 @@ let run ppf cfg_with_layout =
       ppf;
       fun_name = cfg.fun_name;
       cfg;
-      tailrec_entry_label = None
+      tailrec_entry_label = None;
+      reported_dangling = Label.Set.empty
     }
   in
   if Checks_not_assuming_structural_soundness.check_all t ~layout
