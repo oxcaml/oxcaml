@@ -268,7 +268,7 @@ type primitive =
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
   | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
-      mode : locality_mode; boxed : bool }
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;

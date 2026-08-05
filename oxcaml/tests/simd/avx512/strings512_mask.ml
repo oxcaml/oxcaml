@@ -320,40 +320,6 @@ module _ = Bytes_tests (struct
   ;;
 end)
 
-module _ = Bytes_tests (struct
-  external get_mask_prim : bytes -> int64# -> mask#
-    = "%caml_bytes_getmask#_indexed_by_int64#"
-
-  let get_mask b i = box_mask (get_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
-
-  external get_mask_unsafe_prim : bytes -> int64# -> mask#
-    = "%caml_bytes_getmasku#_indexed_by_int64#"
-
-  let get_mask_unsafe b i = box_mask (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
-
-  external set_mask_prim : bytes -> int64# -> mask# -> unit
-    = "%caml_bytes_setmask#_indexed_by_int64#"
-
-  let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) (unbox_mask v)
-
-  external set_mask_unsafe_prim : bytes -> int64# -> mask# -> unit
-    = "%caml_bytes_setmasku#_indexed_by_int64#"
-
-  let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) (unbox_mask v)
-
-  let extra_checks data =
-    List.iter
-      (fun index ->
-        let index = Stdlib_upstream_compatible.Int64_u.of_int64 index in
-        assert_raises_out_of_bounds (fun () ->
-          let _ = get_mask_prim data index in
-          ());
-        assert_raises_out_of_bounds (fun () ->
-          set_mask_prim data index (unbox_mask (mask_of_int64 1L))))
-      Int64.[ min_int; add min_int one; sub zero one; max_int ]
-  ;;
-end)
-
 (* ---- String ---- *)
 
 module String_tests (Primitives : sig
