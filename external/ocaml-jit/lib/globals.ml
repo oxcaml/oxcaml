@@ -19,3 +19,13 @@ open! Import
 let symbols = ref Symbols.empty
 
 let debug = ref false
+
+(* Handles for in-memory ELF symfiles registered with GDB. Kept alive here
+   so the underlying buffers and C-allocated jit_code_entry records are not
+   freed for the duration of the process. *)
+let gdb_jit_handles : Gdb_jit.handle list ref = ref []
+
+(* Lazily-initialised perf jitdump writer. [None] on non-Linux or before
+   the first JIT phrase is loaded; [Some] once initialised, even if init
+   subsequently failed (in which case it stays [None] permanently). *)
+let perf_jitdump : Perf_jitdump.handle option option ref = ref None

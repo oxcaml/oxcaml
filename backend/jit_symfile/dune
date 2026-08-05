@@ -1,7 +1,7 @@
 (library
- (name binary_emitter_intf)
+ (name jit_symfile)
  (wrapped false)
- (libraries asm_targets compiler_owee)
+ (libraries asm_targets binary_emitter_intf compiler_owee)
  (ocamlopt_flags
   (:standard -w +4
    (:include %{project_root}/ocamlopt_flags.sexp))))
