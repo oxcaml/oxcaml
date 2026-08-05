@@ -483,7 +483,7 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr (p, _); mod_bounds = _;
+    | Some { base = Kconstr (p, _, _); mod_bounds = _;
              with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
@@ -1268,9 +1268,22 @@ module Jkind0 = struct
     let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
         Jkind_types.Layout.Const.t jkind_base =
       match base with
-      | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
+      | Kconstr (p, sa', op) ->
+        Kconstr (p, Jkind_types.Scannable_axes.meet sa sa', op)
       | Layout l ->
         Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+
+    let apply_operator (base : Jkind_types.Layout.Const.t jkind_base)
+        (op : Jkind_types.Kind_operator.t) :
+        Jkind_types.Layout.Const.t jkind_base =
+      match base with
+      | Layout l ->
+        let l' = Jkind_types.Layout.Const.apply_operator l op in
+        if l' == l then base else Layout l'
+      | Kconstr (p, sa, op') ->
+        let op'' = Jkind_types.Kind_operator.compose op op' in
+        if Jkind_types.Kind_operator.equal op'' op' then base
+        else Kconstr (p, sa, op'')
 
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
@@ -1302,7 +1315,11 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base = Kconstr (path, Jkind_types.Scannable_axes.max);
+      { base =
+          Kconstr
+            (path,
+             Jkind_types.Scannable_axes.max,
+             Jkind_types.Kind_operator.Id);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1331,9 +1348,10 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
+        | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2) ->
           Path.same p1 p2 &&
           Jkind_types.Scannable_axes.equal sa1 sa2 &&
+          Jkind_types.Kind_operator.equal op1 op2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
