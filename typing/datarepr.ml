@@ -117,23 +117,33 @@ type variant_with_null_payload =
   }
 
 type variant_with_null_constructor =
-  | Variant_with_null_nullary
+  | Variant_with_null_null of Jkind_types.Sort.Const.t option
+      (* The sort of the null constructor's all-void argument, if any. *)
   | Variant_with_null_payload of variant_with_null_payload
 
 let classify_variant_with_null_constructor payload_cstr =
   match payload_cstr.cd_args with
-  | Cstr_tuple [] -> Variant_with_null_nullary
+  | Cstr_tuple [] -> Variant_with_null_null None
   | Cstr_tuple [payload_arg] ->
-    Variant_with_null_payload
-      { payload_cstr; payload_arg }
+    begin match payload_arg.ca_sort with
+    | Some sort when Jkind_types.Sort.Const.all_void sort ->
+      Variant_with_null_null (Some sort)
+    | Some _ | None ->
+      Variant_with_null_payload { payload_cstr; payload_arg }
+    end
   | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
     Misc.fatal_error "Invalid constructor for Variant_with_null"
 
+(* Note: before [update_decl_jkind] has filled in the argument sorts, a
+   unary null constructor is indistinguishable from the payload constructor
+   (its [ca_sort] is still [None]), so this function can return the wrong
+   constructor. Callers must run after sorts are filled in, or tolerate
+   misclassification. *)
 let find_variant_with_null_payload cstrs =
   List.find_map
     (fun cstr ->
       match classify_variant_with_null_constructor cstr with
-      | Variant_with_null_nullary -> None
+      | Variant_with_null_null _ -> None
       | Variant_with_null_payload payload -> Some payload)
     cstrs
 
@@ -170,9 +180,15 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_with_null, _ ->
       let layout cstr =
         match classify_variant_with_null_constructor cstr with
-        | Variant_with_null_nullary ->
+        | Variant_with_null_null None ->
           Cstr_layout_known
             { shape = Constructor_uniform_value; sorts = [| |] }
+        | Variant_with_null_null (Some sort) ->
+          Cstr_layout_known
+            { shape =
+                Constructor_mixed
+                  [| Types.mixed_block_element_of_const_sort sort |];
+              sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
@@ -235,7 +251,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         begin match classify_variant_with_null_constructor
           { cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid }
         with
-        | Variant_with_null_nullary -> Null
+        | Variant_with_null_null _ -> Null
         | Variant_with_null_payload _ -> Ordinary {src_index; runtime_tag}
         end
       | _ -> Ordinary {src_index; runtime_tag}
