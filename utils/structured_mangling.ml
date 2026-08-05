@@ -184,36 +184,36 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
-type position =
+type location =
   | Unknown
-  | Offset of int
-  | Line_col of int * int
+  | File of string
+  | Offset of string * int
+  | Location of string * int * int
 
 type 'cu path_item =
   | Compilation_unit of 'cu
   | Inline_marker
   | Module of string
-  | Anonymous_module of string option * position
+  | Anonymous_module of location
   | Class of string
   | Function of string
-  | Anonymous_function of string option * position
-  | Partial_function of string option * position
+  | Anonymous_function of location
+  | Partial_function of location
 
 type 'cu path = 'cu path_item list
 
 let mangle_path_item buf path_item =
   let tag_prefixed ~tag sym = Printf.bprintf buf "%s%a" tag encode sym in
-  let tag_prefixed_loc ~tag file_opt position =
-    let file_name = Option.value ~default:"" file_opt in
-    (* An empty field encodes an unknown component. Real line/col are never
-       empty. *)
-    let line, col =
-      match position with
-      | Unknown -> "", ""
-      | Offset n -> "", string_of_int n
-      | Line_col (line, col) -> string_of_int line, string_of_int col
+  let tag_prefixed_loc ~tag location =
+    let file, line, col =
+      match location with
+      | Unknown -> "", "", ""
+      | File file -> file, "", ""
+      | Offset (file, offset) -> file, "", string_of_int offset
+      | Location (file, line, col) ->
+        file, string_of_int line, string_of_int col
     in
-    tag_prefixed ~tag (Printf.sprintf "%s_%s_%s" file_name line col)
+    tag_prefixed ~tag (Printf.sprintf "%s_%s_%s" file line col)
   in
   match path_item with
   | Compilation_unit cu ->
@@ -225,14 +225,14 @@ let mangle_path_item buf path_item =
     tag_prefixed ~tag:tag_compilation_unit sym
   | Inline_marker -> Buffer.add_string buf tag_inline_marker
   | Module sym -> tag_prefixed ~tag:tag_module sym
-  | Anonymous_module (file_opt, position) ->
-    tag_prefixed_loc ~tag:tag_anonymous_module file_opt position
+  | Anonymous_module location ->
+    tag_prefixed_loc ~tag:tag_anonymous_module location
   | Class sym -> tag_prefixed ~tag:tag_class sym
   | Function sym -> tag_prefixed ~tag:tag_function sym
-  | Anonymous_function (file_opt, position) ->
-    tag_prefixed_loc ~tag:tag_anonymous_function file_opt position
-  | Partial_function (file_opt, position) ->
-    tag_prefixed_loc ~tag:tag_partial_function file_opt position
+  | Anonymous_function location ->
+    tag_prefixed_loc ~tag:tag_anonymous_function location
+  | Partial_function location ->
+    tag_prefixed_loc ~tag:tag_partial_function location
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
@@ -380,18 +380,15 @@ module Parse = struct
     Option.bind
       (int_field (String.sub loc (second + 1) (String.length loc - second - 1)))
     @@ fun col ->
-    (* [Some _, None] is never produced by the encoder, so treat as
-       malformed. *)
-    Option.bind
-      (match line, col with
-      | None, None -> Some Unknown
-      | None, Some n -> Some (Offset n)
-      | Some line, Some col -> Some (Line_col (line, col))
-      | Some _, None -> None)
-    @@ fun position ->
-    let file = String.sub loc 0 first in
-    let file_opt = if file = "" then None else Some file in
-    Some (file_opt, position)
+    (* The other combinations are never produced by the encoder, so treat them
+       as malformed. *)
+    match String.sub loc 0 first, line, col with
+    | "", None, None -> Some Unknown
+    | "", _, _ -> None
+    | file, None, None -> Some (File file)
+    | file, None, Some offset -> Some (Offset (file, offset))
+    | file, Some line, Some col -> Some (Location (file, line, col))
+    | _, Some _, None -> None
 
   (* Linux prefix *)
   let linux_prefix = ocaml_prefix
@@ -414,8 +411,8 @@ module Parse = struct
   let parse sym =
     let parse_loc pos tag_constructor =
       Option.bind (decode sym pos) @@ fun (decoded, l) ->
-      Option.bind (parse_location decoded) @@ fun (file_opt, position) ->
-      Some (tag_constructor file_opt position, l)
+      Option.bind (parse_location decoded) @@ fun location ->
+      Some (tag_constructor location, l)
     in
     let parse_named pos tag_constructor =
       Option.bind (decode sym pos) @@ fun (decoded, l) ->
@@ -443,9 +440,9 @@ module Parse = struct
         | 'M' -> aux parse_named (fun s -> Module s)
         | 'O' -> aux parse_named (fun s -> Class s)
         | 'F' -> aux parse_named (fun s -> Function s)
-        | 'L' -> aux parse_loc (fun f p -> Anonymous_function (f, p))
-        | 'S' -> aux parse_loc (fun f p -> Anonymous_module (f, p))
-        | 'P' -> aux parse_loc (fun f p -> Partial_function (f, p))
+        | 'L' -> aux parse_loc (fun l -> Anonymous_function l)
+        | 'S' -> aux parse_loc (fun l -> Anonymous_module l)
+        | 'P' -> aux parse_loc (fun l -> Partial_function l)
         | 'I' -> loop (Inline_marker :: path) (pos + 1)
         | '_' -> build_result ()
         | _ -> None

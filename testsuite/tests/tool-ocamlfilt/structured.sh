@@ -11,8 +11,6 @@ ${OCAMLFILT} --format structured \
   "_CamlU3FooFu7D2a_let" \
   "_CamlU3FooFu14E27D27_funcsub" \
   "_CamlU6StdlibLu18G2e_stdlibml_334_0" \
-  "_CamlU3FooS5_42_7" \
-  "_CamlU3FooP5_10_5" \
   "_CamlU3FooM3BarM3BazF6my_fun" \
   "_CamlU3FooFu5_0foo" \
   "_CamlU4MainF11say_hello_0_5_code" \
@@ -28,5 +26,6 @@ ${OCAMLFILT} --format structured \
   "_CamlU3FooM3BarIU3BazF3qux" \
   "_CamlU3FooM3BarO5ShapeF4area" \
   "_CamlU3FooL2__" \
+  "_CamlU3FooLu11D2e_fooml__" \
   "_CamlU3FooLu14D2e_fooml__512" \
-  "_CamlU3FooS3__7"
+  "_CamlU3FooS2__"

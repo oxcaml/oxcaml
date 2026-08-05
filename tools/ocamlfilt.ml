@@ -39,26 +39,25 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
-  (* Locations from [Location.none] or ppx-generated code can be missing
-     components (see the note on [Lexing.position] in [Location]). Render the
-     unavailable ones as placeholders rather than nonsensical numbers. *)
-  let format_anonymous_location prefix file_opt
-      (position : Structured_mangling.position) =
-    let file = Option.value ~default:"<unknown>" file_opt in
-    let line, col =
-      match position with
-      | Unknown -> "??", "??"
-      | Offset n -> "??", string_of_int n
-      | Line_col (line, col) -> string_of_int line, string_of_int col
+  (* Locations can be partial, so print only what the symbol records: [@] marks
+     a character offset, as opposed to the [:line:col] of a full location. *)
+  let format_anonymous_location prefix
+      (location : Structured_mangling.location) =
+    let where =
+      match location with
+      | Unknown -> "<unknown>"
+      | File file -> file
+      | Offset (file, offset) -> Printf.sprintf "%s@%d" file offset
+      | Location (file, line, col) -> Printf.sprintf "%s:%d:%d" file line col
     in
-    Printf.sprintf "%s(%s:%s:%s)" prefix file line col
+    Printf.sprintf "%s(%s)" prefix where
 
   let render_path_item (item : string Structured_mangling.path_item) =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> s
-    | Anonymous_function (f, p) -> format_anonymous_location "fn" f p
-    | Anonymous_module (f, p) -> format_anonymous_location "mod" f p
-    | Partial_function (f, p) -> format_anonymous_location "partial" f p
+    | Anonymous_function l -> format_anonymous_location "fn" l
+    | Anonymous_module l -> format_anonymous_location "mod" l
+    | Partial_function l -> format_anonymous_location "partial" l
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)

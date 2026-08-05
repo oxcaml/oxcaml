@@ -52,27 +52,24 @@
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz]. *)
 
-(** A source position. *)
-type position =
-  | Unknown  (** A dummy position ([Location.none]). *)
-  | Offset of int  (** Only a character offset ([pos_cnum]) is known. *)
-  | Line_col of int * int (** A known source position as line and column *)
+(** A source location. *)
+type location =
+  | Unknown  (** A dummy position without a filename ([Location.none]) *)
+  | File of string  (** Only the filename *)
+  | Offset of string * int  (** File and character offset ([pos_cnum]) *)
+  | Location of string * int * int  (** File, line and column *)
 
-(** A path item represents a single lexical scope in the mangling path. The
-    [string option] is the filename ([None] when missing). *)
+(** A path item represents a single lexical scope in the mangling path. *)
 type 'cu path_item =
   | Compilation_unit of 'cu  (** A compilation unit (file) *)
   | Inline_marker
       (** A separator (between destination and source) to track inlining *)
   | Module of string  (** A named module *)
-  | Anonymous_module of string option * position
-      (** [struct ... end] at (file, position) *)
+  | Anonymous_module of location  (** [struct ... end] at a location *)
   | Class of string  (** A class definition *)
   | Function of string  (** A named function *)
-  | Anonymous_function of string option * position
-      (** [fun ... -> ...] at (file, position) *)
-  | Partial_function of string option * position
-      (** A partial application at (file, position) *)
+  | Anonymous_function of location  (** [fun ... -> ...] at a location *)
+  | Partial_function of location  (** A partial application at a location *)
 
 (* CR sspies: Support for lazy expressions (they do not appear in the mangling
    path at all) and object methods (they appear as regular functions) is still
