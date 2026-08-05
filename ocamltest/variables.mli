@@ -19,6 +19,8 @@ type value = string
 
 type exporter = value -> string * string
 
+type snapshot
+
 type t
 
 val compare : t -> t -> int
@@ -40,6 +42,12 @@ val name_of_variable : t -> string
 val description_of_variable : t -> string
 
 val register_variable : t -> unit
+
+val snapshot : unit -> snapshot
+
+val restore : snapshot -> unit
+
+val union : snapshot list -> snapshot
 
 val find_variable : string -> t option
 
