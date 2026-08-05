@@ -24,6 +24,8 @@ vicuna_traverse_typed_tree.ml
 vicuna_traverse_typed_tree.mli
 type_shape.mli
 type_shape.ml
+type_inspection.mli
+type_inspection.ml
 scalar.ml
 scalar.mli
 axis_lattice.ml

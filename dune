@@ -278,6 +278,7 @@
   typedecl_variance
   typedecl_properties
   typedecl_separability
+  type_inspection
   cmt2annot
   out_type
   data_types

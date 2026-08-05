@@ -20,9 +20,7 @@ let (f : <[
     f () (fun x -> <[Int.to_string $x]>))]>
 
 [%%expect {|
->> Fatal error: Translquote [at line 5, characters 8-9]:
-Splices cannot appear in type annotations inserted in quotations
-for higher-rank or package types.
+>> Fatal error: Type_inspection [at lines 5-7, characters 4-41]: Splices cannot appear in elaborated type annotations.
 Uncaught exception: Misc.Fatal_error
 
 |}]
