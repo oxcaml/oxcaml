@@ -1,0 +1,31 @@
+; Boot-context build of the codegen tool, used by [make
+; runtest-upstream-boot] (see Makefile.common-ox). In the boot context the
+; repository's unix library cannot be built (its sources may use syntax
+; that the system compiler does not support), so, as for boot_ocamlopt in
+; the root dune file, link the system compiler's unix library instead.
+
+(copy_files# ../codegen_main.ml)
+
+(copy_files# ../parsecmmaux.ml{,i})
+
+(copy_files# ../lexcmm.mli)
+
+(copy_files ../lexcmm.mll)
+
+(copy_files ../parsecmm.mly)
+
+(ocamllex
+ (modules lexcmm))
+
+(ocamlyacc
+ (modules parsecmm))
+
+(executable
+ (name codegen_main)
+ (modes native)
+ (enabled_if
+  (= %{context_name} "default"))
+ (ocamlc_flags (:standard -I +unix unix.cma))
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
+ (libraries ocamlcommon ocamloptcomp)
+ (modules codegen_main lexcmm parsecmm parsecmmaux))

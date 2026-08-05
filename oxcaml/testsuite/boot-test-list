@@ -1,23 +1,23 @@
 # Tests excluded from [make runtest-upstream-boot], which tests the boot
 # compiler's native binaries and only builds the stdlib (and the stdlib_*
 # universes), the bytecode compiler-libs (for the expect tool, the byte
-# toplevel and the byte tools) and the testsuite support libraries: neither
-# the otherlibs (unix, str, threads, runtime_events, dynlink, eval) nor the
-# native compiler-libs (needed by expectnat, codegen, fexprc and ocamlnat)
-# are available. Tests that request the missing expectnat or ocamlnat are
-# skipped by ocamltest itself (see OCAMLTEST_SKIP_MISSING_TOOLS in
-# ocamltest/ocaml_actions.ml), so this list only excludes directories whose
-# tests fail for other reasons.
+# toplevel and the byte tools), the testsuite support libraries, and — in
+# the boot context, by the system compiler — fexprc and codegen. Neither
+# the otherlibs (unix, str, threads, runtime_events, dynlink, eval) nor
+# native compiler-libs built by the boot compiler (needed by expectnat and
+# ocamlnat) are available.
 #
 # Only directories where most tests require the missing pieces are excluded;
 # directories where only a few tests do are kept, so a small number of
-# failures is expected in this mode.
+# failures is expected in this mode (in particular the few expect.opt tests
+# outside of excluded directories, which need expectnat; note that the
+# toplevel.opt tests fail in the regular flow too, which does not build
+# ocamlnat either).
 #
 # excluded test                  | reason for not running
 # ------------------------------------------------------------------------------------------------
-  tests/asmgen                   | requires the codegen tool (native compiler-libs)
   tests/ast-invariants           | links the native compiler-libs
-  tests/codegen                  | requires the codegen tool (native compiler-libs)
+  tests/codegen                  | expect.opt tests, require expectnat
   tests/language-extensions      | links the native compiler-libs
   tests/lib-bigarray-file        | requires unix
   tests/lib-domain               | requires threads

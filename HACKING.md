@@ -114,13 +114,14 @@ much faster than `make runtest-upstream`; it is also useful when the final
 compiler itself is miscompiled. Tests that request the
 `ocamlc.byte`/`ocamlopt.byte`/`ocamllex.byte` compilers transparently run
 the boot compiler's native binaries instead (through
-`oxcaml/testsuite/tools/compiler_shim.ml`). Tests that need tools that
-cannot be built cheaply in this mode (expectnat, codegen, ocamlnat:
-all native compiler-libs) are skipped by ocamltest, and directories that
-need the otherlibs or the native compiler-libs are excluded via
-`oxcaml/testsuite/boot-test-list`; some kept directories contain a few
-tests that fail in this mode for the same reasons. After a first run,
-single tests can be re-run against the boot compiler with
+`oxcaml/testsuite/tools/compiler_shim.ml`), and the fexprc and codegen
+tools are built in the boot context by the system compiler, which has
+already built the native compiler-libs there. Directories that need the
+otherlibs are excluded via `oxcaml/testsuite/boot-test-list`; some kept
+directories contain a few tests that fail in this mode (in particular
+expect.opt tests, since expectnat cannot be built without the boot
+compiler's native compiler-libs). After a first run, single tests can be
+re-run against the boot compiler with
 `make test-one-no-rebuild TEST=...`.
 
 There is also a `make ci` target which does a full build and test run.
