@@ -54,6 +54,16 @@ let register_closure_allocation ~env (mode : Value.r) ~loc
   in
   alloc_mode, closed_over_mode
 
+(* Module is always allocated on the heap, so every enclosing closure
+   is forced to be [alloc]. *)
+let register_mod_allocation ~env ~loc ~desc =
+  let closures = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
+  List.iter
+    (fun (_, closure_mode) ->
+      Allocation.submode_err (loc, desc)
+        (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
+    closures
+
 let constrain_enclosing_closures pp closures =
   List.iter
     (fun (_, closure_mode) ->
