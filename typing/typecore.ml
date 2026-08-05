@@ -811,18 +811,14 @@ let allocations : allocation list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-(* Register [alloc_mode] for locality optimisation only. No enclosing closure
-   is constrained, hence the empty [closures]. *)
-let register_mode_for_optimisation ~loc alloc_mode =
-  let pp : Hint.pinpoint = (loc, Allocation) in
+let register_mode_for_optimisation pp ?(closures=[]) alloc_mode =
   let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := {alloc_mode; closures = []; pp} :: !allocations
+  allocations := {alloc_mode; closures; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc alloc_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
   let closures = Env.walk_locks_for_allocation ~env pp in
-  let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := {alloc_mode; closures; pp} :: !allocations
+  register_mode_for_optimisation pp ~closures alloc_mode
 
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
@@ -9183,7 +9179,8 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_mode_for_optimisation ~loc:lid.loc
+           register_mode_for_optimisation
+             (lid.loc, Ident {category = Value; lid = lid.txt})
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
        end;
