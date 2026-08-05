@@ -41,6 +41,12 @@ check_reject structured "_CamlU3FooFu11G2g_funcsub"
 # ([A] is not a lowercase hexadecimal digit)
 check_reject structured "_CamlU3FooFu11G2A_funcsub"
 
+# Structured: location payloads the mangler never emits. A line and column
+# without a file name, and a line without a column.
+check_reject structured "_CamlU3FooS5_42_7"
+check_reject structured "_CamlU3FooP5_10_5"
+check_reject structured "_CamlU3FooLu12D2e_fooml_5_"
+
 # Flat scheme accepts [caml...] or [_caml...] (macOS) but never
 # [__caml...]; that's a structured-scheme shape ([__Caml...]).
 check_reject flat1 '__camlFoo__bar_0'
