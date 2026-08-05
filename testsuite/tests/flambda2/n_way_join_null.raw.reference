@@ -18,7 +18,7 @@ let $camlN_way_join_null__first_const = Block 0 () in
      where k3 (y) =
        cont k1 (y)
  in
- let main = closure main_0 @main &toplevel.alloc_region in
+ let main = closure main_0 @main &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (main) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

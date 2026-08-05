@@ -6,6 +6,6 @@ let code loopify(never) size(0) newer_version_of(f_0)
         : imm tagged =
   cont k (0)
 in
-let $camlTests0__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlTests0__f_1 = closure f_0_1 @f &toplevel in
 let $camlTests0 = Block 0 ($camlTests0__f_1) in
 cont done ($camlTests0)

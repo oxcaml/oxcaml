@@ -10,7 +10,7 @@ let code inline(never) loopify(never) size(9) newer_version_of(g_0)
   let float_add = %box_num.`float`.my_alloc_region (prim_1) in
   cont k (float_add)
 in
-let $camlFloat_fn__g_2 = closure g_0_1 @g &toplevel.alloc_region in
+let $camlFloat_fn__g_2 = closure g_0_1 @g &toplevel in
 let code loopify(never) size(13) newer_version_of(f_1)
       f_1_1 (b, x : float boxed)
         my_closure &my_alloc_region my_depth
@@ -24,6 +24,6 @@ let code loopify(never) size(13) newer_version_of(f_1)
       let float_add = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_add)
 in
-let $camlFloat_fn__f_3 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlFloat_fn__f_3 = closure f_1_1 @f &toplevel in
 let $camlFloat_fn = Block 0 ($camlFloat_fn__g_2, $camlFloat_fn__f_3) in
 cont done ($camlFloat_fn)

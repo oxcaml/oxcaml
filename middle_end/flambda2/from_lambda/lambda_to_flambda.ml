@@ -1856,10 +1856,6 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~sections (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
-  let toplevel_my_region = Ident.create_local "toplevel_my_region" in
-  let toplevel_my_ghost_region =
-    Ident.create_local "toplevel_my_ghost_region"
-  in
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
@@ -1873,5 +1869,5 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
-    ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections
+    ~prog_return_cont:return_continuation ~exn_continuation
+    ~toplevel_my_alloc_region ~sections

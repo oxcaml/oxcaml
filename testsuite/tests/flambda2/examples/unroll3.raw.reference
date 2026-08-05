@@ -42,13 +42,13 @@ let $camlUnroll3__first_const = Block 0 () in
            (int_sub)
            -> k1 * k2
  in
- let even = closure even_0 @even &toplevel.alloc_region
- and odd = closure odd_1 @odd &toplevel.alloc_region
+ let even = closure even_0 @even &toplevel
+ and odd = closure odd_1 @odd &toplevel
  in
- apply direct(even_0 &toplevel.alloc_region) unroll(4)
+ apply direct(even_0 &toplevel) unroll(4)
    (even : _ -> imm tagged) (3) -> k1 * error
    where k1 (three_is_even : imm tagged) =
-     (apply direct(odd_1 &toplevel.alloc_region) unroll(2)
+     (apply direct(odd_1 &toplevel) unroll(2)
         (odd : _ -> imm tagged) (4) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
           let Pmakeblock =

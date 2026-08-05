@@ -34,6 +34,6 @@ let code loopify(never) size(48) newer_version_of(f_0)
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       cont k (0)
 in
-let $camlEol_detect__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlEol_detect__f_1 = closure f_0_1 @f &toplevel in
 let $camlEol_detect = Block 0 ($camlEol_detect__f_1) in
 cont done ($camlEol_detect)

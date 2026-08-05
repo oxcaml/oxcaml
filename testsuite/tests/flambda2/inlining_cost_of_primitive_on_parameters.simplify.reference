@@ -10,7 +10,7 @@ let code loopify(never) size(8) newer_version_of(f_0)
   cont k (Pstringlength)
 in
 let $camlInlining_cost_of_primitive_on_parameters__f_2 =
-  closure f_0_1 @f &toplevel.alloc_region
+  closure f_0_1 @f &toplevel
 in
 let code loopify(never) size(4) newer_version_of(g_1)
       g_1_1 (x : val)
@@ -23,7 +23,7 @@ let code loopify(never) size(4) newer_version_of(g_1)
       -> k * k1
 in
 let $camlInlining_cost_of_primitive_on_parameters__g_3 =
-  closure g_1_1 @g &toplevel.alloc_region
+  closure g_1_1 @g &toplevel
 in
 let $camlInlining_cost_of_primitive_on_parameters =
   Block 0 ($camlInlining_cost_of_primitive_on_parameters__f_2,

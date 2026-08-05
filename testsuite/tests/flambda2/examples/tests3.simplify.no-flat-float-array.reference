@@ -1,6 +1,6 @@
-let $camlTests3__string16 = "index out of bounds" in
-let $camlTests3__block18 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string16)
+let $camlTests3__string14 = "index out of bounds" in
+let $camlTests3__block16 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string14)
 in
 let code foo_0 deleted in
 let code f_1 deleted in
@@ -18,12 +18,12 @@ let code loopify(never) size(29) newer_version_of(foo_0)
       let Parrayrefs = %array_load.mut (arr, i) in
       apply &my_alloc_region f (Parrayrefs) -> k2 * k1
     where k3 =
-      cont k1 pop(regular k1) ($camlTests3__block18)
+      cont k1 pop(regular k1) ($camlTests3__block16)
     where k2 (apply_result : val) =
       let Parraysets = %array_set (arr, i, apply_result) in
       cont k (0)
 in
-let $camlTests3__foo_2 = closure foo_0_1 @foo &toplevel.alloc_region in
+let $camlTests3__foo_2 = closure foo_0_1 @foo &toplevel in
 let code loopify(never) size(33) newer_version_of(f_1)
       f_1_1 (c : imm tagged, m, n, x' : imm tagged, y' : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -48,6 +48,6 @@ let code loopify(never) size(33) newer_version_of(f_1)
            let int_add = %int_barith.add (x, y) in
            cont k (int_add))
 in
-let $camlTests3__f_3 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlTests3__f_3 = closure f_1_1 @f &toplevel in
 let $camlTests3 = Block 0 ($camlTests3__foo_2, $camlTests3__f_3) in
 cont done ($camlTests3)

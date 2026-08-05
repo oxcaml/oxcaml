@@ -867,13 +867,6 @@ let conv flambda_unit =
     Env.bind_toplevel_alloc_region env
       (Flambda_unit.toplevel_my_alloc_region flambda_unit)
   in
-  let env =
-    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_ghost_region env
-      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
-  in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)
   let env = bind_all_code_ids env flambda_unit in

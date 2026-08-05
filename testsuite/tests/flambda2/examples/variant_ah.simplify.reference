@@ -13,9 +13,7 @@ let code inline(always) loopify(never) size(18) newer_version_of(maybe_0)
       let Pmakeblock = %block.[`0`].my_alloc_region (x) in
       cont k (Pmakeblock)
 in
-let $camlVariant_ah__maybe_2 =
-  closure maybe_0_1 @maybe &toplevel.alloc_region
-in
+let $camlVariant_ah__maybe_2 = closure maybe_0_1 @maybe &toplevel in
 let code loopify(never) size(33) newer_version_of(shouldn't_alloc_1)
       shouldn't_alloc_1_1 (f : val, g : val, b : imm tagged, x)
         my_closure &my_alloc_region my_depth
@@ -34,7 +32,7 @@ let code loopify(never) size(33) newer_version_of(shouldn't_alloc_1)
            apply &my_alloc_region f (unboxed_field_0_0) -> k * k1)
 in
 let $camlVariant_ah__shouldn't_alloc_3 =
-  closure shouldn't_alloc_1_1 @shouldn't_alloc &toplevel.alloc_region
+  closure shouldn't_alloc_1_1 @shouldn't_alloc &toplevel
 in
 let $camlVariant_ah =
   Block 0 ($camlVariant_ah__maybe_2, $camlVariant_ah__shouldn't_alloc_3)

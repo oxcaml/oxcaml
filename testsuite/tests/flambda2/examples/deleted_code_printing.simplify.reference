@@ -4,7 +4,7 @@ let env = %block.mut.[`0`].`toplevel` (42) in
 let env_1 = env in
 let set_of_closures
       $camlDeleted_code_printing__foobar_2 =
-      closure foobar_0_1 @foobar &toplevel.alloc_region
+      closure foobar_0_1 @foobar &toplevel
       with { env = env }
     end
 and code loopify(never) size(4) newer_version_of(foobar_0)
@@ -16,7 +16,7 @@ and code loopify(never) size(4) newer_version_of(foobar_0)
     ($camlDeleted_code_printing__aux_3 : _ -> imm tagged) (0) -> k * k1
 and set_of_closures
       $camlDeleted_code_printing__aux_3 =
-      closure aux_1_1 @aux &toplevel.alloc_region
+      closure aux_1_1 @aux &toplevel
       with { env_1 = env_1 }
     end
 and code loopify(done) size(15) newer_version_of(aux_1)

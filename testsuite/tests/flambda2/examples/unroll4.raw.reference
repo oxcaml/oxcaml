@@ -71,12 +71,12 @@ let $camlUnroll4__first_const = Block 0 () in
    let next_depth = rec_info (succ my_depth) in
    cont k1 (b)
  in
- let parity_is = closure parity_is_0 @parity_is &toplevel.alloc_region in
- let k = closure k_3 @k &toplevel.alloc_region in
- apply direct(parity_is_0 &toplevel.alloc_region)
+ let parity_is = closure parity_is_0 @parity_is &toplevel in
+ let k = closure k_3 @k &toplevel in
+ apply direct(parity_is_0 &toplevel)
    (parity_is : _ -> imm tagged) (0, 1, k) -> k1 * error
    where k1 (one_is_even : imm tagged) =
-     (apply direct(parity_is_0 &toplevel.alloc_region)
+     (apply direct(parity_is_0 &toplevel)
         (parity_is : _ -> imm tagged) (1, 4, k) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
           let Pmakeblock =

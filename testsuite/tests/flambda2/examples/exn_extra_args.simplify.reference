@@ -1,4 +1,4 @@
-let $camlExn_extra_args__immstring11 = "bar" in
+let $camlExn_extra_args__immstring9 = "bar" in
 let code input_line_0 deleted in
 let code ld_conf_contents_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(input_line_0)
@@ -6,10 +6,10 @@ let code inline(never) loopify(never) size(1) newer_version_of(input_line_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  cont k ($camlExn_extra_args__immstring11)
+  cont k ($camlExn_extra_args__immstring9)
 in
 let $camlExn_extra_args__input_line_2 =
-  closure input_line_0_1 @input_line &toplevel.alloc_region
+  closure input_line_0_1 @input_line &toplevel
 in
 let code loopify(never) size(49) newer_version_of(ld_conf_contents_1)
       ld_conf_contents_1_1 (param : imm tagged)
@@ -62,7 +62,7 @@ let code loopify(never) size(49) newer_version_of(ld_conf_contents_1)
       cont k (path_unboxed0_1)
 in
 let $camlExn_extra_args__ld_conf_contents_3 =
-  closure ld_conf_contents_1_1 @ld_conf_contents &toplevel.alloc_region
+  closure ld_conf_contents_1_1 @ld_conf_contents &toplevel
 in
 let $camlExn_extra_args =
   Block 0 ($camlExn_extra_args__input_line_2,

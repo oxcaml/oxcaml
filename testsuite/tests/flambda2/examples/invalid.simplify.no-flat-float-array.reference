@@ -1,4 +1,4 @@
-let $camlInvalid__immstring19 = "lengths" in
+let $camlInvalid__immstring17 = "lengths" in
 let code check_0 deleted in
 let code bar_1 deleted in
 let $camlInvalid__empty_array44 = Empty_array in
@@ -19,8 +19,7 @@ let code inline(never) loopify(never) size(16) newer_version_of(check_0)
     | 0 -> k (0)
     | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock75)
 in
-let $camlInvalid__check_3 = closure check_0_1 @check &toplevel.alloc_region
-in
+let $camlInvalid__check_3 = closure check_0_1 @check &toplevel in
 let code inline(always) loopify(never) size(12) newer_version_of(bar_1)
       bar_1_1 (t1 : val array, t2 : val array)
         my_closure &my_alloc_region my_depth
@@ -37,7 +36,7 @@ let code inline(always) loopify(never) size(12) newer_version_of(bar_1)
       let float_ordered_and_equal = %tag_imm (prim_1) in
       cont k (float_ordered_and_equal)
 in
-let $camlInvalid__bar_4 = closure bar_1_1 @bar &toplevel.alloc_region in
+let $camlInvalid__bar_4 = closure bar_1_1 @bar &toplevel in
 let code loopify(never) size(18) newer_version_of(foo_2)
       foo_2_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -58,7 +57,7 @@ let code loopify(never) size(18) newer_version_of(foo_2)
       let float_ordered_and_equal = %tag_imm (prim_1) in
       cont k (float_ordered_and_equal)
 in
-let $camlInvalid__foo_5 = closure foo_2_1 @foo &toplevel.alloc_region in
+let $camlInvalid__foo_5 = closure foo_2_1 @foo &toplevel in
 let $camlInvalid =
   Block 0 ($camlInvalid__check_3, $camlInvalid__bar_4, $camlInvalid__foo_5)
 in

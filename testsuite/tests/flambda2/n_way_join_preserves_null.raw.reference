@@ -29,7 +29,7 @@ let $camlN_way_join_preserves_null__first_const = Block 0 () in
             let noteq = %tag_imm (prim) in
             cont k1 (noteq))
  in
- let f = closure f_0 @f &toplevel.alloc_region in
+ let f = closure f_0 @f &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

@@ -47,7 +47,7 @@ let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
 in
 let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
-    &toplevel.alloc_region
+    &toplevel
 in
 let $camlTOP1 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
 cont done ($camlTOP1)
@@ -62,7 +62,7 @@ let map_tagged_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_tagged_ints_to_float_constants_2 deleted in
-let $camlTOP2__switch_block111 =
+let $camlTOP2__switch_block107 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
@@ -78,12 +78,12 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
     | 0 -> k2
     | 1 -> k (0x1p+2)
     where k2 =
-      let arg = %array_load.`float` ($camlTOP2__switch_block111, param) in
+      let arg = %array_load.`float` ($camlTOP2__switch_block107, param) in
       cont k (arg)
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_3 =
   closure map_tagged_ints_to_float_constants_2_1
-    @map_tagged_ints_to_float_constants &toplevel.alloc_region
+    @map_tagged_ints_to_float_constants &toplevel
 in
 let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_3) in
 cont done ($camlTOP2)
@@ -109,7 +109,7 @@ let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP7__match_on_ints_13 =
-  closure match_on_ints_12_1 @match_on_ints &toplevel.alloc_region
+  closure match_on_ints_12_1 @match_on_ints &toplevel
 and code loopify(never) size(88) newer_version_of(match_on_ints_12)
       match_on_ints_12_1 (param : nativeint)
         my_closure &my_alloc_region my_depth
@@ -189,8 +189,7 @@ let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP8__match_on_tagged_ints_15 =
-  closure match_on_tagged_ints_14_1 @match_on_tagged_ints
-    &toplevel.alloc_region
+  closure match_on_tagged_ints_14_1 @match_on_tagged_ints &toplevel
 and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
       match_on_tagged_ints_14_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth

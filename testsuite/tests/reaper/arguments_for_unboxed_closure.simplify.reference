@@ -7,8 +7,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(id_2)
       id_2_1 (z) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (z)
 in
-let $camlArguments_for_unboxed_closure__id_6 =
-  closure id_2_1 @`id` &toplevel.alloc_region
+let $camlArguments_for_unboxed_closure__id_6 = closure id_2_1 @`id` &toplevel
 in
 let code inline(never) loopify(never) size(10) newer_version_of(u_4)
       u_4_1 (param : imm tagged)
@@ -34,7 +33,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(unused_3)
   cont k (0)
 in
 let $camlArguments_for_unboxed_closure__unused_7 =
-  closure unused_3_1 @unused &toplevel.alloc_region
+  closure unused_3_1 @unused &toplevel
 in
 let code loopify(never) size(11) newer_version_of(g_1)
       g_1_1 (h : val)
@@ -71,9 +70,7 @@ let code loopify(never) size(52) newer_version_of(f_0)
            let `unit` = %end_region (`region`) in
            cont k (int_add))
 in
-let $camlArguments_for_unboxed_closure__f_5 =
-  closure f_0_1 @f &toplevel.alloc_region
-in
+let $camlArguments_for_unboxed_closure__f_5 = closure f_0_1 @f &toplevel in
 let $camlArguments_for_unboxed_closure =
   Block 0 ($camlArguments_for_unboxed_closure__f_5)
 in

@@ -1,9 +1,9 @@
 let code g_1 deleted and code f_0 deleted in
 let z = %opaque (42) in
 let $camlToplevel_rec__f_2 =
-  closure f_0_1 @f &toplevel.alloc_region
+  closure f_0_1 @f &toplevel
 and $camlToplevel_rec__g_3 =
-  closure g_1_1 @g &toplevel.alloc_region
+  closure g_1_1 @g &toplevel
 and code rec loopify(never) size(10) newer_version_of(g_1)
       g_1_1 (y : imm tagged)
         my_closure &my_alloc_region my_depth

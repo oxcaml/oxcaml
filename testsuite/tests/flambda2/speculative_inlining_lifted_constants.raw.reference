@@ -19,15 +19,13 @@ let $camlSpeculative_inlining_lifted_constants__first_const = Block 0 () in
    apply direct(f_0 &my_alloc_region)
      (f : _ -> [ 0 of imm tagged * imm tagged ]) (one) -> k1 * k2
  in
- let f = closure f_0 @f &toplevel.alloc_region in
+ let f = closure f_0 @f &toplevel in
  let zero = %opaque (0) in
- apply direct(f_0 &toplevel.alloc_region)
+ apply direct(f_0 &toplevel)
    (f : _ -> [ 0 of imm tagged * imm tagged ]) (zero) -> k1 * error
    where k1 (v0 : [ 0 of imm tagged * imm tagged ]) =
      let one = %opaque (1) in
-     let v1 = closure v1_1 @v1 &toplevel.alloc_region
-     with { f = f; one = one }
-     in
+     let v1 = closure v1_1 @v1 &toplevel with { f = f; one = one } in
      let Pmakeblock = %block.[`0`].`toplevel` (f, zero, v0, one, v1) in
      cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

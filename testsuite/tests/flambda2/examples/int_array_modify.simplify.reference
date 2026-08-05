@@ -10,6 +10,6 @@ let code loopify(never) size(12) newer_version_of(f_0)
       let Parraysetu = %array_set.gc_ign (a, 0, x) in
       cont k (a)
 in
-let $camlInt_array_modify__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlInt_array_modify__f_1 = closure f_0_1 @f &toplevel in
 let $camlInt_array_modify = Block 0 ($camlInt_array_modify__f_1) in
 cont done ($camlInt_array_modify)

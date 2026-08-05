@@ -11,7 +11,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,39--51]_3`)
 in
 let $`camlTests12__fn[tests12.ml:25,39--51]_7` =
   closure `fn[tests12.ml:25,39--51]_3_1` @`fn[tests12.ml:25,39--51]`
-    &toplevel.alloc_region
+    &toplevel
 in
 let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,52--67]_2`)
       `fn[tests12.ml:25,52--67]_2_1` (param : imm tagged)
@@ -22,7 +22,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests12.ml:25,52--67]_2`)
 in
 let $`camlTests12__fn[tests12.ml:25,52--67]_6` =
   closure `fn[tests12.ml:25,52--67]_2_1` @`fn[tests12.ml:25,52--67]`
-    &toplevel.alloc_region
+    &toplevel
 in
 let code loopify(never) size(7) newer_version_of(`fn[tests12.ml:25,2--70]_1`)
       `fn[tests12.ml:25,2--70]_1_1` (param : imm tagged)
@@ -50,9 +50,9 @@ let code inline(always) loopify(never) size(16) newer_version_of(bar_0)
   in
   cont k (`fn[tests12.ml:25,2--70]`)
 in
-let $camlTests12__bar_5 = closure bar_0_1 @bar &toplevel.alloc_region in
+let $camlTests12__bar_5 = closure bar_0_1 @bar &toplevel in
 let $camlTests12__map_foo_8 =
-  closure map_foo_4_1 @map_foo &toplevel.alloc_region
+  closure map_foo_4_1 @map_foo &toplevel
 and code rec loopify(never) size(75) newer_version_of(map_foo_4)
       map_foo_4_1 (f : val, seq : val, param : imm tagged)
         my_closure &my_alloc_region my_depth

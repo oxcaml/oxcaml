@@ -275,18 +275,14 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
        apply direct(sum_10 &my_alloc_region)
          (sum : _ -> imm tagged) (apply_result) -> k1 * k2
  in
- (let fold_left = closure fold_left_0 @fold_left &toplevel.alloc_region in
-  let map = closure map_2 @map &toplevel.alloc_region in
-  let filter = closure filter_4 @filter &toplevel.alloc_region in
-  let unfold = closure unfold_6 @unfold &toplevel.alloc_region in
-  let square = closure square_7 @square &toplevel.alloc_region in
-  let ints = closure ints_8 @ints &toplevel.alloc_region
-  with { unfold = unfold }
-  in
-  let sum = closure sum_10 @sum &toplevel.alloc_region
-  with { fold_left = fold_left }
-  in
-  let foo = closure foo_12 @foo &toplevel.alloc_region
+ (let fold_left = closure fold_left_0 @fold_left &toplevel in
+  let map = closure map_2 @map &toplevel in
+  let filter = closure filter_4 @filter &toplevel in
+  let unfold = closure unfold_6 @unfold &toplevel in
+  let square = closure square_7 @square &toplevel in
+  let ints = closure ints_8 @ints &toplevel with { unfold = unfold } in
+  let sum = closure sum_10 @sum &toplevel with { fold_left = fold_left } in
+  let foo = closure foo_12 @foo &toplevel
   with {
     map = map;
     filter = filter;

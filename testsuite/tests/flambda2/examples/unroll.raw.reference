@@ -23,11 +23,11 @@ let $camlUnroll__first_const = Block 0 () in
             let int_mul = %int_barith.mul (n, apply_result) in
             cont k1 (int_mul))
  in
- let fact = closure fact_0 @fact &toplevel.alloc_region in
- apply direct(fact_0 &toplevel.alloc_region) unroll(4)
+ let fact = closure fact_0 @fact &toplevel in
+ apply direct(fact_0 &toplevel) unroll(4)
    (fact : _ -> imm tagged) (6) -> k1 * error
    where k1 (i : imm tagged) =
-     (apply direct(fact_0 &toplevel.alloc_region) unroll(7)
+     (apply direct(fact_0 &toplevel) unroll(7)
         (fact : _ -> imm tagged) (6) -> k1 * error
         where k1 (j : imm tagged) =
           let Pmakeblock = %block.[`0`].`toplevel` (fact, i, j) in

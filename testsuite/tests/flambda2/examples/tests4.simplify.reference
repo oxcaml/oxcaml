@@ -29,7 +29,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
       cont k (float_sub)
 in
 let $camlTests4__pr2162_2_first_4 =
-  closure pr2162_2_first_0_1 @pr2162_2_first &toplevel.alloc_region
+  closure pr2162_2_first_0_1 @pr2162_2_first &toplevel
 in
 let code loopify(never) size(34) newer_version_of(pr2162_2_1)
       pr2162_2_1_1 (z : imm tagged, x : imm tagged, y : float boxed)
@@ -57,9 +57,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_1)
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_sub)
 in
-let $camlTests4__pr2162_2_5 =
-  closure pr2162_2_1_1 @pr2162_2 &toplevel.alloc_region
-in
+let $camlTests4__pr2162_2_5 = closure pr2162_2_1_1 @pr2162_2 &toplevel in
 let code loopify(never) size(34) newer_version_of(pr2162_3_2)
       pr2162_3_2_1 (z : imm tagged, x : imm tagged, y : float boxed)
         my_closure &my_alloc_region my_depth
@@ -86,9 +84,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_3_2)
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_sub)
 in
-let $camlTests4__pr2162_3_6 =
-  closure pr2162_3_2_1 @pr2162_3 &toplevel.alloc_region
-in
+let $camlTests4__pr2162_3_6 = closure pr2162_3_2_1 @pr2162_3 &toplevel in
 let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
       pr2162_3_as_int64_3_1
         (z : imm tagged, x : imm tagged, y : int64 boxed, y' : int32 boxed)
@@ -125,7 +121,7 @@ let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
       cont k (Pmakeblock)
 in
 let $camlTests4__pr2162_3_as_int64_7 =
-  closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel.alloc_region
+  closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel
 in
 let $camlTests4 =
   Block 0 ($camlTests4__pr2162_2_first_4,

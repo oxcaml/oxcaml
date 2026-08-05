@@ -109,8 +109,6 @@ val close_program :
   program:(Acc.t -> Env.t -> Expr_with_acc.t) ->
   prog_return_cont:Continuation.t ->
   exn_continuation:Continuation.t ->
-  toplevel_my_region:Ident.t ->
-  toplevel_my_ghost_region:Ident.t ->
   toplevel_my_alloc_region:Ident.t ->
   sections:File_sections.Builder.t ->
   'mode close_program_result

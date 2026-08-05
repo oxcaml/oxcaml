@@ -272,11 +272,9 @@ let alloc_mode_for_allocation =
           then env.toplevel_alloc_region
           else Fexpr_to_flambda_commons.find_var env alloc_region
         in
-        (* CR-someday ncourant: right now this is unable to produce ghost
-           regions at toplevel, which is a bit unfortunate *)
         let region =
           if String.equal (unwrap_loc region) "toplevel"
-          then env.toplevel_region
+          then env.toplevel_alloc_region
           else Fexpr_to_flambda_commons.find_var env region
         in
         Alloc_mode.For_allocations.local ~alloc_region ~region )
@@ -298,16 +296,12 @@ let alloc_mode_for_allocation =
           match
             Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
           with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         let region =
           match Flambda_to_fexpr_commons.Env.find_region_exn env region with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         local (alloc_region, region) env
@@ -316,9 +310,7 @@ let alloc_mode_for_allocation =
           match
             Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
           with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         heap alloc_region env)
@@ -327,8 +319,7 @@ let alloc_region =
   D.maps
     ~to_:(fun env alloc_region ->
       match Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region with
-      | Fexpr.Toplevel_alloc_region | Toplevel_region | Toplevel_ghost_region ->
-        wrap_loc "toplevel"
+      | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
       | Named s -> s)
     ~from:(fun env alloc_region ->
       if String.equal (unwrap_loc alloc_region) "toplevel"

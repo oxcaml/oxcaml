@@ -57,11 +57,11 @@
            (Pfield_1, Pmakeblock)
            -> k1 * k2
  in
- let $camlTests9__immstring53 = "tests9.ml" in
- let $camlTests9__const_block55 = Block 0 ($camlTests9__immstring53, 39, 52)
+ let $camlTests9__immstring51 = "tests9.ml" in
+ let $camlTests9__const_block53 = Block 0 ($camlTests9__immstring51, 39, 52)
  in
- let $camlTests9__Pmakeblock58 =
-   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block55)
+ let $camlTests9__Pmakeblock56 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block53)
  in
  let code rec loopify(default tailrec) size(42)
        chop_3 (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -97,7 +97,7 @@
                 (int_sub, Pfield)
                 -> k1 * k2
           where k3 =
-            cont k2 pop(regular k2) ($camlTests9__Pmakeblock58))
+            cont k2 pop(regular k2) ($camlTests9__Pmakeblock56))
  in
  let code rec loopify(default tailrec) size(119)
        rev_merge_5
@@ -1650,16 +1650,16 @@
        (42, l)
        -> k1 * k2
  in
- let length_aux = closure length_aux_0 @length_aux &toplevel.alloc_region in
- let length = closure length_1 @length &toplevel.alloc_region
+ let length_aux = closure length_aux_0 @length_aux &toplevel in
+ let length = closure length_1 @length &toplevel
  with { length_aux = length_aux }
  in
- let rev_append = closure rev_append_2 @rev_append &toplevel.alloc_region in
- let chop = closure chop_3 @chop &toplevel.alloc_region in
- let sort_uniq = closure sort_uniq_4 @sort_uniq &toplevel.alloc_region
+ let rev_append = closure rev_append_2 @rev_append &toplevel in
+ let chop = closure chop_3 @chop &toplevel in
+ let sort_uniq = closure sort_uniq_4 @sort_uniq &toplevel
  with { length = length; rev_append_2 = rev_append; chop_1 = chop }
  in
- let foo = closure foo_9 @foo &toplevel.alloc_region in
+ let foo = closure foo_9 @foo &toplevel in
  let Pmakeblock =
    %block.[`0`].`toplevel`
      (length_aux, length, rev_append, chop, sort_uniq, foo)

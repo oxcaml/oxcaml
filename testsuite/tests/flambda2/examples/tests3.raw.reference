@@ -1,6 +1,6 @@
-(let $camlTests3__string16 = "index out of bounds" in
- let $camlTests3__block18 =
-   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string16)
+(let $camlTests3__string14 = "index out of bounds" in
+ let $camlTests3__block16 =
+   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string14)
  in
  let code size(94)
        foo_0 (arr : any array, f : val, i : imm tagged)
@@ -16,7 +16,7 @@
      where k6 =
        cont k4
      where k5 =
-       cont k2 pop(regular k2) ($camlTests3__block18)
+       cont k2 pop(regular k2) ($camlTests3__block16)
      where k4 =
        ((let cond_result = %is_flat_float_array (arr) in
          switch cond_result
@@ -40,7 +40,7 @@
           where k5 =
             cont k3
           where k4 =
-            cont k2 pop(regular k2) ($camlTests3__block18)
+            cont k2 pop(regular k2) ($camlTests3__block16)
           where k3 =
             ((let cond_result = %is_flat_float_array (arr) in
               switch cond_result
@@ -89,8 +89,8 @@
             let int_add = %int_barith.add (x, y) in
             cont k1 (int_add))
  in
- let foo = closure foo_0 @foo &toplevel.alloc_region in
- let f = closure f_1 @f &toplevel.alloc_region in
+ let foo = closure foo_0 @foo &toplevel in
+ let f = closure f_1 @f &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (foo, f) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

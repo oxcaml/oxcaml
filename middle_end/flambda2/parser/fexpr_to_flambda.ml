@@ -1011,8 +1011,6 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let { done_continuation = return_continuation;
         error_continuation;
         toplevel_alloc_region;
-        toplevel_region;
-        toplevel_ghost_region;
         _
       } =
     env
@@ -1023,9 +1021,7 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
-      ~toplevel_my_alloc_region:toplevel_alloc_region
-      ~toplevel_my_region:toplevel_region
-      ~toplevel_my_ghost_region:toplevel_ghost_region ~body ~module_symbol
+      ~toplevel_my_alloc_region:toplevel_alloc_region ~body ~module_symbol
       ~used_value_slots:Unknown
   in
   { unit; code_slot_offsets }

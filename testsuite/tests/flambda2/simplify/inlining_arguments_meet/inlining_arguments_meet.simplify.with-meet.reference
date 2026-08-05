@@ -11,9 +11,7 @@ let code loopify(never) size(4) newer_version_of(h_0)
       (x)
       -> k * k1
 in
-let $camlInlining_arguments_meet__h_2 =
-  closure h_0_1 @h &toplevel.alloc_region
-in
+let $camlInlining_arguments_meet__h_2 = closure h_0_1 @h &toplevel in
 let code loopify(never) size(17) newer_version_of(g_with_code_size_between_11_and_20_3_1)
       g_with_code_size_between_11_and_20_3 (y : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -27,7 +25,7 @@ let code loopify(never) size(17) newer_version_of(g_with_code_size_between_11_an
 in
 let $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_3 =
   closure g_with_code_size_between_11_and_20_3
-    @g_with_code_size_between_11_and_20 &toplevel.alloc_region
+    @g_with_code_size_between_11_and_20 &toplevel
   with { x = 42 }
 in
 let code loopify(never) size(4) newer_version_of(q_1)
@@ -41,9 +39,7 @@ let code loopify(never) size(4) newer_version_of(q_1)
       (x)
       -> k * k1
 in
-let $camlInlining_arguments_meet__q_4 =
-  closure q_1_1 @q &toplevel.alloc_region
-in
+let $camlInlining_arguments_meet__q_4 = closure q_1_1 @q &toplevel in
 let $camlInlining_arguments_meet =
   Block 0 ($camlInlining_arguments_meet__h_2,
            $camlInlining_arguments_meet__g_with_code_size_between_11_and_20_3,

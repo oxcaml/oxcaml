@@ -4,9 +4,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (lam) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (lam)
 in
-let $camlCse_with_alias_to_param__id_2 =
-  closure id_0_1 @`id` &toplevel.alloc_region
-in
+let $camlCse_with_alias_to_param__id_2 = closure id_0_1 @`id` &toplevel in
 let code loopify(never) size(42) newer_version_of(foo_1)
       foo_1_1 (v : val, opt : [ 0 | 0 of val ])
         my_closure &my_alloc_region my_depth
@@ -30,9 +28,7 @@ let code loopify(never) size(42) newer_version_of(foo_1)
       let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, x) in
       cont k (Pmakeblock_1)
 in
-let $camlCse_with_alias_to_param__foo_3 =
-  closure foo_1_1 @foo &toplevel.alloc_region
-in
+let $camlCse_with_alias_to_param__foo_3 = closure foo_1_1 @foo &toplevel in
 let $camlCse_with_alias_to_param =
   Block 0 ($camlCse_with_alias_to_param__id_2,
            $camlCse_with_alias_to_param__foo_3)
