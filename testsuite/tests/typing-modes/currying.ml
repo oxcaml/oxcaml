@@ -412,12 +412,32 @@ let _ =
   let f : _ @ unique -> (_ -> _) = fun _ -> fun x -> x in
   f "hello" "world"
 [%%expect{|
-Line 3, characters 2-11:
-3 |   f "hello" "world"
-      ^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling once values, extra arguments are passed in a separate application.
-Hint: Try wrapping the marked application in parentheses.
+- : string = "world"
+|}]
+
+let use_unique (x @ unique) = ()
+[%%expect{|
+val use_unique : 'a @ unique -> unit = <fun>
+|}]
+
+let _ =
+  let f : _ @ unique -> (_ -> _) = fun x -> use_unique x; fun x -> x in
+  f "hello" "world"
+[%%expect{|
+- : string = "world"
+|}]
+
+let _ =
+  let f : _ @ unique -> (_ -> _) = fun y -> fun x -> use_unique y; x in
+  f "hello" "world"
+[%%expect{|
+Line 2, characters 64-65:
+2 |   let f : _ @ unique -> (_ -> _) = fun y -> fun x -> use_unique y; x in
+                                                                    ^
+Error: This value is "aliased"
+         because it is used inside the function at line 2, characters 44-68
+         which is expected to be "many".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let _ =
