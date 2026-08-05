@@ -1026,6 +1026,5 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
       ~toplevel_my_alloc_region:toplevel_alloc_region
       ~toplevel_my_region:toplevel_region
       ~toplevel_my_ghost_region:toplevel_ghost_region ~body ~module_symbol
-      ~used_value_slots:Unknown
   in
   { unit; code_slot_offsets }
