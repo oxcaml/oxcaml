@@ -524,6 +524,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 
@@ -896,9 +897,11 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
+  | Addressable e1, Addressable e2
+    -> equal_mixed_block_element_up_to_scannable_axes e1 e2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-    | Product _ | Void ), _
+    | Product _ | Void | Addressable _ ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
@@ -918,6 +921,7 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
+  | Addressable e1, Addressable e2 -> compare_mixed_block_element e1 e2
   | Scannable _, _ -> -1
   | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
@@ -948,6 +952,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
+  | Product _, Addressable _ -> -1
+  | Addressable _, Product _ -> 1
 
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
@@ -1057,6 +1063,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
@@ -1146,8 +1153,9 @@ let rec mixed_block_element_to_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "Void"
+  | Addressable e -> "Addressable (" ^ mixed_block_element_to_string e ^ ")"
 
-let mixed_block_element_to_lowercase_string = function
+let rec mixed_block_element_to_lowercase_string = function
   | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
@@ -1168,6 +1176,8 @@ let mixed_block_element_to_lowercase_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "void"
+  | Addressable e ->
+    mixed_block_element_to_lowercase_string e ^ " addressable"
 
 (**** Definitions for backtracking ****)
 

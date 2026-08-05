@@ -323,6 +323,7 @@ module Type_decl_shape = struct
     | Types.Product args ->
       Layout.product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
+    | Types.Addressable e -> Layout.addressable (mixed_block_shape_to_layout e)
 
   let of_constructor type_subst name (cstr_args : Types.constructor_declaration)
       arg_layout shape_for_constr =
