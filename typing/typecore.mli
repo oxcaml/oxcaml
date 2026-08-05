@@ -177,39 +177,6 @@ val generalizable: int -> type_expr -> bool
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
-val reset_allocations: unit -> unit
-
-(** For every allocation registered while type-checking the current structure
-    that is already known to be on the heap, constrain the enclosing closures
-    to be [alloc], and forget the allocation. Allocations that may still be
-    stack-allocated are left to [optimise_allocations].
-
-    Must be called before anything that zaps the mode of a structure item (in
-    particular the modality zapping done while building the inferred
-    signature), since the allocation axis of those modes is only raised
-    here. *)
-val constrain_closures: unit -> unit
-
-(** For every allocation registered while type-checking the current structure
-    that is enclosed by a closure required not to allocate, demand that it is
-    stack-allocated, and forget it.
-
-    Must be called before anything that defaults the areality of arrow types:
-    once the enclosing function's return mode has been defaulted to [global],
-    the demand can no longer be satisfied. *)
-val constrain_allocations: unit -> unit
-
-(** Settle the areality of every allocation registered while type-checking the
-    current structure, pushing each to the highest (i.e. most stack-like) mode
-    it is allowed, and reject the ones that end up on the heap inside a
-    [noalloc] closure.
-
-    Must be called after everything that can constrain the areality of an
-    allocation, in particular the inclusion check against the [.mli] and the
-    defaulting of type-level mode variables; otherwise allocations that belong
-    on the heap would be made [local]. *)
-val optimise_allocations: unit -> unit
-
 val has_poly_constraint : Parsetree.pattern -> bool
 
 

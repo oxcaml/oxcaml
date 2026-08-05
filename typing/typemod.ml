@@ -2227,7 +2227,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         (* Constrain the closure's Allocation mode axis if it closes over some
            allocation that cannot be local, before zapping the modality to
            floor. *)
-        Typecore.constrain_closures ();
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
         in
@@ -4149,7 +4149,7 @@ let remove_mode_and_jkind_variables_for_toplevel str =
 let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
-  Typecore.reset_allocations ();
+  Typeallocation.reset_allocations ();
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
@@ -4157,10 +4157,10 @@ let type_toplevel_phrase env sig_acc s =
      noalloc closure that does not allow heap allocations. This must precede
      the defaulting of arrow modes, after which the demand can no longer be
      satisfied. *)
-  Typecore.constrain_allocations ();
+  Typeallocation.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
-  Typecore.optimise_allocations ();
+  Typeallocation.optimise_allocations ();
   (str, sg, to_remove_from_sg, shape, env)
 
 let type_module_alias env smod =
@@ -4215,12 +4215,12 @@ let type_module_type_of env smod =
      noalloc closure that does not allow heap allocations. This must precede
      the defaulting of arrow modes, after which the demand can no longer be
      satisfied. *)
-  Typecore.constrain_allocations ();
+  Typeallocation.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
   (* Constrain the closure's Allocation mode axis if it closes over some
      allocation that cannot be local, before zapping the modality to floor. *)
-  Typecore.constrain_closures ();
+  Typeallocation.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4472,7 +4472,7 @@ let type_implementation target modulename initial_env ast =
   Cmt_format.clear ();
   Misc.try_finally (fun () ->
       Typecore.reset_delayed_checks ();
-      Typecore.reset_allocations ();
+      Typeallocation.reset_allocations ();
       Env.reset_required_globals ();
       Env.reset_probes ();
       if !Clflags.print_types then (* #7656 *)
@@ -4494,12 +4494,12 @@ let type_implementation target modulename initial_env ast =
            some noalloc closure that does not allow heap allocations. This must
            precede the defaulting of arrow modes, after which the demand can no
            longer be satisfied. *)
-        Typecore.constrain_allocations ();
+        Typeallocation.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
         (* Constrain the closure's Allocation mode axis if it closes over some
            allocation that cannot be local, before zapping the modality to
            floor. *)
-        Typecore.constrain_closures ();
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         in
@@ -4511,7 +4511,7 @@ let type_implementation target modulename initial_env ast =
         in
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
-        Typecore.optimise_allocations ();
+        Typeallocation.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
           Format.(fun () -> fprintf std_formatter "%a@."
@@ -4573,7 +4573,7 @@ let type_implementation target modulename initial_env ast =
              some noalloc closure that does not allow heap allocations. This
              must precede the defaulting of arrow modes, after which the demand
              can no longer be satisfied. *)
-          Typecore.constrain_allocations ();
+          Typeallocation.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit
@@ -4597,7 +4597,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
@@ -4630,12 +4630,12 @@ let type_implementation target modulename initial_env ast =
              some noalloc closure that does not allow heap allocations. This
              must precede the defaulting of arrow modes, after which the demand
              can no longer be satisfied. *)
-          Typecore.constrain_allocations ();
+          Typeallocation.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
           (* Constrain the closure's Allocation mode axis if it closes over
              some allocation that cannot be local, before zapping the modality
              to floor. *)
-          Typecore.constrain_closures ();
+          Typeallocation.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
                inclusion check, so we zap to identity if mode extension is
@@ -4653,7 +4653,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* See comment above. Here the target signature contains all
              the values being exported. We can still capture unused
              declarations like "let x = true;; let x = 1;;", because in this
