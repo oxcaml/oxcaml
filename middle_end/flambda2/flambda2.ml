@@ -143,6 +143,23 @@ let invoke_compilation_unit_callbacks res =
   List.iter (( |> ) res) !compilation_unit_callbacks;
   compilation_unit_callbacks := []
 
+module Reaper_mode = struct
+  (* CR mvellacott: in the future it would be nice to allow running the Reaper
+     on the present unit and supporting LTO at the same time, but at the moment
+     it isn't safe to run the Reaper twice on the same code. *)
+  type t =
+    | Single_unit_run
+    | Lto_support
+    | Disabled
+
+  let of_flags () =
+    if Flambda_features.support_lto ()
+    then Lto_support
+    else if Flambda_features.enable_reaper ()
+    then Single_unit_run
+    else Disabled
+end
+
 let flambda_to_flambda0 : type m.
     ppf_dump:Format.formatter ->
     prefixname:string ->
@@ -203,14 +220,18 @@ let flambda_to_flambda0 : type m.
             all_code,
             slot_offsets,
             final_typing_env,
-            last_pass_name ) =
-        (* CR mvellacott: we can't run the Reaper here when LTO support is
-           enabled because it isn't safe to run the Reaper twice on the same
-           code. It would be nice to remove this limitation in the future. *)
-        if
-          Flambda_features.enable_reaper ()
-          && not (Flambda_features.support_lto ())
-        then (
+            last_pass_name,
+            cmr_payload ) =
+        match Reaper_mode.of_flags () with
+        | Disabled ->
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name,
+            None )
+        | Single_unit_run ->
           let flambda, free_names, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
@@ -226,14 +247,29 @@ let flambda_to_flambda0 : type m.
             all_code,
             slot_offsets,
             final_typing_env,
-            "reaper" ))
-        else
+            "reaper",
+            None )
+        | Lto_support ->
+          let deps, rebuild_data =
+            Flambda2_reaper.Reaper.Staged.traverse flambda
+          in
+          let cmr_payload =
+            Some
+              { Flambda2_reaper.Cmr_format.unit_metadata =
+                  Flambda_unit.metadata flambda;
+                final_typing_env;
+                all_code;
+                deps;
+                rebuild_data
+              }
+          in
           ( flambda,
             free_names,
             all_code,
             slot_offsets,
             final_typing_env,
-            last_pass_name )
+            last_pass_name,
+            cmr_payload )
       in
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
@@ -241,24 +277,6 @@ let flambda_to_flambda0 : type m.
       print_fexpr last_pass_name
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
-      let cmr_payload =
-        (* CR mvellacott: we needn't require -flambda2-reaper to be passed
-           here. *)
-        if Flambda_features.support_lto () && Flambda_features.enable_reaper ()
-        then
-          let deps, rebuild_data =
-            Flambda2_reaper.Reaper.Staged.traverse flambda
-          in
-          Some
-            { Flambda2_reaper.Cmr_format.unit_metadata =
-                Flambda_unit.metadata flambda;
-              final_typing_env;
-              all_code;
-              deps;
-              rebuild_data
-            }
-        else None
-      in
       let { unit = flambda;
             exported_offsets;
             cmx;
