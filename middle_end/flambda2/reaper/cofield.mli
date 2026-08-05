@@ -15,8 +15,6 @@
 
 type view = private Param of int
 
-(** Unlike fields, cofields are plain ints so [param (view t)] is a no-op
-    roundtrip even across processes. *)
 type t
 
 val view : t -> view
