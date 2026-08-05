@@ -453,9 +453,9 @@ Error: The pattern is "contended"
 |}]
 
 (* closing over an uncontended variable without using it can be portable *)
-let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> a
+let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun _ () -> ()
 [%%expect{|
-val foo : unit @ portable -> (unit -> unit) @ portable = <fun>
+val foo : 'a @ portable -> (unit -> unit) @ portable = <fun>
 |}]
 
 (* closing over shared uses gives shareable *)
