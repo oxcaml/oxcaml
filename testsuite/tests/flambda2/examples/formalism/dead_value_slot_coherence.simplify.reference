@@ -1,0 +1,33 @@
+let $camlDead_value_slot_coherence__const_block9 = Block 0 (1, 2) in
+let code `fn[dead_value_slot_coherence.ml:24,2--13]_1` deleted in
+let code mk_0 deleted in
+let code loopify(never) size(1) newer_version_of(`fn[dead_value_slot_coherence.ml:24,2--13]_1`)
+      `fn[dead_value_slot_coherence.ml:24,2--13]_1_1` (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  cont k ($camlDead_value_slot_coherence__const_block9)
+in
+let $`camlDead_value_slot_coherence__fn[dead_value_slot_coherence.ml:24,2--13]_3` =
+  closure `fn[dead_value_slot_coherence.ml:24,2--13]_1_1`
+    @`fn[dead_value_slot_coherence.ml:24,2--13]`
+in
+let code inline(never) loopify(never) size(1) newer_version_of(mk_0)
+      mk_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont k
+         ($`camlDead_value_slot_coherence__fn[dead_value_slot_coherence.ml:24,2--13]_3`)
+in
+let $camlDead_value_slot_coherence__mk_2 = closure mk_0_1 @mk in
+apply direct(mk_0_1)
+  ($camlDead_value_slot_coherence__mk_2 : _ -> val) (0) -> k * error
+  where k (f : val) =
+    ((let Popaque = %opaque (f) in
+      apply Popaque (0) -> k * error)
+       where k (r : [ 0 of imm tagged * imm tagged ]) =
+         let $camlDead_value_slot_coherence =
+           Block 0 ($camlDead_value_slot_coherence__mk_2, f, r)
+         in
+         cont done ($camlDead_value_slot_coherence))
