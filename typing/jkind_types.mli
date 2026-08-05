@@ -130,6 +130,16 @@ module Sort : sig
   end
 end
 
+module Kind_operator : sig
+  type t =
+    | Id
+    | Addressable
+
+  val equal : t -> t -> bool
+
+  val compose : t -> t -> t
+end
+
 module Scannable_axes : sig
   type t =
     { nullability : Jkind_axis.Nullability.t;
@@ -210,6 +220,8 @@ module Layout : sig
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t
+
+    val apply_operator : t -> Kind_operator.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

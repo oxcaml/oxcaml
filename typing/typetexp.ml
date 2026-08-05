@@ -1829,7 +1829,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id, sa) ->
+          | Kconstr (Pident id, sa, op) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1838,8 +1838,16 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             in
             (match v_opt with
             | Some v ->
+              let layout : Jkind_types.Sort.t Jkind_types.Layout.t =
+                let layout =
+                  Jkind_types.Layout.Sort (Jkind_types.Sort.Var v, sa)
+                in
+                match op with
+                | Id -> layout
+                | Addressable -> Addressable layout
+              in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, sa)) in
+                = Layout layout in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
