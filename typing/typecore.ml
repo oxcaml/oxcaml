@@ -12337,10 +12337,6 @@ and type_n_ary_function
       | (Check _ | Assume _ | Ignore_assert_all) ->
         Zero_alloc.create_const zero_alloc
     in
-    let ret_mode =
-      { ret_mode with
-        mode_modes = ret_mode.mode_modes }
-    in
     (* [yielding] records whether *fully applying* this function can perform a
        free effect: the closure may yield if it closes over a yielding value
        (its own mode), or if any argument it is given is yielding (the
