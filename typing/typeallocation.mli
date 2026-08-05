@@ -23,6 +23,9 @@ val register_allocation_value_mode :
 val register_closure_allocation :
   env:Env.t -> Value.r -> loc:Location.t -> Alloc.lr * Value.r
 
+val register_mod_allocation :
+  env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit
+
 (** For every allocation that has to be on heap ([global]), constrain
     the enclosing closures to be [alloc].
     Must only be called before zapping the allocation axis of

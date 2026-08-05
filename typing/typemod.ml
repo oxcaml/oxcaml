@@ -116,12 +116,7 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   mode
 
 let register_allocation ~env ~loc ~desc : Alloc.lr * Value.lr =
-  let closures = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
-  List.iter
-    (fun (_, closure_mode) ->
-      Allocation.submode_err (loc, desc)
-        (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
-    closures;
+  Typeallocation.register_mod_allocation ~env ~loc ~desc;
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -2224,9 +2219,6 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
         in
-        (* Constrain the closure's Allocation mode axis if it closes over some
-           allocation that cannot be local, before zapping the modality to
-           floor. *)
         Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -4153,10 +4145,6 @@ let type_toplevel_phrase env sig_acc s =
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   Value.submode_err (Location.none, Structure) mode toplevel_mode;
-  (* Constrain the allocation's Locality mode axis if it is closed by some
-     noalloc closure that does not allow heap allocations. This must precede
-     the defaulting of arrow modes, after which the demand can no longer be
-     satisfied. *)
   Typeallocation.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4211,15 +4199,9 @@ let type_module_type_of env smod =
         me
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
-  (* Constrain the allocation's Locality mode axis if it is closed by some
-     noalloc closure that does not allow heap allocations. This must precede
-     the defaulting of arrow modes, after which the demand can no longer be
-     satisfied. *)
   Typeallocation.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   check_nongen_modtype env smod.pmod_loc mty;
-  (* Constrain the closure's Allocation mode axis if it closes over some
-     allocation that cannot be local, before zapping the modality to floor. *)
   Typeallocation.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
@@ -4490,15 +4472,8 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
-        (* Constrain the allocation's Locality mode axis if it is closed by
-           some noalloc closure that does not allow heap allocations. This must
-           precede the defaulting of arrow modes, after which the demand can no
-           longer be satisfied. *)
         Typeallocation.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
-        (* Constrain the closure's Allocation mode axis if it closes over some
-           allocation that cannot be local, before zapping the modality to
-           floor. *)
         Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
@@ -4569,10 +4544,6 @@ let type_implementation target modulename initial_env ast =
             error (Inconsistent_argument_types
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
-          (* Constrain the allocation's Locality mode axis if it is closed by
-             some noalloc closure that does not allow heap allocations. This
-             must precede the defaulting of arrow modes, after which the demand
-             can no longer be satisfied. *)
           Typeallocation.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
@@ -4626,15 +4597,8 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
                 sg "(inferred signature)" simple_sg shape)
           in
-          (* Constrain the allocation's Locality mode axis if it is closed by
-             some noalloc closure that does not allow heap allocations. This
-             must precede the defaulting of arrow modes, after which the demand
-             can no longer be satisfied. *)
           Typeallocation.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
-          (* Constrain the closure's Allocation mode axis if it closes over
-             some allocation that cannot be local, before zapping the modality
-             to floor. *)
           Typeallocation.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
