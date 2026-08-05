@@ -281,7 +281,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_override _
     | Texp_letop _
     | Texp_quote _
-    | Texp_splice _ ->
+    | Texp_splice _
+    | Texp_unquote _ ->
         Dynamic
   and classify_value_bindings rec_flag env bindings =
     (* We use a non-recursive classification, classifying each
@@ -1115,6 +1116,8 @@ let rec expression : Typedtree.expression -> term_judg =
         (* The quoted code may be spliced into a dereferencing context. *)
         expression e << Dereference
     | Texp_splice e ->
+        expression e << Dereference
+    | Texp_unquote e ->
         expression e << Dereference
 
 (* Function bodies.

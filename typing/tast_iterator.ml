@@ -526,6 +526,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_hole _ -> ()
   | Texp_quote exp -> sub.expr sub exp
   | Texp_splice exp -> sub.expr sub exp
+  | Texp_unquote exp -> sub.expr sub exp
 
 let package_type sub {tpt_cstrs; tpt_txt; _} =
   List.iter (fun (lid, p) -> iter_loc_lid sub lid; sub.typ sub p) tpt_cstrs;

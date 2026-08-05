@@ -753,6 +753,8 @@ let expr sub x =
         Texp_quote (sub.expr sub exp)
     | Texp_splice exp ->
         Texp_splice (sub.expr sub exp)
+    | Texp_unquote exp ->
+        Texp_unquote (sub.expr sub exp)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}

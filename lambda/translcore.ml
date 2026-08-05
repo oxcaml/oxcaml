@@ -1556,6 +1556,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes layout) exp
   | Texp_splice _ ->
       fatal_errorf_doc
+        "transl_exp: unexpected non-initial-stage splice at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        e.exp_loc
+  | Texp_unquote _ ->
+      fatal_errorf_doc
         "transl_exp: unexpected initial-stage splice at %a"
         (Location.Doc.loc ~capitalize_first:false)
         e.exp_loc

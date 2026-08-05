@@ -842,6 +842,7 @@ let expression sub exp =
     | Texp_hole _ -> Pexp_hole
     | Texp_quote exp -> Pexp_quote (sub.expr sub exp)
     | Texp_splice exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_unquote exp -> Pexp_splice (sub.expr sub exp)
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)

@@ -421,6 +421,7 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quote of expression
   | Texp_splice of expression
+  | Texp_unquote of expression
 
 and ident_kind =
   | Id_value

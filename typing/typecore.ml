@@ -5282,6 +5282,7 @@ let rec is_nonexpansive exp =
   | Texp_letexception _
   | Texp_letop _
   | Texp_splice _
+  | Texp_unquote _
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
@@ -5444,6 +5445,7 @@ let rec maybe_computation exp =
   | Texp_src_pos
   | Texp_overwrite _
   | Texp_splice _
+  | Texp_unquote _
   | Texp_apply_layout _
     -> true
 
@@ -5866,7 +5868,7 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ | Texp_quote _ | Texp_splice _ ->
+            | Texp_function _ | Texp_quote _ | Texp_splice _ | Texp_unquote _ ->
                 check_statement ()
             | Texp_match (_, _, cases, eff_cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases;
@@ -8747,7 +8749,10 @@ and type_expect_
       let ty = Predef.type_expr (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
       re {
-        exp_desc = Texp_splice arg;
+        exp_desc =
+          if (Env.stage new_env :> int) = 0
+          then Texp_unquote arg
+          else Texp_splice arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;

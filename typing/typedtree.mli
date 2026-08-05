@@ -740,7 +740,11 @@ and expression_desc =
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
   | Texp_quote of expression
+    (** The beginning of a quote: translated to syntax tree constructors. *)
   | Texp_splice of expression
+    (** Splice inside a quote: translated as syntax tree constructor. *)
+  | Texp_unquote of expression
+    (** The end of a quote: translated to executable code. *)
 
 and meth =
     Tmeth_name of string
