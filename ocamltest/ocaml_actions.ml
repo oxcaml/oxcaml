@@ -693,7 +693,11 @@ let run_fexpr_check log env =
   in
   let test_build_dir = Actions_helpers.test_build_directory env in
   let test_source_dir = Actions_helpers.test_source_directory env in
-  let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
+  let test_name =
+    match Environments.lookup Ocaml_variables.module_ env with
+    | Some module_ -> module_
+    | None -> Actions_helpers.testfile env in
+  let test_name = Filename.chop_extension test_name in
   List.fold_left (fun (res, env) pass_sfx ->
       let pass_dump_file = Filename.make_filename test_name pass_sfx in
       let pass_ref_file =
