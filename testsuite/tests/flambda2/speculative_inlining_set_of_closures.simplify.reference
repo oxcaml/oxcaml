@@ -1,0 +1,132 @@
+let code use_0 deleted in
+let code f_2 deleted in
+let code g_1 deleted in
+let code r1_3 deleted in
+let code r2_4 deleted in
+let code inline(never) loopify(never) size(15) newer_version_of(use_0)
+      use_0_1 (f : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region f (0) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply &my_alloc_region f (0) -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           let int_add = %int_barith.add (apply_result_1, apply_result) in
+           cont k (int_add))
+in
+let $camlSpeculative_inlining_set_of_closures__use_5 =
+  closure use_0_1 @use &toplevel.alloc_region
+in
+let code loopify(never) size(36) newer_version_of(f_2)
+      f_2_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[f].[x] (my_closure) in
+  let y = %opaque (x) in
+  let int_mul = %int_barith.mul (y, 12) in
+  let int_mul_1 = %int_barith.mul (y, 10) in
+  let int_mul_2 = %int_barith.mul (y, 8) in
+  let int_mul_3 = %int_barith.mul (y, 6) in
+  let int_mul_4 = %int_barith.mul (y, 4) in
+  let int_mul_5 = %int_barith.mul (y, 2) in
+  let int_add = %int_barith.add (int_mul_5, int_mul_4) in
+  let int_add_1 = %int_barith.add (int_add, int_mul_3) in
+  let int_add_2 = %int_barith.add (int_add_1, int_mul_2) in
+  let int_add_3 = %int_barith.add (int_add_2, int_mul_1) in
+  let int_add_4 = %int_barith.add (int_add_3, int_mul) in
+  cont k (int_add_4)
+in
+let code loopify(never) size(48) newer_version_of(g_1)
+      g_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let f = closure f_2_1 @f &my_alloc_region with { x = x } in
+  apply direct(use_0_1 &my_alloc_region)
+    ($camlSpeculative_inlining_set_of_closures__use_5 : _ -> imm tagged)
+      (f)
+      -> k * k1
+in
+let $camlSpeculative_inlining_set_of_closures__g_6 =
+  closure g_1_1 @g &toplevel.alloc_region
+in
+let code loopify(never) size(35) newer_version_of(f_2_1)
+      f_2_2 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let y = %opaque (1) in
+  let int_mul = %int_barith.mul (y, 12) in
+  let int_mul_1 = %int_barith.mul (y, 10) in
+  let int_mul_2 = %int_barith.mul (y, 8) in
+  let int_mul_3 = %int_barith.mul (y, 6) in
+  let int_mul_4 = %int_barith.mul (y, 4) in
+  let int_mul_5 = %int_barith.mul (y, 2) in
+  let int_add = %int_barith.add (int_mul_5, int_mul_4) in
+  let int_add_1 = %int_barith.add (int_add, int_mul_3) in
+  let int_add_2 = %int_barith.add (int_add_1, int_mul_2) in
+  let int_add_3 = %int_barith.add (int_add_2, int_mul_1) in
+  let int_add_4 = %int_barith.add (int_add_3, int_mul) in
+  cont k (int_add_4)
+in
+let $camlSpeculative_inlining_set_of_closures__f_9 =
+  closure f_2_2 @f &toplevel.alloc_region
+  with { x = 1 }
+in
+let code loopify(never) size(4) newer_version_of(r1_3)
+      r1_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(use_0_1 &my_alloc_region) inlining_state(depth(10))
+    ($camlSpeculative_inlining_set_of_closures__use_5 : _ -> imm tagged)
+      ($camlSpeculative_inlining_set_of_closures__f_9)
+      -> k * k1
+in
+let $camlSpeculative_inlining_set_of_closures__r1_7 =
+  closure r1_3_1 @r1 &toplevel.alloc_region
+in
+let code loopify(never) size(36) newer_version_of(f_2_1)
+      f_2_3 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[f].[x] (my_closure) in
+  let y = %opaque (x) in
+  let int_mul = %int_barith.mul (y, 12) in
+  let int_mul_1 = %int_barith.mul (y, 10) in
+  let int_mul_2 = %int_barith.mul (y, 8) in
+  let int_mul_3 = %int_barith.mul (y, 6) in
+  let int_mul_4 = %int_barith.mul (y, 4) in
+  let int_mul_5 = %int_barith.mul (y, 2) in
+  let int_add = %int_barith.add (int_mul_5, int_mul_4) in
+  let int_add_1 = %int_barith.add (int_add, int_mul_3) in
+  let int_add_2 = %int_barith.add (int_add_1, int_mul_2) in
+  let int_add_3 = %int_barith.add (int_add_2, int_mul_1) in
+  let int_add_4 = %int_barith.add (int_add_3, int_mul) in
+  cont k (int_add_4)
+in
+let code loopify(never) size(48) newer_version_of(r2_4)
+      r2_4_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Popaque = %opaque (1) in
+  let f = closure f_2_3 @f &my_alloc_region with { x = Popaque } in
+  apply direct(use_0_1 &my_alloc_region) inlining_state(depth(10))
+    ($camlSpeculative_inlining_set_of_closures__use_5 : _ -> imm tagged)
+      (f)
+      -> k * k1
+in
+let $camlSpeculative_inlining_set_of_closures__r2_10 =
+  closure r2_4_1 @r2 &toplevel.alloc_region
+in
+let $camlSpeculative_inlining_set_of_closures =
+  Block 0 ($camlSpeculative_inlining_set_of_closures__use_5,
+           $camlSpeculative_inlining_set_of_closures__g_6,
+           $camlSpeculative_inlining_set_of_closures__r1_7,
+           $camlSpeculative_inlining_set_of_closures__r2_10)
+in
+cont done ($camlSpeculative_inlining_set_of_closures)
