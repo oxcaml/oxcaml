@@ -47,11 +47,19 @@ let seq_or_avx sse vex ?i args =
   let seq = if Arch.Extension.enabled AVX then vex else sse in
   cfg_operation (Simd.sequence seq i) args
 
-let seq_or_avx_zeroed ~dbg seq instr ?i args =
+let seq_or_avx_with_merge ~dbg seq instr ?i args =
   if Arch.Extension.enabled AVX
   then
-    cfg_operation (Simd.instruction instr i)
-      (Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args)
+    let args =
+      match[@warning "-4"] args with
+      | [(Cmm.Cvar _ as arg)] ->
+        (* The first operand only supplies the upper bits of the result, which
+           are irrelevant here. Using the source avoids materializing a zero,
+           and does not add a dependency since the source is read anyway. *)
+        [arg; arg]
+      | _ -> Cmm_helpers.vec128 ~dbg { word0 = 0L; word1 = 0L } :: args
+    in
+    cfg_operation (Simd.instruction instr i) args
   else cfg_operation (Simd.sequence seq i) args
 
 let simd_load ~mode instr args =
@@ -221,7 +229,7 @@ let select_operation_sse ~dbg op args =
     simd_store_sse_or_avx ~mode:Arch.identity_addressing movntps vmovntps_m128_X
       args
   | "caml_sse_float32_sqrt" | "sqrtf" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtss vsqrtss_X_X_Xm32 args
+    seq_or_avx_with_merge ~dbg Seq.sqrtss vsqrtss_X_X_Xm32 args
   | "caml_simd_float32_max" | "caml_sse_float32_max" ->
     sse_or_avx maxss vmaxss_X_X_Xm32 args
   | "caml_simd_float32_min" | "caml_sse_float32_min" ->
@@ -293,7 +301,7 @@ let select_operation_sse2 ~dbg op args =
     (* Does not have a mode; base address is always in rdi. *)
     sse_or_avx maskmovdqu vmaskmovdqu args
   | "caml_sse2_float64_sqrt" | "sqrt" ->
-    seq_or_avx_zeroed ~dbg Seq.sqrtsd vsqrtsd_X_X_Xm64 args
+    seq_or_avx_with_merge ~dbg Seq.sqrtsd vsqrtsd_X_X_Xm64 args
   | "caml_simd_float64_max" | "caml_sse2_float64_max" ->
     sse_or_avx maxsd vmaxsd_X_X_Xm64 args
   | "caml_simd_float64_min" | "caml_sse2_float64_min" ->
@@ -604,43 +612,43 @@ let select_operation_sse41 ~dbg op args =
     | "caml_sse41_float64_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd ~i args
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd ~i args
     | "caml_simd_float64_round_current" | "caml_sse41_float64_round_current" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundCurrent)
         args
     | "caml_simd_float64_round_neg_inf" | "caml_sse41_float64_round_neg_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundDown)
         args
     | "caml_simd_float64_round_pos_inf" | "caml_sse41_float64_round_pos_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundUp)
         args
     | "caml_simd_float64_round_towards_zero"
     | "caml_sse41_float64_round_towards_zero" ->
-      seq_or_avx_zeroed ~dbg Seq.roundsd vroundsd
+      seq_or_avx_with_merge ~dbg Seq.roundsd vroundsd
         ~i:(int_of_float_rounding RoundTruncate)
         args
     | "caml_sse41_float32_round" ->
       let i, args = extract_constant args ~max:15 op in
       check_float_rounding i;
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss ~i args
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss ~i args
     | "caml_simd_float32_round_current" | "caml_sse41_float32_round_current" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundCurrent)
         args
     | "caml_simd_float32_round_neg_inf" | "caml_sse41_float32_round_neg_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundDown)
         args
     | "caml_simd_float32_round_pos_inf" | "caml_sse41_float32_round_pos_inf" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundUp)
         args
     | "caml_simd_float32_round_towards_zero"
     | "caml_sse41_float32_round_towards_zero" ->
-      seq_or_avx_zeroed ~dbg Seq.roundss vroundss
+      seq_or_avx_with_merge ~dbg Seq.roundss vroundss
         ~i:(int_of_float_rounding RoundTruncate)
         args
     | "caml_sse41_int8x16_max" -> sse_or_avx pmaxsb vpmaxsb_X_X_Xm128 args

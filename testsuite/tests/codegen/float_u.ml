@@ -56,12 +56,10 @@ abs:
   ret
 |}]
 
-(* CR ttebbi: This should be vsqrtsd %xmm0, %xmm0, %xmm0 *)
 let sqrt x = Float_u.sqrt x
 [%%expect_asm X86_64{|
 sqrt:
-  vxorpd %xmm1, %xmm1, %xmm1
-  vsqrtsd %xmm0, %xmm1, %xmm0
+  vsqrtsd %xmm0, %xmm0, %xmm0
   ret
 |}]
 
