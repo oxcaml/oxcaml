@@ -1,7 +1,7 @@
 (* TEST
  include stdlib_stable;
  include stdlib_upstream_compatible;
- flags = "-extension small_numbers -dlambda";
+ flags = "-extension small_numbers -dlambda -dcanonical-ids";
  (* Soon this file is expected to compile and run. At that point the remainder
     of this test spec can simply be deleted. *)
  {
