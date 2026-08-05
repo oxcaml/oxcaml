@@ -1,0 +1,23 @@
+opam-version: "2.0"
+version: "v0.18~preview.130.91+190"
+name: "ppxlib_jane"
+synopsis: "OxCaml AST helpers for the browser toolchain"
+maintainer: "Jane Street developers"
+license: "MIT"
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "dune" {>= "3.17.0"}
+  "ppxlib_ast" {>= "0.33.0"}
+]
+patches: ["compat.patch"]
+extra-files: [
+  [
+    "compat.patch"
+    "sha256=9d51b584403a6e1e3a42189f04b644c554b46ebcacbe1f399970c17143b6d6a5"
+  ]
+]
+build: [["dune" "build" "-p" name "-j" jobs]]
+url {
+  src: "https://github.com/janestreet/ppxlib_jane/archive/ee5f0d96c93ba6ca3cfe57e87b6502da8eb3e3a6.tar.gz"
+  checksum: "sha256=e3ef640b8b4433b85efc7991a8156aba72275f024996a00f3c534b8d8b501085"
+}

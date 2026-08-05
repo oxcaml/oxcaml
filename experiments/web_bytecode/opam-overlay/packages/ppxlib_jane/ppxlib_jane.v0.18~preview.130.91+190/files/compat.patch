@@ -1,0 +1,542 @@
+--- a/src/common.ml
++++ b/src/common.ml
+@@ -26,10 +26,10 @@
+   else None
+ ;;
+ 
+-let mangle_longident ~suffix : Longident.t -> Longident.t = function
+-  | Lident name -> Lident (name ^ suffix)
+-  | Ldot (path, name) -> Ldot (path, name ^ suffix)
+-  | Lapply _ as longident -> longident
++let mangle_longident ~suffix : Astlib.Longident.t -> Astlib.Longident.t = function
++  | Astlib.Longident.Lident name -> Astlib.Longident.Lident (name ^ suffix)
++  | Astlib.Longident.Ldot (path, name) -> Astlib.Longident.Ldot (path, name ^ suffix)
++  | Astlib.Longident.Lapply _ as longident -> longident
+ ;;
+ 
+ let localize_longident = mangle_longident ~suffix:"__local"
+--- a/src/names.ml
++++ b/src/names.ml
+@@ -18,7 +18,6 @@
+     | Ptyp_quote _ -> "quoted type"
+     | Ptyp_splice _ -> "spliced type"
+     | Ptyp_of_kind _ -> "type of a fixed kind"
+-    | Ptyp_repr _ -> "kind-polymorphic type"
+     | Ptyp_extension _ -> "extension point as a type"
+   ;;
+ 
+@@ -38,8 +37,6 @@
+     | Pexp_apply _ -> "application expression"
+     | Pexp_match _ -> "match expression"
+     | Pexp_try _ -> "try-with expression"
+-    | Pexp_unboxed_unit -> "unboxed unit expression"
+-    | Pexp_unboxed_bool _ -> "unboxed bool expression"
+     | Pexp_tuple _ -> "tuple expression"
+     | Pexp_unboxed_tuple _ -> "unboxed tuple expression"
+     | Pexp_construct _ -> "variant constructor expression"
+@@ -84,7 +81,6 @@
+     | Pexp_quote _ -> "quoted expression"
+     | Pexp_splice _ -> "spliced expression"
+     | Pexp_hole -> "hole"
+-    | Pexp_borrow _ -> "borrowing expression"
+   ;;
+ 
+   let of_pattern_desc : Shim.Pattern_desc.t -> string = function
+@@ -101,8 +97,6 @@
+        | Pconst_float _ -> "floating point literal pattern"
+        | Pconst_unboxed_float _ -> "unboxed floating point literal pattern")
+     | Ppat_interval _ -> "character interval '..' pattern"
+-    | Ppat_unboxed_unit -> "unboxed unit pattern"
+-    | Ppat_unboxed_bool _ -> "unboxed bool pattern"
+     | Ppat_tuple _ -> "tuple pattern"
+     | Ppat_unboxed_tuple _ -> "unboxed tuple pattern"
+     | Ppat_construct _ -> "variant constructor pattern"
+@@ -140,7 +134,7 @@
+     | Psig_class_type _ -> "class type declaration"
+     | Psig_attribute _ -> "module-level attribute (in a sig)"
+     | Psig_extension _ -> "extension point as a signature item"
+-    | Psig_jkind _ -> "kind declaration"
++    | Psig_kind_abbrev _ -> "extension point as a signature item"
+   ;;
+ 
+   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
+@@ -157,7 +151,7 @@
+     | Pstr_class_type _ -> "class type definition"
+     | Pstr_attribute _ -> "module-level attribute (in a struct)"
+     | Pstr_extension _ -> "extension point as a structure item"
+-    | Pstr_jkind _ -> "kind definition"
++    | Pstr_kind_abbrev _ -> "extension point as a structure item"
+     | Pstr_eval _ -> "top-level expression"
+     | Pstr_primitive _ -> "primitive 'external' binding"
+   ;;
+@@ -202,7 +196,6 @@
+     | Ptyp_quote _ -> "Ptyp_quote"
+     | Ptyp_splice _ -> "Ptyp_splice"
+     | Ptyp_of_kind _ -> "Ptyp_of_kind"
+-    | Ptyp_repr _ -> "Ptyp_repr"
+     | Ptyp_extension _ -> "Ptyp_extension"
+   ;;
+ 
+@@ -214,8 +207,6 @@
+     | Pexp_apply _ -> "Pexp_apply"
+     | Pexp_match _ -> "Pexp_match"
+     | Pexp_try _ -> "Pexp_try"
+-    | Pexp_unboxed_unit -> "Pexp_unboxed_unit"
+-    | Pexp_unboxed_bool _ -> "Pexp_unboxed_bool"
+     | Pexp_tuple _ -> "Pexp_tuple"
+     | Pexp_unboxed_tuple _ -> "Pexp_unboxed_tuple"
+     | Pexp_construct _ -> "Pexp_construct"
+@@ -255,7 +246,6 @@
+     | Pexp_quote _ -> "Pexp_quote"
+     | Pexp_splice _ -> "Pexp_splice"
+     | Pexp_hole -> "Pexp_hole"
+-    | Pexp_borrow _ -> "Pexp_borrow"
+   ;;
+ 
+   let of_pattern_desc : Shim.Pattern_desc.t -> string = function
+@@ -264,8 +254,6 @@
+     | Ppat_alias _ -> "Ppat_alias"
+     | Ppat_constant _ -> "Ppat_constant"
+     | Ppat_interval _ -> "Ppat_interval"
+-    | Ppat_unboxed_unit -> "Ppat_unboxed_unit"
+-    | Ppat_unboxed_bool _ -> "Ppat_unboxed_bool"
+     | Ppat_tuple _ -> "Ppat_tuple"
+     | Ppat_unboxed_tuple _ -> "Ppat_unboxed_tuple"
+     | Ppat_construct _ -> "Ppat_construct"
+@@ -300,7 +288,7 @@
+     | Psig_class_type _ -> "Psig_class_type"
+     | Psig_attribute _ -> "Psig_attribute"
+     | Psig_extension _ -> "Psig_extension"
+-    | Psig_jkind _ -> "Psig_jkind"
++    | Psig_kind_abbrev _ -> "Psig_extension"
+   ;;
+ 
+   let of_structure_item_desc : Shim.Structure_item_desc.t -> string = function
+@@ -317,7 +305,7 @@
+     | Pstr_class_type _ -> "Pstr_class_type"
+     | Pstr_attribute _ -> "Pstr_attribute"
+     | Pstr_extension _ -> "Pstr_extension"
+-    | Pstr_jkind _ -> "Pstr_jkind"
++    | Pstr_kind_abbrev _ -> "Pstr_extension"
+     | Pstr_eval _ -> "Pstr_eval"
+     | Pstr_primitive _ -> "Pstr_primitive"
+   ;;
+--- a/src/ppxlib_jane.ml
++++ b/src/ppxlib_jane.ml
+@@ -28,13 +28,13 @@
+ 
+ type jkind_annotation_desc = Shim.jkind_annotation_desc =
+   | Pjk_default
+-  | Pjk_abbreviation of Longident.t Ppxlib_ast.Asttypes.loc
++  | Pjk_abbreviation of string
+   | Pjk_mod of Shim.jkind_annotation * Shim.Modes.t
+   | Pjk_with of Shim.jkind_annotation * Ppxlib_ast.Parsetree.core_type * Shim.Modalities.t
+   | Pjk_kind_of of Ppxlib_ast.Parsetree.core_type
+   | Pjk_product of Shim.jkind_annotation list
+ 
+ type jkind_annotation = Shim.jkind_annotation =
+-  { pjka_loc : Location.t
+-  ; pjka_desc : Shim.jkind_annotation_desc
++  { pjkind_loc : Location.t
++  ; pjkind_desc : Shim.jkind_annotation_desc
+   }
+--- a/src/shim.ml
++++ b/src/shim.ml
+@@ -81,8 +81,7 @@
+   let extract_modalities vd = vd.pval_modalities, { vd with pval_modalities = [] }
+ 
+   let create ~loc ~name ~type_ ~modalities ~prim =
+-    { pval_poly = false
+-    ; pval_loc = loc
++    { pval_loc = loc
+     ; pval_modalities = modalities
+     ; pval_name = name
+     ; pval_type = type_
+@@ -109,8 +108,7 @@
+   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
+ 
+   let create ~loc ~pat ~expr ~modes =
+-    { pvb_is_poly = false
+-    ; pvb_pat = pat
++    { pvb_pat = pat
+     ; pvb_expr = expr
+     ; pvb_modes = modes
+     ; pvb_attributes = []
+@@ -181,11 +179,12 @@
+   | Index_unboxed_nativeint
+ 
+ type nonrec block_access = block_access =
+-  | Baccess_field of Longident.t loc
++  | Baccess_field of Astlib.Longident.t loc
+   | Baccess_array of mutable_flag * index_kind * expression
+   | Baccess_block of mutable_flag * expression
+ 
+-type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
++type nonrec unboxed_access = unboxed_access =
++  Uaccess_unboxed_field of Astlib.Longident.t loc
+ 
+ module Core_type_desc = struct
+   type t = core_type_desc =
+@@ -194,9 +193,9 @@
+     | Ptyp_arrow of arg_label * core_type * core_type * Modes.t * Modes.t
+     | Ptyp_tuple of (string option * core_type) list
+     | Ptyp_unboxed_tuple of (string option * core_type) list
+-    | Ptyp_constr of Longident.t loc * core_type list
++    | Ptyp_constr of Astlib.Longident.t loc * core_type list
+     | Ptyp_object of object_field list * closed_flag
+-    | Ptyp_class of Longident.t loc * core_type list
++    | Ptyp_class of Astlib.Longident.t loc * core_type list
+     | Ptyp_alias of core_type * string loc option * jkind_annotation option
+     | Ptyp_variant of row_field list * closed_flag * label list option
+     | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
+@@ -204,7 +203,6 @@
+     | Ptyp_quote of core_type
+     | Ptyp_splice of core_type
+     | Ptyp_of_kind of jkind_annotation
+-    | Ptyp_repr of string loc list * core_type
+     | Ptyp_extension of extension
+ 
+   let of_parsetree x = x
+@@ -218,24 +216,22 @@
+     | Ppat_alias of pattern * string loc
+     | Ppat_constant of constant
+     | Ppat_interval of constant * constant
+-    | Ppat_unboxed_unit
+-    | Ppat_unboxed_bool of bool
+     | Ppat_tuple of (string option * pattern) list * closed_flag
+     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
+     | Ppat_construct of
+-        Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
++        Astlib.Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
+     | Ppat_variant of label * pattern option
+-    | Ppat_record of (Longident.t loc * pattern) list * closed_flag
+-    | Ppat_record_unboxed_product of (Longident.t loc * pattern) list * closed_flag
++    | Ppat_record of (Astlib.Longident.t loc * pattern) list * closed_flag
++    | Ppat_record_unboxed_product of (Astlib.Longident.t loc * pattern) list * closed_flag
+     | Ppat_array of mutable_flag * pattern list
+     | Ppat_or of pattern * pattern
+     | Ppat_constraint of pattern * core_type option * Modes.t
+-    | Ppat_type of Longident.t loc
++    | Ppat_type of Astlib.Longident.t loc
+     | Ppat_lazy of pattern
+     | Ppat_unpack of string option loc
+     | Ppat_exception of pattern
+     | Ppat_extension of extension
+-    | Ppat_open of Longident.t loc * pattern
++    | Ppat_open of Astlib.Longident.t loc * pattern
+ 
+   let of_parsetree x = x
+   let to_parsetree ~loc:_ x = x
+@@ -243,7 +239,7 @@
+ 
+ module Expression_desc = struct
+   type t = expression_desc =
+-    | Pexp_ident of Longident.t loc
++    | Pexp_ident of Astlib.Longident.t loc
+     | Pexp_constant of constant
+     | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
+     | Pexp_function of
+@@ -253,18 +249,16 @@
+     | Pexp_apply of expression * (arg_label * expression) list
+     | Pexp_match of expression * case list
+     | Pexp_try of expression * case list
+-    | Pexp_unboxed_unit
+-    | Pexp_unboxed_bool of bool
+     | Pexp_tuple of (string option * expression) list
+     | Pexp_unboxed_tuple of (string option * expression) list
+-    | Pexp_construct of Longident.t loc * expression option
++    | Pexp_construct of Astlib.Longident.t loc * expression option
+     | Pexp_variant of label * expression option
+-    | Pexp_record of (Longident.t loc * expression) list * expression option
++    | Pexp_record of (Astlib.Longident.t loc * expression) list * expression option
+     | Pexp_record_unboxed_product of
+-        (Longident.t loc * expression) list * expression option
+-    | Pexp_field of expression * Longident.t loc
+-    | Pexp_unboxed_field of expression * Longident.t loc
+-    | Pexp_setfield of expression * Longident.t loc * expression
++        (Astlib.Longident.t loc * expression) list * expression option
++    | Pexp_field of expression * Astlib.Longident.t loc
++    | Pexp_unboxed_field of expression * Astlib.Longident.t loc
++    | Pexp_setfield of expression * Astlib.Longident.t loc * expression
+     | Pexp_array of mutable_flag * expression list
+     | Pexp_idx of block_access * unboxed_access list
+     | Pexp_ifthenelse of expression * expression * expression option
+@@ -274,7 +268,7 @@
+     | Pexp_constraint of expression * core_type option * Modes.t
+     | Pexp_coerce of expression * core_type option * core_type
+     | Pexp_send of expression * label loc
+-    | Pexp_new of Longident.t loc
++    | Pexp_new of Astlib.Longident.t loc
+     | Pexp_setvar of label loc * expression
+     | Pexp_override of (label loc * expression) list
+     | Pexp_letmodule of string option loc * module_expr * expression
+@@ -295,7 +289,6 @@
+     | Pexp_quote of expression
+     | Pexp_splice of expression
+     | Pexp_hole
+-    | Pexp_borrow of expression
+ 
+   (* The ignored [loc] argument is used in shim_upstream.ml. *)
+   let of_parsetree x ~loc:_ = x
+@@ -358,7 +351,7 @@
+     | Psig_class_type of class_type_declaration list
+     | Psig_attribute of attribute
+     | Psig_extension of extension * attributes
+-    | Psig_jkind of jkind_declaration
++    | Psig_kind_abbrev of string loc * jkind_annotation
+ 
+   let of_parsetree x = x
+   let to_parsetree x = x
+@@ -366,23 +359,17 @@
+ 
+ type nonrec jkind_annotation_desc = jkind_annotation_desc =
+   | Pjk_default
+-  | Pjk_abbreviation of Longident.t loc
++  | Pjk_abbreviation of string
+   | Pjk_mod of jkind_annotation * Modes.t
+   | Pjk_with of jkind_annotation * core_type * Modality.t loc list
+   | Pjk_kind_of of core_type
+   | Pjk_product of jkind_annotation list
+ 
+ type nonrec jkind_annotation = jkind_annotation =
+-  { pjka_loc : Location.t
+-  ; pjka_desc : jkind_annotation_desc
++  { pjkind_loc : Location.t
++  ; pjkind_desc : jkind_annotation_desc
+   }
+ 
+-type nonrec jkind_declaration = jkind_declaration =
+-  { pjkind_name : string loc
+-  ; pjkind_manifest : jkind_annotation option
+-  ; pjkind_attributes : attributes
+-  ; pjkind_loc : Location.t
+-  }
+ 
+ module Type_declaration = struct
+   type t = type_declaration =
+@@ -456,7 +443,7 @@
+     | Pstr_include of include_declaration
+     | Pstr_attribute of attribute
+     | Pstr_extension of extension * attributes
+-    | Pstr_jkind of jkind_declaration
++    | Pstr_kind_abbrev of string loc * jkind_annotation
+ 
+   let of_parsetree x = x
+   let to_parsetree x = x
+@@ -476,14 +463,14 @@
+ 
+ module Module_type_desc = struct
+   type t = module_type_desc =
+-    | Pmty_ident of Longident.t loc
++    | Pmty_ident of Astlib.Longident.t loc
+     | Pmty_signature of signature
+     | Pmty_functor of functor_parameter * module_type * Modes.t
+     | Pmty_with of module_type * with_constraint list
+     | Pmty_typeof of module_expr
+     | Pmty_extension of extension
+-    | Pmty_alias of Longident.t loc
+-    | Pmty_strengthen of module_type * Longident.t loc
++    | Pmty_alias of Astlib.Longident.t loc
++    | Pmty_strengthen of module_type * Astlib.Longident.t loc
+ 
+   let of_parsetree x = x
+   let to_parsetree ~loc:_ x = x
+@@ -491,7 +478,7 @@
+ 
+ module Module_expr_desc = struct
+   type t = module_expr_desc =
+-    | Pmod_ident of Longident.t loc
++    | Pmod_ident of Astlib.Longident.t loc
+     | Pmod_structure of structure
+     | Pmod_functor of functor_parameter * module_expr
+     | Pmod_apply of module_expr * module_expr
+--- a/src/shim.mli
++++ b/src/shim.mli
+@@ -128,23 +128,17 @@
+ 
+ type nonrec jkind_annotation_desc = jkind_annotation_desc =
+   | Pjk_default
+-  | Pjk_abbreviation of Longident.t loc
++  | Pjk_abbreviation of string
+   | Pjk_mod of jkind_annotation * Modes.t
+   | Pjk_with of jkind_annotation * core_type * Modalities.t
+   | Pjk_kind_of of core_type
+   | Pjk_product of jkind_annotation list
+ 
+ type nonrec jkind_annotation = jkind_annotation =
+-  { pjka_loc : Location.t
+-  ; pjka_desc : jkind_annotation_desc
++  { pjkind_loc : Location.t
++  ; pjkind_desc : jkind_annotation_desc
+   }
+ 
+-type nonrec jkind_declaration = jkind_declaration =
+-  { pjkind_name : string loc
+-  ; pjkind_manifest : jkind_annotation option
+-  ; pjkind_attributes : attributes
+-  ; pjkind_loc : Location.t
+-  }
+ 
+ module Type_declaration : sig
+   type t = type_declaration =
+@@ -229,11 +223,12 @@
+   | Index_unboxed_nativeint
+ 
+ type nonrec block_access = block_access =
+-  | Baccess_field of Longident.t loc
++  | Baccess_field of Astlib.Longident.t loc
+   | Baccess_array of mutable_flag * index_kind * expression
+   | Baccess_block of mutable_flag * expression
+ 
+-type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Longident.t loc
++type nonrec unboxed_access = unboxed_access =
++  Uaccess_unboxed_field of Astlib.Longident.t loc
+ 
+ module Core_type_desc : sig
+   type t = core_type_desc =
+@@ -242,9 +237,9 @@
+     | Ptyp_arrow of arg_label * core_type * core_type * Modes.t * Modes.t
+     | Ptyp_tuple of (string option * core_type) list
+     | Ptyp_unboxed_tuple of (string option * core_type) list
+-    | Ptyp_constr of Longident.t loc * core_type list
++    | Ptyp_constr of Astlib.Longident.t loc * core_type list
+     | Ptyp_object of object_field list * closed_flag
+-    | Ptyp_class of Longident.t loc * core_type list
++    | Ptyp_class of Astlib.Longident.t loc * core_type list
+     | Ptyp_alias of core_type * string loc option * jkind_annotation option
+     | Ptyp_variant of row_field list * closed_flag * label list option
+     | Ptyp_poly of (string loc * jkind_annotation option) list * core_type
+@@ -252,7 +247,6 @@
+     | Ptyp_quote of core_type
+     | Ptyp_splice of core_type
+     | Ptyp_of_kind of jkind_annotation
+-    | Ptyp_repr of string loc list * core_type
+     | Ptyp_extension of extension
+ 
+   val of_parsetree : core_type_desc -> t
+@@ -278,24 +272,22 @@
+     | Ppat_alias of pattern * string loc
+     | Ppat_constant of constant
+     | Ppat_interval of constant * constant
+-    | Ppat_unboxed_unit
+-    | Ppat_unboxed_bool of bool
+     | Ppat_tuple of (string option * pattern) list * closed_flag
+     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
+     | Ppat_construct of
+-        Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
++        Astlib.Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
+     | Ppat_variant of label * pattern option
+-    | Ppat_record of (Longident.t loc * pattern) list * closed_flag
+-    | Ppat_record_unboxed_product of (Longident.t loc * pattern) list * closed_flag
++    | Ppat_record of (Astlib.Longident.t loc * pattern) list * closed_flag
++    | Ppat_record_unboxed_product of (Astlib.Longident.t loc * pattern) list * closed_flag
+     | Ppat_array of mutable_flag * pattern list
+     | Ppat_or of pattern * pattern
+     | Ppat_constraint of pattern * core_type option * Modes.t
+-    | Ppat_type of Longident.t loc
++    | Ppat_type of Astlib.Longident.t loc
+     | Ppat_lazy of pattern
+     | Ppat_unpack of string option loc
+     | Ppat_exception of pattern
+     | Ppat_extension of extension
+-    | Ppat_open of Longident.t loc * pattern
++    | Ppat_open of Astlib.Longident.t loc * pattern
+ 
+   val of_parsetree : pattern_desc -> t
+   val to_parsetree : loc:Location.t -> t -> pattern_desc
+@@ -303,7 +295,7 @@
+ 
+ module Expression_desc : sig
+   type t = expression_desc =
+-    | Pexp_ident of Longident.t loc
++    | Pexp_ident of Astlib.Longident.t loc
+     | Pexp_constant of constant
+     | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
+     | Pexp_function of
+@@ -313,18 +305,16 @@
+     | Pexp_apply of expression * (arg_label * expression) list
+     | Pexp_match of expression * case list
+     | Pexp_try of expression * case list
+-    | Pexp_unboxed_unit
+-    | Pexp_unboxed_bool of bool
+     | Pexp_tuple of (string option * expression) list
+     | Pexp_unboxed_tuple of (string option * expression) list
+-    | Pexp_construct of Longident.t loc * expression option
++    | Pexp_construct of Astlib.Longident.t loc * expression option
+     | Pexp_variant of label * expression option
+-    | Pexp_record of (Longident.t loc * expression) list * expression option
++    | Pexp_record of (Astlib.Longident.t loc * expression) list * expression option
+     | Pexp_record_unboxed_product of
+-        (Longident.t loc * expression) list * expression option
+-    | Pexp_field of expression * Longident.t loc
+-    | Pexp_unboxed_field of expression * Longident.t loc
+-    | Pexp_setfield of expression * Longident.t loc * expression
++        (Astlib.Longident.t loc * expression) list * expression option
++    | Pexp_field of expression * Astlib.Longident.t loc
++    | Pexp_unboxed_field of expression * Astlib.Longident.t loc
++    | Pexp_setfield of expression * Astlib.Longident.t loc * expression
+     | Pexp_array of mutable_flag * expression list
+     | Pexp_idx of block_access * unboxed_access list
+     | Pexp_ifthenelse of expression * expression * expression option
+@@ -334,7 +324,7 @@
+     | Pexp_constraint of expression * core_type option * Modes.t
+     | Pexp_coerce of expression * core_type option * core_type
+     | Pexp_send of expression * label loc
+-    | Pexp_new of Longident.t loc
++    | Pexp_new of Astlib.Longident.t loc
+     | Pexp_setvar of label loc * expression
+     | Pexp_override of (label loc * expression) list
+     | Pexp_letmodule of string option loc * module_expr * expression
+@@ -355,7 +345,6 @@
+     | Pexp_quote of expression
+     | Pexp_splice of expression
+     | Pexp_hole
+-    | Pexp_borrow of expression
+ 
+   val of_parsetree : expression_desc -> loc:Location.t -> t
+   val to_parsetree : loc:Location.t -> t -> expression_desc
+@@ -417,7 +406,7 @@
+     | Psig_class_type of class_type_declaration list
+     | Psig_attribute of attribute
+     | Psig_extension of extension * attributes
+-    | Psig_jkind of jkind_declaration
++    | Psig_kind_abbrev of string loc * jkind_annotation
+ 
+   val of_parsetree : signature_item_desc -> t
+   val to_parsetree : t -> signature_item_desc
+@@ -451,7 +440,7 @@
+     | Pstr_include of include_declaration
+     | Pstr_attribute of attribute
+     | Pstr_extension of extension * attributes
+-    | Pstr_jkind of jkind_declaration
++    | Pstr_kind_abbrev of string loc * jkind_annotation
+ 
+   val of_parsetree : structure_item_desc -> t
+   val to_parsetree : t -> structure_item_desc
+@@ -468,14 +457,14 @@
+ 
+ module Module_type_desc : sig
+   type t = module_type_desc =
+-    | Pmty_ident of Longident.t loc
++    | Pmty_ident of Astlib.Longident.t loc
+     | Pmty_signature of signature
+     | Pmty_functor of functor_parameter * module_type * Modes.t
+     | Pmty_with of module_type * with_constraint list
+     | Pmty_typeof of module_expr
+     | Pmty_extension of extension
+-    | Pmty_alias of Longident.t loc
+-    | Pmty_strengthen of module_type * Longident.t loc
++    | Pmty_alias of Astlib.Longident.t loc
++    | Pmty_strengthen of module_type * Astlib.Longident.t loc
+ 
+   val of_parsetree : module_type_desc -> t
+   val to_parsetree : loc:Location.t -> t -> module_type_desc
+@@ -483,7 +472,7 @@
+ 
+ module Module_expr_desc : sig
+   type t = module_expr_desc =
+-    | Pmod_ident of Longident.t loc
++    | Pmod_ident of Astlib.Longident.t loc
+     | Pmod_structure of structure
+     | Pmod_functor of functor_parameter * module_expr
+     | Pmod_apply of module_expr * module_expr

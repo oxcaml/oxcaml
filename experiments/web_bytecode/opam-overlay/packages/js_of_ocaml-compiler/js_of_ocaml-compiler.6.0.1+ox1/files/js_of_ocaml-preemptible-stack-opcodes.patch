@@ -1,0 +1,82 @@
+diff --git a/compiler/lib/instr.ml b/compiler/lib/instr.ml
+index a999e639..bb9d46a4 100644
+--- a/compiler/lib/instr.ml
++++ b/compiler/lib/instr.ml
+@@ -176,6 +176,8 @@ type t =
+   | MAKE_FAUX_MIXEDBLOCK
+   | WITH_STACK
+   | WITH_STACK_BIND
++  | WITH_STACK_PREEMPTIBLE
++  | WITH_STACK_BIND_PREEMPTIBLE
+   | FIRST_UNIMPLEMENTED_OP
+ 
+ let equal (a : t) b = Poly.equal a b
+@@ -370,6 +372,10 @@ let instrs =
+      ; MAKE_FAUX_MIXEDBLOCK, if_oxcaml KBinary, "MAKE_FAUX_MIXEDBLOCK"
+      ; WITH_STACK, if_oxcaml (KStop 1), "WITH_STACK"
+      ; WITH_STACK_BIND, if_oxcaml (KStop 1), "WITH_STACK_BIND"
++     ; WITH_STACK_PREEMPTIBLE, if_oxcaml (KStop 1), "WITH_STACK_PREEMPTIBLE"
++     ; ( WITH_STACK_BIND_PREEMPTIBLE
++       , if_oxcaml (KStop 1)
++       , "WITH_STACK_BIND_PREEMPTIBLE" )
+      ; FIRST_UNIMPLEMENTED_OP, K_will_not_happen, "FIRST_UNIMPLEMENTED_OP"
+     |]
+   in
+diff --git a/compiler/lib/instr.mli b/compiler/lib/instr.mli
+index a2f772ac..332ebd9c 100644
+--- a/compiler/lib/instr.mli
++++ b/compiler/lib/instr.mli
+@@ -175,6 +175,8 @@ type t =
+   | MAKE_FAUX_MIXEDBLOCK
+   | WITH_STACK
+   | WITH_STACK_BIND
++  | WITH_STACK_PREEMPTIBLE
++  | WITH_STACK_BIND_PREEMPTIBLE
+   | FIRST_UNIMPLEMENTED_OP
+ 
+ val equal : t -> t -> bool
+diff --git a/compiler/lib/parse_bytecode.ml b/compiler/lib/parse_bytecode.ml
+index 52c8c8a8..20a2f439 100644
+--- a/compiler/lib/parse_bytecode.ml
++++ b/compiler/lib/parse_bytecode.ml
+@@ -2630,6 +2630,40 @@ let parse_instr ~debug ~getglobal ~branch_to_currying ~in_curry_fun state instr
+         ) :: instrs
+       , Return x
+       , state )
++    | WITH_STACK_PREEMPTIBLE ->
++      let valuec = State.accu state in
++      let exnc = State.peek 0 state in
++      let effc = State.peek 1 state in
++      let f = State.peek 3 state in
++      let arg = State.peek 4 state in
++      let x, state = State.fresh_var state in
++      (* Browser execution is single-threaded. Dropping the [htick] argument
++         preserves effect-handler semantics while omitting scheduler preemption. *)
++      ( Let (
++          x,
++          Prim (Extern "%with_stack", [ Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg ])
++        ) :: instrs
++      , Return x
++      , state )
++    | WITH_STACK_BIND_PREEMPTIBLE ->
++      let valuec = State.accu state in
++      let exnc = State.peek 0 state in
++      let effc = State.peek 1 state in
++      let dyn = State.peek 3 state in
++      let bind = State.peek 4 state in
++      let f = State.peek 5 state in
++      let arg = State.peek 6 state in
++      let x, state = State.fresh_var state in
++      (* See [WITH_STACK_PREEMPTIBLE]. *)
++      ( Let (
++          x,
++          Prim (
++            Extern "%with_stack_bind",
++            [ Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg ]
++          )
++        ) :: instrs
++      , Return x
++      , state )
+     | EVENT | BREAK | FIRST_UNIMPLEMENTED_OP -> assert false)
+ 
+ (****)

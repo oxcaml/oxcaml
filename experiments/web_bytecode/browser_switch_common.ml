@@ -1,0 +1,224 @@
+type environment =
+  | Native
+  | Browser
+
+exception Missing_cmi of string
+
+let browser_cmis_dir = Browser_switch_package_manifest.browser_cmis_dir
+let browser_package_roots = Browser_switch_package_manifest.browser_package_roots
+let browser_include_dirs =
+  browser_cmis_dir :: Browser_switch_package_manifest.browser_package_include_dirs
+
+let make_formatter_buffer () =
+  let buffer = Buffer.create 256 in
+  let ppf = Format.formatter_of_buffer buffer in
+  buffer, ppf
+
+let flush_formatter ppf =
+  Format.pp_print_flush ppf ();
+  flush_all ()
+
+let capture_diagnostics f =
+  let buffer, ppf = make_formatter_buffer () in
+  let ok =
+    try f ppf with
+    | Missing_cmi _ as exn -> raise exn
+    | exn ->
+      Location.report_exception ppf exn;
+      let backtrace = Printexc.get_backtrace () in
+      if not (String.equal backtrace "")
+      then Format.fprintf ppf "@.%s" backtrace;
+      false
+  in
+  flush_formatter ppf;
+  if ok then "" else Buffer.contents buffer
+
+let compilation_unit filename =
+  let name =
+    Unit_info.strict_modname_from_source filename
+    |> Compilation_unit.Name.of_string
+  in
+  Compilation_unit.create Compilation_unit.Prefix.empty name
+
+let file_prefix filename =
+  if Filename.check_suffix filename ".ml.md"
+  then String.sub filename 0 (String.length filename - String.length ".ml.md")
+  else
+    match Filename.extension filename with
+    | "" -> filename
+    | ext -> String.sub filename 0 (String.length filename - String.length ext)
+
+let cleanup_if_exists path =
+  try Sys.remove path
+  with Sys_error _ -> ()
+
+let cleanup_build_artifacts ~source_path ~output_prefix =
+  List.iter cleanup_if_exists
+    [ source_path;
+      source_path ^ ".ppx.ast";
+      output_prefix ^ ".cmo";
+      output_prefix ^ ".cmi";
+      output_prefix ^ ".cmt";
+      output_prefix ^ ".cms";
+      output_prefix ^ ".annot" ]
+
+let replace_all ~pattern ~with_ text =
+  let pattern_length = String.length pattern in
+  if pattern_length = 0
+  then text
+  else (
+    let buffer = Buffer.create (String.length text) in
+    let rec loop search_start =
+      if search_start >= String.length text
+      then Buffer.contents buffer
+      else (
+        match String.index_from_opt text search_start pattern.[0] with
+        | None ->
+          Buffer.add_substring buffer text search_start
+            (String.length text - search_start);
+          Buffer.contents buffer
+        | Some index ->
+          if index + pattern_length <= String.length text
+             && String.sub text index pattern_length = pattern
+          then (
+            Buffer.add_substring buffer text search_start (index - search_start);
+            Buffer.add_string buffer with_;
+            loop (index + pattern_length))
+          else (
+            Buffer.add_substring buffer text search_start (index + 1 - search_start);
+            loop (index + 1)))
+    in
+    loop 0)
+
+let write_source_file ~source_path ~source =
+  let oc = open_out_bin source_path in
+  Fun.protect
+    (fun () -> output_string oc source)
+    ~finally:(fun () -> close_out_noerr oc)
+
+let read_file path =
+  let ic = open_in_bin path in
+  Fun.protect
+    (fun () ->
+      let length = in_channel_length ic in
+      really_input_string ic length)
+    ~finally:(fun () -> close_in_noerr ic)
+
+let expand_structure_with_ppx ast =
+  Browser_switch_ppx.expand_structure ast
+
+let parse_and_expand_source ~filename ~source =
+  let lexbuf = Lexing.from_string source in
+  Location.input_name := filename;
+  Location.input_lexbuf := Some lexbuf;
+  Location.init lexbuf filename;
+  Parse.implementation lexbuf |> expand_structure_with_ppx
+
+let compile_parsed_file ~source_path ~output_prefix =
+  let saved_dont_write_files = !Clflags.dont_write_files in
+  Fun.protect
+    (fun () ->
+      Clflags.dont_write_files := false;
+      Compile.implementation
+        ~start_from:Clflags.Compiler_pass.Parsing
+        ~source_file:source_path
+        ~output_prefix
+        ~keep_symbol_tables:false;
+      output_prefix ^ ".cmo")
+    ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
+
+let compile_source_file_direct ~source_path ~output_prefix =
+  let saved_dont_write_files = !Clflags.dont_write_files in
+  Fun.protect
+    (fun () ->
+      Clflags.dont_write_files := false;
+      Compile.implementation
+        ~start_from:Clflags.Compiler_pass.Parsing
+        ~source_file:source_path
+        ~output_prefix
+        ~keep_symbol_tables:false;
+      output_prefix ^ ".cmo")
+    ~finally:(fun () -> Clflags.dont_write_files := saved_dont_write_files)
+
+let compile_source_file ~filename ~source_path ~output_prefix =
+  let source = read_file source_path in
+  let ast_path = source_path ^ ".ppx.ast" in
+  let ast = parse_and_expand_source ~filename ~source in
+  Pparse.write_ast Pparse.Structure ast_path ast;
+  compile_parsed_file ~source_path:ast_path ~output_prefix
+
+let prepare_lexbuf ~filename source =
+  let lexbuf = Lexing.from_string source in
+  Location.input_name := filename;
+  Location.input_lexbuf := Some lexbuf;
+  Location.init lexbuf filename;
+  lexbuf
+
+let missing_cmi_filename unit_name =
+  let requested = Compilation_unit.Name.to_string unit_name ^ ".cmi" in
+  match Misc.normalized_unit_filename requested with
+  | Ok filename -> filename
+  | Error _ -> requested
+
+let reset_flags ?project_dir environment =
+  Clflags.annotations := false;
+  Clflags.binary_annotations := false;
+  Clflags.binary_annotations_cms := false;
+  Clflags.dont_write_files := true;
+  (* Dox relies on bytecode events for precise source correlation.  Keeping
+     debug bytecode enabled also matches the compiler's supported path for
+     the traced local functions produced by [prepare_doclang_structure]. *)
+  Clflags.debug := true;
+  Clflags.native_code := false;
+  Clflags.no_std_include := environment = Browser;
+  Clflags.no_cwd := environment = Browser;
+  Clflags.include_dirs :=
+    (Option.to_list project_dir
+     @ (match environment with
+        | Native -> []
+        | Browser -> browser_include_dirs))
+    |> List.map (fun path -> { Clflags.path; cmx_guaranteed = false });
+  Clflags.hidden_include_dirs := [];
+  Clflags.preprocessor := None;
+  Clflags.all_ppx := [];
+  Clflags.use_threads := false
+
+let prepare_compiler ?project_dir environment ~filename =
+  reset_flags ?project_dir environment;
+  Location.reset ();
+  Lexer.reset_syntax_mode ();
+  Typemod.reset ~preserve_persistent_env:false;
+  Env.reset_cache ~preserve_persistent_env:false;
+  let dir =
+    match environment with
+    | Native -> Filename.dirname filename
+    | Browser -> ""
+  in
+  Compmisc.init_path ~dir ();
+  (match environment with
+   | Native -> ()
+   | Browser ->
+     let visible = Load_path.Visible { cmx_guaranteed = false } in
+     Option.iter (Load_path.add_dir visible) project_dir;
+     List.iter
+       (Load_path.add_dir visible)
+       browser_include_dirs);
+  Compmisc.init_parameters ()
+
+let with_missing_cmi_detection ?(allow_missing = fun _ -> false) environment f =
+  match environment with
+  | Native -> f ()
+  | Browser ->
+    let previous_load = !Persistent_env.Persistent_signature.load in
+    Fun.protect
+      (fun () ->
+        Persistent_env.Persistent_signature.load :=
+          (fun ~allow_hidden ~unit_name ->
+            match previous_load ~allow_hidden ~unit_name with
+            | Some _ as result -> result
+            | None ->
+              let filename = missing_cmi_filename unit_name in
+              if allow_missing filename then None else raise (Missing_cmi filename));
+        f ())
+      ~finally:(fun () ->
+        Persistent_env.Persistent_signature.load := previous_load)

@@ -1,0 +1,974 @@
+--- a/compiler/bin-wasm_of_ocaml/compile.ml
++++ b/compiler/bin-wasm_of_ocaml/compile.ml
+@@ -336,8 +336,7 @@
+                 ~name:(Link.source_name i j file)
+                 ~contents:(Yojson.Basic.to_string (`String sm))))
+
+-let merge_shape a b =
+-  StringMap.union (fun _name s1 s2 -> if Shape.equal s1 s2 then Some s1 else None) a b
++let merge_shape a b = StringMap.union (fun _name _s1 _s2 -> assert false) a b
+
+ let sexp_of_shapes s =
+   StringMap.bindings s
+--- a/compiler/lib/shape.ml
++++ b/compiler/lib/shape.ml
+@@ -28,17 +28,6 @@
+       ; res : t
+       }
+
+-let rec equal a b =
+-  match a, b with
+-  | Top, Top -> true
+-  | ( Function { arity = a1; pure = p1; res = r1 }
+-    , Function { arity = a2; pure = p2; res = r2 } ) ->
+-      a1 = a2 && Bool.(p1 = p2) && equal r1 r2
+-  | Block b1, Block b2 -> (
+-      try List.for_all2 ~f:equal b1 b2 with Invalid_argument _ -> false)
+-  | Top, (Function _ | Block _) | Function _, (Top | Block _) | Block _, (Top | Function _)
+-    -> false
+-
+ let rec merge (u : t) (v : t) =
+   match u, v with
+   | ( Function { arity = a1; pure = p1; res = r1 }
+--- a/compiler/lib/shape.mli
++++ b/compiler/lib/shape.mli
+@@ -30,9 +30,7 @@
+
+ val of_string : string -> t
+
+-val equal : t -> t -> bool
+-
+ val merge : t -> t -> t
+
+ module Store : sig
+
+--- a/compiler/lib/driver.ml
++++ b/compiler/lib/driver.ml
+@@ -133,9 +133,10 @@
+         let return_values = Code.return_values p in
+         StringMap.filter_map
+           (fun _ x ->
+-            match Flow.the_shape_of ~return_values ~pure info x with
++            let s = Flow.the_shape_of ~return_values ~pure info x in
++            match s.desc with
+             | Top -> None
+-            | (Function _ | Block _) as s -> Some s)
++            | Function _ | Block _ -> Some s)
+           !shapes
+     in
+     if times () then Format.eprintf "  shapes: %a@." Timer.print t;
+@@ -181,8 +182,8 @@
+         Specialize.f
+           ~shape:(fun f ->
+             match Global_flow.function_arity info f with
+-            | None -> Shape.Top
+-            | Some arity -> Shape.Function { arity; pure = false; res = Top })
++            | None -> Shape.top
++            | Some arity -> Shape.funct ~arity ~pure:false ~res:Shape.top)
+           ~update_def:(fun x expr -> Global_flow.update_def info x expr)
+           p
+       in
+--- a/compiler/lib/flow.ml
++++ b/compiler/lib/flow.ml
+@@ -465,7 +465,7 @@
+ let the_shape_of ~return_values ~pure info x =
+   let rec loop info x acc : Shape.t =
+     if Var.Set.mem x acc
+-    then Top
++    then Shape.top
+     else
+       let acc = Var.Set.add x acc in
+       get_approx
+@@ -476,16 +476,16 @@
+           | None -> (
+               match info.info_defs.(Var.idx x) with
+               | Expr (Block (_, a, _, Immutable)) ->
+-                  Shape.Block (List.map ~f:(fun x -> loop info x acc) (Array.to_list a))
++                  Shape.block (List.map ~f:(fun x -> loop info x acc) (Array.to_list a))
+               | Expr (Closure (l, _, _)) ->
+                   let pure = Pure_fun.pure pure x in
+                   let res =
+                     match Var.Map.find_opt x return_values with
+-                    | None -> Shape.Top
++                    | None -> Shape.top
+                     | Some set ->
+                         let set = Var.Set.remove x set in
+                         if Var.Set.is_empty set
+-                        then Shape.Top
++                        then Shape.top
+                         else
+                           let first = Var.Set.choose set in
+                           Var.Set.fold
+@@ -495,28 +495,28 @@
+                             set
+                             (loop info first acc)
+                   in
+-                  Shape.Function { arity = List.length l; pure; res }
++                  Shape.funct ~arity:(List.length l) ~pure ~res
+               | Expr (Special (Alias_prim name)) -> (
+                   try
+                     let arity = Primitive.arity name in
+                     let pure = Primitive.is_pure name in
+-                    Shape.Function { arity; pure; res = Top }
+-                  with _ -> Top)
++                    Shape.funct ~arity ~pure ~res:Shape.top
++                  with Not_found -> Shape.top)
+               | Expr (Apply { f; args; _ }) ->
+                   let shape = loop info f (Var.Set.add f acc) in
+                   let rec loop n' shape =
+-                    match shape with
+-                    | Shape.Function { arity = n; pure; res } ->
++                    match shape.Shape.desc with
++                    | Function { arity = n; pure; res } ->
+                         if n = n'
+                         then res
+                         else if n' < n
+-                        then Shape.Function { arity = n - n'; pure; res }
++                        then Shape.funct ~arity:(n - n') ~pure ~res
+                         else loop (n' - n) res
+-                    | Shape.Block _ | Shape.Top -> Shape.Top
++                    | Block _ | Top -> Shape.top
+                   in
+                   loop (List.length args) shape
+-              | _ -> Shape.Top))
+-        Top
++              | _ -> Shape.top))
++        Shape.top
+         (fun u v -> Shape.merge u v)
+         x
+   in
+--- a/compiler/lib/shape.ml
++++ b/compiler/lib/shape.ml
+@@ -19,7 +19,7 @@
+
+ open! Stdlib
+
+-type t =
++type desc =
+   | Top
+   | Block of t list
+   | Function of
+@@ -28,18 +28,38 @@
+       ; res : t
+       }
+
++and t =
++  { id : int
++  ; mutable desc : desc
++  }
++
++let next_id = ref 0
++
++let fresh_id () =
++  let id = !next_id in
++  incr next_id;
++  id
++
++let make desc = { id = fresh_id (); desc }
++
++let top = make Top
++
++let block fields = make (Block fields)
++
++let funct ~arity ~pure ~res = make (Function { arity; pure; res })
++
+ let rec merge (u : t) (v : t) =
+-  match u, v with
++  match u.desc, v.desc with
+   | ( Function { arity = a1; pure = p1; res = r1 }
+     , Function { arity = a2; pure = p2; res = r2 } ) ->
+-      if a1 = a2 then Function { arity = a1; pure = p1 && p2; res = merge r1 r2 } else Top
++      if a1 = a2 then funct ~arity:a1 ~pure:(p1 && p2) ~res:(merge r1 r2) else top
+   | Block b1, Block b2 ->
+-      if List.compare_lengths b1 b2 = 0 then Block (List.map2 b1 b2 ~f:merge) else Top
+-  | Top, _ | _, Top -> Top
+-  | Function _, Block _ | Block _, Function _ -> Top
++      if List.compare_lengths b1 b2 = 0 then block (List.map2 b1 b2 ~f:merge) else top
++  | Top, _ | _, Top -> top
++  | Function _, Block _ | Block _, Function _ -> top
+
+ let rec to_string (shape : t) =
+-  match shape with
++  match shape.desc with
+   | Top -> "N"
+   | Block l -> "[" ^ String.concat ~sep:"," (List.map ~f:to_string l) ^ "]"
+   | Function { arity; pure; res } ->
+@@ -47,7 +67,7 @@
+         "F(%d)%s%s"
+         arity
+         (if pure then "*" else "")
+-        (match res with
++        (match res.desc with
+         | Top -> ""
+         | _ -> "->" ^ to_string res)
+
+@@ -83,7 +103,7 @@
+         parse_block []
+     | 'N' ->
+         next ();
+-        Top
++        top
+     | 'F' ->
+         next ();
+         parse_fun ()
+@@ -92,7 +112,7 @@
+     match current () with
+     | ']' ->
+         next ();
+-        Block (List.rev acc)
++        block (List.rev acc)
+     | _ -> (
+         let x = parse_shape () in
+         match current () with
+@@ -101,7 +121,7 @@
+             parse_block (x :: acc)
+         | ']' ->
+             next ();
+-            Block (List.rev (x :: acc))
++            block (List.rev (x :: acc))
+         | _ -> assert false)
+   and parse_fun () =
+     let () = parse_char '(' in
+@@ -113,8 +133,8 @@
+         next ();
+         parse_char '>';
+         let res = parse_shape () in
+-        Function { arity; pure; res }
+-    | _ -> Function { arity; pure; res = Top }
++        funct ~arity ~pure ~res
++    | _ -> funct ~arity ~pure ~res:top
+   in
+   parse_shape ()
+
+@@ -153,8 +173,10 @@
+   let propagate x offset target =
+     match Code.Var.Hashtbl.find_opt t.table x with
+     | None -> ()
+-    | Some (Top | Function _) -> ()
+-    | Some (Block l) -> assign target (List.nth l offset)
++    | Some shape -> (
++        match shape.desc with
++        | Top | Function _ -> ()
++        | Block fields -> assign target (List.nth fields offset))
+
+   let mem x = BitSet.mem t.cache (Code.Var.idx x)
+
+@@ -163,8 +185,10 @@
+   let is_pure_fun x =
+     match Code.Var.Hashtbl.find_opt t.table x with
+     | None -> false
+-    | Some (Top | Block _) -> false
+-    | Some (Function { pure; _ }) -> pure
++    | Some shape -> (
++        match shape.desc with
++        | Top | Block _ -> false
++        | Function { pure; _ } -> pure)
+
+   let reset () =
+     Code.Var.Hashtbl.clear t.table;
+--- a/compiler/lib/shape.mli
++++ b/compiler/lib/shape.mli
+@@ -17,7 +17,7 @@
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+  *)
+
+-type t =
++type desc =
+   | Top
+   | Block of t list
+   | Function of
+@@ -26,6 +26,17 @@
+       ; res : t
+       }
+
++and t =
++  { id : int
++  ; mutable desc : desc
++  }
++
++val top : t
++
++val block : t list -> t
++
++val funct : arity:int -> pure:bool -> res:t -> t
++
+ val to_string : t -> string
+
+ val of_string : string -> t
+--- a/compiler/lib/specialize.ml
++++ b/compiler/lib/specialize.ml
+@@ -37,8 +37,8 @@
+
+ let specialize_apply opt_count shape update_def =
+   let rec loop x f args shape loc (acc, free_pc, extra) =
+-    match (shape : Shape.t) with
++    match shape.Shape.desc with
+     | Top | Block _ -> Let (x, Apply { f; args; exact = false }) :: acc, free_pc, extra
+     | Function { arity; res; _ } ->
+         let nargs = List.length args in
+
+--- a/compiler/lib/shape.ml
++++ b/compiler/lib/shape.ml
+@@ -42,7 +42,9 @@
+
+ let make desc = { id = fresh_id (); desc }
+
+-let top = make Top
++let proxy () = make Top
++
++let top = proxy ()
+
+ let block fields = make (Block fields)
+
+@@ -58,18 +60,59 @@
+   | Top, _ | _, Top -> top
+   | Function _, Block _ | Block _, Function _ -> top
+
+-let rec to_string (shape : t) =
+-  match shape.desc with
+-  | Top -> "N"
+-  | Block l -> "[" ^ String.concat ~sep:"," (List.map ~f:to_string l) ^ "]"
+-  | Function { arity; pure; res } ->
+-      Printf.sprintf
+-        "F(%d)%s%s"
+-        arity
+-        (if pure then "*" else "")
+-        (match res.desc with
+-        | Top -> ""
+-        | _ -> "->" ^ to_string res)
++let to_string (shape : t) =
++  let counts = Int.Hashtbl.create 17 in
++  let rec count (s : t) =
++    let n = try Int.Hashtbl.find counts s.id with Not_found -> 0 in
++    Int.Hashtbl.replace counts s.id (n + 1);
++    if n = 0
++    then
++      match s.desc with
++      | Top -> ()
++      | Function { res; _ } -> count res
++      | Block fields -> List.iter ~f:count fields
++  in
++  count shape;
++  let names = Int.Hashtbl.create 17 in
++  let next_name = ref 0 in
++  let buf = Buffer.create 64 in
++  let rec emit (s : t) =
++    let desc = s.desc in
++    match desc with
++    | Top -> Buffer.add_char buf 'N'
++    | _ -> (
++        let multi = Int.Hashtbl.find counts s.id > 1 in
++        match if multi then Int.Hashtbl.find_opt names s.id else None with
++        | Some name -> Buffer.add_string buf (Printf.sprintf "$%d" name)
++        | None -> (
++            if multi
++            then begin
++              let name = !next_name in
++              incr next_name;
++              Int.Hashtbl.replace names s.id name;
++              Buffer.add_string buf (Printf.sprintf "#%d=" name)
++            end;
++            match desc with
++            | Top -> assert false
++            | Function { arity; pure; res } -> (
++                Buffer.add_string buf (Printf.sprintf "F(%d)" arity);
++                if pure then Buffer.add_char buf '*';
++                match res.desc with
++                | Top -> ()
++                | _ ->
++                    Buffer.add_string buf "->";
++                    emit res)
++            | Block fields ->
++                Buffer.add_char buf '[';
++                List.iteri
++                  ~f:(fun i x ->
++                    if i > 0 then Buffer.add_char buf ',';
++                    emit x)
++                  fields;
++                Buffer.add_char buf ']'))
++  in
++  emit shape;
++  Buffer.contents buf
+
+ let of_string (s : string) =
+   let pos = ref 0 in
+@@ -96,6 +139,7 @@
+         parse_int acc
+     | _ -> acc
+   in
++  let ref_table = Int.Hashtbl.create 17 in
+   let rec parse_shape () =
+     match current () with
+     | '[' ->
+@@ -107,6 +151,19 @@
+     | 'F' ->
+         next ();
+         parse_fun ()
++    | '#' ->
++        next ();
++        let parsed_id = parse_int 0 in
++        parse_char '=';
++        let shape_proxy = proxy () in
++        Int.Hashtbl.replace ref_table parsed_id shape_proxy;
++        let actual_shape = parse_shape () in
++        shape_proxy.desc <- actual_shape.desc;
++        shape_proxy
++    | '$' ->
++        next ();
++        let parsed_id = parse_int 0 in
++        Int.Hashtbl.find ref_table parsed_id
+     | _ -> assert false
+   and parse_block acc =
+     match current () with
+--- a/compiler/lib/shape.mli
++++ b/compiler/lib/shape.mli
+@@ -37,6 +37,8 @@
+
+ val funct : arity:int -> pure:bool -> res:t -> t
+
++val proxy : unit -> t
++
+ val to_string : t -> string
+
+ val of_string : string -> t
+--- a/compiler/lib/driver.ml
++++ b/compiler/lib/driver.ml
+@@ -64,10 +64,8 @@
+ let specialize_1 (p, info) =
+   if debug () then Format.eprintf "Specialize...@.";
+   let return_values = Code.Var.Map.empty in
+-  Specialize.f
+-    ~shape:(fun f -> Flow.the_shape_of ~return_values ~pure:Pure_fun.empty info f)
+-    ~update_def:(fun x expr -> Flow.Info.update_def info x expr)
+-    p
++  let shape = Flow.the_shape_of ~return_values ~pure:Pure_fun.empty info in
++  Specialize.f ~shape ~update_def:(fun x expr -> Flow.Info.update_def info x expr) p
+
+ let specialize_js (p, info) =
+   if debug () then Format.eprintf "Specialize js...@.";
+@@ -131,9 +129,10 @@
+         let _, info = Flow.f p in
+         let pure = Pure_fun.f p in
+         let return_values = Code.return_values p in
++        let shape = Flow.the_shape_of ~return_values ~pure info in
+         StringMap.filter_map
+           (fun _ x ->
+-            let s = Flow.the_shape_of ~return_values ~pure info x in
++            let s = shape x in
+             match s.desc with
+             | Top -> None
+             | Function _ | Block _ -> Some s)
+--- a/compiler/lib/flow.ml
++++ b/compiler/lib/flow.ml
+@@ -462,65 +462,209 @@
+         y
+   | _ -> None
+
+-let the_shape_of ~return_values ~pure info x =
+-  let rec loop info x acc : Shape.t =
+-    if Var.Set.mem x acc
+-    then Shape.top
+-    else
+-      let acc = Var.Set.add x acc in
+-      get_approx
+-        info
+-        (fun x ->
+-          match Shape.State.get x with
+-          | Some shape -> shape
+-          | None -> (
+-              match info.info_defs.(Var.idx x) with
+-              | Expr (Block (_, a, _, Immutable)) ->
+-                  Shape.block (List.map ~f:(fun x -> loop info x acc) (Array.to_list a))
+-              | Expr (Closure (l, _, _)) ->
+-                  let pure = Pure_fun.pure pure x in
+-                  let res =
+-                    match Var.Map.find_opt x return_values with
+-                    | None -> Shape.top
+-                    | Some set ->
+-                        let set = Var.Set.remove x set in
+-                        if Var.Set.is_empty set
+-                        then Shape.top
+-                        else
+-                          let first = Var.Set.choose set in
+-                          Var.Set.fold
+-                            (fun x s1 ->
+-                              let s2 = loop info x acc in
+-                              Shape.merge s1 s2)
+-                            set
+-                            (loop info first acc)
+-                  in
+-                  Shape.funct ~arity:(List.length l) ~pure ~res
+-              | Expr (Special (Alias_prim name)) -> (
+-                  try
+-                    let arity = Primitive.arity name in
+-                    let pure = Primitive.is_pure name in
+-                    Shape.funct ~arity ~pure ~res:Shape.top
+-                  with Not_found -> Shape.top)
+-              | Expr (Apply { f; args; _ }) ->
+-                  let shape = loop info f (Var.Set.add f acc) in
+-                  let rec loop n' shape =
+-                    match shape.Shape.desc with
+-                    | Function { arity = n; pure; res } ->
+-                        if n = n'
+-                        then res
+-                        else if n' < n
+-                        then Shape.funct ~arity:(n - n') ~pure ~res
+-                        else loop (n' - n) res
+-                    | Block _ | Top -> Shape.top
+-                  in
+-                  loop (List.length args) shape
+-              | _ -> Shape.top))
+-        Shape.top
+-        (fun u v -> Shape.merge u v)
+-        x
++type prop =
++  | PTop
++  | PBlock of
++      { fields_vars : Var.Set.t array
++      ; fields_shapes : Shape.Set.t array
++      }
++  | PFunction of
++      { arity : int
++      ; pure : bool
++      ; res_vars : Var.Set.t
++      ; res_shapes : Shape.Set.t
++      }
++
++let merge_prop p1 p2 =
++  match p1, p2 with
++  | PBlock b1, PBlock b2 ->
++      let len1 = Array.length b1.fields_vars in
++      let len2 = Array.length b2.fields_vars in
++      if len1 = len2
++      then
++        let fields_vars =
++          Array.init len1 ~f:(fun i ->
++              Var.Set.union b1.fields_vars.(i) b2.fields_vars.(i))
++        in
++        let fields_shapes =
++          Array.init len1 ~f:(fun i ->
++              Shape.Set.union b1.fields_shapes.(i) b2.fields_shapes.(i))
++        in
++        PBlock { fields_vars; fields_shapes }
++      else PTop
++  | PFunction f1, PFunction f2 when f1.arity = f2.arity ->
++      PFunction
++        { arity = f1.arity
++        ; pure = f1.pure && f2.pure
++        ; res_vars = Var.Set.union f1.res_vars f2.res_vars
++        ; res_shapes = Shape.Set.union f1.res_shapes f2.res_shapes
++        }
++  | _ -> PTop
++
++module VarSetShapeSetId = struct
++  type t = Var.Set.t * Shape.Set.t
++
++  let compare (v1, s1) (v2, s2) =
++    let c = Var.Set.compare v1 v2 in
++    if c <> 0 then c else Shape.Set.compare s1 s2
++end
++
++module VarSetShapeSetMap = Map.Make (VarSetShapeSetId)
++
++let shape_to_prop s =
++  match s.Shape.desc with
++  | Top -> PTop
++  | Block fields ->
++      let len = List.length fields in
++      PBlock
++        { fields_vars = Array.make len Var.Set.empty
++        ; fields_shapes = Array.of_list (List.map ~f:Shape.Set.singleton fields)
++        }
++  | Function { arity; pure; res } ->
++      PFunction
++        { arity; pure; res_vars = Var.Set.empty; res_shapes = Shape.Set.singleton res }
++
++let the_shape_of ~return_values ~pure info =
++  let cache = Var.Hashtbl.create 17 in
++  let set_cache = ref VarSetShapeSetMap.empty in
++  let eval_var_cache = Var.Hashtbl.create 17 in
++  let rec compute_set vars shapes =
++    if Var.Set.compare_cardinal_with vars 1 = 0 && Shape.Set.is_empty shapes
++    then (
++      let x = Var.Set.choose vars in
++      match Var.Hashtbl.find_opt cache x with
++      | Some s -> s
++      | None ->
++          let s = compute_internal vars shapes in
++          Var.Hashtbl.replace cache x s;
++          s)
++    else compute_internal vars shapes
++  and compute_internal vars shapes =
++    let key = vars, shapes in
++    match VarSetShapeSetMap.find_opt key !set_cache with
++    | Some shape -> shape
++    | None ->
++        let shape_proxy = Shape.proxy () in
++        set_cache := VarSetShapeSetMap.add key shape_proxy !set_cache;
++        let unknown =
++          Var.Set.exists (fun x -> Var.Tbl.get info.Info.info_maybe_unknown x) vars
++        in
++        (if not unknown
++         then
++           let p_vars =
++             let expanded =
++               Var.Set.fold
++                 (fun x expanded ->
++                   Var.Set.union expanded (Var.Tbl.get info.Info.info_known_origins x))
++                 vars
++                 Var.Set.empty
++             in
++             if Var.Set.is_empty expanded
++             then None
++             else
++               let first = Var.Set.choose expanded in
++               let rest = Var.Set.remove first expanded in
++               Some
++                 (Var.Set.fold
++                    (fun x acc -> merge_prop acc (eval_var x))
++                    rest
++                    (eval_var first))
++           in
++           let p_shapes =
++             if Shape.Set.is_empty shapes
++             then None
++             else
++               let first = Shape.Set.choose shapes in
++               let rest = Shape.Set.remove first shapes in
++               Some
++                 (Shape.Set.fold
++                    (fun s acc -> merge_prop acc (shape_to_prop s))
++                    rest
++                    (shape_to_prop first))
++           in
++           let p_combined =
++             match p_vars, p_shapes with
++             | None, None -> PTop
++             | Some p, None | None, Some p -> p
++             | Some p1, Some p2 -> merge_prop p1 p2
++           in
++           shape_proxy.desc <- prop_to_desc p_combined);
++        shape_proxy
++  and prop_to_desc p : Shape.desc =
++    match p with
++    | PTop -> Shape.Top
++    | PBlock { fields_vars; fields_shapes } ->
++        Shape.Block
++          (List.init ~len:(Array.length fields_vars) ~f:(fun i ->
++               compute_set fields_vars.(i) fields_shapes.(i)))
++    | PFunction { arity; pure; res_vars; res_shapes } ->
++        Shape.Function { arity; pure; res = compute_set res_vars res_shapes }
++  and eval_var x =
++    match Var.Hashtbl.find_opt eval_var_cache x with
++    | Some p -> p
++    | None ->
++        let p = eval_var_uncached x in
++        Var.Hashtbl.replace eval_var_cache x p;
++        p
++  and eval_var_uncached x =
++    match Shape.State.get x with
++    | Some s -> shape_to_prop s
++    | None -> (
++        match info.Info.info_defs.(Var.idx x) with
++        | Expr (Block (_, a, _, Immutable)) ->
++            PBlock
++              { fields_vars = Array.map ~f:Var.Set.singleton a
++              ; fields_shapes = Array.make (Array.length a) Shape.Set.empty
++              }
++        | Expr (Closure (l, _, _)) ->
++            let res_vars =
++              match Var.Map.find_opt x return_values with
++              | None -> Var.Set.empty
++              | Some set -> set
++            in
++            PFunction
++              { arity = List.length l
++              ; pure = Pure_fun.pure pure x
++              ; res_vars
++              ; res_shapes = Shape.Set.empty
++              }
++        | Expr (Special (Alias_prim name)) -> (
++            try
++              let arity = Primitive.arity name in
++              let pure = Primitive.is_pure name in
++              PFunction
++                { arity; pure; res_vars = Var.Set.empty; res_shapes = Shape.Set.empty }
++            with Not_found -> PTop)
++        | Expr (Apply { f; args; _ }) ->
++            let f_shape = compute_set (Var.Set.singleton f) Shape.Set.empty in
++            let rec loop n' shape =
++              match shape.Shape.desc with
++              | Function { arity = n; pure; res } ->
++                  if n = n'
++                  then shape_to_prop res
++                  else if n' < n
++                  then
++                    PFunction
++                      { arity = n - n'
++                      ; pure
++                      ; res_vars = Var.Set.empty
++                      ; res_shapes = Shape.Set.singleton res
++                      }
++                  else loop (n' - n) res
++              | Block _ | Top -> PTop
++            in
++            loop (List.length args) f_shape
++        | _ -> PTop)
++  in
++  let get x =
++    match Var.Hashtbl.find_opt cache x with
++    | Some s -> s
++    | None ->
++        let s = compute_internal (Var.Set.singleton x) Shape.Set.empty in
++        Var.Hashtbl.replace cache x s;
++        s
+   in
+-  loop info x Var.Set.empty
++  get
+
+ let build_subst (info : Info.t) vars =
+   let nv = Var.count () in
+--- a/compiler/lib/flow.mli
++++ b/compiler/lib/flow.mli
+@@ -74,3 +74,5 @@
+   -> Info.t
+   -> Code.Var.t
+   -> Shape.t
++(** Returns a function [get] where [get x] computes the shape of
++    variable [x]. Results are memoized across calls to [get]. *)
+--- a/compiler/lib/shape.ml
++++ b/compiler/lib/shape.ml
+@@ -50,15 +50,11 @@
+
+ let funct ~arity ~pure ~res = make (Function { arity; pure; res })
+
+-let rec merge (u : t) (v : t) =
+-  match u.desc, v.desc with
+-  | ( Function { arity = a1; pure = p1; res = r1 }
+-    , Function { arity = a2; pure = p2; res = r2 } ) ->
+-      if a1 = a2 then funct ~arity:a1 ~pure:(p1 && p2) ~res:(merge r1 r2) else top
+-  | Block b1, Block b2 ->
+-      if List.compare_lengths b1 b2 = 0 then block (List.map2 b1 b2 ~f:merge) else top
+-  | Top, _ | _, Top -> top
+-  | Function _, Block _ | Block _, Function _ -> top
++module Set = Set.Make (struct
++  type nonrec t = t
++
++  let compare a b = Int.compare a.id b.id
++end)
+
+ let to_string (shape : t) =
+   let counts = Int.Hashtbl.create 17 in
+--- a/compiler/lib/shape.mli
++++ b/compiler/lib/shape.mli
+@@ -39,12 +39,12 @@
+
+ val proxy : unit -> t
+
++module Set : Set.S with type elt = t
++
+ val to_string : t -> string
+
+ val of_string : string -> t
+
+-val merge : t -> t -> t
+-
+ module Store : sig
+   val set : name:string -> t -> unit
+
+--- a/compiler/lib/driver.ml
++++ b/compiler/lib/driver.ml
+@@ -64,7 +64,7 @@
+ let specialize_1 (p, info) =
+   if debug () then Format.eprintf "Specialize...@.";
+   let return_values = Code.Var.Map.empty in
+-  let shape = Flow.the_shape_of ~return_values ~pure:Pure_fun.empty info in
++  let shape = Flow.the_shape_of ~return_values ~pure:Pure_fun.empty ~blocks:false info in
+   Specialize.f ~shape ~update_def:(fun x expr -> Flow.Info.update_def info x expr) p
+
+ let specialize_js (p, info) =
+@@ -129,7 +129,7 @@
+         let _, info = Flow.f p in
+         let pure = Pure_fun.f p in
+         let return_values = Code.return_values p in
+-        let shape = Flow.the_shape_of ~return_values ~pure info in
++        let shape = Flow.the_shape_of ~return_values ~pure ~blocks:true info in
+         StringMap.filter_map
+           (fun _ x ->
+             let s = shape x in
+--- a/compiler/lib/flow.ml
++++ b/compiler/lib/flow.ml
+@@ -524,7 +524,7 @@
+       PFunction
+         { arity; pure; res_vars = Var.Set.empty; res_shapes = Shape.Set.singleton res }
+
+-let the_shape_of ~return_values ~pure info =
++let the_shape_of ~return_values ~pure ~blocks info =
+   let cache = Var.Hashtbl.create 17 in
+   let set_cache = ref VarSetShapeSetMap.empty in
+   let eval_var_cache = Var.Hashtbl.create 17 in
+@@ -612,10 +612,13 @@
+     | None -> (
+         match info.Info.info_defs.(Var.idx x) with
+         | Expr (Block (_, a, _, Immutable)) ->
+-            PBlock
+-              { fields_vars = Array.map ~f:Var.Set.singleton a
+-              ; fields_shapes = Array.make (Array.length a) Shape.Set.empty
+-              }
++            if not blocks
++            then PTop
++            else
++              PBlock
++                { fields_vars = Array.map ~f:Var.Set.singleton a
++                ; fields_shapes = Array.make (Array.length a) Shape.Set.empty
++                }
+         | Expr (Closure (l, _, _)) ->
+             let res_vars =
+               match Var.Map.find_opt x return_values with
+--- a/compiler/lib/flow.mli
++++ b/compiler/lib/flow.mli
+@@ -71,7 +71,8 @@
+ val the_shape_of :
+      return_values:Code.Var.Set.t Code.Var.Map.t
+   -> pure:Pure_fun.t
++  -> blocks:bool
+   -> Info.t
+   -> Code.Var.t
+   -> Shape.t
+
+--- a/compiler/lib/driver.ml
++++ b/compiler/lib/driver.ml
+@@ -64,8 +64,14 @@
+ let specialize_1 (p, info) =
+   if debug () then Format.eprintf "Specialize...@.";
+   let return_values = Code.Var.Map.empty in
+-  let shape = Flow.the_shape_of ~return_values ~pure:Pure_fun.empty ~blocks:false info in
+-  Specialize.f ~shape ~update_def:(fun x expr -> Flow.Info.update_def info x expr) p
++  let shape, set_shape =
++    Flow.the_shape_of ~return_values ~pure:Pure_fun.empty ~blocks:false info
++  in
++  Specialize.f
++    ~shape
++    ~set_shape
++    ~update_def:(fun x expr -> Flow.Info.update_def info x expr)
++    p
+
+ let specialize_js (p, info) =
+   if debug () then Format.eprintf "Specialize js...@.";
+@@ -129,7 +135,9 @@
+         let _, info = Flow.f p in
+         let pure = Pure_fun.f p in
+         let return_values = Code.return_values p in
+-        let shape = Flow.the_shape_of ~return_values ~pure ~blocks:true info in
++        let shape, _set_shape =
++          Flow.the_shape_of ~return_values ~pure ~blocks:true info
++        in
+         StringMap.filter_map
+           (fun _ x ->
+             let s = shape x in
+@@ -183,6 +191,7 @@
+             match Global_flow.function_arity info f with
+             | None -> Shape.top
+             | Some arity -> Shape.funct ~arity ~pure:false ~res:Shape.top)
++          ~set_shape:(fun _ _ -> ())
+           ~update_def:(fun x expr -> Global_flow.update_def info x expr)
+           p
+       in
+--- a/compiler/lib/flow.ml
++++ b/compiler/lib/flow.ml
+@@ -667,7 +667,8 @@
+         Var.Hashtbl.replace cache x s;
+         s
+   in
+-  get
++  let set x s = Var.Hashtbl.replace cache x s in
++  get, set
+
+ let build_subst (info : Info.t) vars =
+   let nv = Var.count () in
+--- a/compiler/lib/flow.mli
++++ b/compiler/lib/flow.mli
+@@ -73,7 +73,8 @@
+   -> pure:Pure_fun.t
+   -> blocks:bool
+   -> Info.t
+-  -> Code.Var.t
+-  -> Shape.t
+-(** Returns a function [get] where [get x] computes the shape of
+-    variable [x]. Results are memoized across calls to [get]. *)
++  -> (Code.Var.t -> Shape.t) * (Code.Var.t -> Shape.t -> unit)
++(** Returns [(get, set)] where [get x] computes the shape of variable [x]
++    and [set x s] injects a shape for [x] into the internal cache (used to
++    register shapes of fresh variables introduced by specialization).
++    Results are memoized across calls to [get]. *)
+--- a/compiler/lib/specialize.ml
++++ b/compiler/lib/specialize.ml
+@@ -35,7 +35,7 @@
+   | Let (_, Apply { f = _; args = _; exact = false }) -> true
+   | _ -> false
+
+-let specialize_apply opt_count shape update_def =
++let specialize_apply opt_count shape set_shape update_def =
+   let rec loop x f args shape loc (acc, free_pc, extra) =
+     match shape.Shape.desc with
+     | Top | Block _ -> Let (x, Apply { f; args; exact = false }) :: acc, free_pc, extra
+@@ -71,6 +71,7 @@
+           (* over application *)
+           incr opt_count;
+           let v = Code.Var.fresh () in
++          set_shape v res;
+           let args, rest = List.take arity args in
+           let exact_expr = Apply { f; args; exact = true } in
+           let body =
+@@ -84,9 +85,9 @@
+     | Let (x, Apply { f; args; exact = false }) -> loop x f args (shape f) loc acc
+     | _ -> i :: body_rev, free_pc, extra
+
+-let specialize_instrs ~shape ~update_def opt_count p =
++let specialize_instrs ~shape ~set_shape ~update_def opt_count p =
+   let blocks, free_pc =
+-    let specialize_instrs = specialize_apply opt_count shape update_def in
++    let specialize_instrs = specialize_apply opt_count shape set_shape update_def in
+     Addr.Map.fold
+       (fun pc block (blocks, free_pc) ->
+         if List.exists ~f:unknown_apply block.body
+@@ -113,13 +114,15 @@
+   in
+   { p with blocks; free_pc }
+
+-let f ~shape ~update_def p =
++let f ~shape ~set_shape ~update_def p =
+   Code.invariant p;
+   let previous_p = p in
+   let t = Timer.make () in
+   let opt_count = ref 0 in
+   let p =
+-    if Config.Flag.optcall () then specialize_instrs ~shape ~update_def opt_count p else p
++    if Config.Flag.optcall ()
++    then specialize_instrs ~shape ~set_shape ~update_def opt_count p
++    else p
+   in
+   if times () then Format.eprintf "  optcall: %a@." Timer.print t;
+   if stats () then Format.eprintf "Stats - optcall: %d@." !opt_count;
+--- a/compiler/lib/specialize.mli
++++ b/compiler/lib/specialize.mli
+@@ -20,7 +20,8 @@
+
+ val f :
+      shape:(Code.Var.t -> Shape.t)
++  -> set_shape:(Code.Var.t -> Shape.t -> unit)
+   -> update_def:(Code.Var.t -> Code.expr -> unit)
+   -> Code.program
+   -> Code.program
+
+--- a/compiler/lib/driver.ml
++++ b/compiler/lib/driver.ml
+@@ -63,7 +63,7 @@
+
+ let specialize_1 (p, info) =
+   if debug () then Format.eprintf "Specialize...@.";
+-  let return_values = Code.Var.Map.empty in
++  let return_values = Code.return_values p in
+   let shape, set_shape =
+     Flow.the_shape_of ~return_values ~pure:Pure_fun.empty ~blocks:false info
+   in

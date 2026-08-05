@@ -1,0 +1,431 @@
+--- a/src/ast_builder.ml
++++ b/src/ast_builder.ml
+@@ -1,5 +1,70 @@
+ open! Import
+ 
++(* Internally to Jane Street, shadow the auto-generated [pexp_fun] and [pexp_function]
++   bindings. We only want to export versions of these functions that know how to add
++   arity-related attributes.
++
++   This code can go away when we update to a version of the OCaml compiler that
++   includes https://github.com/ocaml/ocaml/pull/12236.
++*)
++(* Also shadow nodes than our compiler has changed, since ppxes should use [Ppxlib_jane]'s
++   version so as to stay upstream compatible *)
++module Bindings_to_shadow = struct
++  let pexp_fun = `Shadowed
++  let pexp_function = `Shadowed
++  let label_declaration = `Shadowed
++  let value_description = `Shadowed
++  let ptyp_arrow = `Shadowed
++  let ppat_constraint = `Shadowed
++  let pexp_constraint = `Shadowed
++  let pexp_let = `Shadowed
++  let value_binding = `Shadowed
++  let include_infos = `Shadowed
++  let psig_include = `Shadowed
++  let pcstr_tuple = `Shadowed
++  let module_declaration = `Shadowed
++  let pmty_functor = `Shadowed
++  let pmod_constraint = `Shadowed
++
++  (* [signature] is a bit different as we don't explicitly shadow it.
++     Instead, we encourage people use the version that's automatically
++     compatible with open-source code. *)
++  let signature = `Use_Ppxlib_jane
++
++  let () = ignore (
++    pexp_fun,
++    pexp_function,
++    label_declaration,
++    value_description,
++    ptyp_arrow,
++    ppat_constraint,
++    pexp_constraint,
++    pexp_let,
++    value_binding,
++    include_infos,
++    psig_include,
++    signature,
++    pcstr_tuple,
++    module_declaration,
++    pmty_functor,
++    pmod_constraint
++  )
++end
++
++module Ast_builder_generated = struct
++  include Ast_builder_generated
++
++  module M = struct
++    include Ast_builder_generated.M
++    include Bindings_to_shadow
++  end
++
++  module Make (Loc : Ast_builder_intf.Loc) = struct
++    include Make (Loc)
++    include Bindings_to_shadow
++  end
++end
++
+ module Default = struct
+   module Located = struct
+     type 'a t = 'a Loc.t
+@@ -14,10 +79,24 @@ module Default = struct
+   include Ast_builder_generated.M
+ 
+   module Latest = struct
+-    let ppat_construct = ppat_construct
++    let ppat_construct ~loc lid p =
++      {
++        ppat_loc_stack = [];
++        ppat_attributes = [];
++        ppat_loc = loc;
++        ppat_desc = Ppat_construct (lid, p);
++      }
+ 
+     let constructor_declaration ~loc ~name ~vars ~args ~res () =
++      let vars = List.map vars ~f:(fun var -> var, None) in
+       constructor_declaration ~loc ~name ~vars ~args ~res
++
++    let pmty_signature = pmty_signature
++    let signature = Ppxlib_jane.Ast_builder.Default.signature
++
++    let label_declaration =
++      Ppxlib_jane.Ast_builder.Default.label_declaration
++
+   end
+ 
+   (*------ stable layer above Ast_builder_generated.M -----*)
+@@ -41,6 +120,48 @@ module Default = struct
+ 
+   (*-------------------------------------------------------*)
+ 
++  (* override changed nodes to use [Ppxlib_jane] interface *)
++  let label_declaration =
++    Ppxlib_jane.Ast_builder.Default.label_declaration ~modalities:[]
++
++  let value_description =
++    Ppxlib_jane.Ast_builder.Default.value_description ~modalities:[]
++
++  let pmty_signature ~loc x =
++    pmty_signature ~loc (Ppxlib_jane.Ast_builder.Default.signature ~loc ~modalities:[] x)
++
++  let ptyp_arrow ~loc arg_label arg_type result_type =
++    Ppxlib_jane.Ast_builder.Default.ptyp_arrow ~loc
++      { arg_label; arg_type; arg_modes = [] }
++      { result_type; result_modes = [] }
++
++  let pexp_let ~loc a b c =
++    Ppxlib_jane.Ast_builder.Default.pexp_let ~loc Immutable a b c
++
++  let pexp_constraint ~loc a b =
++    Ppxlib_jane.Ast_builder.Default.pexp_constraint ~loc a (Some b) []
++
++  let ppat_constraint ~loc a b =
++    Ppxlib_jane.Ast_builder.Default.ppat_constraint ~loc a (Some b) []
++
++  let value_binding = Ppxlib_jane.Ast_builder.Default.value_binding ~modes:[]
++
++  let include_infos = Ppxlib_jane.Ast_builder.Default.include_infos ~kind:Structure
++
++  let psig_include ~loc a =
++    Ppxlib_jane.Ast_builder.Default.psig_include ~loc ~modalities:[] a
++
++  let module_declaration ~loc ~name ~type_ =
++    Ppxlib_jane.Ast_builder.Default.module_declaration ~loc name type_
++
++  let pmty_functor ~loc param mty =
++    Ppxlib_jane.Ast_builder.Default.pmty_functor ~loc param mty
++
++  let pmod_constraint ~loc expr mty =
++    Ppxlib_jane.Ast_builder.Default.pmod_constraint ~loc expr (Some mty) []
++
++  (* ----------------------------------------------------- *)
++
+   let pstr_value_list ~loc rec_flag = function
+     | [] -> []
+     | vbs -> [ pstr_value ~loc rec_flag vbs ]
+@@ -88,9 +209,9 @@ module Default = struct
+   let pvar ~loc v = ppat_var ~loc (Located.mk ~loc v)
+   let eunit ~loc = pexp_construct ~loc (Located.lident ~loc "()") None
+   let punit ~loc = ppat_construct ~loc (Located.lident ~loc "()") None
+-  let pexp_tuple ~loc l = match l with [ x ] -> x | _ -> pexp_tuple ~loc l
+-  let ppat_tuple ~loc l = match l with [ x ] -> x | _ -> ppat_tuple ~loc l
+-  let ptyp_tuple ~loc l = match l with [ x ] -> x | _ -> ptyp_tuple ~loc l
++  let pexp_tuple ~loc l = match l with [ x ] -> x | _ -> pexp_tuple ~loc (List.map ~f:(fun e -> None, e) l)
++  let ppat_tuple ~loc l = match l with [ x ] -> x | _ -> ppat_tuple ~loc (List.map ~f:(fun p -> None, p) l) Closed
++  let ptyp_tuple ~loc l = match l with [ x ] -> x | _ -> ptyp_tuple ~loc (List.map ~f:(fun t -> None, t) l)
+ 
+   let pexp_tuple_opt ~loc l =
+     match l with [] -> None | _ :: _ -> Some (pexp_tuple ~loc l)
+@@ -98,8 +219,11 @@ module Default = struct
+   let ppat_tuple_opt ~loc l =
+     match l with [] -> None | _ :: _ -> Some (ppat_tuple ~loc l)
+ 
++  let pexp_array ~loc l = pexp_array ~loc Mutable l
++  let ppat_array ~loc l = ppat_array ~loc Mutable l
++
+   let ptyp_poly ~loc vars ty =
+-    match vars with [] -> ty | _ -> ptyp_poly ~loc vars ty
++    match vars with [] -> ty | _ -> ptyp_poly ~loc (List.map vars ~f:(fun v -> v, None)) ty
+ 
+   let pexp_apply ~loc e el =
+     match (e, el) with
+@@ -111,9 +235,23 @@ module Default = struct
+   let eapply ~loc e el =
+     pexp_apply ~loc e (List.map el ~f:(fun e -> (Asttypes.Nolabel, e)))
+ 
+-  let eabstract ~loc ps e =
+-    List.fold_right ps ~init:e ~f:(fun p e ->
+-        pexp_fun ~loc Asttypes.Nolabel None p e)
++  let pexp_function ~loc a : expression =
++    Ppxlib_jane.Ast_builder.Default.unary_function ~loc a
++
++  let pexp_fun ~loc a b c d : expression =
++    Ppxlib_jane.Ast_builder.Default.add_fun_param ~loc a b c d
++
++  let eabstract ~loc a b : expression =
++    Ppxlib_jane.Ast_builder.Default.eabstract ~loc a b
++
++  let ptyp_any ~loc = ptyp_any ~loc None
++  let ptyp_var ~loc a = ptyp_var ~loc a None
++  let ptyp_alias ~loc a b = ptyp_alias ~loc a (Some b) None
++  let pexp_newtype ~loc a b = pexp_newtype ~loc a None b
++
++  let type_declaration ~loc ~name ~params ~cstrs ~kind ~private_ ~manifest =
++    type_declaration ~loc ~name ~params ~cstrs ~kind ~private_ ~manifest
++      ~jkind_annotation:None
+ 
+   let esequence ~loc el =
+     match List.rev el with
+@@ -180,52 +318,62 @@ module Default = struct
+     type_constr_conv longident ~loc ~f []
+ 
+   let eta_reduce =
+-    let rec gather_params acc expr =
++    let rec split_params rev_prefix suffix =
++      match suffix with
++      | { pparam_desc = Pparam_val (label, None, subpat); pparam_loc = _ } :: suffix ->
++         (match subpat with
++          | { ppat_desc = Ppat_var name;
++              ppat_attributes = [];
++              ppat_loc = _;
++              ppat_loc_stack = _;
++            } ->
++            split_params ((label, name, None, []) :: rev_prefix) suffix
++          | { ppat_desc =
++                Ppat_constraint
++                  ( {
++                    ppat_desc = Ppat_var name;
++                    ppat_attributes = [];
++                    ppat_loc = _;
++                    ppat_loc_stack = _;
++                  },
++                    ty,
++                    modes );
++              ppat_attributes = [];
++              ppat_loc = _;
++              ppat_loc_stack = _;
++            } ->
++            (* We reduce [fun (x : ty) -> f x] by rewriting it [(f : ty -> _)]. *)
++            split_params ((label, name, ty, modes) :: rev_prefix) suffix
++          | _ -> List.rev rev_prefix, suffix)
++      | _ -> List.rev rev_prefix, suffix
++    in
++    let gather_params expr =
+       match expr with
+-      | {
+-       pexp_desc =
+-         Pexp_fun (label, None (* no default expression *), subpat, body);
+-       pexp_attributes = [];
+-       pexp_loc = _;
+-       pexp_loc_stack = _;
+-      } -> (
+-          match subpat with
+-          | {
+-           ppat_desc = Ppat_var name;
+-           ppat_attributes = [];
+-           ppat_loc = _;
+-           ppat_loc_stack = _;
+-          } ->
+-              gather_params ((label, name, None) :: acc) body
+-          | {
+-           ppat_desc =
+-             Ppat_constraint
+-               ( {
+-                   ppat_desc = Ppat_var name;
+-                   ppat_attributes = [];
+-                   ppat_loc = _;
+-                   ppat_loc_stack = _;
+-                 },
+-                 ty );
+-           ppat_attributes = [];
+-           ppat_loc = _;
+-           ppat_loc_stack = _;
+-          } ->
+-              (* We reduce [fun (x : ty) -> f x] by rewriting it [(f : ty -> _)]. *)
+-              gather_params ((label, name, Some ty) :: acc) body
+-          | _ -> (List.rev acc, expr))
+-      | _ -> (List.rev acc, expr)
++      | { pexp_desc = Pexp_function (params, constraint_, Pfunction_body body);
++          pexp_attributes = [];
++          pexp_loc = _;
++          pexp_loc_stack = _;
++        } when Ppxlib_jane.Shim.Pexp_function.Function_constraint.is_none constraint_ ->
++         let gathered_prefix, suffix = split_params [] params in
++         (match suffix with
++          | [] -> gathered_prefix, body
++          | _ -> [], expr)
++      | _ -> [], expr
+     in
+     let annotate ~loc expr params =
+-      if List.exists params ~f:(fun (_, _, ty) -> Option.is_some ty) then
++      if List.exists params
++           ~f:(fun (_, _, ty, modes) -> Option.is_some ty || not (List.is_empty modes))
++      then
+         let ty =
+           List.fold_right params ~init:(ptyp_any ~loc)
+-            ~f:(fun (param_label, param, ty_opt) acc ->
++            ~f:(fun (arg_label, param, ty_opt, arg_modes) acc ->
+               let loc = param.loc in
+               let ty =
+                 match ty_opt with None -> ptyp_any ~loc | Some ty -> ty
+               in
+-              ptyp_arrow ~loc param_label ty acc)
++              Ppxlib_jane.Ast_builder.Default.ptyp_arrow ~loc
++                { arg_label; arg_type = ty; arg_modes }
++                { result_type = acc; result_modes = [] })
+         in
+         pexp_constraint ~loc expr ty
+       else expr
+@@ -248,13 +396,13 @@ module Default = struct
+         | _ -> None
+     in
+     fun expr ->
+-      let params, body = gather_params [] expr in
++      let params, body = gather_params expr in
+       match gather_args (List.length params) body with
+       | None -> None
+       | Some (({ pexp_desc = Pexp_ident _; _ } as f_ident), args) -> (
+           match
+             List.for_all2 args params
+-              ~f:(fun (arg_label, arg) (param_label, param, _) ->
++              ~f:(fun (arg_label, arg) (param_label, param, _, _) ->
+                 Poly.( = ) (arg_label : arg_label) param_label
+                 &&
+                 match arg with
+@@ -286,7 +434,7 @@ module type S = sig
+ 
+   module Latest : sig
+     val ppat_construct :
+-      longident loc -> (label loc list * pattern) option -> pattern
++      longident loc -> ((label loc * jkind_annotation option) list * pattern) option -> pattern
+ 
+     val constructor_declaration :
+       name:label loc ->
+@@ -295,6 +443,16 @@ module type S = sig
+       res:core_type option ->
+       unit ->
+       constructor_declaration
++
++    val pmty_signature : signature -> module_type
++    val signature : ?modalities:modalities -> signature_item list -> signature
++    val label_declaration :
++    name:string loc ->
++    mutable_:mutable_flag ->
++    modalities:modalities ->
++    type_:core_type ->
++    label_declaration
++
+   end
+ 
+   val ppat_construct : longident loc -> pattern option -> pattern
+@@ -315,7 +473,13 @@ end) : S = struct
+     let ppat_construct = ppat_construct
+ 
+     let constructor_declaration ~name ~vars ~args ~res () =
++      let vars = List.map vars ~f:(fun var -> var, None) in
+       constructor_declaration ~name ~vars ~args ~res
++
++    let pmty_signature = pmty_signature
++    let signature = Ppxlib_jane.Ast_builder.Default.signature ~loc
++
++    let label_declaration = Ppxlib_jane.Ast_builder.Default.label_declaration ~loc
+   end
+ 
+   (*----- stable layer above Ast_builder_generated.Make (Loc) -----*)
+@@ -340,6 +504,33 @@ end) : S = struct
+ 
+   (*---------------------------------------------------------------*)
+ 
++  (* override changed nodes to use [Ppxlib_jane] interface *)
++  let label_declaration ~name ~mutable_ ~type_ =
++    Default.label_declaration ~loc ~name ~mutable_ ~type_
++
++  let value_description ~name ~type_ ~prim =
++    Default.value_description ~loc ~name ~type_ ~prim
++
++  let ptyp_arrow a b c = Default.ptyp_arrow ~loc a b c
++  let pexp_let a b c = Default.pexp_let ~loc a b c
++  let pexp_constraint a b = Default.pexp_constraint ~loc a b
++  let ppat_constraint a b = Default.ppat_constraint ~loc a b
++
++  let value_binding ~pat ~expr =
++    Default.value_binding ~loc ~pat ~expr
++
++  let include_infos ?attrs a = Default.include_infos ~loc ?attrs a
++
++  let psig_include a = Default.psig_include ~loc a
++
++  let module_declaration = Default.module_declaration ~loc
++
++  let pmty_functor = Default.pmty_functor ~loc
++
++  let pmod_constraint = Default.pmod_constraint ~loc
++
++  (* ----------------------------------------------------- *)
++
+   let pstr_value_list = Default.pstr_value_list
+ 
+   let nonrec_type_declaration ~name ~params ~cstrs ~kind ~private_ ~manifest =
+@@ -359,6 +550,8 @@ end) : S = struct
+   let ptyp_tuple l = Default.ptyp_tuple ~loc l
+   let pexp_tuple_opt l = Default.pexp_tuple_opt ~loc l
+   let ppat_tuple_opt l = Default.ppat_tuple_opt ~loc l
++  let pexp_array l = Default.pexp_array ~loc l
++  let ppat_array l = Default.ppat_array ~loc l
+   let ptyp_poly vars ty = Default.ptyp_poly ~loc vars ty
+   let pexp_apply e el = Default.pexp_apply ~loc e el
+   let eint t = Default.eint ~loc t
+@@ -389,17 +582,30 @@ end) : S = struct
+   let elist l = Default.elist ~loc l
+   let plist l = Default.plist ~loc l
+ 
++  let ptyp_any = Default.ptyp_any ~loc
++  let ptyp_var a = Default.ptyp_var ~loc a
++  let ptyp_alias a b = Default.ptyp_alias ~loc a b
++  let pexp_newtype a b = Default.pexp_newtype ~loc a b
++
++  let pexp_fun a b c d : expression = Default.pexp_fun ~loc a b c d
++  let pexp_function t : expression = Default.pexp_function ~loc t
++
+   let type_constr_conv ident ~f args =
+     Default.type_constr_conv ~loc ident ~f args
+ 
+   let unapplied_type_constr_conv ident ~f =
+     Default.unapplied_type_constr_conv ~loc ident ~f
+ 
++  let type_declaration ~name ~params ~cstrs ~kind ~private_ ~manifest =
++    Default.type_declaration ~loc ~name ~params ~cstrs ~kind ~private_ ~manifest
++
+   let eta_reduce = Default.eta_reduce
+   let eta_reduce_if_possible = Default.eta_reduce_if_possible
+ 
+   let eta_reduce_if_possible_and_nonrec =
+     Default.eta_reduce_if_possible_and_nonrec
++
++  let pmty_signature xs = Default.pmty_signature ~loc xs
+ end
+ 
+ let make loc =

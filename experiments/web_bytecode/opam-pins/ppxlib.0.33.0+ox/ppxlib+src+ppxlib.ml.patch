@@ -1,0 +1,8 @@
+--- a/src/ppxlib.ml
++++ b/src/ppxlib.ml
+@@ -107,4 +107,5 @@ end
+ module Ppxlib_private = struct
+   module Common = Common
+   module Name = Name
++  module Utils = Utils
+ end

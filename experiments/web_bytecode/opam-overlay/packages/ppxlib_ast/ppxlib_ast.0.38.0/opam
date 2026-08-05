@@ -1,0 +1,17 @@
+opam-version: "2.0"
+name: "ppxlib_ast"
+version: "0.38.0"
+synopsis: "Compatibility package for ppxlib.ast"
+description: """
+This switch uses ppxlib versions where the ppxlib.ast library is installed by
+the ppxlib package. This package only satisfies packages that still depend on
+the split ppxlib_ast opam package.
+"""
+maintainer: "Jane Street Group, LLC"
+authors: "Jane Street Group, LLC"
+license: "MIT"
+depends: [
+  "ppxlib" {>= "0.38.0" & < "0.39.0"}
+]
+build: []
+install: []

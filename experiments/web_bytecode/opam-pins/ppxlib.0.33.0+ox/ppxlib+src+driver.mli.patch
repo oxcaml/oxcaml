@@ -1,0 +1,43 @@
+--- a/src/driver.mli
++++ b/src/driver.mli
+@@ -80,7 +80,7 @@ val register_transformation :
+   ?extensions:Extension.t list (* deprecated, use ~rules instead *) ->
+   ?rules:Context_free.Rule.t list ->
+   ?enclose_impl:(Location.t option -> structure * structure) ->
+-  ?enclose_intf:(Location.t option -> signature * signature) ->
++  ?enclose_intf:(Location.t option -> signature_item list * signature_item list) ->
+   ?impl:(structure -> structure) ->
+   ?intf:(signature -> signature) ->
+   ?lint_impl:(structure -> Lint_error.t list) ->
+@@ -173,7 +173,7 @@ module V2 : sig
+     ?enclose_impl:
+       (Expansion_context.Base.t -> Location.t option -> structure * structure) ->
+     ?enclose_intf:
+-      (Expansion_context.Base.t -> Location.t option -> signature * signature) ->
++      (Expansion_context.Base.t -> Location.t option -> signature_item list * signature_item list) ->
+     ?impl:(Expansion_context.Base.t -> structure -> structure) ->
+     ?intf:(Expansion_context.Base.t -> signature -> signature) ->
+     ?lint_impl:(Expansion_context.Base.t -> structure -> Lint_error.t list) ->
+@@ -220,7 +220,11 @@ end
+ module Create_file_property (Name : sig
+   val name : string
+ end)
+-(T : Sexpable.S) : sig
++    (T : sig
++       type t
++
++       include Sexpable.S with type t := t
++    end) : sig
+   val set : T.t -> unit
+ end
+ 
+@@ -237,6 +241,9 @@ val pretty : unit -> bool
+ (** If [true], code transformations should avoid generating code that is not
+     strictly necessary, such as extra type annotations. *)
+ 
++val as_merlin : unit -> bool
++(** If [true], then the PPX is being run by Merlin. *)
++
+ (**/**)
+ 
+ val map_structure : structure -> structure

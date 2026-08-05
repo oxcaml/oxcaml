@@ -149,6 +149,1380 @@ let prim_fresh_oo_id =
   Pccall
     (Lambda.simple_prim_on_values ~name:"caml_fresh_oo_id" ~arity:1 ~alloc:false)
 
+let prim_doclang_observe_enter =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_enter" ~arity:1 ~alloc:false)
+
+let prim_doclang_observe_enter_tail =
+  Lambda.Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_enter_tail" ~arity:1 ~alloc:false)
+
+let prim_doclang_observe_tail_handoff =
+  Lambda.Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_tail_handoff" ~arity:4 ~alloc:false)
+
+let prim_doclang_observe_register_function =
+  Lambda.Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_register_function" ~arity:3 ~alloc:false)
+
+let prim_doclang_observe_is_registered_function =
+  Lambda.Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_is_registered_function" ~arity:2
+       ~alloc:false)
+
+let prim_doclang_observe_return =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_return" ~arity:3 ~alloc:false)
+
+let prim_doclang_observe_leaf =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_leaf" ~arity:2 ~alloc:false)
+
+let prim_doclang_observe_mark =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_mark" ~arity:1 ~alloc:false)
+
+let prim_doclang_observe_unwind =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_unwind" ~arity:2 ~alloc:false)
+
+let prim_doclang_observe_parameter =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_parameter" ~arity:3 ~alloc:false)
+
+let prim_doclang_observe_write =
+  Pccall
+    (Lambda.simple_prim_on_values
+       ~name:"caml_doclang_observe_write" ~arity:2 ~alloc:false)
+
+type doclang_observation = {
+  attribute : Parsetree.attribute;
+  construct_id : string option;
+  kind : string;
+  label : string;
+  type_ : string;
+  schema : string;
+}
+
+let doclang_attribute name attributes =
+  match
+    Builtin_attributes.select_attributes
+      [name, Builtin_attributes.Return]
+      attributes
+  with
+  | attribute :: _ -> Some attribute
+  | [] -> None
+
+let doclang_trace_all () =
+  match Sys.getenv_opt "DOX_TRACE_ALL" with
+  | Some ("1" | "true") -> true
+  | None | Some _ -> false
+
+let doclang_trace_location location =
+  let path = location.Location.loc_start.Lexing.pos_fname in
+  (not location.Location.loc_ghost)
+  && (Filename.check_suffix path ".ml.md"
+      || String.starts_with ~prefix:"<dox-inline:" path)
+
+let doclang_construct_attribute_prefix = "ocaml.dox.construct."
+
+let doclang_construct_id attributes =
+  List.find_map
+    (fun (attribute : Parsetree.attribute) ->
+      let name = attribute.attr_name.txt in
+      if String.starts_with ~prefix:doclang_construct_attribute_prefix name
+      then
+        Some
+          (String.sub name (String.length doclang_construct_attribute_prefix)
+             (String.length name
+              - String.length doclang_construct_attribute_prefix))
+      else None)
+    attributes
+
+let doclang_construct_attribute id location =
+  { Parsetree.attr_name =
+      { Location.txt = doclang_construct_attribute_prefix ^ id;
+        loc = location
+      };
+    attr_payload = PStr [];
+    attr_loc = location
+  }
+
+let doclang_hex value =
+  let digits = "0123456789abcdef" in
+  let result = Bytes.create (String.length value * 2) in
+  String.iteri
+    (fun index character ->
+      let code = Char.code character in
+      Bytes.set result (index * 2) digits.[code lsr 4];
+      Bytes.set result ((index * 2) + 1) digits.[code land 0xf])
+    value;
+  Bytes.unsafe_to_string result
+
+let doclang_manifest_entry id category semantic_kind parent_id owner_scope_id lexical_scope_id
+    syntax_fingerprint lexical_ancestry_fingerprint
+    (location : Location.t) =
+  let start = location.Location.loc_start in
+  let finish = location.loc_end in
+  String.concat "\t"
+    [ "C";
+      doclang_hex id;
+      category;
+      semantic_kind;
+      doclang_hex start.pos_fname;
+      string_of_int start.pos_cnum;
+      string_of_int finish.pos_cnum;
+      string_of_int start.pos_lnum;
+      string_of_int (start.pos_cnum - start.pos_bol);
+      string_of_int finish.pos_lnum;
+      string_of_int (finish.pos_cnum - finish.pos_bol);
+      (if location.loc_ghost then "1" else "0");
+      Option.fold ~none:"-" ~some:doclang_hex parent_id;
+      doclang_hex owner_scope_id;
+      doclang_hex lexical_scope_id;
+      syntax_fingerprint;
+      lexical_ancestry_fingerprint
+    ]
+
+let doclang_scope_manifest_entry id kind function_construct_id =
+  String.concat "\t"
+    [ "S";
+      doclang_hex id;
+      kind;
+      Option.fold ~none:"-" ~some:doclang_hex function_construct_id
+    ]
+
+let doclang_selector_manifest_entry id role subject_id priority tie_break_rank
+    syntax_fingerprint (location : Location.t) =
+  let start = location.Location.loc_start in
+  let finish = location.loc_end in
+  String.concat "\t"
+    [ "L";
+      doclang_hex id;
+      role;
+      doclang_hex subject_id;
+      doclang_hex start.pos_fname;
+      string_of_int start.pos_cnum;
+      string_of_int finish.pos_cnum;
+      string_of_int start.pos_lnum;
+      string_of_int (start.pos_cnum - start.pos_bol);
+      string_of_int finish.pos_lnum;
+      string_of_int (finish.pos_cnum - finish.pos_bol);
+      string_of_int priority;
+      string_of_int tie_break_rank;
+      syntax_fingerprint
+    ]
+
+let doclang_name_is_operator name =
+  let index =
+    match String.rindex_opt name '.' with
+    | Some index -> index + 1
+    | None -> 0
+  in
+  index < String.length name
+  &&
+  match name.[index] with
+  | 'a' .. 'z' | 'A' .. 'Z' | '_' -> false
+  | _ -> true
+
+let prepare_doclang_structure compilation_unit ~generated_path structure =
+  if not (doclang_trace_all ()) then structure
+  else
+    let unit_name =
+      Format_doc.asprintf "%a" Compilation_unit.print compilation_unit
+    in
+    let unit_digest = Digest.to_hex (Digest.string unit_name) in
+    let generated_source =
+      In_channel.with_open_bin generated_path In_channel.input_all
+    in
+    let generated_source_digest = Digest.to_hex (Digest.string generated_source) in
+    let top_level_scope = unit_digest ^ "-scope-top-level" in
+    let ordinal = ref 0 in
+    let entries = ref [] in
+    let selector_entries = ref [] in
+    let scopes =
+      ref [doclang_scope_manifest_entry top_level_scope "top-level" None]
+    in
+    let parent_id = ref None in
+    let owner_scope_id = ref top_level_scope in
+    let lexical_ancestry_fingerprint = ref unit_digest in
+    let syntax_fingerprint category (location : Location.t) =
+      let start = location.loc_start.pos_cnum in
+      let finish = location.loc_end.pos_cnum in
+      let source =
+        if start < 0 || finish < start || finish > String.length generated_source
+        then ""
+        else String.sub generated_source start (finish - start)
+      in
+      Digest.to_hex (Digest.string (category ^ "\000" ^ source))
+    in
+    let fresh_id category =
+      let id =
+        Printf.sprintf "%s-%s-%08x" unit_digest category !ordinal
+      in
+      incr ordinal;
+      id
+    in
+    let selector_ordinal = ref 0 in
+    let add_selector role subject_id priority location =
+      if not location.Location.loc_ghost then begin
+        let tie_break_rank = !selector_ordinal in
+        let id =
+          Printf.sprintf "%s-selector-%08x" unit_digest !selector_ordinal
+        in
+        incr selector_ordinal;
+        selector_entries :=
+          doclang_selector_manifest_entry id role subject_id priority
+            tie_break_rank
+            (syntax_fingerprint ("selector:" ^ role) location)
+            location
+          :: !selector_entries
+      end
+    in
+    let position_after (position : Lexing.position) start finish =
+      let line = ref position.pos_lnum in
+      let beginning = ref position.pos_bol in
+      for index = start to finish - 1 do
+        if generated_source.[index] = '\n' then begin
+          incr line;
+          beginning := index + 1
+        end
+      done;
+      { position with pos_lnum = !line; pos_bol = !beginning; pos_cnum = finish }
+    in
+    let add_keyword_selector role subject_id keyword
+        (left : Location.t) (right : Location.t) =
+      let start = left.loc_end.pos_cnum in
+      let finish = right.loc_start.pos_cnum in
+      let keyword_length = String.length keyword in
+      let is_identifier_character = function
+        | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '\'' -> true
+        | _ -> false
+      in
+      let rec find index =
+        if index + keyword_length > finish then None
+        else if
+          String.sub generated_source index keyword_length = keyword
+          && (index = start
+             || not (is_identifier_character generated_source.[index - 1]))
+          && (index + keyword_length = finish
+             || not
+                  (is_identifier_character
+                     generated_source.[index + keyword_length]))
+        then Some index
+        else find (index + 1)
+      in
+      Option.iter
+        (fun index ->
+          let loc_start =
+            position_after left.loc_end start index
+          in
+          let loc_end =
+            position_after loc_start index (index + keyword_length)
+          in
+          add_selector role subject_id 30
+            { Location.loc_start; loc_end; loc_ghost = false })
+        (if start < 0 || finish > String.length generated_source
+         || finish < start
+         then None
+         else find start)
+    in
+    let within ~parent ~scope ~ancestry operation =
+      let previous_parent = !parent_id in
+      let previous_scope = !owner_scope_id in
+      let previous_ancestry = !lexical_ancestry_fingerprint in
+      parent_id := Some parent;
+      owner_scope_id := scope;
+      lexical_ancestry_fingerprint := ancestry;
+      Fun.protect
+        ~finally:(fun () ->
+          parent_id := previous_parent;
+          owner_scope_id := previous_scope;
+          lexical_ancestry_fingerprint := previous_ancestry)
+        operation
+    in
+    let function_anchor = ref None in
+    let expression_semantic_kind expression =
+      match expression.exp_desc with
+      | Texp_function _ -> "function"
+      | Texp_apply _ -> "application"
+      | Texp_ident _ -> "identifier"
+      | Texp_constant _ -> "literal"
+      | Texp_let _ -> "binding"
+      | Texp_match _ -> "match"
+      | Texp_ifthenelse _ -> "condition"
+      | Texp_setfield _ -> "mutation"
+      | Texp_sequence _ -> "sequence"
+      | Texp_while _ | Texp_for _ -> "loop"
+      | _ -> "expression"
+    in
+    let expression_depth = ref 0 in
+    let mapper =
+      let mapper =
+        { Tast_mapper.default with
+          expr =
+            (fun self expression ->
+              let path = expression.exp_loc.loc_start.pos_fname in
+              let is_function =
+                match expression.exp_desc with
+                | Texp_function _ -> true
+                | _ -> false
+              in
+              let traceable_function =
+                is_function
+                && (Filename.check_suffix path ".ml.md"
+                   || String.starts_with ~prefix:"<dox-inline:" path)
+              in
+              if doclang_trace_location expression.exp_loc || traceable_function
+              then
+                let id = fresh_id "expression" in
+                let enclosing_scope = !owner_scope_id in
+                let child_scope =
+                  if is_function then id ^ "-scope" else !owner_scope_id
+                in
+                let syntax_fingerprint =
+                  syntax_fingerprint "expression" expression.exp_loc
+                in
+                let ancestry =
+                  Digest.to_hex
+                    (Digest.string
+                       (!lexical_ancestry_fingerprint ^ "\000"
+                      ^ syntax_fingerprint))
+                in
+                if is_function then
+                  scopes :=
+                    doclang_scope_manifest_entry child_scope "function" (Some id)
+                    :: !scopes;
+                entries :=
+                  doclang_manifest_entry id "expression"
+                    (expression_semantic_kind expression)
+                    !parent_id enclosing_scope enclosing_scope
+                    syntax_fingerprint ancestry expression.exp_loc
+                  :: !entries;
+                add_selector "construct" id 0 expression.exp_loc;
+                if is_function then begin
+                  let finish = expression.exp_loc.loc_end.pos_cnum in
+                  let at_line_end =
+                    finish = String.length generated_source
+                    || (finish >= 0
+                       && finish < String.length generated_source
+                       && generated_source.[finish] = '\n')
+                  in
+                  if at_line_end then
+                    add_selector "function-context" id 35
+                      { expression.exp_loc with
+                        loc_start = expression.exp_loc.loc_end;
+                        loc_ghost = false
+                      }
+                end;
+                (match is_function, !function_anchor with
+                 | true, Some location ->
+                   function_anchor := None;
+                   add_selector "binder" id 25 location
+                 | true, None | false, _ -> ());
+                (match expression.exp_desc with
+                 | Texp_apply (callee, _, _, _, _, _) ->
+                   let role =
+                     match callee.exp_desc with
+                     | Texp_ident { path; _ }
+                       when doclang_name_is_operator (Path.name path) ->
+                       "operator"
+                     | _ -> "callee"
+                   in
+                   add_selector role id 20 callee.exp_loc
+                 | _ -> ());
+                let expression =
+                  { expression with
+                    exp_attributes =
+                      doclang_construct_attribute id expression.exp_loc
+                      :: expression.exp_attributes
+                  }
+                in
+                let expression =
+                  within ~parent:id ~scope:child_scope ~ancestry (fun () ->
+                      incr expression_depth;
+                      Fun.protect
+                        ~finally:(fun () -> decr expression_depth)
+                        (fun () -> Tast_mapper.default.expr self expression))
+                in
+                let expression_start =
+                  { expression.exp_loc with
+                    loc_end = expression.exp_loc.loc_start
+                  }
+                in
+                let expression_end =
+                  { expression.exp_loc with
+                    loc_start = expression.exp_loc.loc_end
+                  }
+                in
+                let child_subject fallback child =
+                  Option.value
+                    (doclang_construct_id child.exp_attributes)
+                    ~default:fallback
+                in
+                let add_case_selectors :
+                    type k. Location.t -> k case -> Location.t =
+                  fun previous case ->
+                  let subject_id = child_subject id case.c_rhs in
+                  add_keyword_selector "alternative" subject_id "|"
+                    previous case.c_lhs.pat_loc;
+                  let arrow_left =
+                    match case.c_guard with
+                    | None -> case.c_lhs.pat_loc
+                    | Some guard ->
+                      add_keyword_selector "when"
+                        (child_subject subject_id guard) "when"
+                        case.c_lhs.pat_loc guard.exp_loc;
+                      guard.exp_loc
+                  in
+                  add_keyword_selector "arrow" subject_id "->"
+                    arrow_left case.c_rhs.exp_loc;
+                  case.c_rhs.exp_loc
+                in
+                (match expression.exp_desc with
+                 | Texp_ifthenelse (condition, yes, no) ->
+                   add_keyword_selector "if" (child_subject id condition) "if"
+                     expression_start
+                     condition.exp_loc;
+                   Option.iter
+                     (fun subject_id ->
+                       add_keyword_selector "then" subject_id "then"
+                         condition.exp_loc yes.exp_loc)
+                     (doclang_construct_id yes.exp_attributes);
+                   Option.iter
+                     (fun no ->
+                       Option.iter
+                         (fun subject_id ->
+                           add_keyword_selector "else" subject_id "else"
+                             yes.exp_loc no.exp_loc)
+                         (doclang_construct_id no.exp_attributes))
+                     no
+                 | Texp_match (argument, _, cases, effect_cases, _) ->
+                   let argument_id = child_subject id argument in
+                   add_keyword_selector "match" argument_id "match"
+                     expression_start argument.exp_loc;
+                   let first_pattern =
+                     match cases, effect_cases with
+                     | case :: _, _ -> Some case.c_lhs.pat_loc
+                     | [], case :: _ -> Some case.c_lhs.pat_loc
+                     | [], [] -> None
+                   in
+                   Option.iter
+                     (fun first_pattern ->
+                       add_keyword_selector "with" argument_id "with"
+                         argument.exp_loc first_pattern)
+                     first_pattern;
+                   let previous =
+                     List.fold_left add_case_selectors argument.exp_loc cases
+                   in
+                   ignore
+                     (List.fold_left add_case_selectors previous effect_cases)
+                 | Texp_let (rec_flag, bindings, body) ->
+                   (match bindings with
+                    | binding :: _ ->
+                      let subject_id = child_subject id binding.vb_expr in
+                      add_keyword_selector "let" subject_id "let"
+                        expression_start binding.vb_pat.pat_loc;
+                      if rec_flag = Recursive then
+                        add_keyword_selector "rec" subject_id "rec"
+                          expression_start binding.vb_pat.pat_loc
+                    | [] -> ());
+                   let left =
+                     match List.rev bindings with
+                     | binding :: _ -> binding.vb_expr.exp_loc
+                     | [] -> expression_start
+                   in
+                   add_keyword_selector "in" (child_subject id body) "in"
+                     left body.exp_loc
+                 | Texp_function { params; body; _ } ->
+                   let first_parameter_location =
+                     match params with
+                     | parameter :: _ ->
+                       (match parameter.fp_kind with
+                        | Tparam_pat pattern
+                        | Tparam_optional_default (pattern, _, _) ->
+                          Some pattern.pat_loc)
+                     | [] -> None
+                   in
+                   Option.iter
+                     (fun right ->
+                       add_keyword_selector "fun" id "fun"
+                         expression_start right)
+                     first_parameter_location;
+                   (match body with
+                    | Tfunction_body _ -> ()
+                    | Tfunction_cases { fc_cases; _ } ->
+                      (match fc_cases with
+                       | case :: _ ->
+                         add_keyword_selector "function" id "function"
+                           expression_start case.c_lhs.pat_loc
+                       | [] -> ());
+                      ignore
+                        (List.fold_left add_case_selectors expression_start
+                           fc_cases))
+                 | Texp_while { wh_cond; wh_body; _ } ->
+                   add_keyword_selector "while" id "while"
+                     expression_start wh_cond.exp_loc;
+                   add_keyword_selector "do" (child_subject id wh_body) "do"
+                     wh_cond.exp_loc wh_body.exp_loc;
+                   add_keyword_selector "done" id "done"
+                     wh_body.exp_loc expression_end
+                 | Texp_for { for_from; for_to; for_body; _ } ->
+                   add_keyword_selector "for" id "for"
+                     expression_start for_from.exp_loc;
+                   add_keyword_selector "do" (child_subject id for_body) "do"
+                     for_to.exp_loc for_body.exp_loc;
+                   add_keyword_selector "done" id "done"
+                     for_body.exp_loc expression_end
+                 | _ -> ());
+                expression
+              else Tast_mapper.default.expr self expression);
+          pat =
+            (fun (type k) (self : Tast_mapper.mapper)
+                 (pattern : k general_pattern) : k general_pattern ->
+              match pattern.pat_desc with
+              | Tpat_value inner when doclang_trace_location pattern.pat_loc ->
+                (* [Tpat_value] is a compiler-only computation-pattern
+                   wrapper.  It has no user syntax or attributes of its own
+                   and deliberately shares the inner pattern's range.  Giving
+                   both nodes manifest identities creates an unobservable
+                   equal-range selector, so the inner value pattern is the
+                   canonical user-visible construct. *)
+                let inner = self.pat self (inner :> pattern) in
+                Typedtree.as_computation_pattern inner
+              | _ when doclang_trace_location pattern.pat_loc ->
+                let id = fresh_id "pattern" in
+                let syntax_fingerprint =
+                  syntax_fingerprint "pattern" pattern.pat_loc
+                in
+                let ancestry =
+                  Digest.to_hex
+                    (Digest.string
+                       (!lexical_ancestry_fingerprint ^ "\000"
+                      ^ syntax_fingerprint))
+                in
+                entries :=
+                  doclang_manifest_entry id "pattern"
+                    (match pattern.pat_desc with
+                     | Tpat_var _ | Tpat_fun_layout _ -> "binder"
+                     | Tpat_alias _ -> "alias"
+                     | Tpat_any -> "wildcard"
+                     | Tpat_or _ -> "alternative"
+                     | Tpat_construct _ -> "constructor"
+                     | _ -> "pattern")
+                    !parent_id
+                    !owner_scope_id !owner_scope_id syntax_fingerprint ancestry
+                    pattern.pat_loc
+                  :: !entries;
+                let selector_role, selector_priority =
+                  match pattern.pat_desc with
+                  | Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _ ->
+                    "binder", 10
+                  | _ -> "construct", 10
+                in
+                add_selector selector_role id selector_priority pattern.pat_loc;
+                let pattern =
+                  { pattern with
+                    pat_attributes =
+                      doclang_construct_attribute id pattern.pat_loc
+                      :: pattern.pat_attributes
+                  }
+                in
+                let pattern =
+                  within ~parent:id ~scope:!owner_scope_id ~ancestry (fun () ->
+                      Tast_mapper.default.pat self pattern)
+                in
+                (match pattern.pat_desc with
+                 | Tpat_or (left, right, _) ->
+                   Option.iter
+                     (fun subject_id ->
+                       add_keyword_selector "alternative" subject_id "|"
+                         left.pat_loc right.pat_loc)
+                     (doclang_construct_id right.pat_attributes)
+                 | _ -> ());
+                pattern
+              | _ -> Tast_mapper.default.pat self pattern);
+          value_bindings =
+            (fun self bindings ->
+              let top_level = !expression_depth = 0 in
+              let rec_flag, bindings =
+                Tast_mapper.default.value_bindings self bindings
+              in
+              (if top_level && rec_flag = Recursive then
+                 match bindings with
+                 | binding :: _ ->
+                   let subject_id =
+                     match binding.vb_expr.exp_desc with
+                     | Texp_function _ ->
+                       doclang_construct_id binding.vb_expr.exp_attributes
+                     | _ -> doclang_construct_id binding.vb_pat.pat_attributes
+                   in
+                   Option.iter
+                     (fun subject_id ->
+                       let pattern_start = binding.vb_pat.pat_loc.loc_start in
+                       let line_start =
+                         { pattern_start with pos_cnum = pattern_start.pos_bol }
+                       in
+                       add_keyword_selector "rec" subject_id "rec"
+                         { binding.vb_pat.pat_loc with
+                           loc_start = line_start;
+                           loc_end = line_start
+                         }
+                         binding.vb_pat.pat_loc)
+                     subject_id
+                 | [] -> ());
+              rec_flag, bindings);
+          value_binding =
+            (fun self binding ->
+              let top_level = !expression_depth = 0 in
+              let previous = !function_anchor in
+              function_anchor :=
+                (match binding.vb_pat.pat_desc, binding.vb_expr.exp_desc with
+                 | (Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _),
+                   Texp_function _ ->
+                   Some binding.vb_pat.pat_loc
+                 | _ -> None);
+              let binding =
+                Fun.protect
+                  ~finally:(fun () -> function_anchor := previous)
+                  (fun () -> Tast_mapper.default.value_binding self binding)
+              in
+              Option.iter
+                (fun subject_id ->
+                  let left, right =
+                    match binding.vb_expr.exp_desc with
+                    | Texp_function { params; body; _ } ->
+                      (match List.rev params with
+                       | parameter :: _ ->
+                         let left =
+                           match parameter.fp_kind with
+                           | Tparam_pat pattern
+                           | Tparam_optional_default (pattern, _, _) ->
+                             pattern.pat_loc
+                         in
+                         let right =
+                           match body with
+                           | Tfunction_body body -> body.exp_loc
+                           | Tfunction_cases
+                               { fc_cases = case :: _; _ } ->
+                             case.c_lhs.pat_loc
+                           | Tfunction_cases { fc_cases = []; _ } ->
+                             binding.vb_expr.exp_loc
+                         in
+                         left, right
+                       | [] ->
+                         binding.vb_pat.pat_loc, binding.vb_expr.exp_loc)
+                    | _ ->
+                      binding.vb_pat.pat_loc, binding.vb_expr.exp_loc
+                  in
+                  add_keyword_selector "equals" subject_id "=" left right)
+                (doclang_construct_id binding.vb_expr.exp_attributes);
+              if top_level then begin
+                let subject_id =
+                  match binding.vb_expr.exp_desc with
+                  | Texp_function _ ->
+                    doclang_construct_id binding.vb_expr.exp_attributes
+                  | _ -> doclang_construct_id binding.vb_pat.pat_attributes
+                in
+                Option.iter
+                  (fun subject_id ->
+                    let pattern_start = binding.vb_pat.pat_loc.loc_start in
+                    let line_start =
+                      { pattern_start with pos_cnum = pattern_start.pos_bol }
+                    in
+                    add_keyword_selector "let" subject_id "let"
+                      { binding.vb_pat.pat_loc with
+                        loc_start = line_start;
+                        loc_end = line_start
+                      }
+                      binding.vb_pat.pat_loc)
+                  subject_id
+              end;
+              binding)
+        }
+      in
+      mapper
+    in
+    let structure = mapper.structure mapper structure in
+    Option.iter
+      (fun path ->
+        let channel = open_out_bin path in
+        Fun.protect
+          ~finally:(fun () -> close_out_noerr channel)
+          (fun () ->
+            Printf.fprintf channel
+              "dox-construct-manifest\t6\t%s\t%s\t%s\t%d\t%s\n"
+              (doclang_hex unit_name) (doclang_hex top_level_scope)
+              (doclang_hex generated_path) (String.length generated_source)
+              generated_source_digest;
+            List.iter
+              (fun scope -> output_string channel (scope ^ "\n"))
+              (List.rev !scopes);
+            List.iter
+              (fun entry -> output_string channel (entry ^ "\n"))
+              (List.rev !entries);
+            List.iter
+              (fun entry -> output_string channel (entry ^ "\n"))
+              (List.rev !selector_entries)))
+      (Sys.getenv_opt "DOX_EXECUTION_MANIFEST");
+    structure
+
+let doclang_trace_expression_kind expression =
+  match expression.exp_desc with
+  | Texp_function _ -> None
+  | Texp_setfield _ -> Some ("write", "write")
+  | Texp_apply _ -> Some ("call", "call")
+  | Texp_ident { path; _ } -> Some ("value", Path.name path)
+  | _ -> Some ("step", "step")
+
+let doclang_expression_is_user_tail_call expression =
+  match expression.exp_desc with
+  | Texp_apply
+      ( { exp_desc =
+            Texp_ident { desc = { val_kind = Val_prim _; _ }; _ };
+          _
+        },
+        _, Typedtree.Tail, _, _, _ ) ->
+    false
+  | Texp_apply (_, _, Typedtree.Tail, _, _, _) -> true
+  | _ -> false
+
+let doclang_expression_has_user_tail_call expression =
+  let found = ref false in
+  let root = ref true in
+  let expr iterator candidate =
+    let is_root = !root in
+    root := false;
+    if doclang_expression_is_user_tail_call candidate
+    then found := true
+    else
+      match candidate.exp_desc with
+      | Texp_function _ when not is_root -> ()
+      | _ -> Tast_iterator.default_iterator.expr iterator candidate
+  in
+  let iterator = { Tast_iterator.default_iterator with expr } in
+  iterator.expr iterator expression;
+  !found
+
+let doclang_function_body_has_tail_call body =
+  match body with
+  | Tfunction_body expression ->
+    doclang_expression_has_user_tail_call expression
+  | Tfunction_cases { fc_cases; _ } ->
+    List.exists
+      (fun { c_guard; c_rhs; _ } ->
+        Option.fold ~none:false
+          ~some:doclang_expression_has_user_tail_call c_guard
+        || doclang_expression_has_user_tail_call c_rhs)
+      fc_cases
+
+let doclang_synthetic_attribute location =
+  { Parsetree.attr_name =
+      { Location.txt = "doclang.debug_function"; loc = location };
+    attr_payload = PStr [];
+    attr_loc = location
+  }
+
+let doclang_binding_location pattern expression =
+  { pattern.pat_loc with loc_end = expression.exp_loc.loc_end }
+
+let doclang_schema env root =
+  let remaining_nodes = ref 384 in
+  let name value = string_of_int (String.length value) ^ ":" ^ value in
+  let same_path left right = Path.same left right in
+  let rec schema active ty =
+    if !remaining_nodes <= 0
+    then "Z"
+    else begin
+      decr remaining_nodes;
+      match Types.get_desc ty with
+    | Tvar _ | Tunivar _ -> "?"
+    | Tarrow (_, _, result, _) -> "F" ^ schema active result
+    | Ttuple fields ->
+      "T" ^ string_of_int (List.length fields) ^ ":"
+      ^ String.concat ""
+          (List.map (fun (_, field) -> schema active field) fields)
+    | Tconstr (path, _, _) when same_path path Predef.path_int -> "I"
+    | Tconstr (path, _, _) when same_path path Predef.path_bool -> "B"
+    | Tconstr (path, _, _) when same_path path Predef.path_unit -> "U"
+    | Tconstr (path, _, _) when same_path path Predef.path_char -> "C"
+    | Tconstr (path, _, _) when same_path path Predef.path_float -> "D"
+    | Tconstr (path, _, _) when same_path path Predef.path_string -> "S"
+    | Tconstr (path, [element], _) when same_path path Predef.path_list ->
+      "L" ^ schema active element
+    | Tconstr (path, [element], _) when same_path path Predef.path_option ->
+      "O" ^ schema active element
+    | Tconstr (path, [element], _) when same_path path Predef.path_array ->
+      "A" ^ schema active element
+    | Tconstr (path, arguments, _) ->
+      (if List.exists (same_path path) active then "X"
+       else
+        (match Env.find_type path env with
+         | exception Not_found -> "Z"
+         | declaration ->
+           let instantiate field =
+             try
+               Ctype.apply env declaration.type_params field arguments
+             with Ctype.Cannot_apply -> field
+           in
+           (match declaration.type_manifest with
+            | Some manifest -> schema (path :: active) (instantiate manifest)
+            | None ->
+              match declaration.type_kind with
+              | Type_variant
+                  (constructors, Variant_boxed layouts,
+                   _unsafe_mode_crossing)
+                when Array.for_all
+                       (function
+                         | Cstr_layout_known
+                             { shape = Constructor_uniform_value; _ } -> true
+                         | Cstr_layout_known
+                             { shape = Constructor_mixed _; _ }
+                         | Cstr_layout_known
+                             { shape = Constructor_variable; _ }
+                         | Cstr_layout_variable -> false)
+                       layouts ->
+                let constants, blocks =
+                  List.fold_left
+                    (fun (constants, blocks)
+                         (constructor : Types.constructor_declaration) ->
+                      match constructor.cd_args with
+                      | Cstr_tuple [] ->
+                        (Ident.name constructor.cd_id :: constants, blocks)
+                      | Cstr_tuple fields ->
+                        let fields =
+                          List.map
+                            (fun (field : Types.constructor_argument) ->
+                              instantiate field.ca_type)
+                            fields
+                        in
+                        (constants,
+                         (Ident.name constructor.cd_id, fields) :: blocks)
+                      | Cstr_record fields ->
+                        let fields =
+                          List.map
+                            (fun (field : Types.label_declaration) ->
+                              instantiate field.ld_type)
+                            fields
+                        in
+                        (constants,
+                         (Ident.name constructor.cd_id, fields) :: blocks))
+                    ([], []) constructors
+                in
+                let constants = List.rev constants in
+                let blocks = List.rev blocks in
+                let constants_schema =
+                  String.concat "" (List.map name constants)
+                in
+                let blocks_schema =
+                  blocks
+                  |> List.mapi
+                       (fun tag (constructor, fields) ->
+                         string_of_int tag ^ "," ^ name constructor
+                         ^ string_of_int (List.length fields) ^ ":"
+                         ^ String.concat ""
+                             (List.map (schema (path :: active)) fields))
+                  |> String.concat ""
+                in
+                "V" ^ string_of_int (List.length constants) ^ ":"
+                ^ constants_schema
+                ^ string_of_int (List.length blocks) ^ ":" ^ blocks_schema
+              | Type_record
+                  (fields, Record_boxed, _unsafe_mode_crossing) ->
+                "Q" ^ string_of_int (List.length fields) ^ ":"
+                ^ String.concat ""
+                    (List.map
+                       (fun (field : Types.label_declaration) ->
+                         name (Ident.name field.ld_id)
+                         ^ schema (path :: active) (instantiate field.ld_type))
+                       fields)
+              | Type_abstract _ | Type_open
+              | Type_record (_, _, _)
+              | Type_record_unboxed_product _
+              | Type_variant (_, _, _) -> "Z")))
+    | Tpoly (body, _) | Tlink body | Tsubst (body, _)
+    | Tquote body | Tsplice body | Tquote_eval body | Tbox body ->
+      schema active body
+    | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil | Tvariant _ | Tmod _
+    | Trepr _ | Tpackage _ | Tof_kind _ -> "Z"
+    end
+  in
+  schema [] root
+
+let doclang_observation ?construct_id ~attribute ~kind ~label env type_ =
+  { attribute;
+    construct_id;
+    kind;
+    label;
+    type_ =
+      Printtyp.wrap_printing_env env ~error:true (fun () ->
+        Format.asprintf "%a" Printtyp.type_expr type_);
+    schema = doclang_schema env type_
+  }
+
+let doclang_observation_with_type observation env type_ =
+  doclang_observation ?construct_id:observation.construct_id
+    ~attribute:observation.attribute ~kind:observation.kind
+    ~label:observation.label env type_
+
+let doclang_metadata observation =
+  let location = observation.attribute.attr_loc in
+  let start = location.loc_start in
+  let finish = location.loc_end in
+  let path = start.pos_fname in
+  let line = start.pos_lnum in
+  let column = start.pos_cnum - start.pos_bol in
+  let end_line = finish.pos_lnum in
+  let end_column = finish.pos_cnum - finish.pos_bol in
+  let site =
+    match observation.construct_id with
+    | Some construct_id -> construct_id
+    | None ->
+      Printf.sprintf "%s:%d:%d:%d:%d:%s" path line column end_line end_column
+        observation.kind
+  in
+  String.concat "\x1f"
+    [ site; observation.kind; observation.label; path;
+      string_of_int line; string_of_int column; string_of_int end_line;
+      string_of_int end_column; observation.type_; observation.schema ]
+
+let doclang_observe_write ~scopes ~expression ~operation
+      ~new_value_expression ~new_value_lambda new_value_layout mutation =
+  match new_value_layout with
+  | Pvalue _ ->
+    let location = expression.exp_loc in
+    let observation =
+      doclang_observation
+        ?construct_id:(doclang_construct_id expression.exp_attributes)
+        ~attribute:(doclang_synthetic_attribute location)
+        ~kind:"write" ~label:operation new_value_expression.exp_env
+        new_value_expression.exp_type
+    in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let loc = of_location ~scopes location in
+    Lsequence
+      (mutation,
+       Lprim (prim_doclang_observe_write, [metadata; new_value_lambda], loc))
+  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+    mutation
+
+let doclang_primitive_write = function
+  | "%setfield0" | "%setfield1" -> Some ("ref", 1)
+  | "%obj_set_field" -> Some ("field", 2)
+  | "%string_safe_set" | "%string_unsafe_set"
+  | "%bytes_safe_set" | "%bytes_unsafe_set" -> Some ("bytes", 2)
+  | "%array_safe_set" | "%array_unsafe_set"
+  | "%floatarray_safe_set" | "%floatarray_unsafe_set" -> Some ("array", 2)
+  | "%atomic_set" | "%atomic_set_loc" -> Some ("custom", 1)
+  | "%atomic_set_field" -> Some ("custom", 2)
+  | _ -> None
+
+let doclang_return_observation ~metadata ~occurrence ~loc layout lambda =
+  let result = Ident.create_local "doclang_result" in
+  let return =
+    Lsequence
+      (Lprim
+         (prim_doclang_observe_return,
+          [metadata; Lvar occurrence; Lvar result], loc),
+       Lvar result)
+  in
+  Llet (Strict, layout, result, Lambda.debug_uid_none, lambda, return)
+
+let doclang_leaf_observation ~scopes observation layout lambda =
+  match layout with
+  | Pvalue _ ->
+    let location = observation.attribute.attr_loc in
+    let loc = of_location ~scopes location in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let result = Ident.create_local "doclang_leaf_result" in
+    Llet
+      ( Strict,
+        layout,
+        result,
+        Lambda.debug_uid_none,
+        lambda,
+        Lsequence
+          (Lprim
+             (prim_doclang_observe_leaf, [metadata; Lvar result], loc),
+           Lvar result) )
+  | _ ->
+    Location.raise_errorf ~loc:observation.attribute.attr_loc
+      "Observed execution currently supports boxed values only."
+
+let doclang_expression_is_leaf expression =
+  match expression.exp_desc with
+  | Texp_ident _ | Texp_constant _
+  | Texp_construct (_, _, _, [], _) -> true
+  | _ -> false
+
+let doclang_unwind_observation ~mark ~loc layout lambda =
+  let exception_ = Ident.create_local "doclang_exception" in
+  let handler =
+    Lsequence
+      (Lprim
+         (prim_doclang_observe_unwind,
+          [Lvar mark; Lvar exception_], loc),
+       Lprim (Praise Raise_reraise, [Lvar exception_], loc))
+  in
+  Ltrywith (lambda, exception_, Lambda.debug_uid_none, handler, layout)
+
+let doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout lambda =
+  doclang_unwind_observation ~mark ~loc layout
+    (doclang_return_observation ~metadata ~occurrence ~loc layout lambda)
+
+let doclang_trywith ~scopes location body exception_ uid handler layout =
+  if not (doclang_trace_all () && doclang_trace_location location)
+  then Ltrywith (body, exception_, uid, handler, layout)
+  else
+    let mark = Ident.create_local "doclang_handler_mark" in
+    let loc = of_location ~scopes location in
+    Llet
+      ( Strict,
+        Lambda.layout_int,
+        mark,
+        Lambda.debug_uid_none,
+        Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+        Ltrywith
+          ( body,
+            exception_,
+            uid,
+            Lsequence
+              (Lprim
+                 (prim_doclang_observe_unwind,
+                  [Lvar mark; Lvar exception_], loc),
+               handler),
+            layout ) )
+
+let rec doclang_has_tail_handoff = function
+  | Lprim
+      (Pccall
+         { Primitive.prim_name = "caml_doclang_observe_tail_handoff"; _ },
+       _, _) ->
+    true
+  | Llet (_, _, _, _, value, body)
+  | Lmutlet (_, _, _, value, body) ->
+    doclang_has_tail_handoff value || doclang_has_tail_handoff body
+  | Lsequence (before, body) ->
+    doclang_has_tail_handoff before || doclang_has_tail_handoff body
+  | Levent (body, _) | Lifused (_, body) | Lregion (body, _)
+  | Lexclave body ->
+    doclang_has_tail_handoff body
+  | _ -> false
+
+let rec doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout body =
+  let finish =
+    doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout
+  in
+  let guard prefix_layout prefix =
+    doclang_unwind_observation ~mark ~loc prefix_layout prefix
+  in
+  match body with
+  | Lapply ({ ap_func; _ } as apply)
+    when doclang_has_tail_handoff ap_func ->
+    Lapply apply
+  | Llet (kind, bound_layout, id, uid, value, body) ->
+    Llet (kind, bound_layout, id, uid, guard bound_layout value, finish body)
+  | Lmutlet (bound_layout, id, uid, value, body) ->
+    Lmutlet
+      (bound_layout, id, uid, guard bound_layout value, finish body)
+  | Lletrec (bindings, body) ->
+    Lletrec (bindings, finish body)
+  | Lifthenelse (condition, yes, no, result_layout) ->
+    Lifthenelse
+      (guard Lambda.layout_bool condition,
+       finish yes, finish no,
+       result_layout)
+  | Lswitch (argument, switch, switch_loc, result_layout) ->
+    let finish_case (tag, body) =
+      tag,
+      finish body
+    in
+    let switch =
+      { switch with
+        sw_consts = List.map finish_case switch.sw_consts;
+        sw_blocks = List.map finish_case switch.sw_blocks;
+        sw_failaction =
+          Option.map finish switch.sw_failaction
+      }
+    in
+    Lswitch
+      (guard Lambda.layout_any_value argument, switch, switch_loc,
+       result_layout)
+  | Lstringswitch (argument, cases, fallback, switch_loc, result_layout) ->
+    let finish_case (tag, body) =
+      tag,
+      finish body
+    in
+    Lstringswitch
+      (guard Lambda.layout_any_value argument, List.map finish_case cases,
+       Option.map finish fallback,
+       switch_loc, result_layout)
+  | Lstaticcatch (body, handler_info, handler, pop_region, result_layout) ->
+    Lstaticcatch
+      (finish body, handler_info, finish handler,
+       pop_region, result_layout)
+  | Lsequence (before, body) ->
+    Lsequence (guard Lambda.layout_unit before, finish body)
+  | Levent (body, event) ->
+    Levent (finish body, event)
+  | Lifused (id, body) ->
+    Lifused (id, finish body)
+  | Lregion (body, result_layout) ->
+    Lregion (finish body, result_layout)
+  | Lexclave body ->
+    Lexclave (finish body)
+  | Ltrywith (body, exception_, uid, handler, result_layout) ->
+    Ltrywith
+      (doclang_return_observation ~metadata ~occurrence ~loc layout body,
+       exception_, uid, finish handler, result_layout)
+  | body ->
+    doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout body
+
+let doclang_observe_lambda
+      ?(parameters = []) ?(tail_capable = false) ~scopes observation layout
+      lambda =
+  match layout with
+  | Pvalue _ ->
+    let location = observation.attribute.attr_loc in
+    let loc = of_location ~scopes location in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let occurrence = Ident.create_local "doclang_occurrence" in
+    let add_parameter_events body =
+      List.fold_right
+        (fun (parameter, parameter_value) body ->
+          let parameter_metadata =
+            Lconst
+              (Const_base
+                 (Const_string
+                    (doclang_metadata parameter, location, None)))
+          in
+          Lsequence
+            (Lprim
+               ( prim_doclang_observe_parameter,
+                 [Lvar occurrence; parameter_metadata; parameter_value],
+                 loc ),
+             body))
+        parameters
+        body
+    in
+    let enter =
+      if not tail_capable
+      then Lprim (prim_doclang_observe_enter, [metadata], loc)
+      else Lprim (prim_doclang_observe_enter_tail, [metadata], loc)
+    in
+    let enter_and_run body =
+      Llet
+        ( Strict,
+          Lambda.layout_int,
+          occurrence,
+          Lambda.debug_uid_none,
+          enter,
+          add_parameter_events body )
+    in
+    if tail_capable || String.equal observation.kind "function"
+    then
+      let mark = Ident.create_local "doclang_mark" in
+      let body =
+        if tail_capable
+        then
+          doclang_finish_tail_paths ~metadata ~occurrence ~mark ~loc layout
+            lambda
+        else
+          doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout
+            lambda
+      in
+      Llet
+        ( Strict,
+          Lambda.layout_int,
+          mark,
+          Lambda.debug_uid_none,
+          Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+          enter_and_run body )
+    else
+      enter_and_run
+        (doclang_return_observation ~metadata ~occurrence ~loc layout lambda)
+  | _ ->
+    Location.raise_errorf ~loc:observation.attribute.attr_loc
+      "Observed execution currently supports boxed values only."
+
+let doclang_observe_tail_lambda ~scopes observation layout lambda =
+  match layout with
+  | Pvalue _ ->
+    let location = observation.attribute.attr_loc in
+    let loc = of_location ~scopes location in
+    let metadata =
+      Lconst
+        (Const_base
+           (Const_string (doclang_metadata observation, location, None)))
+    in
+    let occurrence = Ident.create_local "doclang_occurrence" in
+    let mark = Ident.create_local "doclang_mark" in
+    let guard prefix_layout prefix =
+      doclang_unwind_observation ~mark ~loc prefix_layout prefix
+    in
+    let rec instrument = function
+      | Llet (kind, bound_layout, id, uid, value, body) ->
+        Llet
+          (kind, bound_layout, id, uid, guard bound_layout value,
+           instrument body)
+      | Lmutlet (bound_layout, id, uid, value, body) ->
+        Lmutlet
+          (bound_layout, id, uid, guard bound_layout value, instrument body)
+      | Levent (body, event) -> Levent (instrument body, event)
+      | Lregion (body, result_layout) ->
+        Lregion (instrument body, result_layout)
+      | Lexclave body -> Lexclave (instrument body)
+      | Lapply ({ ap_func = Lvar function_; _ } as apply) ->
+        let supplied_arguments =
+          Lconst (Lambda.const_int (List.length apply.ap_args))
+        in
+        let tail_apply =
+          Lapply
+            { apply with
+              ap_func =
+                Lsequence
+                  (Lprim
+                     (prim_doclang_observe_tail_handoff,
+                      [ metadata;
+                        Lvar occurrence;
+                        Lvar function_;
+                        supplied_arguments
+                      ], loc),
+                   Lvar function_)
+            }
+        in
+        let fallback =
+          doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout
+            (Lapply apply)
+        in
+        Lifthenelse
+          (Lprim
+             (prim_doclang_observe_is_registered_function,
+              [Lvar function_; supplied_arguments], loc),
+           tail_apply, fallback, layout)
+      | body ->
+        doclang_finish_observation ~metadata ~occurrence ~mark ~loc layout body
+    in
+    Llet
+      ( Strict,
+        Lambda.layout_int,
+        mark,
+        Lambda.debug_uid_none,
+        Lprim (prim_doclang_observe_mark, [lambda_unit], loc),
+        Llet
+          ( Strict,
+            Lambda.layout_int,
+            occurrence,
+            Lambda.debug_uid_none,
+            Lprim (prim_doclang_observe_enter, [metadata], loc),
+            instrument lambda ) )
+  | _ -> doclang_observe_lambda ~scopes observation layout lambda
+
+let doclang_pattern_is_simple_variable pattern =
+  match pattern.pat_desc with
+  | Tpat_var _ | Tpat_fun_layout _ -> true
+  | _ -> false
+
+let doclang_without_construct_attribute pattern =
+  { pattern with
+    pat_attributes =
+      List.filter
+        (fun (attribute : Parsetree.attribute) ->
+          not
+            (String.starts_with ~prefix:doclang_construct_attribute_prefix
+               attribute.attr_name.txt))
+        pattern.pat_attributes
+  }
+
+let rec doclang_prepend_pattern_observation prefix body =
+  match body with
+  | Levent (inner, event) ->
+    Levent (doclang_prepend_pattern_observation prefix inner, event)
+  | Lifthenelse (condition, yes, (Lstaticraise (_, []) as no), layout) ->
+    Lifthenelse (Lsequence (prefix, condition), yes, no, layout)
+  | body -> Lsequence (prefix, body)
+
+let doclang_pattern_observation_lambda ~scopes ~matched ~matched_layout pattern =
+  match doclang_construct_id pattern.pat_attributes with
+  | None -> None
+  | Some construct_id ->
+    let kind, label =
+      match pattern.pat_desc with
+      | Tpat_var { id; _ }
+      | Tpat_fun_layout { id; _ }
+      | Tpat_alias { id; _ } -> "binding", Ident.name id
+      | _ -> "pattern", "pattern"
+    in
+    let observation, layout, value =
+      match matched_layout with
+      | Pvalue _ ->
+        ( doclang_observation ~construct_id
+            ~attribute:(doclang_synthetic_attribute pattern.pat_loc)
+            ~kind ~label pattern.pat_env pattern.pat_type,
+          matched_layout,
+          matched )
+      | Ptop | Pbottom | Punboxed_float _
+      | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+      | Punboxed_product _ | Psplicevar _ ->
+        ( doclang_observation ~construct_id
+            ~attribute:(doclang_synthetic_attribute pattern.pat_loc)
+            ~kind ~label pattern.pat_env Predef.type_unit,
+          Lambda.layout_unit,
+          lambda_unit )
+    in
+    Some (doclang_observe_lambda ~scopes observation layout value)
+
+let doclang_observe_pattern_success ?(alias_bindings = [])
+      ~matched ~matched_layout pattern body =
+  if doclang_trace_all () && doclang_trace_location pattern.pat_loc
+  then
+    let scopes = Debuginfo.Scoped_location.empty_scopes in
+    let observations =
+      pattern :: List.map fst alias_bindings
+      |> List.filter_map
+           (doclang_pattern_observation_lambda ~scopes ~matched
+              ~matched_layout)
+    in
+    match observations with
+    | [] -> body
+    | observations ->
+      let prefix =
+        List.fold_right
+          (fun observation prefix -> Lsequence (observation, prefix))
+          observations lambda_unit
+      in
+      doclang_prepend_pattern_observation prefix body
+  else body
+
+let () =
+  Matching.set_doclang_pattern_action_hook
+    (fun pattern alias_bindings matched matched_sort body ->
+      doclang_observe_pattern_success ~alias_bindings
+        ~matched ~matched_layout:(layout_pat matched_sort pattern) pattern body)
+
 let transl_extension_constructor ~scopes env path ext =
   let path =
     Printtyp.wrap_printing_env env ~error:true (fun () ->
@@ -444,17 +1818,96 @@ let rec transl_exp ~scopes layout e =
    parsed as a let-bound Pexp_function node [let f = fun x -> ...].
    We give it f's scope.
 *)
-and transl_exp1 ~scopes ~in_new_scope layout e =
+and transl_exp1 ?binding_observation ~scopes ~in_new_scope layout e =
+  let preserve_tail_calls = doclang_expression_has_user_tail_call e in
+  let is_tail_call = doclang_expression_is_user_tail_call e in
+  let binding_observation =
+    match binding_observation, e.exp_desc with
+    | None, Texp_function _
+      when doclang_trace_all () && doclang_trace_location e.exp_loc ->
+      Some
+        (doclang_observation
+           ?construct_id:(doclang_construct_id e.exp_attributes)
+           ~attribute:(doclang_synthetic_attribute e.exp_loc)
+           ~kind:"function" ~label:"fun" e.exp_env e.exp_type)
+    | observation, _ -> observation
+  in
   let eval_once =
     (* Whether classes for immediate objects must be cached *)
     match e.exp_desc with
       Texp_function _ | Texp_for _ | Texp_while _ -> false
     | _ -> true
   in
-  if eval_once then transl_exp0 ~scopes ~in_new_scope layout e else
-  Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
+  let lambda =
+    if eval_once
+    then transl_exp0 ?binding_observation ~scopes ~in_new_scope layout e
+    else
+      Translobj.oo_wrap e.exp_env true
+        (transl_exp0 ?binding_observation ~scopes ~in_new_scope layout) e
+  in
+  let observe observation =
+    if doclang_expression_is_leaf e
+    then doclang_leaf_observation ~scopes observation layout lambda
+    else doclang_observe_lambda ~scopes observation layout lambda
+  in
+  match doclang_attribute "doclang.observe_expression" e.exp_attributes with
+  | Some attribute when is_tail_call ->
+    let observation =
+      doclang_observation
+        ?construct_id:(doclang_construct_id e.exp_attributes)
+        ~attribute ~kind:"call" ~label:"call"
+        e.exp_env e.exp_type
+    in
+    doclang_observe_tail_lambda ~scopes observation layout lambda
+  | Some attribute when not is_tail_call ->
+    if preserve_tail_calls then
+      let observation =
+        doclang_observation
+          ?construct_id:(doclang_construct_id e.exp_attributes)
+          ~attribute ~kind:"boundary" ~label:"boundary"
+          e.exp_env Predef.type_unit
+      in
+      Lsequence
+        (doclang_observe_lambda ~scopes observation Lambda.layout_unit
+           lambda_unit,
+         lambda)
+    else
+      let observation =
+        doclang_observation
+          ?construct_id:(doclang_construct_id e.exp_attributes)
+          ~attribute ~kind:"expression" ~label:"expression"
+          e.exp_env e.exp_type
+      in
+      observe observation
+  | None
+    when doclang_trace_all () && doclang_trace_location e.exp_loc ->
+    (match layout, doclang_trace_expression_kind e with
+     | Pvalue _, Some (kind, label) ->
+       let attribute = doclang_synthetic_attribute e.exp_loc in
+       let observation =
+         doclang_observation
+           ?construct_id:(doclang_construct_id e.exp_attributes)
+           ~attribute ~kind ~label e.exp_env e.exp_type
+       in
+       if is_tail_call then
+         doclang_observe_tail_lambda ~scopes observation layout lambda
+       else if preserve_tail_calls then
+         let observation =
+           doclang_observation
+             ?construct_id:(doclang_construct_id e.exp_attributes)
+             ~attribute ~kind:"boundary" ~label:"boundary"
+             e.exp_env Predef.type_unit
+         in
+         Lsequence
+           (doclang_observe_lambda ~scopes observation Lambda.layout_unit
+              lambda_unit,
+            lambda)
+       else observe observation
+     | _ -> lambda)
+  | Some _ | None -> lambda
 
-and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
+and transl_exp0 ?binding_observation ~in_new_scope ~scopes
+    (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
@@ -481,7 +1934,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
-      transl_function ~in_new_scope ~scopes e params body
+      transl_function ?binding_observation ~in_new_scope ~scopes e params body
         ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
@@ -503,7 +1956,27 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | _, ((_, Omitted _) :: _) -> assert false
       in
       let arg_exps, extra_args = cut_args p.prim_native_repr_args oargs in
-      let args = transl_list ~scopes arg_exps in
+      let translated_args = transl_list ~scopes arg_exps in
+      let write =
+        if extra_args = [] && doclang_trace_all ()
+           && doclang_trace_location e.exp_loc
+        then doclang_primitive_write p.prim_name
+        else None
+      in
+      let bindings, args =
+        match write with
+        | Some (_, _new_value_index) ->
+          let bindings =
+            List.map2
+              (fun (argument, sort) translated ->
+                let layout = layout_exp sort argument in
+                let id = Ident.create_local "doclang_write_argument" in
+                argument, layout, id, translated)
+              arg_exps translated_args
+          in
+          bindings, List.map (fun (_, _, id, _) -> Lvar id) bindings
+        | None -> [], translated_args
+      in
       let prim_exp = if extra_args = [] then Some e else None in
       let position =
         if extra_args = [] then transl_apply_position pos
@@ -530,8 +2003,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
-      if extra_args = [] then lam
-      else begin
+      let lam =
+        if extra_args = [] then lam
+        else begin
         let tailcall = Translattribute.get_tailcall_attribute funct in
         let inlined = Translattribute.get_inlined_attribute funct in
         let specialised = Translattribute.get_specialised_attribute funct in
@@ -543,9 +2017,35 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              ~position ~mode ~yielding
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
-      end
+        end
+      in
+      (match write with
+       | Some (operation, new_value_index) ->
+         (match List.nth_opt bindings new_value_index with
+          | Some (new_value, new_value_layout, new_value_id, _) ->
+            let observed =
+              doclang_observe_write ~scopes ~expression:e ~operation
+                ~new_value_expression:new_value
+                ~new_value_lambda:(Lvar new_value_id) new_value_layout lam
+            in
+            List.fold_left
+              (fun body (_, argument_layout, id, translated) ->
+                Llet
+                  (Strict, argument_layout, id, Lambda.debug_uid_none,
+                   translated, body))
+              observed bindings
+          | None -> lam)
+       | None -> lam)
   | Texp_apply(funct, oargs, position, ap_mode, ap_yielding, zero_alloc)
     ->
+      let doclang_tail_trace =
+        doclang_expression_is_user_tail_call e
+        && doclang_trace_location e.exp_loc
+        && (doclang_trace_all ()
+            || Option.is_some
+                 (doclang_attribute "doclang.observe_expression"
+                    e.exp_attributes))
+      in
       let tailcall = Translattribute.get_tailcall_attribute funct in
       let inlined = Translattribute.get_inlined_attribute funct in
       let specialised = Translattribute.get_specialised_attribute funct in
@@ -558,6 +2058,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
+           ~doclang_tail_trace
            ~result_layout:layout
            ~position ~mode ~yielding
            (transl_exp ~scopes Lambda.layout_function funct)
@@ -593,11 +2094,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
       let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
-      Ltrywith(transl_exp ~scopes layout body, id, id_duid,
-               Matching.for_trywith ~scopes ~return_layout:layout
-                 e.exp_loc (Lvar id)
-                 (transl_cases_try ~scopes layout pat_expr_list),
-               layout)
+      doclang_trywith ~scopes e.exp_loc
+        (transl_exp ~scopes layout body) id id_duid
+        (Matching.for_trywith ~scopes ~return_layout:layout
+           e.exp_loc (Lvar id)
+           (transl_cases_try ~scopes layout pat_expr_list))
+        layout
   | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
@@ -1028,7 +2530,30 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | Record_variable ->
             fatal_error "transl_exp0: unexpected unknown representation"
       in
-      Lprim(prim, args, of_location ~scopes e.exp_loc)
+      if doclang_trace_all () && doclang_trace_location e.exp_loc
+      then
+        let new_value_id = Ident.create_local "doclang_write_value" in
+        let record_id = Ident.create_local "doclang_write_record" in
+        let args =
+          match args with
+          | [_record; _new_value] -> [Lvar record_id; Lvar new_value_id]
+          | [_record; field; _new_value] ->
+            [Lvar record_id; field; Lvar new_value_id]
+          | _ -> Misc.fatal_error "Unexpected mutable-record primitive arity"
+        in
+        let mutation = Lprim(prim, args, of_location ~scopes e.exp_loc) in
+        let observed =
+          doclang_observe_write ~scopes ~expression:e ~operation:"field"
+            ~new_value_expression:newval
+            ~new_value_lambda:(Lvar new_value_id) newval_layout mutation
+        in
+        Llet
+          (Strict, newval_layout, new_value_id, Lambda.debug_uid_none,
+           newval_lambda,
+           Llet
+             (Strict, arg_layout, record_id, Lambda.debug_uid_none,
+              arg_lambda, observed))
+      else Lprim(prim, args, of_location ~scopes e.exp_loc)
   | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
       let mode = transl_alloc_mode alloc_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -1605,19 +3130,44 @@ and transl_cont cont c_cont body =
   | Some _, None -> body
   | None, Some _ -> assert false
 
-and transl_case ~scopes ?cont rhs_layout {c_lhs; c_cont; c_guard; c_rhs} =
-  (c_lhs,
-   transl_cont cont c_cont (transl_guard ~scopes c_guard rhs_layout c_rhs))
+and transl_case ~scopes ?cont ?matched:_ rhs_layout
+    {c_lhs; c_cont; c_guard; c_rhs} =
+  let expression =
+    event_before ~scopes c_rhs (transl_exp ~scopes rhs_layout c_rhs)
+  in
+  let body =
+    match c_guard with
+    | None -> expression
+    | Some condition ->
+      event_before ~scopes condition
+        (Lifthenelse
+           (transl_exp ~scopes Lambda.layout_bool condition,
+            expression, staticfail, rhs_layout))
+  in
+  (c_lhs, transl_cont cont c_cont body)
 
-and transl_cases ~scopes ?cont rhs_layout cases =
+and transl_cases ~scopes ?cont ?matched rhs_layout cases =
   let cases =
     List.filter (fun c -> c.c_rhs.exp_desc <> Texp_unreachable) cases in
-  List.map (transl_case ~scopes ?cont rhs_layout) cases
+  List.map (transl_case ~scopes ?cont ?matched rhs_layout) cases
 
 and transl_case_try ~scopes rhs_layout {c_lhs; c_guard; c_rhs} =
   iter_exn_names Translprim.add_exception_ident c_lhs;
   Misc.try_finally
-    (fun () -> c_lhs, transl_guard ~scopes c_guard rhs_layout c_rhs)
+    (fun () ->
+      let expression =
+        event_before ~scopes c_rhs (transl_exp ~scopes rhs_layout c_rhs)
+      in
+      let body =
+        match c_guard with
+        | None -> expression
+        | Some condition ->
+          event_before ~scopes condition
+            (Lifthenelse
+               (transl_exp ~scopes Lambda.layout_bool condition,
+                expression, staticfail, rhs_layout))
+      in
+      c_lhs, body)
     ~always:(fun () ->
         iter_exn_names Translprim.remove_exception_ident c_lhs)
 
@@ -1636,6 +3186,7 @@ and transl_tupled_cases ~scopes rhs_layout patl_expr_list =
     patl_expr_list
 
 and transl_apply ~scopes
+      ?(doclang_tail_trace = false)
       ?(tailcall=Default_tailcall)
       ?(inlined = Default_inlined)
       ?(specialised = Default_specialise)
@@ -1806,7 +3357,38 @@ and transl_apply ~scopes
            Arg (transl_exp ~scopes layout exp, layout))
       sargs
   in
-  build_apply lam [] loc position mode result_layout args
+  if doclang_tail_trace
+     && List.for_all (function Arg _ -> true | Omitted _ -> false) args
+  then
+    let function_ = Ident.create_local "doclang_tail_function" in
+    let arguments =
+      List.mapi
+        (fun index -> function
+          | Arg (argument, layout) ->
+            Ident.create_local (Printf.sprintf "doclang_tail_argument%d" index),
+            layout,
+            argument
+          | Omitted _ -> assert false)
+        args
+    in
+    let protected_args =
+      List.map
+        (fun (argument, layout, _) -> Arg (Lvar argument, layout))
+        arguments
+    in
+    let body =
+      build_apply (Lvar function_) [] loc position mode result_layout
+        protected_args
+    in
+    let bindings =
+      List.rev arguments
+      @ [function_, Lambda.layout_function, lam]
+    in
+    List.fold_right
+      (fun (id, layout, value) body ->
+        Llet (Strict, layout, id, Lambda.debug_uid_none, value, body))
+      bindings body
+  else build_apply lam [] loc position mode result_layout args
 
 (* There are two cases in function translation:
     - [Tupled]. It takes a tupled argument, and we can flatten it.
@@ -2060,7 +3642,10 @@ and transl_curried_function ~scopes loc repr params body
         let body =
           Matching.for_function ~scopes fc_loc repr (Lvar fc_param)
             ~arg_sort:fc_arg_sort ~arg_layout ~return_layout
-            (transl_cases ~scopes return_layout fc_cases) fc_partial
+            (transl_cases ~scopes
+               ~matched:(Lvar fc_param, arg_layout)
+               return_layout fc_cases)
+            fc_partial
         in
         Some param, body
   in
@@ -2094,8 +3679,13 @@ and transl_curried_function ~scopes loc repr params body
         let body =
           match fp_kind with
           | Tparam_pat pat ->
+              let matching_pat =
+                if doclang_pattern_is_simple_variable pat
+                then doclang_without_construct_attribute pat
+                else pat
+              in
               Matching.for_function ~scopes fp_loc None (Lvar fp_param)
-                [ pat, body ]
+                [ matching_pat, body ]
                 fp_partial
                 ~arg_sort:fp_sort ~arg_layout
                 ~return_layout
@@ -2109,7 +3699,11 @@ and transl_curried_function ~scopes loc repr params body
                   (transl_exp ~scopes default_arg_layout default_arg)
               in
               Matching.for_optional_arg_default ~return_layout
-                ~scopes fp_loc pat body ~default_arg ~default_arg_sort
+                ~scopes fp_loc
+                (if doclang_pattern_is_simple_variable pat
+                 then doclang_without_construct_attribute pat
+                 else pat)
+                body ~default_arg ~default_arg_sort
                 ~param:fp_param
         in
         body, param :: params)
@@ -2197,9 +3791,30 @@ and transl_curried_function ~scopes loc repr params body
     in
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
-and transl_function ~in_new_scope ~scopes e params body
+and transl_function ?binding_observation ~in_new_scope ~scopes e params body
       ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
       ~zero_alloc ~yielding =
+  let doclang_typed_parameters = params in
+  let doclang_typed_body = body in
+  let doclang_tail_capable =
+    doclang_trace_all () && doclang_function_body_has_tail_call body
+  in
+  let rec doclang_drop_parameter_types count type_ =
+    if count <= 0
+    then type_
+    else
+      match Types.get_desc type_ with
+      | Tarrow (_, _, result, _) ->
+        doclang_drop_parameter_types (count - 1) result
+      | _ -> type_
+  in
+  let doclang_return_type =
+    let parameter_count =
+      List.length params
+      + match body with Tfunction_body _ -> 0 | Tfunction_cases _ -> 1
+    in
+    doclang_drop_parameter_types parameter_count e.exp_type
+  in
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2262,22 +3877,191 @@ and transl_function ~in_new_scope ~scopes e params body
     { function_attribute_disallowing_arity_fusion with zero_alloc }
   in
   let loc = of_location ~scopes e.exp_loc in
+  let body =
+    match binding_observation with
+    | None -> body
+    | Some observation ->
+      let rec parameter_observations index typed translated =
+        match typed, translated with
+        | typed_parameter :: typed, parameter :: translated ->
+          let pattern =
+            match typed_parameter.fp_kind with
+            | Tparam_pat pattern -> pattern
+            | Tparam_optional_default (pattern, _, _) -> pattern
+          in
+          let label =
+            match typed_parameter.fp_arg_label, pat_bound_idents pattern with
+            | (Labelled label | Optional label | Position label), _ -> label
+            | Nolabel, [identifier] -> Ident.name identifier
+            | Nolabel, _ -> Printf.sprintf "argument%d" index
+          in
+          let rest, translated =
+            parameter_observations (index + 1) typed translated
+          in
+          (match parameter.layout with
+           | Pvalue _ ->
+             let parameter_observation =
+               doclang_observation
+                 ?construct_id:(doclang_construct_id pattern.pat_attributes)
+                 ~attribute:observation.attribute
+                 ~kind:"parameter" ~label pattern.pat_env pattern.pat_type
+             in
+             (parameter_observation, Lvar parameter.name) :: rest, translated
+           | Ptop | Pbottom | Punboxed_float _
+           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+           | Punboxed_product _ | Psplicevar _ -> rest, translated)
+        | [], translated -> [], translated
+        | _ :: _, [] -> [], []
+      in
+      let parameters, untranslated_parameters =
+        parameter_observations 1 doclang_typed_parameters params
+      in
+      let parameters =
+        match doclang_typed_body, untranslated_parameters with
+        | Tfunction_cases _, parameter :: _ ->
+          (match parameter.layout with
+           | Pvalue _ ->
+             let argument_type =
+               doclang_drop_parameter_types
+                 (List.length doclang_typed_parameters)
+                 e.exp_type
+             in
+             let argument_type =
+               match Types.get_desc argument_type with
+               | Tarrow (_, argument, _, _) -> argument
+               | _ -> argument_type
+             in
+             let parameter_observation =
+               doclang_observation
+                 ?construct_id:(doclang_construct_id e.exp_attributes)
+                 ~attribute:observation.attribute
+                 ~kind:"parameter" ~label:"argument"
+                 e.exp_env argument_type
+             in
+             parameters
+             @ [parameter_observation, Lvar parameter.name]
+           | _ -> parameters)
+        | Tfunction_body _, _ | Tfunction_cases _, [] -> parameters
+      in
+      let observation =
+        doclang_observation_with_type observation e.exp_env doclang_return_type
+      in
+      doclang_observe_lambda ~parameters ~tail_capable:doclang_tail_capable
+        ~scopes observation return body
+  in
   let body = if region then maybe_region_layout return body else body in
   let lf = lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
   let lam = Lfunction (lfunction_with_yielding yielding lf) in
-  Translattribute.add_function_attributes lam e.exp_loc attrs
+  let lam = Translattribute.add_function_attributes lam e.exp_loc attrs in
+  match binding_observation with
+  | None -> lam
+  | Some observation when not (String.equal observation.label "fun") -> lam
+  | Some observation ->
+      let observation =
+        doclang_observation_with_type observation e.exp_env doclang_return_type
+      in
+      let metadata =
+        Lconst
+          (Const_base
+             (Const_string
+                (doclang_metadata observation, e.exp_loc, None)))
+      in
+      let function_ = Ident.create_local "doclang_closure" in
+      Llet
+        ( Strict,
+          Lambda.layout_function,
+          function_,
+          Lambda.debug_uid_none,
+          lam,
+          Lsequence
+            (Lprim
+               (prim_doclang_observe_register_function,
+                [ Lvar function_;
+                  Lconst (Lambda.const_int (List.length params));
+                  metadata
+                ], loc),
+             Lvar function_) )
 
 (* Like transl_exp, but used when a new scope was just introduced. *)
-and transl_scoped_exp ~scopes layout expr =
-  transl_exp1 ~scopes ~in_new_scope:true layout expr
+and transl_scoped_exp ?binding_observation ~scopes layout expr =
+  transl_exp1 ?binding_observation ~scopes ~in_new_scope:true layout expr
 
 (* Decides whether a pattern binding should introduce a new scope. *)
-and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
+and transl_bound_exp ~scopes ~in_structure ~recursive pat layout expr loc
+      attrs =
+  let is_function =
+    match expr.exp_desc with
+    | Texp_function _ -> true
+    | _ -> false
+  in
+  let is_simple_binding =
+    match pat.pat_desc with
+    | Tpat_var _ | Tpat_fun_layout _ -> true
+    | _ -> false
+  in
+  let binding_observation =
+    match doclang_attribute "doclang.observe_binding" attrs with
+    | None
+      when not
+             (doclang_trace_all ()
+              && doclang_trace_location
+                   (if is_function then pat.pat_loc else expr.exp_loc)) ->
+      None
+    | None when not is_function && not is_simple_binding -> None
+    | None ->
+      let label =
+        match pat_bound_idents pat with
+        | identifier :: _ -> Ident.name identifier
+        | [] -> "function"
+      in
+      let location =
+        if is_function
+        then pat.pat_loc
+        else doclang_binding_location pat expr
+      in
+      let attribute = doclang_synthetic_attribute location in
+      Some
+        (doclang_observation
+           ?construct_id:
+             (doclang_construct_id
+                (if is_function then expr.exp_attributes else pat.pat_attributes))
+           ~attribute ~kind:"binding" ~label
+           expr.exp_env expr.exp_type)
+    | Some attribute ->
+      let label =
+        match pat_bound_idents pat with
+        | identifier :: _ -> Ident.name identifier
+        | [] -> "binding"
+      in
+      let attribute =
+        if is_function
+        then attribute
+        else
+          { attribute with
+            attr_loc = doclang_binding_location pat expr
+          }
+      in
+      Some
+        (doclang_observation
+           ?construct_id:
+             (doclang_construct_id
+                (if is_function then expr.exp_attributes else pat.pat_attributes))
+           ~attribute ~kind:"binding" ~label
+           expr.exp_env expr.exp_type)
+  in
   let should_introduce_scope =
     match expr.exp_desc with
     | Texp_function _ -> true
     | _ when in_structure -> true
     | _ -> false in
+  let function_observation =
+    if is_function
+    then
+      Option.map
+        (fun observation -> { observation with kind = "function" })
+        binding_observation
+    else None
+  in
   let lam =
     match pat_bound_idents pat with
     | (id :: _) when should_introduce_scope ->
@@ -2285,8 +4069,19 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
       (* If this is a let-binding of a function, the scope will be updated
          with zero_alloc info in [transl_function]. *)
       let scopes = enter_value_definition ~scopes ~assume_zero_alloc id in
-      transl_scoped_exp ~scopes layout expr
+      transl_scoped_exp ?binding_observation:function_observation
+        ~scopes layout expr
     | _ -> transl_exp ~scopes layout expr
+  in
+  let lam =
+    match binding_observation, is_function with
+    | None, _ | Some _, true -> lam
+    | Some observation, false ->
+      if recursive
+      then
+        Location.raise_errorf ~loc:observation.attribute.attr_loc
+          "A recursive observed binding must be a function."
+      else doclang_observe_lambda ~scopes observation layout lam
   in
   Translattribute.add_function_attributes lam loc attrs
 
@@ -2299,6 +4094,46 @@ and transl_bound_exp ~scopes ~in_structure pat layout expr loc attrs =
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
   add_type_shapes_of_patterns pat_expr_list;
+  let register_function_binding pattern expression attributes body =
+    let consumption =
+      match expression.exp_desc with
+      | Texp_function { params; body; _ }
+        when Option.is_some
+               (doclang_attribute "doclang.observe_binding" attributes)
+             || (doclang_trace_all ()
+                 && doclang_trace_location pattern.pat_loc) ->
+        Some
+          (List.length params
+           + match body with
+             | Tfunction_body _ -> 0
+             | Tfunction_cases _ -> 1)
+      | _ -> None
+    in
+    match consumption, pat_bound_idents pattern with
+    | Some consumption, function_ :: _ ->
+        let observation =
+          doclang_observation
+            ?construct_id:(doclang_construct_id expression.exp_attributes)
+            ~attribute:(doclang_synthetic_attribute expression.exp_loc)
+            ~kind:"function" ~label:(Ident.name function_)
+            expression.exp_env expression.exp_type
+        in
+        let metadata =
+          Lconst
+            (Const_base
+               (Const_string
+                  (doclang_metadata observation, expression.exp_loc, None)))
+        in
+        Lsequence
+          (Lprim
+             (prim_doclang_observe_register_function,
+              [ Lvar function_;
+                Lconst (Lambda.const_int consumption);
+                metadata
+              ], of_location ~scopes pattern.pat_loc),
+           body)
+    | None, _ | Some _, [] -> body
+  in
   match rec_flag with
     Nonrecursive ->
       let rec transl = function
@@ -2309,7 +4144,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           let sort = Jkind.Sort.default_for_transl_and_get sort in
           let layout = layout_exp sort expr in
           let lam =
-            transl_bound_exp ~scopes ~in_structure pat layout expr vb_loc
+            transl_bound_exp ~scopes ~in_structure ~recursive:false
+              pat layout expr vb_loc
               vb_attributes
           in
           let lam =
@@ -2317,8 +4153,12 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           in
           let mk_body = transl rem in
           fun body ->
-            Matching.for_let ~scopes ~arg_sort:sort ~return_layout pat.pat_loc
-              lam Immutable pat (mk_body body)
+            let body = mk_body body in
+            let body =
+              register_function_binding pat expr vb_attributes body
+            in
+            Matching.for_let ~scopes ~arg_sort:sort ~return_layout
+              pat.pat_loc lam Immutable pat body
       in
       transl pat_expr_list
   | Recursive ->
@@ -2337,7 +4177,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
         let vb_layout = layout_exp vb_sort expr in
         let def =
-          transl_bound_exp ~scopes ~in_structure vb_pat vb_layout expr
+          transl_bound_exp ~scopes ~in_structure ~recursive:true
+            vb_pat vb_layout expr
             vb_loc vb_attributes
         in
         let def =
@@ -2345,14 +4186,22 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         in
         ( id, id_duid, rkind, def ) in
       let lam_bds = List.map2 transl_case pat_expr_list idlist in
-      fun body -> Value_rec_compiler.compile_letrec lam_bds body
+      fun body ->
+        let body =
+          List.fold_right
+            (fun { vb_pat; vb_expr; vb_attributes; _ } body ->
+              register_function_binding vb_pat vb_expr vb_attributes body)
+            pat_expr_list body
+        in
+        Value_rec_compiler.compile_letrec lam_bds body
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
   let arg_sort = Jkind_types.Sort.default_to_scannable_and_get vb_sort in
   let arg_layout = layout_exp arg_sort expr in
   let lam =
-    transl_bound_exp ~scopes ~in_structure:false pat arg_layout expr vb_loc attr
+    transl_bound_exp ~scopes ~in_structure:false ~recursive:false
+      pat arg_layout expr vb_loc attr
   in
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
@@ -2788,6 +4637,37 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
   (arg, lbl)
 
 and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
+  let has_exception_pattern =
+    List.exists
+      (fun { c_lhs; _ } ->
+        match split_pattern c_lhs with
+        | _, Some _ -> true
+        | _, None -> false)
+      pat_expr_list
+  in
+  let doclang_match_capture =
+    let arg_layout = layout_exp arg_sort arg in
+    if doclang_trace_all () && doclang_trace_location e.exp_loc
+       && not has_exception_pattern
+    then
+      match arg_layout with
+      | Pvalue _ ->
+        let id = Ident.create_local "doclang_pattern_value" in
+        Some
+          ( id,
+            Lambda.debug_uid_none,
+            arg_layout,
+            transl_exp ~scopes arg_layout arg )
+      | Ptop | Pbottom | Punboxed_float _
+      | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+      | Punboxed_product _ | Psplicevar _ -> None
+    else None
+  in
+  let doclang_matched =
+    Option.map
+      (fun (id, _, layout, _) -> Lvar id, layout)
+      doclang_match_capture
+  in
   let rewrite_case (val_cases, exn_cases, static_handlers as acc)
         ({ c_lhs; c_guard; c_rhs } as case) =
     if c_rhs.exp_desc = Texp_unreachable then acc else
@@ -2796,7 +4676,8 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
     | None, None -> assert false
     | Some pv, None ->
         let val_case =
-          transl_case ~scopes return_layout { case with c_lhs = pv }
+          transl_case ~scopes ?matched:doclang_matched return_layout
+            { case with c_lhs = pv }
         in
         val_case :: val_cases, exn_cases, static_handlers
     | None, Some pe ->
@@ -2859,17 +4740,28 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
     let id, id_duid = Typecore.name_pattern "exn" (List.map fst exn_cases) in
     let static_exception_id = next_raise_count () in
     Lstaticcatch
-      (Ltrywith (Lstaticraise (static_exception_id, scrutinees), id, id_duid,
-                 Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
-                   exn_cases,
-                 return_layout),
+      (doclang_trywith ~scopes e.exp_loc
+         (Lstaticraise (static_exception_id, scrutinees)) id id_duid
+         (Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
+            exn_cases)
+         return_layout,
        (static_exception_id, val_ids),
        handler,
       Same_region, return_layout)
   in
   let classic =
-    match arg, exn_cases with
-    | {exp_desc = Texp_tuple (argl, alloc_mode)}, [] ->
+    match doclang_match_capture, arg, exn_cases with
+    | Some (id, uid, arg_layout, translated_arg), _, [] ->
+      assert (static_handlers = []);
+      Llet
+        ( Strict,
+          arg_layout,
+          id,
+          uid,
+          translated_arg,
+          Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
+            e.exp_loc None (Lvar id) val_cases partial )
+    | None, {exp_desc = Texp_tuple (argl, alloc_mode)}, [] ->
       (* CR layouts v7.1: This case and the one below it give special treatment
          to matching on literal tuples. This optimization is irrelevant for
          unboxed tuples in native code, but not doing it for unboxed tuples in
@@ -2882,7 +4774,7 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
-    | {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
+    | None, {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
         let argl =
           List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
         in
@@ -2899,12 +4791,12 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
         static_catch (transl_list ~scopes argl) val_ids
           (Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
              lvars mode val_cases partial)
-    | arg, [] ->
+    | None, arg, [] ->
       assert (static_handlers = []);
       let arg_layout = layout_exp arg_sort arg in
       Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
         e.exp_loc None (transl_exp ~scopes arg_layout arg) val_cases partial
-    | arg, _ :: _ ->
+    | None, arg, _ :: _ ->
         let val_id, val_id_duid =
           Typecore.name_pattern "val" (List.map fst val_cases)
         in
@@ -2914,6 +4806,7 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
           [val_id, val_id_duid, arg_layout]
           (Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
              e.exp_loc None (Lvar val_id) val_cases partial)
+    | Some _, _, _ :: _ -> assert false
   in
   List.fold_left (fun body (static_exception_id, val_ids, handler) ->
     Lstaticcatch

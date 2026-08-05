@@ -1,0 +1,8 @@
+--- a/compiler/lib/ocaml_compiler.ml
++++ b/compiler/lib/ocaml_compiler.ml
+@@ -32,7 +32,7 @@ let rec constant_of_const c : Code.constant =
+   | Const_base (Const_char c) -> Int (Targetint.of_int_exn (Char.code c))
+   | ((Const_base (Const_untagged_char c)) [@if oxcaml]) ->
+-      Int (Targetint.of_int_warning_on_overflow (Char.code c))
++      Int (Targetint.of_int_warning_on_overflow c)
+   | Const_base (Const_string (s, _, _)) -> String s

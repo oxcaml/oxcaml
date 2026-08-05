@@ -1,0 +1,30 @@
+--- a/lib/tests/test_misc.ml
++++ b/lib/tests/test_misc.ml
+@@ -16,7 +16,7 @@
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+  *)
+
+-open Js_of_ocaml
++open! Js_of_ocaml
+
+ (* Make sure we don't emit an unused warning for method not using "self" *)
+
+--- a/ppx/ppx_js/lib_internal/ppx_js_internal.ml
++++ b/ppx/ppx_js/lib_internal/ppx_js_internal.ml
+@@ -745,12 +745,15 @@
+                 body
+           | _ -> body
+         in
++        let ghost_self_id =
++          { self_id with ppat_loc = { self_id.ppat_loc with loc_ghost = true } }
++        in
+         lift_function_body_constraint
+           (Ast_builder.Default.pexp_fun
+              ~loc:{ body.pexp_loc with loc_ghost = true }
+              Nolabel
+              None
+-             self_id
++             ghost_self_id
+              body)
+   in
+   let extra_types =

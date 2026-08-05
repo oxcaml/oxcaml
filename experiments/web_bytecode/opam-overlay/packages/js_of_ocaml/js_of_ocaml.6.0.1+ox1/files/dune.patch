@@ -1,0 +1,51 @@
+diff --git a/compiler/lib/dune b/compiler/lib/dune
+index b03e41bd..23a20394 100644
+--- a/compiler/lib/dune
++++ b/compiler/lib/dune
+@@ -15,7 +16,7 @@
+  (flags
+   (:standard -w -7-37 -safe-string))
+  (preprocess
+-  (pps ppx_optcomp_light sedlex.ppx)))
++  (pps ppx_optcomp_light -no-check sedlex.ppx)))
+
+ (ocamllex annot_lexer)
+
+diff --git a/ppx/ppx_js/as-lib/dune b/ppx/ppx_js/as-lib/dune
+index f3d0f4c3..2cc128fd 100644
+--- a/ppx/ppx_js/as-lib/dune
++++ b/ppx/ppx_js/as-lib/dune
+@@ -2,7 +2,7 @@
+  (name ppx_js)
+  (public_name js_of_ocaml-ppx.as-lib)
+  (synopsis "Js_of_ocaml ppx")
+- (libraries compiler-libs.common ppxlib)
++ (libraries compiler-libs.common ppxlib ppxlib_jane)
+  (preprocess
+   (pps ppxlib.metaquot)))
+
+diff --git a/ppx/ppx_js/lib_internal/dune b/ppx/ppx_js/lib_internal/dune
+index d888f72b..aa92f071 100644
+--- a/ppx/ppx_js/lib_internal/dune
++++ b/ppx/ppx_js/lib_internal/dune
+@@ -1,6 +1,6 @@
+ (library
+  (name ppx_js_internal)
+- (libraries compiler-libs.common ppxlib)
++ (libraries compiler-libs.common ppxlib ppxlib_jane)
+  (kind ppx_rewriter)
+  (preprocess
+   (pps ppxlib.metaquot)))
+
+diff --git a/dune-project b/dune-project
+--- a/dune-project
++++ b/dune-project
+@@ -25,7 +25,7 @@
+   (ppxlib (>= 0.33))
+   (ocaml-compiler-libs (>= v0.12.4))
+   (re :with-test)
+-  (cmdliner (>= 2.0))
++  (cmdliner (>= 1.1.0))
+   (sedlex (>= 3.3))
+   (qcheck :with-test)
+   menhir

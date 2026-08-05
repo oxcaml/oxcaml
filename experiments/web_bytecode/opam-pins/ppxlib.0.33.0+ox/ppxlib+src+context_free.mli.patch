@@ -1,0 +1,54 @@
+--- a/src/context_free.mli
++++ b/src/context_free.mli
+@@ -47,7 +47,33 @@ module Rule : sig
+ 
+   (** The rest of this API is for rewriting rules that apply when a certain
+       attribute is present. The API is not complete and is currently only enough
+-      to implement deriving. *)
++      to implement deriving and ppx_template. *)
++
++  module Attribute_list : sig
++    type ('a, _) t =
++      | [] : ('a, unit) t
++      | ( :: ) : ('a, 'b) Attribute.t * ('a, 'c) t -> ('a, 'b * 'c) t
++  end
++
++  module Parsed_payload_list : sig
++    type _ t = [] : unit t | ( :: ) : 'a option * 'b t -> ('a * 'b) t
++  end
++
++  (** Rewrite an item when the attribute is present. *)
++
++  val attr_replace :
++    string ->
++    'a Extension.Context.t ->
++    ('a, 'b) Attribute.t ->
++    (ctxt:Expansion_context.Base.t -> 'a -> 'b -> 'a) ->
++    t
++
++  val attr_multiple_replace:
++    string ->
++    'a Extension.Context.t ->
++    ('a, 'list) Attribute_list.t ->
++    (ctxt:Expansion_context.Base.t -> 'a -> 'list Parsed_payload_list.t -> 'a) ->
++    t
+ 
+   type ('a, 'b, 'c) attr_group_inline =
+     ('b, 'c) Attribute.t ->
+@@ -113,6 +139,16 @@ module Rule : sig
+ 
+   val attr_sig_exception_expect :
+     (signature_item, type_exception, _) attr_inline
++
++  type ('item, 'parsed_payload) attr_floating_inline =
++    ('item, 'parsed_payload) Attribute.Floating.t ->
++    (ctxt:Expansion_context.Deriver.t -> 'parsed_payload -> 'item list) ->
++    t
++
++  val attr_str_floating_expect : (structure_item, _)  attr_floating_inline
++  val attr_sig_floating_expect : (signature_item, _)  attr_floating_inline
++  val attr_str_floating_expect_and_expand : (structure_item, _)  attr_floating_inline
++  val attr_sig_floating_expect_and_expand : (signature_item, _)  attr_floating_inline
+ end
+ 
+ (**/**)

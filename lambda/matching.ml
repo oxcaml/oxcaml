@@ -96,6 +96,23 @@ open Lambda
 open Parmatch
 open Printpat.Compat
 
+let doclang_pattern_action_hook =
+  ref
+    (fun (_ : pattern) (_ : (pattern * Ident.t) list) (_ : lambda)
+         (_ : Jkind.Sort.Const.t) action -> action)
+
+let set_doclang_pattern_action_hook hook =
+  doclang_pattern_action_hook := hook
+
+let doclang_construct_attribute_prefix = "ocaml.dox.construct."
+
+let doclang_pattern_is_instrumented (pattern : _ general_pattern) =
+  List.exists
+    (fun (attribute : Parsetree.attribute) ->
+      String.starts_with ~prefix:doclang_construct_attribute_prefix
+        attribute.attr_name.txt)
+    pattern.pat_attributes
+
 module Scoped_location = Debuginfo.Scoped_location
 
 let dbg () = !Clflags.dump_matchcomp
@@ -216,7 +233,8 @@ module Half_simple : sig
 
   type nonrec clause = pattern Non_empty_row.t clause
 
-  val of_clause : arg:lambda -> General.clause -> clause
+  val of_clause :
+    arg:lambda -> arg_sort:Jkind.Sort.Const.t -> General.clause -> clause
 end = struct
   include Patterns.Half_simple
 
@@ -248,10 +266,17 @@ end = struct
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
-  let of_clause ~arg cl =
-    let rec aux (((p, patl), action) : General.clause) : clause =
-      let continue p (view : General.view) : clause =
-        aux (({ p with pat_desc = view }, patl), action)
+  let of_clause ~arg ~arg_sort cl =
+    let rec aux ~observe (((p, patl), action) : General.clause) : clause =
+      let action =
+        if observe
+        then
+          (!doclang_pattern_action_hook) (General.erase p) [] arg arg_sort
+            action
+        else action
+      in
+      let continue ?(observe = true) p (view : General.view) : clause =
+        aux ~observe (({ p with pat_desc = view }, patl), action)
       in
       let stop p (view : view) : clause =
         (({ p with pat_desc = view }, patl), action)
@@ -259,10 +284,14 @@ end = struct
       match p.pat_desc with
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
-        continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
+        (* The alias is introduced by the matching compiler.  The source
+           variable was observed above, so the synthetic alias must not emit a
+           second occurrence for the same construct. *)
+        continue ~observe:false p
+          (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
       | `Alias (sub_p, id, _, duid, sort, _, _) ->
-          aux
+          aux ~observe:true
             ( (General.view sub_p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
@@ -285,7 +314,7 @@ end = struct
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Lazy _ )
         as view -> stop p view
     in
-    aux cl
+    aux ~observe:true cl
 end
 
 exception Cannot_flatten
@@ -373,7 +402,9 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+      | `Alias (subpattern, id, _, _, _, _, _) ->
+          let alias = General.erase p in
+          explode (General.view subpattern) ((alias, id) :: aliases) rem
       | `Var (id, str, uid, sort, mode) ->
           explode
             { p with pat_desc =
@@ -396,34 +427,54 @@ end = struct
              compile a tuple pattern [match e1, .. en with ...]
              without allocating the tuple [(e1, .., en)].
           *)
-          let rec fresh_clause arg_id action_vars renaming_env = function
+          let rec fresh_clause arg_id action_vars action_bindings renaming_env =
+            function
             | [] ->
                 let fresh_pat = alpha renaming_env { p with pat_desc = view } in
-                let fresh_action = mk_action ~vars:(List.rev action_vars) in
+                let alias_bindings =
+                  List.filter_map
+                    (fun (pattern, id) ->
+                      Option.map
+                        (fun actual -> pattern, actual)
+                        (List.assoc_opt id action_bindings))
+                    aliases
+                in
+                let fresh_action =
+                  (!doclang_pattern_action_hook) (General.erase fresh_pat)
+                    alias_bindings arg arg_sort
+                    (mk_action ~vars:(List.rev action_vars))
+                in
                 (fresh_pat, fresh_action)
             | (pat_id, pat_duid) :: rem_vars ->
-              if not (List.mem pat_id aliases) then begin
+              if not (List.exists (fun (_, id) -> Ident.same pat_id id) aliases)
+              then begin
                 let fresh_id = Ident.rename pat_id in
                 let action_vars = fresh_id :: action_vars in
+                let action_bindings = (pat_id, fresh_id) :: action_bindings in
                 let renaming_env = ((pat_id, fresh_id) :: renaming_env) in
-                fresh_clause arg_id action_vars renaming_env rem_vars
+                fresh_clause arg_id action_vars action_bindings renaming_env
+                  rem_vars
               end else begin match arg_id, arg with
                 | Some id, _
                 | None, Lvar id ->
                   let action_vars = id :: action_vars in
-                  fresh_clause arg_id action_vars renaming_env rem_vars
+                  let action_bindings = (pat_id, id) :: action_bindings in
+                  fresh_clause arg_id action_vars action_bindings renaming_env
+                    rem_vars
                 | None, _ ->
                   (* [pat_id] is a name used locally to refer to the argument,
                      so it makes sense to reuse it (refreshed) *)
                   let id = Ident.rename pat_id in
                   let action_vars = (id :: action_vars) in
+                  let action_bindings = (pat_id, id) :: action_bindings in
                   let pat, action =
-                    fresh_clause (Some id) action_vars renaming_env rem_vars
+                    fresh_clause (Some id) action_vars action_bindings
+                      renaming_env rem_vars
                   in
                   pat, bind_alias pat id pat_duid ~arg ~arg_sort ~action
               end
           in
-          fresh_clause None [] [] patbound_action_vars :: rem
+          fresh_clause None [] [] [] patbound_action_vars :: rem
     in
     explode (p : Half_simple.pattern :> General.pattern) [] []
 end
@@ -1390,16 +1441,17 @@ let safe_before ((p, ps), act_p) l =
       || not (may_compats (General.erase p :: ps) (General.erase q :: qs)))
     l
 
-let half_simplify_nonempty ~arg
+let half_simplify_nonempty ~arg ~arg_sort
       (cls : Typedtree.pattern Non_empty_row.t clause) : Half_simple.clause =
   cls
   |> map_on_row (Non_empty_row.map_first General.view)
-  |> Half_simple.of_clause ~arg
+  |> Half_simple.of_clause ~arg ~arg_sort
 
-let half_simplify_clause ~arg (cls : Typedtree.pattern list clause) =
+let half_simplify_clause ~arg ~arg_sort
+      (cls : Typedtree.pattern list clause) =
   cls
   |> map_on_row Non_empty_row.of_initial
-  |> half_simplify_nonempty ~arg
+  |> half_simplify_nonempty ~arg ~arg_sort
 
 (* Once matchings are *fully* simplified, one can easily find
    their nature. *)
@@ -1763,7 +1815,8 @@ and precompile_var args cls def k =
                 (* we learned by pattern-matching on [args]
                    that [p::ps] has at least two arguments,
                    so [ps] must be non-empty *)
-                half_simplify_clause ~arg:(Lvar v) (ps, act))
+                half_simplify_clause ~arg:(Lvar v) ~arg_sort:first.sort
+                  (ps, act))
               cls
           and var_def = Default_environment.pop_column def in
           let { me = first; matrix }, nexts =
@@ -3965,6 +4018,8 @@ let rec event_branch repr lam =
           } )
   | Llet (str, k, id, duid, lam, body), _ ->
       Llet (str, k, id, duid, lam, event_branch repr body)
+  | Lsequence (before, body), _ ->
+      Lsequence (before, event_branch repr body)
   | Lstaticraise _, _ -> lam
   | _, Some _ ->
       fatal_errorf "Matching.event_branch: %a" Printlambda.lambda lam
@@ -4219,7 +4274,11 @@ and compile_match_nonempty ~scopes value_kind repr partial ctx
       let v, v_duid = arg_to_var arg m.cases in
       bind_match_arg binding_kind v v_duid arg layout (
         let args = { first = { first with arg = Var v }; rest } in
-        let cases = List.map (half_simplify_nonempty ~arg:(Lvar v)) m.cases in
+        let cases =
+          List.map
+            (half_simplify_nonempty ~arg:(Lvar v) ~arg_sort:first.sort)
+            m.cases
+        in
         let m = { m with args; cases } in
         let first_match, rem =
           split_and_precompile_half_simplified m in
@@ -4803,6 +4862,20 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
   List.fold_left push_sublet exit rev_sublets
 
 let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
+  if mutable_flag == Asttypes.Immutable
+     && doclang_pattern_is_instrumented pat
+     &&
+     match pat.pat_desc with
+     | Tpat_var _ -> false
+     | Tpat_fun_layout { lpoly; _ } -> List.is_empty (Lpoly.get_exn lpoly)
+     | _ -> true
+  then
+    (* The normal let compiler has fast paths that erase wildcard patterns or
+       split tuple patterns before the matching matrix sees them.  The traced
+       path deliberately uses the ordinary matcher so every source pattern
+       node reaches the per-node action hook. *)
+    simple_for_let ~scopes ~arg_sort ~return_layout loc param pat body
+  else
   match pat.pat_desc with
   | Tpat_any ->
       (* This eliminates a useless variable (and stack slot in bytecode)
@@ -5008,7 +5081,11 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
   handler (fun partial pm1 ->
     let pm1_half =
       { pm1 with
-        cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
+        cases =
+          List.map
+            (half_simplify_nonempty ~arg
+               ~arg_sort:Jkind.Sort.Const.for_tuple)
+            pm1.cases }
     in
     let next, nexts = split_and_precompile_half_simplified pm1_half in
     let size = List.length idl in

@@ -40,6 +40,10 @@
 #include "caml/startup.h"
 #include "caml/startup_aux.h"
 
+CAMLextern void caml_doclang_observe_register_partial(value original,
+                                                       value partial);
+CAMLextern void caml_doclang_observe_call_function(value function);
+
 /* Registers for the abstract machine:
         pc         the code pointer
         sp         the stack pointer (grows downward)
@@ -115,6 +119,13 @@ sp is a local copy of the global variable Caml_state->current_stack->sp. */
   { sp = domain_state->current_stack->sp; accu = sp[0]; \
     pc = (code_t) sp[3]; env = sp[4]; extra_args = Long_val(sp[5]); \
     sp += 6; }
+
+#define Doclang_observe_register_partial(original) \
+  do { \
+    Setup_for_event; \
+    caml_doclang_observe_register_partial(original, accu); \
+    Restore_after_event; \
+  } while (0)
 
 /* Debugger interface */
 
@@ -508,6 +519,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
     }
     Instruct(APPLY): {
       extra_args = *pc - 1;
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       goto check_stacks;
@@ -519,6 +531,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp[1] = (value)pc;
       sp[2] = env;
       sp[3] = Val_long(extra_args);
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args = 0;
@@ -533,6 +546,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp[2] = (value)pc;
       sp[3] = env;
       sp[4] = Val_long(extra_args);
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args = 1;
@@ -549,6 +563,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp[3] = (value)pc;
       sp[4] = env;
       sp[5] = Val_long(extra_args);
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args = 2;
@@ -564,6 +579,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       newsp = sp + slotsize - nargs;
       for (int i = nargs - 1; i >= 0; i--) newsp[i] = sp[i];
       sp = newsp;
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args += nargs - 1;
@@ -573,6 +589,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       value arg1 = sp[0];
       sp = sp + *pc - 1;
       sp[0] = arg1;
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       goto check_stacks;
@@ -583,6 +600,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp = sp + *pc - 2;
       sp[0] = arg1;
       sp[1] = arg2;
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args += 1;
@@ -596,6 +614,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp[0] = arg1;
       sp[1] = arg2;
       sp[2] = arg3;
+      caml_doclang_observe_call_function(accu);
       pc = Code_val(accu);
       env = accu;
       extra_args += 2;
@@ -606,6 +625,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       sp += *pc++;
       if (extra_args > 0) {
         extra_args--;
+        caml_doclang_observe_call_function(accu);
         pc = Code_val(accu);
         env = accu;
         Next;
@@ -667,6 +687,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         for (mlsize_t i = 0; i < num_args; i++) Field(accu, i + 3) = sp[i];
         Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
         Closinfo_val(accu) = Make_closinfo(0, 2, 1);
+        Doclang_observe_register_partial(env);
         sp += num_args;
         goto do_return;
       }

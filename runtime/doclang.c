@@ -1,0 +1,1675 @@
+/**************************************************************************/
+/*                                                                        */
+/*                                 OCaml                                  */
+/*                                                                        */
+/*   This file is distributed under the terms of the GNU Lesser General   */
+/*   Public License version 2.1, with the special exception on linking.    */
+/*                                                                        */
+/**************************************************************************/
+
+#define CAML_INTERNALS
+
+#include <stdio.h>
+#include <stdatomic.h>
+#include <string.h>
+
+#include "caml/mlvalues.h"
+#include "caml/memory.h"
+#include "caml/misc.h"
+#include "caml/domain.h"
+#include "caml/osdeps.h"
+#include "caml/platform.h"
+#include "caml/printexc.h"
+#include "caml/signals.h"
+
+#define DOCLANG_STACK_LIMIT 4096
+#define DOCLANG_EVENT_BYTE_LIMIT 12000000
+#define DOCLANG_FUNCTION_LIMIT 8192
+#define DOCLANG_REGISTRY_BUCKETS 16384
+#define DOCLANG_CLOSURE_CACHE_BUCKETS 65536
+
+static _Atomic uintnat doclang_counter = 0;
+static _Atomic uintnat doclang_handoff_counter = 0;
+static caml_plat_mutex doclang_output_lock = CAML_PLAT_MUTEX_INITIALIZER;
+static atomic_flag doclang_registry_guard = ATOMIC_FLAG_INIT;
+static FILE *doclang_output_channel = NULL;
+static size_t doclang_output_bytes = 0;
+static _Atomic int doclang_trace_truncated = 0;
+static _Atomic uintnat doclang_function_count = 0;
+static _Atomic(code_t) doclang_functions[DOCLANG_FUNCTION_LIMIT];
+static _Atomic intnat doclang_function_consumptions[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat doclang_function_bucket_heads[DOCLANG_REGISTRY_BUCKETS];
+static uintnat doclang_function_next[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat doclang_partial_function_count = 0;
+static _Atomic(code_t) doclang_partial_functions[DOCLANG_FUNCTION_LIMIT];
+static _Atomic intnat
+  doclang_partial_function_consumptions[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat
+  doclang_partial_function_bucket_heads[DOCLANG_REGISTRY_BUCKETS];
+static uintnat doclang_partial_function_next[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat doclang_closure_count = 0;
+static value doclang_closures[DOCLANG_FUNCTION_LIMIT];
+static value doclang_closure_metadata[DOCLANG_FUNCTION_LIMIT];
+static uintnat doclang_closure_ids[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat doclang_closure_bucket_heads[DOCLANG_REGISTRY_BUCKETS];
+static uintnat doclang_closure_next[DOCLANG_FUNCTION_LIMIT];
+static _Atomic uintnat
+  doclang_closure_cache[DOCLANG_CLOSURE_CACHE_BUCKETS];
+static CAMLthread_local uintnat doclang_stack[DOCLANG_STACK_LIMIT];
+static CAMLthread_local uintnat doclang_parents[DOCLANG_STACK_LIMIT];
+static CAMLthread_local value doclang_metadata[DOCLANG_STACK_LIMIT];
+static CAMLthread_local int doclang_tail_capable[DOCLANG_STACK_LIMIT];
+static CAMLthread_local uintnat doclang_overapply_parents[DOCLANG_STACK_LIMIT];
+static CAMLthread_local uintnat doclang_overapply_remaining[DOCLANG_STACK_LIMIT];
+static CAMLthread_local uintnat doclang_depth = 0;
+static CAMLthread_local uintnat doclang_overflow_depth = 0;
+static CAMLthread_local uintnat doclang_pending_tail_parent = 0;
+static CAMLthread_local uintnat doclang_pending_tail_remaining = 0;
+static CAMLthread_local uintnat doclang_pending_tail_handoff = 0;
+static CAMLthread_local uintnat doclang_pending_closure_id = 0;
+
+static void doclang_hex_byte(FILE *channel, unsigned char byte)
+{
+  static const char digits[] = "0123456789abcdef";
+  fputc(digits[byte >> 4], channel);
+  fputc(digits[byte & 15], channel);
+}
+
+static void doclang_hex(FILE *channel, const char *value, mlsize_t length)
+{
+  mlsize_t index;
+  for (index = 0; index < length; index++) {
+    doclang_hex_byte(channel, (unsigned char)value[index]);
+  }
+}
+
+static void doclang_hex_c_string(FILE *channel, const char *value)
+{
+  doclang_hex(channel, value, strlen(value));
+}
+
+static void doclang_hex_separator(FILE *channel)
+{
+  doclang_hex_byte(channel, 0x1f);
+}
+
+static mlsize_t doclang_site_length(value metadata)
+{
+  const char *source = String_val(metadata);
+  mlsize_t length = caml_string_length(metadata);
+  mlsize_t index;
+  for (index = 0; index < length; index++) {
+    if (source[index] == 0x1f) return index;
+  }
+  return length;
+}
+
+static mlsize_t doclang_public_metadata_length(value metadata)
+{
+  const char *source = String_val(metadata);
+  mlsize_t length = caml_string_length(metadata);
+  mlsize_t index;
+  size_t separators = 0;
+  for (index = 0; index < length; index++) {
+    if (source[index] == 0x1f && ++separators == 9) return index;
+  }
+  return length;
+}
+
+static const char *doclang_metadata_field(value metadata, size_t wanted,
+                                          mlsize_t *field_length)
+{
+  const char *source = String_val(metadata);
+  mlsize_t length = caml_string_length(metadata);
+  mlsize_t start = 0;
+  size_t field = 0;
+  mlsize_t index;
+  for (index = 0; index <= length; index++) {
+    if (index == length || source[index] == 0x1f) {
+      if (field == wanted) {
+        *field_length = index - start;
+        return source + start;
+      }
+      field++;
+      start = index + 1;
+    }
+  }
+  *field_length = 0;
+  return NULL;
+}
+
+static int doclang_metadata_field_is(value metadata, size_t index,
+                                     const char *expected)
+{
+  mlsize_t length;
+  const char *field = doclang_metadata_field(metadata, index, &length);
+  size_t expected_length = strlen(expected);
+  return field != NULL && length == expected_length
+         && memcmp(field, expected, expected_length) == 0;
+}
+
+static int doclang_type_is(value metadata, const char *expected)
+{
+  return doclang_metadata_field_is(metadata, 8, expected);
+}
+
+static int doclang_type_ends_with(value metadata, const char *suffix)
+{
+  mlsize_t length;
+  const char *field = doclang_metadata_field(metadata, 8, &length);
+  size_t suffix_length = strlen(suffix);
+  return field != NULL && length >= suffix_length
+         && memcmp(field + length - suffix_length, suffix, suffix_length) == 0;
+}
+
+static size_t doclang_append(char *buffer, size_t capacity, size_t position,
+                             const char *text)
+{
+  size_t available;
+  size_t length;
+  if (position >= capacity) return position;
+  available = capacity - position - 1;
+  length = strlen(text);
+  if (length > available) length = available;
+  memcpy(buffer + position, text, length);
+  position += length;
+  buffer[position] = 0;
+  return position;
+}
+
+static void doclang_format_float(char *buffer, size_t capacity, double number)
+{
+  size_t index;
+  size_t length;
+  int needs_decimal_point = 1;
+  if (capacity == 0) return;
+  snprintf(buffer, capacity, "%.12g", number);
+  for (index = 0; buffer[index] != 0; index++) {
+    if ((buffer[index] < '0' || buffer[index] > '9')
+        && buffer[index] != '-') {
+      needs_decimal_point = 0;
+      break;
+    }
+  }
+  length = strlen(buffer);
+  if (needs_decimal_point && length + 1 < capacity) {
+    buffer[length] = '.';
+    buffer[length + 1] = 0;
+  }
+}
+
+static void doclang_preview_element(char *buffer, size_t capacity,
+                                    value observed)
+{
+  if (Is_long(observed)) {
+    snprintf(buffer, capacity, "%ld", Long_val(observed));
+  } else {
+    switch (Tag_val(observed)) {
+      case String_tag:
+        snprintf(buffer, capacity, "\"%.60s\"", String_val(observed));
+        break;
+      case Double_tag:
+        doclang_format_float(buffer, capacity, Double_val(observed));
+        break;
+      case Closure_tag:
+      case Infix_tag:
+        snprintf(buffer, capacity, "<function>");
+        break;
+      default:
+        snprintf(buffer, capacity, "<value>");
+    }
+  }
+}
+
+typedef struct {
+  char *data;
+  size_t capacity;
+  size_t position;
+  int complete;
+} doclang_preview_buffer;
+
+static void doclang_preview_append_n(doclang_preview_buffer *output,
+                                     const char *text, size_t length)
+{
+  size_t available;
+  if (output->position >= output->capacity) {
+    output->complete = 0;
+    return;
+  }
+  available = output->capacity - output->position - 1;
+  if (length > available) {
+    length = available;
+    output->complete = 0;
+  }
+  memcpy(output->data + output->position, text, length);
+  output->position += length;
+  output->data[output->position] = 0;
+}
+
+static void doclang_preview_append(doclang_preview_buffer *output,
+                                   const char *text)
+{
+  doclang_preview_append_n(output, text, strlen(text));
+}
+
+static void doclang_preview_append_incomplete(doclang_preview_buffer *output,
+                                              const char *text)
+{
+  output->complete = 0;
+  doclang_preview_append(output, text);
+}
+
+static void doclang_preview_append_int(doclang_preview_buffer *output,
+                                       intnat number)
+{
+  char formatted[64];
+  snprintf(formatted, sizeof(formatted), "%ld", number);
+  doclang_preview_append(output, formatted);
+}
+
+static size_t doclang_schema_number(const char **cursor, const char *end,
+                                    char separator)
+{
+  size_t number = 0;
+  while (*cursor < end && **cursor >= '0' && **cursor <= '9') {
+    number = number * 10 + (size_t)(**cursor - '0');
+    (*cursor)++;
+  }
+  if (*cursor < end && **cursor == separator) (*cursor)++;
+  return number;
+}
+
+static const char *doclang_schema_name(const char **cursor, const char *end,
+                                       size_t *length)
+{
+  const char *name;
+  *length = doclang_schema_number(cursor, end, ':');
+  name = *cursor;
+  if ((size_t)(end - *cursor) < *length) *length = (size_t)(end - *cursor);
+  *cursor += *length;
+  return name;
+}
+
+static void doclang_skip_schema(const char **cursor, const char *end)
+{
+  char kind;
+  size_t count;
+  size_t index;
+  if (*cursor >= end) return;
+  kind = *(*cursor)++;
+  switch (kind) {
+    case 'L': case 'O': case 'A': case 'R': case 'F': case 'E':
+      doclang_skip_schema(cursor, end);
+      break;
+    case 'M':
+      doclang_skip_schema(cursor, end);
+      doclang_skip_schema(cursor, end);
+      break;
+    case 'T':
+      count = doclang_schema_number(cursor, end, ':');
+      for (index = 0; index < count; index++) doclang_skip_schema(cursor, end);
+      break;
+    case 'Q':
+      count = doclang_schema_number(cursor, end, ':');
+      for (index = 0; index < count; index++) {
+        size_t name_length;
+        (void)doclang_schema_name(cursor, end, &name_length);
+        doclang_skip_schema(cursor, end);
+      }
+      break;
+    case 'V': {
+      size_t constants = doclang_schema_number(cursor, end, ':');
+      size_t blocks;
+      for (index = 0; index < constants; index++) {
+        size_t name_length;
+        (void)doclang_schema_name(cursor, end, &name_length);
+      }
+      blocks = doclang_schema_number(cursor, end, ':');
+      for (index = 0; index < blocks; index++) {
+        size_t arity;
+        size_t field;
+        size_t name_length;
+        (void)doclang_schema_number(cursor, end, ',');
+        (void)doclang_schema_name(cursor, end, &name_length);
+        arity = doclang_schema_number(cursor, end, ':');
+        for (field = 0; field < arity; field++)
+          doclang_skip_schema(cursor, end);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void doclang_preview_schema(doclang_preview_buffer *output,
+                                   const char **cursor, const char *end,
+                                   const char *self, const char *self_end,
+                                   value observed, unsigned depth);
+
+static void doclang_preview_string(doclang_preview_buffer *output,
+                                   value observed)
+{
+  const char *source;
+  mlsize_t length;
+  mlsize_t shown;
+  mlsize_t index;
+  if (!Is_block(observed) || Tag_val(observed) != String_tag) {
+    doclang_preview_append_incomplete(output, "<opaque>");
+    return;
+  }
+  source = String_val(observed);
+  length = caml_string_length(observed);
+  shown = length > 240 ? 240 : length;
+  doclang_preview_append(output, "\"");
+  for (index = 0; index < shown; index++) {
+    unsigned char character = (unsigned char)source[index];
+    if (character == '"' || character == '\\') {
+      char escaped[2] = {'\\', (char)character};
+      doclang_preview_append_n(output, escaped, 2);
+    } else if (character >= 0x20 && character != 0x7f) {
+      doclang_preview_append_n(output, (const char *)&source[index], 1);
+    } else {
+      doclang_preview_append(output, ".");
+    }
+  }
+  if (shown < length) doclang_preview_append_incomplete(output, "…");
+  doclang_preview_append(output, "\"");
+}
+
+static void doclang_preview_dynamic(doclang_preview_buffer *output,
+                                    value observed, unsigned depth)
+{
+  mlsize_t index;
+  mlsize_t shown;
+  if (Is_long(observed)) {
+    doclang_preview_append_int(output, Long_val(observed));
+  } else if (depth > 7) {
+    doclang_preview_append_incomplete(output, "…");
+  } else {
+    switch (Tag_val(observed)) {
+      case String_tag:
+        doclang_preview_string(output, observed);
+        break;
+      case Double_tag: {
+        char formatted[64];
+        doclang_format_float(formatted, sizeof(formatted),
+                             Double_val(observed));
+        doclang_preview_append(output, formatted);
+        break;
+      }
+      case Closure_tag:
+      case Infix_tag:
+        doclang_preview_append_incomplete(output, "<function>");
+        break;
+      default:
+        if (Tag_val(observed) >= No_scan_tag) {
+          doclang_preview_append_incomplete(output, "<opaque>");
+          break;
+        }
+        shown = Wosize_val(observed) > 12 ? 12 : Wosize_val(observed);
+        doclang_preview_append(output, "#");
+        doclang_preview_append_int(output, Tag_val(observed));
+        doclang_preview_append(output, "(");
+        for (index = 0; index < shown; index++) {
+          if (index > 0) doclang_preview_append(output, ", ");
+          doclang_preview_dynamic(output, Field(observed, index), depth + 1);
+        }
+        if (shown < Wosize_val(observed))
+          doclang_preview_append_incomplete(output, ", …");
+        doclang_preview_append(output, ")");
+        break;
+    }
+  }
+}
+
+static void doclang_preview_abstract(doclang_preview_buffer *output,
+                                     value observed, unsigned depth)
+{
+  if (Is_long(observed)) {
+    doclang_preview_append(output, "#immediate(");
+    doclang_preview_append_int(output, Long_val(observed));
+    doclang_preview_append(output, ")");
+  } else {
+    doclang_preview_dynamic(output, observed, depth);
+  }
+}
+
+static void doclang_preview_child(doclang_preview_buffer *output,
+                                  const char *schema, const char *schema_end,
+                                  const char *self, const char *self_end,
+                                  value observed, unsigned depth)
+{
+  const char *cursor = schema;
+  doclang_preview_schema(output, &cursor, schema_end, self, self_end,
+                         observed, depth);
+}
+
+static int doclang_preview_map_tree(doclang_preview_buffer *output,
+                                    const char *key_schema,
+                                    const char *key_end,
+                                    const char *value_schema,
+                                    const char *value_end,
+                                    value tree, size_t *shown,
+                                    unsigned depth)
+{
+  int truncated;
+  if (tree == Val_long(0)) return 0;
+  if (*shown >= 12) return 1;
+  if (!Is_block(tree) || Tag_val(tree) != 0 || Wosize_val(tree) < 5)
+    return 1;
+  truncated = doclang_preview_map_tree(output, key_schema, key_end,
+                                       value_schema, value_end,
+                                       Field(tree, 0), shown, depth);
+  if (*shown >= 12) return 1;
+  if (*shown > 0) doclang_preview_append(output, "; ");
+  doclang_preview_child(output, key_schema, key_end, NULL, NULL,
+                        Field(tree, 1), depth + 1);
+  doclang_preview_append(output, " ↦ ");
+  doclang_preview_child(output, value_schema, value_end, NULL, NULL,
+                        Field(tree, 2), depth + 1);
+  (*shown)++;
+  return doclang_preview_map_tree(output, key_schema, key_end,
+                                  value_schema, value_end,
+                                  Field(tree, 3), shown, depth) || truncated;
+}
+
+static int doclang_preview_set_tree(doclang_preview_buffer *output,
+                                    const char *element_schema,
+                                    const char *element_end,
+                                    value tree, size_t *shown,
+                                    unsigned depth)
+{
+  int truncated;
+  if (tree == Val_long(0)) return 0;
+  if (*shown >= 12) return 1;
+  if (!Is_block(tree) || Tag_val(tree) != 0 || Wosize_val(tree) < 4)
+    return 1;
+  truncated = doclang_preview_set_tree(output, element_schema, element_end,
+                                       Field(tree, 0), shown, depth);
+  if (*shown >= 12) return 1;
+  if (*shown > 0) doclang_preview_append(output, "; ");
+  doclang_preview_child(output, element_schema, element_end, NULL, NULL,
+                        Field(tree, 1), depth + 1);
+  (*shown)++;
+  return doclang_preview_set_tree(output, element_schema, element_end,
+                                  Field(tree, 2), shown, depth) || truncated;
+}
+
+static void doclang_preview_schema(doclang_preview_buffer *output,
+                                   const char **cursor, const char *end,
+                                   const char *self, const char *self_end,
+                                   value observed, unsigned depth)
+{
+  const char *schema_start = *cursor;
+  char kind;
+  if (*cursor >= end) {
+    doclang_preview_append_incomplete(output, "<opaque>");
+    return;
+  }
+  if (depth > 7) {
+    doclang_skip_schema(cursor, end);
+    doclang_preview_append_incomplete(output, "…");
+    return;
+  }
+  kind = *(*cursor)++;
+  switch (kind) {
+    case 'I':
+      if (Is_long(observed)) doclang_preview_append_int(output, Long_val(observed));
+      else doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+    case 'B':
+      if (Is_long(observed))
+        doclang_preview_append(output, Long_val(observed) == 0 ? "false" : "true");
+      else doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+    case 'U':
+      doclang_preview_append(output, "()");
+      break;
+    case 'C':
+      if (Is_long(observed)) {
+        char character[4] = {'\'', (char)Long_val(observed), '\'', 0};
+        doclang_preview_append(output, character);
+      } else doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+    case 'D':
+      if (Is_block(observed) && Tag_val(observed) == Double_tag) {
+        char formatted[64];
+        doclang_format_float(formatted, sizeof(formatted),
+                             Double_val(observed));
+        doclang_preview_append(output, formatted);
+      } else doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+    case 'S':
+      doclang_preview_string(output, observed);
+      break;
+    case 'F':
+      doclang_skip_schema(cursor, end);
+      doclang_preview_append_incomplete(output, "<function>");
+      break;
+    case 'X':
+      if (self == NULL) doclang_preview_append_incomplete(output, "<opaque>");
+      else doclang_preview_child(output, self, self_end, self, self_end,
+                                 observed, depth + 1);
+      break;
+    case 'T': {
+      size_t count = doclang_schema_number(cursor, end, ':');
+      size_t index;
+      doclang_preview_append(output, "(");
+      for (index = 0; index < count; index++) {
+        const char *field_schema = *cursor;
+        const char *field_end = field_schema;
+        doclang_skip_schema(&field_end, end);
+        if (index > 0) doclang_preview_append(output, ", ");
+        if (Is_block(observed) && index < Wosize_val(observed))
+          doclang_preview_child(output, field_schema, field_end, self, self_end,
+                                Field(observed, index), depth + 1);
+        else
+          doclang_preview_append_incomplete(output, "<opaque>");
+        *cursor = field_end;
+      }
+      doclang_preview_append(output, ")");
+      break;
+    }
+    case 'L': {
+      const char *element_schema = *cursor;
+      const char *element_end = element_schema;
+      value current = observed;
+      size_t count = 0;
+      doclang_skip_schema(&element_end, end);
+      *cursor = element_end;
+      doclang_preview_append(output, "[");
+      while (Is_block(current) && Tag_val(current) == 0
+             && Wosize_val(current) == 2 && count < 12) {
+        if (count > 0) doclang_preview_append(output, "; ");
+        doclang_preview_child(output, element_schema, element_end,
+                              self, self_end, Field(current, 0), depth + 1);
+        current = Field(current, 1);
+        count++;
+      }
+      if (current != Val_long(0))
+        doclang_preview_append_incomplete(output, "; …");
+      doclang_preview_append(output, "]");
+      break;
+    }
+    case 'O': {
+      const char *element_schema = *cursor;
+      const char *element_end = element_schema;
+      doclang_skip_schema(&element_end, end);
+      *cursor = element_end;
+      if (observed == Val_long(0)) {
+        doclang_preview_append(output, "None");
+      } else if (Is_block(observed) && Tag_val(observed) == 0
+                 && Wosize_val(observed) == 1) {
+        doclang_preview_append(output, "Some (");
+        doclang_preview_child(output, element_schema, element_end,
+                              self, self_end, Field(observed, 0), depth + 1);
+        doclang_preview_append(output, ")");
+      } else {
+        doclang_preview_append_incomplete(output, "<opaque>");
+      }
+      break;
+    }
+    case 'A': {
+      const char *element_schema = *cursor;
+      const char *element_end = element_schema;
+      mlsize_t length = 0;
+      mlsize_t shown;
+      mlsize_t index;
+      doclang_skip_schema(&element_end, end);
+      *cursor = element_end;
+      if (Is_block(observed) && Tag_val(observed) == Double_array_tag
+          && element_schema < element_end && *element_schema == 'D') {
+        length = Wosize_val(observed) / Double_wosize;
+      } else if (Is_block(observed) && Tag_val(observed) == 0) {
+        length = Wosize_val(observed);
+      }
+      shown = length > 12 ? 12 : length;
+      doclang_preview_append(output, "[|");
+      for (index = 0; index < shown; index++) {
+        if (index > 0) doclang_preview_append(output, "; ");
+        if (Tag_val(observed) == Double_array_tag) {
+          char formatted[64];
+          doclang_format_float(formatted, sizeof(formatted),
+                               Double_flat_field(observed, index));
+          doclang_preview_append(output, formatted);
+        } else {
+          doclang_preview_child(output, element_schema, element_end,
+                                self, self_end, Field(observed, index),
+                                depth + 1);
+        }
+      }
+      if (shown < length)
+        doclang_preview_append_incomplete(output, "; …");
+      doclang_preview_append(output, "|]");
+      break;
+    }
+    case 'M': {
+      const char *key_schema = *cursor;
+      const char *key_end = key_schema;
+      const char *value_schema;
+      const char *value_end;
+      size_t shown = 0;
+      int truncated;
+      doclang_skip_schema(&key_end, end);
+      value_schema = key_end;
+      value_end = value_schema;
+      doclang_skip_schema(&value_end, end);
+      *cursor = value_end;
+      doclang_preview_append(output, "{");
+      truncated = doclang_preview_map_tree(output, key_schema, key_end,
+                                           value_schema, value_end,
+                                           observed, &shown, depth);
+      if (truncated) {
+        if (shown > 0) doclang_preview_append(output, "; ");
+        doclang_preview_append_incomplete(output, "…");
+      }
+      doclang_preview_append(output, "}");
+      break;
+    }
+    case 'E': {
+      const char *element_schema = *cursor;
+      const char *element_end = element_schema;
+      size_t shown = 0;
+      int truncated;
+      doclang_skip_schema(&element_end, end);
+      *cursor = element_end;
+      doclang_preview_append(output, "{");
+      truncated = doclang_preview_set_tree(output, element_schema, element_end,
+                                           observed, &shown, depth);
+      if (truncated) {
+        if (shown > 0) doclang_preview_append(output, "; ");
+        doclang_preview_append_incomplete(output, "…");
+      }
+      doclang_preview_append(output, "}");
+      break;
+    }
+    case 'R': {
+      const char *element_schema = *cursor;
+      const char *element_end = element_schema;
+      doclang_skip_schema(&element_end, end);
+      *cursor = element_end;
+      if (Is_block(observed) && Tag_val(observed) == 0
+          && Wosize_val(observed) == 1) {
+        doclang_preview_append(output, "{contents = ");
+        doclang_preview_child(output, element_schema, element_end,
+                              self, self_end, Field(observed, 0), depth + 1);
+        doclang_preview_append(output, "}");
+      } else {
+        doclang_preview_append_incomplete(output, "<opaque>");
+      }
+      break;
+    }
+    case 'Q': {
+      size_t count = doclang_schema_number(cursor, end, ':');
+      size_t index;
+      doclang_preview_append(output, "{");
+      for (index = 0; index < count; index++) {
+        size_t name_length;
+        const char *name = doclang_schema_name(cursor, end, &name_length);
+        const char *field_schema = *cursor;
+        const char *field_end = field_schema;
+        doclang_skip_schema(&field_end, end);
+        if (index > 0) doclang_preview_append(output, "; ");
+        doclang_preview_append_n(output, name, name_length);
+        doclang_preview_append(output, " = ");
+        if (Is_block(observed) && index < Wosize_val(observed))
+          doclang_preview_child(output, field_schema, field_end,
+                                schema_start, end, Field(observed, index),
+                                depth + 1);
+        else
+          doclang_preview_append_incomplete(output, "<opaque>");
+        *cursor = field_end;
+      }
+      doclang_preview_append(output, "}");
+      break;
+    }
+    case 'V': {
+      size_t constants = doclang_schema_number(cursor, end, ':');
+      size_t index;
+      int matched = 0;
+      for (index = 0; index < constants; index++) {
+        size_t name_length;
+        const char *name = doclang_schema_name(cursor, end, &name_length);
+        if (!matched && Is_long(observed) && (uintnat)Long_val(observed) == index) {
+          doclang_preview_append_n(output, name, name_length);
+          matched = 1;
+        }
+      }
+      {
+        size_t blocks = doclang_schema_number(cursor, end, ':');
+        for (index = 0; index < blocks; index++) {
+          size_t tag = doclang_schema_number(cursor, end, ',');
+          size_t name_length;
+          const char *name = doclang_schema_name(cursor, end, &name_length);
+          size_t arity = doclang_schema_number(cursor, end, ':');
+          size_t field;
+          int this_block = !matched && Is_block(observed)
+                           && Tag_val(observed) == tag
+                           && Wosize_val(observed) >= arity;
+          if (this_block) {
+            doclang_preview_append_n(output, name, name_length);
+            if (arity > 0) doclang_preview_append(output, " (");
+          }
+          for (field = 0; field < arity; field++) {
+            const char *field_schema = *cursor;
+            const char *field_end = field_schema;
+            doclang_skip_schema(&field_end, end);
+            if (this_block) {
+              if (field > 0) doclang_preview_append(output, ", ");
+              doclang_preview_child(output, field_schema, field_end,
+                                    schema_start, end, Field(observed, field),
+                                    depth + 1);
+            }
+            *cursor = field_end;
+          }
+          if (this_block) {
+            if (arity > 0) doclang_preview_append(output, ")");
+            matched = 1;
+          }
+        }
+      }
+      if (!matched) doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+    }
+    case '?':
+      doclang_preview_dynamic(output, observed, depth);
+      break;
+    case 'Z':
+      doclang_preview_abstract(output, observed, depth);
+      break;
+    default:
+      doclang_preview_append_incomplete(output, "<opaque>");
+      break;
+  }
+}
+
+static int doclang_preview(char *buffer, size_t capacity, value metadata,
+                           value observed, int is_exception)
+{
+  size_t position = 0;
+  if (is_exception) {
+    char *formatted = caml_format_exception(observed);
+    int complete;
+    if (formatted == NULL) {
+      complete = snprintf(buffer, capacity, "<exception>") < (int)capacity;
+    } else {
+      complete = snprintf(buffer, capacity, "%s", formatted) < (int)capacity;
+      caml_stat_free(formatted);
+    }
+    return complete;
+  }
+
+  {
+    mlsize_t schema_length;
+    const char *schema = doclang_metadata_field(metadata, 9, &schema_length);
+    if (schema != NULL && schema_length > 0) {
+      const char *cursor = schema;
+      doclang_preview_buffer output = { buffer, capacity, 0, 1 };
+      if (capacity > 0) buffer[0] = 0;
+      doclang_preview_schema(&output, &cursor, schema + schema_length,
+                             NULL, NULL, observed, 0);
+      return output.complete;
+    }
+  }
+
+  if (Is_long(observed)) {
+    intnat immediate = Long_val(observed);
+    if (doclang_type_is(metadata, "unit")
+        || doclang_type_ends_with(metadata, "-> unit")) {
+      snprintf(buffer, capacity, "()");
+    } else if (doclang_type_is(metadata, "bool")
+               || doclang_type_ends_with(metadata, "-> bool")) {
+      snprintf(buffer, capacity, "%s", immediate == 0 ? "false" : "true");
+    } else if (doclang_type_is(metadata, "char")
+               || doclang_type_ends_with(metadata, "-> char")) {
+      snprintf(buffer, capacity, "'%c'", (char)immediate);
+    } else if (immediate == 0 && doclang_type_ends_with(metadata, " option")) {
+      snprintf(buffer, capacity, "None");
+    } else if (immediate == 0 && doclang_type_ends_with(metadata, " list")) {
+      snprintf(buffer, capacity, "[]");
+    } else {
+      snprintf(buffer, capacity, "%ld", immediate);
+    }
+    return 1;
+  }
+
+  if (doclang_type_ends_with(metadata, " list")
+      && Tag_val(observed) == 0 && Wosize_val(observed) == 2) {
+    value current = observed;
+    size_t count = 0;
+    char element[96];
+    position = doclang_append(buffer, capacity, position, "[");
+    while (Is_block(current) && Tag_val(current) == 0
+           && Wosize_val(current) == 2 && count < 8) {
+      if (count > 0) {
+        position = doclang_append(buffer, capacity, position, "; ");
+      }
+      doclang_preview_element(element, sizeof(element), Field(current, 0));
+      position = doclang_append(buffer, capacity, position, element);
+      current = Field(current, 1);
+      count++;
+    }
+    if (current != Val_long(0)) {
+      position = doclang_append(buffer, capacity, position, "; ...");
+    }
+    doclang_append(buffer, capacity, position, "]");
+    return current == Val_long(0);
+  }
+
+  if (doclang_type_ends_with(metadata, " option")
+      && Tag_val(observed) == 0 && Wosize_val(observed) == 1) {
+    char element[96];
+    doclang_preview_element(element, sizeof(element), Field(observed, 0));
+    position = doclang_append(buffer, capacity, position, "Some (");
+    position = doclang_append(buffer, capacity, position, element);
+    doclang_append(buffer, capacity, position, ")");
+    return 1;
+  }
+
+  if (doclang_type_ends_with(metadata, " ref")
+      && Tag_val(observed) == 0 && Wosize_val(observed) == 1) {
+    char element[96];
+    doclang_preview_element(element, sizeof(element), Field(observed, 0));
+    position = doclang_append(buffer, capacity, position, "{contents = ");
+    position = doclang_append(buffer, capacity, position, element);
+    doclang_append(buffer, capacity, position, "}");
+    return 1;
+  }
+
+  if (doclang_type_ends_with(metadata, " array")
+      && Tag_val(observed) == 0) {
+    mlsize_t length = Wosize_val(observed);
+    mlsize_t shown = length > 8 ? 8 : length;
+    mlsize_t index;
+    char element[96];
+    position = doclang_append(buffer, capacity, position, "[|");
+    for (index = 0; index < shown; index++) {
+      if (index > 0) {
+        position = doclang_append(buffer, capacity, position, "; ");
+      }
+      doclang_preview_element(element, sizeof(element), Field(observed, index));
+      position = doclang_append(buffer, capacity, position, element);
+    }
+    if (shown < length) {
+      position = doclang_append(buffer, capacity, position, "; ...");
+    }
+    doclang_append(buffer, capacity, position, "|]");
+    return shown == length;
+  }
+
+  switch (Tag_val(observed)) {
+    case String_tag: {
+      const char *source = String_val(observed);
+      mlsize_t length = caml_string_length(observed);
+      mlsize_t shown = length > 80 ? 80 : length;
+      mlsize_t index;
+      int closed = 0;
+      if (capacity == 0) return 0;
+      buffer[position++] = '"';
+      for (index = 0; index < shown && position + 2 < capacity; index++) {
+        unsigned char character = (unsigned char)source[index];
+        if (character == '"' || character == '\\') {
+          buffer[position++] = '\\';
+          buffer[position++] = character;
+        } else if (character >= 0x20 && character != 0x7f) {
+          buffer[position++] = character;
+        } else {
+          buffer[position++] = '.';
+        }
+      }
+      if (shown < length && position + 3 < capacity) {
+        buffer[position++] = '.';
+        buffer[position++] = '.';
+        buffer[position++] = '.';
+      }
+      if (position + 1 < capacity) {
+        buffer[position++] = '"';
+        closed = 1;
+      }
+      buffer[position] = 0;
+      return shown == length && index == shown && closed;
+    }
+    case Double_tag:
+      doclang_format_float(buffer, capacity, Double_val(observed));
+      return 1;
+    case Closure_tag:
+    case Infix_tag:
+      snprintf(buffer, capacity, "<function>");
+      return 0;
+    default:
+      snprintf(buffer, capacity, "<value tag=%u size=%zu>",
+               Tag_val(observed), (size_t)Wosize_val(observed));
+      return 0;
+  }
+}
+
+static void doclang_event_with_detail(const char *phase, uintnat occurrence,
+                                      uintnat parent, value metadata,
+                                      value observed, int has_observed,
+                                      const char *detail)
+{
+  char occurrence_buffer[32];
+  char parent_buffer[32];
+  char domain_buffer[32];
+  char preview[4096] = "";
+  int preview_complete = 1;
+  int compact_metadata =
+    strcmp(phase, "tail-handoff") == 0
+    || strcmp(phase, "tail-link") == 0
+    || strcmp(phase, "call-attempt-open") == 0
+    || strcmp(phase, "call-attempt-consumed") == 0
+    || strcmp(phase, "activation-closure") == 0
+    || strcmp(phase, "closure-created") == 0;
+  char_os *path = caml_secure_getenv(T("DOCLANG_TRACE_PATH"));
+  char *metadata_copy;
+  mlsize_t metadata_length;
+  mlsize_t public_metadata_length;
+  mlsize_t site_length;
+  FILE *channel;
+  /* Keep backwards compatibility for standalone compiler users. Dox gives
+     compiler traces their own bounded file so large Doc.* values cannot
+     consume the trace budget (or vice versa). */
+  if (path == NULL) path = caml_secure_getenv(T("DOCLANG_EVENT_PATH"));
+  if (path == NULL) return;
+  if (atomic_load(&doclang_trace_truncated)) return;
+
+  snprintf(occurrence_buffer, sizeof(occurrence_buffer), "%lu",
+           (unsigned long)occurrence);
+  snprintf(domain_buffer, sizeof(domain_buffer), "%ld",
+           (long)caml_domain_index());
+  if (parent == 0) {
+    parent_buffer[0] = 0;
+  } else {
+    snprintf(parent_buffer, sizeof(parent_buffer), "%lu",
+             (unsigned long)parent);
+  }
+
+  if (detail != NULL) {
+    snprintf(preview, sizeof(preview), "%s", detail);
+  } else if (has_observed) {
+    preview_complete =
+      doclang_preview(preview, sizeof(preview), metadata, observed,
+                      strcmp(phase, "raise") == 0);
+  }
+  metadata_length = caml_string_length(metadata);
+  public_metadata_length = doclang_public_metadata_length(metadata);
+  site_length = doclang_site_length(metadata);
+  metadata_copy = caml_stat_alloc_noexc(metadata_length);
+  if (metadata_copy == NULL) return;
+  memcpy(metadata_copy, String_val(metadata), metadata_length);
+
+  caml_enter_blocking_section();
+  caml_plat_lock_blocking(&doclang_output_lock);
+  if (atomic_load(&doclang_trace_truncated)) {
+    caml_plat_unlock(&doclang_output_lock);
+    caml_leave_blocking_section();
+    caml_stat_free(metadata_copy);
+    return;
+  }
+  if (doclang_output_channel == NULL) {
+    doclang_output_channel = fopen_os(path, T("ab"));
+    if (doclang_output_channel != NULL)
+      setvbuf(doclang_output_channel, NULL, _IOFBF, 65536);
+  }
+  channel = doclang_output_channel;
+  if (channel != NULL) {
+    size_t emitted_metadata_length =
+      compact_metadata ? site_length + 8 : public_metadata_length;
+    size_t event_bytes =
+      10 + (2 * site_length)
+      + (2 * (strlen(phase) + 1 + strlen(occurrence_buffer) + 1
+              + strlen(domain_buffer) + 1 + strlen(parent_buffer) + 1
+              + emitted_metadata_length + 3
+              + ((has_observed || detail != NULL) ? strlen(preview) : 0)));
+    if (doclang_output_bytes + event_bytes > DOCLANG_EVENT_BYTE_LIMIT) {
+      fputs("trace-truncated\t\t\n", channel);
+      atomic_store(&doclang_trace_truncated, 1);
+      caml_plat_unlock(&doclang_output_lock);
+      caml_leave_blocking_section();
+      caml_stat_free(metadata_copy);
+      return;
+    }
+    fputs("observe\t", channel);
+    doclang_hex(channel, metadata_copy, site_length);
+    fputc('\t', channel);
+    doclang_hex_c_string(channel, phase);
+    doclang_hex_separator(channel);
+    doclang_hex_c_string(channel, domain_buffer);
+    doclang_hex_separator(channel);
+    doclang_hex_c_string(channel, occurrence_buffer);
+    doclang_hex_separator(channel);
+    doclang_hex_c_string(channel, parent_buffer);
+    doclang_hex_separator(channel);
+    if (!compact_metadata) {
+      doclang_hex(channel, metadata_copy, public_metadata_length);
+    } else {
+      /* Tail relations need only the construct ID and relation payload. Keep
+         the trace_event field shape but omit repeated type/schema/location
+         metadata so tail recursion does not consume the observation budget. */
+      doclang_hex(channel, metadata_copy, site_length);
+      doclang_hex_separator(channel); /* kind */
+      doclang_hex_separator(channel); /* label */
+      doclang_hex_separator(channel); /* path */
+      doclang_hex_separator(channel); /* line */
+      doclang_hex_c_string(channel, "0");
+      doclang_hex_separator(channel);
+      doclang_hex_c_string(channel, "0");
+      doclang_hex_separator(channel);
+      doclang_hex_c_string(channel, "0");
+      doclang_hex_separator(channel);
+      doclang_hex_c_string(channel, "0");
+      doclang_hex_separator(channel); /* type */
+    }
+    doclang_hex_separator(channel);
+    doclang_hex_c_string(channel, preview_complete ? "1" : "0");
+    doclang_hex_separator(channel);
+    if (has_observed || detail != NULL) doclang_hex_c_string(channel, preview);
+    fputc('\n', channel);
+    doclang_output_bytes += event_bytes;
+  }
+  caml_plat_unlock(&doclang_output_lock);
+  caml_leave_blocking_section();
+  caml_stat_free(metadata_copy);
+}
+
+static void doclang_event(const char *phase, uintnat occurrence,
+                          uintnat parent, value metadata, value observed,
+                          int has_observed)
+{
+  doclang_event_with_detail(phase, occurrence, parent, metadata, observed,
+                            has_observed, NULL);
+}
+
+static void doclang_mark_trace_truncated(const char *reason)
+{
+  char_os *path;
+  FILE *channel;
+  if (atomic_exchange_explicit(&doclang_trace_truncated, 1,
+                               memory_order_acq_rel)) return;
+  path = caml_secure_getenv(T("DOCLANG_TRACE_PATH"));
+  if (path == NULL) path = caml_secure_getenv(T("DOCLANG_EVENT_PATH"));
+  if (path == NULL) return;
+  caml_enter_blocking_section();
+  caml_plat_lock_blocking(&doclang_output_lock);
+  if (doclang_output_channel == NULL) {
+    doclang_output_channel = fopen_os(path, T("ab"));
+    if (doclang_output_channel != NULL)
+      setvbuf(doclang_output_channel, NULL, _IOFBF, 65536);
+  }
+  channel = doclang_output_channel;
+  if (channel != NULL) {
+    fprintf(channel, "trace-truncated\t%s\t\n", reason);
+    fflush(channel);
+  }
+  caml_plat_unlock(&doclang_output_lock);
+  caml_leave_blocking_section();
+}
+
+static uintnat doclang_tail_handoff(value metadata, uintnat occurrence,
+                                    uintnat parent, uintnat remaining)
+{
+  char detail[64];
+  uintnat handoff = atomic_fetch_add(&doclang_handoff_counter, 1) + 1;
+  snprintf(detail, sizeof(detail), "%lu:%lu", (unsigned long)handoff,
+           (unsigned long)remaining);
+  doclang_event_with_detail("tail-handoff", occurrence, parent, metadata,
+                            Val_unit, 0, detail);
+  return handoff;
+}
+
+static void doclang_tail_link(value metadata, uintnat occurrence,
+                              uintnat parent, uintnat handoff,
+                              uintnat remaining)
+{
+  char detail[64];
+  snprintf(detail, sizeof(detail), "%lu:%lu", (unsigned long)handoff,
+           (unsigned long)remaining);
+  doclang_event_with_detail("tail-link", occurrence, parent, metadata,
+                            Val_unit, 0, detail);
+}
+
+static void doclang_release_frame(uintnat index)
+{
+  doclang_metadata[index] = Val_unit;
+  doclang_tail_capable[index] = 0;
+  doclang_overapply_parents[index] = 0;
+  doclang_overapply_remaining[index] = 0;
+}
+
+static value doclang_enter(value metadata, int tail_capable)
+{
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return Val_long(0);
+  }
+  uintnat occurrence = atomic_fetch_add(&doclang_counter, 1) + 1;
+  uintnat parent;
+  uintnat tail_handoff = 0;
+  uintnat tail_remaining = 0;
+  if (doclang_depth >= DOCLANG_STACK_LIMIT) {
+    doclang_overflow_depth++;
+    return Val_long(0);
+  }
+  if (doclang_pending_tail_parent != 0) {
+    parent = doclang_pending_tail_parent;
+    tail_handoff = doclang_pending_tail_handoff;
+    tail_remaining = doclang_pending_tail_remaining;
+    doclang_overapply_parents[doclang_depth] = parent;
+    doclang_overapply_remaining[doclang_depth] =
+      doclang_pending_tail_remaining;
+    doclang_pending_tail_parent = 0;
+    doclang_pending_tail_remaining = 0;
+    doclang_pending_tail_handoff = 0;
+  } else {
+    parent = doclang_depth == 0 ? 0 : doclang_stack[doclang_depth - 1];
+    doclang_overapply_parents[doclang_depth] = 0;
+    doclang_overapply_remaining[doclang_depth] = 0;
+  }
+  doclang_stack[doclang_depth] = occurrence;
+  doclang_parents[doclang_depth] = parent;
+  doclang_metadata[doclang_depth] = metadata;
+  doclang_tail_capable[doclang_depth] = tail_capable;
+  doclang_depth++;
+  doclang_event("enter", occurrence, parent, metadata, Val_unit, 0);
+  if (doclang_metadata_field_is(metadata, 1, "call")) {
+    doclang_event("call-attempt-open", occurrence, parent, metadata,
+                  Val_unit, 0);
+  } else if (doclang_metadata_field_is(metadata, 1, "function")
+             && parent != 0) {
+    if (doclang_pending_closure_id != 0) {
+      char closure_detail[32];
+      snprintf(closure_detail, sizeof(closure_detail), "%lu",
+               (unsigned long)doclang_pending_closure_id);
+      doclang_event_with_detail("activation-closure", occurrence, parent,
+                                metadata, Val_unit, 0, closure_detail);
+    }
+    doclang_event("call-attempt-consumed", occurrence, parent, metadata,
+                  Val_unit, 0);
+    doclang_pending_closure_id = 0;
+  }
+  if (tail_handoff != 0) {
+    doclang_tail_link(metadata, occurrence, parent, tail_handoff,
+                      tail_remaining);
+  }
+  return Val_long(occurrence);
+}
+
+CAMLprim value caml_doclang_observe_enter(value metadata)
+{
+  return doclang_enter(metadata, 0);
+}
+
+CAMLprim value caml_doclang_observe_enter_tail(value metadata)
+{
+  return doclang_enter(metadata, 1);
+}
+
+static code_t doclang_function_code(value function)
+{
+  if (!Is_block(function)
+      || (Tag_val(function) != Closure_tag && Tag_val(function) != Infix_tag)) {
+    return NULL;
+  }
+  return Code_val(function);
+}
+
+static uintnat doclang_code_bucket(code_t code)
+{
+  return (((uintnat)code) >> 4) & (DOCLANG_REGISTRY_BUCKETS - 1);
+}
+
+static uintnat doclang_closure_cache_bucket(value closure)
+{
+  return (((uintnat)closure) >> 3) & (DOCLANG_CLOSURE_CACHE_BUCKETS - 1);
+}
+
+/* Interpreter APPLY calls this code without first publishing its local VM
+   registers as GC roots. This guard must therefore never release the OCaml
+   domain lock or enter a blocking section. The guarded work does not allocate
+   in the OCaml heap. */
+static void doclang_registry_acquire(void)
+{
+  while (atomic_flag_test_and_set_explicit(
+    &doclang_registry_guard, memory_order_acquire)) { }
+}
+
+static void doclang_registry_release(void)
+{
+  atomic_flag_clear_explicit(&doclang_registry_guard, memory_order_release);
+}
+
+static void doclang_closure_cache_insert(uintnat index)
+{
+  value closure = doclang_closures[index];
+  uintnat bucket = doclang_closure_cache_bucket(closure);
+  uintnat offset;
+  for (offset = 0; offset < DOCLANG_CLOSURE_CACHE_BUCKETS; offset++) {
+    uintnat slot = (bucket + offset) & (DOCLANG_CLOSURE_CACHE_BUCKETS - 1);
+    uintnat entry = atomic_load_explicit(
+      &doclang_closure_cache[slot], memory_order_relaxed);
+    if (entry == 0 || entry == index + 1) {
+      atomic_store_explicit(
+        &doclang_closure_cache[slot], index + 1, memory_order_release);
+      return;
+    }
+  }
+}
+
+static intnat doclang_closure_cache_lookup(value closure)
+{
+  uintnat bucket = doclang_closure_cache_bucket(closure);
+  uintnat offset;
+  for (offset = 0; offset < DOCLANG_CLOSURE_CACHE_BUCKETS; offset++) {
+    uintnat slot = (bucket + offset) & (DOCLANG_CLOSURE_CACHE_BUCKETS - 1);
+    uintnat entry = atomic_load_explicit(
+      &doclang_closure_cache[slot], memory_order_acquire);
+    if (entry == 0) return -1;
+    if (doclang_closures[entry - 1] == closure) return (intnat)(entry - 1);
+  }
+  return -1;
+}
+
+static void doclang_closure_cache_rebuild(void)
+{
+  uintnat count = atomic_load_explicit(&doclang_closure_count,
+                                       memory_order_acquire);
+  uintnat index;
+  if (count > DOCLANG_FUNCTION_LIMIT) count = DOCLANG_FUNCTION_LIMIT;
+  for (index = 0; index < DOCLANG_CLOSURE_CACHE_BUCKETS; index++) {
+    atomic_store_explicit(&doclang_closure_cache[index], 0,
+                          memory_order_relaxed);
+  }
+  for (index = 0; index < count; index++) {
+    doclang_closure_cache_insert(index);
+  }
+}
+
+static void doclang_publish_registry_index(_Atomic uintnat *heads,
+                                           uintnat *next, code_t code,
+                                           uintnat index)
+{
+  uintnat bucket = doclang_code_bucket(code);
+  uintnat head = atomic_load_explicit(&heads[bucket], memory_order_acquire);
+  do {
+    next[index] = head;
+  } while (!atomic_compare_exchange_weak_explicit(
+    &heads[bucket], &head, index + 1,
+    memory_order_release, memory_order_acquire));
+}
+
+static intnat doclang_registered_code_consumption_for_code(code_t code)
+{
+  uintnat entry;
+  if (code == NULL) return 0;
+  entry = atomic_load_explicit(
+    &doclang_function_bucket_heads[doclang_code_bucket(code)],
+    memory_order_acquire);
+  while (entry != 0) {
+    uintnat index = entry - 1;
+    if (atomic_load_explicit(&doclang_functions[index], memory_order_acquire)
+      == code) {
+      return atomic_load_explicit(&doclang_function_consumptions[index],
+                                  memory_order_acquire);
+    }
+    entry = doclang_function_next[index];
+  }
+  return 0;
+}
+
+static intnat doclang_registered_code_consumption(value function)
+{
+  return doclang_registered_code_consumption_for_code(
+    doclang_function_code(function));
+}
+
+static intnat doclang_partial_code_consumption_for_code(code_t code)
+{
+  uintnat entry;
+  if (code == NULL) return 0;
+  entry = atomic_load_explicit(
+    &doclang_partial_function_bucket_heads[doclang_code_bucket(code)],
+    memory_order_acquire);
+  while (entry != 0) {
+    uintnat index = entry - 1;
+    if (atomic_load_explicit(&doclang_partial_functions[index],
+                             memory_order_acquire) == code) {
+      return atomic_load_explicit(
+        &doclang_partial_function_consumptions[index], memory_order_acquire);
+    }
+    entry = doclang_partial_function_next[index];
+  }
+  return 0;
+}
+
+static intnat doclang_partial_code_consumption(value function)
+{
+  return doclang_partial_code_consumption_for_code(
+    doclang_function_code(function));
+}
+
+static intnat doclang_registered_function_consumption(
+  value function, intnat supplied_arguments)
+{
+  intnat consumption;
+  intnat total_consumption;
+  intnat captured_arguments;
+  if (doclang_function_code(function) == NULL) return 0;
+  consumption = doclang_registered_code_consumption(function);
+  if (consumption == 0) {
+    total_consumption = doclang_partial_code_consumption(function);
+    if (total_consumption > 0 && Wosize_val(function) >= 3) {
+      captured_arguments = (intnat)Wosize_val(function) - 3;
+      if (captured_arguments < total_consumption) {
+        consumption = total_consumption - captured_arguments;
+      }
+    }
+  }
+  if (consumption > 0 && supplied_arguments >= consumption) {
+    return consumption;
+  }
+  return 0;
+}
+
+static intnat doclang_closure_index(value function)
+{
+  code_t code = doclang_function_code(function);
+  uintnat entry;
+  intnat index;
+  if (code == NULL) return -1;
+  doclang_registry_acquire();
+  index = doclang_closure_cache_lookup(function);
+  if (index >= 0) {
+    doclang_registry_release();
+    return index;
+  }
+  entry = atomic_load_explicit(
+    &doclang_closure_bucket_heads[doclang_code_bucket(code)],
+    memory_order_acquire);
+  if (entry != 0) {
+    /* The GC updates registered roots but cannot update their address-derived
+       cache slots. Repair the whole identity index once after movement so a
+       group of same-code closures does not degrade to one scan per call. */
+    doclang_closure_cache_rebuild();
+    index = doclang_closure_cache_lookup(function);
+  }
+  doclang_registry_release();
+  return index;
+}
+
+static uintnat doclang_register_closure(value function, value metadata,
+                                        uintnat derived_from)
+{
+  uintnat index;
+  uintnat closure_id;
+  uintnat origin = doclang_depth == 0 ? 0 : doclang_stack[doclang_depth - 1];
+  char detail[64];
+  doclang_registry_acquire();
+  index = atomic_fetch_add_explicit(&doclang_closure_count, 1,
+                                    memory_order_acq_rel);
+  if (index >= DOCLANG_FUNCTION_LIMIT) {
+    doclang_registry_release();
+    doclang_mark_trace_truncated("closure-registry-limit");
+    return 0;
+  }
+  closure_id = index + 1;
+  doclang_closures[index] = function;
+  caml_register_generational_global_root(&doclang_closures[index]);
+  doclang_closure_metadata[index] = metadata;
+  caml_register_generational_global_root(&doclang_closure_metadata[index]);
+  doclang_closure_ids[index] = closure_id;
+  doclang_publish_registry_index(
+    doclang_closure_bucket_heads, doclang_closure_next,
+    doclang_function_code(function), index);
+  doclang_closure_cache_insert(index);
+  doclang_registry_release();
+  if (derived_from == 0) detail[0] = 0;
+  else snprintf(detail, sizeof(detail), "derived:%lu",
+                (unsigned long)derived_from);
+  doclang_event_with_detail("closure-created", closure_id, origin, metadata,
+                            Val_unit, 0, detail);
+  return closure_id;
+}
+
+CAMLprim value caml_doclang_observe_register_function(value function,
+                                                       value consumption_value,
+                                                       value metadata)
+{
+  code_t code = doclang_function_code(function);
+  intnat consumption = Long_val(consumption_value);
+  uintnat index;
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return Val_unit;
+  }
+  if (code == NULL || consumption <= 0) {
+    return Val_unit;
+  }
+  (void)doclang_register_closure(function, metadata, 0);
+  if (doclang_registered_code_consumption_for_code(code) != 0) return Val_unit;
+  index = atomic_fetch_add_explicit(&doclang_function_count, 1,
+                                    memory_order_acq_rel);
+  if (index < DOCLANG_FUNCTION_LIMIT) {
+    atomic_store_explicit(&doclang_function_consumptions[index], consumption,
+                          memory_order_relaxed);
+    atomic_store_explicit(&doclang_functions[index], code,
+                          memory_order_release);
+    doclang_publish_registry_index(
+      doclang_function_bucket_heads, doclang_function_next, code, index);
+  } else doclang_mark_trace_truncated("function-registry-limit");
+  return Val_unit;
+}
+
+CAMLexport void caml_doclang_observe_register_partial(value original,
+                                                       value partial)
+{
+  intnat consumption;
+  intnat original_index;
+  code_t code;
+  uintnat index;
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return;
+  }
+  consumption = doclang_registered_code_consumption(original);
+  original_index = doclang_closure_index(original);
+  code = doclang_function_code(partial);
+  if (consumption <= 0 || code == NULL) return;
+  if (original_index >= 0) {
+    (void)doclang_register_closure(
+      partial, doclang_closure_metadata[original_index],
+      doclang_closure_ids[original_index]);
+  }
+  if (doclang_partial_code_consumption_for_code(code) != 0) return;
+  index = atomic_fetch_add_explicit(&doclang_partial_function_count, 1,
+                                    memory_order_acq_rel);
+  if (index < DOCLANG_FUNCTION_LIMIT) {
+    atomic_store_explicit(&doclang_partial_function_consumptions[index],
+                          consumption, memory_order_relaxed);
+    atomic_store_explicit(&doclang_partial_functions[index], code,
+                          memory_order_release);
+    doclang_publish_registry_index(
+      doclang_partial_function_bucket_heads, doclang_partial_function_next,
+      code, index);
+  } else doclang_mark_trace_truncated("partial-function-registry-limit");
+}
+
+CAMLexport void caml_doclang_observe_call_function(value function)
+{
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return;
+  }
+  intnat index = doclang_closure_index(function);
+  doclang_pending_closure_id =
+    index < 0 ? 0 : doclang_closure_ids[index];
+}
+
+CAMLprim value caml_doclang_observe_is_registered_function(
+  value function, value supplied_arguments)
+{
+  /* Once the trace is closed, choose the direct tail path for every call.
+     The handoff primitive sees occurrence zero and becomes a no-op. This
+     preserves program tail calls without doing any more trace bookkeeping. */
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return Val_true;
+  }
+  return Val_bool(doclang_registered_function_consumption(
+                    function, Long_val(supplied_arguments)) > 0);
+}
+
+CAMLprim value caml_doclang_observe_tail_handoff(value metadata,
+                                                 value occurrence_value,
+                                                 value function,
+                                                 value supplied_arguments)
+{
+  uintnat occurrence = Long_val(occurrence_value);
+  uintnat index;
+  intnat supplied = Long_val(supplied_arguments);
+  intnat consumed;
+  if (occurrence == 0
+      || doclang_depth == 0
+      || doclang_stack[doclang_depth - 1] != occurrence) {
+    return Val_unit;
+  }
+  consumed = doclang_registered_function_consumption(function, supplied);
+  if (consumed == 0) return Val_unit;
+  index = doclang_depth - 1;
+  doclang_pending_tail_handoff =
+    doclang_tail_handoff(metadata, occurrence, doclang_parents[index],
+                         (uintnat)(supplied - consumed));
+  doclang_release_frame(index);
+  doclang_depth--;
+  if (doclang_depth > 0 && doclang_tail_capable[doclang_depth - 1]) {
+    uintnat outer_handoff;
+    uintnat inner_parent = occurrence;
+    index = doclang_depth - 1;
+    outer_handoff =
+      doclang_tail_handoff(metadata, doclang_stack[index],
+                           doclang_parents[index], 0);
+    doclang_tail_link(metadata, inner_parent, doclang_stack[index],
+                      outer_handoff, 0);
+    doclang_release_frame(index);
+    doclang_depth--;
+  }
+  doclang_pending_tail_parent = occurrence;
+  doclang_pending_tail_remaining = (uintnat)(supplied - consumed);
+  return Val_unit;
+}
+
+static value doclang_leave(const char *phase, value metadata,
+                           value occurrence_value, value observed)
+{
+  uintnat occurrence = Long_val(occurrence_value);
+  uintnat parent;
+  uintnat overapply_parent;
+  uintnat overapply_remaining;
+  doclang_pending_tail_parent = 0;
+  doclang_pending_tail_remaining = 0;
+  doclang_pending_tail_handoff = 0;
+  if (occurrence == 0) {
+    if (doclang_overflow_depth > 0) doclang_overflow_depth--;
+    return Val_unit;
+  }
+  if (doclang_depth == 0
+      || doclang_stack[doclang_depth - 1] != occurrence) {
+    return Val_unit;
+  }
+  if (doclang_overflow_depth > 0) {
+    doclang_overflow_depth--;
+    return Val_unit;
+  }
+  parent = doclang_parents[doclang_depth - 1];
+  overapply_parent = doclang_overapply_parents[doclang_depth - 1];
+  overapply_remaining = doclang_overapply_remaining[doclang_depth - 1];
+  doclang_release_frame(doclang_depth - 1);
+  doclang_depth--;
+  doclang_event(phase, occurrence, parent, metadata, observed, 1);
+  if (doclang_metadata_field_is(metadata, 1, "call")) {
+    doclang_event(strcmp(phase, "raise") == 0
+                    ? "call-attempt-raise"
+                    : "call-attempt-return",
+                  occurrence, parent, metadata, observed, 1);
+  }
+  if (overapply_parent != 0 && overapply_remaining > 0
+      && strcmp(phase, "return") == 0) {
+    intnat consumed;
+    uintnat fallback =
+      doclang_depth == 0 ? 0 : doclang_stack[doclang_depth - 1];
+    consumed = doclang_registered_function_consumption(
+      observed, (intnat)overapply_remaining);
+    if (consumed > 0) {
+      doclang_pending_tail_handoff =
+        doclang_tail_handoff(metadata, overapply_parent, fallback,
+                             overapply_remaining - consumed);
+      doclang_pending_tail_parent = overapply_parent;
+      doclang_pending_tail_remaining = overapply_remaining - consumed;
+    }
+  }
+  return Val_unit;
+}
+
+CAMLprim value caml_doclang_observe_parameter(value occurrence_value,
+                                              value metadata, value observed)
+{
+  uintnat occurrence = Long_val(occurrence_value);
+  uintnat parent;
+  if (occurrence == 0 || doclang_depth == 0
+      || doclang_stack[doclang_depth - 1] != occurrence) {
+    return Val_unit;
+  }
+  parent = doclang_parents[doclang_depth - 1];
+  doclang_event("parameter", occurrence, parent, metadata, observed, 1);
+  return Val_unit;
+}
+
+CAMLprim value caml_doclang_observe_write(value metadata, value observed)
+{
+  if (atomic_load_explicit(&doclang_trace_truncated, memory_order_acquire)) {
+    return Val_unit;
+  }
+  uintnat occurrence = atomic_fetch_add(&doclang_counter, 1) + 1;
+  uintnat parent =
+    doclang_depth == 0 ? 0 : doclang_stack[doclang_depth - 1];
+  doclang_event("write", occurrence, parent, metadata, observed, 1);
+  return Val_unit;
+}
+
+CAMLprim value caml_doclang_observe_return(value metadata,
+                                           value occurrence_value,
+                                           value observed)
+{
+  return doclang_leave("return", metadata, occurrence_value, observed);
+}
+
+CAMLprim value caml_doclang_observe_leaf(value metadata, value observed)
+{
+  value occurrence = doclang_enter(metadata, 0);
+  if (Long_val(occurrence) != 0) {
+    doclang_leave("return", metadata, occurrence, observed);
+  }
+  return Val_unit;
+}
+
+CAMLprim value caml_doclang_observe_raise(value metadata,
+                                          value occurrence_value,
+                                          value exception)
+{
+  return doclang_leave("raise", metadata, occurrence_value, exception);
+}
+
+CAMLprim value caml_doclang_observe_mark(value unit)
+{
+  (void)unit;
+  return Val_long(doclang_depth);
+}
+
+CAMLprim value caml_doclang_observe_unwind(value mark_value, value exception)
+{
+  uintnat mark = Long_val(mark_value);
+  doclang_overflow_depth = 0;
+  if (mark > doclang_depth) mark = doclang_depth;
+  while (doclang_depth > mark) {
+    uintnat index = doclang_depth - 1;
+    value metadata = doclang_metadata[index];
+    value occurrence = Val_long(doclang_stack[index]);
+    doclang_leave("raise", metadata, occurrence, exception);
+  }
+  return Val_unit;
+}

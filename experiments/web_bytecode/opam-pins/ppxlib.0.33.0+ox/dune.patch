@@ -1,0 +1,196 @@
+--- a/src/dune
++++ b/src/dune
+@@ -3,16 +3,19 @@
+  (public_name ppxlib)
+  (libraries
+   (re_export ppxlib_ast)
++  compiler-libs.common
++  ocaml-compiler-libs.common
+   ocaml-compiler-libs.shadow
+   astlib
+   ppxlib_print_diff
+   ppx_derivers
++  ppxlib_jane
+   ppxlib_traverse_builtins
+   stdppx
+   stdlib-shims
+   sexplib0)
+  (flags
+-  (:standard -safe-string))
++  (:standard -safe-string -open Ocaml_shadow))
+  (ppx.driver
+   (main Ppxlib.Driver.standalone)
+   (flags
+--- a/src/gen/dune
++++ b/src/gen/dune
+@@ -2,4 +2,4 @@
+  (names gen_ast_pattern gen_ast_builder)
+  (flags
+   (:standard -safe-string))
+- (libraries ppxlib_ast astlib ppxlib_traverse_builtins stdppx stdlib-shims))
++ (libraries ppxlib_ast ppxlib_jane astlib ppxlib_traverse_builtins stdppx stdlib-shims))
+--- a/traverse/dune
++++ b/traverse/dune
+@@ -4,6 +4,6 @@
+  (kind ppx_deriver)
+  (flags
+   (:standard -safe-string))
+- (libraries ppxlib ppxlib_ast ppxlib_traverse_builtins stdppx stdlib-shims)
++ (libraries ppxlib ppxlib_ast ppxlib_ast.astlib ppxlib_jane ppxlib_traverse_builtins stdppx stdlib-shims)
+  (preprocess
+   (pps ppxlib_metaquot)))
+--- /dev/null
++++ b/shims/ast/dune
+@@ -0,0 +1,5 @@
++(library
++ (name ppxlib_ast_shim)
++ (wrapped false)
++ (public_name ppxlib.ast)
++ (libraries (re_export ppxlib_ast.ast)))
+--- /dev/null
++++ b/shims/astlib/dune
+@@ -0,0 +1,5 @@
++(library
++ (name astlib_shim)
++ (wrapped false)
++ (public_name ppxlib.astlib)
++ (libraries (re_export ppxlib_ast.astlib)))
+--- /dev/null
++++ b/shims/stdppx/dune
+@@ -0,0 +1,5 @@
++(library
++ (name stdppx_shim)
++ (wrapped false)
++ (public_name ppxlib.stdppx)
++ (libraries (re_export ppxlib_ast.stdppx)))
+--- /dev/null
++++ b/shims/traverse_builtins/dune
+@@ -0,0 +1,5 @@
++(library
++ (name ppxlib_traverse_builtins_shim)
++ (wrapped false)
++ (public_name ppxlib.traverse_builtins)
++ (libraries (re_export ppxlib_ast.traverse_builtins)))
+--- a/dune-project
++++ b/dune-project
+@@ -21,6 +21,8 @@
+   (sexplib0 (>= v0.12))
+   (sexplib0 (and :with-test (>= "v0.15"))) ; Printexc.register_printer in sexplib0 changed
+   stdlib-shims
++  ppxlib_ast
++  ppxlib_jane
+   (ocamlfind :with-test)
+   (re (and :with-test (>= 1.9.0)))
+   (cinaps (and :with-test (>= v0.12.1))))
+--- a/src/dune
++++ b/src/dune
+@@ -28,12 +28,12 @@
+  (targets ast_pattern_generated.ml)
+  (deps gen/gen_ast_pattern.exe)
+  (action
+-  (run ./gen/gen_ast_pattern.exe %{lib:ppxlib.ast:ast.ml})))
++  (run ./gen/gen_ast_pattern.exe %{lib:ppxlib_ast.ast:ast.ml})))
+
+ (rule
+  (targets ast_builder_generated.ml)
+  (deps gen/gen_ast_builder.exe)
+  (action
+-  (run ./gen/gen_ast_builder.exe %{lib:ppxlib.ast:ast.ml})))
++  (run ./gen/gen_ast_builder.exe %{lib:ppxlib_ast.ast:ast.ml})))
+
+ (ocamllex skip_hash_bang)
+--- a/ast/dune
++++ b/ast/dune
+@@ -4,16 +4,16 @@
+
+ (library
+  (name ppxlib_ast)
+- (public_name ppxlib.ast)
+- (libraries astlib stdlib-shims)
++ (public_name ppxlib_ast.ast)
++ (libraries astlib compiler-libs.common ocaml-compiler-libs.common ocaml-compiler-libs.shadow stdlib-shims)
+  (flags
+-  (:standard -safe-string)
++  (:standard -safe-string -open Ocaml_shadow)
+   -w
+   -9-27-32)
+  (preprocess
+   (per_module
+    ((action
+-     (run %{exe:pp/pp.exe} %{ocaml_version} %{input-file}))
++     (run %{exe:pp/pp.exe} 9.99 %{input-file}))
+     versions)))
+  (lint
+   (pps ppxlib_traverse -deriving-keep-w32=impl)))
+--- a/astlib/dune
++++ b/astlib/dune
+@@ -1,6 +1,8 @@
+ (library
+  (name astlib)
+- (public_name ppxlib.astlib)
++ (public_name ppxlib_ast.astlib)
++ (modules ast_414 ast_500 ast_999 ast_metadata astlib config keyword location longident
++  migrate_414_500 migrate_500_414 migrate_500_999 migrate_999_500 parse pprintast stdlib0)
+  (libraries ocaml-compiler-libs.common compiler-libs.common)
+  (flags -w -9)
+  (preprocess
+@@ -10,7 +12,7 @@
+ (rule
+  (targets ast-version)
+  (action
+-  (run %{ocaml} %{dep:config/gen.ml} %{ocaml_version})))
++  (run %{ocaml} %{dep:config/gen.ml} 9.99)))
+
+ (cinaps
+  (files *.ml *.mli)
+--- a/stdppx/dune
++++ b/stdppx/dune
+@@ -1,6 +1,6 @@
+ (library
+  (name stdppx)
+- (public_name ppxlib.stdppx)
+- (libraries sexplib0 stdlib-shims)
++ (public_name ppxlib_ast.stdppx)
++ (libraries sexplib0 stdlib-shims sexp_type)
+  (flags
+   (:standard -safe-string)))
+--- a/traverse_builtins/dune
++++ b/traverse_builtins/dune
+@@ -1,5 +1,5 @@
+ (library
+  (name ppxlib_traverse_builtins)
+- (public_name ppxlib.traverse_builtins)
++ (public_name ppxlib_ast.traverse_builtins)
+  (flags
+   (:standard -safe-string)))
+--- a/dune-project
++++ b/dune-project
+@@ -13,6 +13,28 @@
+ (documentation "https://ocaml-ppx.github.io/ppxlib/")
+
+ (package
++ (name ppxlib_ast)
++ (depends
++  ocaml
++  (ocaml-compiler-libs (>= v0.11.0))
++  (ppx_derivers (>= 1.0))
++  (sexplib0 (>= v0.12))
++  stdlib-shims)
++ (synopsis "Standard infrastructure for ppx rewriters")
++ (description "Ppxlib is the standard infrastructure for ppx rewriters
++and other programs that manipulate the in-memory representation of
++OCaml programs, a.k.a the \"Parsetree\".
++
++It also comes bundled with two ppx rewriters that are commonly used to
++write tools that manipulate and/or generate Parsetree values;
++`ppxlib.metaquot` which allows to construct Parsetree values using the
++OCaml syntax directly and `ppxlib.traverse` which provides various
++ways of automatically traversing values of a given type, in particular
++allowing to inject a complex structured value into generated code.
++"))
++
++
++(package
+  (name ppxlib)
+  (depends
+   ocaml
