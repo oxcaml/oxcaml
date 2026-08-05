@@ -468,6 +468,9 @@ static dynamic_node_t dynamic_node_get_or_init(struct stack_info *stack)
       caml_raise_out_of_memory();
     }
     caml_dynamic_table_init(&node->table);
+    node->lexical_parent = NULL;
+    node->span_next = NULL;
+    node->lexical_root = false;
     stack->dyn_node = node;
   }
   return node;
@@ -493,13 +496,59 @@ static bool dynamic_node_find(dynamic_node_t node, value dyn, value *val)
   return false;
 }
 
+/* Fibers have up to two out-edges: the [lexical_parent] fork edge (usually
+   NULL; see [dynamic_node_s] in dynamic.h) and [Stack_parent]. Lookup walks
+   the current fiber's chain (the spine) and, at each fiber pinned to a fork
+   point, takes a detour through the lexically enclosing scope: the fork
+   point's fibers up to the base of its task, jumping through nested fork
+   edges. Bindings visible at a fork point thus win over bindings inherited
+   from the fiber's current (possibly reparented) dynamic chain, while
+   dynamics unbound at the fork point still resolve against that chain via
+   the spine.
+
+   The spine dereferences live [Stack_parent] links: it only visits fibers
+   mounted on this domain, which cannot be reallocated concurrently. Detours
+   instead walk nodes along the span links frozen when the fork point's
+   handle was taken (see [caml_dynamic_current_fiber]): the fork point may
+   be running on another domain, so neither its [stack_info] nor its live
+   parent link is safe to read here. A NULL span link is the task base; in
+   particular a detour never reads a task base's [Stack_parent], which
+   changes whenever a scheduler moves the task. The spine deliberately
+   ignores task bases: a fiber's own lookups fall through them into the
+   chain of the worker executing it.
+
+   Both walks are linear. Within a detour each node has a single successor
+   (fork edge or span link), so detours never branch and no recursion is
+   needed. */
 static value dynamic_lookup(struct stack_info *stack, value dyn)
 {
   value val;
 
-  for(; stack != NULL; stack = Stack_parent(stack)) {
-    if(dynamic_node_find(stack->dyn_node, dyn, &val)) {
+  for(; stack != NULL; stack = Stack_parent(stack)) { /* spine */
+    dynamic_node_t node = stack->dyn_node;
+    if(node == NULL) {
+      continue;
+    }
+    if(dynamic_node_find(node, dyn, &val)) {
       return val;
+    }
+    /* Skip the detour when the fork point is also the dynamic parent (a
+       child running directly on its forker): the spine visits the same
+       fibers, and correctly continues past the task base. */
+    if(node->lexical_parent != NULL
+       && (Stack_parent(stack) == NULL
+           || node->lexical_parent != Stack_parent(stack)->dyn_node)) {
+      dynamic_node_t p = node->lexical_parent;
+      while(p != NULL) { /* lexical detour */
+        if(dynamic_node_find(p, dyn, &val)) {
+          return val;
+        }
+        if(p->lexical_parent != NULL) {
+          p = p->lexical_parent; /* nested fork ancestry */
+        } else {
+          p = p->span_next; /* enclosing fiber; NULL at the task base */
+        }
+      }
     }
   }
   return Val_null;
@@ -528,6 +577,9 @@ CAMLprim value caml_dynamic_get(value dyn)
 CAMLprim value caml_dynamic_push(value dyn, value val)
 {
   CAMLparam2(dyn, val);
+
+  /* Val_null is reserved as the "unbound" sentinel */
+  CAMLassert(Is_this(val));
 
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
@@ -561,6 +613,69 @@ CAMLprim value caml_dynamic_pop(value dyn)
   if(entry->dyn == dyn) {
     entry->dyn = Val_null;
   }
+
+  return Val_unit;
+}
+
+/* See dynamic.h: returns the current fiber's node and freezes the span
+   links from it up to the task base. Fibers between this fiber and the
+   base are suspended below it on this domain, so walking their live parent
+   links right here is safe; afterwards detours use only the frozen links. */
+CAMLprim value caml_dynamic_current_fiber(value unit)
+{
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  dynamic_node_t node = dynamic_node_get_or_init(stack);
+  dynamic_node_t cur = node;
+  while(true) {
+    if(cur->lexical_parent != NULL) {
+      break; /* detours continue through the fork edge, not the span */
+    }
+    if(cur->lexical_root || Stack_parent(stack) == NULL) {
+      /* Task base; also clears a link frozen for some previous task */
+      if(cur->span_next != NULL) {
+        cur->span_next = NULL;
+      }
+      break;
+    }
+    stack = Stack_parent(stack);
+    dynamic_node_t next = dynamic_node_get_or_init(stack);
+    if(cur->span_next != next) {
+      cur->span_next = next;
+    }
+    cur = next;
+  }
+
+  return Val_ptr(node);
+}
+
+CAMLprim value caml_dynamic_set_lexical_parent(value fiber)
+{
+  /* Val_ptr(NULL) == Val_unit, so passing () clears the edge */
+  dynamic_node_t parent = Ptr_val(fiber);
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  if(parent == NULL && stack->dyn_node == NULL) {
+    return Val_unit; /* nothing to clear */
+  }
+  dynamic_node_get_or_init(stack)->lexical_parent = parent;
+
+  /* Cached lookups may now resolve differently */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_set_lexical_root(value unit)
+{
+  dynamic_node_t node = dynamic_node_get_or_init(Caml_state->current_stack);
+  node->lexical_root = true;
+  node->span_next = NULL; /* span freezing and detours stop here */
+
+  /* Cached lookups may now resolve differently */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   return Val_unit;
 }
