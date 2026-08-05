@@ -27,6 +27,9 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+(* CR-someday polytypic for xclerc: rather than printing the errors one-by-one,
+ * it would be developer-friendlier to print the CFG with error annotations. *)
+
 module CL = Cfg_with_layout
 module DLL = Doubly_linked_list
 
