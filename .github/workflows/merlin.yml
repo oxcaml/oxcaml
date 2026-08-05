@@ -27,12 +27,46 @@ on:
 # is updated when and only when we import new changes from OxCaml into merlin.
 
 jobs:
+  # Determine whether the PR has the merlin-emergency-skip label. For
+  # pull_request events the labels are in the event payload, but merge queue
+  # (merge_group) runs don't carry label information, so we recover the PR
+  # number from the queue branch name and query the API for labels associated
+  # with the PR.
+  emergency-skip:
+    name: check for merlin-emergency-skip label
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+    - name: Check whether the PR has the merlin-emergency-skip label
+      id: check
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        skip=false
+        case "$GITHUB_EVENT_NAME" in
+          pull_request)
+            skip=${{ contains(github.event.pull_request.labels.*.name, 'merlin-emergency-skip') }}
+            ;;
+          merge_group)
+            # If this check is running on the merge queue, we figure out the PR
+            # associated with it and then check if it has the label.
+            # The ref looks like refs/heads/gh-readonly-queue/main/pr-1234-<sha>
+            pr=$(echo "$GITHUB_REF" | sed -n 's|.*/pr-\([0-9]*\)-.*|\1|p')
+            if [ -n "$pr" ] && gh api "repos/$GITHUB_REPOSITORY/issues/$pr/labels" --jq '.[].name' \
+                 | grep -qx merlin-emergency-skip; then
+              skip=true
+            fi
+            ;;
+        esac
+        echo "skip=$skip" | tee -a "$GITHUB_OUTPUT"
+
   build:
     # The type of runner that the job will run on
     name: merlin
-    # Skip the check if the merlin-emergency-skip label is present on the PR.
-    if: github.event_name != 'pull_request'
-      || !contains(github.event.pull_request.labels.*.name, 'merlin-emergency-skip')
+    # Skip the check if the merlin-emergency-skip label is present on the PR
+    needs: emergency-skip
+    if: needs.emergency-skip.outputs.skip != 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
