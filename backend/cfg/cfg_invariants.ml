@@ -60,6 +60,16 @@ let lookup_block t ~kind ~referrer label =
 let types_are_compatible left right =
   try Proc.types_are_compatible left right with Misc.Fatal_error -> false
 
+(* Report that the [stack_offset] at the source of the edge from [pred] to
+   [succ] (i.e. the offset of [pred]'s terminator) does not match the
+   [stack_offset] of [succ]. *)
+let report_edge_stack_offset_mismatch t ~pred ~succ ~terminator_stack_offset
+    ~block_stack_offset =
+  report t
+    "Wrong stack offset: the terminator of block %a has stack offset %d, but \
+     its successor block %a has stack offset %d.\n"
+    Label.print pred terminator_stack_offset Label.print succ block_stack_offset
+
 let print_layout ppf layout =
   Format.(
     pp_print_list ~pp_sep:pp_print_space Label.print ppf (layout |> DLL.to_list))
@@ -424,16 +434,9 @@ let check_stack_offset t label (block : Cfg.basic_block) =
            in
            if not (Int.equal stack_offset pred_terminator_stack_offset)
            then
-             report t
-               "Wrong stack offset: block %s in predecessors of block %s, \
-                stack offset of the terminator of %s is %d, stack offset of \
-                block %s is %d, expected stack offset of terminator is %d \
-                (block.is_trap_handler=%b).\n"
-               (Label.to_string predecessor)
-               (Label.to_string label)
-               (Label.to_string predecessor)
-               pred_terminator_stack_offset (Label.to_string label)
-               block.stack_offset stack_offset block.is_trap_handler)
+             report_edge_stack_offset_mismatch t ~pred:predecessor ~succ:label
+               ~terminator_stack_offset:pred_terminator_stack_offset
+               ~block_stack_offset:stack_offset)
        (Cfg.predecessor_labels block));
   let terminator_stack_offset = block.terminator.stack_offset in
   Label.Set.iter
@@ -443,15 +446,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
       | Some succ_block ->
         if not (Int.equal terminator_stack_offset succ_block.stack_offset)
         then
-          report t
-            "Wrong stack offset: block %s in normal successors of block %s, \
-             stack offset of the terminator of %s is %d, stack offset of block \
-             %s is %d.\n"
-            (Label.to_string successor)
-            (Label.to_string label) (Label.to_string label)
-            terminator_stack_offset
-            (Label.to_string successor)
-            succ_block.stack_offset)
+          report_edge_stack_offset_mismatch t ~pred:label ~succ:successor
+            ~terminator_stack_offset ~block_stack_offset:succ_block.stack_offset)
     (Cfg.successor_labels ~normal:true ~exn:false block);
   let stack_offset_after_body =
     DLL.fold_left block.body ~init:block.stack_offset
@@ -463,6 +459,16 @@ let check_stack_offset t label (block : Cfg.basic_block) =
              instruction is %d, but expected %d.\n"
             (Label.to_string label) InstructionId.print basic.id
             Printcfg.basic_desc basic.desc basic.stack_offset cur_stack_offset;
+        let check_new_stack_offset new_stack_offset =
+          if Int.compare new_stack_offset 0 < 0
+          then
+            report t
+              "Negative stack offset in block %s: the offset after [(id:%a) \
+               %a] instruction is %d\n"
+              (Label.to_string label) InstructionId.print basic.id
+              Printcfg.basic_desc basic.desc new_stack_offset;
+          new_stack_offset
+        in
         match basic.desc with
         | Pushtrap { lbl_handler } ->
           (match
@@ -481,27 +487,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
                 handler_block.stack_offset);
           cur_stack_offset + Proc.trap_size_in_bytes ()
         | Poptrap { lbl_handler = _ } ->
-          let new_stack_offset =
-            cur_stack_offset - Proc.trap_size_in_bytes ()
-          in
-          if Int.compare new_stack_offset 0 < 0
-          then
-            report t
-              "Negative stack offset in block %s: the offset after [(id:%a) \
-               %a] instruction is %d\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Printcfg.basic_desc basic.desc new_stack_offset;
-          new_stack_offset
-        | Op (Stackoffset n) ->
-          let new_stack_offset = cur_stack_offset + n in
-          if Int.compare new_stack_offset 0 < 0
-          then
-            report t
-              "Negative stack offset in block %s: the offset after [(id:%a) \
-               %a] instruction is %d\n"
-              (Label.to_string label) InstructionId.print basic.id
-              Printcfg.basic_desc basic.desc new_stack_offset;
-          new_stack_offset
+          check_new_stack_offset (cur_stack_offset - Proc.trap_size_in_bytes ())
+        | Op (Stackoffset n) -> check_new_stack_offset (cur_stack_offset + n)
         | Op
             ( Move | Spill | Reload | Const_int _ | Const_float _
             | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
