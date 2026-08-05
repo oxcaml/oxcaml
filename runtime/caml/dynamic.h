@@ -21,8 +21,6 @@
 #include "mlvalues.h"
 #include "roots.h"
 
-struct stack_info;
-
 /* Define a new dynamic value, which is an immediate unique ID. */
 CAMLprim value caml_dynamic_make(value unit);
 
@@ -162,11 +160,10 @@ extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           void *);
 
 
-/* Per-fiber dynamic-binding state. Allocated lazily, owned by exactly one
-   fiber ([stack_info.dyn_node]) and freed with it, but allocated separately
-   from the stack block: stack reallocation moves [stack_info], not this
-   node, so lexical edges and the handles returned by
-   [caml_dynamic_current_fiber] stay valid for the fiber's whole lifetime.
+/* Per-fiber binding state. Owned by the fiber, but separately allocated
+   for stability (the stack_info allocation may be resized): lexical edges
+   and the handles returned by [caml_dynamic_current_fiber] stay valid for
+   the fiber's whole lifetime.
 
    [lexical_parent] is the fork edge: the node of the fiber whose dynamic
    bindings lexically enclose this fiber's, or NULL. Set on fork/join child
@@ -188,9 +185,9 @@ extern void caml_dynamic_table_scan_roots(dynamic_table_t,
    executing worker's chain. Set by schedulers (see
    [caml_dynamic_set_lexical_root]).
 
-   The GC scans each node's table via its owning fiber only; edges between
-   nodes are not scanned, and whoever installs an edge must keep the target
-   span alive (see [caml_dynamic_set_lexical_parent]). */
+   Scanned by the GC via the owning fiber only; edges between nodes are not
+   scanned, and whoever installs an edge must keep the target span alive
+   (see [caml_dynamic_set_lexical_parent]). */
 typedef struct dynamic_node_s {
   dynamic_table_s table;
   struct dynamic_node_s* lexical_parent;
@@ -198,8 +195,8 @@ typedef struct dynamic_node_s {
   bool lexical_root;
 } dynamic_node_s, *dynamic_node_t;
 
-/* Free a fiber's dynamic-binding state, if any. */
-extern void caml_dynamic_node_free(struct stack_info* stack);
+/* Free a dynamic node and its contents. */
+extern void caml_dynamic_node_free(dynamic_node_t node);
 
 #endif /* CAML_INTERNALS */
 

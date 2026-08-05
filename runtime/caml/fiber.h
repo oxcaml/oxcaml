@@ -73,10 +73,8 @@ struct stack_info {
   intnat local_limit;
 
   /* Temporary dynamic bindings and lexical edges, applying only in this
-     fiber, or NULL. Allocated lazily, owned by this fiber and freed with
-     it; the node itself is stable across stack reallocation (see
-     [dynamic_node_s] in dynamic.h). */
-  struct dynamic_node_s* dyn_node;
+     fiber. Allocated lazily; may be NULL. */
+  dynamic_node_t dyn_node;
 };
 
 #ifdef STACK_GUARD_PAGES
