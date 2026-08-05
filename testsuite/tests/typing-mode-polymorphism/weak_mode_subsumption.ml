@@ -1,7 +1,7 @@
 (* TEST
  flags += "-extension mode_polymorphism_alpha";
  setup-ocamlopt.byte-build-env;
- ocamlopt_byte_exit_status = "0";
+ ocamlopt_byte_exit_status = "2";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
 *)

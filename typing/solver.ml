@@ -1210,7 +1210,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       [f v] is below the floor of [g u]. [v] is temporarily zapped to its
       ceiling to make its bounds precise; the zapping is reverted before
       returning. *)
-  let submode_mvmv_rigid : type a b c l r.
+  let submode_mvmv_rigid_both : type a b c l r.
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
@@ -1241,37 +1241,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else Error (ceil, Comp_hint.Unknown ceil, floor, Comp_hint.Unknown floor)
 
   (** Handles [f v <= g u] where [u] is rigid but [v] is not. We cannot add the
-      arrow [g' (f v)] to [u.vlower]; instead we enforce the bound requirement
-      the arrow would impose, namely that [v]'s upper bound stays below [u]'s
-      upper bound: we push [g (ceil u)] onto [v] as an upper bound. *)
-  let push_upper_bound_rigid : type a b c l r.
-      log:_ ->
-      H.Pinpoint.t ->
-      b C.obj ->
-      a var ->
-      (a, b, allowed * r) C.morph ->
-      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
-      c var ->
-      (c, b, l * allowed) C.morph ->
-      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
-      (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
-   fun ~log pp dst v f f_hint u g g_hint ->
-    let ceil =
-      ceil_reachable_morphvar dst ~stop:(C.min dst) (Amorphvar (u, g, g_hint))
-    in
-    match
-      submode_mvc ~allow_rigid:false ~log pp dst
-        (Amorphvar (v, f, f_hint))
-        ceil (Comp_hint.Unknown ceil)
-    with
-    | Ok () -> Ok ()
-    | Error (a, a_hint) -> Error (a, a_hint, ceil, Comp_hint.Unknown ceil)
-
-  (** Handles [f v <= g u] where [v] is rigid but [u] is not. We cannot add the
-      arrow [f' (g u)] to [v.vupper]; instead we enforce the bound requirement
-      the arrow would impose, namely that [u]'s lower bound stays above [v]'s
-      lower bound: we push [f (floor v)] onto [u] as a lower bound. *)
-  let push_lower_bound_rigid : type a b c l r.
+      arrow [g' (f v)] to [u.vlower]; instead we enforce the constraint for
+      every valuation of [u], namely [f v <= g (floor u)], by pushing
+      [g (floor u)] onto [v] as an upper bound. *)
+  let submode_mvmv_rigid_right : type a b c l r.
       log:_ ->
       H.Pinpoint.t ->
       b C.obj ->
@@ -1284,14 +1257,41 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
    fun ~log pp dst v f f_hint u g g_hint ->
     let floor =
-      floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (v, f, f_hint))
+      floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (u, g, g_hint))
     in
     match
-      submode_cmv ~allow_rigid:false ~log pp dst floor (Comp_hint.Unknown floor)
+      submode_mvc ~allow_rigid:false ~log pp dst
+        (Amorphvar (v, f, f_hint))
+        floor (Comp_hint.Unknown floor)
+    with
+    | Ok () -> Ok ()
+    | Error (a, a_hint) -> Error (a, a_hint, floor, Comp_hint.Unknown floor)
+
+  (** Handles [f v <= g u] where [v] is rigid but [u] is not. We cannot add the
+      arrow [f' (g u)] to [v.vupper]; instead we enforce the constraint for
+      every valuation of [v], namely [f (ceil v) <= g u], by pushing
+      [f (ceil v)] onto [u] as a lower bound. *)
+  let submode_mvmv_rigid_left : type a b c l r.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      c var ->
+      (c, b, l * allowed) C.morph ->
+      (c, b, l * allowed) Comp_hint.Morph_hint.t ->
+      (_, b * (b, _) Comp_hint.t * b * (b, _) Comp_hint.t) result =
+   fun ~log pp dst v f f_hint u g g_hint ->
+    let ceil =
+      ceil_reachable_morphvar dst ~stop:(C.min dst) (Amorphvar (v, f, f_hint))
+    in
+    match
+      submode_cmv ~allow_rigid:false ~log pp dst ceil (Comp_hint.Unknown ceil)
         (Amorphvar (u, g, g_hint))
     with
     | Ok () -> Ok ()
-    | Error (a, a_hint) -> Error (floor, Comp_hint.Unknown floor, a, a_hint)
+    | Error (a, a_hint) -> Error (ceil, Comp_hint.Unknown ceil, a, a_hint)
 
   (** Computes the morphism [g'f] whose arrow [g'f v] [add_vlower] would record
       in [u.vlower] for the relationship [f v <= g u], along with its hint and
@@ -1389,8 +1389,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             else if (not allow_rigid) && u.level = rigid_level
             then
               begin if v.level = rigid_level
-              then submode_mvmv_rigid ~log pp dst v f f_hint u g g_hint
-              else push_upper_bound_rigid ~log pp dst v f f_hint u g g_hint
+              then submode_mvmv_rigid_both ~log pp dst v f f_hint u g g_hint
+              else submode_mvmv_rigid_right ~log pp dst v f f_hint u g g_hint
               end
             else
               add_vlower ~allow_rigid ~log pp dst v g'f g'f_hint mv u g g_hint
@@ -1402,7 +1402,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             if recorded
             then Ok ()
             else if v.level = rigid_level
-            then push_lower_bound_rigid ~log pp dst v f f_hint u g g_hint
+            then submode_mvmv_rigid_left ~log pp dst v f f_hint u g g_hint
             else
               add_vupper ~allow_rigid ~log pp dst v f f_hint u f'g f'g_hint mu
           end)
