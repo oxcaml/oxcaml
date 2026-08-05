@@ -9,6 +9,6 @@ let code loopify(never) size(9) newer_version_of(neg_0)
   let float_neg = %box_num.`float`.my_alloc_region (prim_1) in
   cont k (float_neg)
 in
-let $camlC__neg_1 = closure neg_0_1 @neg &toplevel.alloc_region in
+let $camlC__neg_1 = closure neg_0_1 @neg &toplevel in
 let $camlC = Block 0 ($camlC__neg_1) in
 cont done ($camlC)

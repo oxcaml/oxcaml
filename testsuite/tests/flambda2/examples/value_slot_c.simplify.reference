@@ -50,6 +50,6 @@ let code loopify(never) size(59) newer_version_of(f_2)
                   | 0 -> k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_9)
                   | 1 -> k (0)))
 in
-let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel.alloc_region in
+let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel in
 let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_10) in
 cont done ($camlValue_slot_c)

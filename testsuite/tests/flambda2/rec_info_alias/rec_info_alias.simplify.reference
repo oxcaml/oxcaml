@@ -29,6 +29,6 @@ let code loopify(never) size(34) newer_version_of(h_0)
   let g = closure g_2 @g &my_alloc_region with { f = f } in
   cont k (g)
 in
-let $camlRec_info_alias__h_1 = closure h_0_1 @h &toplevel.alloc_region in
+let $camlRec_info_alias__h_1 = closure h_0_1 @h &toplevel in
 let $camlRec_info_alias = Block 0 ($camlRec_info_alias__h_1) in
 cont done ($camlRec_info_alias)

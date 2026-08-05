@@ -45,8 +45,7 @@ let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
   cont k (arg)
 in
 let $camlTOP2__match_tagged_immediate_2 =
-  closure match_tagged_immediate_0_1 @match_tagged_immediate
-    &toplevel.alloc_region
+  closure match_tagged_immediate_0_1 @match_tagged_immediate &toplevel
 in
 let $camlTOP2 = Block 0 ($camlTOP2__match_tagged_immediate_2) in
 cont done ($camlTOP2)
@@ -78,8 +77,7 @@ let code loopify(never) size(2) newer_version_of(match_naked_immediate_1)
   cont k (arg)
 in
 let $camlTOP4__match_naked_immediate_7 =
-  closure match_naked_immediate_1_1 @match_naked_immediate
-    &toplevel.alloc_region
+  closure match_naked_immediate_1_1 @match_naked_immediate &toplevel
 in
 let $camlTOP4 = Block 0 ($camlTOP4__match_naked_immediate_7) in
 cont done ($camlTOP4)
@@ -114,7 +112,7 @@ let code loopify(never) size(2) newer_version_of(match_naked_float_2)
   cont k (arg)
 in
 let $camlTOP5__match_naked_float_11 =
-  closure match_naked_float_2_1 @match_naked_float &toplevel.alloc_region
+  closure match_naked_float_2_1 @match_naked_float &toplevel
 in
 let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_11) in
 cont done ($camlTOP5)
@@ -149,7 +147,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_float32_3)
   cont k (arg)
 in
 let $camlTOP6__match_naked_float32_15 =
-  closure match_naked_float32_3_1 @match_naked_float32 &toplevel.alloc_region
+  closure match_naked_float32_3_1 @match_naked_float32 &toplevel
 in
 let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_15) in
 cont done ($camlTOP6)
@@ -179,7 +177,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_int32_4)
   cont k (arg)
 in
 let $camlTOP7__match_naked_int32_19 =
-  closure match_naked_int32_4_1 @match_naked_int32 &toplevel.alloc_region
+  closure match_naked_int32_4_1 @match_naked_int32 &toplevel
 in
 let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_19) in
 cont done ($camlTOP7)
@@ -209,7 +207,7 @@ let code loopify(never) size(2) newer_version_of(match_naked_int64_5)
   cont k (arg)
 in
 let $camlTOP8__match_naked_int64_23 =
-  closure match_naked_int64_5_1 @match_naked_int64 &toplevel.alloc_region
+  closure match_naked_int64_5_1 @match_naked_int64 &toplevel
 in
 let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_23) in
 cont done ($camlTOP8)
@@ -239,8 +237,7 @@ let code loopify(never) size(2) newer_version_of(match_naked_nativeint_6)
   cont k (arg)
 in
 let $camlTOP9__match_naked_nativeint_27 =
-  closure match_naked_nativeint_6_1 @match_naked_nativeint
-    &toplevel.alloc_region
+  closure match_naked_nativeint_6_1 @match_naked_nativeint &toplevel
 in
 let $camlTOP9 = Block 0 ($camlTOP9__match_naked_nativeint_27) in
 cont done ($camlTOP9)
@@ -271,7 +268,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_int8_7)
   cont k (arg)
 in
 let $camlTOP10__match_naked_int8_31 =
-  closure match_naked_int8_7_1 @match_naked_int8 &toplevel.alloc_region
+  closure match_naked_int8_7_1 @match_naked_int8 &toplevel
 in
 let $camlTOP10 = Block 0 ($camlTOP10__match_naked_int8_31) in
 cont done ($camlTOP10)
@@ -301,7 +298,7 @@ let code loopify(never) size(3) newer_version_of(match_naked_int16_8)
   cont k (arg)
 in
 let $camlTOP11__match_naked_int16_35 =
-  closure match_naked_int16_8_1 @match_naked_int16 &toplevel.alloc_region
+  closure match_naked_int16_8_1 @match_naked_int16 &toplevel
 in
 let $camlTOP11 = Block 0 ($camlTOP11__match_naked_int16_35) in
 cont done ($camlTOP11)
@@ -340,7 +337,7 @@ let code loopify(never) size(2) newer_version_of(match_symbol_9)
   cont k (arg)
 in
 let $camlTOP12__match_symbol_42 =
-  closure match_symbol_9_1 @match_symbol &toplevel.alloc_region
+  closure match_symbol_9_1 @match_symbol &toplevel
 in
 let $camlTOP12 = Block 0 ($camlTOP12__match_symbol_42) in
 cont done ($camlTOP12)
@@ -385,7 +382,7 @@ let code loopify(never) size(2) newer_version_of(match_symbol_or_tagged_immediat
 in
 let $camlTOP14__match_symbol_or_tagged_immediate_49 =
   closure match_symbol_or_tagged_immediate_10_1
-    @match_symbol_or_tagged_immediate &toplevel.alloc_region
+    @match_symbol_or_tagged_immediate &toplevel
 in
 let $camlTOP14 = Block 0 ($camlTOP14__match_symbol_or_tagged_immediate_49) in
 cont done ($camlTOP14)
@@ -427,7 +424,7 @@ let code loopify(never) size(2) newer_version_of(match_symbol_tagged_or_null_11)
 in
 let $camlTOP15__match_symbol_tagged_or_null_55 =
   closure match_symbol_tagged_or_null_11_1 @match_symbol_tagged_or_null
-    &toplevel.alloc_region
+    &toplevel
 in
 let $camlTOP15 = Block 0 ($camlTOP15__match_symbol_tagged_or_null_55) in
 cont done ($camlTOP15)

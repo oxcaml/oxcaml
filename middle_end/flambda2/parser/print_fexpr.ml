@@ -139,9 +139,7 @@ let result_continuation ppf rcont =
 let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
-  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel.alloc_region"
-  | Toplevel_region -> Format.pp_print_string ppf "toplevel.region"
-  | Toplevel_ghost_region -> Format.pp_print_string ppf "toplevel.ghost_region"
+  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel"
 
 let cfprintf directive ppf fmt =
   directive ppf;

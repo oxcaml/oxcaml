@@ -1,6 +1,6 @@
 let code fact_0 deleted in
 let $camlUnroll__fact_1 =
-  closure fact_0_1 @fact &toplevel.alloc_region
+  closure fact_0_1 @fact &toplevel
 and code rec loopify(never) size(23) newer_version_of(fact_0)
       fact_0_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -21,7 +21,7 @@ and code rec loopify(never) size(23) newer_version_of(fact_0)
            let int_mul = %int_barith.mul (n, apply_result) in
            cont k (int_mul))
 in
-apply direct(fact_0_1 &toplevel.alloc_region) inlining_state(depth(40))
+apply direct(fact_0_1 &toplevel) inlining_state(depth(40))
   ($camlUnroll__fact_1 ~ depth unroll 1 3 -> unroll 0 4 : _ -> imm tagged)
     (2)
     -> k * error

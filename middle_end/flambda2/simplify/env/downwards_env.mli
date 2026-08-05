@@ -36,8 +36,6 @@ val create :
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
   unit_toplevel_return_continuation:Continuation.t ->
-  toplevel_my_region:Variable.t ->
-  toplevel_my_ghost_region:Variable.t ->
   toplevel_my_alloc_region:Variable.t ->
   t
 

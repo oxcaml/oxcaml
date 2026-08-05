@@ -16,7 +16,7 @@ let code inline(never) loopify(never) size(15) newer_version_of(use_0)
            cont k (int_add))
 in
 let $camlSpeculative_inlining_set_of_closures__use_1 =
-  closure use_0_1 @use &toplevel.alloc_region
+  closure use_0_1 @use &toplevel
 in
 let code loopify(never) size(36) newer_version_of(f_2)
       f_2_1 (param : imm tagged)
@@ -50,7 +50,7 @@ let code loopify(never) size(48) newer_version_of(g_1)
       -> k * k1
 in
 let $camlSpeculative_inlining_set_of_closures__g_2 =
-  closure g_1_1 @g &toplevel.alloc_region
+  closure g_1_1 @g &toplevel
 in
 let code loopify(never) size(35) newer_version_of(f_2_1)
       f_2_2 (param : imm tagged)
@@ -72,7 +72,7 @@ let code loopify(never) size(35) newer_version_of(f_2_1)
   cont k (int_add_4)
 in
 let $camlSpeculative_inlining_set_of_closures__f_5 =
-  closure f_2_2 @f &toplevel.alloc_region
+  closure f_2_2 @f &toplevel
   with { x = 1 }
 in
 let code loopify(never) size(4) newer_version_of(r1_3)
@@ -86,7 +86,7 @@ let code loopify(never) size(4) newer_version_of(r1_3)
       -> k * k1
 in
 let $camlSpeculative_inlining_set_of_closures__r1_3 =
-  closure r1_3_1 @r1 &toplevel.alloc_region
+  closure r1_3_1 @r1 &toplevel
 in
 let code loopify(never) size(36) newer_version_of(f_2_1)
       f_2_3 (param : imm tagged)
@@ -121,7 +121,7 @@ let code loopify(never) size(48) newer_version_of(r2_4)
       -> k * k1
 in
 let $camlSpeculative_inlining_set_of_closures__r2_6 =
-  closure r2_4_1 @r2 &toplevel.alloc_region
+  closure r2_4_1 @r2 &toplevel
 in
 let $camlSpeculative_inlining_set_of_closures =
   Block 0 ($camlSpeculative_inlining_set_of_closures__use_1,

@@ -183,13 +183,11 @@
        in
        cont k1 (Pmakeblock)
  in
- let pr2162_2_first =
-   closure pr2162_2_first_0 @pr2162_2_first &toplevel.alloc_region
- in
- let pr2162_2 = closure pr2162_2_1 @pr2162_2 &toplevel.alloc_region in
- let pr2162_3 = closure pr2162_3_2 @pr2162_3 &toplevel.alloc_region in
+ let pr2162_2_first = closure pr2162_2_first_0 @pr2162_2_first &toplevel in
+ let pr2162_2 = closure pr2162_2_1 @pr2162_2 &toplevel in
+ let pr2162_3 = closure pr2162_3_2 @pr2162_3 &toplevel in
  let pr2162_3_as_int64 =
-   closure pr2162_3_as_int64_3 @pr2162_3_as_int64 &toplevel.alloc_region
+   closure pr2162_3_as_int64_3 @pr2162_3_as_int64 &toplevel
  in
  let Pmakeblock =
    %block.[`0`].`toplevel`

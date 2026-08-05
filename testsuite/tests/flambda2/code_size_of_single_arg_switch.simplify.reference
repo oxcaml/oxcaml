@@ -19,7 +19,7 @@ let code loopify(never) size(2) newer_version_of(switch_converted_to_lookup_tabl
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1 =
   closure switch_converted_to_lookup_table_0_1
-    @switch_converted_to_lookup_table &toplevel.alloc_region
+    @switch_converted_to_lookup_table &toplevel
 in
 let code loopify(never) size(4) newer_version_of(switch_converted_to_lookup_table'_1)
       switch_converted_to_lookup_table'_1_1 (x : imm tagged)
@@ -34,7 +34,7 @@ let code loopify(never) size(4) newer_version_of(switch_converted_to_lookup_tabl
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_3 =
   closure switch_converted_to_lookup_table'_1_1
-    @switch_converted_to_lookup_table' &toplevel.alloc_region
+    @switch_converted_to_lookup_table' &toplevel
 in
 let code loopify(never) size(7) newer_version_of(switch_converted_to_affine_2)
       switch_converted_to_affine_2_1 (x : imm tagged)
@@ -47,7 +47,7 @@ let code loopify(never) size(7) newer_version_of(switch_converted_to_affine_2)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_affine_4 =
   closure switch_converted_to_affine_2_1 @switch_converted_to_affine
-    &toplevel.alloc_region
+    &toplevel
 in
 let code loopify(never) size(4) newer_version_of(switch_converted_to_affine'_3)
       switch_converted_to_affine'_3_1 (x : imm tagged)
@@ -62,7 +62,7 @@ let code loopify(never) size(4) newer_version_of(switch_converted_to_affine'_3)
 in
 let $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_5 =
   closure switch_converted_to_affine'_3_1 @switch_converted_to_affine'
-    &toplevel.alloc_region
+    &toplevel
 in
 let $camlCode_size_of_single_arg_switch =
   Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1,

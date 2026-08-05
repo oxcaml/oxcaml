@@ -158,10 +158,6 @@ module Env : sig
 
   val bind_toplevel_alloc_region : t -> Variable.t -> t
 
-  val bind_toplevel_region : t -> Variable.t -> t
-
-  val bind_toplevel_ghost_region : t -> Variable.t -> t
-
   val find_var_exn : t -> Variable.t -> Fexpr.variable
 
   val find_symbol_exn : t -> Symbol.t -> Fexpr.symbol
@@ -284,9 +280,7 @@ end = struct
       function_slots : Function_slot_name_map.t;
       vars_within_closures : Value_slot_name_map.t;
       continuations : Continuation_name_map.t;
-      toplevel_alloc_region : Variable.t option;
-      toplevel_region : Variable.t option;
-      toplevel_ghost_region : Variable.t option
+      toplevel_alloc_region : Variable.t option
     }
 
   let create () =
@@ -296,9 +290,7 @@ end = struct
       function_slots = Function_slot_name_map.create ();
       vars_within_closures = Value_slot_name_map.create ();
       continuations = Continuation_name_map.empty;
-      toplevel_alloc_region = None;
-      toplevel_region = None;
-      toplevel_ghost_region = None
+      toplevel_alloc_region = None
     }
 
   let bind_var t v =
@@ -339,10 +331,6 @@ end = struct
 
   let bind_toplevel_alloc_region t v = { t with toplevel_alloc_region = Some v }
 
-  let bind_toplevel_region t v = { t with toplevel_region = Some v }
-
-  let bind_toplevel_ghost_region t v = { t with toplevel_ghost_region = Some v }
-
   let find_var_exn t v = Variable_name_map.find_exn t.variables v
 
   let find_symbol_exn t s =
@@ -370,18 +358,9 @@ end = struct
     Continuation_name_map.find_exn t.continuations c
 
   let find_region_exn t r : Fexpr.region =
-    match
-      List.find_map
-        (function
-          | Some region, result ->
-            if Variable.equal region r then Some result else None
-          | None, _ -> None)
-        [ t.toplevel_alloc_region, Fexpr.Toplevel_alloc_region;
-          t.toplevel_region, Fexpr.Toplevel_region;
-          t.toplevel_ghost_region, Fexpr.Toplevel_ghost_region ]
-    with
-    | Some result -> result
-    | None -> Named (find_var_exn t r)
+    match t.toplevel_alloc_region with
+    | Some region when Variable.equal region r -> Fexpr.Toplevel_alloc_region
+    | Some _ | None -> Named (find_var_exn t r)
 
   let translate_function_slot t c =
     Function_slot_name_map.translate t.function_slots c
