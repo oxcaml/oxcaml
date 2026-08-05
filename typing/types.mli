@@ -931,6 +931,7 @@ and mixed_block_element =
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 

@@ -67,6 +67,9 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** Invariant: this constructor is never redundantly applied. I.e.,
+              given [Addressable t], [not (is_surely_addressable t)] *)
 
     val of_base : base -> t
 
@@ -81,6 +84,10 @@ module type Sort = sig
     val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
+
+    val is_surely_addressable : t -> bool
+
+    val addressable : t -> t
 
     val scannable : t
 
