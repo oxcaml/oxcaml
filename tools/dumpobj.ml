@@ -419,7 +419,7 @@ let print_event ev =
     let kind =
       match ev.ev_kind with
       | Event_before -> "before"
-      | Event_after _ -> "after"
+      | Event_after _ | Event_after_untyped -> "after"
       | Event_pseudo -> "pseudo"
     in
     let info =

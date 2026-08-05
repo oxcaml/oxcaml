@@ -190,15 +190,18 @@ let merge_events ev ev' =
     | Event_pseudo, _ -> ev', ev
     | _, Event_pseudo -> ev, ev'
     (* Keep following event, supposedly more informative *)
-    | Event_before, (Event_after _ | Event_before) -> ev', ev
+    | Event_before, (Event_after _ | Event_after_untyped | Event_before) ->
+      ev', ev
     (* Discard following events, supposedly less informative *)
-    | Event_after _, (Event_after _ | Event_before) -> ev, ev'
+    | ( (Event_after _ | Event_after_untyped),
+        (Event_after _ | Event_after_untyped | Event_before) ) ->
+      ev, ev'
   in
   copy_event maj maj.ev_kind (merge_infos maj min) (merge_repr maj min)
 
 let weaken_event ev cont =
   match ev.ev_kind with
-  | Event_after _ -> (
+  | Event_after _ | Event_after_untyped -> (
     match cont with
     | Kpush :: Kevent ({ ev_repr = Event_none } as ev') :: c -> (
       match ev.ev_info with
@@ -218,12 +221,9 @@ let add_event ev = function
   | Kevent ev' :: cont -> weaken_event (merge_events ev ev') cont
   | cont -> weaken_event ev cont
 
-let strip_event_kind =
-  let dummy_ty = Btype.newgenvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-  let event_after = Event_after dummy_ty in
-  function
-  | Event_after _ -> event_after
-  | (Event_before | Event_pseudo) as k -> k
+let strip_event_kind = function
+  | Event_after _ -> Event_after_untyped
+  | (Event_after_untyped | Event_before | Event_pseudo) as k -> k
 
 (**** Compilation of a lambda expression ****)
 
