@@ -60,6 +60,38 @@ val transl_primitive_application :
 val sort_of_native_repr :
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Jkind.Sort.Const.t
 
+(** Whether an application of a primitive compiles to a direct primitive
+    application, or whether [Translcore] first has to eta-expand the primitive
+    into a closure.
+
+    Set [check_poly_mode] to [true] to check zap mode and make precise decision
+    for Prim_poly. *)
+val can_apply_primitive :
+  Primitive.description ->
+  Mode.Locality.lr option ->
+  Typedtree.apply_position ->
+  (Typedtree.arg_label * Typedtree.apply_arg) list ->
+  check_poly_mode:bool ->
+  bool
+
+type allocation_registration =
+  | No_allocation
+  | Allocation_at_locality of Mode.Locality.lr
+
+(** The whole allocation decision for an application of a primitive. *)
+val application_allocation :
+  Env.t ->
+  Location.t ->
+  Primitive.description ->
+  Typedtree.apply_position ->
+  (Typedtree.arg_label * Typedtree.apply_arg) list ->
+  poly_mode:Mode.Locality.lr option ->
+  ty:Types.type_expr ->
+  allocation_registration
+
+(** Whether the primitive is non-arrow type but still allocates. *)
+val non_arrow_prim_allocates : Location.t -> Primitive.description -> bool
+
 (* Errors *)
 
 type invalid_stack_primitive =
