@@ -297,6 +297,11 @@ let apply_code_id t code_id =
   in
   Code_ids.apply t.code_ids code_id
 
+let apply_code_id_or_name t code_id_or_name =
+  Code_id_or_name.pattern_match' code_id_or_name
+    ~code_id:(fun code_id -> Code_id_or_name.code_id (apply_code_id t code_id))
+    ~name:(fun name -> Code_id_or_name.name (apply_name t name))
+
 let apply_const t cst =
   match t.import_map with
   | None -> cst

@@ -127,6 +127,12 @@ module Variable : sig
   val export : t -> exported
 
   val import : exported -> t
+
+  (** Saved and restored across a paused compilation so new identifiers cannot
+      collide with imported ones. Restoring only ever increases the counter. *)
+  val get_name_stamp_counter : unit -> int
+
+  val restore_name_stamp_counter : int -> unit
 end
 
 module Symbol : sig
@@ -257,6 +263,10 @@ module Code_id : sig
   val export : t -> exported
 
   val import : exported -> t
+
+  val get_name_stamp_counter : unit -> int
+
+  val restore_name_stamp_counter : int -> unit
 end
 
 module Code_id_or_symbol : sig

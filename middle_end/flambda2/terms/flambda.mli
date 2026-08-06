@@ -165,6 +165,8 @@ module Named : sig
 
   include Expr_std.S with type t := t
 
+  val ids_for_export : t -> Ids_for_export.t
+
   (** Convert a register-width value into the defining expression of a [Let]. *)
   val create_simple : Simple.t -> t
 

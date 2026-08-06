@@ -344,6 +344,33 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
   let current_unit = build_unit_info ~main_module_block_format ~arg_descr in
   write_unit_info current_unit filename
 
+let save_resumed_unit_info filename ~paused =
+  let info =
+    build_unit_info ~main_module_block_format:paused.ui_format
+      ~arg_descr:paused.ui_arg_descr
+  in
+  (* We should take fields produced by the frontend and typechecker from the
+     old pre-Reaper cmx, since neither run after resume. *)
+  let info =
+    { info with
+      ui_imports_cmi = paused.ui_imports_cmi;
+      ui_quoted_cmi = paused.ui_quoted_cmi;
+      ui_quoted_cmx = paused.ui_quoted_cmx
+    }
+  in
+  (* We want .reaped.cmx files to link against each other, not against the
+     .cmx files they saw during compilation, and we don't know those CRCs. *)
+  let info =
+    { info with
+      ui_imports_cmx =
+        List.map
+          (fun import ->
+            Import_info.create_normal (Import_info.cu import) ~crc:None)
+          info.ui_imports_cmx
+    }
+  in
+  write_unit_info info filename
+
 let new_const_symbol () =
   Symbol.for_new_const_in_current_unit ()
   |> Symbol.linkage_name

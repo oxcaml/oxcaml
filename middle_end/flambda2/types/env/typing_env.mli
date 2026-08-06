@@ -34,6 +34,23 @@ module Serializable : sig
 
   val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
+  (** Like [create] but don't do the reachability pruning expected in CMXs. *)
+  val create_without_pruning : Pre_serializable.t -> t
+
+  (** Turn a [Serializable.t] back into a typing environment. The current
+      compilation unit must be the same one that produced it, and it should be
+      produced with [create_without_pruning].
+
+      The roundtrip is lossy: aliases are flattened, variable are given in-types
+      mode and imported binding time, names from other units go through
+      [resolver], and scope/level history is gone so [cut] cannot see past the
+      pause. This is fine for the Reaper's rebuild stage. *)
+  val to_typing_env :
+    t ->
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> t option) ->
+    typing_env
+
   val create_from_closure_conversion_approx :
     machine_width:Target_system.Machine_width.t ->
     'a Value_approximation.t Symbol.Map.t ->

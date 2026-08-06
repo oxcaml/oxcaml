@@ -18,11 +18,16 @@ module Id = Table_by_int_id.Id
 
 let continuation_flags = 0
 
-let next_stamp =
-  let next_stamp = ref 0 in
-  fun () ->
-    incr next_stamp;
-    !next_stamp
+let previous_stamp = ref 0
+
+let next_stamp () =
+  incr previous_stamp;
+  !previous_stamp
+
+let get_stamp_counter () = !previous_stamp
+
+let restore_stamp_counter counter =
+  previous_stamp := max !previous_stamp counter
 
 module Sort = struct
   type t =

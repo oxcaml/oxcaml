@@ -213,3 +213,122 @@ let add_code_id_my_closure t code_id my_closure =
     <- NN.add_or_replace
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
+
+module NMap = Code_id_or_name.Map
+
+let ids_for_export graph =
+  let add_id = Ids_for_export.add_code_id_or_name in
+  (* Edges are stored in nested maps which come in a few different types. These
+     are given short names like [ncn] which means [unit NMap.t Cofield.Map.t
+     NMap.t]. *)
+  let add_ids_from_n (n : N.t) ids =
+    NMap.fold (fun id () ids -> add_id ids id) n ids
+  in
+  let add_ids_from_nn (nn : NN.t) ids =
+    NMap.fold (fun id n ids -> add_ids_from_n n (add_id ids id)) nn ids
+  in
+  let add_ids_from_nnn (nnn : NNN.t) ids =
+    NMap.fold (fun id nn ids -> add_ids_from_nn nn (add_id ids id)) nnn ids
+  in
+  let add_ids_from_ncn (ncn : NCN.t) ids =
+    NMap.fold
+      (fun id (cn : N.t Cofield.Map.t) ids ->
+        Cofield.Map.fold
+          (fun (_ : Cofield.t) n ids -> add_ids_from_n n ids)
+          cn (add_id ids id))
+      ncn ids
+  in
+  let add_ids_from_nfn (nfn : NFN.t) ids =
+    NMap.fold
+      (fun id (fn : N.t Field.Map.t) ids ->
+        Field.Map.fold
+          (fun (_ : Field.t) n ids -> add_ids_from_n n ids)
+          fn (add_id ids id))
+      nfn ids
+  in
+  let ids = Ids_for_export.empty in
+  let ids = add_ids_from_nn graph.alias ids in
+  let ids = add_ids_from_nn graph.use ids in
+  let ids = add_ids_from_nfn graph.accessor ids in
+  let ids = add_ids_from_nfn graph.constructor ids in
+  let ids = add_ids_from_ncn graph.argument ids in
+  let ids = add_ids_from_ncn graph.parameter ids in
+  let ids = add_ids_from_nnn graph.propagate ids in
+  let ids = add_ids_from_nnn graph.alias_if_any_source ids in
+  let ids = add_ids_from_n graph.any_usage ids in
+  let ids = add_ids_from_n graph.any_source ids in
+  let ids = add_ids_from_n graph.zero_alloc_source ids in
+  let ids = add_ids_from_nn graph.code_id_my_closure ids in
+  ids
+
+let fields_for_export graph =
+  (* Here [fn] means [unit NMap.t Field.Map.t], and similarly [nfn] is an [fn]
+     inside a [NMap.t]. *)
+  let add_fields_from_nfn (nfn : NFN.t) fields =
+    NMap.fold
+      (fun (_ : Code_id_or_name.t) (fn : N.t Field.Map.t) fields ->
+        Field.Map.fold
+          (fun field (_ : N.t) fields -> Field.Set.add field fields)
+          fn fields)
+      nfn fields
+  in
+  let fields = Field.Set.empty in
+  let fields = add_fields_from_nfn graph.accessor fields in
+  let fields = add_fields_from_nfn graph.constructor fields in
+  fields
+
+let apply_renaming graph renaming ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  (* Edges are stored in nested maps which come in a few different types. These
+     are given short names like [ncn] which means [unit NMap.t Cofield.Map.t
+     NMap.t]. Within this function, the prefix [old_] means pre-renaming and
+     [new_] means post-renaming. *)
+  let rename_n (old_n : N.t) =
+    NMap.fold
+      (fun id () new_n -> NMap.add (rename_id id) () new_n)
+      old_n NMap.empty
+  in
+  let rename_nn (old_nn : NN.t) =
+    NMap.fold
+      (fun id old_n new_nn -> NMap.add (rename_id id) (rename_n old_n) new_nn)
+      old_nn NMap.empty
+  in
+  let rename_nnn (old_nnn : NNN.t) =
+    NMap.fold
+      (fun id old_nn new_nnn ->
+        NMap.add (rename_id id) (rename_nn old_nn) new_nnn)
+      old_nnn NMap.empty
+  in
+  let rename_ncn (old_ncn : NCN.t) =
+    (* Cofields are not renamed because they are stable across processes. *)
+    NMap.fold
+      (fun id (old_cn : N.t Cofield.Map.t) new_ncn ->
+        let new_cn : N.t Cofield.Map.t = Cofield.Map.map rename_n old_cn in
+        NMap.add (rename_id id) new_cn new_ncn)
+      old_ncn NMap.empty
+  in
+  let rename_nfn old_nfn =
+    NMap.fold
+      (fun id (old_fn : N.t Field.Map.t) new_nfn ->
+        let new_fn : N.t Field.Map.t =
+          Field.Map.fold
+            (fun field old_n new_fn ->
+              Field.Map.add (rename_field field) (rename_n old_n) new_fn)
+            old_fn Field.Map.empty
+        in
+        NMap.add (rename_id id) new_fn new_nfn)
+      old_nfn NMap.empty
+  in
+  { alias = rename_nn graph.alias;
+    use = rename_nn graph.use;
+    accessor = rename_nfn graph.accessor;
+    constructor = rename_nfn graph.constructor;
+    argument = rename_ncn graph.argument;
+    parameter = rename_ncn graph.parameter;
+    propagate = rename_nnn graph.propagate;
+    alias_if_any_source = rename_nnn graph.alias_if_any_source;
+    any_usage = rename_n graph.any_usage;
+    any_source = rename_n graph.any_source;
+    zero_alloc_source = rename_n graph.zero_alloc_source;
+    code_id_my_closure = rename_nn graph.code_id_my_closure
+  }
