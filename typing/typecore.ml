@@ -476,6 +476,10 @@ type expected_mode =
     strictly_stack. However, if we do that, there would be uncaught exception
     in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
 
+    alloc_annot : Allocation.Const.t option;
+    (** [Some c] iff the function was directly annotated with the allocation
+    mode [c] on its binding (e.g. [let (f @ noalloc) x = ...]). *)
+
     tuple_modes : (Value.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -581,8 +585,9 @@ let mode_default mode =
     mode = Value.disallow_left mode;
     strictly_local = false;
     tuple_modes = None;
+    strictly_stack = false;
     return_from_exclave = None;
-    strictly_stack = false }
+    alloc_annot = None }
 
 let mode_legacy = mode_default Value.legacy
 
@@ -716,6 +721,9 @@ let mode_strictly_stack expected_mode =
   { expected_mode
     with strictly_stack = true
   }
+
+let mode_alloc_annot expected_mode alloc_annot =
+  { expected_mode with alloc_annot }
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
@@ -875,11 +883,17 @@ let allocations : Locality.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode ~env ~loc ?(stack = false) alloc_mode =
+let register_allocation_mode ~env ~loc
+    ?(stack = false) ?(closure = false) alloc_mode =
   (* [stack_]-marked allocations are stack-allocated and so do not count
      towards the allocation axis; only heap allocations walk the locks. *)
-  if not stack then
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+  if not stack then begin
+    let local_closure =
+      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation closure)
+    in
+    if local_closure then
+      Locality.submode_err (loc, Function) Locality.local alloc_mode
+  end;
   allocations := alloc_mode :: !allocations
 
 let newvar_below_if_modepoly level m =
@@ -943,7 +957,8 @@ let register_closure_allocation ~env ?(stack = false) (mode : Value.r) ~loc
   let closed_over_mode =
     alloc_as_value ~allocation (Alloc.disallow_left mode)
   in
-  register_allocation_mode ~env ~loc ~stack (Locality.disallow_left alloc_mode);
+  register_allocation_mode ~env ~loc ~stack ~closure:true
+    (Locality.disallow_left alloc_mode);
   alloc_mode, mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
@@ -5120,30 +5135,13 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
   loop ty_fun0 mode_fun rev_args sargs
 
 (* See Note [Type-checking applications] for an overview *)
-let collect_apply_args env loc funct ignore_labels ty_fun ty_fun0 mode_fun sargs
+let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
       ret_tvar =
   let warned = ref false in
   let rec loop ty_fun ty_fun0 mode_fun rev_args sargs =
-    if sargs = [] then begin
-      (* Allocation axis check: partial application of a function returns
-         an arrow type and allocates *)
-      let ty_fun' = expand_head env ty_fun in
-      let ty_fun_is_arrow =
-        match get_desc ty_fun' with Tarrow _ -> true | _ -> false
-      in
-      (* CR shsong: this check for partial application is not strong enough
-          to guarantee soundness. Especially for the case where the partial
-          application's return type is an abstract type and is actually a
-          function. *)
-      (* CR shsong: Alternative design: only register_allocation_mode if
-          partial_app = is_partial_apply untyped_args (where untyped_args
-          are in the return value) is false, since if partial_app is true,
-          there are Omitted args and the code walks the locks already *)
-      if ty_fun_is_arrow then
-        register_allocation_mode ~env ~loc (Locality.disallow_left Locality.legacy);
+    if sargs = [] then
       collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
         ret_tvar
-    end
     else
     let ty_fun' = expand_head env ty_fun in
     let lv = get_level ty_fun' in
@@ -6515,6 +6513,12 @@ let split_function_ty
     | false -> env
     | true ->
         let env =
+          match expected_mode.alloc_annot with
+          | Some (Noalloc | Noalloc_strict) ->
+            Env.add_closure_noalloc_lock env
+          | Some Alloc | None -> env
+        in
+        let env =
           Env.add_closure_lock
             (loc, Function)
             closed_over_mode.comonadic
@@ -6798,6 +6802,10 @@ let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
       in
       Some env_alloc_mode, mode_default exp_mode
     else None, exp_mode
+  in
+  let exp_mode =
+    mode_alloc_annot exp_mode
+      ((mode_annots_from_pat spat).mode_modes.allocation)
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
@@ -8969,7 +8977,7 @@ and type_expect_
             Value.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          Typedtree.alloc_mode_r_submode_err (exp.exp_loc, Allocation)
+          Typedtree.alloc_mode_r_submode_err (exp.exp_loc, Allocation false)
             (Locality.of_const ~hint:Stack_expression Local)
             alloc_mode
         end
@@ -10882,7 +10890,7 @@ and type_application env app_loc expected_mode position_and_mode
             (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
           in
           let ty_ret, mode_ret, untyped_args =
-            collect_apply_args env app_loc funct ignore_labels ty (instance ty)
+            collect_apply_args env funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
           in
           (* example: [collect_apply_args] returns
@@ -12297,6 +12305,7 @@ and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
     in
+    let expected_mode = mode_alloc_annot expected_mode modes.allocation in
     expected_mode
 
 and type_n_ary_function
