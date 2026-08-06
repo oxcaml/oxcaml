@@ -252,3 +252,12 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+val ids_for_export_continuation_info : continuation_info -> Ids_for_export.t
+
+val ids_for_export_code_dep : code_dep -> Ids_for_export.t
+
+val apply_renaming_continuation_info :
+  continuation_info -> Renaming.t -> continuation_info
+
+val apply_renaming_code_dep : code_dep -> Renaming.t -> code_dep

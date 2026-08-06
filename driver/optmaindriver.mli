@@ -35,5 +35,10 @@ val main
     machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     cmr_filename:string ->
+    cmx_imports_to_reload:Import_info.t list ->
     Cmm.phrase list)
+  -> reaper_lto_solve:(
+    cmr_files:string list ->
+    ltosol_filename:string ->
+    unit)
   -> int

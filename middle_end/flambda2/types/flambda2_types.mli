@@ -141,6 +141,14 @@ module Typing_env : sig
 
     val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
+    val create_without_pruning : Pre_serializable.t -> t
+
+    val to_typing_env :
+      t ->
+      machine_width:Target_system.Machine_width.t ->
+      resolver:(Compilation_unit.t -> t option) ->
+      typing_env
+
     val create_from_closure_conversion_approx :
       machine_width:Target_system.Machine_width.t ->
       'a Value_approximation.t Symbol.Map.t ->

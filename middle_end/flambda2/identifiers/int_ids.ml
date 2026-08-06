@@ -482,14 +482,14 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name kind =
+  let create_in_compilation_unit ?user_visible name kind compilation_unit =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Compilation_unit.get_current_exn ();
+      { compilation_unit;
         name;
         name_stamp;
         kind;
@@ -497,6 +497,10 @@ module Variable = struct
       }
     in
     Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit ?user_visible name kind
+      (Compilation_unit.get_current_exn ())
 
   module T0 = struct
     let compare = Id.compare
@@ -537,6 +541,11 @@ module Variable = struct
   let export t = find_data t
 
   let import (data : exported) = Table.add !grand_table_of_variables data
+
+  let get_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    previous_name_stamp := max !previous_name_stamp counter
 end
 
 module Symbol = struct
@@ -919,6 +928,11 @@ module Code_id = struct
   let export t = find_data t
 
   let import (data : exported) = Table.add !grand_table_of_code_ids data
+
+  let get_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    previous_name_stamp := max !previous_name_stamp counter
 end
 
 module Code_id_or_symbol = struct

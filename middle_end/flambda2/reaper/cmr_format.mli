@@ -15,9 +15,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* CR mvellacott: (long term) get rid of CMR files, and put the data in CMX instead *)
-(* CR mvellacott: (short term) store actually useful data in CMR files *)
-type t = string
+(* CR mvellacott: get rid of CMR files, and put the data in CMX instead *)
+type t =
+  { unit_metadata : Flambda_unit.Metadata.t;
+    final_typing_env : Typing_env.t option;
+    all_code : Exported_code.t;
+    deps : Global_flow_graph.graph;
+    rebuild_data : Reaper.Staged.Traverse_rebuild.t
+  }
 
 type error =
   | Wrong_format of string
@@ -27,6 +32,16 @@ type error =
 
 exception Error of error
 
-val save : filename:string -> t -> unit
+(** [used_value_slots] is the set computed by [Slot_offsets.finalize_offsets]
+    for the unit being stored; it describes the data written alongside it. *)
+val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
 
-val restore : filename:string -> t
+(** The resuming invocation must use the same machine width as the one that
+    wrote the file. *)
+val restore :
+  filename:string ->
+  machine_width:Target_system.Machine_width.t ->
+  resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  t
+
+val restore_deps : string -> Compilation_unit.t * Global_flow_graph.graph

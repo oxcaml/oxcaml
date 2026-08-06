@@ -20,6 +20,10 @@ module Metadata : sig
   type t
 
   val module_symbol : t -> Symbol.t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
 end
 
 type t
