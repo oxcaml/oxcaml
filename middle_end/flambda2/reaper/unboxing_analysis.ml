@@ -672,9 +672,16 @@ let perform_analysis db ~stats =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              (* The new variables are binders in the rebuilt code where
+                 [to_patch] occurs, so they belong to its unit. *)
+              let compilation_unit =
+                Code_id_or_name.compilation_unit to_patch
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
-                  ~mk:(fun kind name -> Variable.create name kind)
+                  ~mk:(fun kind name ->
+                    Variable.create_in_compilation_unit name kind
+                      compilation_unit)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
@@ -733,10 +740,15 @@ let perform_analysis db ~stats =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                (* The new slots describe the changed layout of the set of
+                   closures containing [code_id_or_name], so they belong to its
+                   unit. *)
+                let compilation_unit =
+                  Code_id_or_name.compilation_unit code_id_or_name
+                in
                 let mk kind name =
-                  Value_slot.create
-                    (Compilation_unit.get_current_exn ())
-                    ~name ~is_always_immediate:false kind
+                  Value_slot.create compilation_unit ~name
+                    ~is_always_immediate:false kind
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -752,8 +764,7 @@ let perform_analysis db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
-                        (Function_slot.create
-                           (Compilation_unit.get_current_exn ())
+                        (Function_slot.create compilation_unit
                            ~name:(Function_slot.name fs)
                            ~is_always_immediate:false Flambda_kind.value)
                         acc)
