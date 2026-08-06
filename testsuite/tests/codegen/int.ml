@@ -287,19 +287,11 @@ equal:
 |}]
 
 
-(* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare (x : int) (y : int) =
   Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rsi
-  movq  $-1, %rdi
-  xorl  %eax, %eax
-  cmpq  %rbx, %rsi
-  setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
-  cmpq  $1, %rax
+  cmpq  %rbx, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
