@@ -124,7 +124,8 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
   mode
 
 let register_allocation ~env ~loc : With_locality.lr * With_regionality.lr =
-  Env.walk_locks_for_allocation ~env (loc, Hint.Allocation);
+  ignore
+    (Env.walk_locks_for_allocation ~env (loc, Hint.Allocation false) : bool);
   let upper_bound =
     With_locality.of_const
       ~hint_comonadic:Module_allocated_on_heap
