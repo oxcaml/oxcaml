@@ -824,10 +824,6 @@ module Sort = struct
       (* path compression *)
       result
 
-  let get_concrete_defaulting_to_scannable s =
-    let const = default_to_scannable_and_get s in
-    if Const.is_concrete const then Const.some const else None
-
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
 
@@ -839,6 +835,11 @@ module Sort = struct
     | Univar uv -> Some (Univar uv)
     | Var r -> (
       match r.contents with None -> None | Some s -> to_const_opt s)
+
+  let get_concrete s =
+    match to_const_opt s with
+    | Some const when Const.is_concrete const -> Const.some const
+    | Some _ | None -> None
 
   let is_scannable_or_var s =
     match get s with Base Scannable | Var _ -> true | _ -> false

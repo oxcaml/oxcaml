@@ -232,13 +232,6 @@ module type Sort = sig
       variable, it is set to [scannable] first. *)
   val default_to_scannable_and_get : t -> Const.t
 
-  (** Like [default_to_scannable_and_get], but returns [None] if the result is
-      not concrete.
-
-      CR layout-polymorphism: This function should be deleted once we support
-      layout-poly any-fields *)
-  val get_concrete_defaulting_to_scannable : t -> Const.t option
-
   (* CR layouts v12: Default this to void. *)
 
   (** [default_for_transl_and_get] extracts the sort as a `const`. If it's a
@@ -248,6 +241,12 @@ module type Sort = sig
 
   (** Return a [Const.t] if the sort has no unset variables, or [None] *)
   val to_const_opt : t -> Const.t option
+
+  (** Like [to_const_opt], but returns [None] if the result is not concrete.
+
+      CR layout-polymorphism: This function should be deleted once we support
+      layout-poly any-fields *)
+  val get_concrete : t -> Const.t option
 
   (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
   val var_default_to_scannable_and_get : var -> Const.t

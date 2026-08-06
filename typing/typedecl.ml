@@ -1834,18 +1834,12 @@ let check_record_not_all_void loc sorts =
    [transl_declaration] due to mutually recursive types.
 *)
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form)
-      ~default_to_scannable =
+let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
-      let ld_sort =
-        Option.bind sort
-          (if default_to_scannable
-           then Jkind.Sort.get_concrete_defaulting_to_scannable
-           else Jkind.Sort.to_const_opt)
-      in
+      let ld_sort = Option.bind sort Jkind.Sort.get_concrete in
       ld_sort, jkind
     ) types
   in
@@ -1857,9 +1851,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
 
 let update_label_sorts_in_place env loc lbls ~form =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds =
-    update_label_sorts env loc types ~form ~default_to_scannable:true
-  in
+  let sorts, jkinds = update_label_sorts env loc types ~form in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
@@ -1877,9 +1869,7 @@ let update_constructor_arguments_sorts env loc cd_args =
       List.map (fun ({Types.ca_type; _} as arg) ->
           let jkind = Ctype.type_jkind env ca_type in
           let sort = Jkind.sort_option_of_jkind env jkind in
-          let ca_sort =
-            Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
-          in
+          let ca_sort = Option.bind sort Jkind.Sort.get_concrete in
           {arg with ca_sort}, jkind)
         args
     in
@@ -1983,17 +1973,13 @@ module Element_repr = struct
     in
     of_t t
 
-  (* If [default_to_scannable] is true, unfilled sort variables are defaulted;
-     otherwise the element is classified as [None] *)
-  let classify env ty jkind ~default_to_scannable =
+  (* An element whose sort is an unfilled variable is classified as [None],
+     like an element of kind [any] *)
+  let classify env ty jkind =
     if is_float env ty
     then Some Float_element
     else
-      let layout =
-        if default_to_scannable
-        then Jkind.get_layout_defaulting_to_scannable env jkind
-        else Jkind.get_layout env jkind
-      in
+      let layout = Jkind.get_layout env jkind in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
       | Base (Scannable, sa) -> Some (Value_element sa)
@@ -2060,9 +2046,7 @@ type unrepresentable_constructor =
   | Unrepresentable_argument_field of string
 
 let mixed_block_element env ty jkind =
-  let unboxed_element =
-    Element_repr.classify env ty jkind ~default_to_scannable:true
-  in
+  let unboxed_element = Element_repr.classify env ty jkind in
   Option.map Element_repr.to_shape_element unboxed_element
 
 (* Atomic fields must have layout value. *)
@@ -2080,16 +2064,14 @@ let check_atomic_fields reprs lbls =
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
-    ~is_extension_constructor ~default_to_scannable
+    ~is_extension_constructor
   =
   let flat_suffix =
     match cd_args with
     | Cstr_tuple arg_types_and_modes ->
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
-            Element_repr.classify env arg_type arg_jkind
-              ~default_to_scannable,
-            arg_type)
+            Element_repr.classify env arg_type arg_jkind, arg_type)
             arg_types_and_modes arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_tuple
@@ -2098,8 +2080,7 @@ let update_constructor_representation
     | Cstr_record fields ->
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
-            Element_repr.classify env ld.Types.ld_type arg_jkind
-              ~default_to_scannable,
+            Element_repr.classify env ld.Types.ld_type arg_jkind,
             ld.Types.ld_type)
             fields arg_jkinds
         in
@@ -2124,7 +2105,7 @@ let update_constructor_representation_or_variable env cd_args jkinds ~loc
     ~sorts_and_types =
   match
     update_constructor_representation env cd_args jkinds ~loc
-      ~is_extension_constructor:false ~default_to_scannable:false
+      ~is_extension_constructor:false
   with
   | Ok shape -> shape
   | Error (Unrepresentable_argument _ | Unrepresentable_argument_field _) ->
@@ -2137,7 +2118,7 @@ let update_constructor_representation_and_arg_sorts env loc args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
-      ~is_extension_constructor ~default_to_scannable:true
+      ~is_extension_constructor
   in
   args, ~constant, constructor_shape, arg_sorts
 
@@ -2267,12 +2248,11 @@ type element_repr_summary =
      mutable first_any : Ident.t option;
   }
 
-let compute_repr_summary env lbls jkinds ~default_to_scannable =
+let compute_repr_summary env lbls jkinds =
   let reprs =
     List.map2
       (fun (_lbl, ld_type) jkind ->
-          Element_repr.classify env ld_type jkind ~default_to_scannable,
-          ld_type)
+          Element_repr.classify env ld_type jkind, ld_type)
       lbls jkinds
   in
   let repr_summary =
@@ -2322,9 +2302,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       Jkind.apply_modality_l lbl.Types.ld_modalities
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
-    let ld_sort =
-      Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
-    in
+    let ld_sort = Option.bind sort Jkind.Sort.get_concrete in
     let rep =
       (* Weirdly, we CAN give the record a representation even if its kind is
          [any]. This works because the representation doesn't include a sort,
@@ -2337,12 +2315,8 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds =
-      update_label_sorts env loc types ~form ~default_to_scannable:true
-    in
-    let reprs, repr_summary =
-      compute_repr_summary env lbls jkinds ~default_to_scannable:true
-    in
+    let sorts, jkinds = update_label_sorts env loc types ~form in
+    let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let jkind =
       match form with
       | Legacy ->
@@ -2459,11 +2433,9 @@ let update_record_representation
       lbls_and_types
   in
   let types = List.map snd lbls_and_types in
-  let _sorts, jkinds =
-    update_label_sorts env loc types ~form ~default_to_scannable:false
-  in
+  let _sorts, jkinds = update_label_sorts env loc types ~form in
   let reprs, repr_summary =
-    compute_repr_summary env lbls_and_types jkinds ~default_to_scannable:false
+    compute_repr_summary env lbls_and_types jkinds
   in
   let sorts_and_types () =
     List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
@@ -2545,9 +2517,7 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
     let ts =
       Array.to_list sorts_and_types
       |> List.map (fun (_sort, ty) ->
-           Element_repr.classify env ty (Ctype.type_jkind env ty)
-             ~default_to_scannable:false,
-           ty)
+           Element_repr.classify env ty (Ctype.type_jkind env ty), ty)
     in
     match Element_repr.mixed_product_shape loc ts kind with
     | Ok shape -> shape
@@ -2622,7 +2592,7 @@ let rec update_decl_jkind env dpath decl =
             payload_arg = { ca_type = ty; ca_modalities = modality; _ } } ->
         let jkind = Ctype.type_jkind env ty in
         let sort = Jkind.sort_of_jkind env jkind in
-        let ca_sort = Jkind.Sort.get_concrete_defaulting_to_scannable sort in
+        let ca_sort = Jkind.Sort.get_concrete sort in
         let cstrs =
           List.map
             (fun (cstr : Types.constructor_declaration) ->
@@ -2663,7 +2633,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ca_sort =
-              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
+              Option.bind sort Jkind.Sort.get_concrete
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
@@ -2674,7 +2644,7 @@ let rec update_decl_jkind env dpath decl =
             let jkind = Ctype.type_jkind env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ld_sort =
-              Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
+              Option.bind sort Jkind.Sort.get_concrete
             in
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =

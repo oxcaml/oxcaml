@@ -101,12 +101,11 @@ type unrepresentable_constructor =
 
 (* Update the representation of a constructor whose representation at
    declaration time was [None] because it has an argument of kind [any].
-   Without [default_to_scannable], unfilled sort variables are treated as
-   unrepresentable, resulting in an [Error] *)
+   Unfilled sort variables are treated as unrepresentable, resulting in an
+   [Error] *)
 val update_constructor_representation:
     Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
     loc:Location.t -> is_extension_constructor:bool ->
-    default_to_scannable:bool ->
     (Types.constructor_representation, unrepresentable_constructor) Result.t
 
 val update_constructor_representation_or_variable:
