@@ -1083,7 +1083,7 @@ and lkindinstantiate =
   { kinst_func: lambda;
     kinst_args: layout list;
     kinst_result_layout: layout;
-    kinst_mode: locality_mode;
+    kinst_mode: return_mode;
     kinst_loc: scoped_location;
   }
 
@@ -1491,7 +1491,6 @@ val is_maybe_alloc_stack : return_mode -> bool
 val is_not_alloc_stack : return_mode -> bool
 val eq_return_mode : return_mode -> return_mode -> bool
 val locality_return_compat : locality_mode -> return_mode -> bool
-val return_mode_of_locality_mode : locality_mode -> return_mode
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.

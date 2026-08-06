@@ -468,7 +468,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             Typeopt.layout_of_sort e.exp_loc layout)
           args;
         kinst_result_layout = layout;
-        kinst_mode = alloc_local;
+        kinst_mode = maybe_alloc_stack;
         kinst_loc = (of_location ~scopes e.exp_loc);
       }
   | Texp_constant cst -> Lconst (Const_base cst)
