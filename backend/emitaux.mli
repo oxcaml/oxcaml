@@ -85,15 +85,13 @@ type emit_frame_actions =
     efa_def_label : Label.t -> unit
   }
 
-(* Emits the frame table, with the debuginfo strings in
-   [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, except
-   under the binary emitter, which keeps them in [frametable_section] as
-   same-section label differences. *)
+(* Emits the frame table into the current section which must be
+   [Read_only_data]. Debuginfo strings go in [debug_strings_section]: pass
+   [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
+   [Read_only_data] to keep them inline in the frametable (the binary emitter
+   needs this, having no relocations that can target the mergeable section). *)
 val emit_frames :
-  binary_emitter:bool ->
-  frametable_section:Asm_targets.Asm_section.t ->
-  emit_frame_actions ->
-  unit
+  debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
 
 val is_generic_function : string -> bool
 

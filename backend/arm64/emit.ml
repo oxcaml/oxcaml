@@ -2301,24 +2301,23 @@ let end_assembly () =
   global_maybe_protected data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
-  let frametable_section : Asm_targets.Asm_section.t =
-    (* This is inconsistent with x86, where the non-rodata section is [Text]
-       instead of [Data]. Now that [frametables_in_rodata] is the default, it's
-       unclear how much this matters. *)
-    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
-  in
-  D.switch_to_section frametable_section;
+  D.switch_to_section Read_only_data;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
-  D.define_symbol_label ~section:frametable_section frametable_sym;
+  D.define_symbol_label ~section:Read_only_data frametable_sym;
   Emitaux.disable_short_descriptors := false;
+  (* The binary emitter keeps the strings inline in the frametable section:
+     same-section label differences need no relocations. *)
+  let debug_strings_section : Asm_targets.Asm_section.t =
+    if Binary_emitter_helpers.should_use_binary_emitter ()
+    then Read_only_data
+    else Debuginfo_strings
+  in
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
-  emit_frames
-    ~binary_emitter:(Binary_emitter_helpers.should_use_binary_emitter ())
-    ~frametable_section
+  emit_frames ~debug_strings_section
     { efa_code_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:Text lbl in
@@ -2339,7 +2338,7 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
       efa_label_delta =
@@ -2350,7 +2349,7 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun lbl ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           D.define_label lbl)
     };
   D.type_symbol ~ty:Object frametable_sym;
