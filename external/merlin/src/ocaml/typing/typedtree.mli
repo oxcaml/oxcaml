@@ -739,22 +739,8 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-<<<<<<< Merlin:liam-synchronize-merlin
-  | Texp_quotation of expression
-  | Texp_antiquotation of expression
-||||||| Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
-  | Texp_quotation of expression
-  | Texp_antiquotation of expression
-
-and meth =
-    Tmeth_name of string
-=======
   | Texp_quote of expression
   | Texp_splice of expression
-
-and meth =
-    Tmeth_name of string
->>>>>>> Compiler:HEAD
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)
