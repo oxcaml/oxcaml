@@ -155,6 +155,7 @@ typing_SOURCES = \
   typing/typeopt.mli typing/typeopt.ml \
   typing/typedecl.mli typing/typedecl.ml \
   typing/value_rec_check.mli typing/value_rec_check.ml \
+  typing/type_zero_alloc.mli typing/type_zero_alloc.ml \
   typing/allocations.mli typing/allocations.ml \
   typing/typecore.mli typing/typecore.ml \
   typing/typeclass.mli typing/typeclass.ml \
