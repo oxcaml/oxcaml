@@ -13,7 +13,7 @@ let code loopify(never) size(11) newer_version_of(f1_0)
         | 0 -> k (unboxed_field_0_0)
         | 1 -> k (1)
 in
-let $camlVariant_unboxing__f1_3 = closure f1_0_1 @f1 &toplevel.alloc_region
+let $camlVariant_unboxing__f1_1 = closure f1_0_1 @f1 &toplevel.alloc_region
 in
 let code loopify(never) size(94) newer_version_of(f2_1)
       f2_1_1 (x : imm tagged, y : imm tagged, a : imm tagged, b : imm tagged)
@@ -106,7 +106,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
       let `unit` = %end_region (`region`) in
       cont k (region_return)
 in
-let $camlVariant_unboxing__f2_4 = closure f2_1_1 @f2 &toplevel.alloc_region
+let $camlVariant_unboxing__f2_2 = closure f2_1_1 @f2 &toplevel.alloc_region
 in
 let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
       f3_returning_a_2_1
@@ -141,12 +141,12 @@ let code loopify(never) size(45) newer_version_of(f3_returning_a_2)
       let `unit` = %end_region (`region`) in
       cont k (region_return)
 in
-let $camlVariant_unboxing__f3_returning_a_5 =
+let $camlVariant_unboxing__f3_returning_a_3 =
   closure f3_returning_a_2_1 @f3_returning_a &toplevel.alloc_region
 in
 let $camlVariant_unboxing =
-  Block 0 ($camlVariant_unboxing__f1_3,
-           $camlVariant_unboxing__f2_4,
-           $camlVariant_unboxing__f3_returning_a_5)
+  Block 0 ($camlVariant_unboxing__f1_1,
+           $camlVariant_unboxing__f2_2,
+           $camlVariant_unboxing__f3_returning_a_3)
 in
 cont done ($camlVariant_unboxing)

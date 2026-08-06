@@ -36,6 +36,6 @@ let code loopify(never) size(43) newer_version_of(f_0)
       let Parraysets = %array_set (table_1, cse_param, Pmakeblock) in
       cont k (0)
 in
-let $camlCse_minus__f_1 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlCse_minus = Block 0 ($camlCse_minus__f_1) in
+let $camlCse_minus__f_5 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlCse_minus = Block 0 ($camlCse_minus__f_5) in
 cont done ($camlCse_minus)

@@ -35,20 +35,20 @@ match_tagged_immediate:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_tagged_immediate_0 deleted in
-let $camlTOP2__switch_block_2 = Value_array [|5; 10; 2; 7|] in
+let $camlTOP2__switch_block_3 = Value_array [|5; 10; 2; 7|] in
 let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
       match_tagged_immediate_0_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let arg = %array_load ($camlTOP2__switch_block_2, t) in
+  let arg = %array_load ($camlTOP2__switch_block_3, t) in
   cont k (arg)
 in
-let $camlTOP2__match_tagged_immediate_1 =
+let $camlTOP2__match_tagged_immediate_2 =
   closure match_tagged_immediate_0_1 @match_tagged_immediate
     &toplevel.alloc_region
 in
-let $camlTOP2 = Block 0 ($camlTOP2__match_tagged_immediate_1) in
+let $camlTOP2 = Block 0 ($camlTOP2__match_tagged_immediate_2) in
 cont done ($camlTOP2)
 |}]
 
@@ -68,20 +68,20 @@ match_naked_immediate:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_immediate_2 deleted in
-let $camlTOP4__switch_block_6 = Int_array [|5; 10; 2; 7|] in
+let $camlTOP4__switch_block_8 = Int_array [|5; 10; 2; 7|] in
 let code loopify(never) size(2) newer_version_of(match_naked_immediate_2)
       match_naked_immediate_2_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm =
-  let arg = %array_load.`int` ($camlTOP4__switch_block_6, t) in
+  let arg = %array_load.`int` ($camlTOP4__switch_block_8, t) in
   cont k (arg)
 in
-let $camlTOP4__match_naked_immediate_3 =
+let $camlTOP4__match_naked_immediate_7 =
   closure match_naked_immediate_2_1 @match_naked_immediate
     &toplevel.alloc_region
 in
-let $camlTOP4 = Block 0 ($camlTOP4__match_naked_immediate_3) in
+let $camlTOP4 = Block 0 ($camlTOP4__match_naked_immediate_7) in
 cont done ($camlTOP4)
 |}]
 
@@ -99,7 +99,7 @@ match_naked_float:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_float_4 deleted in
-let $camlTOP5__switch_block_9 =
+let $camlTOP5__switch_block_12 =
   Float_array [|0x1.4p+2;
   0x1.4p+3;
   0x1p+1;
@@ -110,13 +110,13 @@ let code loopify(never) size(2) newer_version_of(match_naked_float_4)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float =
-  let arg = %array_load.`float` ($camlTOP5__switch_block_9, t) in
+  let arg = %array_load.`float` ($camlTOP5__switch_block_12, t) in
   cont k (arg)
 in
-let $camlTOP5__match_naked_float_5 =
+let $camlTOP5__match_naked_float_11 =
   closure match_naked_float_4_1 @match_naked_float &toplevel.alloc_region
 in
-let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_5) in
+let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_11) in
 cont done ($camlTOP5)
 |}]
 
@@ -134,7 +134,7 @@ match_naked_float32:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_float32_6 deleted in
-let $camlTOP6__switch_block_12 =
+let $camlTOP6__switch_block_16 =
   Float32_array [|0x1.4p+2s;
   0x1.4p+3s;
   0x1p+1s;
@@ -145,13 +145,13 @@ let code loopify(never) size(3) newer_version_of(match_naked_float32_6)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float32 =
-  let arg = %array_load.`float32` ($camlTOP6__switch_block_12, t) in
+  let arg = %array_load.`float32` ($camlTOP6__switch_block_16, t) in
   cont k (arg)
 in
-let $camlTOP6__match_naked_float32_7 =
+let $camlTOP6__match_naked_float32_15 =
   closure match_naked_float32_6_1 @match_naked_float32 &toplevel.alloc_region
 in
-let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_7) in
+let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_15) in
 cont done ($camlTOP6)
 |}]
 
@@ -169,19 +169,19 @@ match_naked_int32:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_int32_8 deleted in
-let $camlTOP7__switch_block_15 = Int32_array [|5l; 10l; 2l; 7l|] in
+let $camlTOP7__switch_block_20 = Int32_array [|5l; 10l; 2l; 7l|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int32_8)
       match_naked_int32_8_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int32 =
-  let arg = %array_load.`int32` ($camlTOP7__switch_block_15, t) in
+  let arg = %array_load.`int32` ($camlTOP7__switch_block_20, t) in
   cont k (arg)
 in
-let $camlTOP7__match_naked_int32_9 =
+let $camlTOP7__match_naked_int32_19 =
   closure match_naked_int32_8_1 @match_naked_int32 &toplevel.alloc_region
 in
-let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_9) in
+let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_19) in
 cont done ($camlTOP7)
 |}]
 
@@ -199,19 +199,19 @@ match_naked_int64:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_int64_10 deleted in
-let $camlTOP8__switch_block_18 = Int64_array [|5L; 10L; 2L; 7L|] in
+let $camlTOP8__switch_block_24 = Int64_array [|5L; 10L; 2L; 7L|] in
 let code loopify(never) size(2) newer_version_of(match_naked_int64_10)
       match_naked_int64_10_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int64 =
-  let arg = %array_load.`int64` ($camlTOP8__switch_block_18, t) in
+  let arg = %array_load.`int64` ($camlTOP8__switch_block_24, t) in
   cont k (arg)
 in
-let $camlTOP8__match_naked_int64_11 =
+let $camlTOP8__match_naked_int64_23 =
   closure match_naked_int64_10_1 @match_naked_int64 &toplevel.alloc_region
 in
-let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_11) in
+let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_23) in
 cont done ($camlTOP8)
 |}]
 
@@ -229,20 +229,20 @@ match_naked_nativeint:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_nativeint_12 deleted in
-let $camlTOP9__switch_block_21 = Nativeint_array [|5n; 10n; 2n; 7n|] in
+let $camlTOP9__switch_block_28 = Nativeint_array [|5n; 10n; 2n; 7n|] in
 let code loopify(never) size(2) newer_version_of(match_naked_nativeint_12)
       match_naked_nativeint_12_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : nativeint =
-  let arg = %array_load.`nativeint` ($camlTOP9__switch_block_21, t) in
+  let arg = %array_load.`nativeint` ($camlTOP9__switch_block_28, t) in
   cont k (arg)
 in
-let $camlTOP9__match_naked_nativeint_13 =
+let $camlTOP9__match_naked_nativeint_27 =
   closure match_naked_nativeint_12_1 @match_naked_nativeint
     &toplevel.alloc_region
 in
-let $camlTOP9 = Block 0 ($camlTOP9__match_naked_nativeint_13) in
+let $camlTOP9 = Block 0 ($camlTOP9__match_naked_nativeint_27) in
 cont done ($camlTOP9)
 |}]
 
@@ -261,19 +261,19 @@ match_naked_int8:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_int8_14 deleted in
-let $camlTOP10__switch_block_24 = Int8_array [|5s; 10s; 2s; 7s|] in
+let $camlTOP10__switch_block_32 = Int8_array [|5s; 10s; 2s; 7s|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int8_14)
       match_naked_int8_14_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int8 =
-  let arg = %array_load.`int8` ($camlTOP10__switch_block_24, t) in
+  let arg = %array_load.`int8` ($camlTOP10__switch_block_32, t) in
   cont k (arg)
 in
-let $camlTOP10__match_naked_int8_15 =
+let $camlTOP10__match_naked_int8_31 =
   closure match_naked_int8_14_1 @match_naked_int8 &toplevel.alloc_region
 in
-let $camlTOP10 = Block 0 ($camlTOP10__match_naked_int8_15) in
+let $camlTOP10 = Block 0 ($camlTOP10__match_naked_int8_31) in
 cont done ($camlTOP10)
 |}]
 
@@ -291,19 +291,19 @@ match_naked_int16:
 |}]
 [%%expect_fexpr Simplify{|
 let code match_naked_int16_16 deleted in
-let $camlTOP11__switch_block_27 = Int16_array [|5S; 10S; 2S; 7S|] in
+let $camlTOP11__switch_block_36 = Int16_array [|5S; 10S; 2S; 7S|] in
 let code loopify(never) size(3) newer_version_of(match_naked_int16_16)
       match_naked_int16_16_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int16 =
-  let arg = %array_load.`int16` ($camlTOP11__switch_block_27, t) in
+  let arg = %array_load.`int16` ($camlTOP11__switch_block_36, t) in
   cont k (arg)
 in
-let $camlTOP11__match_naked_int16_17 =
+let $camlTOP11__match_naked_int16_35 =
   closure match_naked_int16_16_1 @match_naked_int16 &toplevel.alloc_region
 in
-let $camlTOP11 = Block 0 ($camlTOP11__match_naked_int16_17) in
+let $camlTOP11 = Block 0 ($camlTOP11__match_naked_int16_35) in
 cont done ($camlTOP11)
 |}]
 
@@ -320,29 +320,29 @@ match_symbol:
   ret
 |}]
 [%%expect_fexpr Simplify{|
-let $camlTOP12__immstring_29 = "alpha" in
-let $camlTOP12__immstring_30 = "beta" in
-let $camlTOP12__immstring_31 = "gamma" in
-let $camlTOP12__immstring_32 = "delta" in
+let $camlTOP12__immstring_38 = "alpha" in
+let $camlTOP12__immstring_39 = "beta" in
+let $camlTOP12__immstring_40 = "gamma" in
+let $camlTOP12__immstring_41 = "delta" in
 let code match_symbol_18 deleted in
-let $camlTOP12__switch_block_33 =
-  Value_array [|$camlTOP12__immstring_29;
-  $camlTOP12__immstring_30;
-  $camlTOP12__immstring_31;
-  $camlTOP12__immstring_32|]
+let $camlTOP12__switch_block_43 =
+  Value_array [|$camlTOP12__immstring_38;
+  $camlTOP12__immstring_39;
+  $camlTOP12__immstring_40;
+  $camlTOP12__immstring_41|]
 in
 let code loopify(never) size(2) newer_version_of(match_symbol_18)
       match_symbol_18_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  let arg = %array_load ($camlTOP12__switch_block_33, t) in
+  let arg = %array_load ($camlTOP12__switch_block_43, t) in
   cont k (arg)
 in
-let $camlTOP12__match_symbol_19 =
+let $camlTOP12__match_symbol_42 =
   closure match_symbol_18_1 @match_symbol &toplevel.alloc_region
 in
-let $camlTOP12 = Block 0 ($camlTOP12__match_symbol_19) in
+let $camlTOP12 = Block 0 ($camlTOP12__match_symbol_42) in
 cont done ($camlTOP12)
 |}]
 
@@ -365,14 +365,14 @@ match_symbol_or_tagged_immediate:
   ret
 |}]
 [%%expect_fexpr Simplify{|
-let $camlTOP14__immstring_36 = "foo" in
-let $camlTOP14__const_block_37 = Block 1 ($camlTOP14__immstring_36) in
-let $camlTOP14__const_block_38 = Block 0 (42) in
+let $camlTOP14__immstring_46 = "foo" in
+let $camlTOP14__const_block_47 = Block 1 ($camlTOP14__immstring_46) in
+let $camlTOP14__const_block_48 = Block 0 (42) in
 let code match_symbol_or_tagged_immediate_20 deleted in
-let $camlTOP14__switch_block_39 =
-  Value_array [|$camlTOP14__const_block_37;
+let $camlTOP14__switch_block_50 =
+  Value_array [|$camlTOP14__const_block_47;
   1;
-  $camlTOP14__const_block_38;
+  $camlTOP14__const_block_48;
   0|]
 in
 let code loopify(never) size(2) newer_version_of(match_symbol_or_tagged_immediate_20)
@@ -380,14 +380,14 @@ let code loopify(never) size(2) newer_version_of(match_symbol_or_tagged_immediat
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 |1 | 0 of imm tagged |1 of val ] =
-  let arg = %array_load ($camlTOP14__switch_block_39, t) in
+  let arg = %array_load ($camlTOP14__switch_block_50, t) in
   cont k (arg)
 in
-let $camlTOP14__match_symbol_or_tagged_immediate_21 =
+let $camlTOP14__match_symbol_or_tagged_immediate_49 =
   closure match_symbol_or_tagged_immediate_20_1
     @match_symbol_or_tagged_immediate &toplevel.alloc_region
 in
-let $camlTOP14 = Block 0 ($camlTOP14__match_symbol_or_tagged_immediate_21) in
+let $camlTOP14 = Block 0 ($camlTOP14__match_symbol_or_tagged_immediate_49) in
 cont done ($camlTOP14)
 |}]
 
@@ -408,27 +408,27 @@ match_symbol_tagged_or_null:
   ret
 |}]
 [%%expect_fexpr Simplify{|
-let $camlTOP15__immstring_41 = "foo" in
-let $camlTOP15__const_block_42 = Block 1 ($camlTOP15__immstring_41) in
-let $camlTOP15__const_block_43 = Block 0 (42) in
+let $camlTOP15__immstring_52 = "foo" in
+let $camlTOP15__const_block_53 = Block 1 ($camlTOP15__immstring_52) in
+let $camlTOP15__const_block_54 = Block 0 (42) in
 let code match_symbol_tagged_or_null_22 deleted in
-let $camlTOP15__switch_block_44 =
-  Value_array [|$camlTOP15__const_block_42;
+let $camlTOP15__switch_block_56 =
+  Value_array [|$camlTOP15__const_block_53;
   null;
-  $camlTOP15__const_block_43;
+  $camlTOP15__const_block_54;
   0|]
 in
 let code loopify(never) size(2) newer_version_of(match_symbol_tagged_or_null_22)
       match_symbol_tagged_or_null_22_1 (t : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  let arg = %array_load ($camlTOP15__switch_block_44, t) in
+  let arg = %array_load ($camlTOP15__switch_block_56, t) in
   cont k (arg)
 in
-let $camlTOP15__match_symbol_tagged_or_null_23 =
+let $camlTOP15__match_symbol_tagged_or_null_55 =
   closure match_symbol_tagged_or_null_22_1 @match_symbol_tagged_or_null
     &toplevel.alloc_region
 in
-let $camlTOP15 = Block 0 ($camlTOP15__match_symbol_tagged_or_null_23) in
+let $camlTOP15 = Block 0 ($camlTOP15__match_symbol_tagged_or_null_55) in
 cont done ($camlTOP15)
 |}]

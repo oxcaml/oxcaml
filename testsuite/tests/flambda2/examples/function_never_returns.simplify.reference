@@ -8,7 +8,7 @@ let code inline(never) loopify(never) size(3) newer_version_of(f_0)
         : imm tagged =
   cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1474)
 in
-let $camlFunction_never_returns__f_3 =
+let $camlFunction_never_returns__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(foo_1)
@@ -17,9 +17,9 @@ let code loopify(never) size(4) newer_version_of(foo_1)
         -> k * k1
         : imm tagged =
   apply direct(f_0_1 &my_alloc_region)
-    ($camlFunction_never_returns__f_3 : _ -> imm tagged) (0) -> never * k1
+    ($camlFunction_never_returns__f_1 : _ -> imm tagged) (0) -> never * k1
 in
-let $camlFunction_never_returns__foo_4 =
+let $camlFunction_never_returns__foo_2 =
   closure foo_1_1 @foo &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(bar_2)
@@ -28,14 +28,14 @@ let code loopify(never) size(4) newer_version_of(bar_2)
         -> k * k1
         : imm tagged =
   apply direct(f_0_1 &my_alloc_region) inlining_state(depth(1))
-    ($camlFunction_never_returns__f_3 : _ -> imm tagged) (0) -> never * k1
+    ($camlFunction_never_returns__f_1 : _ -> imm tagged) (0) -> never * k1
 in
-let $camlFunction_never_returns__bar_5 =
+let $camlFunction_never_returns__bar_3 =
   closure bar_2_1 @bar &toplevel.alloc_region
 in
 let $camlFunction_never_returns =
-  Block 0 ($camlFunction_never_returns__f_3,
-           $camlFunction_never_returns__foo_4,
-           $camlFunction_never_returns__bar_5)
+  Block 0 ($camlFunction_never_returns__f_1,
+           $camlFunction_never_returns__foo_2,
+           $camlFunction_never_returns__bar_3)
 in
 cont done ($camlFunction_never_returns)

@@ -36,10 +36,10 @@ camlE2e_oxcaml                                              E2e_oxcaml          
 camlE2e_oxcaml__Bump_N                                      E2e_oxcaml.Bump_N              (error)                                   E2e_oxcaml.Bump_N
 camlE2e_oxcaml__Make_adder_N                                E2e_oxcaml.Make_adder_N        (error)                                   E2e_oxcaml.Make_adder_N
 camlE2e_oxcaml__Pipeline_N                                  E2e_oxcaml.Pipeline_N          (error)                                   E2e_oxcaml.Pipeline_N
-camlE2e_oxcaml__PmakeblockN                                 E2e_oxcaml.PmakeblockN         (error)                                   E2e_oxcaml.PmakeblockN
-camlE2e_oxcaml__PmakeblockN                                 E2e_oxcaml.PmakeblockN         (error)                                   E2e_oxcaml.PmakeblockN
-camlE2e_oxcaml__PmakeblockN                                 E2e_oxcaml.PmakeblockN         (error)                                   E2e_oxcaml.PmakeblockN
-camlE2e_oxcaml__PmakeblockN                                 E2e_oxcaml.PmakeblockN         (error)                                   E2e_oxcaml.PmakeblockN
+camlE2e_oxcaml__Pmakeblock_N                                E2e_oxcaml.Pmakeblock_N        (error)                                   E2e_oxcaml.Pmakeblock_N
+camlE2e_oxcaml__Pmakeblock_N                                E2e_oxcaml.Pmakeblock_N        (error)                                   E2e_oxcaml.Pmakeblock_N
+camlE2e_oxcaml__Pmakeblock_N                                E2e_oxcaml.Pmakeblock_N        (error)                                   E2e_oxcaml.Pmakeblock_N
+camlE2e_oxcaml__Pmakeblock_N                                E2e_oxcaml.Pmakeblock_N        (error)                                   E2e_oxcaml.Pmakeblock_N
 camlE2e_oxcaml__Pmakeblock_N                                E2e_oxcaml.Pmakeblock_N        (error)                                   E2e_oxcaml.Pmakeblock_N
 camlE2e_oxcaml__add_N                                       E2e_oxcaml.add_N               (error)                                   E2e_oxcaml.add_N
 camlE2e_oxcaml__apply_poly_N                                E2e_oxcaml.apply_poly_N        (error)                                   E2e_oxcaml.apply_poly_N
@@ -53,7 +53,7 @@ camlE2e_oxcaml__data_end                                    E2e_oxcaml.data_end 
 camlE2e_oxcaml__entry                                       E2e_oxcaml.entry               (error)                                   E2e_oxcaml.entry
 camlE2e_oxcaml__frametable                                  E2e_oxcaml.frametable          (error)                                   E2e_oxcaml.frametable
 camlE2e_oxcaml__gc_roots                                    E2e_oxcaml.gc_roots            (error)                                   E2e_oxcaml.gc_roots
-camlE2e_oxcaml__iarrN                                       E2e_oxcaml.iarrN               (error)                                   E2e_oxcaml.iarrN
+camlE2e_oxcaml__iarr_N                                      E2e_oxcaml.iarr_N              (error)                                   E2e_oxcaml.iarr_N
 camlE2e_oxcaml__iarr_first_N                                E2e_oxcaml.iarr_first_N        (error)                                   E2e_oxcaml.iarr_first_N
 camlE2e_oxcaml__id_succ_N                                   E2e_oxcaml.id_succ_N           (error)                                   E2e_oxcaml.id_succ_N
 camlE2e_oxcaml__lt_sum_N                                    E2e_oxcaml.lt_sum_N            (error)                                   E2e_oxcaml.lt_sum_N
