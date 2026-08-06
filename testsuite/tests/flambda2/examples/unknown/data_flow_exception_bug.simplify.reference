@@ -11,7 +11,10 @@ let code do_stuff_0 deleted in
 let code stuff_1 deleted in
 let code loopify(never) size(3) newer_version_of(do_stuff_0)
       do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlData_flow_exception_bug__Pmakeblock17)
+  cont k1
+         pop(regular k1)
+         close[exn] my_alloc_region
+         ($camlData_flow_exception_bug__Pmakeblock17)
 in
 let $camlData_flow_exception_bug__do_stuff_2 =
   closure do_stuff_0_1 @do_stuff &toplevel.alloc_region
@@ -41,11 +44,12 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
     where k2 (region_return : [ 0 | 0 of val ]) =
       let `unit` = %end_region (`region`) in
       let unit_1 = %end_ghost_region (ghost_region) in
-      cont k (region_return)
+      cont k close[normal] my_alloc_region (region_return)
 in
 let $camlData_flow_exception_bug__stuff_3 =
   closure stuff_1_1 @stuff &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlData_flow_exception_bug =
   Block 0 ($camlData_flow_exception_bug__do_stuff_2,
            $camlData_flow_exception_bug__stuff_3)

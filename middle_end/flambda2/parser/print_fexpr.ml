@@ -342,6 +342,7 @@ let rec simple ppf : simple -> unit = function
   | Symbol s -> symbol ppf s
   | Var v -> variable ppf v
   | Const c -> const ppf c
+  | Region r -> region ppf r
   | Coerce (s, co) -> Format.fprintf ppf "%a ~ %a" simple s coercion co
 
 let simple_args ~space ~omit_if_empty ppf = function
@@ -395,6 +396,19 @@ let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
     pp_spaced ~space ppf "&%a" pp alloc_region
   | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
+
+let alloc_check ppf = function
+  | Alloc_checks.Forward -> Format.pp_print_string ppf "forward"
+  | Alloc_checks.Close -> Format.pp_print_string ppf "close"
+
+let alloc_checks ~space ppf { Alloc_checks.normal; exn; notrace; div } =
+  match normal, exn, notrace, div with
+  | Alloc_checks.(Forward, Forward, Forward, Close) ->
+    (* This is the default when the clause is omitted. *)
+    ()
+  | Alloc_checks.(Forward | Close), _, _, _ ->
+    pp_spaced ~space ppf "[%a %a %a %a]" alloc_check normal alloc_check exn
+      alloc_check notrace alloc_check div
 
 let boxed_variable ppf var ~kind =
   Format.fprintf ppf "%a : %s boxed" variable var kind
@@ -541,10 +555,25 @@ let trap_action ppf = function
       (pp_option ~space:After raise_kind)
       rk continuation exn_handler
 
-let apply_cont ppf ({ cont; trap_action = action; args } : Fexpr.apply_cont) =
-  Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
+let check_action ppf (action : Fexpr.check_action) =
+  match action with
+  | Close_alloc_region { exit; region = r } ->
+    let exit =
+      match exit with Normal -> "normal" | Exn -> "exn" | Notrace -> "notrace"
+    in
+    Format.fprintf ppf "close[%s] %a" exit region r
+
+let check_actions ppf = function
+  | [] -> ()
+  | actions ->
+    pp_spaced ~space:Before ppf "%a" (pp_list ~sep:"@ " check_action) actions
+
+let apply_cont ppf
+    ({ cont; trap_action = action; check_actions = actions; args } :
+      Fexpr.apply_cont) =
+  Format.fprintf ppf "@[<hv2>%a%a%a%a@]" continuation cont
     (pp_option ~space:Before trap_action)
-    action
+    action check_actions actions
     (simple_args ~space:Before ~omit_if_empty:true)
     args
 
@@ -726,6 +755,7 @@ let rec expr scope ppf = function
   | Apply
       { call_kind = kind;
         alloc_mode;
+        alloc_checks = ac;
         inlined;
         inlining_state = is;
         continuation = ret;
@@ -740,13 +770,15 @@ let rec expr scope ppf = function
         ppf is
     in
     Format.fprintf ppf
-      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
+      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ \
+       %a@]@]@]"
       Flambda_colours.expr_keyword Flambda_colours.pop Flambda_colours.elide
       (call_kind_and_alloc_mode ~space:Before)
       (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
-      inlined pp_inlining_state () Flambda_colours.pop
-      func_name_with_optional_arities (func, arities)
+      inlined pp_inlining_state ()
+      (alloc_checks ~space:Before)
+      ac Flambda_colours.pop func_name_with_optional_arities (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
 

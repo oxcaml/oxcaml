@@ -12,7 +12,7 @@ and code loopify(never) size(4) newer_version_of(foobar_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(aux_1_1 &my_alloc_region)
+  apply direct(aux_1_1 &my_alloc_region) [close close close close]
     ($camlDeleted_code_printing__aux_3 : _ -> imm tagged) (0) -> k * k1
 and set_of_closures
       $camlDeleted_code_printing__aux_3 =
@@ -36,8 +36,9 @@ and code loopify(done) size(15) newer_version_of(aux_1)
           | 1 -> k2)
          where k2 =
            let Pfield = %block_load.mut.[`0`] (env_2) in
-           cont k (Pfield))
+           cont k close[normal] my_alloc_region (Pfield))
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlDeleted_code_printing =
   Block 0 (env, $camlDeleted_code_printing__foobar_2)
 in

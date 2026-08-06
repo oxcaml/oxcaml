@@ -454,6 +454,7 @@ let unary_prim_size ~machine_width prim =
   | Get_header -> 2
   | Peek _ -> 1
   | Make_lazy _ -> alloc_size + 1
+  | Close_alloc_region _ | New_alloc_region _ -> 0
 
 let binary_prim_size ~machine_width prim =
   match (prim : Flambda_primitive.binary_primitive) with

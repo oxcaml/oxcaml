@@ -7,7 +7,7 @@ let code loopify(never) size(3) newer_version_of(f_0)
         -> k * k1
         : imm tagged =
   let int_add = %int_barith.add (n, 42) in
-  cont k (int_add)
+  cont k close[normal] my_alloc_region (int_add)
 in
 let $camlLet_symbol_var_inlining__f_2 =
   closure f_0_1 @f &toplevel.alloc_region
@@ -18,11 +18,12 @@ let code loopify(never) size(5) newer_version_of(g_1)
         -> k * k1
         : imm tagged =
   let int_mul = %int_barith.mul (m, 42) in
-  cont k (int_mul)
+  cont k close[normal] my_alloc_region (int_mul)
 in
 let $camlLet_symbol_var_inlining__g_3 =
   closure g_1_1 @g &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlLet_symbol_var_inlining =
   Block 0 ($Stdlib__List.camlStdlib__List__length_109,
            b,

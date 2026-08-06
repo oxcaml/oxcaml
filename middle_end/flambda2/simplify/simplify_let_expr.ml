@@ -436,6 +436,15 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in
+      let removed_alloc_region =
+        match Bound_pattern.must_be_singleton_opt bound_pattern with
+        | None -> None
+        | Some bound_var -> (
+          let var = VB.var bound_var in
+          match DE.find_removed_alloc_region (DA.denv dacc) var with
+          | None -> None
+          | Some _ -> Some var)
+      in
       (* Simplify the body of the let-expression and make the new [Let] bindings
          around the simplified body. [Simplify_named] will already have prepared
          [dacc] with the necessary bindings for the simplification of the
@@ -443,6 +452,20 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       let down_to_up dacc ~rebuild:rebuild_body =
         let rebuild uacc ~after_rebuild =
           let after_rebuild body uacc =
+            (match removed_alloc_region with
+            | None -> ()
+            | Some region ->
+              if
+                Name_mode.Or_absent.is_present
+                  (Name_occurrences.greatest_name_mode_var
+                     (UA.name_occurrences uacc) region)
+              then
+                Misc.fatal_errorf
+                  "Allocation region %a, whose [New_alloc_region] binding was \
+                   removed by simplification, still occurs in the body:@ %a"
+                  Variable.print region
+                  (RE.print (UA.are_rebuilding_terms uacc))
+                  body);
             rebuild_let simplify_named_result removed_operations
               ~lifted_constants_from_defining_expr ~at_unit_toplevel
               ~closure_info ~body uacc ~after_rebuild ~rewrite_id

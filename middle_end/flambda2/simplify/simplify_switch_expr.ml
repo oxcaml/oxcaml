@@ -27,7 +27,8 @@ type mergeable_arms =
   | No_arms
   | Mergeable of
       { cont : Continuation.t;
-        args : alias_set list
+        args : alias_set list;
+        check_actions : Check_action.t list
       }
   | Not_mergeable
 
@@ -43,6 +44,9 @@ let inter_alias_set alias1 alias2 =
         "[inter_alias_set]: intersection of poison with different kinds %a and \
          %a"
         Flambda_kind.print kind1 Flambda_kind.print kind2
+
+let equal_check_actions actions1 actions2 =
+  Misc.Stdlib.List.equal Check_action.equal actions1 actions2
 
 let find_all_aliases env arg =
   let find_all_aliases () =
@@ -109,7 +113,10 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
         else
           let check_handler ~handler ~action =
             match RE.to_apply_cont handler with
-            | Some action -> Some action
+            | Some handler_action ->
+              Some
+                (Apply_cont.prepend_check_actions handler_action
+                   (Apply_cont.check_actions action))
             | None -> Some action
           in
           match cont_info_from_uenv with
@@ -161,11 +168,16 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
             in
             ( new_let_conts,
               arms,
-              Mergeable { cont; args },
+              Mergeable
+                { cont; args; check_actions = Apply_cont.check_actions action },
               identity_arms,
               not_arms )
-          | Mergeable { cont; args } ->
-            if not (Continuation.equal cont (Apply_cont.continuation action))
+          | Mergeable { cont; args; check_actions } ->
+            if
+              (not (Continuation.equal cont (Apply_cont.continuation action)))
+              || not
+                   (equal_check_actions check_actions
+                      (Apply_cont.check_actions action))
             then new_let_conts, arms, Not_mergeable, identity_arms, not_arms
             else
               let args =
@@ -176,7 +188,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
               in
               ( new_let_conts,
                 arms,
-                Mergeable { cont; args },
+                Mergeable { cont; args; check_actions },
                 identity_arms,
                 not_arms )
       in
@@ -401,8 +413,21 @@ let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
   if TI.Map.cardinal arms < 3
   then None
   else
-    recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
-      ~arms
+    match TI.Map.data arms with
+    | [] -> None
+    | first :: rest ->
+      let check_actions = Apply_cont.check_actions first in
+      if
+        List.for_all
+          (fun action ->
+            equal_check_actions check_actions (Apply_cont.check_actions action))
+          rest
+      then
+        Option.map
+          (fun (dest, fields) -> dest, check_actions, fields)
+          (recognize_switch_with_single_arg_to_same_destination0 dbg
+             machine_width ~arms)
+      else None
 
 (* Tiny DSL to preserve sanity while rebuilding expressions. *)
 
@@ -497,7 +522,8 @@ let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
       P.Array_kind.print array_kind Debuginfo.print_compact dbg
 
 let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~(lookup_table_fields : lookup_table_fields) dbg =
+    ~scrutinee ~dest ~check_actions ~(lookup_table_fields : lookup_table_fields)
+    dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
     let var = Variable.create "switch_block" K.value in
@@ -570,7 +596,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
         continuations in [Name_occurrences] and then try to inline out [dest].
         This might happen anyway in the backend though so this probably isn't
         that important for now. *)
-     let apply_cont = Apply_cont.create dest ~args:[arg] ~dbg in
+     let apply_cont = Apply_cont.create dest ~args:[arg] ~check_actions ~dbg in
      let free_names_of_body = Apply_cont.free_names apply_cont in
      let expr =
        let body = RE.create_apply_cont apply_cont in
@@ -611,7 +637,7 @@ type affine_immediate_kind =
   | Naked
 
 let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg =
+    ~scrutinee ~dest ~check_actions ~offset ~slope ~immediate_kind dbg =
   (* We are creating the following fragment: *)
   (* let scaled = x * slope in
    * let final = scaled + offset in
@@ -628,7 +654,9 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
         (Int_arith (standard_int, Add), scaled_arg, Simple.const (const offset))
     in
     let$ final_arg = bound_prim "final_arg" kind add_prim dbg in
-    let apply_cont = Apply_cont.create dest ~args:[final_arg] ~dbg in
+    let apply_cont =
+      Apply_cont.create dest ~args:[final_arg] ~check_actions ~dbg
+    in
     let free_names = Apply_cont.free_names apply_cont in
     let added_code_size = Code_size.apply_cont apply_cont in
     return ~added_code_size ~free_names (RE.create_apply_cont apply_cont)
@@ -656,14 +684,30 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   let switch_merged =
     match mergeable_arms with
     | No_arms | Not_mergeable -> None
-    | Mergeable { cont; args } ->
+    | Mergeable { cont; args; check_actions } ->
       let num_args = List.length args in
       let required_names = UA.required_names uacc in
       let args =
         List.filter_map (filter_and_choose_alias required_names) args
       in
       if List.compare_length_with args num_args = 0
-      then Some (cont, args)
+      then Some (cont, args, check_actions)
+      else None
+  in
+  let common_destination_and_check_actions arms =
+    match TI.Map.data arms with
+    | [] -> None
+    | first :: rest ->
+      let cont = Apply_cont.continuation first in
+      let check_actions = Apply_cont.check_actions first in
+      if
+        List.for_all
+          (fun action ->
+            Continuation.equal cont (Apply_cont.continuation action)
+            && equal_check_actions check_actions
+                 (Apply_cont.check_actions action))
+          rest
+      then Some (cont, check_actions)
       else None
   in
   let switch_is_identity =
@@ -671,10 +715,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     let identity_arms_discrs = TI.Map.keys identity_arms in
     if not (TI.Set.equal arm_discrs identity_arms_discrs)
     then None
-    else
-      TI.Map.data identity_arms
-      |> List.map Apply_cont.continuation
-      |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+    else common_destination_and_check_actions identity_arms
   in
   let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
   let switch_is_boolean_not =
@@ -684,10 +725,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       (not (TI.Set.equal arm_discrs (TI.all_bools machine_width)))
       || not (TI.Set.equal arm_discrs not_arms_discrs)
     then None
-    else
-      TI.Map.data not_arms
-      |> List.map Apply_cont.continuation
-      |> Continuation.Set.of_list |> Continuation.Set.get_singleton
+    else common_destination_and_check_actions not_arms
   in
   let switch_is_single_arg_to_same_destination =
     recognize_switch_with_single_arg_to_same_destination condition_dbg
@@ -723,7 +761,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       let[@inline] normal_case uacc =
         match switch_is_single_arg_to_same_destination with
         | None -> normal_case0 uacc
-        | Some (dest, lookup_table_fields) -> (
+        | Some (dest, check_actions, lookup_table_fields) -> (
           let try_affine immediate_kind consts =
             assert (List.length consts = TI.Map.cardinal arms);
             Option.map
@@ -759,23 +797,25 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
           match affine with
           | None ->
             rebuild_switch_with_single_arg_to_same_destination uacc
-              ~dacc_before_switch ~scrutinee ~dest ~lookup_table_fields dbg
+              ~dacc_before_switch ~scrutinee ~dest ~check_actions
+              ~lookup_table_fields dbg
           | Some (immediate_kind, offset, slope) ->
             rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-              ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg)
+              ~scrutinee ~dest ~check_actions ~offset ~slope ~immediate_kind dbg
+          )
       in
       match switch_merged with
-      | Some (dest, args) ->
+      | Some (dest, args, check_actions) ->
         let uacc =
           UA.notify_removed ~operation:Removed_operations.branch uacc
         in
-        let apply_cont = Apply_cont.create dest ~args ~dbg in
+        let apply_cont = Apply_cont.create dest ~args ~check_actions ~dbg in
         let expr = RE.create_apply_cont apply_cont in
         let uacc = UA.add_free_names uacc (Apply_cont.free_names apply_cont) in
         expr, uacc
       | None -> (
         match switch_is_identity with
-        | Some dest ->
+        | Some (dest, check_actions) ->
           let uacc =
             (* CR mshinwell: it seems like this should be registering the
                potentially significant reduction in code size -- likewise in
@@ -790,7 +830,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                  dbg
              in
              let apply_cont =
-               Apply_cont.create dest ~args:[tagged_scrutinee] ~dbg
+               Apply_cont.create dest ~args:[tagged_scrutinee] ~check_actions
+                 ~dbg
              in
              let expr = RE.create_apply_cont apply_cont in
              return
@@ -799,7 +840,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                expr)
         | None -> (
           match switch_is_boolean_not with
-          | Some dest ->
+          | Some (dest, check_actions) ->
             let uacc =
               UA.notify_removed ~operation:Removed_operations.branch uacc
             in
@@ -815,7 +856,8 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                    dbg
                in
                let apply_cont =
-                 Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                 Apply_cont.create dest ~args:[not_scrutinee] ~check_actions
+                   ~dbg
                in
                let free_names = Apply_cont.free_names apply_cont in
                let added_code_size = Code_size.apply_cont apply_cont in
@@ -831,6 +873,11 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
   match T.meet typing_env_at_use scrutinee_ty shape with
   | Bottom -> arms, dacc
   | Ok (_meet_ty, env_at_use) ->
+    let action =
+      AC.with_check_actions action
+        (Simplify_common.rewrite_check_actions_for_removed_alloc_regions
+           (DA.denv dacc) (AC.check_actions action))
+    in
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let args = AC.args action in
     let use_kind =
@@ -853,11 +900,11 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
     let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
     let action = AC.with_debuginfo action ~dbg in
     let dacc =
-      DA.map_flow_acc dacc
-        ~f:
-          (Flow.Acc.add_apply_cont_args ~rewrite_id
-             (Apply_cont.continuation action)
-             args)
+      DA.map_flow_acc dacc ~f:(fun data_flow ->
+          Flow.Acc.add_apply_cont_args ~rewrite_id
+            (Apply_cont.continuation action)
+            args data_flow
+          |> Flow.Acc.add_check_actions (Apply_cont.check_actions action))
     in
     let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
     arms, dacc

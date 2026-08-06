@@ -4,7 +4,7 @@ let code g_1 deleted in
 let code f_3 deleted in
 let code loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
-  cont k (x)
+  cont k close[normal] my_alloc_region (x)
 in
 let $camlTest_exn_handler_inlining__id_4 =
   closure id_0_1 @`id` &toplevel.alloc_region
@@ -20,11 +20,12 @@ let code loopify(never) size(19) newer_version_of(p_2)
     | 1 -> k3
     where k3 =
       let Popaque = %opaque (0) in
-      cont k (Popaque)
+      cont k close[normal] my_alloc_region (Popaque)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
       let Popaque = %opaque ($camlTest_exn_handler_inlining__id_4) in
-      apply &my_alloc_region Popaque (Pfield) -> k * k1
+      apply &my_alloc_region [close close close close]
+        Popaque (Pfield) -> k * k1
 in
 let $camlTest_exn_handler_inlining__p_6 =
   closure p_2_1 @p &toplevel.alloc_region
@@ -34,7 +35,7 @@ let code loopify(never) size(4) newer_version_of(g_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
-  apply direct(p_2_1 &my_alloc_region)
+  apply direct(p_2_1 &my_alloc_region) [close close close close]
     ($camlTest_exn_handler_inlining__p_6
      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
       (y)
@@ -72,11 +73,12 @@ let code loopify(never) size(18) newer_version_of(f_3)
       let c_unboxed0_1 = c_unboxed0 in
       let `unit` = %end_try_region (try_region) in
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
-      cont k (c_unboxed0_1)
+      cont k close[normal] my_alloc_region (c_unboxed0_1)
 in
 let $camlTest_exn_handler_inlining__f_7 =
   closure f_3_1 @f &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTest_exn_handler_inlining =
   Block 0 ($camlTest_exn_handler_inlining__id_4,
            $camlTest_exn_handler_inlining__g_5,

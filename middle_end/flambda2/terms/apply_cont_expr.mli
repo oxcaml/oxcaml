@@ -25,6 +25,7 @@ include Contains_ids.S with type t := t
 
 val create :
   ?trap_action:Trap_action.t ->
+  ?check_actions:Check_action.t list ->
   Continuation.t ->
   args:Simple.t list ->
   dbg:Debuginfo.t ->
@@ -38,6 +39,8 @@ val args : t -> Simple.t list
 
 val trap_action : t -> Trap_action.t option
 
+val check_actions : t -> Check_action.t list
+
 val debuginfo : t -> Debuginfo.t
 
 val with_continuation : t -> Continuation.t -> t
@@ -45,6 +48,12 @@ val with_continuation : t -> Continuation.t -> t
 val with_continuation_and_args : t -> Continuation.t -> args:Simple.t list -> t
 
 val update_args : t -> args:Simple.t list -> t
+
+val with_check_actions : t -> Check_action.t list -> t
+
+val add_check_actions : t -> Check_action.t list -> t
+
+val prepend_check_actions : t -> Check_action.t list -> t
 
 val with_debuginfo : t -> dbg:Debuginfo.t -> t
 

@@ -8,7 +8,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
   let for_stop = %tag_imm (prim) in
   let prim_1 = %int_comp.le (0, for_stop) in
   switch prim_1
-    | 0 -> k (0)
+    | 0 -> k close[normal] my_alloc_region (0)
     | 1 -> k2
     where k2 =
       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim) in
@@ -44,11 +44,12 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                   %int_comp.`int64`.le (for_next_naked, for_stop_naked)
                 in
                 switch prim_5
-                  | 0 -> k (0)
+                  | 0 -> k close[normal] my_alloc_region (0)
                   | 1 -> k2 (for_next_naked, int_add)))
 in
 let $camlMutable_vars1__escape_string_1 =
   closure escape_string_0_1 @escape_string &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlMutable_vars1 = Block 0 ($camlMutable_vars1__escape_string_1) in
 cont done ($camlMutable_vars1)

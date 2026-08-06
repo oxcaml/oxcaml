@@ -1194,6 +1194,12 @@ let nullary_classify_for_printing p =
   | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
 
+let map_alloc_regions_nullary_primitive p ~f:_ =
+  match p with
+  | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+    p
+
 module Reinterpret_64_bit_word = struct
   type t =
     | Tagged_int63_as_unboxed_int64
@@ -1274,6 +1280,52 @@ type unary_primitive =
       { lazy_tag : Lazy_block_tag.t;
         alloc_region : Variable.t
       }
+  | Close_alloc_region of Check_action.close_alloc_region_type
+  | New_alloc_region of alloc_region_checks
+
+and alloc_check_action =
+  | Transfer
+  | Check
+  | Discard
+
+and alloc_region_checks =
+  (Alloc_checks.check * alloc_check_action) Alloc_checks.per_exit
+
+and alloc_check_actions = alloc_check_action Alloc_checks.per_exit
+
+let alloc_region_checks_with_actions (checks : Alloc_checks.t)
+    ~(actions : alloc_check_actions) : alloc_region_checks =
+  Alloc_checks.map2 checks actions ~f:(fun check action -> check, action)
+
+let alloc_region_checks_with_action checks ~action =
+  Alloc_checks.map checks ~f:(fun check -> check, action)
+
+let meet_alloc_region_checks (checks : alloc_region_checks)
+    (flags : Alloc_checks.t) : alloc_region_checks =
+  Alloc_checks.map2 checks flags ~f:(fun (check, action) flag ->
+      Alloc_checks.meet_check check flag, action)
+
+let alloc_region_checks_flags (checks : alloc_region_checks) : Alloc_checks.t =
+  Alloc_checks.map checks ~f:fst
+
+let alloc_region_checks_only_transfer (checks : alloc_region_checks) =
+  Alloc_checks.for_all checks ~f:(fun (_check, action) ->
+      match action with Transfer -> true | Check | Discard -> false)
+
+let compare_alloc_check_action (action1 : alloc_check_action)
+    (action2 : alloc_check_action) =
+  let numbering (action : alloc_check_action) =
+    match action with Transfer -> 0 | Check -> 1 | Discard -> 2
+  in
+  Int.compare (numbering action1) (numbering action2)
+
+let compare_alloc_region_checks (checks1 : alloc_region_checks)
+    (checks2 : alloc_region_checks) =
+  Alloc_checks.compare_per_exit
+    (fun (check1, action1) (check2, action2) ->
+      let c = Alloc_checks.compare_check check1 check2 in
+      if c <> 0 then c else compare_alloc_check_action action1 action2)
+    checks1 checks2
 
 (* Here and below, operations that are genuine projections shouldn't be eligible
    for CSE, since we deal with projections through types. *)
@@ -1308,6 +1360,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   | Project_function_slot _ | Project_value_slot _ -> false
   | Is_boxed_float | Is_flat_float_array -> true
   | End_region _ | End_try_region _ | Obj_dup _ | Peek _ | Make_lazy _ -> false
+  | Close_alloc_region _ | New_alloc_region _ -> false
 
 let compare_unary_primitive p1 p2 =
   let unary_primitive_numbering p =
@@ -1343,6 +1396,8 @@ let compare_unary_primitive p1 p2 =
     | Peek _ -> 28
     | Make_lazy _ -> 29
     | Reinterpret_boxed_vector -> 30
+    | Close_alloc_region _ -> 31
+    | New_alloc_region _ -> 32
   in
   match p1, p2 with
   | ( Block_load { kind = kind1; mut = mut1; field = field1 },
@@ -1441,6 +1496,10 @@ let compare_unary_primitive p1 p2 =
       Make_lazy { lazy_tag = lazy_tag2; alloc_region = alloc_region2 } ) ->
     let c = Lazy_block_tag.compare lazy_tag1 lazy_tag2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
+  | Close_alloc_region exit1, Close_alloc_region exit2 ->
+    Check_action.compare_close_alloc_region_type exit1 exit2
+  | New_alloc_region checks1, New_alloc_region checks2 ->
+    compare_alloc_region_checks checks1 checks2
   | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
       | Is_null | Get_tag | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
@@ -1449,7 +1508,7 @@ let compare_unary_primitive p1 p2 =
       | Untag_immediate | Tag_immediate | Project_function_slot _
       | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
       | End_region _ | End_try_region _ | Obj_dup _ | Get_header | Peek _
-      | Make_lazy _ ),
+      | Make_lazy _ | Close_alloc_region _ | New_alloc_region _ ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -1523,6 +1582,25 @@ let print_unary_primitive ppf p =
   | Make_lazy { lazy_tag; alloc_region } ->
     fprintf ppf "@[<hov 1>(Make_lazy@ (lazy_tag %a)@ (alloc_region %a))@]"
       Lazy_block_tag.print lazy_tag Variable.print alloc_region
+  | Close_alloc_region kind ->
+    let name =
+      match kind with Normal -> "normal" | Exn -> "exn" | Notrace -> "notrace"
+    in
+    fprintf ppf "Close_alloc_region[%s]" name
+  | New_alloc_region alloc_checks ->
+    let print_action ppf action =
+      Format.pp_print_string ppf
+        (match action with
+        | Transfer -> "Transfer"
+        | Check -> "Check"
+        | Discard -> "Discard")
+    in
+    let print_check ppf (check, action) =
+      fprintf ppf "%a@ %a" Alloc_checks.print_check check print_action action
+    in
+    fprintf ppf "@[<hov 1>(New_alloc_region@ %a)@]"
+      (Alloc_checks.print_per_exit print_check)
+      alloc_checks
 
 let arg_kind_of_unary_primitive p =
   match p with
@@ -1559,6 +1637,8 @@ let arg_kind_of_unary_primitive p =
   | Get_header -> K.value
   | Peek _ -> K.naked_nativeint
   | Make_lazy _ -> K.value
+  | Close_alloc_region _ -> K.region
+  | New_alloc_region _ -> K.region
 
 let result_kind_of_unary_primitive p : result_kind =
   match p with
@@ -1598,6 +1678,8 @@ let result_kind_of_unary_primitive p : result_kind =
   | Get_header -> Singleton K.naked_nativeint
   | Peek kind -> Singleton (K.Standard_int_or_float.to_kind kind)
   | Make_lazy _ -> Singleton K.value
+  | Close_alloc_region _ -> Singleton K.value
+  | New_alloc_region _ -> Singleton K.region
 
 let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
   match p with
@@ -1722,6 +1804,9 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
       No_coeffects,
       Strict,
       Can't_move_before_any_branch )
+  | Close_alloc_region _ | New_alloc_region _ ->
+    (* These need special-casing for deletion. *)
+    Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
 
 let unary_classify_for_printing p =
   match p with
@@ -1740,6 +1825,7 @@ let unary_classify_for_printing p =
   | Get_header -> Neither
   | Peek _ -> Neither
   | Make_lazy _ -> Constructive
+  | Close_alloc_region _ | New_alloc_region _ -> Neither
 
 let free_names_unary_primitive p =
   match p with
@@ -1766,7 +1852,8 @@ let free_names_unary_primitive p =
   | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Get_header
-  | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Peek (_ : Flambda_kind.Standard_int_or_float.t)
+  | Close_alloc_region _ | New_alloc_region _ ->
     Name_occurrences.empty
 
 let apply_renaming_unary_primitive p renaming =
@@ -1815,7 +1902,58 @@ let apply_renaming_unary_primitive p renaming =
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
   | Get_header
-  | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Peek (_ : Flambda_kind.Standard_int_or_float.t)
+  | Close_alloc_region _ | New_alloc_region _ ->
+    p
+
+let map_alloc_regions_unary_primitive p ~f =
+  match p with
+  | Box_number (kind, alloc_mode) ->
+    let alloc_mode' =
+      Alloc_mode.For_allocations.map_alloc_region alloc_mode ~f
+    in
+    if alloc_mode == alloc_mode' then p else Box_number (kind, alloc_mode')
+  | Int_as_pointer alloc_mode ->
+    let alloc_mode' =
+      Alloc_mode.For_allocations.map_alloc_region alloc_mode ~f
+    in
+    if alloc_mode == alloc_mode' then p else Int_as_pointer alloc_mode'
+  | Duplicate_array
+      { alloc_region; kind; source_mutability; destination_mutability } ->
+    let alloc_region' = f alloc_region in
+    if alloc_region == alloc_region'
+    then p
+    else
+      Duplicate_array
+        { alloc_region = alloc_region';
+          kind;
+          source_mutability;
+          destination_mutability
+        }
+  | Duplicate_block { alloc_region; kind } ->
+    let alloc_region' = f alloc_region in
+    if alloc_region == alloc_region'
+    then p
+    else Duplicate_block { alloc_region = alloc_region'; kind }
+  | Obj_dup { alloc_region } ->
+    let alloc_region' = f alloc_region in
+    if alloc_region == alloc_region'
+    then p
+    else Obj_dup { alloc_region = alloc_region' }
+  | Make_lazy { alloc_region; lazy_tag } ->
+    let alloc_region' = f alloc_region in
+    if alloc_region == alloc_region'
+    then p
+    else Make_lazy { alloc_region = alloc_region'; lazy_tag }
+  | Block_load _ | Is_int _ | Is_null | Get_tag | String_length _
+  | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
+  | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
+  | Array_length _ | Bigarray_length _ | Unbox_number _ | Untag_immediate
+  | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
+  | End_try_region _ | Project_function_slot _ | Project_value_slot _
+  | Get_header
+  | Peek (_ : Flambda_kind.Standard_int_or_float.t)
+  | Close_alloc_region _ | New_alloc_region _ ->
     p
 
 let ids_for_export_unary_primitive p =
@@ -1834,7 +1972,8 @@ let ids_for_export_unary_primitive p =
   | Tag_immediate | Is_boxed_float | Is_flat_float_array | End_region _
   | End_try_region _ | Project_function_slot _ | Project_value_slot _
   | Get_header
-  | Peek (_ : Flambda_kind.Standard_int_or_float.t) ->
+  | Peek (_ : Flambda_kind.Standard_int_or_float.t)
+  | Close_alloc_region _ | New_alloc_region _ ->
     Ids_for_export.empty
 
 type binary_int_arith_op =
@@ -2192,6 +2331,15 @@ let ids_for_export_binary_primitive p =
   | Read_offset _ ->
     Ids_for_export.empty
 
+let map_alloc_regions_binary_primitive p ~f:_ =
+  match p with
+  | Block_set _ | Array_load _ | String_or_bigstring_load _ | Bigarray_load _
+  | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _ | Float_arith _
+  | Float_comp _ | Bigarray_get_alignment _ | Atomic_load_field _
+  | Poke (_ : Flambda_kind.Standard_int_or_float.t)
+  | Read_offset _ ->
+    p
+
 type int_atomic_op =
   | Fetch_add
   | Add
@@ -2507,6 +2655,17 @@ let ids_for_export_quaternary_primitive p =
   | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ ->
     Ids_for_export.empty
 
+let map_alloc_regions_ternary_primitive p ~f:_ =
+  match p with
+  | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
+  | Atomic_field_int_arith _ | Atomic_set_field _ | Atomic_exchange_field _
+  | Write_offset _ ->
+    p
+
+let map_alloc_regions_quaternary_primitive p ~f:_ =
+  match p with
+  | Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _ -> p
+
 type variadic_primitive =
   | Begin_region of { ghost : bool }
   | Begin_try_region of { ghost : bool }
@@ -2630,6 +2789,20 @@ let apply_renaming_variadic_primitive p renaming =
   | Make_array (kind, mut, alloc_mode) ->
     let alloc_mode' =
       Alloc_mode.For_allocations.apply_renaming alloc_mode renaming
+    in
+    if alloc_mode == alloc_mode' then p else Make_array (kind, mut, alloc_mode')
+
+let map_alloc_regions_variadic_primitive p ~f =
+  match p with
+  | Begin_region _ | Begin_try_region _ -> p
+  | Make_block (kind, mut, alloc_mode) ->
+    let alloc_mode' =
+      Alloc_mode.For_allocations.map_alloc_region alloc_mode ~f
+    in
+    if alloc_mode == alloc_mode' then p else Make_block (kind, mut, alloc_mode')
+  | Make_array (kind, mut, alloc_mode) ->
+    let alloc_mode' =
+      Alloc_mode.For_allocations.map_alloc_region alloc_mode ~f
     in
     if alloc_mode == alloc_mode' then p else Make_array (kind, mut, alloc_mode')
 
@@ -2897,6 +3070,11 @@ let args t =
   | Quaternary (_, x0, x1, x2, x3) -> [x0; x1; x2; x3]
   | Variadic (_, xs) -> xs
 
+let of_check_action (check_action : Check_action.t) : t =
+  match check_action with
+  | Close_alloc_region { exit; region } ->
+    Unary (Close_alloc_region exit, Simple.var region)
+
 let map_args f t =
   match t with
   | Nullary _ -> t
@@ -2923,6 +3101,27 @@ let map_args f t =
   | Variadic (p, xs) ->
     let xs' = Misc.Stdlib.List.map_sharing f xs in
     if xs == xs' then t else Variadic (p, xs')
+
+let map_alloc_regions t ~f =
+  match t with
+  | Nullary p ->
+    let p' = map_alloc_regions_nullary_primitive p ~f in
+    if p == p' then t else Nullary p'
+  | Unary (p, x0) ->
+    let p' = map_alloc_regions_unary_primitive p ~f in
+    if p == p' then t else Unary (p', x0)
+  | Binary (p, x0, x1) ->
+    let p' = map_alloc_regions_binary_primitive p ~f in
+    if p == p' then t else Binary (p', x0, x1)
+  | Ternary (p, x0, x1, x2) ->
+    let p' = map_alloc_regions_ternary_primitive p ~f in
+    if p == p' then t else Ternary (p', x0, x1, x2)
+  | Quaternary (p, x0, x1, x2, x3) ->
+    let p' = map_alloc_regions_quaternary_primitive p ~f in
+    if p == p' then t else Quaternary (p', x0, x1, x2, x3)
+  | Variadic (p, xs) ->
+    let p' = map_alloc_regions_variadic_primitive p ~f in
+    if p == p' then t else Variadic (p', xs)
 
 let result_kind (t : t) =
   match t with
@@ -3251,6 +3450,17 @@ let is_end_region t =
     | Some (region, _coercion) -> Some region
     | None ->
       Misc.fatal_errorf "End_region with non-Variable argument:@ %a"
+        Simple.print region)
+  | _ -> None
+[@@ocaml.warning "-fragile-match"]
+
+let is_check_action t : Check_action.t option =
+  match t with
+  | Unary (Close_alloc_region exit, region) -> (
+    match Simple.must_be_var region with
+    | Some (region, _coercion) -> Some (Close_alloc_region { exit; region })
+    | None ->
+      Misc.fatal_errorf "Close_alloc_region with non-Variable argument:@ %a"
         Simple.print region)
   | _ -> None
 [@@ocaml.warning "-fragile-match"]

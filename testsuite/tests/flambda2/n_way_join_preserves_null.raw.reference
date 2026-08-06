@@ -20,18 +20,18 @@ let $camlN_way_join_preserves_null__first_const = Block 0 () in
      where k3 (c : imm tagged) =
        ((let untagged = %untag_imm (c) in
          switch untagged
-           | 0 -> k1 (0)
+           | 0 -> k1 close[normal] my_alloc_region (0)
            | 1 -> k4)
           where k4 =
             cont k3
           where k3 =
             let prim = %phys_ne (bit, 0) in
             let noteq = %tag_imm (prim) in
-            cont k1 (noteq))
+            cont k1 close[normal] my_alloc_region (noteq))
  in
  let f = closure f_0 @f &toplevel.alloc_region in
  let Pmakeblock = %block.[`0`].`toplevel` (f) in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
     let $camlN_way_join_preserves_null = Block 0 (field_0) in

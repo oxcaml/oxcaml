@@ -18,9 +18,10 @@ open! Flambda.Import
 module RC = Apply.Result_continuation
 
 let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
-    ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
-    ~bind_params ~bind_depth ~apply_renaming =
+    ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~alloc_checks
+    ~exn_continuation ~return_continuation ~apply_exn_continuation
+    ~apply_return_continuation ~bind_params ~bind_depth ~bind_alloc_region
+    ~apply_renaming =
   let renaming = Renaming.empty in
   let renaming =
     match (apply_return_continuation : RC.t) with
@@ -30,7 +31,7 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
   let renaming =
     Renaming.add_continuation renaming exn_continuation apply_exn_continuation
   in
-  let renaming =
+  let renaming, my_alloc_region, alloc_region =
     (* If region_inlined_into is Heap, then this function should return a heap
        value, and as such, never allocate in the caller's region. As such,
        [my_region] should be unused in the body. *)
@@ -38,7 +39,7 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
     | Not_alloc_stack { alloc_region } -> (
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
       | Not_alloc_stack { alloc_region = my_alloc_region } ->
-        Renaming.add_variable renaming my_alloc_region alloc_region
+        renaming, my_alloc_region, alloc_region
       | Maybe_alloc_stack _ ->
         Misc.fatal_error
           "Cannot inline a local returning function into a global function; \
@@ -55,13 +56,13 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
             region = my_region;
             ghost_region = my_ghost_region
           } ->
-        Renaming.add_variable
-          (Renaming.add_variable
-             (Renaming.add_variable renaming my_region region)
-             my_ghost_region ghost_region)
-          my_alloc_region alloc_region
+        ( Renaming.add_variable
+            (Renaming.add_variable renaming my_region region)
+            my_ghost_region ghost_region,
+          my_alloc_region,
+          alloc_region )
       | Not_alloc_stack { alloc_region = my_alloc_region } ->
-        Renaming.add_variable renaming my_alloc_region alloc_region)
+        renaming, my_alloc_region, alloc_region)
   in
   let body =
     match callee with
@@ -70,6 +71,9 @@ let make_inlined_body ~callee ~called_code_id:_ ~region_inlined_into ~params
     | None -> bind_params ~params ~args ~body
   in
   let body = bind_depth ~my_depth ~rec_info ~body in
+  let body =
+    bind_alloc_region ~my_alloc_region ~alloc_region ~alloc_checks ~body
+  in
   apply_renaming body renaming
 
 let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation

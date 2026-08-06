@@ -510,6 +510,41 @@ type unary_primitive =
       { lazy_tag : Lazy_block_tag.t;
         alloc_region : Variable.t
       }
+  | Close_alloc_region of Check_action.close_alloc_region_type
+  | New_alloc_region of alloc_region_checks
+
+(** What to do with the allocation state of a region when it is closed: transfer
+    it to the parent region, check that no allocation occurred, or discard it.
+*)
+and alloc_check_action =
+  | Transfer
+  | Check
+  | Discard
+
+and alloc_region_checks =
+  (Alloc_checks.check * alloc_check_action) Alloc_checks.per_exit
+
+and alloc_check_actions = alloc_check_action Alloc_checks.per_exit
+
+(** Pair every check of the given [Alloc_checks.t] with the corresponding action
+    from [actions]. *)
+val alloc_region_checks_with_actions :
+  Alloc_checks.t -> actions:alloc_check_actions -> alloc_region_checks
+
+(** Pair every check of the given [Alloc_checks.t] with the same [action]. *)
+val alloc_region_checks_with_action :
+  Alloc_checks.t -> action:alloc_check_action -> alloc_region_checks
+
+(** Meet the Forward/Close flags of the given checks pointwise with [flags]
+    (Close iff both are Close), leaving the actions unchanged. *)
+val meet_alloc_region_checks :
+  alloc_region_checks -> Alloc_checks.t -> alloc_region_checks
+
+(** The Forward/Close flags of the given checks, without the actions. *)
+val alloc_region_checks_flags : alloc_region_checks -> Alloc_checks.t
+
+(** Whether every action of the given checks is [Transfer]. *)
+val alloc_region_checks_only_transfer : alloc_region_checks -> bool
 
 (** Whether a comparison is to yield a boolean result, as given by a particular
     comparison operator, or whether it is to behave in the manner of "compare"
@@ -660,6 +695,16 @@ val args : t -> Simple.t list
 
 val map_args : (Simple.t -> Simple.t) -> t -> t
 
+(** The primitive performing the given check action, when it is made explicit
+    rather than attached to an [Apply_cont]. *)
+val of_check_action : Check_action.t -> t
+
+(** Apply [f] to the allocation regions embedded in the given primitive, i.e.
+    those indicating where it allocates. The regions taken as arguments by
+    [New_alloc_region] and [Close_alloc_region] are not affected, nor are any
+    stack allocation regions. *)
+val map_alloc_regions : t -> f:(Variable.t -> Variable.t) -> t
+
 (** Simpler version (e.g. for [Inlining_cost]), where only the actual primitive
     matters, not the arguments. *)
 module Without_args : sig
@@ -804,3 +849,8 @@ val is_begin_or_end_region : t -> bool
 val is_begin_region : t -> bool
 
 val is_end_region : t -> Variable.t option
+
+(** The check action performing the same operation as the given primitive, if
+    there is one (i.e. if it is a [Close_alloc_region]). Inverse of
+    [of_check_action]. *)
+val is_check_action : t -> Check_action.t option

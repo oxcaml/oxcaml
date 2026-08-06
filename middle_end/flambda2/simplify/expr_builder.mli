@@ -42,6 +42,15 @@ type binding_to_place =
       }
   | Delete_binding of { original_defining_expr : Named.t option }
 
+(** [Keep_binding]s performing the given check actions, to be placed (with
+    [make_new_let_bindings]) around the handler of a continuation that a jump
+    carrying these actions is being replaced by. *)
+val check_action_bindings :
+  Upwards_acc.t ->
+  dbg:Debuginfo.t ->
+  Check_action.t list ->
+  binding_to_place list
+
 (** Create [Let] binding(s) around a given body. (The type of this function
     prevents it from being used to create "let symbol" bindings; use the other
     functions in this module instead.) Bindings will be elided if they are

@@ -5,7 +5,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(read_int_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  cont k (42)
+  cont k close[normal] my_alloc_region (42)
 in
 let $camlFloat_and_int_mix__read_int_2 =
   closure read_int_0_1 @read_int &toplevel.alloc_region
@@ -21,6 +21,7 @@ in
 let $camlFloat_and_int_mix__gasp_in_horror_3 =
   closure gasp_in_horror_1_1 @gasp_in_horror &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlFloat_and_int_mix =
   Block 0 ($camlFloat_and_int_mix__read_int_2,
            $camlFloat_and_int_mix__gasp_in_horror_3)

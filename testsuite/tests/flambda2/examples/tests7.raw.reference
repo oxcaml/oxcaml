@@ -18,7 +18,7 @@
    let int_add_1 = %int_barith.add (int_add, Pstringlength_2) in
    let int_add_2 = %int_barith.add (int_add_1, Pstringlength_1) in
    let int_add_3 = %int_barith.add (int_add_2, Pstringlength) in
-   cont k1 (int_add_3)
+   cont k1 close[normal] my_alloc_region (int_add_3)
  in
  let code size(31)
        foo_1 (af : float ^ 2, y : float boxed)
@@ -38,7 +38,7 @@
    let prim_6 = %unbox_num.`float` (x) in
    let prim_7 = %bfloat_arith.add (prim_6, prim_5) in
    let float_add = %box_num.`float`.my_alloc_region (prim_7) in
-   cont k1 (float_add)
+   cont k1 close[normal] my_alloc_region (float_add)
  in
  let $camlTests7__empty_block5 = Block 0 () in
  let f = closure f_0 @f &toplevel.alloc_region in
@@ -51,7 +51,7 @@
       f,
       foo)
  in
- cont k (Pmakeblock))
+ cont k close[normal] toplevel.alloc_region (Pmakeblock))
   where k define_root_symbol (module_block) =
     let field_0 = $camlTests7__empty_block5 in
     let field_1 = $camlTests7__immstring8 in

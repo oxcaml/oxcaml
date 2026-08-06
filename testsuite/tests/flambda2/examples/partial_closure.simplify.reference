@@ -9,7 +9,7 @@ let code loopify(never) size(17) newer_version_of(foo_1)
       let prim = %is_int (l) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (accu)
+         | 1 -> k close[normal] my_alloc_region (accu)
          where k2 =
            let Pfield = %block_load.[`1`] (l) in
            let Pfield_1 = %block_load.[`0`] (l) in
@@ -18,5 +18,6 @@ let code loopify(never) size(17) newer_version_of(foo_1)
 in
 let $camlPartial_closure__foo_5 = closure foo_1_1 @foo &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlPartial_closure = Block 0 ($camlPartial_closure__foo_5) in
 cont done ($camlPartial_closure)

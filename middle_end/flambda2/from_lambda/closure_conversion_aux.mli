@@ -224,6 +224,7 @@ module Acc : sig
     { code_id : Code_id.t;
       return_continuation : Continuation.t;
       exn_continuation : Exn_continuation.t;
+      my_alloc_region : Variable.t;
       my_closure : Variable.t;
       is_purely_tailrec : bool;
       slot_offsets_at_definition : Slot_offsets.t
@@ -234,6 +235,9 @@ module Acc : sig
   val create :
     cmx_loader:Flambda_cmx.loader ->
     machine_width:Target_system.Machine_width.t ->
+    toplevel_return_continuation:Continuation.t ->
+    toplevel_exn_continuation:Continuation.t ->
+    toplevel_my_alloc_region:Variable.t ->
     t
 
   val manufacture_symbol_short_name : t -> t * Linkage_name.t
@@ -315,11 +319,35 @@ module Acc : sig
 
   val top_closure_info : t -> closure_info option
 
+  val current_alloc_exit_context :
+    t -> Variable.t * Continuation.t * Continuation.t
+
+  val push_alloc_region :
+    t ->
+    alloc_region:Variable.t ->
+    normal_continuation:Continuation.t ->
+    exn_continuation:Continuation.t ->
+    t
+
+  val pop_alloc_region : t -> alloc_region:Variable.t -> t
+
+  (** The check action closing the current allocation region at the given exit.
+  *)
+  val close_alloc_region_action :
+    t -> exit:Check_action.close_alloc_region_type -> Check_action.t
+
+  (** The check actions for a raise to [exn_handler]: closes the current
+      allocation region if [exn_handler] is the exception continuation of the
+      current allocation region context. *)
+  val raise_check_actions :
+    t -> raise_kind:Lambda.raise_kind -> Continuation.t -> Check_action.t list
+
   val push_closure_info :
     t ->
     return_continuation:Continuation.t ->
     exn_continuation:Exn_continuation.t ->
     my_closure:Variable.t ->
+    my_alloc_region:Variable.t ->
     is_purely_tailrec:bool ->
     code_id:Code_id.t ->
     t
@@ -482,6 +510,7 @@ module Apply_cont_with_acc : sig
   val create :
     Acc.t ->
     ?trap_action:Trap_action.t ->
+    ?check_actions:Check_action.t list ->
     ?args_approx:Env.value_approximation list ->
     Continuation.t ->
     args:Simple.t list ->

@@ -53,20 +53,25 @@ let code loopify(never) size(47) newer_version_of(foo_0)
       (switch tag
          | 0 -> k2
          | 1 -> k3
-         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock33)
+         | 2 ->
+           k1
+             pop(regular k1)
+             close[exn] my_alloc_region
+             ($camlVariant_unboxed__Pmakeblock33)
          where k3 =
            let prim = %unbox_num.`float` (unboxed_field_1_1) in
            let prim_1 = %num_conv.[`float`].[`imm`] (prim) in
            let int_of_float = %tag_imm (prim_1) in
            let int_add = %int_barith.add (unboxed_field_1_0, int_of_float) in
-           cont k (int_add)
+           cont k close[normal] my_alloc_region (int_add)
          where k2 =
            let int_add =
              %int_barith.add (unboxed_field_0_0, unboxed_field_0_1)
            in
-           cont k (int_add))
+           cont k close[normal] my_alloc_region (int_add))
 in
 let $camlVariant_unboxed__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_1) in
 cont done ($camlVariant_unboxed)

@@ -5,7 +5,8 @@ let code loopify(never) size(7) stub
         -> k * k1
         : imm tagged =
   let f = %project_value_slot.[partial_f].[f] (my_closure) in
-  apply &my_alloc_region (f : val * val -> imm tagged) (0, param1) -> k * k1
+  apply &my_alloc_region [close close close close]
+    (f : val * val -> imm tagged) (0, param1) -> k * k1
 in
 let code test_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(f_1)
@@ -13,7 +14,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  cont k (0)
+  cont k close[normal] my_alloc_region (0)
 in
 let $camlPartial_app_kind_check_simplify__f_4 =
   closure f_1_1 @f &toplevel.alloc_region
@@ -27,11 +28,14 @@ let code loopify(never) size(1) newer_version_of(test_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int64 =
-  cont k ($camlPartial_app_kind_check_simplify__partial_f_5)
+  cont k
+         close[normal] my_alloc_region
+         ($camlPartial_app_kind_check_simplify__partial_f_5)
 in
 let $camlPartial_app_kind_check_simplify__test_3 =
   closure test_0_1 @test &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlPartial_app_kind_check_simplify =
   Block 0 ($camlPartial_app_kind_check_simplify__test_3)
 in

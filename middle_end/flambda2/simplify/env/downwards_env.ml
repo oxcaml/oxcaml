@@ -95,13 +95,17 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool
+    has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
+    removed_alloc_regions : (Variable.t * Alloc_checks.t) Variable.Map.t
+        (* Allocation regions whose [New_alloc_region] binding has been removed,
+           mapped to their parent region and the Forward/Close flags they were
+           created with. *)
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
@@ -116,6 +120,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
                 has_seen_a_non_liftable_continuation; join_analysis;
+                removed_alloc_regions;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
@@ -142,7 +147,8 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(join_analysis@ %a)@]@ \
       @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]@ \
-      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]\
+      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]@ \
+      @[<hov 1>(removed_alloc_regions@ %a)@]\
       )@]"
     round
     Target_system.Machine_width.print machine_width
@@ -170,6 +176,10 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
     has_seen_a_non_liftable_continuation
+    (Variable.Map.print (fun ppf (parent, checks) ->
+      Format.fprintf ppf "@[<hov 1>(%a@ %a)@]"
+        Variable.print parent Alloc_checks.print checks))
+    removed_alloc_regions
 
 let define_continuations ~can_be_lifted t conts =
   let replay_history =
@@ -255,16 +265,22 @@ let create ~round ~machine_width ~(resolver : resolver)
       lifted = Variable.Set.empty;
       cost_of_lifting_continuations_out_of_current_one = 0;
       has_seen_a_non_liftable_continuation = false;
-      join_analysis = None
+      join_analysis = None;
+      removed_alloc_regions = Variable.Map.empty
     }
   in
   let my_region_duid = Flambda_debug_uid.none in
   let my_ghost_region_duid = Flambda_debug_uid.none in
+  let my_alloc_region_duid = Flambda_debug_uid.none in
   define_variable
-    (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
+    (define_variable
+       (define_variable t
+          (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
+          K.region)
+       (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
+          Name_mode.normal)
        K.region)
-    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
+    (Bound_var.create toplevel_my_alloc_region my_alloc_region_duid
        Name_mode.normal)
     K.region
 
@@ -292,6 +308,38 @@ let unit_toplevel_exn_continuation t = t.unit_toplevel_exn_continuation
 let unit_toplevel_return_continuation t = t.unit_toplevel_return_continuation
 
 let unit_toplevel_alloc_region t = t.unit_toplevel_alloc_region
+
+let removed_alloc_regions t = t.removed_alloc_regions
+
+let add_removed_alloc_region t region ~parent ~checks =
+  { t with
+    removed_alloc_regions =
+      Variable.Map.add region (parent, checks) t.removed_alloc_regions
+  }
+
+let find_removed_alloc_region t region =
+  Variable.Map.find_opt region t.removed_alloc_regions
+
+(* We rely on the (subtle) invariant that no removed alloc_region ever appears
+   as an argument to a continuation. During the downward pass, this holds
+   because nothing introduces region variables as continuation arguments.
+   Continuation lifting can produce region parameters, but if they correspond to
+   a region that can be removed, it should be immediately removed and won't
+   stay. *)
+let rename_removed_alloc_regions t renaming =
+  if Variable.Map.is_empty t.removed_alloc_regions
+  then t
+  else
+    { t with
+      removed_alloc_regions =
+        Variable.Map.fold
+          (fun region (parent, checks) removed ->
+            Variable.Map.add
+              (Renaming.apply_variable renaming region)
+              (Renaming.apply_variable renaming parent, checks)
+              removed)
+          t.removed_alloc_regions Variable.Map.empty
+    }
 
 let at_unit_toplevel t = t.at_unit_toplevel
 
@@ -356,7 +404,8 @@ let enter_set_of_closures
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
-      join_analysis = _
+      join_analysis = _;
+      removed_alloc_regions = _
     } =
   { machine_width;
     round;
@@ -385,7 +434,10 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false
+    has_seen_a_non_liftable_continuation = false;
+    (* Allocation regions from outer scopes cannot occur inside closure bodies:
+       the body only sees its own [my_alloc_region]. *)
+    removed_alloc_regions = Variable.Map.empty
   }
 
 let define_symbol t sym kind =
@@ -803,6 +855,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv.disable_partial_application_stub_generation;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
+    removed_alloc_regions = denv.removed_alloc_regions;
     (* denv_for_join *)
     all_code = denv_for_join.all_code;
     typing_env = denv_for_join.typing_env;

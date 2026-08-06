@@ -3,14 +3,15 @@
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   cont k1 (0)
+   cont k1 close[normal] my_alloc_region (0)
  in
  let code size(4) stub
        partial_f_2 (param1)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   apply direct(f_1 &my_alloc_region)  (0, param1) -> k1 * k2
+   apply direct(f_1 &my_alloc_region) [close close close close]
+      (0, param1) -> k1 * k2
  in
  let $camlPartial_app_kind_check_classic__s2 =
    closure partial_f_2 @partial_f &toplevel.alloc_region
@@ -20,7 +21,9 @@
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : int64 =
-   cont k1 ($camlPartial_app_kind_check_classic__s2)
+   cont k1
+          close[normal] my_alloc_region
+          ($camlPartial_app_kind_check_classic__s2)
  in
  let $camlPartial_app_kind_check_classic__s0 =
    closure test_0 @test &toplevel.alloc_region
@@ -31,7 +34,9 @@
  let $camlPartial_app_kind_check_classic__s1 =
    closure f_1 @f &toplevel.alloc_region
  in
- cont k ($camlPartial_app_kind_check_classic__s3))
+ cont k
+        close[normal] toplevel.alloc_region
+        ($camlPartial_app_kind_check_classic__s3))
   where k define_root_symbol (module_block) =
     let field_0 = $camlPartial_app_kind_check_classic__s0 in
     let $camlPartial_app_kind_check_classic = Block 0 (field_0) in

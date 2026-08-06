@@ -1,7 +1,7 @@
 let $camlGenlex2__immstring34 = "" in
 let code foo_0 deleted in
 let $camlGenlex2__immstring7 = "Genlex2.Error" in
-apply ccall noalloc
+apply ccall noalloc [forward close close close]
   ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
   where k (Pccall) =
     let $camlGenlex2__Error42 =
@@ -22,7 +22,7 @@ apply ccall noalloc
       let prim = %int_comp.ne (f, 97) in
       switch prim
         | 0 -> k2
-        | 1 -> k (0)
+        | 1 -> k close[normal] my_alloc_region (0)
         where k2 =
           let try_region = %begin_try_region () in
           let try_ghost_region = %begin_try_ghost_region () in
@@ -40,12 +40,20 @@ apply ccall noalloc
                let prim_1 = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure)
                in
                switch prim_1
-                 | 0 -> k1 pop(reraise k1) (`exn`)
-                 | 1 -> k1 pop(regular k1) ($camlGenlex2__Pmakeblock67)
+                 | 0 -> k1 pop(reraise k1) close[exn] my_alloc_region (`exn`)
+                 | 1 ->
+                   k1
+                     pop(regular k1)
+                     close[exn] my_alloc_region
+                     ($camlGenlex2__Pmakeblock67)
              where k2 =
-               cont k1 pop(regular k1) ($camlGenlex2__Pmakeblock68))
+               cont k1
+                      pop(regular k1)
+                      close[exn] my_alloc_region
+                      ($camlGenlex2__Pmakeblock68))
     in
     let $camlGenlex2__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region in
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlGenlex2 = Block 0 ($camlGenlex2__Error42, $camlGenlex2__foo_1)
     in
     cont done ($camlGenlex2)

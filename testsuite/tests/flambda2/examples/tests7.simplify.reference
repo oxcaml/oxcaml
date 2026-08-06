@@ -14,7 +14,7 @@ let code loopify(never) size(16) newer_version_of(f_0)
   let int_add_1 = %int_barith.add (int_add, 5) in
   let int_add_2 = %int_barith.add (int_add_1, Pstringlength) in
   let int_add_3 = %int_barith.add (int_add_2, Pstringlength) in
-  cont k (int_add_3)
+  cont k close[normal] my_alloc_region (int_add_3)
 in
 let $camlTests7__f_2 = closure f_0_1 @f &toplevel.alloc_region in
 let code loopify(never) size(13) newer_version_of(foo_1)
@@ -28,9 +28,10 @@ let code loopify(never) size(13) newer_version_of(foo_1)
   let prim_3 = %unbox_num.`float` (y) in
   let prim_4 = %bfloat_arith.add (prim_2, prim_3) in
   let float_add = %box_num.`float`.my_alloc_region (prim_4) in
-  cont k (float_add)
+  cont k close[normal] my_alloc_region (float_add)
 in
 let $camlTests7__foo_3 = closure foo_1_1 @foo &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests7 =
   Block 0 ($camlTests7__empty_block5,
            $camlTests7__immstring8,

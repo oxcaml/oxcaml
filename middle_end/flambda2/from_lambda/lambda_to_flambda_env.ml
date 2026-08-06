@@ -358,6 +358,8 @@ let current_region t =
    have a single alloc_region for a function. *)
 let current_alloc_region t = t.my_alloc_region
 
+let entering_alloc_region t my_alloc_region = { t with my_alloc_region }
+
 let parent_region t =
   if not (Flambda_features.stack_allocation_enabled ())
   then t.my_region

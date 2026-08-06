@@ -353,7 +353,7 @@ let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =
 
 type behaviour =
   | Invalid
-  | Shortcut_to of Continuation.t * Simple.t list
+  | Shortcut_to of Continuation.t * Simple.t list * Check_action.t list
   | Unknown
 
 let get_removed_aliased_params uacc cont =
@@ -468,9 +468,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
          which case we're left with the body; or if the body is just an
          [Apply_cont] (with no trap action) of [cont], in which case we're left
          with the handler. *)
-      let expr, name_occurrences, cost_metrics =
+      let expr, name_occurrences, cost_metrics, uacc =
         if remove_let_cont_leaving_body
-        then body, name_occurrences_body, cost_metrics_of_body
+        then body, name_occurrences_body, cost_metrics_of_body, uacc
         else
           let remove_let_cont_leaving_handler =
             match RE.to_apply_cont body with
@@ -478,19 +478,34 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
               if
                 not
                   (Continuation.equal cont (Apply_cont.continuation apply_cont))
-              then false
+              then None
               else
                 match Apply_cont.args apply_cont with
-                | [] -> Option.is_none (Apply_cont.trap_action apply_cont)
-                | _ :: _ -> false)
-            | None -> false
+                | [] ->
+                  if Option.is_none (Apply_cont.trap_action apply_cont)
+                  then Some apply_cont
+                  else None
+                | _ :: _ -> None)
+            | None -> None
           in
-          if remove_let_cont_leaving_handler
-          then
-            ( handler.handler_expr,
-              handler.name_occurrences_of_handler,
-              handler.cost_metrics_of_handler )
-          else
+          match remove_let_cont_leaving_handler with
+          | Some apply_cont ->
+            let bindings_outermost_first =
+              EB.check_action_bindings uacc
+                ~dbg:(Apply_cont.debuginfo apply_cont)
+                (Apply_cont.check_actions apply_cont)
+            in
+            let uacc =
+              UA.with_name_occurrences uacc
+                ~name_occurrences:handler.name_occurrences_of_handler
+              |> UA.with_cost_metrics handler.cost_metrics_of_handler
+            in
+            let expr, uacc =
+              EB.make_new_let_bindings uacc ~bindings_outermost_first
+                ~body:handler.handler_expr
+            in
+            expr, UA.name_occurrences uacc, UA.cost_metrics uacc, uacc
+          | None ->
             let name_occurrences =
               NO.union name_occurrences_body handler.name_occurrences_of_handler
             in
@@ -505,7 +520,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
                 cont handler.handler ~body ~num_free_occurrences_of_cont_in_body
                 ~is_applied_with_traps
             in
-            expr, name_occurrences, cost_metrics
+            expr, name_occurrences, cost_metrics, uacc
       in
       rebuild_groups expr name_occurrences cost_metrics uacc groups
     | Recursive { continuation_handlers; invariant_params } :: groups ->
@@ -756,7 +771,10 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
                 | Some _ -> Unknown
                 | None ->
                   let args = Apply_cont.args apply_cont in
-                  Shortcut_to (Apply_cont.continuation apply_cont, args))
+                  Shortcut_to
+                    ( Apply_cont.continuation apply_cont,
+                      args,
+                      Apply_cont.check_actions apply_cont ))
               | None ->
                 if
                   RE.can_be_removed_as_invalid handler
@@ -768,8 +786,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           | Invalid ->
             let arity = Bound_parameters.arity params in
             UE.add_invalid_continuation uenv cont arity
-          | Shortcut_to (shortcut_to, args) ->
+          | Shortcut_to (shortcut_to, args, check_actions) ->
             UE.add_continuation_shortcut uenv cont ~params ~shortcut_to ~args
+              ~check_actions
           | Unknown ->
             UE.add_non_inlinable_continuation uenv cont ~params
               ~handler:(if is_cold then Unknown else Known handler)
@@ -1752,10 +1771,18 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
       let params_to_lift =
         DE.variables_defined_in_current_continuation denv_for_join
       in
-      let handlers =
-        Original_handlers.add_params_to_lift data.handlers params_to_lift
+      let lifted_params, lifted_params_renaming =
+        Lifted_cont_params.rename params_to_lift
       in
-      let dacc = DA.add_lifted_continuation data.denv_for_join handlers dacc in
+      let handlers =
+        Original_handlers.add_params_to_lift data.handlers lifted_params
+          ~renaming:lifted_params_renaming
+      in
+      let denv_at_definition =
+        DE.rename_removed_alloc_regions data.denv_for_join
+          lifted_params_renaming
+      in
+      let dacc = DA.add_lifted_continuation denv_at_definition handlers dacc in
       (* Restore lifted constants in dacc *)
       let dacc =
         DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants

@@ -35,13 +35,13 @@ let $camlSymbol_projections5__immstring11 = "FOO" in
             %block.[`0`].my_alloc_region
               ($camlSymbol_projections5__g_5 ~ depth my_depth -> succ my_depth)
           in
-          cont k (Pmakeblock)
+          cont k close[normal] my_alloc_region (Pmakeblock)
         where k2 =
           let Pmakeblock =
             %block.[`1`].my_alloc_region
               ($camlSymbol_projections5__g_5 ~ depth my_depth -> succ my_depth)
           in
-          cont k (Pmakeblock)
+          cont k close[normal] my_alloc_region (Pmakeblock)
     in
     let $camlSymbol_projections5__h_4 =
       closure h_1_1 @h &toplevel.alloc_region
@@ -59,13 +59,13 @@ let $camlSymbol_projections5__immstring11 = "FOO" in
             %block.[`0`].my_alloc_region
               ($camlSymbol_projections5__h_4 ~ depth my_depth -> succ my_depth)
           in
-          cont k (Pmakeblock)
+          cont k close[normal] my_alloc_region (Pmakeblock)
         where k2 =
           let Pmakeblock =
             %block.[`1`].my_alloc_region
               ($camlSymbol_projections5__h_4 ~ depth my_depth -> succ my_depth)
           in
-          cont k (Pmakeblock)
+          cont k close[normal] my_alloc_region (Pmakeblock)
     in
     let code loopify(never) size(11) newer_version_of(f_0)
           f_0_1 (b : imm tagged)
@@ -74,12 +74,15 @@ let $camlSymbol_projections5__immstring11 = "FOO" in
             : val =
       let untagged = %untag_imm (b) in
       switch untagged
-        | 0 -> k ($camlSymbol_projections5__h_4)
-        | 1 -> k ($camlSymbol_projections5__g_5)
+        | 0 ->
+          k close[normal] my_alloc_region ($camlSymbol_projections5__h_4)
+        | 1 ->
+          k close[normal] my_alloc_region ($camlSymbol_projections5__g_5)
     in
     let $camlSymbol_projections5__f_3 =
       closure f_0_1 @f &toplevel.alloc_region
     in
+    let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
     let $camlSymbol_projections5 =
       Block 0 (foo, $camlSymbol_projections5__f_3)
     in

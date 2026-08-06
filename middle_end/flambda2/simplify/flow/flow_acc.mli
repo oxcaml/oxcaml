@@ -104,6 +104,10 @@ val record_value_slot : Name.t -> Value_slot.t -> Name_occurrences.t -> t -> t
     *excluding* uses in apply_cont expressions, which are tracked separately. *)
 val add_used_in_current_handler : Name_occurrences.t -> t -> t
 
+(** Record the regions occurring in the check actions of an [Apply_cont] (or
+    [Switch] arm) in the current handler. *)
+val add_check_actions : Check_action.t list -> t -> t
+
 (** Add the given continuation as being used as the return continuation for a
     function call. *)
 val add_apply_conts :

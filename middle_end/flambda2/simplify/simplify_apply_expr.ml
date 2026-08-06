@@ -647,6 +647,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
+              ~alloc_checks:
+                { normal = Close; exn = Close; notrace = Close; div = Close }
               dbg ~inlined:Default_inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
@@ -766,8 +768,21 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           code_id,
           code )
       in
+      let check_actions =
+        match (Apply.alloc_checks apply).normal with
+        | Forward -> []
+        | Close ->
+          [ Check_action.Close_alloc_region
+              { region =
+                  Alloc_mode.For_applications.alloc_region
+                    (Apply.return_mode apply);
+                exit = Normal
+              } ]
+      in
       let apply_cont =
-        Apply_cont.create apply_continuation ~args:[Simple.var wrapper_var] ~dbg
+        Apply_cont.create apply_continuation ~check_actions
+          ~args:[Simple.var wrapper_var]
+          ~dbg
       in
       let expr =
         let wrapper_var =
@@ -1207,7 +1222,28 @@ type ('a, 'b) simplify_apply_shared_result =
   | Ok of 'a
   | Invalid of 'b
 
+let rewrite_apply_for_removed_alloc_regions denv apply =
+  let return_mode = Apply.return_mode apply in
+  let alloc_region = Alloc_mode.For_applications.alloc_region return_mode in
+  let alloc_region =
+    Simplify_common.canonicalize_alloc_region denv alloc_region
+  in
+  match DE.find_removed_alloc_region denv alloc_region with
+  | None -> apply
+  | Some (parent, flags) ->
+    let return_mode =
+      match (return_mode : Alloc_mode.For_applications.t) with
+      | Not_alloc_stack _ ->
+        Alloc_mode.For_applications.not_alloc_stack ~alloc_region:parent
+      | Maybe_alloc_stack { alloc_region = _; region; ghost_region } ->
+        Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region:parent
+          ~region ~ghost_region
+    in
+    let alloc_checks = Alloc_checks.meet (Apply.alloc_checks apply) flags in
+    Apply.with_return_mode_and_checks apply ~return_mode ~alloc_checks
+
 let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
+  let apply = rewrite_apply_for_removed_alloc_regions (DA.denv dacc) apply in
   let callee_ty, simplified_callee =
     match Apply.callee apply with
     | None -> None, None
@@ -1255,6 +1291,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~return_arity:(Apply.return_arity apply)
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
+        ~alloc_checks:(Apply.alloc_checks apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined:(Apply.inlined apply) ~inlining_state
         ~probe:(Apply.probe apply) ~position:(Apply.position apply)

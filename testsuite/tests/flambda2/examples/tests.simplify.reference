@@ -5,7 +5,7 @@ let code inline(always) loopify(never) size(1) newer_version_of(to_inline_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  cont k (42)
+  cont k close[normal] my_alloc_region (42)
 in
 let $camlTests__to_inline_2 =
   closure to_inline_0_1 @to_inline &toplevel.alloc_region
@@ -23,13 +23,14 @@ let code loopify(never) size(22) newer_version_of(f_1)
   let prim = %is_int (m) in
   switch prim
     | 0 -> k2
-    | 1 -> k (0)
+    | 1 -> k close[normal] my_alloc_region (0)
     where k2 =
       let prim_1 = %is_int (n) in
       switch prim_1
-        | 0 -> k (42)
-        | 1 -> k (1)
+        | 0 -> k close[normal] my_alloc_region (42)
+        | 1 -> k close[normal] my_alloc_region (1)
 in
 let $camlTests__f_3 = closure f_1_1 @f &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests = Block 0 ($camlTests__to_inline_2, $camlTests__f_3) in
 cont done ($camlTests)

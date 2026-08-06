@@ -34,7 +34,11 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
   let prim_1 = %int_comp.ne (`*match*`, 1) in
   switch prim_1
     | 0 -> k2
-    | 1 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock33)
+    | 1 ->
+      k1
+        pop(regular k1)
+        close[exn] my_alloc_region
+        ($camlFrom_core_char_test__Pmakeblock33)
     where k2 =
       ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
         let prim_3 = %int_comp.`nativeint`.unsigned.lt (0n, prim_2) in
@@ -44,9 +48,12 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
          where k3 =
            let prim_2 = %string_load.[`8`] (s, 0n) in
            let Pstringrefs = %tag_imm (prim_2) in
-           cont k (Pstringrefs)
+           cont k close[normal] my_alloc_region (Pstringrefs)
          where k2 =
-           cont k1 pop(regular k1) ($camlFrom_core_char_test__block22))
+           cont k1
+                  pop(regular k1)
+                  close[exn] my_alloc_region
+                  ($camlFrom_core_char_test__block22))
 in
 let $camlFrom_core_char_test__char_of_string_6 =
   closure char_of_string_0_1 @char_of_string &toplevel.alloc_region
@@ -58,7 +65,7 @@ let code inline(always) loopify(never) size(5) newer_version_of(result_is_error_
         : imm tagged =
   let prim = %get_tag (r) in
   let tagged_scrutinee = %tag_imm (prim) in
-  cont k (tagged_scrutinee)
+  cont k close[normal] my_alloc_region (tagged_scrutinee)
 in
 let $camlFrom_core_char_test__result_is_error_7 =
   closure result_is_error_1_1 @result_is_error &toplevel.alloc_region
@@ -75,12 +82,12 @@ let code inline(always) loopify(never) size(29) newer_version_of(result_try_with
       (apply &my_alloc_region f (0) -> k3 * k2
          where k3 (apply_result : val) =
            let Pmakeblock = %block.[`0`].my_alloc_region (apply_result) in
-           cont k pop(k2) (Pmakeblock))
+           cont k pop(k2) close[normal] my_alloc_region (Pmakeblock))
     where k2 exn (`exn` : val) =
       let `unit` = %end_try_region (try_region) in
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       let Pmakeblock = %block.[`1`].my_alloc_region (`exn`) in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlFrom_core_char_test__result_try_with_8 =
   closure result_try_with_2_1 @result_try_with &toplevel.alloc_region
@@ -95,14 +102,14 @@ let code inline(always) loopify(never) size(20) newer_version_of(test_3)
   let Pstringrefs = %tag_imm (prim) in
   let prim_1 = %phys_eq (Pstringrefs, 99) in
   switch prim_1
-    | 0 -> k (0)
+    | 0 -> k close[normal] my_alloc_region (0)
     | 1 -> k2
     where k2 =
       let try_region = %begin_try_region () in
       let try_ghost_region = %begin_try_ghost_region () in
       let `unit` = %end_try_region (try_region) in
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
-      cont k (1)
+      cont k close[normal] my_alloc_region (1)
 in
 let $camlFrom_core_char_test__test_9 =
   closure test_3_1 @test &toplevel.alloc_region
@@ -127,12 +134,17 @@ let code loopify(never) size(30) newer_version_of(top_5)
        cont k2 (1i))
     where k2 (naked_immediate : imm) =
       switch naked_immediate
-        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock97)
-        | 1 -> k (0)
+        | 0 ->
+          k1
+            pop(regular k1)
+            close[exn] my_alloc_region
+            ($camlFrom_core_char_test__Pmakeblock97)
+        | 1 -> k close[normal] my_alloc_region (0)
 in
 let $camlFrom_core_char_test__top_11 =
   closure top_5_1 @top &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlFrom_core_char_test =
   Block 0 ($camlFrom_core_char_test__char_of_string_6,
            $camlFrom_core_char_test__result_is_error_7,

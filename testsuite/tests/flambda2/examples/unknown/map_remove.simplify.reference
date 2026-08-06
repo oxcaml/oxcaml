@@ -21,7 +21,7 @@ let code inline(never) loopify(never) size(9) newer_version_of(bal_0)
           | 0 of [ 0 | 0 of val * imm tagged * val ] * imm tagged *
               [ 0 | 0 of val * imm tagged * val ] ] =
   let Pmakeblock = %block.[`0`].my_alloc_region (l, v, r) in
-  cont k (Pmakeblock)
+  cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlMap_remove__bal_5 = closure bal_0_1 @bal &toplevel.alloc_region in
 let code loopify(done) size(26) newer_version_of(min_binding_1)
@@ -42,7 +42,11 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
       let prim = %is_int (param_1) in
       (switch prim
          | 0 -> k2
-         | 1 -> k1 pop(reraise k1) ($`*predef*`.caml_exn_Not_found)
+         | 1 ->
+           k1
+             pop(reraise k1)
+             close[exn] my_alloc_region
+             ($`*predef*`.caml_exn_Not_found)
          where k2 =
            let l = %block_load.[`0`] (param_1) in
            let prim_1 = %is_int (l) in
@@ -51,12 +55,12 @@ let code loopify(done) size(26) newer_version_of(min_binding_1)
               | 1 -> k2
               where k2 =
                 let Pfield = %block_load.[`1`] (param_1) in
-                cont k (Pfield)))
+                cont k close[normal] my_alloc_region (Pfield)))
 in
 let $camlMap_remove__min_binding_6 =
   closure min_binding_1_1 @min_binding &toplevel.alloc_region
 in
-let $camlMap_remove__Pmakeblock171 =
+let $camlMap_remove__Pmakeblock172 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
            $camlMap_remove__immstring50)
 in
@@ -76,7 +80,11 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(reraise k1) ($camlMap_remove__Pmakeblock171)
+    | 1 ->
+      k1
+        pop(reraise k1)
+        close[exn] my_alloc_region
+        ($camlMap_remove__Pmakeblock172)
     where k2 =
       let l = %block_load.[`0`] (param) in
       let prim_1 = %is_int (l) in
@@ -85,11 +93,12 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
          | 1 -> k3
          where k3 =
            let Pfield = %block_load.[`2`] (param) in
-           cont k (Pfield)
+           cont k close[normal] my_alloc_region (Pfield)
          where k2 =
            let Pfield = %block_load.[`2`] (param) in
            let Pfield_1 = %block_load.[`1`] (param) in
            (apply direct(remove_min_binding_2_1 &my_alloc_region)
+                   [forward close close close]
               ($camlMap_remove__remove_min_binding_7 ~ depth my_depth -> succ my_depth
                : _ ->
                  [ 0
@@ -105,6 +114,7 @@ and code rec loopify(never) size(35) newer_version_of(remove_min_binding_2)
                              imm tagged * [ 0 | 0 of val * imm tagged * val ]
                          ]) =
                 apply direct(bal_0_1 &my_alloc_region)
+                       [close close close close]
                   ($camlMap_remove__bal_5
                    : _ ->
                      [ 0
@@ -132,19 +142,21 @@ let code loopify(never) size(34) newer_version_of(merge_3)
   let prim = %is_int (t1) in
   switch prim
     | 0 -> k2
-    | 1 -> k (t2)
+    | 1 -> k close[normal] my_alloc_region (t2)
     where k2 =
       let prim_1 = %is_int (t2) in
       (switch prim_1
          | 0 -> k2
-         | 1 -> k (t1)
+         | 1 -> k close[normal] my_alloc_region (t1)
          where k2 =
            (apply direct(min_binding_1_1 &my_alloc_region)
+                   [forward close close close]
               ($camlMap_remove__min_binding_6 : _ -> imm tagged)
                 (t2)
                 -> k2 * k1
               where k2 (x : imm tagged) =
                 (apply direct(remove_min_binding_2_1 &my_alloc_region)
+                        [forward close close close]
                    ($camlMap_remove__remove_min_binding_7
                     : _ ->
                       [ 0
@@ -160,6 +172,7 @@ let code loopify(never) size(34) newer_version_of(merge_3)
                                   imm tagged *
                                   [ 0 | 0 of val * imm tagged * val ] ]) =
                      apply direct(bal_0_1 &my_alloc_region)
+                            [close close close close]
                        ($camlMap_remove__bal_5
                         : _ ->
                           [ 0
@@ -188,7 +201,7 @@ let code loopify(never) size(36) newer_version_of(remove_4)
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k (0)
+    | 1 -> k close[normal] my_alloc_region (0)
     where k2 =
       let l = %block_load.[`0`] (param) in
       let Pfield = %block_load.[`1`] (param) in
@@ -196,11 +209,11 @@ let code loopify(never) size(36) newer_version_of(remove_4)
       let int_compare = %tag_imm (prim_1) in
       let prim_2 = %phys_eq (int_compare, 0) in
       (switch prim_2
-         | 0 -> k (l)
+         | 0 -> k close[normal] my_alloc_region (l)
          | 1 -> k2
          where k2 =
            let Pfield_1 = %block_load.[`2`] (param) in
-           apply direct(merge_3_1 &my_alloc_region)
+           apply direct(merge_3_1 &my_alloc_region) [close close close close]
              ($camlMap_remove__merge_8
               : _ ->
                 [ 0
@@ -213,6 +226,7 @@ in
 let $camlMap_remove__remove_9 =
   closure remove_4_1 @remove &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlMap_remove =
   Block 0 ($camlMap_remove__bal_5,
            $camlMap_remove__min_binding_6,

@@ -500,13 +500,24 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      so we don't need any binder for it (this is why we can ignore
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
-  let env, my_region_var, my_ghost_region_var =
+  let env, my_alloc_region_var, my_region_var, my_ghost_region_var =
     (* CR alloc_regions: my_alloc_region should be propagated as well. *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Not_alloc_stack { alloc_region = my_alloc_region } ->
+      let my_alloc_region_duid = Flambda_debug_uid.none in
+      let env, alloc_region =
+        Env.create_bound_parameter env (my_alloc_region, my_alloc_region_duid)
+      in
+      env, alloc_region, None, None
     | Maybe_alloc_stack
-        { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
-      ->
+        { alloc_region = my_alloc_region;
+          region = my_region;
+          ghost_region = my_ghost_region
+        } ->
+      let my_alloc_region_duid = Flambda_debug_uid.none in
+      let env, alloc_region =
+        Env.create_bound_parameter env (my_alloc_region, my_alloc_region_duid)
+      in
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env (my_region, my_region_duid)
@@ -515,7 +526,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       let env, ghost_region =
         Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
       in
-      env, Some region, Some ghost_region
+      env, alloc_region, Some region, Some ghost_region
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
@@ -530,10 +541,12 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       To_cmm_env.Symbol_inits.print fun_body_symbol_inits;
   let fun_free_vars =
     C.remove_vars_with_machtype
-      (C.remove_var_opt_with_provenance
-         (C.remove_var_opt_with_provenance fun_body_free_vars
-            my_ghost_region_var)
-         my_region_var)
+      (C.remove_var_with_provenance
+         (C.remove_var_opt_with_provenance
+            (C.remove_var_opt_with_provenance fun_body_free_vars
+               my_ghost_region_var)
+            my_region_var)
+         my_alloc_region_var)
       fun_params
   in
   if not (Backend_var.Set.is_empty fun_free_vars)

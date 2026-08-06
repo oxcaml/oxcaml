@@ -45,14 +45,23 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
     where k3 =
       let untagged = %untag_imm (b) in
       switch untagged
-        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock50)
-        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock56)
+        | 0 ->
+          k1
+            pop(regular k1)
+            close[exn] my_alloc_region
+            ($camlAlt_ergo__Pmakeblock50)
+        | 1 ->
+          k1
+            pop(regular k1)
+            close[exn] my_alloc_region
+            ($camlAlt_ergo__Pmakeblock56)
     where k2 =
       ((let Pfield = %block_load.[`0`] (b) in
         let Pfield_1 = %block_load.[`0`] (Pfield) in
         let Popaque = %opaque (0) in
         let Pobj_magic = %opaque (Popaque) in
-        apply &my_alloc_region Pobj_magic (Pfield_1) -> k3 * k1
+        apply &my_alloc_region [forward close close close]
+          Pobj_magic (Pfield_1) -> k3 * k1
           where k3 (param : [ 0 |1 ]) =
             let unboxed_field = %untag_imm (param) in
             cont k2 (unboxed_field))
@@ -60,7 +69,7 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
            let naked_immediate = unboxed_field in
            (switch naked_immediate
               | 0 -> k2
-              | 1 -> k (1)
+              | 1 -> k close[normal] my_alloc_region (1)
               where k2 =
                 ((let prim_1 = %get_tag (b) in
                   switch prim_1
@@ -77,7 +86,7 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
                      let Pmakeblock_1 =
                        %block.[`1`].my_alloc_region (Pmakeblock)
                      in
-                     cont k (Pmakeblock_1)
+                     cont k close[normal] my_alloc_region (Pmakeblock_1)
                    where k2 =
                      let Pfield = %block_load.[`0`] (b) in
                      let Pfield_1 = %block_load.[`1`] (Pfield) in
@@ -89,7 +98,7 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
                      let Pmakeblock_1 =
                        %block.[`0`].my_alloc_region (Pmakeblock)
                      in
-                     cont k (Pmakeblock_1))))
+                     cont k close[normal] my_alloc_region (Pmakeblock_1))))
 in
 let $camlAlt_ergo__inv_borne_sup_6 =
   closure inv_borne_sup_1_1 @inv_borne_sup &toplevel.alloc_region
@@ -104,6 +113,7 @@ let code loopify(never) size(14) newer_version_of(inv_bornes_2)
   let u = %block_load.[`1`] (param) in
   (let Pfield = %block_load.[`0`] (param) in
    apply direct(inv_borne_sup_1_1 &my_alloc_region)
+          [forward close close close]
      ($camlAlt_ergo__inv_borne_sup_6
       : _ ->
         [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
@@ -116,7 +126,7 @@ let code loopify(never) size(14) newer_version_of(inv_bornes_2)
                [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
                |1 of [ 0 of imm tagged * imm tagged ] ]) =
       let Pmakeblock = %block.[`0`].my_alloc_region (apply_result, u) in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlAlt_ergo__inv_bornes_7 =
   closure inv_bornes_2_1 @inv_bornes &toplevel.alloc_region
@@ -129,12 +139,20 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+    | 1 ->
+      k1
+        pop(regular k1)
+        close[exn] my_alloc_region
+        ($camlAlt_ergo__Pmakeblock97)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
       let prim_1 = %is_int (Pfield) in
       (switch prim_1
-         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+         | 0 ->
+           k1
+             pop(regular k1)
+             close[exn] my_alloc_region
+             ($camlAlt_ergo__Pmakeblock97)
          | 1 -> k2
          where k2 =
            let `*match*` = %block_load.[`0`] (param) in
@@ -144,6 +162,7 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
                %block.[`0`].my_alloc_region (Pfield_2, Pfield_1)
              in
              apply direct(inv_bornes_2_1 &my_alloc_region)
+                    [forward close close close]
                ($camlAlt_ergo__inv_bornes_7
                 : _ ->
                   [ 0 of [ 0 |1 | 0 of val |1 of val ] *
@@ -158,7 +177,7 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
                 let Pmakeblock =
                   %block.[`0`].my_alloc_region (apply_result, 0)
                 in
-                cont k (Pmakeblock)))
+                cont k close[normal] my_alloc_region (Pmakeblock)))
 in
 let $camlAlt_ergo__inv_8 = closure inv_3_1 @inv &toplevel.alloc_region in
 let code loopify(never) size(11) newer_version_of(div_4)
@@ -168,15 +187,19 @@ let code loopify(never) size(11) newer_version_of(div_4)
   (let tuple_field = %block_load.tag[`0`].`size`[`3`].[`0`] (i2) in
    let tuple_field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (i2) in
    let tuple_field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (i2) in
-   apply direct(inv_3_1 &my_alloc_region)
+   apply direct(inv_3_1 &my_alloc_region) [forward close close close]
      ($camlAlt_ergo__inv_8 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
        (tuple_field, tuple_field_1, tuple_field_2)
        -> k3 * k1
      where k3 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
        cont k2)
     where k2 =
-      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock112)
+      cont k1
+             pop(regular k1)
+             close[exn] my_alloc_region
+             ($camlAlt_ergo__Pmakeblock112)
 in
 let $camlAlt_ergo__div_9 = closure div_4_1 @div &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_9) in
 cont done ($camlAlt_ergo)

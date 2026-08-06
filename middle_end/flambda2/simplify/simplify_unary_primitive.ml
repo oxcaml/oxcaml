@@ -1005,6 +1005,86 @@ let simplify_peek ~original_prim dacc ~original_term ~arg:_ ~arg_ty:_
     (P.result_kind' original_prim)
     ~original_term
 
+(* Regions removed by simplification are given an unknown type, not an alias
+   type, so that their occurrences reach the simplifiers below unchanged: the
+   rewriting to the parent region must go through [DE.find_removed_alloc_region]
+   in order to take the Forward/Close flags into account. Aliases of regions, on
+   the other hand, are given alias types, so [arg] below (which has been
+   simplified, hence canonicalised) denotes either a live region or a removed
+   one, never an alias. *)
+(* CR-someday ncourant: should we actually track removed regions in the
+   typing_env instead? *)
+let simplify_close_alloc_region (exit : Check_action.close_alloc_region_type)
+    dbg ~original_prim:_ dacc ~original_term ~arg ~arg_ty:_ ~result_var =
+  let removed =
+    match Simple.must_be_var arg with
+    | None -> None
+    | Some (region, _coercion) ->
+      DE.find_removed_alloc_region (DA.denv dacc) region
+  in
+  let machine_width = DE.machine_width (DA.denv dacc) in
+  let unit_ty = T.this_tagged_immediate (Target_ocaml_int.zero machine_width) in
+  let dacc = DA.add_variable dacc result_var unit_ty in
+  match removed with
+  | None -> SPR.create original_term ~try_reify:false dacc
+  | Some (parent, flags) -> (
+    match Check_action.alloc_check_for_close_alloc_region_type flags exit with
+    | Close ->
+      (* The closed region was created with [Close] for this exit: its closure
+         also stood for the closure of its parent, so the parent must now be
+         closed here. *)
+      let named =
+        Named.create_prim
+          (P.of_check_action (Close_alloc_region { region = parent; exit }))
+          dbg
+      in
+      SPR.create named ~try_reify:false dacc
+    | Forward ->
+      (* The closed region was created with [Forward] for this exit: closing it
+         only merged it into its (still open) parent, which is a no-op now that
+         its allocations are directly attributed to the parent. *)
+      let named = Named.create_simple (Simple.const_unit machine_width) in
+      SPR.create named ~try_reify:false dacc)
+
+let simplify_new_alloc_region (checks : P.alloc_region_checks) dbg
+    ~original_prim:_ dacc ~original_term:_ ~arg ~arg_ty:_ ~result_var =
+  let parent =
+    match Simple.must_be_var arg with
+    | Some (parent, _coercion) -> parent
+    | None ->
+      Misc.fatal_errorf "[New_alloc_region] applied to a non-variable:@ %a"
+        Simple.print arg
+  in
+  let checks, parent =
+    match DE.find_removed_alloc_region (DA.denv dacc) parent with
+    | None -> checks, parent
+    | Some (grandparent, parent_flags) ->
+      (* An exit of the new region cascades into a close of the grandparent only
+         if both this region and the removed parent were created with [Close]
+         for that exit. *)
+      P.meet_alloc_region_checks checks parent_flags, grandparent
+  in
+  let parent_simple = Simple.var parent in
+  if P.alloc_region_checks_only_transfer checks
+  then
+    (* A region whose every action is [Transfer] performs no checking of its
+       own: allocations in it can be attributed directly to its parent, and the
+       region itself can be removed. Its uses are rewritten as they are
+       simplified, using the mapping recorded here. *)
+    let dacc =
+      DA.map_denv dacc ~f:(fun denv ->
+          DE.add_removed_alloc_region denv (Bound_var.var result_var) ~parent
+            ~checks:(P.alloc_region_checks_flags checks))
+    in
+    let dacc = DA.add_variable dacc result_var (T.unknown K.region) in
+    SPR.create (Named.create_simple parent_simple) ~try_reify:false dacc
+  else
+    let named =
+      Named.create_prim (Unary (New_alloc_region checks, parent_simple)) dbg
+    in
+    let dacc = DA.add_variable dacc result_var (T.unknown K.region) in
+    SPR.create named ~try_reify:false dacc
+
 let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     ~arg_ty dbg ~result_var =
   let min_name_mode = Bound_var.name_mode result_var in
@@ -1074,5 +1154,9 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Get_header -> simplify_get_header ~original_prim
     | Peek _ -> simplify_peek ~original_prim
     | Make_lazy _ -> simplify_lazy ~original_prim
+    | Close_alloc_region exit ->
+      simplify_close_alloc_region exit dbg ~original_prim
+    | New_alloc_region checks ->
+      simplify_new_alloc_region checks dbg ~original_prim
   in
   simplifier dacc ~original_term ~arg ~arg_ty ~result_var
