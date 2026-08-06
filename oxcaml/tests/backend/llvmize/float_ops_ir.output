@@ -318,9 +318,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlFloat_ops__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlFloat_ops = global i64 1792, section ".data", align 8
-@camlFloat_ops = global { ptr } { ptr @camlFloat_ops__Pmakeblock267 }, section ".data", align 8
-@header.camlFloat_ops__Pmakeblock267 = global i64 7936, section ".data", align 8
-@camlFloat_ops__Pmakeblock267 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlFloat_ops__add_0_1, ptr @camlFloat_ops__sub_1_2, ptr @camlFloat_ops__mul_2_3, ptr @camlFloat_ops__div_3_4, ptr @camlFloat_ops__neg_4_5, ptr @camlFloat_ops__abs_5_6, ptr @camlFloat_ops__compare_HIDE_STAMP }, section ".data", align 8
+@camlFloat_ops = global { ptr } { ptr @camlFloat_ops__Pmakeblock267_8 }, section ".data", align 8
+@header.camlFloat_ops__Pmakeblock267_8 = global i64 7936, section ".data", align 8
+@camlFloat_ops__Pmakeblock267_8 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlFloat_ops__add_0_1, ptr @camlFloat_ops__sub_1_2, ptr @camlFloat_ops__mul_2_3, ptr @camlFloat_ops__div_3_4, ptr @camlFloat_ops__neg_4_5, ptr @camlFloat_ops__abs_5_6, ptr @camlFloat_ops__compare_HIDE_STAMP }, section ".data", align 8
 @header.camlFloat_ops__compare_HIDE_STAMP = global i64 4087, section ".data", align 8
 @camlFloat_ops__compare_6_7 = global { ptr, i64, ptr } { ptr @caml_curryF_F, i64 180143985094819847, ptr @camlFloat_ops__compare_HIDE_STAMP }, section ".data", align 8
 @header.camlFloat_ops__abs_HIDE_STAMP = global i64 3063, section ".data", align 8

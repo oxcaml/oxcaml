@@ -62,7 +62,9 @@ let manufacture_symbol_of_variable v =
 
 let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
     =
-  let symbol = manufacture_symbol (Function_slot.to_string function_slot) in
+  let symbol =
+    manufacture_symbol (Function_slot.canonical_name function_slot)
+  in
   let env =
     Env.add_simple_to_substitute env ident (Simple.symbol symbol)
       K.With_subkind.any_value
