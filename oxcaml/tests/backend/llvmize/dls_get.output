@@ -104,9 +104,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlDls_get__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlDls_get = global i64 1792, section ".data", align 8
-@camlDls_get = global { ptr } { ptr @camlDls_get__should_grow_1 }, section ".data", align 8
-@header.camlDls_get__should_grow_1 = global i64 3063, section ".data", align 8
-@camlDls_get__should_grow_1 = global { ptr, i64 } { ptr @camlDls_get__should_grow_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlDls_get = global { ptr } { ptr @camlDls_get__should_grow_HIDE_STAMP }, section ".data", align 8
+@header.camlDls_get__should_grow_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlDls_get__should_grow_1_1 = global { ptr, i64 } { ptr @camlDls_get__should_grow_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 
 
 

@@ -139,7 +139,7 @@ f:
   movq  %rax, 16(%rbx)
   movl  $1, %eax
   addq  $8, %rsp
-  jmp   camlTOP5__do_work_11_15_code@PLT
+  jmp   camlTOP5__do_work_7_15_code@PLT
 
 f.do_work:
   movq  16(%rbx), %rax

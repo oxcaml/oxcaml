@@ -15,7 +15,7 @@ let code loopify(never) size(16) newer_version_of(always_0_0)
         -> k * k1
         : imm tagged =
   apply direct(hidden_identity_0 &my_alloc_region) inlined(never)
-    ($Hidden_identity.camlHidden_identity__hidden_identity_1_1
+    ($Hidden_identity.camlHidden_identity__hidden_identity_0_1
      : _ -> imm tagged)
       (0)
       -> k2 * k1

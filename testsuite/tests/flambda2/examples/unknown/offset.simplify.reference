@@ -75,14 +75,14 @@ let code inline(always) loopify(never) size(101) newer_version_of(inline_0)
         : val =
   apply direct(partial_apply1_44 &my_alloc_region) inlined(never)
          inlining_state(depth(10))
-    ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
+    ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61
      : _ -> imm tagged)
       (10)
       -> k2 * k1
     where k2 (r : imm tagged) =
       (apply direct(partial_apply1_44 &my_alloc_region) inlined(never)
               inlining_state(depth(10))
-         ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
+         ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61
           : _ -> imm tagged)
            (10)
            -> k2 * k1
@@ -99,14 +99,14 @@ let $camlOffset__inline_1 =
 in
 apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
        inlining_state(depth(11))
-  ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
-   : _ -> imm tagged)
+  ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61 : _ -> imm tagged
+   )
     (10)
     -> k * error
   where k (r : imm tagged) =
     (apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
             inlining_state(depth(11))
-       ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
+       ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61
         : _ -> imm tagged)
          (10)
          -> k * error
@@ -147,14 +147,14 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
          in
          (apply direct(partial_apply1_44 &toplevel.alloc_region)
                  inlined(never) inlining_state(depth(11))
-            ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
+            ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61
              : _ -> imm tagged)
               (10)
               -> k * error
             where k (r_1 : imm tagged) =
               (apply direct(partial_apply1_44 &toplevel.alloc_region)
                       inlined(never) inlining_state(depth(11))
-                 ($Stdlib__Random.camlStdlib__Random__partial_apply1_104_61
+                 ($Stdlib__Random.camlStdlib__Random__partial_apply1_44_61
                   : _ -> imm tagged)
                    (10)
                    -> k * error
