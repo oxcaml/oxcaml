@@ -9628,6 +9628,7 @@ and type_function
         params_contain_gadt = No_gadt;
         fun_alloc_mode = Some (Alloc.newvar ());
         ret_info = Some ret_info;
+        calling_convention_sorts = []
       })
 
 (* Typecheck parameters one at a time followed by the body. Later parameters
