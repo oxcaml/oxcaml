@@ -958,7 +958,7 @@ let compile_indirect newval =
     ap_specialised = Default_specialise;
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
-    ap_mode = Lambda.alloc_heap;
+    ap_mode = Lambda.not_alloc_stack;
     (* [indirect] just allocates a forwarding block; it never runs user code,
        so it can't yield *)
     ap_yielding = Unyielding;

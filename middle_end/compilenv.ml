@@ -168,9 +168,10 @@ let equal_up_to_pack_prefix cu1 cu2 =
 let get_export_info infos =
   Option.map
     (fun export_info ->
+      Profile.record_call ~accumulate:true "cmx_from_raw" (fun () ->
       Flambda2_cmx.Flambda_cmx_format.from_raw
         ~sections:infos.ui_file_sections
-        export_info)
+        export_info))
     infos.ui_export_info
 
 let get_unit_export_info comp_unit =

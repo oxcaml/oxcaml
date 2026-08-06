@@ -161,6 +161,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Specific Ineg
   | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
@@ -290,7 +291,10 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
 let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
-  | Cconst_int (n, _dbg) when int_is_immediate n ->
+  (* The immediate of a store is never negated, so the full signed 32-bit range
+     applies (hence [is_immediate_natint] rather than [int_is_immediate], whose
+     range is symmetric). *)
+  | Cconst_int (n, _dbg) when is_immediate_natint (Nativeint.of_int n) ->
     Rewritten
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
@@ -381,12 +385,17 @@ let select_operation'
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
-  (* Recognize the LEA instruction *)
+  (* Recognize the NEG and LEA instructions *)
   | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
-    match select_addressing Word_int (Cop (op, args, dbg)) with
-    | Iindexed _, _ | Iindexed2 0, _ -> Use_default
-    | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
-      Rewritten (specific (Ilea addr), [arg]))
+    match op, args with
+    | Csubi, ([Cconst_int (0, _); arg] | [Cconst_natint (0n, _); arg]) ->
+      Rewritten (specific Ineg, [arg])
+    | _, _ -> (
+      match select_addressing Word_int (Cop (op, args, dbg)) with
+      | Iindexed _, _ | Iindexed2 0, _ -> Use_default
+      | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg
+        ->
+        Rewritten (specific (Ilea addr), [arg])))
   (* Recognize float arithmetic with memory. *)
   | Caddf width -> select_floatarith true width Iaddf Ifloatadd args
   | Csubf width -> select_floatarith false width Isubf Ifloatsub args

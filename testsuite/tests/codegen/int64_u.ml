@@ -15,13 +15,10 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
-(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -46,7 +43,6 @@ mul:
   ret
 |}]
 
-(* CR ttebbi: imul could be replaced with lea (x*2+x) *)
 let mul_3 x = Int64_u.mul x #3L
 [%%expect_asm X86_64{|
 mul_3:
@@ -66,9 +62,7 @@ div:
   idivq %rcx
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 .L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
@@ -242,12 +236,10 @@ unsigned_rem_7:
   ret
 |}]
 
-(* CR ttebbi: Could instead start with [cmpq $-1, %rax] *)
 let unsigned_div_umaxint x = Int64_u.unsigned_div x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_div_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   movl  $1, %eax
   ret
@@ -259,8 +251,7 @@ unsigned_div_umaxint:
 let unsigned_rem_umaxint x = Int64_u.unsigned_rem x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_rem_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   xorl  %eax, %eax
   ret
@@ -290,9 +281,7 @@ abs:
   jl    .L0
   ret
 .L0:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 

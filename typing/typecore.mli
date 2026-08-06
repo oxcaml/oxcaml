@@ -304,6 +304,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
   | Mixed_record_atomic_loc of Longident.t
+  | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -347,6 +348,7 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Block_index_atomic_unsupported
+  | Mutable_block_index_polymorphic_field of Longident.t
   | Submode_failed of Mode.Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -360,6 +362,12 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Function_type_escapes_partial_match of
+      { ty : type_expr;
+        match_loc : Location.t;
+        kind : [`Argument | `Result];
+        why : [`Partial_match | `Optional_argument];
+      }
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t

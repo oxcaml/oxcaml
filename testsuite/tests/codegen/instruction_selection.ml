@@ -266,7 +266,6 @@ external memcmp :
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
 
-(* CR ttebbi: Double sign extension instructions. *)
 let int32_box_unbox_after_call (a : ptr) (b : ptr) =
   Int32_u.of_int (Int32_u.to_int (memcmp a b ~len:#5n))
 [%%expect_asm X86_64{|
@@ -276,7 +275,6 @@ int32_box_unbox_after_call:
   movq  %rbx, %rsi
   movl  $5, %edx
   call  memcmp@PLT
-  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret

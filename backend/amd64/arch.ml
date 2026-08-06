@@ -299,6 +299,7 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ineg                               (* integer negation *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)
@@ -411,8 +412,9 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
       else Some (Ilea (offset_addressing addr displ_delta))
     end
   | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
-  | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
-  | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _ ->
+  | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+  | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
+  | Illvm_intrinsic _ ->
     None
 
 let addressing_displacement_for_llvmize addr =
@@ -494,6 +496,8 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "sextend32 %a" printreg arg.(0)
   | Izextend32 ->
       fprintf ppf "zextend32 %a" printreg arg.(0)
+  | Ineg ->
+      fprintf ppf "neg %a" printreg arg.(0)
   | Irdtsc ->
       fprintf ppf "rdtsc"
   | Ilfence ->
@@ -531,6 +535,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
       "bswap " ^ (bitwidth |> int_of_bswap_bitwidth |> string_of_int)
   | Isextend32 -> "sextend32"
   | Izextend32 -> "zextend32"
+  | Ineg -> "neg"
   | Irdtsc -> "rdtsc"
   | Ilfence -> "lfence"
   | Isfence -> "sfence"
@@ -553,7 +558,7 @@ let win64 =
 (* Specific operations that are pure *)
 (* Keep in sync with [Vectorize_specific] *)
 let operation_is_pure = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _  -> true
   | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
@@ -569,7 +574,7 @@ let operation_is_pure = function
 
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
@@ -648,6 +653,8 @@ let equal_specific_operation left right =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ineg, Ineg ->
+    true
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -672,7 +679,7 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 |
+     Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
@@ -761,6 +768,8 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ineg, Ineg ->
+    true
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -785,7 +794,7 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 |
+     Isextend32 | Izextend32 | Ineg |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->

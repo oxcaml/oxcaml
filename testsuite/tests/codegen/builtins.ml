@@ -751,10 +751,9 @@ let ptr_fetch_sub_int (p : nativeint#) v =
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int:
   sarq  $1, %rbx
-  xorl  %edi, %edi
-  subq  %rbx, %rdi
-  lock xaddq %rdi, (%rax)
-  leaq  1(%rdi,%rdi), %rax
+  neg   %rbx
+  lock xaddq %rbx, (%rax)
+  leaq  1(%rbx,%rbx), %rax
   ret
 |}]
 
@@ -796,8 +795,8 @@ let ptr_fetch_sub_int64 (p : nativeint#) (v : int64#) =
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int64:
   movq  %rax, %rdi
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  movq  %rbx, %rax
+  neg   %rax
   lock xaddq %rax, (%rdi)
   ret
 |}]
@@ -838,10 +837,9 @@ let ptr_fetch_sub_int32 (p : nativeint#) (v : int32#) =
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int32:
-  xorl  %edi, %edi
-  subq  %rbx, %rdi
-  lock xaddl %edi, (%rax)
-  movslq %edi, %rax
+  neg   %rbx
+  lock xaddl %ebx, (%rax)
+  movslq %ebx, %rax
   ret
 |}]
 
@@ -885,8 +883,8 @@ let ptr_fetch_sub_nativeint (p : nativeint#) (v : nativeint#) =
 [%%expect_asm X86_64{|
 ptr_fetch_sub_nativeint:
   movq  %rax, %rdi
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  movq  %rbx, %rax
+  neg   %rax
   lock xaddq %rax, (%rdi)
   ret
 |}]

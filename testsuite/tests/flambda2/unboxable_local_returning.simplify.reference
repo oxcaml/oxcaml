@@ -3,7 +3,7 @@ let code loopify(never) size(13) stub
       ret_local_1_1 (param : imm tagged)
         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
         -> k * k1
-        : float boxed local =
+        : float boxed stack =
   (let ret_local_unboxed =
      %project_function_slot.[ret_local].[ret_local_unboxed] (my_closure)
    in
@@ -11,7 +11,7 @@ let code loopify(never) size(13) stub
      (ret_local_unboxed : imm tagged -> float) (param) -> k2 * k1)
     where k2 (unboxed_return : float) =
       let boxed_return =
-        %box_num.`float`.my_alloc_region.`local`[my_region] (unboxed_return)
+        %box_num.`float`.my_alloc_region.local[my_region] (unboxed_return)
       in
       cont k (boxed_return)
 in
@@ -36,7 +36,7 @@ let code loopify(never) size(1) newer_version_of(ret_local_1)
         my_unboxed_closure &my_alloc_region &my_region &my_ghost_region
           my_depth
         -> unboxed_return * k
-        : float local =
+        : float stack =
   cont unboxed_return (0x1p+0)
 in
 let $camlUnboxable_local_returning__ret_local_4 =
