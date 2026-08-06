@@ -1568,7 +1568,7 @@ let rec exp_is_nominal exp =
 
 let unpack_functor_me me =
   match me.mod_desc with
-  | Tmod_functor (fp, me) -> fp, me
+  | Tmod_functor (fp, me, _) -> fp, me
   | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
 
 let unpack_functor_mty mty =
