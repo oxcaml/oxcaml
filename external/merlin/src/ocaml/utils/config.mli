@@ -44,6 +44,7 @@ val flat_float_array: bool
 
 val reserved_header_bits : int
 val syntax_quotations : bool
+(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
 val default_keyword_edition : (int * int) option * string list
 
@@ -53,15 +54,7 @@ type name_mangling_scheme =
 
 exception Invalid_name_mangling_scheme of string
 
-<<<<<<< Merlin:liam-synchronize-merlin
 val name_mangling_scheme : name_mangling_scheme
-||||||| Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
-val syntax_quotations : bool
-(** Whether runtime quotations syntax is enabled. *)
-=======
-val syntax_quotations : bool
-(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
->>>>>>> Compiler:HEAD
 
 (** Access to configuration values *)
 val print_config : out_channel -> unit

@@ -1450,21 +1450,11 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-<<<<<<< Merlin:liam-synchronize-merlin
-let check_atomic_loc ~loc ~env record_repres mutability lid =
-  if not (Types.is_atomic mutability) then
-    raise (error (loc, env, Label_not_atomic lid));
-||||||| Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
-let check_atomic_loc ~loc ~env record_repres mutability lid =
-  if not (Types.is_atomic mutability) then
-    raise (Error (loc, env, Label_not_atomic lid));
-=======
 let check_atomic_loc ~loc ~env record_repres label lid =
   if not (Types.is_atomic label.lbl_mut) then
-    raise (Error (loc, env, Label_not_atomic lid));
+    raise (error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
->>>>>>> Compiler:HEAD
+    raise (error (loc, env, Polymorphic_atomic_loc lid));
   match record_repres with
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
@@ -5352,17 +5342,9 @@ let rec is_nonexpansive exp =
   | Texp_function _
   | Texp_probe_is_enabled _
   | Texp_src_pos
-<<<<<<< Merlin:liam-synchronize-merlin
-  | Texp_quotation _
+  | Texp_quote _
   | Texp_array (_, _, [], _)
   | Texp_typed_hole -> true
-||||||| Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
-  | Texp_quotation _
-  | Texp_array (_, _, [], _) -> true
-=======
-  | Texp_quote _
-  | Texp_array (_, _, [], _) -> true
->>>>>>> Compiler:HEAD
   | Texp_let(_rec_flag, pat_exp_list, body) ->
       List.for_all (fun vb -> is_nonexpansive vb.vb_expr) pat_exp_list &&
       is_nonexpansive body
@@ -8114,17 +8096,9 @@ and type_expect_
       | Baccess_block (Mutable_access, _) ->
         Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic }
       | Baccess_field
-<<<<<<< Merlin:liam-synchronize-merlin
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (error(loc, env, Block_index_atomic_unsupported))
-||||||| Compiler:last-imported
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (Error(loc, env, Block_index_atomic_unsupported))
-=======
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _)
       | Baccess_block (Atomic_access, _) ->
         Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic }
->>>>>>> Compiler:HEAD
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -8152,16 +8126,10 @@ and type_expect_
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-<<<<<<< Merlin:liam-synchronize-merlin
-        raise (error(loc, env, Block_index_modality_mismatch { mut; err }))
-||||||| Compiler:last-imported
-        raise (Error(loc, env, Block_index_modality_mismatch { mut; err }))
-=======
-        raise (Error(
+        raise (error(
           loc, env,
           Block_index_modality_mismatch { mut = is_mutable; err }
         ))
->>>>>>> Compiler:HEAD
     end;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
