@@ -6409,28 +6409,6 @@ let add_zero_alloc_attribute expr attributes =
     end
   | _ -> expr
 
-let register_prim_application_allocation ~env ~pos funct args =
-  match funct.exp_desc with
-  | Texp_ident { desc = { val_kind = Val_prim prim; _ };
-                 kind = Id_prim (poly_mode, _); lid; _ } ->
-      let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
-      begin match
-        Translprim.application_allocation env lid.loc prim pos args
-          ~poly_mode ~ty:funct.exp_type
-      with
-      | No_allocation -> ()
-      | Allocation_at_locality mode ->
-          Typeallocation.register_allocation_mode ~env ~loc:lid.loc
-            (Alloc.max_with_comonadic Areality mode)
-      end
-  | _ -> ()
-
-let relax_alloc desc ~is_applied mode =
-  match desc.val_kind with
-  | Val_prim _ when is_applied ->
-    Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
-  | _ -> mode
-
 let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(is_applied=false)
       env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -7190,8 +7168,8 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      register_prim_application_allocation ~env ~pos:pm.apply_position
-        funct args;
+      Typeallocation.register_prim_application_allocation ~env
+        ~pos:pm.apply_position funct args;
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
@@ -9009,7 +8987,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  let relax_mode = relax_alloc desc ~is_applied mode in
+  let relax_mode = Typeallocation.relax_alloc desc ~is_applied mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (relax_mode, locks)

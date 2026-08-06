@@ -64,6 +64,30 @@ let register_mod_allocation ~env ~loc ~desc =
         (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
     closures
 
+let register_prim_application_allocation ~env ~pos
+    (funct : Typedtree.expression) args =
+  match funct.exp_desc with
+  | Typedtree.Texp_ident
+      { desc = { Types.val_kind = Types.Val_prim prim; _ };
+        kind = Typedtree.Id_prim (poly_mode, _); lid; _ } ->
+      let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
+      begin match
+        Translprim.application_allocation env lid.loc prim pos args
+          ~poly_mode ~ty:funct.exp_type
+      with
+      | Translprim.No_allocation -> ()
+      | Translprim.Allocation_at_locality mode ->
+          register_allocation_mode ~env ~loc:lid.loc
+            (Alloc.max_with_comonadic Areality mode)
+      end
+  | _ -> ()
+
+let relax_alloc (desc : Types.value_description) ~is_applied mode =
+  match desc.val_kind with
+  | Types.Val_prim _ when is_applied ->
+    Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+  | _ -> mode
+
 let constrain_enclosing_closures pp closures =
   List.iter
     (fun (_, closure_mode) ->
