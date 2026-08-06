@@ -36,8 +36,8 @@ exception Error of error
     for the unit being stored; it describes the data written alongside it. *)
 val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
 
-(** The resuming invocation must use the same machine width and compilation unit
-    as the one that wrote the file. *)
+(** The resuming invocation must use the same machine width as the one that
+    wrote the file. *)
 val restore :
   filename:string ->
   machine_width:Target_system.Machine_width.t ->

@@ -141,7 +141,8 @@ end = struct
   type cmr_format = t
 
   type t =
-    { id_stamp_counters : Id_stamp_counters.t;
+    { original_compilation_unit : Compilation_unit.t;
+      id_stamp_counters : Id_stamp_counters.t;
       table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
@@ -184,7 +185,8 @@ end = struct
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
-    { id_stamp_counters = Id_stamp_counters.save ();
+    { original_compilation_unit = Compilation_unit.get_current_exn ();
+      id_stamp_counters = Id_stamp_counters.save ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
       unit_metadata;
@@ -195,7 +197,8 @@ end = struct
     }
 
   let deserialise ~machine_width ~resolver
-      { id_stamp_counters;
+      { original_compilation_unit;
+        id_stamp_counters;
         table_data;
         used_value_slots;
         unit_metadata;
@@ -208,7 +211,7 @@ end = struct
     Id_stamp_counters.restore id_stamp_counters;
     let renaming, code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
-        ~original_compilation_unit:(Compilation_unit.get_current_exn ())
+        ~original_compilation_unit
     in
     let final_typing_env =
       Option.map
