@@ -720,11 +720,7 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
     List.map2
       (fun cid v ->
         let v = Bound_var.var v in
-        let name =
-          if !Clflags.canonical_ids
-          then Variable.name v
-          else Variable.unique_name v
-        in
+        let name = Variable.canonical_name v in
         cid, Symbol.manufacture comp_unit name)
       cids bound_vars
     |> Function_slot.Map.of_list

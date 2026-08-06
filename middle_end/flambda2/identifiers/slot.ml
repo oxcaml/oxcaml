@@ -36,6 +36,8 @@ module type S = sig
 
   val name : t -> string
 
+  val canonical_name : t -> string
+
   val kind : t -> Flambda_kind.t
 
   val is_always_immediate : t -> bool
@@ -130,6 +132,8 @@ end) : S = struct
   let to_string t = t.name ^ "_" ^ string_of_int t.name_stamp
 
   let name t = t.name
+
+  let canonical_name t = if !Clflags.canonical_ids then name t else to_string t
 
   let kind t = t.kind
 
