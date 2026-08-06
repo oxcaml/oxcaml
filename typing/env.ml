@@ -177,7 +177,7 @@ type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.Value.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
-  | Closure_noalloc_lock
+  | Closure_noalloc_lock of Mode.Hint.noalloc * Mode.Hint.pinpoint
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -3132,7 +3132,8 @@ let add_closure_lock closure_context comonadic env =
   in
   add_lock lock env
 
-let add_closure_noalloc_lock env = add_lock Closure_noalloc_lock env
+let add_closure_noalloc_lock annot closure_context env =
+  add_lock (Closure_noalloc_lock (annot, closure_context)) env
 
 let add_region_lock env = add_lock Region_lock env
 
@@ -3735,13 +3736,15 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   in
   {Mode.monadic; comonadic}
 
-let closure_noalloc_mode (pp : Mode.Hint.pinpoint) vmode =
+let closure_noalloc_mode (pp : Mode.Hint.pinpoint) vmode annot closure =
   let _, pp_desc = pp in
   match pp_desc with
-  | Mode.Hint.Allocation true ->
+  | Mode.Hint.Allocation ->
+    (* CR shsong: Simply return the inner most noalloc closure for now. *)
+    Some (Mode.Hint.Allocated_in_noalloc_closure (annot, closure)),
     Mode.Value.meet_const_with Allocation Mode.Allocation.Const.Noalloc_strict
       vmode
-  | _ -> vmode
+  | _ -> None, vmode
 
 let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
@@ -3789,8 +3792,10 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
         (Non_value_used_in_object (lid, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
-    list of locks and constrains [mode] and [ty]. Return the access mode of the
-    value allowed by the locks.
+    list of locks and constrains [mode] and [ty]. Returns the access mode of
+    the value allowed by the locks, paired with the innermost enclosing closure
+    that is not allowed to allocate on the heap (only ever [Some] when [pp]
+    describes an allocation).
 
     [ty_and_lid] is the type of the value paired with its identifier; it is
     [None] when the function is used on modules and classes.
@@ -3798,20 +3803,25 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
     [pp] is the pinpoint used in errors. *)
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
-    (fun vmode lock ->
+    (fun (acc, vmode) lock ->
       match lock with
-      | Region_lock -> region_mode vmode
+      | Region_lock -> acc, region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
+          acc,
           const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
+          acc,
           closure_mode pp vmode closure_context comonadic
-      | Closure_noalloc_lock -> closure_noalloc_mode pp vmode
+      | Closure_noalloc_lock (annot, closure) ->
+          closure_noalloc_mode pp vmode annot closure
       | Exclave_lock ->
+          acc,
           exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
-          unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
-          vmode
-    ) mode locks
+          acc,
+          (unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
+          vmode)
+    ) (None, mode) locks
 
 (** Constrains every enclosing closure lock with the given minimum mode. *)
 let walk_locks_with_mode_constraint ~env pp ~mode =
@@ -3819,7 +3829,7 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
   let _stage_locks, locks = partition_locks locks in
   (walk_locks ~errors:true ~env ~pp
       (Mode.Value.disallow_right mode) None locks
-    : Mode.Value.l)
+    : _ option * Mode.Value.l)
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -3831,21 +3841,23 @@ let walk_locks_for_legacy_construct ~env pp =
 
 (** Registers a use of an allocation, constraining every enclosing closure lock.
     Used for constructs with allocations that force enclosing functions to be
-    alloc (rather than noalloc_strict) *)
+    alloc (rather than noalloc_strict).
+
+    Returns the minimum mode of the allocation: if some enclosing closure is
+    required (annotated) to be noalloc, the allocation must be stack-allocated,
+    so the returned mode is [local]; otherwise it is unconstrained ([global]).
+    *)
 (* CR shsong: currently it only considers noalloc_strict and alloc,
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
-  let post_mode =
+  let noalloc_closure, _ =
     walk_locks_with_mode_constraint ~env pp
       ~mode:(Mode.Value.min_with_comonadic Allocation Mode.Allocation.alloc)
   in
-  match
-    Mode.Allocation.submode
-      (Mode.Value.proj_comonadic Allocation post_mode)
-      Mode.Allocation.noalloc
-  with
-  | Ok () -> true
-  | Error _ -> false
+  match noalloc_closure with
+  | None -> Mode.Value.(of_const Const.min)
+  | Some hint_comonadic ->
+    Mode.Value.(of_const ~hint_comonadic {Const.min with areality = Local})
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3876,7 +3888,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) | Closure_noalloc_lock ->
+      | Const_closure_lock (true, _, _) | Closure_noalloc_lock _ ->
           mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
@@ -4577,7 +4589,7 @@ let lookup_class ~errors ~use ~loc lid env =
   let vmode =
     if use then
       let pp : Mode.Hint.pinpoint = (loc, Ident {category = Class; lid}) in
-      walk_locks ~errors ~env ~pp clda_mode None locks
+      snd (walk_locks ~errors ~env ~pp clda_mode None locks)
     else
       clda_mode
   in
@@ -4727,7 +4739,7 @@ let find_cltype_index id env = find_index_tbl id env.cltypes
 let walk_locks ~env ~loc lid ~item ty (mode, locks) =
   let pp : Mode.Hint.pinpoint = (loc, Ident {category = item; lid}) in
   let ty_and_lid = Option.map (fun ty -> (ty, lid)) ty in
-  walk_locks ~errors:true ~env ~pp mode ty_and_lid locks
+  snd (walk_locks ~errors:true ~env ~pp mode ty_and_lid locks)
 
 let lookup_module_path ?(use=true) ~loc ~load lid env =
   lookup_module_path ~errors:true ~use ~loc ~load lid env

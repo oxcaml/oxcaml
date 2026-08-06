@@ -34,9 +34,7 @@ type pinpoint_desc =
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
-  | Allocation of bool
-      (** An allocation, the boolean indicates whether the allocation is for a
-          closure or not *)
+  | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
   | Effect_match  (** A pattern match with effect cases *)
   | Effect_try  (** A try-with expression with effect cases *)
@@ -60,6 +58,10 @@ type mutable_part =
 type always_dynamic =
   | Application
   | Try_with
+
+type noalloc =
+  | Noalloc
+  | Noalloc_strict
 
 type legacy =
   | Compilation_unit
@@ -120,6 +122,9 @@ type 'd const =
   | Lazy_forced : (disallowed * 'r) neg const
   | Function_return : (disallowed * 'r) pos const
   | Stack_expression : ('l * disallowed) pos const
+  | Allocated_in_noalloc_closure :
+      noalloc * pinpoint
+      -> ('l * disallowed) pos const
   | Module_allocated_on_heap : (disallowed * 'r) pos const
   | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
   | Branching : ('l * disallowed) neg const
