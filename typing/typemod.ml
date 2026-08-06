@@ -123,9 +123,8 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
     (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
-let register_allocation ~env ~loc : With_locality.lr * With_regionality.lr =
-  ignore
-    (Env.walk_locks_for_allocation ~env (loc, Hint.Allocation false) : bool);
+let register_allocation ~env ~loc ~desc : With_locality.lr * With_regionality.lr =
+  let min_mode = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
   let upper_bound =
     With_locality.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -137,6 +136,7 @@ let register_allocation ~env ~loc : With_locality.lr * With_regionality.lr =
       ~allocation:({loc; txt = Unknown})
       mode_with_locality
   in
+  With_regionality.submode_err (loc, desc) min_mode closed_over_mode;
   mode_with_locality, closed_over_mode
 
 open Typedtree
@@ -3274,7 +3274,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let mode_with_locality, closed_over_mode =
-        register_allocation ~env ~loc:sbody.pmod_loc
+        register_allocation ~env ~loc:sbody.pmod_loc ~desc:Functor
       in
       let newenv =
         Env.add_closure_lock
@@ -3814,7 +3814,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
-  let _, md_mode = register_allocation ~env ~loc:loc_md in
+  let _, md_mode = register_allocation ~env ~loc:loc_md ~desc:Structure in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4489,7 +4489,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation ~env ~loc:modl.mod_loc in
+  let _, mode = register_allocation ~env ~loc:modl.mod_loc ~desc:Module in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in

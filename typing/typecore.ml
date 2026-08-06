@@ -468,16 +468,6 @@ type expected_mode =
     field and [mode]: this field being [true] while [mode] being [global] is
     sensible, but not very useful as it will fail all expressions. *)
 
-    strictly_stack : bool;
-    (** True iff this expression is the direct operand of [stack_].
-    Suppresses the allocation-axis lock-walk for its top allocation. *)
-
-    (* CR shsong: An alternative design is to unify strictly_local and
-    strictly_stack. Specifically, we want to set strictly_local when
-    [stack_] keyword is used, so that we can use strictly_local and remove
-    strictly_stack. However, if we do that, there would be uncaught exception
-    in Test 5h in test typing-modes/zero_alloc.ml. We will review this later. *)
-
     alloc_annot : Allocation.Const.t option;
     (** [Some c] iff the function was directly annotated with the allocation
     mode [c] on its binding (e.g. [let (f @ noalloc) x = ...]). *)
@@ -586,10 +576,9 @@ let mode_default mode =
   { position = RNontail;
     mode = With_regionality.disallow_left mode;
     strictly_local = false;
-    tuple_modes = None;
-    strictly_stack = false;
     return_from_exclave = None;
-    alloc_annot = None }
+    alloc_annot = None;
+    tuple_modes = None }
 
 let mode_legacy = mode_default With_regionality.legacy
 
@@ -718,11 +707,6 @@ let mode_return_from_exclave (expected_mode : expected_mode) =
   | None ->
     let r = ref false in
     r, { expected_mode with return_from_exclave = Some r }
-
-let mode_strictly_stack expected_mode =
-  { expected_mode
-    with strictly_stack = true
-  }
 
 let mode_alloc_annot expected_mode alloc_annot =
   { expected_mode with alloc_annot }
@@ -909,17 +893,15 @@ let allocations : Locality.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_allocation_mode ~env ~loc
-    ?(stack = false) ?(closure = false) locality_mode =
-  (* [stack_]-marked allocations are stack-allocated and so do not count
-     towards the allocation axis; only heap allocations walk the locks. *)
-  if not stack then begin
-    let local_closure =
-      Env.walk_locks_for_allocation ~env (loc, Hint.Allocation closure)
-    in
-    if local_closure then
-      Locality.submode_err (loc, Function) Locality.local locality_mode
-  end;
+let register_allocation_mode ~env ~loc locality_mode =
+  let min_mode =
+    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
+  in
+  let max_mode =
+    With_locality.max_with_comonadic Areality locality_mode
+    |> with_locality_as_regionality
+  in
+  With_regionality.submode_err (loc, Hint.Allocation) min_mode max_mode;
   allocations := locality_mode :: !allocations
 
 let newvar_below_if_modepoly level m =
@@ -953,10 +935,10 @@ let create_allocation_mode_r mode =
   |> newvar_below_if_modepoly 0
   |> Locality.disallow_left
 
-let register_allocation_value_mode ~env ~loc ?(stack = false)
+let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
   let locality_mode = create_allocation_mode_r (with_regionality_to_locality_r2g mode) in
-  register_allocation_mode ~env ~loc ~stack locality_mode;
+  register_allocation_mode ~env ~loc locality_mode;
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
   let mode =
@@ -973,7 +955,7 @@ let register_allocation_value_mode ~env ~loc ?(stack = false)
    parameter function needs to be made global if its partial application
    to one argument must be global. As a result, a function gets an
    [With_locality.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation ~env ?(stack = false) (mode : With_regionality.r) ~loc
+let register_closure_allocation ~env (mode : With_regionality.r) ~loc
     : Locality.lr * With_locality.lr * With_regionality.r =
   let allocation : Hint.allocation = {loc; txt = Unknown} in
   let (mode : With_locality.lr), _ =
@@ -985,7 +967,7 @@ let register_closure_allocation ~env ?(stack = false) (mode : With_regionality.r
   let closed_over_mode =
     with_locality_as_regionality ~allocation (With_locality.disallow_left mode)
   in
-  register_allocation_mode ~env ~loc ~stack ~closure:true
+  register_allocation_mode ~env ~loc
     (Locality.disallow_left locality_mode);
   locality_mode, mode, closed_over_mode
 
@@ -994,7 +976,7 @@ let register_closure_allocation ~env ?(stack = false) (mode : With_regionality.r
     of potential subcomponents. *)
 let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   let locality_mode, mode =
-    register_allocation_value_mode ~env ~loc ~stack:expected_mode.strictly_stack
+    register_allocation_value_mode ~env ~loc
       ?desc (as_single_mode expected_mode)
   in
   locality_mode, mode_default mode
@@ -6557,8 +6539,7 @@ let split_function_ty
     ~is_first_val_param ~is_final_val_param
   =
   let locality_mode, closure_mode, closed_over_mode =
-    register_closure_allocation ~env ~stack:expected_mode.strictly_stack ~loc
-      (as_single_mode expected_mode)
+    register_closure_allocation ~env ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local locality_mode;
@@ -6600,8 +6581,11 @@ let split_function_ty
     | true ->
         let env =
           match expected_mode.alloc_annot with
-          | Some (Noalloc | Noalloc_strict) ->
-            Env.add_closure_noalloc_lock env
+          | Some Noalloc ->
+            Env.add_closure_noalloc_lock Hint.Noalloc (loc, Function) env
+          | Some Noalloc_strict ->
+            Env.add_closure_noalloc_lock Hint.Noalloc_strict (loc, Function)
+              env
           | Some Alloc | None -> env
         in
         let env =
@@ -8501,10 +8485,14 @@ and type_expect_
       let (cl_path, cl_decl, cl_mode) =
         Env.lookup_class ~loc:cl.loc cl.txt env
       in
-      With_regionality.submode_exn
-        ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
-        cl_mode
-        With_regionality.legacy;
+      (* Allocation axis: [new] allocates the object on the heap. This
+         registration is currently redundant -- [Env.lookup_class] above
+         already walks the locks and forces enclosing closures to [alloc] --
+         but we register it anyway so every allocation site is covered. *)
+      register_allocation_mode ~env ~loc
+        (Locality.disallow_left Locality.legacy);
+      With_regionality.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
+        cl_mode With_regionality.legacy;
       let pm = position_and_mode env expected_mode sexp in
       begin match cl_decl.cty_new with
           None ->
@@ -8549,6 +8537,9 @@ and type_expect_
         exp_env = env }
   | Pexp_override lst ->
       submode ~loc ~env With_regionality.legacy expected_mode;
+      (* Allocation axis check: [{< ... >}] copies [self], which allocates *)
+      register_allocation_mode ~env ~loc
+        (Locality.disallow_left Locality.legacy);
       let _ =
        List.fold_right
         (fun (lab, _) l ->
@@ -9097,10 +9088,7 @@ and type_expect_
            exp_attributes = sexp.pexp_attributes;
            exp_env = env }
   | Pexp_stack e ->
-      (* Allocation axis: suppress the axis lock-walk at the registration
-          site *)
-      let expected_stack_mode = mode_strictly_stack expected_mode in
-      let exp = type_expect env expected_stack_mode e ty_expected_explained in
+      let exp = type_expect env expected_mode e ty_expected_explained in
       let always_heap category =
         raise (Error (exp.exp_loc, env, Always_heap_allocation category))
       in
@@ -9119,7 +9107,7 @@ and type_expect_
             With_regionality.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          Typedtree.locality_mode_r_submode_err (exp.exp_loc, Allocation false)
+          Typedtree.locality_mode_r_submode_err (exp.exp_loc, Allocation)
             (Locality.of_const ~hint:Stack_expression Local)
             locality_mode
         end
@@ -9635,6 +9623,9 @@ and type_ident env ?(recarg=Rejected) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
+  (* CR shsong: the allocation axis is treated conservatively here -- any value
+     referenced at [alloc] (in particular every primitive) forces the enclosing
+     closures to [alloc], even when no allocation actually happens. *)
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (mode, locks)
@@ -9661,18 +9652,32 @@ and type_ident env ?(recarg=Rejected) lid =
   end;
   let layout_args, val_type, kind =
     match desc.val_kind with
+    (* Allocation axis: only [Val_prim] can allocate merely by being referenced
+       (the primitive's result). We register an allocation whenever one may
+       happen, not only for poly results as an optimization hint. *)
+    (* CR shsong: this check is currently masked by [walk_locks] above, which
+       already treats every primitive as [alloc]. *)
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
-       (* if the locality of returned value of the primitive is poly
-          we then register allocation for further optimization *)
+       (* Poly result: register an allocation at the result's locality. *)
        | (Prim_poly, _), Some mode ->
            let mode = Locality.disallow_left mode in
            register_allocation_mode ~env ~loc:lid.loc mode
-       | _ -> ()
+       (* Unreachable: a poly result implies [mode = Some]. Conservatively
+          register a heap allocation rather than silently skip it. *)
+       | (Prim_poly, _), None
+       (* Global result: register a heap allocation. *)
+       | (Prim_global, _), _
+         ->
+           register_allocation_mode ~env ~loc:lid.loc
+             (Locality.disallow_left Locality.legacy)
+       (* Local result: a stack allocation, which does not count on the
+          allocation axis. *)
+       | (Prim_local, _), _ -> ()
        end;
        let yielding =
          prim_params_yielding env ty ~arity:prim.prim_arity
@@ -11113,8 +11118,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
   let locality_mode, value_mode =
-    register_allocation_value_mode ~env ~loc
-      ~stack:expected_mode.strictly_stack expected_mode.mode
+    register_allocation_value_mode ~env ~loc expected_mode.mode
   in
   let argument_mode =
     value_mode
@@ -11145,8 +11149,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
           List.map (fun (mode, _) ->
-            snd (register_allocation_value_mode ~env ~loc
-                   ~stack:expected_mode.strictly_stack mode)) tuple_modes
+            snd (register_allocation_value_mode ~env ~loc mode)) tuple_modes
         in
         let argument_mode =
           With_regionality.meet
