@@ -88,6 +88,9 @@ type specific_operation =
                                         (* Store an integer constant *)
   | Ioffset_loc of int * addressing_mode (* Add a constant to a location *)
   | Ifloatarithmem of float_width * float_operation * addressing_mode
+  | Ifloatcomp_tagged of float_width * Cmm.float_comparison
+                                       (* Float comparison yielding the tagged
+                                          boolean directly *)
                                        (* Float arith operation with memory *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
   | Isextend32                         (* 32 to 64 bit conversion with sign

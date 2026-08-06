@@ -179,6 +179,28 @@ let pseudoregs_for_operation op arg res =
   | Int128op (Iadd128 | Isub128) ->
     [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
+  | Specific (Ifloatcomp_tagged (Float64, cond)) ->
+    (* Same scratch-register discipline as [Icompf] below; the swap must be
+       computed for the *negated* comparison, which is the one emission uses. *)
+    let treg = Reg.create Float in
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped =
+        float_cond_and_need_swap (Cmm.negate_float_comparison cond)
+      in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
+  | Specific (Ifloatcomp_tagged (Float32, cond)) ->
+    (* Emission keeps the original predicate for [Float32] (the tagged boolean
+       is obtained by shifting the zero-extended mask). *)
+    let treg = Reg.create Float32 in
+    if Proc.has_three_operand_float_ops ()
+    then arg, [| res.(0); treg |]
+    else
+      let _, is_swapped = float_cond_and_need_swap cond in
+      ( (if is_swapped then [| arg.(0); treg |] else [| treg; arg.(1) |]),
+        [| res.(0); treg |] )
   | Floatop (Float64, Icompf cond) ->
     (* We need to temporarily store the result of the comparison in a float
        register, but we don't want to clobber any of the inputs if they would
@@ -384,6 +406,20 @@ let select_operation'
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
+  (* Tagging of a float-comparison result, [2 * (a <cmp> b) + 1]: fuse the
+     comparison with the tagging so that emission can absorb the usual mask
+     negation into the tag arithmetic (see [Ifloatcomp_tagged]). *)
+  | Caddi
+    when match args with
+         | [ Cop (Clsl, [Cop (Ccmpf _, _, _); Cconst_int (1, _)], _);
+             Cconst_int (1, _) ] ->
+           true
+         | _ -> false -> (
+    match args with
+    | [ Cop (Clsl, [Cop (Ccmpf (width, cmp), cmp_args, _); Cconst_int (1, _)], _);
+        Cconst_int (1, _) ] ->
+      Rewritten (specific (Ifloatcomp_tagged (width, cmp)), cmp_args)
+    | _ -> Use_default)
   (* Recognize the LEA instruction *)
   | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
     match select_addressing Word_int (Cop (op, args, dbg)) with

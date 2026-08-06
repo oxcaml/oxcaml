@@ -294,6 +294,9 @@ type specific_operation =
                                        (* Add a constant to a location *)
   | Ifloatarithmem of float_width * float_operation * addressing_mode
                                        (* Float arith operation with memory *)
+  | Ifloatcomp_tagged of float_width * Cmm.float_comparison
+                                       (* Float comparison yielding the tagged
+                                          boolean directly *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
   | Isextend32                         (* 32 to 64 bit conversion with sign
                                           extension *)
@@ -410,7 +413,8 @@ let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
       then None
       else Some (Ilea (offset_addressing addr displ_delta))
     end
-  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
+  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ifloatcomp_tagged _
+  | Ibswap _ | Isextend32
   | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
   | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ | Illvm_intrinsic _ ->
     None
@@ -492,6 +496,9 @@ let print_specific_operation printreg op ppf arg =
     fprintf ppf "bswap_%i %a" (int_of_bswap_bitwidth bitwidth) printreg arg.(0)
   | Isextend32 ->
       fprintf ppf "sextend32 %a" printreg arg.(0)
+  | Ifloatcomp_tagged (_width, cmp) ->
+      fprintf ppf "floatcomp_tagged[%s] %a %a"
+        (Printcmm.float_comparison cmp) printreg arg.(0) printreg arg.(1)
   | Izextend32 ->
       fprintf ppf "zextend32 %a" printreg arg.(0)
   | Irdtsc ->
@@ -530,6 +537,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ibswap { bitwidth } ->
       "bswap " ^ (bitwidth |> int_of_bswap_bitwidth |> string_of_int)
   | Isextend32 -> "sextend32"
+  | Ifloatcomp_tagged _ -> "floatcomp_tagged"
   | Izextend32 -> "zextend32"
   | Irdtsc -> "rdtsc"
   | Ilfence -> "lfence"
@@ -554,7 +562,7 @@ let win64 =
 (* Keep in sync with [Vectorize_specific] *)
 let operation_is_pure = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
-  | Ifloatarithmem _  -> true
+  | Ifloatarithmem _ | Ifloatcomp_tagged _ -> true
   | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
   | Istore_int (_, _, _) | Ioffset_loc (_, _)
@@ -570,7 +578,7 @@ let operation_is_pure = function
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32
-  | Ifloatarithmem _
+  | Ifloatarithmem _ | Ifloatcomp_tagged _
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
   | Ilfence | Isfence | Imfence
@@ -648,6 +656,8 @@ let equal_specific_operation left right =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ifloatcomp_tagged (w1, c1), Ifloatcomp_tagged (w2, c2) ->
+    Cmm.equal_float_width w1 w2 && Cmm.equal_float_comparison c1 c2
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -671,7 +681,8 @@ let equal_specific_operation left right =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
-  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
+  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _
+    | Ifloatcomp_tagged _ | Ibswap _ |
      Isextend32 | Izextend32 |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
@@ -761,6 +772,8 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ifloatcomp_tagged (w1, c1), Ifloatcomp_tagged (w2, c2) ->
+    Cmm.equal_float_width w1 w2 && Cmm.equal_float_comparison c1 c2
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -784,7 +797,8 @@ let isomorphic_specific_operation op1 op2 =
   | Isimd_mem (l,al), Isimd_mem (r,ar) ->
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
-  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
+  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _
+    | Ifloatcomp_tagged _ | Ibswap _ |
      Isextend32 | Izextend32 |
      Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |

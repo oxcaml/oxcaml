@@ -562,6 +562,14 @@ let arg_idx i n : X86_ast.reg_idx =
   | Mem64_RIP _ ->
     assert false
 
+let res_idx i n : X86_ast.reg_idx =
+  match res i n with
+  | Reg64 reg -> Scalar reg
+  | Regf reg -> Vector reg
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regmask _ | Mem _
+  | Mem64_RIP _ ->
+    assert false
+
 let argX i n = arg_as_xmm (reg i.arg.(n))
 
 let resX i n = arg_as_xmm (reg i.res.(n))
@@ -2469,6 +2477,30 @@ let emit_instr ~first ~last ~fallthrough i =
        copy the result to the top 32 bits. *)
     I.movsxd r0_32 r0;
     I.neg r0
+  | Lop (Specific (Ifloatcomp_tagged (Float64, cmp))) ->
+    (* The comparison is emitted with the negated predicate: the mask is then [b
+       - 1] (0 when [cmp] holds, -1 otherwise), so the tagged boolean [2b + 1]
+       is [2 * mask + 3] and the usual [neg] is absorbed into the tag
+       arithmetic. *)
+    let cond, need_swap =
+      float_cond_and_need_swap (Cmm.negate_float_comparison cmp)
+    in
+    let r0, r1 = res i 0, res i 1 in
+    let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
+    cmp_sse_or_avx cmpsd vcmpsd_X_X_Xm64 cond a1 a0 r1;
+    movq r1 r0;
+    I.lea (mem64 NONE 3 (res_idx i 0) ~scale:1 ~base:(reg64 i.res.(0))) r0
+  | Lop (Specific (Ifloatcomp_tagged (Float32, cmp))) ->
+    (* The 32-bit mask is moved with a zero extension, so the tagged boolean is
+       [(mask lsr 30) lor 1] (0xFFFFFFFF yielding 3, and 0 yielding 1); this
+       saves both the sign extension and the negation. *)
+    let cond, need_swap = float_cond_and_need_swap cmp in
+    let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
+    let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
+    cmp_sse_or_avx cmpss vcmpss_X_X_Xm32 cond a1 a0 r1;
+    movd r1 r0_32;
+    I.shr (int 30) r0;
+    I.or_ (int 1) r0
   | Lop (Floatop (Float64, Inegf)) ->
     sse_or_avx_dst xorpd vxorpd_X_X_Xm128
       (mem64_rip VEC128 (S.encode S.Predef.caml_negf_mask))

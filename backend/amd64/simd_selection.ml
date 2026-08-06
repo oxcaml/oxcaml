@@ -1518,9 +1518,9 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
             | Iindexed2scaled (scale, displ) -> Some scale, Some displ
             | Ibased _ -> None, None)
           | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
-          | Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence
-          | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Iprefetch _
-          | Icldemote _ | Illvm_intrinsic _ ->
+          | Isextend32 | Ifloatcomp_tagged _ | Izextend32 | Irdtsc | Irdpmc
+          | Ilfence | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _
+          | Iprefetch _ | Icldemote _ | Illvm_intrinsic _ ->
             assert false)
         | Move | Load _ | Store _ | Intop _ | Intop_imm _ | Alloc _
         | Reinterpret_cast _ | Static_cast _ | Spill | Reload | Const_int _
@@ -1617,7 +1617,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               make_binary_operation (Result 0) (New_Vec128 1) (Result 0) add ]
         | _ -> None)
       | Ibased _ -> None)
-    | Isextend32 -> (
+    | Isextend32 | Ifloatcomp_tagged _ -> (
       match width_type with
       | W512 -> None
       | W256 -> None
@@ -1654,7 +1654,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
               ( Ifloatarithmem _ | Ioffset_loc _ | Iprefetch _ | Icldemote _
               | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence | Ipackf32
               | Isimd _ | Isimd_mem _ | Ilea _ | Ibswap _ | Isextend32
-              | Izextend32 | Illvm_intrinsic _ )
+              | Ifloatcomp_tagged _ | Izextend32 | Illvm_intrinsic _ )
           | Intop_imm _ | Move | Load _ | Store _ | Intop _ | Int128op _
           | Alloc _ | Reinterpret_cast _ | Static_cast _ | Spill | Reload
           | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
