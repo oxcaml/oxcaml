@@ -583,11 +583,11 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlCsel__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlCsel = global i64 2816, section ".data", align 8
-@camlCsel = global { ptr, ptr } { ptr @camlCsel__csel_2_22, ptr @camlCsel__min_HIDE_STAMP }, section ".data", align 8
+@camlCsel = global { ptr, ptr } { ptr @camlCsel__csel_0_22, ptr @camlCsel__min_HIDE_STAMP }, section ".data", align 8
 @header.camlCsel__min_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlCsel__min_3_23 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlCsel__min_HIDE_STAMP }, section ".data", align 8
+@camlCsel__min_1_23 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlCsel__min_HIDE_STAMP }, section ".data", align 8
 @header.camlCsel__csel_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlCsel__csel_2_22 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlCsel__csel_HIDE_STAMP }, section ".data", align 8
+@camlCsel__csel_0_22 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlCsel__csel_HIDE_STAMP }, section ".data", align 8
 @header.camlCsel__const_block_3 = global i64 2827, section ".data", align 8
 @camlCsel__const_block_3 = global { ptr, ptr } { ptr @camlCsel__immstring_0, ptr @camlCsel__const_block_2 }, section ".data", align 8
 @header.camlCsel__immstring_0 = global i64 4092, section ".data", align 8
