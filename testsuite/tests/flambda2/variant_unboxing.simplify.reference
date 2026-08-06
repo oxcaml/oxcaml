@@ -1,0 +1,85 @@
+let code descr_0 deleted in
+let code is_empty_2 deleted in
+let code Tree_operations_1 deleted in
+let code loopify(never) size(32) newer_version_of(descr_0)
+      descr_0_1
+        (param :
+           [ 0 | 0 of imm tagged
+           |1 of imm tagged *
+              [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] *
+              [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of imm tagged * val
+          |1 of imm tagged *
+             [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] *
+             [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] ] =
+  (let prim = %is_int (param) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k (0))
+    where k3 =
+      let prim = %get_tag (param) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (param)
+    where k2 =
+      let Pfield = %block_load.[`0`] (param) in
+      let Pmakeblock = %block.[`0`] (Pfield, 0) in
+      cont k (Pmakeblock)
+in
+let $camlVariant_unboxing__descr_3 = closure descr_0_1 @descr in
+let $camlVariant_unboxing__Pmakeblock163 =
+  Block 0 ($camlVariant_unboxing__descr_3)
+in
+let code loopify(never) size(12) newer_version_of(is_empty_2)
+      is_empty_2_1 (t : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Tree = %project_value_slot.[is_empty].[Tree] (my_closure) in
+  (let Pfield = %block_load.[`0`] (Tree) in
+   apply Pfield (t) -> k2 * k1)
+    where k2
+            (`*match*` :
+               [ 0 | 0 of imm tagged * val |1 of imm tagged * val * val ]) =
+      let prim = %is_int (`*match*`) in
+      let Pisint = %tag_imm (prim) in
+      cont k (Pisint)
+in
+let code inline(always) loopify(never) size(27) newer_version_of(Tree_operations_1)
+      Tree_operations_1_1 (Tree : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let is_empty = closure is_empty_2_1 @is_empty with { Tree = Tree } in
+  let Pmakeblock = %block.[`0`] (is_empty) in
+  cont k (Pmakeblock)
+in
+let $camlVariant_unboxing__Tree_operations_4 =
+  closure Tree_operations_1_1 @Tree_operations
+in
+let code loopify(never) size(4) newer_version_of(is_empty_2_1)
+      is_empty_2_2 (t : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %is_int (t) in
+   cont k2 (prim))
+    where k2 (is_int : imm) =
+      let Pisint = %tag_imm (is_int) in
+      cont k (Pisint)
+in
+let $camlVariant_unboxing__is_empty_5 =
+  closure is_empty_2_2 @is_empty
+  with { Tree = $camlVariant_unboxing__Pmakeblock163 }
+in
+let $camlVariant_unboxing__Pmakeblock239 =
+  Block 0 ($camlVariant_unboxing__is_empty_5)
+in
+let $camlVariant_unboxing =
+  Block 0 ($camlVariant_unboxing__Pmakeblock163,
+           $camlVariant_unboxing__Tree_operations_4,
+           $camlVariant_unboxing__Pmakeblock239)
+in
+cont done ($camlVariant_unboxing)

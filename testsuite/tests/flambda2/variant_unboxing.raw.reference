@@ -1,0 +1,88 @@
+let $camlVariant_unboxing__first_const = Block 0 () in
+(let code size(52)
+       descr_0
+         (param :
+            [ 0 | 0 of imm tagged
+            |1 of imm tagged *
+               [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] *
+               [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] ])
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : [ 0 | 0 of imm tagged * val
+           |1 of imm tagged *
+              [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] *
+              [ 0 | 0 of imm tagged |1 of imm tagged * val * val ] ] =
+   let next_depth = rec_info (succ my_depth) in
+   (let prim = %is_int (param) in
+    let is_scrutinee_int = %tag_imm (prim) in
+    let untagged = %untag_imm (is_scrutinee_int) in
+    switch untagged
+      | 0 -> k5
+      | 1 -> k6)
+     where k6 =
+       let untagged = %untag_imm (param) in
+       cont k1 (0)
+     where k5 =
+       let prim = %get_tag (param) in
+       let scrutinee_tag = %tag_imm (prim) in
+       let untagged = %untag_imm (scrutinee_tag) in
+       switch untagged
+         | 0 -> k3
+         | 1 -> k4
+     where k4 =
+       let Pfield = %block_load.[`2`] (param) in
+       let Pfield_1 = %block_load.[`1`] (param) in
+       let Pfield_2 = %block_load.[`0`] (param) in
+       let Pmakeblock = %block.[`1`] (Pfield_2, Pfield_1, Pfield) in
+       cont k1 (Pmakeblock)
+     where k3 =
+       let Pfield = %block_load.[`0`] (param) in
+       let Pmakeblock = %block.[`0`] (Pfield, 0) in
+       cont k1 (Pmakeblock)
+ in
+ let code size(12)
+       is_empty_2 (t : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let Tree = %project_value_slot.[is_empty].[Tree] (my_closure) in
+   (let Pfield = %block_load.[`0`] (Tree) in
+    apply Pfield (t) -> k3 * k2)
+     where k3
+             (`*match*` :
+                [ 0 | 0 of imm tagged * val |1 of imm tagged * val * val ]) =
+       let prim = %is_int (`*match*`) in
+       let Pisint = %tag_imm (prim) in
+       cont k1 (Pisint)
+ in
+ let code inline(always) loopify(never) size(27)
+       Tree_operations_1 (Tree : val)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : val =
+   let next_depth = rec_info (succ my_depth) in
+   let is_empty = closure is_empty_2 @is_empty with { Tree = Tree } in
+   let Pmakeblock = %block.[`0`] (is_empty) in
+   cont k1 (Pmakeblock)
+ in
+ (let descr = closure descr_0 @descr in
+  let Pmakeblock = %block.[`0`] (descr) in
+  cont k1 (Pmakeblock))
+   where k1 (Set0 : val) =
+     let Tree_operations = closure Tree_operations_1 @Tree_operations in
+     (apply direct(Tree_operations_1)
+        (Tree_operations : _ -> val) (Set0) -> k2 * error
+        where k2 (include : val) =
+          let Pfield = %block_load.[`0`] (include) in
+          let Pmakeblock = %block.[`0`] (Pfield) in
+          cont k1 (Pmakeblock)
+        where k1 (Set : val) =
+          let Pmakeblock = %block.[`0`] (Set0, Tree_operations, Set) in
+          cont k (Pmakeblock)))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`3`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (module_block) in
+    let field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (module_block) in
+    let $camlVariant_unboxing = Block 0 (field_0, field_1, field_2) in
+    cont done ($camlVariant_unboxing)
