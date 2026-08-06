@@ -242,12 +242,10 @@ unsigned_rem_7:
   ret
 |}]
 
-(* CR ttebbi: Could instead start with [cmpq $-1, %rax] *)
 let unsigned_div_umaxint x = Int64_u.unsigned_div x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_div_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   movl  $1, %eax
   ret
@@ -259,8 +257,7 @@ unsigned_div_umaxint:
 let unsigned_rem_umaxint x = Int64_u.unsigned_rem x (-#1L)
 [%%expect_asm X86_64{|
 unsigned_rem_umaxint:
-  movq  $-1, %rbx
-  cmpq  %rbx, %rax
+  cmpq  $-1, %rax
   jne   .L0
   xorl  %eax, %eax
   ret
