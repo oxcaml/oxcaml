@@ -199,6 +199,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Legacy x -> Legacy x
         | Stack_expression -> Stack_expression
+        | Allocated_in_noalloc_closure (annot, pp) ->
+          Allocated_in_noalloc_closure (annot, pp)
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
@@ -246,6 +248,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
+        | Allocated_in_noalloc_closure (annot, pp) ->
+          Allocated_in_noalloc_closure (annot, pp)
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -274,6 +278,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
+        | Allocated_in_noalloc_closure (annot, pp) ->
+          Allocated_in_noalloc_closure (annot, pp)
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -4871,10 +4877,7 @@ module Report = struct
       Some (print_article_noun Consonant "pattern match with effect cases")
     | Effect_try ->
       Some (print_article_noun Consonant "try-with with effect cases")
-    | Allocation closure ->
-      if closure
-      then Some (print_article_noun Vowel "allocation for closure")
-      else Some (print_article_noun Vowel "allocation")
+    | Allocation -> Some (print_article_noun Vowel "allocation")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")
@@ -5114,6 +5117,18 @@ module Report = struct
          value"
     | Stack_expression ->
       Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
+    | Allocated_in_noalloc_closure (annot, closure) ->
+      let print_closure = print_pinpoint closure |> Option.get in
+      let annot =
+        match annot with
+        | Noalloc -> "noalloc"
+        | Noalloc_strict -> "noalloc_strict"
+      in
+      Fmt.fprintf ppf
+        "it is allocated inside %t,@ which is %a and thus cannot allocate on \
+         the heap"
+        (print_closure ~definite:true ~capitalize:false)
+        Misc.Style.inline_code annot
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }
