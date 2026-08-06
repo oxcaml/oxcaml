@@ -3968,6 +3968,11 @@ let transl_extension_constructor_decl
       ~cstr_path:(Pident id) ~type_path ~unboxed:false ~extension:true
       typext_params svars sargs sret_type
   in
+  (* Default any unfilled sort variables (e.g. of an existential argument)
+     before computing the shape, as [Ctype.closed_type_decl] does for
+     ordinary declarations. [Ctype.closed_extension_constructor] also
+     defaults them, but only runs after the shape is computed. *)
+  Btype.iter_type_expr_cstr_args Ctype.remove_mode_and_jkind_variables args;
   let args, ~constant, constructor_shape, _arg_sorts =
     update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor:true
