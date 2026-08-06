@@ -13,9 +13,9 @@ let $camlValue_slot_c__Pmakeblock_9 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
            $camlValue_slot_c__const_block_8)
 in
-let code f_3 deleted in
-let code loopify(never) size(59) newer_version_of(f_3)
-      f_3_1 (b : imm tagged)
+let code f_2 deleted in
+let code loopify(never) size(59) newer_version_of(f_2)
+      f_2_1 (b : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -50,6 +50,6 @@ let code loopify(never) size(59) newer_version_of(f_3)
                   | 0 -> k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_9)
                   | 1 -> k (0)))
 in
-let $camlValue_slot_c__f_10 = closure f_3_1 @f &toplevel.alloc_region in
+let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel.alloc_region in
 let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_10) in
 cont done ($camlValue_slot_c)

@@ -28,7 +28,7 @@ apply ccall noalloc
               let Popaque = %opaque ($camlLazy_invalid__immstring_0) in
               apply direct(force_lazy_block_4 &toplevel.alloc_region)
                      inlined(never)
-                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11_4
+                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_4_4
                   (Popaque)
                   -> k * error))
   where k (region_return : val) =
@@ -74,7 +74,7 @@ apply ccall noalloc
                          let Popaque = %opaque ($camlLazy_invalid__foo_1) in
                          apply direct(force_lazy_block_4 &my_alloc_region)
                                 inlined(never)
-                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11_4
+                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_4_4
                              (Popaque)
                              -> k * k1))
          in
