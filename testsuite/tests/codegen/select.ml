@@ -61,7 +61,6 @@ select_cmp_twice:
 |}]
 
 
-(* CR ttebbi: We could constant-fold this. *)
 let select_constant (x : int) = Builtins.select true x 55
 [%%expect_asm X86_64{|
 select_constant:

@@ -46,7 +46,6 @@ mul:
   ret
 |}]
 
-(* CR ttebbi: imul could be replaced with lea (x*2+x) *)
 let mul_3 x = Int64_u.mul x #3L
 [%%expect_asm X86_64{|
 mul_3:
