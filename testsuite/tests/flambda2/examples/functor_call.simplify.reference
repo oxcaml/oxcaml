@@ -1,6 +1,6 @@
-let code test_3 deleted in
-let code inline(always) loopify(never) size(5) newer_version_of(test_3)
-      test_3_1 (x : imm tagged)
+let code test_2 deleted in
+let code inline(always) loopify(never) size(5) newer_version_of(test_2)
+      test_2_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -8,7 +8,7 @@ let code inline(always) loopify(never) size(5) newer_version_of(test_3)
   let int_greaterthan = %tag_imm (prim) in
   cont k (int_greaterthan)
 in
-let $camlFunctor_call__test_4 = closure test_3_1 @test &toplevel.alloc_region
+let $camlFunctor_call__test_4 = closure test_2_1 @test &toplevel.alloc_region
 in
 let $camlFunctor_call__Pmakeblock_5 = Block 0 ($camlFunctor_call__test_4) in
 let code loopify(done) size(16) newer_version_of(foo_1_1)

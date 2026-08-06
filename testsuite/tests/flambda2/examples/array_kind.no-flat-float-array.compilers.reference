@@ -5,10 +5,10 @@
        (array.get[addr indexed by int] a/0 0)))
   (makeblock 0 f/0))
 (data global "camlArray_kind__gc_roots": int 0)
-(data int 1792 global "camlArray_kind": addr G:"camlArray_kind__f_1")
+(data int 1792 global "camlArray_kind": addr G:"camlArray_kind__f_2")
 (data
  int 3063
- global "camlArray_kind__f_1":
+ global "camlArray_kind__f_2":
  addr G:"camlArray_kind__f_0_1_code"
  int 108086391056891909)
 (data

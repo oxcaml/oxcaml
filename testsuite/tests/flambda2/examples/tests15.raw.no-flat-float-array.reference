@@ -8,7 +8,7 @@
  let $camlTests15__empty_array_3 = Empty_array in
  let code size(20)
        list_to_array_0 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val array =
    let next_depth = rec_info (succ my_depth) in
@@ -33,7 +33,7 @@
           param :
             [ 0 of imm tagged |1 of imm tagged |2 of imm tagged
             |3 of imm tagged ])
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -49,7 +49,7 @@
  in
  let code size(6)
        set_to_x_2 (b : val, i : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -60,7 +60,7 @@
  in
  let code size(3)
        classical_id_3 (b : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -70,7 +70,7 @@
  in
  let code size(8)
        swapped_4 (param : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -79,7 +79,7 @@
  in
  let code size(3)
        negate_5 (x : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -88,7 +88,7 @@
  in
  let code size(2)
        foo_6 (x : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -96,15 +96,19 @@
    cont k1 (int_or)
  in
  let $camlTests15__immstring_4 = " \\ \n " in
- let list_to_array = closure list_to_array_0 @list_to_array in
- let is_c = closure is_c_1 @is_c in
- let set_to_x = closure set_to_x_2 @set_to_x in
- let classical_id = closure classical_id_3 @classical_id in
- let swapped = closure swapped_4 @swapped in
- let negate = closure negate_5 @negate in
- let foo = closure foo_6 @foo in
+ let list_to_array =
+   closure list_to_array_0 @list_to_array &toplevel.alloc_region
+ in
+ let is_c = closure is_c_1 @is_c &toplevel.alloc_region in
+ let set_to_x = closure set_to_x_2 @set_to_x &toplevel.alloc_region in
+ let classical_id =
+   closure classical_id_3 @classical_id &toplevel.alloc_region
+ in
+ let swapped = closure swapped_4 @swapped &toplevel.alloc_region in
+ let negate = closure negate_5 @negate &toplevel.alloc_region in
+ let foo = closure foo_6 @foo &toplevel.alloc_region in
  let Pmakeblock =
-   %block.[`0`]
+   %block.[`0`].`toplevel`
      (list_to_array,
       is_c,
       set_to_x,
