@@ -711,10 +711,9 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
     Function_slot.Lmap.mapi
       (fun function_slot _func_decl ->
         let name =
-          function_slot |> Function_slot.rename |> Function_slot.to_string
-          |> Linkage_name.of_string
+          function_slot |> Function_slot.rename |> Function_slot.canonical_name
         in
-        Symbol.create (Current_unit.get_cu_exn ()) name)
+        Symbol.manufacture (Current_unit.get_cu_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

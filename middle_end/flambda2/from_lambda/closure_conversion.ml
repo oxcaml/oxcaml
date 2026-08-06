@@ -57,11 +57,7 @@ let manufacture_symbol proposed_name =
   Symbol.manufacture (Current_unit.get_cu_exn ()) proposed_name
 
 let manufacture_symbol_of_variable v =
-  let name =
-    if !Clflags.canonical_ids
-    then Variable.canonical_name v
-    else Variable.unique_name v
-  in
+  let name = Variable.canonical_name v in
   manufacture_symbol name
 
 let declare_symbol_for_function_slot env ident function_slot : Env.t * Symbol.t
