@@ -35,7 +35,6 @@ loop_code_layout:
   cmpq  $1, %rax
   jne   .L2
   movq  %rbx, (%rsp)
-  movl  $1, %eax
   call  camlTOP2__cold_1_4_code@PLT
 .L1:
   movq  (%rsp), %rax
