@@ -20,10 +20,9 @@ val is_nan : Intrinsics.Float_u.t -> bool = <fun>
 |}]
 [%%expect_asm X86_64{|
 is_nan:
-  vcmpsd $4, %xmm0, %xmm0, %xmm0
+  vcmpsd $0, %xmm0, %xmm0, %xmm0
   vmovq %xmm0, %rax
-  neg   %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  3(%rax,%rax), %rax
   ret
 |}]
 

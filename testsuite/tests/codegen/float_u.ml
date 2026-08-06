@@ -118,15 +118,12 @@ external float_equal :
   (float[@local_opt]) -> (float[@local_opt]) -> bool @@ portable = "%equal"
 
 
-(* CR ttebbi: We could save the neg instruction by negating
-   the vcmpsd predicate. *)
 let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y)
 [%%expect_asm X86_64{|
 equal:
-  vcmpsd $0, %xmm1, %xmm0, %xmm0
+  vcmpsd $4, %xmm1, %xmm0, %xmm0
   vmovq %xmm0, %rax
-  neg   %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  3(%rax,%rax), %rax
   ret
 |}]
 
@@ -308,10 +305,9 @@ min_unchecked:
 let is_nan (x : Float_u.t) = Float.is_nan (Float_u.to_float x)
 [%%expect_asm X86_64{|
 is_nan:
-  vcmpsd $4, %xmm0, %xmm0, %xmm0
+  vcmpsd $0, %xmm0, %xmm0, %xmm0
   vmovq %xmm0, %rax
-  neg   %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  3(%rax,%rax), %rax
   ret
 |}]
 
@@ -328,10 +324,9 @@ let is_finite (x : Float_u.t) =
 [%%expect_asm X86_64{|
 is_finite:
   vsubsd %xmm0, %xmm0, %xmm0
-  vcmpsd $0, %xmm0, %xmm0, %xmm0
+  vcmpsd $4, %xmm0, %xmm0, %xmm0
   vmovq %xmm0, %rax
-  neg   %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  3(%rax,%rax), %rax
   ret
 |}]
 
