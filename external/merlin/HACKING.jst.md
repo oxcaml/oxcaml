@@ -9,6 +9,10 @@ Here are the commands to know:
 * `make merlin-promote` will build Merlin, test it, and promote failing tests.
 * `make merlin-build` will build Merlin without testing it. `make merlin-test` first does `make install` because the testsuite requires a compiler install, so `make merlin-build` can be significantly faster.
 
+Note that for any of the `make` commands, you must have already configured the
+workspace. See "Branching and configuring" in [../../README.md](../../README.md)
+for more information.
+
 # Intended Workflows
 
 ## Authoring
