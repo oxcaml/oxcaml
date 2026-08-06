@@ -3267,23 +3267,22 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  let frametable_section : Asm_targets.Asm_section.t =
-    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
-  in
-  D.switch_to_section frametable_section;
-  I.ud2 ();
-  D.align
-    ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
-    ~bytes:8;
+  D.switch_to_section Read_only_data;
+  D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
-  emit_global_label ~section:frametable_section "frametable";
+  emit_global_label ~section:Read_only_data "frametable";
   (* MASM can't assemble computed ULEB128 constants, so can't do short frame
      descriptors *)
   Emitaux.disable_short_descriptors := X86_proc.masm;
+  (* The binary emitter keeps the strings inline in the frametable section:
+     same-section label differences need no relocations. *)
+  let debug_strings_section : Asm_targets.Asm_section.t =
+    if Option.is_some !X86_proc.internal_assembler
+    then Read_only_data
+    else Debuginfo_strings
+  in
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
-  emit_frames
-    ~binary_emitter:(Option.is_some !X86_proc.internal_assembler)
-    ~frametable_section
+  emit_frames ~debug_strings_section
     { efa_code_label =
         (fun l ->
           let l = label_to_asm_label ~section:Text l in
@@ -3299,15 +3298,10 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align =
-        (fun n ->
-          (* Match GAS's implicit fill: zero in data sections, nops in text. *)
-          D.align
-            ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
-            ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
@@ -3319,7 +3313,7 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:frametable_section l in
+          let lbl = label_to_asm_label ~section:Read_only_data l in
           D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in

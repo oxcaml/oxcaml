@@ -40,7 +40,7 @@ Merlin handle it or add it to the list of ignored flags.
   >     if ! grep -q "\"$flag\"" "$mconfig" && ! is_intentionally_unhandled "$flag"; then
   >       echo "Unhandled flag: $flag"
   >       has_unhandled_flags=1
-  >     fi 
+  >     fi
   >   done
   >   if [ "$has_unhandled_flags" -eq 1 ]; then
   >     cat <<EOF

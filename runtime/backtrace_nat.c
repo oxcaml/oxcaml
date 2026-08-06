@@ -83,7 +83,7 @@ void caml_free_backtrace_buffer(backtrace_slot *backtrace_buffer) {
     caml_stat_free(backtrace_buffer);
 }
 
-#if defined(__aarch64__) || defined(__x86_64__)
+#if defined(TARGET_arm64) || defined(TARGET_amd64)
 
 /* A backtrace_slot is either a frame_descr* or a debuginfo. Both are encoded
    with the address shifted left two bits, leaving the low two bits free for a

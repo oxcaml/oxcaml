@@ -136,18 +136,17 @@ type emit_frame_actions =
     efa_def_label : Label.t -> unit
   }
 
-let emit_frames ~binary_emitter ~frametable_section a =
+let emit_frames ~debug_strings_section a =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
-  (* Debuginfo filename and defname strings go in [Debuginfo_strings] so the
-     linker de-duplicates them. On MacOS the assembler discards L<n> labels as
-     temporaries; to make it into the symbol table we use l_caml<n> _private
-     symbols_ instead (which the linker treats as local and strips). The binary
-     emitter cannot dedupe strings and keeps them in the frametable section, as
-     same-section label differences. *)
-  let macos_cstrings = Target_system.is_macos () && not binary_emitter in
-  let strings_section : Asm_targets.Asm_section.t =
-    if binary_emitter then frametable_section else Debuginfo_strings
+  let module Asm_section = Asm_targets.Asm_section in
+  (* Debuginfo filename and defname strings go in [debug_strings_section]. On
+     MacOS the assembler discards L<n> labels as temporaries; to make it into
+     the symbol table we use l_caml<n> _private symbols_ instead (which the
+     linker treats as local and strips). *)
+  let macos_cstrings =
+    Target_system.is_macos ()
+    && Asm_section.equal debug_strings_section Asm_section.Debuginfo_strings
   in
   (* References carry the frametable section (the directive layer requires a
      referenced label's section to match the current one); definitions carry the
@@ -159,7 +158,7 @@ let emit_frames ~binary_emitter ~frametable_section a =
   in
   let string_label_rel lbl ofs =
     D.between_this_and_label_offset_32bit_expr
-      ~upper:(string_label ~section:frametable_section lbl)
+      ~upper:(string_label ~section:Asm_section.Read_only_data lbl)
       ~offset_upper:(Targetint.of_int32 ofs)
   in
   (* The emit functions below perform bounds checks for the corresponding ranges
@@ -304,7 +303,7 @@ let emit_frames ~binary_emitter ~frametable_section a =
           dbg
   in
   let emit_merged_string str lbl =
-    D.define_label (string_label ~section:strings_section lbl);
+    D.define_label (string_label ~section:debug_strings_section lbl);
     D.string (str ^ "\000")
   in
   (* Partition live offsets into live registers (low bit 1, value >>1 is the
@@ -590,10 +589,10 @@ let emit_frames ~binary_emitter ~frametable_section a =
      Emitting them also populates [defstrings]. *)
   Hashtbl.iter emit_defname defnames;
   a.efa_align Arch.size_addr;
-  D.switch_to_section strings_section;
+  D.switch_to_section debug_strings_section;
   Hashtbl.iter emit_merged_string filenames;
   Hashtbl.iter emit_merged_string defstrings;
-  D.switch_to_section frametable_section;
+  D.switch_to_section Asm_section.Read_only_data;
   frame_descriptors := []
 
 (* Detection of functions that can be duplicated between a DLL and the main
