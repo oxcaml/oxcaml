@@ -155,10 +155,6 @@ let locality_return_compat a b =
   | _, Maybe_alloc_stack -> true
   | Alloc_local, Not_alloc_stack -> false
 
-let return_mode_of_locality_mode = function
-  | Alloc_heap -> not_alloc_stack
-  | Alloc_local -> maybe_alloc_stack
-
 type staticity =
   | Static
   | Dynamic
@@ -1238,7 +1234,7 @@ and lkindinstantiate =
   { kinst_func: lambda;
     kinst_args: layout list;
     kinst_result_layout: layout;
-    kinst_mode: locality_mode;
+    kinst_mode: return_mode;
     kinst_loc: scoped_location;
   }
 
@@ -3672,7 +3668,7 @@ let may_allocate_in_region lam =
       raise Exit
 
     | Lapply {ap_mode=Maybe_alloc_stack}
-    | Lkindinstantiate {kinst_mode=Alloc_local}
+    | Lkindinstantiate {kinst_mode=Maybe_alloc_stack}
     | Lsend (_,_,_,_,_,Maybe_alloc_stack,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
