@@ -809,7 +809,7 @@ and function_cases =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of Mode.Locality.lr option * Jkind.Sort.t option
 
 and block_access =
   | Baccess_field of
