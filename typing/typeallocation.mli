@@ -26,6 +26,16 @@ val register_closure_allocation :
 val register_mod_allocation :
   env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit
 
+val register_prim_application_allocation :
+  env:Env.t ->
+  pos:Typedtree.apply_position ->
+  Typedtree.expression ->
+  (Typedtree.arg_label * Typedtree.apply_arg * 'a) list ->
+  unit
+
+val relax_alloc :
+  Types.value_description -> is_applied:bool -> Value.l -> Value.l
+
 (** For every allocation that has to be on heap ([global]), constrain
     the enclosing closures to be [alloc].
     Must only be called before zapping the allocation axis of
