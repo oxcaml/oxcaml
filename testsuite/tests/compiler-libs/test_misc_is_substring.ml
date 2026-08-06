@@ -18,19 +18,19 @@ let _ = is_substring "abcd" ~substring:"bc"
 (* An occurrence ending at the last character. *)
 let _ = is_substring "xget" ~substring:"get"
 [%%expect {|
-- : bool = false
+- : bool = true
 |}]
 
 (* The needle is the whole subject. *)
 let _ = is_substring "get" ~substring:"get"
 [%%expect {|
-- : bool = false
+- : bool = true
 |}]
 
 (* A single-character needle at the end. *)
 let _ = is_substring "abc" ~substring:"c"
 [%%expect {|
-- : bool = false
+- : bool = true
 |}]
 
 (* A single-character needle at the start. *)
@@ -47,7 +47,7 @@ let _ = is_substring "abc" ~substring:""
 
 let _ = is_substring "" ~substring:""
 [%%expect {|
-- : bool = false
+- : bool = true
 |}]
 
 (* A needle longer than the subject. *)
@@ -65,5 +65,5 @@ let _ = is_substring "abcd" ~substring:"bd"
 (* Overlapping candidates, the real occurrence being the later one. *)
 let _ = is_substring "aab" ~substring:"ab"
 [%%expect {|
-- : bool = false
+- : bool = true
 |}]
