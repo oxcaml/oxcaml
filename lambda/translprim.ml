@@ -374,6 +374,12 @@ let indexing_primitives =
           Pbigstring_set_vec
             { size = Boxed_vec512; checks; index_kind;
               aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pbytes_load_i8 { unsafe; index_kind; tagged } );
@@ -429,6 +435,12 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_string_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pstring_load_i8 { unsafe; index_kind; tagged } );
@@ -460,6 +472,9 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_vec { size = Boxed_vec512; unsafe;
                              index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_mask { unsafe; index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
          upstream compatibility. *)
@@ -2552,15 +2567,20 @@ let lambda_primitive_needs_event_after = function
   | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
   | Pstring_load_vec _
+  | Pstring_load_mask _
   | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
   | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_load_mask _
   | Pbytes_set_8 _ | Pbytes_set_16 _
   | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+  | Pbytes_set_mask _
   | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _
+  | Pbigstring_load_mask _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_mask _
   | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _

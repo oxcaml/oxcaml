@@ -266,6 +266,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
   | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
                         tagged : bool }
   | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
@@ -280,6 +282,8 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -292,6 +296,8 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
@@ -314,6 +320,8 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
   | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
                           tagged : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -331,6 +339,8 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;

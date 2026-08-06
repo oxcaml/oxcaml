@@ -17,6 +17,7 @@ simd/arrays.ml
 simd/arrays256.ml
 simd/avx512/arrays512.ml
 simd/avx512/arrays512_mask.ml
+simd/avx512/strings512_mask.ml
 simd/amd64/int_ops.ml
 simd/amd64/load_store.ml
 simd/mixed_modules.ml

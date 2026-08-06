@@ -620,6 +620,7 @@ module Primitive_reprs = struct
         ("u256", "", C.scannable);
         ("a512", "", C.scannable);
         ("u512", "", C.scannable);
+        ("mask", "", C.scannable);
         ("8", "#", C.bits8);
         ("i8", "#", C.bits8);
         ("16", "#", C.bits16);
@@ -633,6 +634,7 @@ module Primitive_reprs = struct
         ("u256", "#", C.vec256);
         ("a512", "#", C.vec512);
         ("u512", "#", C.vec512);
+        ("mask", "#", C.mask);
       ]
     in
     let indices : (_ * Jkind_types.Sort.Const.t) list =

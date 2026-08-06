@@ -3282,6 +3282,10 @@ let unaligned_load_512 = load_chunk Fivetwelve_unaligned
 
 let unaligned_set_512 = set_chunk Fivetwelve_unaligned
 
+let load_mask = load_chunk Word_mask
+
+let set_mask = set_chunk Word_mask
+
 let opaque e dbg = Cop (Copaque, [e], dbg)
 
 (* Build an actual switch (ie jump table) *)
