@@ -189,14 +189,18 @@ let f (l : int list) =
      (function {nlocal = 0}
        l[value<
           (consts (0))
-           (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))>]
+           (non_consts ([0: value<int>,
+                         value<
+                          (consts (0)) (non_consts ([0: value<int>, *]))>]))>]
        : (consts (0))
-          (non_consts ([0: ?, value<(consts (0)) (non_consts ([0: ?, *]))>]))
+          (non_consts ([0: value<int>,
+                        value<(consts (0)) (non_consts ([0: value<int>, *]))>]))
        (applynontail (field_imm 0 Yielding)
          (function {nlocal = 0} y
            : (consts (0))
-              (non_consts ([0: ?,
-                            value<(consts (0)) (non_consts ([0: ?, *]))>]))
+              (non_consts ([0: value<int>,
+                            value<
+                             (consts (0)) (non_consts ([0: value<int>, *]))>]))
            (region
              (seq
                (apply[yielding] (field_imm 0 List)
