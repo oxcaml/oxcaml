@@ -1,4 +1,5 @@
 (* TEST
+ include ocamlcommon;
  flags = "-extension runtime_metaprogramming";
  expect;
 *)
@@ -16,6 +17,17 @@ module M : sig type t type t' end
 |}]
 #mark_persistent_in_quotations
 
+module Expr = struct
+  let int x : <[int]> expr =
+    let open Ast_helper in
+    Exp.constant (Const.int x) |> Obj.magic
+
+  let bool = function
+    | true -> <[true]>
+    | false -> <[false]>
+end;;
+#mark_persistent_in_quotations
+
 let sorry0 =
         fun (f : (_ Type.eq -> _ @ once)) -> f (Obj.magic Type.Equal) |> Obj.magic_many
 let sorry1 =
@@ -23,15 +35,17 @@ let sorry1 =
 let sorry2 =
   <[ <[ fun (f : (_ Type.eq -> _ @ once)) -> f (Obj.magic Type.Equal) |> Obj.magic_many ]> ]>
 [%%expect {|
+module Expr :
+  sig val int : int -> <[int]> expr val bool : bool -> <[bool]> expr end
 val sorry0 : (('a, 'b) Type.eq -> 'c @ once) -> 'c = <fun>
 val sorry1 : <[(($('a), $('b)) Type.eq -> $('c) @ once) -> $('c)]> expr =
   <[fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-      Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))]>
+      Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib.Type.Equal))]>
 val sorry2 :
   <[<[(($($('a)), $($('b))) Type.eq -> $($('c)) @ once) -> $($('c))]> expr]>
   expr =
   <[<[fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-        Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))]>]>
+        Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib.Type.Equal))]>]>
 |}]
 
 
@@ -61,10 +75,10 @@ type _ t =
 
 (* Compile tracking types under expressions *)
 let rec compile : type a. a t -> a expr @ once = function
-  | Int i -> Quote.Expr.int i
+  | Int i -> Expr.int i
   | Add (e, e') -> <[ $(compile e) + $(compile e') ]>
   | Is_zero e -> <[ Int.equal $(compile e) 0 ]>
-  | Bool b -> Quote.Expr.bool b
+  | Bool b -> Expr.bool b
   | If (c, t, f) -> <[ if $(compile c) then $(compile t) else $(compile f) ]>
   | Pair (e, e') -> <[ $(compile e), $(compile e') ]>
   | First e -> <[ fst $(compile e) ]>
@@ -78,7 +92,7 @@ compile (
       Pair (Int 1, Bool true), Pair (Int 0, Bool false)))
 [%%expect {|
 - : <[int * bool]> expr =
-<[if (if Stdlib.Int.equal (3 + (-3)) 0 then false else true)
+<[if (if Stdlib.Int.equal (Stdlib.(+) 3 (-3)) 0 then false else true)
   then (1, true)
   else (0, false)]>
 |}]
@@ -143,7 +157,7 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
 
 (* 0 ~~> 1 ~~> 0  @  0 <=> 0 *)
 let _ = fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
-    <[ $(Quote.Expr.int (x + 1)) * 2 ]>
+    <[ $(Expr.int (x + 1)) * 2 ]>
 [%%expect {|
 - : ('t, int) Type.eq -> 't -> <[int]> expr @ once = <fun>
 |}]
@@ -153,16 +167,17 @@ let _ = <[
     (fun (Equal : (<[t]> expr, <[int]> expr) Type.eq) -> <[ x + 1 ]>) |> ignore;
     <[()]>) ]>
 [%%expect {|
-- : <[$('t) -> unit]> expr = <[fun (type t) (x : t) -> ()]>
+- : <[$('t) -> unit]> expr = <[fun (type t) -> fun (x : t) -> ()]>
 |}]
 (* 1 ~~> 2 ~~> 1  @  1 <=> 1 *)
 let _ = <[ fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
-    <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
+    <[ $(Expr.int (x + 1)) * 2 ]> ]>
 [%%expect {|
 - : <[($('t), int) Type.eq -> $('t) -> <[int]> expr @ once]> expr =
-<[fun (type t)
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, int) Stdlib.Type.eq)
-    (x : t) -> <[($(Stdlib.Quote.Expr.int (x + 1))) * 2]>]>
+<[fun (type t) ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (t, int) Stdlib.Type.eq)
+      (x : t) -> <[Stdlib.( * ) ($(Expr.int (Stdlib.(+) x 1))) 2]>]>
 |}]
 (* 1 ~~> 2 ~~> 1  @ 2 <=> 2 *)
 let _ = <[ <[
@@ -171,24 +186,27 @@ let _ = <[ <[
     <[()]>) ]> ]>
 [%%expect {|
 - : <[<[$($('t)) -> unit]> expr]> expr =
-<[<[fun (type t) (x : t) ->
-      $(Stdlib.ignore
-          (fun
-             ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-                (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
-             -> <[x + 1]>);
-        <[()]>)]>]>
+<[<[fun (type t) ->
+      fun (x : t) ->
+        $(Stdlib.ignore
+            (fun
+               ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+                  (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
+               -> <[Stdlib.(+) x 1]>);
+          <[()]>)]>]>
 |}]
 (* 2 ~~> 3 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[ fun (type t) (Equal : (t, int) Type.eq) (x : t) ->
-  <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]> ]>
+  <[ $(Expr.int (x + 1)) * 2 ]> ]> ]>
 [%%expect {|
 - : <[<[($($('t)), int) Type.eq -> $($('t)) -> <[int]> expr @ once]> expr]>
     expr
 =
-<[<[fun (type t)
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, int) Stdlib.Type.eq)
-      (x : t) -> <[($(Stdlib.Quote.Expr.int (x + 1))) * 2]>]>]>
+<[<[fun (type t) ->
+      fun
+        ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+           (t, int) Stdlib.Type.eq)
+        (x : t) -> <[Stdlib.( * ) ($(Expr.int (Stdlib.(+) x 1))) 2]>]>]>
 |}]
 (* 0 ~~> 2 ~~> 0  @  0 <=> 0 *)
 let _ = fun (type t) (Equal : (t, bool) Type.eq) (x : t) ->
@@ -222,14 +240,15 @@ let _ = <[ fun (type t) (Equal : (t, bool) Type.eq) (x : t) ->
 [%%expect {|
 - : <[($('t), bool) Type.eq -> $('t) -> <[<[bool]> expr]> expr @ once]> expr
 =
-<[fun (type t)
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (t, bool) Stdlib.Type.eq)
-    (x : t) ->
-    <[Stdlib.Obj.magic_many
-        (<[Stdlib.not
-             ($($(match x with
-                  | true -> <[<[true]>]>
-                  | false -> <[<[false]>]>)))]>)]>]>
+<[fun (type t) ->
+    fun
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (t, bool) Stdlib.Type.eq)
+      (x : t) ->
+      <[Stdlib.Obj.magic_many
+          (<[Stdlib.not
+               ($($(match x with
+                    | true -> <[<[true]>]>
+                    | false -> <[<[false]>]>)))]>)]>]>
 |}]
 (* 1 ~~> 3 ~~> 1  @  1 <=> 1  with persistent [M.t] *)
 let _ = <[ fun (Equal : (M.t, bool) Type.eq) (x : M.t) ->
@@ -241,8 +260,7 @@ let _ = <[ fun (Equal : (M.t, bool) Type.eq) (x : M.t) ->
 [%%expect {|
 - : <[(M.t, bool) Type.eq -> M.t -> <[<[bool]> expr]> expr @ once]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-       (M.t, bool) Stdlib.Type.eq)
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, bool) Stdlib.Type.eq)
     (x : M.t) ->
     <[Stdlib.Obj.magic_many
         (<[Stdlib.not
@@ -277,9 +295,9 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
     expr
 =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
-    (x : <[M.t]> expr) -> <[($x) + 1]>]>
+    (x : <[M.t]> expr) -> <[Stdlib.(+) ($x) 1]>]>
 |}]
 
 (* CR metaprogramming jbachurski: Error messages are often confusing here,
@@ -301,11 +319,11 @@ Error: The value "x" has type "M.t" but an expression was expected of type "int"
 
 (* 1 ~~> 2 ~~> 1  @  1 <=> 0 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) (x : M.t) ->
-    <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
+    <[ $(Expr.int (x + 1)) * 2 ]> ]>
 [%%expect {|
-Line 2, characters 25-26:
-2 |     <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
-                             ^
+Line 2, characters 19-20:
+2 |     <[ $(Expr.int (x + 1)) * 2 ]> ]>
+                       ^
 Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 (* 1 ~~> 2 ~~> 1  @  0 <=> 1 *)
@@ -437,9 +455,9 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
 [%%expect {|
 - : <[(<[M.t]> expr, <[int]> expr) Type.eq -> <[M.t -> int]> expr]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
-    -> <[fun (x : M.t) -> x + 1]>]>
+    -> <[fun (x : M.t) -> Stdlib.(+) x 1]>]>
 |}]
 
 (* Introduce the value and then splice to introduce the evidence *)
@@ -451,7 +469,7 @@ let _ = <[
       <[x + 1]>)
     |> sorry0) ]>
 [%%expect{|
-- : <[$('t) -> int]> expr = <[fun (type t) (x : t) -> x + 1]>
+- : <[$('t) -> int]> expr = <[fun (type t) -> fun (x : t) -> Stdlib.(+) x 1]>
 |}]
 (* 1 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[
@@ -461,14 +479,15 @@ let _ = <[ <[
     |> $sorry1) ]> ]>
 [%%expect{|
 - : <[<[$($('t)) -> int]> expr]> expr =
-<[<[fun (type t) (x : t) ->
-      $((fun
-           ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-              (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
-           -> <[x + 1]>)
-          |>
-          (fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
-             Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib__Type.Equal))))]>]>
+<[<[fun (type t) ->
+      fun (x : t) ->
+        $(Stdlib.(|>)
+            (fun
+               ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
+                  (<[t]> expr, <[int]> expr) Stdlib.Type.eq)
+               -> <[Stdlib.(+) x 1]>)
+            (fun (f : (_, _) Stdlib.Type.eq -> _ @ once) ->
+               Stdlib.Obj.magic_many (f (Stdlib.Obj.magic Stdlib.Type.Equal))))]>]>
 |}]
 (* 0 ~~> 2  @  2 <=> 2 *)
 let _ = <[ <[
@@ -478,7 +497,8 @@ let _ = <[ <[
     |> sorry0)) ]> ]>
 [%%expect{|
 - : <[<[$($('t)) -> int]> expr]> expr =
-<[<[fun (type t) (x : t) -> $(Stdlib.Obj.magic_many (<[x + 1]>))]>]>
+<[<[fun (type t) ->
+      fun (x : t) -> $(Stdlib.Obj.magic_many (<[Stdlib.(+) x 1]>))]>]>
 |}]
 
 (* Evidence travels to the wrong stage in the future -- should always fail:
@@ -618,9 +638,9 @@ let _ =
 - : <[<[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr]> expr =
 <[fun (x : <[M.t]> expr) ->
     <[fun
-        ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+        ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
            (M.t, int) Stdlib.Type.eq)
-        -> ($x) + 1]>]>
+        -> Stdlib.(+) ($x) 1]>]>
 |}]
 
 (* Evidence travels to the right stage in the past, but the target is spliced
@@ -674,22 +694,22 @@ Error: The value "x" has type "t expr" but an expression was expected of type
 (* 1 ~~> 0  @  1 <=> 0 *)
 let _ = fun (x : M.t) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
-        $(Quote.Expr.int x) + 1 ]>
+        $(Expr.int x) + 1 ]>
 [%%expect{|
-Line 3, characters 25-26:
-3 |         $(Quote.Expr.int x) + 1 ]>
-                             ^
+Line 3, characters 19-20:
+3 |         $(Expr.int x) + 1 ]>
+                       ^
 Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
 (* 2 ~~> 0  @  2 <=> 1 *)
 let _ = fun (x : <[M.t]> expr) ->
   <[ <[ fun (Equal : (M.t, int) Type.eq) ->
-        $(Quote.Expr.int $x) + 1 ]> ]>
+        $(Expr.int $x) + 1 ]> ]>
 [%%expect{|
-Line 3, characters 26-27:
-3 |         $(Quote.Expr.int $x) + 1 ]> ]>
-                              ^
+Line 3, characters 20-21:
+3 |         $(Expr.int $x) + 1 ]> ]>
+                        ^
 Error: The value "x" has type "<[M.t]> expr"
        but an expression was expected of type "<[int]> expr"
        Type "M.t" is not compatible with type "int"
@@ -699,11 +719,11 @@ Error: The value "x" has type "<[M.t]> expr"
 let _ =
      <[ fun (x : M.t) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
-        $(Quote.Expr.int x) + 1 ]> ]>
+        $(Expr.int x) + 1 ]> ]>
 [%%expect{|
-Line 4, characters 25-26:
-4 |         $(Quote.Expr.int x) + 1 ]> ]>
-                             ^
+Line 4, characters 19-20:
+4 |         $(Expr.int x) + 1 ]> ]>
+                       ^
 Error: The value "x" has type "M.t" but an expression was expected of type "int"
 |}]
 
@@ -825,13 +845,13 @@ let _ = <[
     expr
 =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (M.t, string) Stdlib.Type.eq)
     ->
     fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
-      -> fun (x : <[M.t]> expr) -> <[($x) + 0]>]>
+      -> fun (x : <[M.t]> expr) -> <[Stdlib.(+) ($x) 0]>]>
 |}]
 (* succeeds, because we instantiate stage 1 *)
 let _ =
@@ -845,13 +865,13 @@ let _ =
     expr
 =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (M.t, string) Stdlib.Type.eq)
     ->
     fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq)
-      -> fun (x : M.t) -> x ^ ""]>
+      -> fun (x : M.t) -> Stdlib.(^) x ""]>
 |}]
 (* fails, because we only instantiate stage 2 *)
 let _ =
@@ -892,7 +912,7 @@ let time_traveller =
           ($(x : <[int]> expr) : int) ]>) |> ignore;
         <[()]>) ]>
 [%%expect {|
-val time_traveller : <[unit -> unit]> expr = <[fun (type t) () -> ()]>
+val time_traveller : <[unit -> unit]> expr = <[fun (type t) -> fun () -> ()]>
 |}]
 
 (* Magic *)
@@ -913,7 +933,7 @@ let magic_with_time_travel =
   ) ]>
 [%%expect {|
 val magic_with_time_travel : <[$('a) -> $('b)]> expr =
-  <[fun (type a) (type b) (x : a) -> (x : b)]>
+  <[fun (type a) (type b) -> fun (x : a) -> (x : b)]>
 |}]
 let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
   let result = ref (None : b option) in

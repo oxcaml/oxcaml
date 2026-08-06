@@ -193,7 +193,7 @@ val expand_module_type: (Env.t -> module_type -> module_type) ref
    in Mtype for debugging purposes and hence don't want to depend on Mtype
    here. *)
 
-(** {1 For [Translquote] *)
+(** {1 For [Translquotes] *)
 type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
 type typvariant_repr = {
   fields : (string * bool * type_expr list) list;

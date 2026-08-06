@@ -109,8 +109,6 @@ STDLIB_MODULE_BASENAMES = \
   stdLabels \
   effect \
   camlinternalComprehension \
-  camlinternalQuote \
-  quote \
   backoff
 
 STDLIB_PREFIXED_MODULES = \

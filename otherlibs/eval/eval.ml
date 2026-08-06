@@ -113,7 +113,8 @@ let read_bundles_from_exe () =
 let counter = ref 0
 
 let eval (expr : 'a expr) =
-  let code : CamlinternalQuote.Code.t = Obj.magic expr in
+  let expr = (Obj.magic expr : Parsetree.expression) in
+  let expr = Pprintast.normalize_identifiers expr in
   (* TODO: assert the JIT is supported *)
   let id = !counter in
   incr counter;
@@ -144,15 +145,10 @@ let eval (expr : 'a expr) =
   (* TODO: set commandline flags *)
   (* Compilation happens here during partial application, not when thunk is
      called *)
-  let code = CamlinternalQuote.Code.Closed.close code in
-  let exp = CamlinternalQuote.Code.Closed.to_exp code in
-  let code_string =
-    Format.asprintf "let eval = (%a)" CamlinternalQuote.Exp.print exp
+  let ast : Parsetree.structure =
+    let open Ast_helper in
+    [Str.value Nonrecursive [Vb.mk (Pat.var (Location.mknoloc "eval")) expr]]
   in
-  let lexbuf = Lexing.from_string code_string in
-  Location.input_lexbuf := Some lexbuf;
-  Location.init lexbuf "//eval//";
-  let ast = Parse.implementation lexbuf in
   (* Unlikely to clash, might be too weird. *)
   let input_name = Printf.sprintf "Eval___%i" id in
   let compilation_unit =
@@ -187,7 +183,7 @@ let eval (expr : 'a expr) =
     Typemod.type_implementation unit_info compilation_unit env ast
   in
   let tlambda_program =
-    Translmod.transl_implementation compilation_unit ~loc:(Location.curr lexbuf)
+    Translmod.transl_implementation compilation_unit ~loc:expr.pexp_loc
       ( typed_impl.structure,
         typed_impl.coercion,
         Option.map
@@ -249,5 +245,5 @@ let eval code =
         Printexc.raise_with_backtrace exn backtrace)
 
 let string_of_expr expr =
-  expr |> Quote.string_of_expr |> Lexing.from_string |> Parse.expression
-  |> Format.asprintf "%a" Pprintast.expression
+  Format.asprintf "%a" Pprintast.expression
+    (Pprintast.normalize_identifiers (Obj.magic expr : Parsetree.expression))

@@ -7,12 +7,10 @@
 #syntax quotations on
 
 (* Test that local (stack_) allocations work inside splices.
-   This exercises the Lregion wrapping of splices
-   in translquote.ml. The outer Sys.opaque_identity prevents
-   dead-code elimination of the local alloc; the inner one
-   prevents static allocation. The fun () -> wrapper places the
-   splice inside a quotation function binding (nlocal=0), ensuring
-   there is no enclosing region other than the Lregion. *)
+   The outer Sys.opaque_identity prevents dead-code elimination of
+   the local alloc; the inner one prevents static allocation.
+   The fun () -> wrapper places the splice inside a quotation function binding
+   (nlocal=0), ensuring there is no enclosing region. *)
 
 let () =
   Printf.printf "\nTest stack_ tuple in splice\n";

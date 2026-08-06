@@ -1,6 +1,6 @@
 Stdlib.ignore
   ((fun x -> x)
-     ({ Labels_types.foo = 123; Labels_types.bar = "abc" } : Labels_types.rcd) : 
+     ({ Labels_types.bar = "abc"; Labels_types.foo = 123 } : Labels_types.rcd) : 
   Labels_types.rcd)
 
 Stdlib.ignore
@@ -29,7 +29,7 @@ Stdlib.ignore
   ((fun x -> x)
      {
        Labels_types.box =
-         (#{ Labels_types.foo = 0; Labels_types.bar = 0 } : Labels_types.urcd)
+         (#{ Labels_types.bar = 0; Labels_types.foo = 0 } : Labels_types.urcd)
      } : Labels_types.urcd Labels_types.box_imm_imm)
 
 Stdlib.ignore
@@ -44,25 +44,25 @@ Stdlib.ignore
 
 Stdlib.ignore
   ((fun x -> x)
-     ({ Labels_types.foo = 123; Labels_types.bar = "abc" } : _
+     ({ Labels_types.bar = "abc"; Labels_types.foo = 123 } : _
                                                                Labels_types.rcd1) : 
   _ Labels_types.rcd1)
 
 Stdlib.ignore
   ((fun x -> x)
-     ({ Labels_types.foo = 123; Labels_types.bar = "abc" } : (_, _)
+     ({ Labels_types.bar = "abc"; Labels_types.foo = 123 } : (_, _)
                                                                Labels_types.rcd2) : 
   (_, _) Labels_types.rcd2)
 
 Stdlib.ignore
   ((fun x -> x)
-     ({ Labels_types.foo = 123; Labels_types.bar = "abc" } : (_, _)
+     ({ Labels_types.bar = "abc"; Labels_types.foo = 123 } : (_, _)
                                                                Labels_types.rcd2) : 
   (_, _) Labels_types.rcd2)
 
 Stdlib.ignore
   ((fun x -> x)
-     ({ Labels_types.foo = 123; Labels_types.bar = "abc" } : (_, _, _)
+     ({ Labels_types.bar = "abc"; Labels_types.foo = 123 } : (_, _, _)
                                                                Labels_types.rcd3) : 
   (_, _, _) Labels_types.rcd3)
 

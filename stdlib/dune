@@ -100,8 +100,6 @@
   camlinternalMod.mli
   camlinternalOO.ml
   camlinternalOO.mli
-  camlinternalQuote.ml
-  camlinternalQuote.mli
   char.ml
   char.mli
   complex.ml
@@ -178,8 +176,6 @@
   printf.mli
   queue.ml
   queue.mli
-  quote.ml
-  quote.mli
   random.ml
   random.mli
   repr.ml
@@ -473,11 +469,6 @@
   .stdlib.objs/byte/stdlib__Queue.cmsi
   .stdlib.objs/byte/stdlib__Queue.cmt
   .stdlib.objs/byte/stdlib__Queue.cmti
-  .stdlib.objs/byte/stdlib__Quote.cmi
-  .stdlib.objs/byte/stdlib__Quote.cms
-  .stdlib.objs/byte/stdlib__Quote.cmsi
-  .stdlib.objs/byte/stdlib__Quote.cmt
-  .stdlib.objs/byte/stdlib__Quote.cmti
   .stdlib.objs/byte/stdlib__Random.cmi
   .stdlib.objs/byte/stdlib__Random.cms
   .stdlib.objs/byte/stdlib__Random.cmsi
@@ -566,7 +557,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmi
   .stdlib.objs/byte/camlinternalOO.cmi
   .stdlib.objs/byte/camlinternalFormat.cmi
-  .stdlib.objs/byte/camlinternalQuote.cmi
   .stdlib.objs/byte/camlinternalAtomic.cms
   .stdlib.objs/byte/camlinternalComprehension.cms
   .stdlib.objs/byte/camlinternalMod.cms
@@ -574,7 +564,6 @@
   .stdlib.objs/byte/camlinternalLazy.cms
   .stdlib.objs/byte/camlinternalOO.cms
   .stdlib.objs/byte/camlinternalFormat.cms
-  .stdlib.objs/byte/camlinternalQuote.cms
   .stdlib.objs/byte/camlinternalAtomic.cmsi
   .stdlib.objs/byte/camlinternalComprehension.cmsi
   .stdlib.objs/byte/camlinternalMod.cmsi
@@ -582,7 +571,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmsi
   .stdlib.objs/byte/camlinternalOO.cmsi
   .stdlib.objs/byte/camlinternalFormat.cmsi
-  .stdlib.objs/byte/camlinternalQuote.cmsi
   .stdlib.objs/byte/camlinternalAtomic.cmt
   .stdlib.objs/byte/camlinternalComprehension.cmt
   .stdlib.objs/byte/camlinternalMod.cmt
@@ -590,7 +578,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmt
   .stdlib.objs/byte/camlinternalOO.cmt
   .stdlib.objs/byte/camlinternalFormat.cmt
-  .stdlib.objs/byte/camlinternalQuote.cmt
   .stdlib.objs/byte/camlinternalAtomic.cmti
   .stdlib.objs/byte/camlinternalComprehension.cmti
   .stdlib.objs/byte/camlinternalMod.cmti
@@ -598,7 +585,6 @@
   .stdlib.objs/byte/camlinternalLazy.cmti
   .stdlib.objs/byte/camlinternalOO.cmti
   .stdlib.objs/byte/camlinternalFormat.cmti
-  .stdlib.objs/byte/camlinternalQuote.cmti
   .stdlib.objs/native/camlinternalAtomic.cmx
   .stdlib.objs/native/camlinternalComprehension.cmx
   .stdlib.objs/native/camlinternalMod.cmx
@@ -606,7 +592,6 @@
   .stdlib.objs/native/camlinternalLazy.cmx
   .stdlib.objs/native/camlinternalOO.cmx
   .stdlib.objs/native/camlinternalFormat.cmx
-  .stdlib.objs/native/camlinternalQuote.cmx
   .stdlib.objs/byte/std_exit.cmi
   .stdlib.objs/byte/std_exit.cmo
   .stdlib.objs/byte/std_exit.cms
@@ -618,7 +603,6 @@
   .stdlib.objs/native/stdlib__Hashtbl.cmx
   .stdlib.objs/native/stdlib__Filename.cmx
   .stdlib.objs/native/stdlib__Queue.cmx
-  .stdlib.objs/native/stdlib__Quote.cmx
   .stdlib.objs/native/stdlib__StdLabels.cmx
   .stdlib.objs/native/stdlib__Weak.cmx
   .stdlib.objs/native/stdlib__Float.cmx

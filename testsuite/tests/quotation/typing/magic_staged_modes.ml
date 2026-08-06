@@ -69,7 +69,7 @@ Error: This value is "local" to the parent region
 (* but we can delay the mode checks on [x] until generation *)
 <[ fun (x @ local) -> $(M.of_local (<[ x ]> [@magic_staged_modes])) ]>
 [%%expect{|
-- : <[$('a) @ local -> unit]> expr = <[fun (x : _ @ local) -> ()]>
+- : <[$('a) @ local -> unit]> expr = <[fun (x @ local) -> ()]>
 |}];;
 (* however, the mode checks on the capture of [x] remain *)
 <[ fun (x @ local) -> $(M.of_global (<[ x ]> [@magic_staged_modes])) ]>

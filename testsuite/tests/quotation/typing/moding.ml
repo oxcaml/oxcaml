@@ -122,7 +122,7 @@ Error: This value is "local"
 (* Unique result *)
 <[ let x @ unique = M.x_unique () in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x : _ @ unique = (M.x_unique () : _ @ unique) in x]>
+- : <[M.t]> expr = <[let (x @ unique) = (M.x_unique () : @ unique) in x]>
 |}];;
 
 (* Once result *)
@@ -139,7 +139,7 @@ Error: This value is "once"
 (* Portable result *)
 <[ let x @ portable = M.x in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x : _ @ portable = (M.x : _ @ portable) in x]>
+- : <[M.t]> expr = <[let (x @ portable) = (M.x : @ portable) in x]>
 |}];;
 
 (* Contended result *)
@@ -267,16 +267,16 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let x = <[42]> in <[$x + $x]>
 [%%expect{|
-- : <[int]> expr = <[42 + 42]>
+- : <[int]> expr = <[Stdlib.(+) 42 42]>
 |}];;
 let x = <[Some 42]> in <[Option.get $x + Option.get $x]>
 [%%expect{|
 - : <[int]> expr =
-<[(Stdlib.Option.get (Some 42)) + (Stdlib.Option.get (Some 42))]>
+<[Stdlib.(+) (Stdlib.Option.get (Some 42)) (Stdlib.Option.get (Some 42))]>
 |}];;
 let x = <[fun () -> 2]> in <[$x () + $x ()]>
 [%%expect{|
-- : <[int]> expr = <[((fun () -> 2) ()) + ((fun () -> 2) ())]>
+- : <[int]> expr = <[Stdlib.(+) ((fun () -> 2) ()) ((fun () -> 2) ())]>
 |}];;
 
 (** Quoting value expressions and using as [many] **)
@@ -349,19 +349,26 @@ Line 1, characters 24-25:
    These tests should succeed. *)
 let x () = <[1 + 1]> in <[$(x ()) + $(x ())]>
 [%%expect{|
-- : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+- : <[int]> expr = <[Stdlib.(+) (Stdlib.(+) 1 1) (Stdlib.(+) 1 1)]>
 |}];;
 <[ let r = ref 0 in $(
     let x () = <[r := !r + 1; !r]> in
     <[ $(x ()) + $(x ()) ]> ) ]>
 [%%expect{|
 - : <[int]> expr =
-<[let r = Stdlib.ref 0 in (r := ((!r) + 1); !r) + (r := ((!r) + 1); !r)]>
+<[let r = Stdlib.ref 0 in
+  Stdlib.(+) (Stdlib.(:=) r (Stdlib.(+) (Stdlib.(!) r) 1); Stdlib.(!) r)
+    (Stdlib.(:=) r (Stdlib.(+) (Stdlib.(!) r) 1); Stdlib.(!) r)]>
 |}];;
 
 (** Duplication of [once] quotes *)
 
-let x = <[1 + 1]> in let x, y = Quote.duplicate x in <[$x + $y]>
+let duplicate (x @ once) @ once =
+  let y = Obj.magic_many x in y, y
+;;
+
+let x = <[1 + 1]> in let x, y = duplicate x in <[$x + $y]>
 [%%expect{|
-- : <[int]> expr = <[(1 + 1) + (1 + 1)]>
+val duplicate : 'a @ once -> 'a * 'a @ once = <fun>
+- : <[int]> expr = <[Stdlib.(+) (Stdlib.(+) 1 1) (Stdlib.(+) 1 1)]>
 |}];;

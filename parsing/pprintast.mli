@@ -80,3 +80,5 @@ module Doc:sig
       of a sentence in a error message. *)
   val nominal_exp : Parsetree.expression -> Format_doc.t option
 end
+
+val normalize_identifiers : Parsetree.expression -> Parsetree.expression

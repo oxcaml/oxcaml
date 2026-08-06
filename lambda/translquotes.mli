@@ -1,10 +1,10 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                      Andrej Ivaskovic, Jane Street                         *
+ *                       Jakub Bachurski, Jane Street                         *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -26,9 +26,10 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Translate an expression inside a [Texp_quote]. The [transl] argument is a
-    function used to translate spliced expressions that need to be translated at
-    compile time. *)
+(** [Lambda] constructing a syntax tree from an expression inside a
+    [Texp_quote].
+
+    The [transl] argument is used to translate spliced expressions. *)
 val transl_quote :
   scopes:Debuginfo.Scoped_location.scopes ->
   loc:Location.t ->

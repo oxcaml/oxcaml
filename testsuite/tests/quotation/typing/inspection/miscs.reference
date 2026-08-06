@@ -1,4 +1,4 @@
-let x = ("abc" : string) in let _ : string = (x : string) in ()
+let x = ("abc" : string) in let (_ : string) = (x : string) in ()
 
 let p =
   CamlinternalFormatBasics.Format
@@ -24,7 +24,7 @@ let f ?(x= 0) y =
              CamlinternalFormatBasics.No_precision,
              (CamlinternalFormatBasics.Char_literal
                 ('\n', CamlinternalFormatBasics.End_of_format)))), "%d\n"))
-    (x + y) in
+    (Stdlib.(+) x y) in
 Stdlib.List.iter (let arg = f in function | eta -> exclave_ arg ?x:None eta)
   [1; 2; 3]
 

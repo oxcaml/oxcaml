@@ -394,13 +394,15 @@ Error: Unbound constructor "My_constructor"
    not the local one.  *)
 let e = <[ fun (x : int) -> x ]> in <[ fun (type int) () -> $e ]>
 [%%expect {|
-- : <[unit -> int -> int]> expr = <[fun (type int) () -> fun (x : int) -> x]>
+- : <[unit -> int -> int]> expr =
+<[fun (type int) -> fun () -> fun (x : int) -> x]>
 |}];;
 (* Exception *)
 let e = <[ Stdlib.raise (Failure "") ]> in
 <[ let exception Failure of string in $e ]>
 [%%expect {|
-- : 'a expr = <[let exception Failure  in Stdlib.raise (Failure "")]>
+- : 'a expr =
+<[let exception Failure of string  in Stdlib.raise (Failure "")]>
 |}];;
 (* We can avoid the following two bugs by banning [let exception],
    but they seem unlikely enough. *)

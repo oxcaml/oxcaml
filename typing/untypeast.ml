@@ -348,6 +348,21 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   (* todo: fix attributes on extras *)
   let attrs = sub.attributes sub pat.pat_attributes in
   let desc =
+  let pat =
+    { pat with
+      pat_extra =
+        let l, r =
+          List.partition
+            (function
+            | Tpat_unpack, _, _
+            | Tpat_type _, _, _ -> false
+            | Tpat_constraint _, _, _
+            | Tpat_open _, _, _
+            | Tpat_inspected_type _, _, _ -> true)
+            pat.pat_extra
+        in
+        l @ r }
+  in
   match pat with
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
@@ -362,6 +377,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
                          Option.map (sub.typ sub) ct, modes)
     | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
         Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
+    | { pat_extra = (Tpat_inspected_type _, _, _attrs) :: rem; _ } ->
+        (sub.pat sub { pat with pat_extra=rem }).ppat_desc
+    | { pat_extra = _ :: _; _ } ->
+        Misc.fatal_errorf "Untypeast: unexpected pat_extra"
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
@@ -746,6 +765,8 @@ let expression sub exp =
           | Tmeth_val id -> mkloc (Ident.name id) loc
           | Tmeth_ancestor(id, _) -> mkloc (Ident.name id) loc)
     | Texp_new (_path, lid, _, _) -> Pexp_new (map_loc sub lid)
+    (* CR translquotes: This feels like a misuse of [lident_of_path],
+       given a name is available. *)
     | Texp_instvar (_, path, name) ->
       Pexp_ident ({loc = sub.location sub name.loc ; txt = lident_of_path path})
     | Texp_mutvar id ->

@@ -102,7 +102,7 @@ let _ = <[ fun (Equal : (int F.f1, int F.r0) Type.eq) -> () ]>
 [%%expect{|
 - : <[(int F.f1, int F.r0) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (int F.f1, int F.r0) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -111,7 +111,7 @@ let _ = <[ fun (Equal : (int F.r0, int F.f1) Type.eq) -> () ]>
 [%%expect{|
 - : <[(int F.r0, int F.f1) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (int F.r0, int F.f1) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -121,7 +121,7 @@ let _ = <[ fun (Equal : (int F.f1, int F.r1) Type.eq) -> () ]>
 [%%expect{|
 - : <[(int F.f1, int F.r1) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (int F.f1, int F.r1) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -130,7 +130,7 @@ let _ = <[ fun (Equal : (int F.r1, int F.f1) Type.eq) -> () ]>
 [%%expect{|
 - : <[(int F.r1, int F.f1) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (int F.r1, int F.f1) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -139,7 +139,7 @@ let _ = <[ fun (Equal : (int F.f1, int F.f1') Type.eq) -> ()]>
 [%%expect{|
 - : <[(int F.f1, int F.f1') Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (int F.f1, int F.f1') Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -151,7 +151,7 @@ let e = <[ fun (Equal : ($(int NonInst1.t), int -> int) Type.eq) -> () ]>
 [%%expect{|
 val e : <[($(int NonInst1.t), int -> int) Type.eq -> unit]> expr =
   <[fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (_, int -> int) Stdlib.Type.eq)
       -> ()]>
 |}]
@@ -159,7 +159,7 @@ let e = <[ fun (Equal : (int -> int, $(int NonInst1.t)) Type.eq) -> () ]>
 [%%expect{|
 val e : <[(int -> int, $(int NonInst1.t)) Type.eq -> unit]> expr =
   <[fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (int -> int, _) Stdlib.Type.eq)
       -> ()]>
 |}]
@@ -168,7 +168,7 @@ let e = <[ fun (Equal : (<[int NonInst0.t]>, int -> int) Type.eq) -> () ]>
 [%%expect{|
 val e : <[(<[int NonInst0.t]>, int -> int) Type.eq -> unit]> expr =
   <[fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (<[int NonInst0.t]>, int -> int) Stdlib.Type.eq)
       -> ()]>
 |}]
@@ -176,7 +176,7 @@ let e = <[ fun (Equal : (int -> int, <[int NonInst0.t]>) Type.eq) -> () ]>
 [%%expect{|
 val e : <[(int -> int, <[int NonInst0.t]>) Type.eq -> unit]> expr =
   <[fun
-      ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
          (int -> int, <[int NonInst0.t]>) Stdlib.Type.eq)
       -> ()]>
 |}]
@@ -185,7 +185,7 @@ let _ = <[ fun (Equal : ($(int NonInst2.t), <[int NonInst0.t]>) Type.eq) -> () ]
 [%%expect{|
 - : <[($(int NonInst2.t), <[int NonInst0.t]>) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (_, <[int NonInst0.t]>) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -193,7 +193,7 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]>, $(int NonInst2.t)) Type.eq) -> () ]
 [%%expect{|
 - : <[(<[int NonInst0.t]>, $(int NonInst2.t)) Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[int NonInst0.t]>, _) Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -202,7 +202,7 @@ let _ = <[ fun (Equal : ($(int NonInst1.t) A.t, $(int NonInst1.t') A.t') Type.eq
 - : <[($(int NonInst1.t) A.t, $(int NonInst1.t') A.t') Type.eq -> unit]> expr
 =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (_ A.t, _ A.t') Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -212,7 +212,7 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]> A.t, <[int NonInst0.t']> A.t') Type.
     expr
 =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[int NonInst0.t]> A.t, <[int NonInst0.t']> A.t') Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -223,7 +223,7 @@ let _ = <[ fun (Equal : (<[int]> A.t, <[int]> A.t') Type.eq) -> () ]>
 [%%expect{|
 - : <[(<[int]> A.t, <[int]> A.t') Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[int]> A.t, <[int]> A.t') Stdlib.Type.eq)
     -> ()]>
 |}]
@@ -231,7 +231,7 @@ let _ = <[ fun (Equal : (<[<[int]>]> A.t, <[<[int]>]> A.t') Type.eq) -> () ]>
 [%%expect{|
 - : <[(<[<[int]>]> A.t, <[<[int]>]> A.t') Type.eq -> unit]> expr =
 <[fun
-    ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+    ((Stdlib.Type.Equal : (_, _) Stdlib.Type.eq) :
        (<[<[int]>]> A.t, <[<[int]>]> A.t') Stdlib.Type.eq)
     -> ()]>
 |}]

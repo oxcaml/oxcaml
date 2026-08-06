@@ -10,10 +10,11 @@ Stdlib.ignore
 
 Stdlib.ignore
   ((fun x -> x)
-     (fun (type a)
-        (((module M)  : (module Pack_types.S with type t = a)) :
-           (module Pack_types.S with type t = a))
-        -> M.x) : (module Pack_types.S with type t = 'a) -> 'a)
+     (fun (type a) ->
+        fun
+          (((module M)  : (module Pack_types.S with type t = a)) :
+             (module Pack_types.S with type t = a))
+          -> M.x) : (module Pack_types.S with type t = 'a) -> 'a)
 
 Stdlib.ignore
   ((fun x -> x)
@@ -26,19 +27,13 @@ Stdlib.ignore
 
 Stdlib.ignore
   ((fun x -> x)
-     (fun (type a)
-        (((module M)  : (module Pack_types.S with type t = a)) :
-           (module Pack_types.S with type t = a))
-        -> ((module M) : (module Pack_types.S with type t = a))) : (module
-                                                                    Pack_types.S
-                                                                    with
-                                                                    type t =
-                                                                    'a) ->
-                                                                    (module
-                                                                    Pack_types.S
-                                                                    with
-                                                                    type t =
-                                                                    'a))
+     (fun (type a) ->
+        fun
+          (((module M)  : (module Pack_types.S with type t = a)) :
+             (module Pack_types.S with type t = a))
+          -> ((module M) : (module Pack_types.S with type t = a))) : 
+  (module Pack_types.S with type t = 'a) ->
+    (module Pack_types.S with type t = 'a))
 
 Stdlib.ignore
   ((fun x -> x)

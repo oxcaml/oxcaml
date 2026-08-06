@@ -1552,7 +1552,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_hole _ ->
       Location.todo_overwrite_not_implemented ~kind:"Translcore" e.exp_loc
   | Texp_quote exp ->
-      Translquote.transl_quote
+      Translquotes.transl_quote
         ~scopes ~loc:e.exp_loc ~transl:(transl_exp ~scopes layout) exp
   | Texp_splice _ ->
       fatal_errorf_doc

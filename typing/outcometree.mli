@@ -62,7 +62,7 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_quote of CamlinternalQuote.Code.t
+  | Oval_quote of Parsetree.expression
   | Oval_floatarray of floatarray
 
 type out_modality = string

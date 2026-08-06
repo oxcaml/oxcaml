@@ -99,8 +99,6 @@
   longident
   docstrings
   lexer
-; CR jbachurski: added here temporarily, remove all diff before merging
-  parse
   camlinternalMenhirLib
   parser_types
   parser
@@ -286,8 +284,6 @@
 (copy_files ../../parsing/docstrings.ml)
 
 (copy_files ../../parsing/lexer.ml)
-
-(copy_files ../../parsing/parse.ml)
 
 (copy_files ../../parsing/parser_types.ml)
 
@@ -493,8 +489,6 @@
 (copy_files ../../parsing/docstrings.mli)
 
 (copy_files ../../parsing/lexer.mli)
-
-(copy_files ../../parsing/parse.mli)
 
 (copy_files ../../parsing/parser_types.mli)
 
@@ -757,10 +751,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parse.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
@@ -773,6 +763,9 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Datarepr.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
@@ -892,10 +885,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parse.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
@@ -908,6 +897,9 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Datarepr.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx

@@ -373,7 +373,7 @@ val or_null_kind : type_expr -> ('a, 'b, constructor_declaration) type_kind
 (* CR layouts v3.5: remove this when users can define null constructors. *)
 val or_null_jkind : Types.type_expr -> Types.jkind_l
 
-(* To initialize linker tables and for [Translquote] *)
+(* To initialize linker tables and for [Translquotes] *)
 
 val builtin_values: (string * Ident.t) list
 val builtin_idents: (string * Ident.t) list

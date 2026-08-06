@@ -78,6 +78,9 @@ type mapper = {
     -> with_constraint;
 }
 
+val exp_extra : mapper -> Typedtree.exp_extra * Warnings.loc * attributes ->
+  Parsetree.expression -> Parsetree.expression
+
 val default_mapper : mapper
 
 val untype_structure : ?mapper:mapper -> Typedtree.structure -> structure

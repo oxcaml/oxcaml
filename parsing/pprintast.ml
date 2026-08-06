@@ -846,8 +846,17 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_constant (c) -> pp f "%a" constant c
     | Ppat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
-    | Ppat_constraint (p, ct, _) ->
-        pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_constraint (p, ct, m) ->
+        begin match ct with
+        | Some ct ->
+            pp f "@[<2>(%a@;:@;%a)@]"
+            (pattern1 ctxt) p
+            (core_type2_with_optional_modes ctxt) (ct, m)
+        | None ->
+            pp f "@[<2>(%a%a)@]"
+            (pattern1 ctxt) p
+            optional_at_modes m
+        end
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->
@@ -1072,7 +1081,7 @@ and expression ctxt f x =
           (bindings reset_ctxt) (mf,rf,l)
           (expression ctxt) e
     | Pexp_apply
-      ({ pexp_desc = Pexp_extension({txt = "extension.exclave"}, PStr []) },
+      ({ pexp_desc = Pexp_extension({txt = "extension.exclave" | "ocaml.exclave" | "exclave"}, PStr []) },
        [Nolabel, sbody]) ->
         pp f "@[<2>exclave_ %a@]" (expression ctxt) sbody
     | Pexp_apply (e, l) ->
@@ -2539,3 +2548,37 @@ module Doc = struct
   let jkind_annotation ppf jkind =
     Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf
 end
+
+let normalize_identifiers (expression : Parsetree.expression) : Parsetree.expression =
+  let t = Hashtbl.create 0 in
+  let rec loop (obj : Obj.t) : Obj.t =
+    match Obj.tag obj with
+    | tag when tag = Obj.int_tag ->
+      obj
+    | tag when tag = Obj.string_tag ->
+      let str : string = Obj.obj obj in
+      begin match String.split_on_char '|' str with
+      | [base; "Translquotes"; stamp] ->
+        if not (Hashtbl.mem t base) then
+          Hashtbl.add t base (Hashtbl.create 0);
+        let of_base = Hashtbl.find t base in
+        let i =
+          match Hashtbl.find_opt of_base stamp with
+          | Some i -> i
+          | None ->
+            let i = Hashtbl.length of_base in
+            Hashtbl.add of_base stamp i;
+            i
+        in
+        Obj.repr (if i <= 0 then base else base ^ "__" ^ string_of_int i)
+      | _ -> obj
+      end
+    | tag when tag < Obj.no_scan_tag ->
+      let size = Obj.size obj in
+      let obj' = Obj.new_block tag size in
+      List.init size
+        (fun i -> Obj.set_field obj' i (loop (Obj.field obj i)))
+      |> ignore;
+      obj'
+    | _ -> Misc.fatal_error "Pprintast: unexpected block in Parsetree"
+  in Obj.obj (loop (Obj.repr expression))

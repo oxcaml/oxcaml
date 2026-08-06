@@ -265,7 +265,7 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun (x, y) -> x + y ]>;;
 [%%expect {|
-- : <[int * int -> int]> expr = <[fun (x, y) -> x + y]>
+- : <[int * int -> int]> expr = <[fun (x, y) -> Stdlib.(+) x y]>
 |}];;
 
 <[ fun (Some x) -> x ]>;;
@@ -307,12 +307,13 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 
 <[ function | (x, y) -> x + y ]>;;
 [%%expect {|
-- : <[int * int -> int]> expr = <[function | (x, y) -> x + y]>
+- : <[int * int -> int]> expr = <[function | (x, y) -> Stdlib.(+) x y]>
 |}];;
 
 <[ function | (x, y, z) -> x + y - z ]>;;
 [%%expect {|
-- : <[int * int * int -> int]> expr = <[function | (x, y, z) -> (x + y) - z]>
+- : <[int * int * int -> int]> expr =
+<[function | (x, y, z) -> Stdlib.(-) (Stdlib.(+) x y) z]>
 |}];;
 
 <[ function | `A -> true | `B -> false ]>;;
@@ -324,7 +325,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[ function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0 ]>;;
 [%%expect {|
 - : <[([< `Bar of int * int | `Baz | `Foo of int ] as '_weak11) -> int]> expr
-= <[function | `Foo x -> x | `Bar (y, z) -> y + z | `Baz -> 0]>
+= <[function | `Foo x -> x | `Bar (y, z) -> Stdlib.(+) y z | `Baz -> 0]>
 |}];;
 
 <[ function | lazy x as l -> Lazy.force l ]>;;
@@ -358,13 +359,13 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[ fun l -> List.map (fun x -> 2 * x) l ]>;;
 [%%expect {|
 - : <[int list -> int list]> expr =
-<[fun l -> Stdlib.List.map (fun x -> 2 * x) l]>
+<[fun l -> Stdlib.List.map (fun x -> Stdlib.( * ) 2 x) l]>
 |}];;
 
 <[ fun (type a) (f : a -> a) (x : a) -> f (f x) ]>;;
 [%%expect {|
 - : <[($('a) -> $('a)) -> $('a) -> $('a)]> expr =
-<[fun (type a) (f : a -> a) (x : a) -> f (f x)]>
+<[fun (type a) -> fun (f : a -> a) (x : a) -> f (f x)]>
 |}];;
 
 <[ fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x) ]>;;
@@ -377,25 +378,23 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[ fun (f : 'a. 'a -> 'a) -> f f ]>;;
 [%%expect {|
 - : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
-<[fun (f : 'a . 'a -> 'a) -> f f]>
+<[fun (f : ('a : value) . 'a -> 'a) -> f f]>
 |}];;
 
 (* CR metaprogramming jbachurski: This should fail an assertion (ticket 6789).
    We should also support this construct (ticket 6790). *)
 <[ let f : type a. a -> a = fun x -> x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 19-20]: cannot quote type a - this is either unsupported or a bug
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) -> $('a)]> expr =
+<[let f : ('a : value) . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in
+  f]>
 |}];;
 
 (* CR metaprogramming jbachurski: We should support this (ticket 6791). *)
 <[ function E.Exists (type a) (x : a) -> ignore (x : a) ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 12-37]:
-Constructor patterns introducing locally abstract types are not supported in quotes.
-Uncaught exception: Misc.Fatal_error
-
+>> Fatal error: a/544/TranslquotesStamped unbound at toplevel
+Exception: Misc.Fatal_error.
 |}];;
 
 <[ fun x -> fun x -> fun x -> 42 ]>;;
@@ -407,7 +406,7 @@ Uncaught exception: Misc.Fatal_error
 <[ fun x -> fun x -> fun x__1 -> 42 ]>;;
 [%%expect {|
 - : <[$('a) -> $('b) -> $('c) -> int]> expr =
-<[fun x -> fun x__1 -> fun x__2 -> 42]>
+<[fun x -> fun x__1 -> fun x__1 -> 42]>
 |}];;
 
 <[ let z = 10 in z ]>;;
@@ -417,7 +416,7 @@ Uncaught exception: Misc.Fatal_error
 
 <[ let (x, y) = (42, 100) in x + y ]>;;
 [%%expect {|
-- : <[int]> expr = <[let (x, y) = (42, 100) in x + y]>
+- : <[int]> expr = <[let (x, y) = (42, 100) in Stdlib.(+) x y]>
 |}];;
 
 <[ let Some x = Some "foo" in x ]>;;
@@ -461,7 +460,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[ let foo = 50 and bar = 15 in foo + bar ]>;;
 [%%expect {|
 - : <[int]> expr = <[let foo = 50
-                     and bar = 15 in foo + bar]>
+                     and bar = 15 in Stdlib.(+) foo bar]>
 |}];;
 
 <[ let x = 42 in let x = x in x ]>;;
@@ -474,8 +473,13 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
    f 20 ]>;;
 [%%expect {|
 - : <[int]> expr =
-<[let rec f x = if (x mod 2) = 0 then x + (g (x / 2)) else g (x - 1)
-  and g x__1 = if x__1 = 0 then 0 else x__1 + (f (x__1 - 1)) in f 20]>
+<[let rec f x =
+    if Stdlib.(=) (Stdlib.(mod) x 2) 0
+    then Stdlib.(+) x (g (Stdlib.(/) x 2))
+    else g (Stdlib.(-) x 1)
+  and g x__1 =
+    if Stdlib.(=) x__1 0 then 0 else Stdlib.(+) x__1 (f (Stdlib.(-) x__1 1)) in
+  f 20]>
 |}];;
 
 <[
@@ -494,8 +498,9 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 ]>;;
 [%%expect {|
 - : <[int option]> expr =
-<[let (let+) x f = Stdlib.Option.map f x in let+ a = Some 42
-                                             in a * 2]>
+<[let (let+) x f = Stdlib.Option.map f x in
+  let+ a = Some 42
+   in Stdlib.( * ) a 2]>
 |}];;
 
 <[
@@ -509,7 +514,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[let ( let* ) x f = Stdlib.List.map f x
   and ( and* ) = Stdlib.List.combine in
   let* a = [1; 2; 3]
-  and* b = [10; 20; 30] in a + b]>
+  and* b = [10; 20; 30] in Stdlib.(+) a b]>
 |}];;
 
 <[ fun (f: int -> int) (x: int) -> f x ]>;;
@@ -521,8 +526,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 <[ let module M = Set.Make(Int) in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
 - : <[Int.t list]> expr =
-<[let module M = (Stdlib.Set.Make)(Stdlib.Int) in
-    M.elements (M.singleton 100)]>
+<[let module M = (Set.Make)(Int) in M.elements (M.singleton 100)]>
 |}];;
 
 (* Non-persistent functor *)
@@ -565,7 +569,9 @@ Error: Identifier "Int'" is used at line 2, characters 27-31,
  ]>;;
 [%%expect {|
 - : <[int]> expr =
-<[let x = Stdlib.ref 0 in for i = 0 to 10 do x := ((!x) + i) done; !x]>
+<[let x = Stdlib.ref 0 in
+  for i = 0 to 10 do Stdlib.(:=) x (Stdlib.(+) (Stdlib.(!) x) i) done;
+  Stdlib.(!) x]>
 |}];;
 
 <[
@@ -577,7 +583,9 @@ Error: Identifier "Int'" is used at line 2, characters 27-31,
  ]>;;
 [%%expect {|
 - : <[int]> expr =
-<[let x = Stdlib.ref 0 in for i = 10 downto 0 do x := ((!x) + i) done; !x]>
+<[let x = Stdlib.ref 0 in
+  for i = 10 downto 0 do Stdlib.(:=) x (Stdlib.(+) (Stdlib.(!) x) i) done;
+  Stdlib.(!) x]>
 |}];;
 
 <[ while true do () done ]>;;
@@ -597,7 +605,11 @@ Error: Identifier "Int'" is used at line 2, characters 27-31,
 - : <[int]> expr =
 <[let f = Stdlib.ref 1
   and i = Stdlib.ref 5 in
-  while (!i) > 0 do (f := ((!i) * (!f)); i := ((!i) - 1)) done; !f]>
+  while Stdlib.(>) (Stdlib.(!) i) 0 do
+    (Stdlib.(:=) f (Stdlib.( * ) (Stdlib.(!) i) (Stdlib.(!) f));
+     Stdlib.(:=) i (Stdlib.(-) (Stdlib.(!) i) 1))
+    done;
+  Stdlib.(!) f]>
 |}];;
 
 <[ assert true ]>;;
@@ -771,13 +783,13 @@ Hint: Label "x" is defined outside any quotations.
 <[ let module M = Option in M.map ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) option -> $('b) option]> expr =
-<[let module M = Stdlib.Option in M.map]>
+<[let module M = Option in M.map]>
 |}];;
 
 <[ let module M = Option in function | M.None -> false | M.Some x -> x ]>;;
 [%%expect {|
 - : <[bool option -> bool]> expr =
-<[let module M = Stdlib.Option in function | None -> false | Some x -> x]>
+<[let module M = Option in function | M.None -> false | M.Some x -> x]>
 |}];;
 
 <[ fun () -> exclave_ Some 42 ]>;;
@@ -802,12 +814,12 @@ Error: This expression is not an allocation site.
 
 <[ let x = borrow_ 42 in x + 1 ]>;;
 [%%expect {|
-- : <[int]> expr = <[let x = borrow_ 42 in x + 1]>
+- : <[int]> expr = <[let x = borrow_ 42 in Stdlib.(+) x 1]>
 |}];;
 
 <[ fun x -> let y = borrow_ x in y + 1 ]>;;
 [%%expect {|
-- : <[int -> int]> expr = <[fun x -> let y = borrow_ x in y + 1]>
+- : <[int -> int]> expr = <[fun x -> let y = borrow_ x in Stdlib.(+) y 1]>
 |}];;
 
 module type S = sig
@@ -926,40 +938,49 @@ let x = <[ 123 ]> in <[ $x ]>;;
 
 <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
 [%%expect {|
-- : <[int list]> expr = <[[a * b for a = 1 to 10 for b = a to 10]]>
+- : <[int list]> expr =
+<[[Stdlib.( * ) a b for a = 1 to 10 for b = a to 10]]>
 |}];;
 
 <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
 [%%expect {|
-- : <[int list]> expr = <[[a * b for a = 1 to 10 and b = 1 to 10]]>
+- : <[int list]> expr =
+<[[Stdlib.( * ) a b for a = 1 to 10 and b = 1 to 10]]>
 |}];;
 
 <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
 [%%expect {|
 - : <[int list]> expr =
-<[[a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0]]>
+<[[Stdlib.( * ) a b
+    for a = 1 to 10
+      for b = a to 10
+      when Stdlib.(=) (Stdlib.(+) a (Stdlib.(mod) b 2)) 0]]>
 |}];;
 
 <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
 [%%expect {|
 - : <[int array]> expr =
-<[[|a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0|]]>
+<[[|Stdlib.( * ) a b
+    for a = 1 to 10
+      for b = a to 10
+      when Stdlib.(=) (Stdlib.(+) a (Stdlib.(mod) b 2)) 0|]]>
 |}];;
 
 <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
 [%%expect {|
-- : <[string array]> expr = <[[|a ^ "!" for a in [|"foo";"bar"|]|]]>
+- : <[string array]> expr = <[[|Stdlib.(^) a "!" for a in [|"foo";"bar"|]|]]>
 |}];;
 
 <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
 [%%expect {|
-- : <[string iarray]> expr = <[[:a ^ "!" for a in [|"foo";"bar"|]:]]>
+- : <[string iarray]> expr =
+<[[:Stdlib.(^) a "!" for a in [:"foo";"bar":]:]]>
 |}];;
 
 <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
 [%%expect {|
 - : <[string list]> expr =
-<[[a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"]]]>
+<[[Stdlib.(^) a b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"]]]>
 |}];;
 
 <[ let o = object method f = 1 end in o#f ]>;;
@@ -975,12 +996,12 @@ Error: Object definition using "object..end"
 <[ let open List in map ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) list -> $('b) list]> expr =
-<[let open! Stdlib.List in Stdlib.List.map]>
+<[let open List in Stdlib.List.map]>
 |}];;
 
 <[ let open M in M.foo ]>;;
 [%%expect {|
-- : <[int]> expr = <[let open! M in M.foo]>
+- : <[int]> expr = <[let open M in M.foo]>
 |}]
 ;;
 
@@ -1034,26 +1055,22 @@ Error: Adding attributes on tags in polymorphic variant types
 
 <[ fun x -> $((fun y -> <[ $y + $y ]>) <[ x ]>) ]>;;
 [%%expect {|
-- : <[int -> int]> expr = <[fun x -> x + x]>
+- : <[int -> int]> expr = <[fun x -> Stdlib.(+) x x]>
 |}];;
 
 <[ $((fun y -> <[ $y + $y ]>) <[ 2 ]>) ]>;;
 [%%expect {|
-- : <[int]> expr = <[2 + 2]>
+- : <[int]> expr = <[Stdlib.(+) 2 2]>
 |}];;
 
 <[ fun () -> <[ $ (<[ 123 ]>) ]> ]>;;
 [%%expect {|
-- : <[unit -> <[int]> expr @ once]> expr =
-Line 1, characters 14-16:
-0 | .......
-1 | ...... =.............................................................................................
-Error: Syntax error
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$(<[123]>)]>]>
 |}];;
 
 let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 [%%expect {|
-- : <[string]> expr = <["foo" ^ "bar"]>
+- : <[string]> expr = <[Stdlib.(^) "foo" "bar"]>
 |}];;
 
 <[ fun x -> <[ fun () -> <[ $($x) ]> ]> ]>;;
@@ -1064,11 +1081,7 @@ let x = <[ "foo" ]> and y = <[ "bar" ]> in <[ $x ^ $y ]>;;
 
 let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 [%%expect {|
-- : <[unit -> <[int]> expr @ once]> expr =
-Line 1, characters 14-16:
-0 | .......
-1 | ...... =.............................................................................................
-Error: Syntax error
+- : <[unit -> <[int]> expr @ once]> expr = <[fun () -> <[$(<[42]>)]>]>
 |}];;
 
 <[ raise Out_of_fibers ]>;;
@@ -1088,15 +1101,15 @@ Error: Syntax error
 <[ let rec add : int * int -> int = fun (x, y) -> x + y in add ]>
 [%%expect {|
 - : <[int * int -> int]> expr =
-<[let rec add : (int * int) -> int =
-    (fun (x, y) -> x + y : (int * int) -> int) in
+<[let rec (add : (int * int) -> int) =
+    (fun (x, y) -> Stdlib.(+) x y : (int * int) -> int) in
   add]>
 |}];;
 
 <[ let rec id : 'a. 'a -> 'a = fun x -> x in id ]>
 [%%expect {|
 - : <[$('a) -> $('a)]> expr =
-<[let rec id : 'a . 'a -> 'a = fun x -> x in id]>
+<[let rec id : ('a : value) . 'a -> 'a = fun x -> x in id]>
 |}];;
 
 <[ let rec foo : int -> int = fun x -> if x < 0 then bar x else 0
@@ -1104,10 +1117,10 @@ Error: Syntax error
    in foo, bar ]>
 [%%expect {|
 - : <[(int -> int) * (int -> int)]> expr =
-<[let rec foo : int -> int =
-    (fun x -> if x < 0 then bar x else 0 : int -> int)
-  and bar : int -> int =
-    (fun x__1 -> if x__1 > 0 then foo x__1 else 0 : int -> int) in
+<[let rec (foo : int -> int) =
+    (fun x -> if Stdlib.(<) x 0 then bar x else 0 : int -> int)
+  and (bar : int -> int) =
+    (fun x__1 -> if Stdlib.(>) x__1 0 then foo x__1 else 0 : int -> int) in
   (foo, bar)]>
 |}];;
 
@@ -1116,8 +1129,8 @@ Error: Syntax error
    in foo, bar ]>
 [%%expect {|
 - : <[(int -> int) * (int -> int)]> expr =
-<[let rec foo (x : int) = (if x < 0 then bar x else 0 : int)
-  and bar (x__1 : int) = (if x__1 > 0 then foo x__1 else 0 : int) in
+<[let rec foo (x : int) = (if Stdlib.(<) x 0 then bar x else 0 : int)
+  and bar (x__1 : int) = (if Stdlib.(>) x__1 0 then foo x__1 else 0 : int) in
   (foo, bar)]>
 |}];;
 
@@ -1135,32 +1148,33 @@ Error: Syntax error
 
 <[ fun x -> [ x ; x + 1 ] ]>
 [%%expect {|
-- : <[int -> int list]> expr = <[fun x -> [x; x + 1]]>
+- : <[int -> int list]> expr = <[fun x -> [x; Stdlib.(+) x 1]]>
 |}];;
 
 (* Constraints must be parenthesised in tuple and list elements *)
 
 <[ fun x -> ((x : int), (x + 1 : int)) ]>
 [%%expect {|
-- : <[int -> int * int]> expr = <[fun x -> ((x : int), (x + 1 : int))]>
+- : <[int -> int * int]> expr =
+<[fun x -> ((x : int), (Stdlib.(+) x 1 : int))]>
 |}];;
 
 <[ fun x -> [(x : int); (x + 1 : int)] ]>
 [%%expect {|
-- : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
+- : <[int -> int list]> expr =
+<[fun x -> [(x : int); (Stdlib.(+) x 1 : int)]]>
 |}];;
 
 <[ (fun f -> (f 42, f "abc") : ('a. 'a -> 'a) -> (int * string)) ]>
 [%%expect {|
 - : <[('a. 'a -> 'a) -> int * string]> expr =
-<[(fun (f : 'a . 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1 . 'a__1 -> 'a__1)
-                                                      -> (int * string))]>
+<[(fun (f : ('a : value) . ('a : value) -> ('a : value)) ->
+     ((f 42), (f "abc")) : (('a : value) . 'a -> 'a) -> (int * string))]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
 [%%expect{|
-- : <[unit]> expr =
-<[let y = borrow_ "foo" in (fun (a : _ @ local) -> ()) y]>
+- : <[unit]> expr = <[let y = borrow_ "foo" in (fun (a @ local) -> ()) y]>
 |}];;
 
 let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
@@ -1198,7 +1212,7 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 <[ fun x -> match x with y when y > 0 -> y | _ -> 0 ]>;;
 [%%expect {|
 - : <[int -> int]> expr =
-<[fun x -> match x with | y when y > 0 -> y | _ -> 0]>
+<[fun x -> match x with | y when Stdlib.(>) y 0 -> y | _ -> 0]>
 |}];;
 
 (* Bug 5: Negative constants must be parenthesized in argument positions *)
@@ -1230,7 +1244,8 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 (* Bug 9: Fun with function cases must have balanced format boxes *)
 <[ fun x -> function | 0 -> x | n -> n + x ]>;;
 [%%expect {|
-- : <[int -> int -> int]> expr = <[fun x -> function | 0 -> x | n -> n + x]>
+- : <[int -> int -> int]> expr =
+<[fun x -> function | 0 -> x | n -> Stdlib.(+) n x]>
 |}];;
 
 (* Bug 10: Src_pos must not print as "." *)
@@ -1396,71 +1411,72 @@ Error: Annotating types with kinds
 <[ let (x @ unique portable) = "abc" in x ]>
 [%%expect {|
 - : <[string]> expr =
-<[let x : _ @ unique portable = ("abc" : _ @ unique portable) in x]>
+<[let (x @ unique portable) = ("abc" : @ unique portable) in x]>
 |}];;
 
 (* Expression constraints *)
 <[ fun x -> (x : _  @ unique portable)]>
 [%%expect {|
 - : <[$('a) @ unique portable -> $('a)]> expr =
-<[fun x -> (x : _ @ unique portable)]>
+<[fun x -> ((x : _) : @ unique portable)]>
 |}];;
 
 <[ fun x -> exclave_ (x : _  @ local)]>
 [%%expect {|
-- : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
+- : <[$('a) -> $('a) @ local]> expr =
+<[fun x -> exclave_ ((x : _) : @ local)]>
 |}];;
 
 (* Function definitions -- without type annotation *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[fun (x : _ @ local unique) -> (x : _ @ local unique)]>
+<[fun (x @ local unique) -> (x : @ local unique)]>
 |}];;
 
 <[ let (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[let f : _ @ unique portable =
-    (fun (x : _ @ local unique) -> (x : _ @ local unique) : _ @ unique portable) in
+<[let (f @ unique portable) =
+    (fun (x @ local unique) -> (x : @ local unique) : @ unique portable) in
   f]>
 |}];;
 
 <[ let rec f (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[let rec f (x : _ @ local unique) = (x : _ @ local unique) in f]>
+<[let rec f (x @ local unique) = (x : @ local unique) in f]>
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 16-22]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let rec (f @ unique portable) =
+    (fun (x @ local unique) -> (x : @ unique portable) : @ unique portable) in
+  f]>
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 16-22]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
+<[let rec (f @ unique portable) =
+    (fun (x @ local unique) -> (x : @ local unique) : @ unique portable) in
+  f]>
 |}];;
 
 <[ let rec (f @ unique portable)
               (x : string @ local unique) : string @ local unique = x in f ]>
 [%%expect {|
->> Fatal error: Translquote [at Line 1, characters 16-22]:
-no support for mode annotations in this position.
-Uncaught exception: Misc.Fatal_error
-
+- : <[string @ local unique -> string @ local unique]> expr =
+<[let rec (f @ unique portable) =
+    (fun (x : string @ local unique) -> ((x : string) : @ local unique) : @ unique portable) in
+  f]>
 |}];;
 
 <[ let local_ f x = x in f "abc" ]>
 [%%expect {|
 - : <[string]> expr =
-<[let f : _ @ local = (fun x -> (x : _ @ local) : _ @ local) in f "abc"]>
+<[let (f @ local) = (fun x -> (x : @ local) : @ local) in f "abc"]>
 |}];;
 
 (* Function definitions -- with type annotations *)
@@ -1479,7 +1495,7 @@ Uncaught exception: Misc.Fatal_error
 <[ let f (x : string @ local unique) : string @ local unique = x in f ]>
 [%%expect {|
 - : <[string @ local unique -> string @ local unique]> expr =
-<[let f (x : string @ local unique) = ((x : string) : _ @ local unique) in f]>
+<[let f (x : string @ local unique) = ((x : string) : @ local unique) in f]>
 |}];;
 
 <[ fun (x : _ @ local unique) -> x ]>
@@ -1497,7 +1513,7 @@ Uncaught exception: Misc.Fatal_error
 <[ fun x @ local unique -> x ]>
 [%%expect {|
 - : <[$('a) @ unique -> $('a) @ local unique]> expr =
-<[fun x -> (x : _ @ local unique)]>
+<[fun x -> (x : @ local unique)]>
 |}];;
 
 (* Function types *)
@@ -1654,7 +1670,7 @@ let open Op in
 (* Infix operators are correctly parenthesised when defined in quotations. *)
 <[ let (+) x y = x ^ y in "foo" + "bar" ]>;;
 [%%expect {|
-- : <[string]> expr = <[let (+) x y = x ^ y in "foo" + "bar"]>
+- : <[string]> expr = <[let (+) x y = Stdlib.(^) x y in "foo" + "bar"]>
 |}];;
 
 <[ let (+) x y = x in let f g = g 1 2 in f (+) ]>;;
@@ -1674,14 +1690,15 @@ let open Op in
 |}];;
 
 (* Extension constructors/exceptions *)
-exception E;;
+exception Eee;;
 [%%expect {|
-exception E
+exception Eee
 |}];;
 
-<[ raise E ]>;;
+<[ raise Eee ]>;;
 [%%expect {|
-- : 'a expr = <[Stdlib.raise (E : exn)]>
+>> Fatal error: Eee/1118/TranslquotesStamped unbound at toplevel
+Exception: Misc.Fatal_error.
 |}];;
 
 <[ raise Exc.E ]>;;
@@ -1694,30 +1711,42 @@ exception E
 <[ let open List in map length [[1]; [2; 3]] ]>
 [%%expect {|
 - : <[int list]> expr =
-<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length [[1]; [2; 3]]]>
+<[let open List in
+    Stdlib.List.map Stdlib.List.length
+      (Stdlib.List.(::)
+         ((Stdlib.List.(::) (1, Stdlib.List.[])),
+           (Stdlib.List.(::)
+              ((Stdlib.List.(::) (2, (Stdlib.List.(::) (3, Stdlib.List.[])))),
+                Stdlib.List.[]))))]>
 |}];;
 
 <[ List.(map length [[1]; [2; 3]]) ]>
 [%%expect {|
 - : <[int list]> expr =
-<[let open! Stdlib.List in Stdlib.List.map Stdlib.List.length [[1]; [2; 3]]]>
+<[let open List in
+    Stdlib.List.map Stdlib.List.length
+      (Stdlib.List.(::)
+         ((Stdlib.List.(::) (1, Stdlib.List.[])),
+           (Stdlib.List.(::)
+              ((Stdlib.List.(::) (2, (Stdlib.List.(::) (3, Stdlib.List.[])))),
+                Stdlib.List.[]))))]>
 |}];;
 
 <[ M.(0.1 + 0.2) ]>
 [%%expect {|
-- : <[float]> expr = <[let open! M in M.(+) 0.1 0.2]>
+- : <[float]> expr = <[let open M in M.(+) 0.1 0.2]>
 |}];;
 
 <[ M.{ record_field = "open" }, { M.record_field = "path" } ]>
 [%%expect {|
 - : <[string M.record * string M.record]> expr =
-<[((let open! M in { M.record_field = "open" }), { M.record_field = "path" })]>
+<[((let open M in { M.record_field = "open" }), { M.record_field = "path" })]>
 |}];;
 
 <[ M.(Variant_tag "open"), M.Variant_tag "path" ]>
 [%%expect {|
 - : <[string M.variant * string M.variant]> expr =
-<[((let open! M in M.Variant_tag "open"), (M.Variant_tag "path"))]>
+<[((let open M in M.Variant_tag "open"), (M.Variant_tag "path"))]>
 |}];;
 
 (* Opening packed module *)
@@ -1725,19 +1754,23 @@ exception E
 <[ fun (module M : T) -> let open M in foo + 1 ]>
 [%%expect {|
 - : <[(module T) -> int]> expr =
-<[fun (((module M)  : (module T)) : (module T)) -> let open! M in M.foo + 1]>
+<[fun (((module M)  : (module T)) : (module T)) ->
+    let open M in Stdlib.(+) M.foo 1]>
 |}];;
 
 (* Cross-stage open *)
 
 <[ let open List in $(hd [ <[ 0 ]>; <[ 1 ]> ]) ]>
 [%%expect {|
-- : <[int]> expr = <[let open! Stdlib.List in 0]>
+- : <[int]> expr = <[let open List in 0]>
 |}];;
 
 let open List in <[ length [1; 2; 3] ]>
 [%%expect {|
-- : <[int]> expr = <[Stdlib.List.length [1; 2; 3]]>
+- : <[int]> expr =
+<[Stdlib.List.length
+    (Stdlib.List.(::)
+       (1, (Stdlib.List.(::) (2, (Stdlib.List.(::) (3, Stdlib.List.[]))))))]>
 |}];;
 
 module M1 = struct let foo1 = 42 end;;
@@ -1752,12 +1785,12 @@ Error: Identifier "foo1" is used at line 2, characters 18-22,
        it is introduced at line 1, characters 23-27, outside any quotations.
 |}];;
 
-<[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
+<[ fun (module M : T) -> let open M in $foo ]>
 [%%expect {|
-Line 1, characters 56-59:
-1 | <[ fun (module M : T) -> let open M in $(Quote.Expr.int foo) ]>
-                                                            ^^^
-Error: Identifier "foo" is used at line 1, characters 56-59,
+Line 1, characters 40-43:
+1 | <[ fun (module M : T) -> let open M in $foo ]>
+                                            ^^^
+Error: Identifier "foo" is used at line 1, characters 40-43,
        outside any quotations; it is introduced at line 2, characters 2-15,
        inside a quotation (<[ ... ]>).
 |}];;
@@ -1766,12 +1799,12 @@ Error: Identifier "foo" is used at line 1, characters 56-59,
 
 <[ let open [@inline] M in foo ]>
 [%%expect {|
-- : <[int]> expr = <[((let open! M in M.foo)[@inline ])]>
+- : <[int]> expr = <[((let open M in M.foo)[@inline ])]>
 |}];;
 
 <[ ((let open M in foo) [@inline]) ]>
 [%%expect {|
-- : <[int]> expr = <[((let open! M in M.foo)[@inline ])]>
+- : <[int]> expr = <[((let open M in M.foo)[@inline ])]>
 |}];;
 
 (** Opening modules in patterns **)
@@ -1779,11 +1812,11 @@ Error: Identifier "foo" is used at line 1, characters 56-59,
 <[ function M.(Variant_tag 0) -> 1 | M.Variant_tag _ -> 0 ]>
 [%%expect {|
 - : <[int M.variant -> int]> expr =
-<[function | M.Variant_tag 0 -> 1 | M.Variant_tag _ -> 0]>
+<[function | M.(M.Variant_tag 0)  -> 1 | M.Variant_tag _ -> 0]>
 |}];;
 
 <[ function M.(Some x) -> x | M.(None) -> 0 ]>
 [%%expect {|
 - : <[int M.my_option -> int]> expr =
-<[function | M.Some x -> x | M.None -> 0]>
+<[function | M.(M.Some x)  -> x | M.(M.None)  -> 0]>
 |}];;
