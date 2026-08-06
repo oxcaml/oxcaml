@@ -55,13 +55,11 @@ f:
   ret
 |}]
 
-(* CR ttebbi: We could merge the and and test instructions *)
 let do_intersect t1 t2 =
   Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
 [%%expect_asm X86_64{|
 do_intersect:
   andq  %rbx, %rax
-  testq %rax, %rax
   jne   .L0
   movl  $100, %eax
   ret
