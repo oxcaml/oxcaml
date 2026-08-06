@@ -466,10 +466,6 @@ type expected_mode =
     field and [mode]: this field being [true] while [mode] being [global] is
     sensible, but not very useful as it will fail all expressions. *)
 
-    alloc_annot : Allocation.Const.t option;
-    (** [Some c] iff the function was directly annotated with the allocation
-    mode [c] on its binding (e.g. [let (f @ noalloc) x = ...]). *)
-
     tuple_modes : (With_regionality.r * Location.t) list option;
     (** No invariant between this and [mode]. It is UNSOUND to ignore this
         field. If this is [Some [x0; x1; ..]]:
@@ -575,7 +571,6 @@ let mode_default mode =
     mode = With_regionality.disallow_left mode;
     strictly_local = false;
     return_from_exclave = None;
-    alloc_annot = None;
     tuple_modes = None }
 
 let mode_legacy = mode_default With_regionality.legacy
@@ -705,9 +700,6 @@ let mode_return_from_exclave (expected_mode : expected_mode) =
   | None ->
     let r = ref false in
     r, { expected_mode with return_from_exclave = Some r }
-
-let mode_alloc_annot expected_mode alloc_annot =
-  { expected_mode with alloc_annot }
 
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> With_regionality.meet [m; mode]) expected_mode
@@ -887,21 +879,6 @@ let dynamic_pat_mode pat_mode =
   in
   {pat_mode with mode}
 
-let allocations : Locality.r list ref = Local_store.s_ref []
-
-let reset_allocations () = allocations := []
-
-let register_allocation_mode ~env ~loc locality_mode =
-  let min_mode =
-    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
-  in
-  let max_mode =
-    With_locality.max_with_comonadic Areality locality_mode
-    |> with_locality_as_regionality
-  in
-  With_regionality.submode_err (loc, Hint.Allocation) min_mode max_mode;
-  allocations := locality_mode :: !allocations
-
 let newvar_below_if_modepoly level m =
   if Language_extension.(is_at_least Mode_polymorphism Alpha)
   then fst (Locality.newvar_below level m)
@@ -933,65 +910,15 @@ let create_allocation_mode_r mode =
   |> newvar_below_if_modepoly 0
   |> Locality.disallow_left
 
-let register_allocation_value_mode ~env ~loc
-    ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
-  let locality_mode = create_allocation_mode_r (with_regionality_to_locality_r2g mode) in
-  register_allocation_mode ~env ~loc locality_mode;
-  (* We must apply each morphism separately so that their hints correspond to
-     the correct morphism *)
-  let mode =
-    with_regionality_to_locality_r2g ~allocation:({loc; txt = desc})
-      (Mode.With_regionality.disallow_left mode)
-  in
-  let mode =
-    with_locality_as_regionality ~allocation:({loc; txt = desc}) mode
-  in
-  locality_mode, mode
-
-(* Unlike most allocations, which can be the highest mode allowed by
-   [expected_mode], functions have more constraints. For example, a two
-   parameter function needs to be made global if its partial application
-   to one argument must be global. As a result, a function gets an
-   [With_locality.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation ~env (mode : With_regionality.r) ~loc
-    : Locality.lr * With_locality.lr * With_regionality.r =
-  let allocation : Hint.allocation = {loc; txt = Unknown} in
-  let (mode : With_locality.lr), _ =
-    With_locality.newvar_below (Ctype.get_current_level ())
-      (with_regionality_to_locality_r2g ~allocation mode)
-  in
-  let closure_locality_mode = With_locality.proj_comonadic Areality mode in
-  let locality_mode, _ = Locality.newvar_below 0 closure_locality_mode in
-  let closed_over_mode =
-    with_locality_as_regionality ~allocation (With_locality.disallow_left mode)
-  in
-  register_allocation_mode ~env ~loc
-    (Locality.disallow_left locality_mode);
-  locality_mode, mode, closed_over_mode
-
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
     of potential subcomponents. *)
 let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   let locality_mode, mode =
-    register_allocation_value_mode ~env ~loc
+    Typeallocation.register_allocation_value_mode ~env ~loc
       ?desc (as_single_mode expected_mode)
   in
   locality_mode, mode_default mode
-
-let optimise_allocations () =
-  (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For
-  example, pushing an allocation to [contended] is useful to the middle-end.
-  However, a [contended] value in a module causes extra modality in printing.
-  Therefore, here we only optimise allocation for stack/heap. Proper solutions:
-  - Remove [Contention] axis from [With_locality].
-  - Add it back when middle-end can really utilize this information. *)
-  List.iter
-    (fun mode ->
-      Locality.zap_to_ceil_exn mode
-      |> ignore)
-    !allocations;
-  reset_allocations ()
 
 (** We keep this state which is passed as an optional argument throughout
     the typechecker. It goes through the following life-cycle:
@@ -5390,7 +5317,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
               Typedtree.create_return_mode
                 (Locality.disallow_right mode_ret_alloc)
              in
-             register_allocation_mode ~env ~loc mode_closure;
+             Typeallocation.register_allocation_mode ~env ~loc mode_closure;
              let arg =
               Omitted {
                 mode_closure = Typedtree.create_locality_mode_r mode_closure;
@@ -6537,7 +6464,8 @@ let split_function_ty
     ~is_first_val_param ~is_final_val_param
   =
   let locality_mode, closure_mode, closed_over_mode =
-    register_closure_allocation ~env ~loc (as_single_mode expected_mode)
+    Typeallocation.register_closure_allocation ~env ~loc
+      (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local locality_mode;
@@ -6577,15 +6505,6 @@ let split_function_ty
     match is_first_val_param with
     | false -> env
     | true ->
-        let env =
-          match expected_mode.alloc_annot with
-          | Some Noalloc ->
-            Env.add_closure_noalloc_lock Hint.Noalloc (loc, Function) env
-          | Some Noalloc_strict ->
-            Env.add_closure_noalloc_lock Hint.Noalloc_strict (loc, Function)
-              env
-          | Some Alloc | None -> env
-        in
         let env =
           Env.add_closure_lock
             (loc, Function)
@@ -6874,10 +6793,6 @@ let pat_modes ~env ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
       Some env_locality_mode, mode_default exp_mode
     else None, exp_mode
   in
-  let exp_mode =
-    mode_alloc_annot exp_mode
-      ((mode_annots_from_pat spat).mode_modes.allocation)
-  in
   attrs, pat_mode, env_locality_mode, exp_mode, spat
 
 let add_zero_alloc_attribute expr attributes =
@@ -6917,9 +6832,10 @@ let add_zero_alloc_attribute expr attributes =
     end
   | _ -> expr
 
-let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
+let rec type_exp ?recarg ?(overwrite=No_overwrite) ?(is_applied=false)
+      env expected_mode sexp =
   (* We now delegate everything to type_expect *)
-  type_expect ?recarg ~overwrite env expected_mode sexp
+  type_expect ?recarg ~overwrite ~is_applied env expected_mode sexp
     (mk_expected (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
 
 (* Typing of an expression with an expected type.
@@ -6933,13 +6849,14 @@ and check_layout_args_empty ~loc ~env layout_args ctx =
   if not (List.is_empty layout_args) then
     raise (Error (loc, env, Layout_poly_inst_not_yet_supported ctx))
 
-and type_expect ?recarg ?(overwrite=No_overwrite) env
+and type_expect ?recarg ?(overwrite=No_overwrite) ?(is_applied=false) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
   let previous_saved_types = Cmt_format.get_saved_types () in
   let exp =
     Builtin_attributes.warning_scope sexp.pexp_attributes
       (fun () ->
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
+         type_expect_ ?recarg ~overwrite ~is_applied env expected_mode sexp
+           ty_expected_explained
       )
   in
   Cmt_format.set_saved_types
@@ -6947,7 +6864,7 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
   exp
 
 and type_expect_
-    ?(recarg=Rejected) ?(overwrite=No_overwrite)
+    ?(recarg=Rejected) ?(overwrite=No_overwrite) ?(is_applied=false)
     env (expected_mode : expected_mode) sexp ty_expected_explained =
   let { ty = ty_expected; explanation } = ty_expected_explained in
   let loc = sexp.pexp_loc in
@@ -7318,7 +7235,7 @@ and type_expect_
   match sexp.pexp_desc with
   | Pexp_ident lid ->
       let path, actual_mode, layout_args, desc, kind =
-        type_ident env ~recarg lid
+        type_ident env ~recarg ~is_applied lid
       in
       let exp_desc =
         match desc.val_kind with
@@ -7645,7 +7562,7 @@ and type_expect_
         let funct =
           with_local_level_generalize_structure_if_principal
             ~before_generalize:generalize_structure_exp
-            (fun () -> type_exp env funct_expected_mode sfunct)
+            (fun () -> type_exp ~is_applied:true env funct_expected_mode sfunct)
         in
         let ty = instance funct.exp_type in
         let rt = wrap_trace_gadt_instances env (ret_tvar TypeSet.empty) ty in
@@ -7682,9 +7599,9 @@ and type_expect_
       in
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
-      let mode_ret =
-        cross_left env ty_ret (with_locality_as_regionality mode_ret)
-      in
+      let mode_ret = cross_left env ty_ret (with_locality_as_regionality mode_ret) in
+      Typeallocation.register_zero_alloc_application_allocation ~env
+        ~pos:pm.apply_position funct args mode_ret;
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -8472,7 +8389,7 @@ and type_expect_
          registration is currently redundant -- [Env.lookup_class] above
          already walks the locks and forces enclosing closures to [alloc] --
          but we register it anyway so every allocation site is covered. *)
-      register_allocation_mode ~env ~loc
+      Typeallocation.register_allocation_mode ~env ~loc
         (Locality.disallow_left Locality.legacy);
       With_regionality.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
         cl_mode With_regionality.legacy;
@@ -8521,7 +8438,7 @@ and type_expect_
   | Pexp_override lst ->
       submode ~loc ~env With_regionality.legacy expected_mode;
       (* Allocation axis check: [{< ... >}] copies [self], which allocates *)
-      register_allocation_mode ~env ~loc
+      Typeallocation.register_allocation_mode ~env ~loc
         (Locality.disallow_left Locality.legacy);
       let _ =
        List.fold_right
@@ -8664,7 +8581,8 @@ and type_expect_
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
       (* Allocation axis check: constructing a lazy block allocates *)
-      register_allocation_mode ~env ~loc (Locality.disallow_left Locality.legacy);
+      Typeallocation.register_allocation_mode ~env ~loc
+        (Locality.disallow_left Locality.legacy);
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
@@ -8678,7 +8596,8 @@ and type_expect_
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env With_regionality.legacy expected_mode;
       (* Allocation axis check: constructing an object block allocates *)
-      register_allocation_mode ~env ~loc (Locality.disallow_left Locality.legacy);
+      Typeallocation.register_allocation_mode ~env ~loc
+        (Locality.disallow_left Locality.legacy);
       let desc, meths = !type_object env loc s in
       rue {
         exp_desc = Texp_object (desc, meths);
@@ -9566,7 +9485,7 @@ and type_newtype
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
 
-and type_ident env ?(recarg=Rejected) lid =
+and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
   let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
@@ -9606,12 +9525,10 @@ and type_ident env ?(recarg=Rejected) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  (* CR shsong: the allocation axis is treated conservatively here -- any value
-     referenced at [alloc] (in particular every primitive) forces the enclosing
-     closures to [alloc], even when no allocation actually happens. *)
+  let relax_mode = Typeallocation.relax_alloc desc ~is_applied mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
-      (mode, locks)
+      (relax_mode, locks)
   in
   (* We need to cross again, because the monadic fragment might have been
   weakened by the locks. Ideally, the first crossing only deals with comonadic,
@@ -9635,38 +9552,31 @@ and type_ident env ?(recarg=Rejected) lid =
   end;
   let layout_args, val_type, kind =
     match desc.val_kind with
-    (* Allocation axis: only [Val_prim] can allocate merely by being referenced
-       (the primitive's result). We register an allocation whenever one may
-       happen, not only for poly results as an optimization hint. *)
-    (* CR shsong: this check is currently masked by [walk_locks] above, which
-       already treats every primitive as [alloc]. *)
     | Val_prim prim ->
        if not @@ Lpoly.is_empty_exn desc.val_lpoly then
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
-       (* Poly result: register an allocation at the result's locality. *)
+       (* Optimization only (Allocation axis do not rely on this
+          register_allocation_mode to guarantee soundness):
+          if the locality of returned value of the primitive is poly
+          we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           let mode = Locality.disallow_left mode in
-           register_allocation_mode ~env ~loc:lid.loc mode
-       (* Unreachable: a poly result implies [mode = Some]. Conservatively
-          register a heap allocation rather than silently skip it. *)
-       | (Prim_poly, _), None
-       (* Global result: register a heap allocation. *)
-       | (Prim_global, _), _
-         ->
-           register_allocation_mode ~env ~loc:lid.loc
-             (Locality.disallow_left Locality.legacy)
-       (* Local result: a stack allocation, which does not count on the
-          allocation axis. *)
-       | (Prim_local, _), _ -> ()
+           Typeallocation.register_mode_for_optimisation
+             (lid.loc, Ident {category = Value; lid = lid.txt})
+             mode
+       | _ -> ()
        end;
+       (* Non-arrow type primitives that trigger allocation when
+          referenced are considered [noalloc_strict] by mode crossing,
+          so we manually register allocation for them. *)
+       if Translprim.non_arrow_prim_allocates lid.loc prim then
+         Typeallocation.register_allocation_mode ~env ~loc:lid.loc Locality.legacy;
        let yielding =
          prim_params_yielding env ty ~arity:prim.prim_arity
        in
-       [], ty,
-       Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
+       [], ty, Id_prim (mode, sort, yielding)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
        begin match lvars with
@@ -11101,7 +11011,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
   let locality_mode, value_mode =
-    register_allocation_value_mode ~env ~loc expected_mode.mode
+    Typeallocation.register_allocation_value_mode ~env ~loc expected_mode.mode
   in
   let argument_mode =
     value_mode
@@ -11132,7 +11042,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
           List.map (fun (mode, _) ->
-            snd (register_allocation_value_mode ~env ~loc mode)) tuple_modes
+            snd (Typeallocation.register_allocation_value_mode ~env ~loc mode))
+            tuple_modes
         in
         let argument_mode =
           With_regionality.meet
@@ -12467,43 +12378,14 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode
-    ~loc
-    ~env
-    ~(modes : With_locality.Const.Option.t)
-    expected_mode =
-    let min =
-      With_locality.Const.Option.value
-        ~default:With_locality.Const.min
-        modes
-      |> Const.with_locality_as_regionality
-    in
-    let max =
-      With_locality.Const.Option.value
-        ~default:With_locality.Const.max
-        modes
-      |> Const.with_locality_as_regionality
-    in
-    submode
-      ~loc
-      ~env
-      ~reason:Other
-      (With_regionality.of_const
-         min)
-      expected_mode;
-    let expected_mode =
-      mode_coerce
-        (With_regionality.of_const
-           max)
-        expected_mode
-    in
-    let expected_mode =
-      match modes.areality with
-      | Some Local -> mode_strictly_local expected_mode
-      | _ -> expected_mode
-    in
-    let expected_mode = mode_alloc_annot expected_mode modes.allocation in
-    expected_mode
+and type_expect_mode ~loc ~env ~(modes : With_locality.Const.Option.t) expected_mode =
+    let min = With_locality.Const.Option.value ~default:With_locality.Const.min modes |> Const.with_locality_as_regionality in
+    let max = With_locality.Const.Option.value ~default:With_locality.Const.max modes |> Const.with_locality_as_regionality in
+    submode ~loc ~env ~reason:Other (With_regionality.of_const min) expected_mode;
+    let expected_mode = mode_coerce (With_regionality.of_const max) expected_mode in
+    match modes.areality with
+    | Some Local -> mode_strictly_local expected_mode
+    | _ -> expected_mode
 
 and type_n_ary_function
       ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
@@ -12809,7 +12691,8 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
   (* Allocation axis check: comprehension expr allocates *)
-  register_allocation_mode ~env ~loc (Locality.disallow_left Locality.legacy);
+  Typeallocation.register_allocation_mode ~env ~loc
+    (Locality.disallow_left Locality.legacy);
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
      ; exp_extra      = []

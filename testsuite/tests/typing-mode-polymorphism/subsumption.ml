@@ -149,7 +149,7 @@ module Bounded_self :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> dynamic]
+    val tick : unit -> int @ [> dynamic] @@ noalloc_strict
   end
 |}, Principal{|
 module Bounded_self :
@@ -163,7 +163,8 @@ module Bounded_self :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> aliased stateful dynamic alloc]
+    val tick : unit -> int @ [> aliased stateful dynamic alloc] @@
+      noalloc_strict
   end
 |}]
 
@@ -192,7 +193,7 @@ module Bounded_restruct :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> dynamic]
+    val tick : unit -> int @ [> dynamic] @@ noalloc_strict
   end
 |}, Principal{|
 module Bounded_restruct :
@@ -206,7 +207,8 @@ module Bounded_restruct :
       stateless
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] @@
       stateless
-    val tick : unit -> int @ [> aliased stateful dynamic alloc]
+    val tick : unit -> int @ [> aliased stateful dynamic alloc] @@
+      noalloc_strict
   end
 |}]
 
