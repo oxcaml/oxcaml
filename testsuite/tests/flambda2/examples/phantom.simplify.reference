@@ -104,7 +104,7 @@ let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
   let Pfield_1 = %block_load.mut.[`3`] (Pfield) in
   cont k (Pfield_1)
 in
-let $camlPhantom__is_false_8 =
+let $camlPhantom__is_false_7 =
   closure is_false_2_1 @is_false &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
@@ -115,7 +115,7 @@ let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
   let Pfield = %block_load.mut.[`3`] (a) in
   cont k (Pfield)
 in
-let $camlPhantom__is_true_7 =
+let $camlPhantom__is_true_6 =
   closure is_true_1_1 @is_true &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
@@ -130,8 +130,8 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       let eval_level = closure eval_level_3_1 @eval_level &my_alloc_region
       with {
         UndecidedLit_1 = UndecidedLit;
-        is_true = $camlPhantom__is_true_7;
-        is_false = $camlPhantom__is_false_8
+        is_true = $camlPhantom__is_true_6;
+        is_false = $camlPhantom__is_false_7
       }
       in
       let true_at_level0 =
@@ -141,14 +141,14 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       let Pmakeblock =
         %block.[`0`].my_alloc_region
           (UndecidedLit,
-           $camlPhantom__is_true_7,
-           $camlPhantom__is_false_8,
+           $camlPhantom__is_true_6,
+           $camlPhantom__is_false_7,
            eval_level,
            true_at_level0)
       in
       cont k (Pmakeblock)
 in
-let $camlPhantom__Make_6 = closure Make_0_1 @Make &toplevel.alloc_region in
+let $camlPhantom__Make_5 = closure Make_0_1 @Make &toplevel.alloc_region in
 let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
       true_at_level0_4_2 (st, a : val)
         my_closure &my_alloc_region my_depth
@@ -248,8 +248,8 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
       let eval_level = closure eval_level_3_2 @eval_level &my_alloc_region
       with {
         UndecidedLit_1 = UndecidedLit;
-        is_true = $camlPhantom__is_true_7;
-        is_false = $camlPhantom__is_false_8
+        is_true = $camlPhantom__is_true_6;
+        is_false = $camlPhantom__is_false_7
       }
       in
       let true_at_level0 =
@@ -259,14 +259,14 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
       let Pmakeblock =
         %block.[`0`].my_alloc_region
           (UndecidedLit,
-           $camlPhantom__is_true_7,
-           $camlPhantom__is_false_8,
+           $camlPhantom__is_true_6,
+           $camlPhantom__is_false_7,
            eval_level,
            true_at_level0)
       in
       cont k (Pmakeblock)
 in
-let $camlPhantom__Make2_9 = closure Make2_5_1 @Make2 &toplevel.alloc_region
+let $camlPhantom__Make2_8 = closure Make2_5_1 @Make2 &toplevel.alloc_region
 in
-let $camlPhantom = Block 0 ($camlPhantom__Make_6, $camlPhantom__Make2_9) in
+let $camlPhantom = Block 0 ($camlPhantom__Make_5, $camlPhantom__Make2_8) in
 cont done ($camlPhantom)

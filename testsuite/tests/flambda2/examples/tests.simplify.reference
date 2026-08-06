@@ -7,7 +7,7 @@ let code inline(always) loopify(never) size(1) newer_version_of(to_inline_0)
         : imm tagged =
   cont k (42)
 in
-let $camlTests__to_inline_2 =
+let $camlTests__to_inline_1 =
   closure to_inline_0_1 @to_inline &toplevel.alloc_region
 in
 let code loopify(never) size(22) newer_version_of(f_1)
@@ -30,6 +30,6 @@ let code loopify(never) size(22) newer_version_of(f_1)
         | 0 -> k (42)
         | 1 -> k (1)
 in
-let $camlTests__f_3 = closure f_1_1 @f &toplevel.alloc_region in
-let $camlTests = Block 0 ($camlTests__to_inline_2, $camlTests__f_3) in
+let $camlTests__f_2 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlTests = Block 0 ($camlTests__to_inline_1, $camlTests__f_2) in
 cont done ($camlTests)

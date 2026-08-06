@@ -9,7 +9,7 @@ let code inline(always) loopify(never) size(4) newer_version_of(of_src_0)
   let Pisint = %tag_imm (prim) in
   cont k (Pisint)
 in
-let $camlIs_int_2020_07_21__of_src_2 =
+let $camlIs_int_2020_07_21__of_src_1 =
   closure of_src_0_1 @of_src &toplevel.alloc_region
 in
 let code loopify(never) size(28) newer_version_of(test_1)
@@ -32,10 +32,10 @@ let code loopify(never) size(28) newer_version_of(test_1)
     where k2 (dst : imm tagged) =
       apply &my_alloc_region g (dst) -> k * k1
 in
-let $camlIs_int_2020_07_21__test_3 =
+let $camlIs_int_2020_07_21__test_2 =
   closure test_1_1 @test &toplevel.alloc_region
 in
 let $camlIs_int_2020_07_21 =
-  Block 0 ($camlIs_int_2020_07_21__of_src_2, $camlIs_int_2020_07_21__test_3)
+  Block 0 ($camlIs_int_2020_07_21__of_src_1, $camlIs_int_2020_07_21__test_2)
 in
 cont done ($camlIs_int_2020_07_21)

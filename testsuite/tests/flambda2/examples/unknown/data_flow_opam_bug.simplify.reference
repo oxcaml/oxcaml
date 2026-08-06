@@ -14,9 +14,9 @@ let code loopify(never) size(11) newer_version_of(to_string_0)
       let is_int = 0i in
       cont k (f)
 in
-let $camlData_flow_opam_bug__to_string_1 =
+let $camlData_flow_opam_bug__to_string_2 =
   closure to_string_0_1 @to_string &toplevel.alloc_region
 in
-let $camlData_flow_opam_bug = Block 0 ($camlData_flow_opam_bug__to_string_1)
+let $camlData_flow_opam_bug = Block 0 ($camlData_flow_opam_bug__to_string_2)
 in
 cont done ($camlData_flow_opam_bug)

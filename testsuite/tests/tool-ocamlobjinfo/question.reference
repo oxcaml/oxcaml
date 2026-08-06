@@ -51,8 +51,8 @@ Typing env:
      (Variant
       (blocks (alloc_mode Heap)
        (known
-        {(tag_0 => (Known 1), ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1[0m[38;5;111;1m[0m))))})))))
-   ([0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1[0m[38;5;111;1m[0m
+        {(tag_0 => (Known 1), ((Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1_1[0m[38;5;111;1m[0m))))})))))
+   ([0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1_1[0m[38;5;111;1m[0m
     (Val!  (alloc_mode Heap)
      (known
       {([0m[38;5;31;1m(answer/0 ∷ [0m[38;5;37;1m𝕍[0m[38;5;31;1m)[0m
@@ -63,7 +63,7 @@ Typing env:
              (rec_info (Rec_info [0m[38;5;249;1m0[0m))))})
          (closure_types
           ((function_slot_components_by_index
-            {([0m[38;5;31;1m(answer/0 ∷ [0m[38;5;37;1m𝕍[0m[38;5;31;1m)[0m (Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1[0m[38;5;111;1m[0m)))})))
+            {([0m[38;5;31;1m(answer/0 ∷ [0m[38;5;37;1m𝕍[0m[38;5;31;1m)[0m (Val ([0m[38;5;160;1m=[0m [0m[38;5;111;1m[0m[38;5;98;1mQuestion.camlQuestion__answer_1_1[0m[38;5;111;1m[0m)))})))
          (value_slot_types ((value_slot_components_by_index {})))))})))})
  (aliases
   ((canonical_elements {}) (aliases_of_canonical_names {})

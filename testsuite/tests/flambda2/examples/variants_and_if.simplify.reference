@@ -27,9 +27,9 @@ apply ccall noalloc
             | 0 -> k (2)
             | 1 -> k (1)
     in
-    let $camlVariants_and_if__f_1 = closure f_0_1 @f &toplevel.alloc_region
+    let $camlVariants_and_if__f_2 = closure f_0_1 @f &toplevel.alloc_region
     in
     let $camlVariants_and_if =
-      Block 0 ($camlVariants_and_if__Foo_1, $camlVariants_and_if__f_1)
+      Block 0 ($camlVariants_and_if__Foo_1, $camlVariants_and_if__f_2)
     in
     cont done ($camlVariants_and_if)

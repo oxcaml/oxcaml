@@ -21,7 +21,7 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
   where k (foo : imm tagged) =
     let foo_1 = foo in
     let set_of_closures
-          $camlSymbol_projections4__f_3 =
+          $camlSymbol_projections4__f_1 =
           closure f_0_1 @f &toplevel.alloc_region
           with { foo = foo }
         end
@@ -36,16 +36,16 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
          | 1 -> k3)
         where k3 =
           let Pmakeblock =
-            %block.[`0`].my_alloc_region (x, $camlSymbol_projections4__g_5)
+            %block.[`0`].my_alloc_region (x, $camlSymbol_projections4__g_3)
           in
           cont k (Pmakeblock)
         where k2 =
           let Pmakeblock =
-            %block.[`0`].my_alloc_region (x, $camlSymbol_projections4__h_4)
+            %block.[`0`].my_alloc_region (x, $camlSymbol_projections4__h_2)
           in
           cont k (Pmakeblock)
     and set_of_closures
-          $camlSymbol_projections4__h_4 =
+          $camlSymbol_projections4__h_2 =
           closure h_1_1 @h &toplevel.alloc_region
           with { foo_1 = foo_1 }
         end
@@ -55,7 +55,7 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
             -> k * k1
             : imm tagged =
       let foo_2 =
-        %project_value_slot.[h].[foo_1] ($camlSymbol_projections4__h_4)
+        %project_value_slot.[h].[foo_1] ($camlSymbol_projections4__h_2)
       in
       (let untagged = %untag_imm (foo_2) in
        switch untagged
@@ -66,7 +66,7 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
           let int_add_1 = %int_barith.add (int_add, y) in
           cont k (int_add_1)
     and set_of_closures
-          $camlSymbol_projections4__g_5 =
+          $camlSymbol_projections4__g_3 =
           closure g_2_1 @g &toplevel.alloc_region
           with { foo_2 = foo_1 }
         end
@@ -76,7 +76,7 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
             -> k * k1
             : imm tagged =
       let foo_2 =
-        %project_value_slot.[g].[foo_2] ($camlSymbol_projections4__g_5)
+        %project_value_slot.[g].[foo_2] ($camlSymbol_projections4__g_3)
       in
       (let untagged = %untag_imm (foo_2) in
        switch untagged
@@ -87,6 +87,6 @@ let $camlSymbol_projections4__immstring_0 = "FOO" in
           cont k (int_add)
     in
     let $camlSymbol_projections4 =
-      Block 0 (foo, $camlSymbol_projections4__f_3)
+      Block 0 (foo, $camlSymbol_projections4__f_1)
     in
     cont done ($camlSymbol_projections4)

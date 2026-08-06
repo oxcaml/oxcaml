@@ -33,7 +33,7 @@ let code loopify(done) size(16) newer_version_of(length_aux_0)
            let int_add = %int_barith.add (len_1, 1) in
            cont `self` (int_add, Pfield))
 in
-let $camlTests9__length_aux_12 =
+let $camlTests9__length_aux_3 =
   closure length_aux_0_1 @length_aux &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(length_1)
@@ -42,10 +42,9 @@ let code loopify(never) size(4) newer_version_of(length_1)
         -> k * k1
         : imm tagged =
   apply direct(length_aux_0_1 &my_alloc_region)
-    ($camlTests9__length_aux_12 : _ -> imm tagged) (0, l) -> k * k1
+    ($camlTests9__length_aux_3 : _ -> imm tagged) (0, l) -> k * k1
 in
-let $camlTests9__length_13 =
-  closure length_1_1 @length &toplevel.alloc_region
+let $camlTests9__length_4 = closure length_1_1 @length &toplevel.alloc_region
 in
 let code loopify(done) size(22) newer_version_of(rev_append_2)
       rev_append_2_1
@@ -68,7 +67,7 @@ let code loopify(done) size(22) newer_version_of(rev_append_2)
            let Pfield_1 = %block_load.[`1`] (l1_1) in
            cont `self` (Pfield_1, Pmakeblock))
 in
-let $camlTests9__rev_append_14 =
+let $camlTests9__rev_append_5 =
   closure rev_append_2_1 @rev_append &toplevel.alloc_region
 in
 let code loopify(done) size(28) newer_version_of(chop_3)
@@ -95,7 +94,7 @@ let code loopify(done) size(28) newer_version_of(chop_3)
                 let int_sub = %int_barith.sub (k_1, 1) in
                 cont `self` (int_sub, Pfield)))
 in
-let $camlTests9__chop_15 = closure chop_3_1 @chop &toplevel.alloc_region in
+let $camlTests9__chop_6 = closure chop_3_1 @chop &toplevel.alloc_region in
 let code loopify(done) size(90) newer_version_of(rev_merge_5)
       rev_merge_5_1
         (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
@@ -116,7 +115,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
          | 1 -> k3
          where k3 =
            apply direct(rev_append_2_1 &my_alloc_region)
-             ($camlTests9__rev_append_14
+             ($camlTests9__rev_append_5
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                (l2_1, accu_1)
                -> k * k1
@@ -127,7 +126,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
               | 1 -> k3
               where k3 =
                 apply direct(rev_append_2_1 &my_alloc_region)
-                  ($camlTests9__rev_append_14
+                  ($camlTests9__rev_append_5
                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                     (l1_1, accu_1)
                     -> k * k1
@@ -183,7 +182,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
          | 1 -> k3
          where k3 =
            apply direct(rev_append_2_1 &my_alloc_region)
-             ($camlTests9__rev_append_14
+             ($camlTests9__rev_append_5
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                (l2_1, accu_1)
                -> k * k1
@@ -194,7 +193,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
               | 1 -> k3
               where k3 =
                 apply direct(rev_append_2_1 &my_alloc_region)
-                  ($camlTests9__rev_append_14
+                  ($camlTests9__rev_append_5
                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                     (l1_1, accu_1)
                     -> k * k1
@@ -613,7 +612,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
       let n1 = %int_shift.asr (n, 1i) in
       let n2 = %int_barith.sub (n, n1) in
       (apply direct(chop_3_1 &my_alloc_region)
-         ($camlTests9__chop_15
+         ($camlTests9__chop_6
           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
            (n1, l)
            -> k2 * k1
@@ -1019,7 +1018,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
       let n1 = %int_shift.asr (n, 1i) in
       let n2 = %int_barith.sub (n, n1) in
       (apply direct(chop_3_1 &my_alloc_region)
-         ($camlTests9__chop_15
+         ($camlTests9__chop_6
           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
            (n1, l)
            -> k2 * k1
@@ -1049,23 +1048,23 @@ let code loopify(never) size(1411) newer_version_of(sort_uniq_4)
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
   let rev_merge = closure rev_merge_5_1 @rev_merge &my_alloc_region
-  with { rev_append_1 = $camlTests9__rev_append_14; cmp = cmp }
+  with { rev_append_1 = $camlTests9__rev_append_5; cmp = cmp }
   in
   let rev_merge_rev =
     closure rev_merge_rev_6_1 @rev_merge_rev &my_alloc_region
-  with { rev_append = $camlTests9__rev_append_14; cmp_1 = cmp }
+  with { rev_append = $camlTests9__rev_append_5; cmp_1 = cmp }
   in
   let sort = closure sort_7_1 @sort &my_alloc_region
   and rev_sort = closure rev_sort_8_1 @rev_sort &my_alloc_region
   with {
-    chop = $camlTests9__chop_15;
+    chop = $camlTests9__chop_6;
     cmp_2 = cmp;
     rev_merge = rev_merge;
     rev_merge_rev = rev_merge_rev
   }
   in
   apply direct(length_aux_0_1 &my_alloc_region) inlining_state(depth(10))
-    ($camlTests9__length_aux_12 : _ -> imm tagged) (0, l) -> k2 * k1
+    ($camlTests9__length_aux_3 : _ -> imm tagged) (0, l) -> k2 * k1
     where k2 (len : imm tagged) =
       let prim = %int_comp.lt (len, 2) in
       (switch prim
@@ -1077,7 +1076,7 @@ let code loopify(never) size(1411) newer_version_of(sort_uniq_4)
                (len, l)
                -> k * k1)
 in
-let $camlTests9__sort_uniq_16 =
+let $camlTests9__sort_uniq_7 =
   closure sort_uniq_4_1 @sort_uniq &toplevel.alloc_region
 in
 let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
@@ -1153,13 +1152,13 @@ let code loopify(never) size(98) newer_version_of(foo_9)
   apply direct(sort_10_1 &my_alloc_region)
     (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) (42, l) -> k * k1
 in
-let $camlTests9__foo_17 = closure foo_9_1 @foo &toplevel.alloc_region in
+let $camlTests9__foo_8 = closure foo_9_1 @foo &toplevel.alloc_region in
 let $camlTests9 =
-  Block 0 ($camlTests9__length_aux_12,
-           $camlTests9__length_13,
-           $camlTests9__rev_append_14,
-           $camlTests9__chop_15,
-           $camlTests9__sort_uniq_16,
-           $camlTests9__foo_17)
+  Block 0 ($camlTests9__length_aux_3,
+           $camlTests9__length_4,
+           $camlTests9__rev_append_5,
+           $camlTests9__chop_6,
+           $camlTests9__sort_uniq_7,
+           $camlTests9__foo_8)
 in
 cont done ($camlTests9)

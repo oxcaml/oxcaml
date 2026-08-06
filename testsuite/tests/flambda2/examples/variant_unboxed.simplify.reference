@@ -66,7 +66,7 @@ let code loopify(never) size(47) newer_version_of(foo_0)
            in
            cont k (int_add))
 in
-let $camlVariant_unboxed__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region
+let $camlVariant_unboxed__foo_3 = closure foo_0_1 @foo &toplevel.alloc_region
 in
-let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_1) in
+let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_3) in
 cont done ($camlVariant_unboxed)
