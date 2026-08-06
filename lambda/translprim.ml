@@ -262,6 +262,8 @@ let bigstring_checks ~unsafe ~aligned size =
     Some (~len, ~align)
 
 let indexing_primitives =
+  lazy
+    (
   let types_and_widths =
     [
       ( Printf.sprintf "%%caml_bigstring_geti8%s%s%s",
@@ -501,9 +503,11 @@ let indexing_primitives =
    let arity = if String.is_substring string ~substring:"get" then 2 else 3 in
    [ (string, fun ~mode -> Primitive (primitive ~mode, arity)) ])
   |> List.to_seq
-  |> String.Map.of_seq
+  |> String.Map.of_seq)
 
 let array_vec_primitives =
+  lazy
+    (
   let array_types_and_primitives =
     [
       ("floatarray",
@@ -592,7 +596,7 @@ let array_vec_primitives =
       fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
    ])
   |> List.to_seq
-  |> String.Map.of_seq
+  |> String.Map.of_seq)
 
 (* Resolve a primitive according to its name. The return value is unspecialized
    in the sense that the array kind in the various primitives that deal with
@@ -1247,10 +1251,10 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%peek" -> Peek None
     | "%poke" -> Poke None
     | s when String.length s > 0 && s.[0] = '%' ->
-      (match String.Map.find_opt s indexing_primitives with
+      (match String.Map.find_opt s (Lazy.force indexing_primitives) with
        | Some prim -> prim ~mode
        | None ->
-         match String.Map.find_opt s array_vec_primitives with
+         match String.Map.find_opt s (Lazy.force array_vec_primitives) with
          | Some prim -> prim ~mode
          | None ->
            match Scalar.Operation.With_percent_prefix.of_string s with
