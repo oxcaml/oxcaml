@@ -558,8 +558,8 @@ val f :
   string ->
   'd @ local ->
   'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
-  int array * string * (int -> (int -> int) @ local) *
-  (int -> (int -> int) @ local) @ local contended = <fun>
+  int array * string * (int -> int -> int) * (int -> int -> int) @ local
+  contended = <fun>
 |}]
 
 let f1 (_ @ local) = ()
