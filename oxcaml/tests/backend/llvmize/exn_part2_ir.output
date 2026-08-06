@@ -897,7 +897,7 @@ L1:
 L234:
   %7 = load i64, ptr %4
   store i64 %7, ptr %5
-  %8 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
+  %8 = ptrtoint ptr @camlExn_part2__Exn3235_5 to i64
   store i64 %8, ptr %6
   %9 = load i64, ptr %6
   store i64 %9, ptr %4
@@ -1420,7 +1420,7 @@ L244:
   store i64 1, ptr %68
   %328 = load i64, ptr %68
   store i64 %328, ptr %69
-  %329 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
+  %329 = ptrtoint ptr @camlExn_part2__Exn3235_5 to i64
   store i64 %329, ptr %70
   %330 = load i64, ptr %18
   %331 = load i64, ptr %70
@@ -1988,7 +1988,7 @@ L436:
   store ptr addrspace(1) %26, ptr %9
   %27 = load ptr addrspace(1), ptr %9
   store ptr addrspace(1) %27, ptr %10
-  %28 = ptrtoint ptr @camlExn_part2__Exn3235 to i64
+  %28 = ptrtoint ptr @camlExn_part2__Exn3235_5 to i64
   store i64 %28, ptr %11
   %29 = load ptr addrspace(1), ptr %11
   %30 = getelementptr i8, ptr addrspace(1) %29, i64 8
@@ -2063,29 +2063,29 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
   ret { { i64, i64 }, { i64 } } %5
 }
 
-@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3235, i64 0 }, section ".data", align 8
+@camlExn_part2__gc_roots = global { ptr, i64 } { ptr @camlExn_part2__Exn3235_5, i64 0 }, section ".data", align 8
 @header.camlExn_part2 = global i64 11008, section ".data", align 8
-@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3235, ptr @camlExn_part2__catch_exn1_from_llvm_0_5, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_1_6, ptr @camlExn_part2__catch_exn1_nested_from_llvm_2_7, ptr @camlExn_part2__raise_1_3_8, ptr @camlExn_part2__raise_2_4_9, ptr @camlExn_part2__raise_3_5_10, ptr @camlExn_part2__complicated_6_11, ptr @camlExn_part2__raise_in_loop_7_12, ptr @camlExn_part2__catch_wildcard_HIDE_STAMP }, section ".data", align 8
+@camlExn_part2 = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlExn_part2__Exn3235_5, ptr @camlExn_part2__catch_exn1_from_llvm_0_6, ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_1_7, ptr @camlExn_part2__catch_exn1_nested_from_llvm_2_8, ptr @camlExn_part2__raise_1_3_9, ptr @camlExn_part2__raise_2_4_10, ptr @camlExn_part2__raise_3_5_11, ptr @camlExn_part2__complicated_6_12, ptr @camlExn_part2__raise_in_loop_7_13, ptr @camlExn_part2__catch_wildcard_HIDE_STAMP }, section ".data", align 8
 @header.camlExn_part2__catch_wildcard_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__catch_wildcard_8_13 = global { ptr, i64 } { ptr @camlExn_part2__catch_wildcard_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__catch_wildcard_8_14 = global { ptr, i64 } { ptr @camlExn_part2__catch_wildcard_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_in_loop_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__raise_in_loop_7_12 = global { ptr, i64 } { ptr @camlExn_part2__raise_in_loop_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__raise_in_loop_7_13 = global { ptr, i64 } { ptr @camlExn_part2__raise_in_loop_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__complicated_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__complicated_6_11 = global { ptr, i64 } { ptr @camlExn_part2__complicated_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__complicated_6_12 = global { ptr, i64 } { ptr @camlExn_part2__complicated_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_3_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__raise_3_5_10 = global { ptr, i64 } { ptr @camlExn_part2__raise_3_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__raise_3_5_11 = global { ptr, i64 } { ptr @camlExn_part2__raise_3_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_2_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__raise_2_4_9 = global { ptr, i64 } { ptr @camlExn_part2__raise_2_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__raise_2_4_10 = global { ptr, i64 } { ptr @camlExn_part2__raise_2_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_1_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlExn_part2__raise_1_3_8 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlExn_part2__raise_1_HIDE_STAMP }, section ".data", align 8
+@camlExn_part2__raise_1_3_9 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlExn_part2__raise_1_HIDE_STAMP }, section ".data", align 8
 @header.camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__catch_exn1_nested_from_llvm_2_7 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__catch_exn1_nested_from_llvm_2_8 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_nested_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__raise_exn1_catch_exn2_from_llvm_1_6 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlExn_part2__raise_exn1_catch_exn2_from_llvm_1_7 = global { ptr, i64 } { ptr @camlExn_part2__raise_exn1_catch_exn2_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlExn_part2__catch_exn1_from_llvm_0_5 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlExn_part2__Exn3235 = global i64 3064, section ".data", align 8
-@camlExn_part2__Exn3235 = global { ptr, i64 } { ptr @camlExn_part2__immstring_0, i64 1 }, section ".data", align 8
+@camlExn_part2__catch_exn1_from_llvm_0_6 = global { ptr, i64 } { ptr @camlExn_part2__catch_exn1_from_llvm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlExn_part2__Exn3235_5 = global i64 3064, section ".data", align 8
+@camlExn_part2__Exn3235_5 = global { ptr, i64 } { ptr @camlExn_part2__immstring_0, i64 1 }, section ".data", align 8
 @header.camlExn_part2__immstring_0 = global i64 3068, section ".data", align 8
 @camlExn_part2__immstring_0 = global { [ 14 x i8 ], [ 1 x i8 ], i8 } { [ 14 x i8 ] c"\45\78\6e\5f\70\61\72\74\32\2e\45\78\6e\33", [ 1 x i8 ] zeroinitializer, i8 1 }, section ".data", align 8
 @header.camlExn_part2__immstring_4 = global i64 2044, section ".data", align 8

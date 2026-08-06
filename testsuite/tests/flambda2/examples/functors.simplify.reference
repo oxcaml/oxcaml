@@ -82,7 +82,7 @@ apply direct(init_mod_4 &toplevel.alloc_region)
            let $camlFunctors__Pmakeblock_9 = Block 0 ($camlFunctors__foo_8)
            in
            apply direct(update_mod_7 &toplevel.alloc_region)
-             ($CamlinternalMod.camlCamlinternalMod__update_mod_7_14
+             ($CamlinternalMod.camlCamlinternalMod__update_mod_7_15
               : _ -> imm tagged)
                ($camlFunctors__const_block_3, M0, $camlFunctors__Pmakeblock_9)
                -> k1 * error
@@ -95,7 +95,7 @@ apply direct(init_mod_4 &toplevel.alloc_region)
                    let Pfield = %block_load.[`2`] (include) in
                    let $camlFunctors__Pmakeblock_10 = Block 0 (Pfield) in
                    (apply direct(update_mod_7 &toplevel.alloc_region)
-                      ($CamlinternalMod.camlCamlinternalMod__update_mod_7_14
+                      ($CamlinternalMod.camlCamlinternalMod__update_mod_7_15
                        : _ -> imm tagged)
                         ($camlFunctors__const_block_3,
                          M,
