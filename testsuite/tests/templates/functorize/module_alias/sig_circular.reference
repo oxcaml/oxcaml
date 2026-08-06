@@ -3,5 +3,5 @@ module Mod_b : sig module Mod_a_alias = DEP__Lib__.Mod_a end
 module Mod_a :
   sig
     module Mod_b_alias = DEP__Lib__.Mod_b
-    val foo : P_int.t -> string @@ portable
+    val foo : P_int.t -> string @@ portable noalloc_strict
   end
