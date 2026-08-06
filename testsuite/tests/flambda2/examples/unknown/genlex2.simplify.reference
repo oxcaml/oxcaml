@@ -8,10 +8,10 @@ apply ccall noalloc
       Block immutable_unique
       248 ($camlGenlex2__immstring_0, Pccall)
     in
-    let $camlGenlex2__Pmakeblock_4 =
+    let $camlGenlex2__Pmakeblock_5 =
       Block 0 ($camlGenlex2__Error_2, $camlGenlex2__immstring_1)
     in
-    let $camlGenlex2__Pmakeblock_3 =
+    let $camlGenlex2__Pmakeblock_4 =
       Block 0 ($camlGenlex2__Error_2, $camlGenlex2__immstring_1)
     in
     let code loopify(never) size(45) newer_version_of(foo_0)
@@ -41,11 +41,11 @@ apply ccall noalloc
                in
                switch prim_1
                  | 0 -> k1 pop(reraise k1) (`exn`)
-                 | 1 -> k1 pop(regular k1) ($camlGenlex2__Pmakeblock_3)
+                 | 1 -> k1 pop(regular k1) ($camlGenlex2__Pmakeblock_4)
              where k2 =
-               cont k1 pop(regular k1) ($camlGenlex2__Pmakeblock_4))
+               cont k1 pop(regular k1) ($camlGenlex2__Pmakeblock_5))
     in
-    let $camlGenlex2__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region in
-    let $camlGenlex2 = Block 0 ($camlGenlex2__Error_2, $camlGenlex2__foo_1)
+    let $camlGenlex2__foo_3 = closure foo_0_1 @foo &toplevel.alloc_region in
+    let $camlGenlex2 = Block 0 ($camlGenlex2__Error_2, $camlGenlex2__foo_3)
     in
     cont done ($camlGenlex2)

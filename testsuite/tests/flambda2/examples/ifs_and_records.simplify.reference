@@ -34,7 +34,7 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_desired_0)
       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_desired_18 =
+let $camlIfs_and_records__help_desired_1 =
   closure help_desired_0_1 @help_desired &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_1)
@@ -51,7 +51,7 @@ let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_1)
       let Pmakeblock = %block.[`0`].my_alloc_region (a_1, b_1) in
       cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_wrap_19 =
+let $camlIfs_and_records__help_wrap_2 =
   closure help_wrap_1_1 @help_wrap &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(27) newer_version_of(help_variant_2)
@@ -71,7 +71,7 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_variant_2)
       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_variant_20 =
+let $camlIfs_and_records__help_variant_3 =
   closure help_variant_2_1 @help_variant &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_variant_3)
@@ -88,7 +88,7 @@ let code inline(always) loopify(never) size(19) newer_version_of(help_wrap_varia
       let Pmakeblock = %block.[`0`].my_alloc_region (a_1, b_1) in
       cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_wrap_variant_21 =
+let $camlIfs_and_records__help_wrap_variant_4 =
   closure help_wrap_variant_3_1 @help_wrap_variant &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(27) newer_version_of(help_tuple_4)
@@ -107,7 +107,7 @@ let code inline(always) loopify(never) size(27) newer_version_of(help_tuple_4)
       let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
       cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_tuple_22 =
+let $camlIfs_and_records__help_tuple_5 =
   closure help_tuple_4_1 @help_tuple &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(30) newer_version_of(help_interior_if_5)
@@ -131,7 +131,7 @@ let code inline(always) loopify(never) size(30) newer_version_of(help_interior_i
            in
            cont k (Pmakeblock))
 in
-let $camlIfs_and_records__help_interior_if_23 =
+let $camlIfs_and_records__help_interior_if_6 =
   closure help_interior_if_5_1 @help_interior_if &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_6)
@@ -142,7 +142,7 @@ let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_6)
   let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
   cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_no_if_24 =
+let $camlIfs_and_records__help_no_if_7 =
   closure help_no_if_6_1 @help_no_if &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_tuple_7)
@@ -153,7 +153,7 @@ let code inline(always) loopify(never) size(8) newer_version_of(help_no_if_tuple
   let Pmakeblock = %block.[`0`].my_alloc_region (a, b) in
   cont k (Pmakeblock)
 in
-let $camlIfs_and_records__help_no_if_tuple_25 =
+let $camlIfs_and_records__help_no_if_tuple_8 =
   closure help_no_if_tuple_7_1 @help_no_if_tuple &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_desired_8)
@@ -170,7 +170,7 @@ let code loopify(never) size(14) newer_version_of(main_desired_8)
       let int_sub = %int_barith.sub (unboxed_field_0, unboxed_field_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_desired_26 =
+let $camlIfs_and_records__main_desired_9 =
   closure main_desired_8_1 @main_desired &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_wrap_9)
@@ -187,7 +187,7 @@ let code loopify(never) size(14) newer_version_of(main_wrap_9)
       let int_sub = %int_barith.sub (a_1, b_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_wrap_27 =
+let $camlIfs_and_records__main_wrap_10 =
   closure main_wrap_9_1 @main_wrap &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_variant_10)
@@ -204,7 +204,7 @@ let code loopify(never) size(14) newer_version_of(main_variant_10)
       let int_sub = %int_barith.sub (unboxed_field_0, unboxed_field_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_variant_28 =
+let $camlIfs_and_records__main_variant_11 =
   closure main_variant_10_1 @main_variant &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_wrap_variant_11)
@@ -221,7 +221,7 @@ let code loopify(never) size(14) newer_version_of(main_wrap_variant_11)
       let int_sub = %int_barith.sub (a_1, b_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_wrap_variant_29 =
+let $camlIfs_and_records__main_wrap_variant_12 =
   closure main_wrap_variant_11_1 @main_wrap_variant &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_tuple_12)
@@ -238,7 +238,7 @@ let code loopify(never) size(14) newer_version_of(main_tuple_12)
       let int_sub = %int_barith.sub (unboxed_field_0, unboxed_field_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_tuple_30 =
+let $camlIfs_and_records__main_tuple_13 =
   closure main_tuple_12_1 @main_tuple &toplevel.alloc_region
 in
 let code loopify(never) size(25) newer_version_of(main_interior_if_13)
@@ -260,7 +260,7 @@ let code loopify(never) size(25) newer_version_of(main_interior_if_13)
            let int_sub = %int_barith.sub (switch_result_1, switch_result) in
            cont k (int_sub))
 in
-let $camlIfs_and_records__main_interior_if_31 =
+let $camlIfs_and_records__main_interior_if_14 =
   closure main_interior_if_13_1 @main_interior_if &toplevel.alloc_region
 in
 let code loopify(never) size(3) newer_version_of(main_no_if_14)
@@ -271,7 +271,7 @@ let code loopify(never) size(3) newer_version_of(main_no_if_14)
   let int_sub = %int_barith.sub (a, b) in
   cont k (int_sub)
 in
-let $camlIfs_and_records__main_no_if_32 =
+let $camlIfs_and_records__main_no_if_15 =
   closure main_no_if_14_1 @main_no_if &toplevel.alloc_region
 in
 let code loopify(never) size(3) newer_version_of(main_no_if_tuple_15)
@@ -282,7 +282,7 @@ let code loopify(never) size(3) newer_version_of(main_no_if_tuple_15)
   let int_sub = %int_barith.sub (a, b) in
   cont k (int_sub)
 in
-let $camlIfs_and_records__main_no_if_tuple_33 =
+let $camlIfs_and_records__main_no_if_tuple_16 =
   closure main_no_if_tuple_15_1 @main_no_if_tuple &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_hand_inline_16)
@@ -299,7 +299,7 @@ let code loopify(never) size(14) newer_version_of(main_hand_inline_16)
       let int_sub = %int_barith.sub (unboxed_field_0, unboxed_field_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_hand_inline_34 =
+let $camlIfs_and_records__main_hand_inline_17 =
   closure main_hand_inline_16_1 @main_hand_inline &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(main_hand_inline_tuple_17)
@@ -316,30 +316,30 @@ let code loopify(never) size(14) newer_version_of(main_hand_inline_tuple_17)
       let int_sub = %int_barith.sub (a_1, b_1) in
       cont k (int_sub)
 in
-let $camlIfs_and_records__main_hand_inline_tuple_35 =
+let $camlIfs_and_records__main_hand_inline_tuple_18 =
   closure main_hand_inline_tuple_17_1 @main_hand_inline_tuple
     &toplevel.alloc_region
 in
 let $camlIfs_and_records =
   Block 0 ($camlIfs_and_records__empty_block_0,
            $camlIfs_and_records__empty_block_0,
-           $camlIfs_and_records__help_desired_18,
-           $camlIfs_and_records__help_wrap_19,
-           $camlIfs_and_records__help_variant_20,
-           $camlIfs_and_records__help_wrap_variant_21,
-           $camlIfs_and_records__help_tuple_22,
-           $camlIfs_and_records__help_interior_if_23,
-           $camlIfs_and_records__help_no_if_24,
-           $camlIfs_and_records__help_no_if_tuple_25,
-           $camlIfs_and_records__main_desired_26,
-           $camlIfs_and_records__main_wrap_27,
-           $camlIfs_and_records__main_variant_28,
-           $camlIfs_and_records__main_wrap_variant_29,
-           $camlIfs_and_records__main_tuple_30,
-           $camlIfs_and_records__main_interior_if_31,
-           $camlIfs_and_records__main_no_if_32,
-           $camlIfs_and_records__main_no_if_tuple_33,
-           $camlIfs_and_records__main_hand_inline_34,
-           $camlIfs_and_records__main_hand_inline_tuple_35)
+           $camlIfs_and_records__help_desired_1,
+           $camlIfs_and_records__help_wrap_2,
+           $camlIfs_and_records__help_variant_3,
+           $camlIfs_and_records__help_wrap_variant_4,
+           $camlIfs_and_records__help_tuple_5,
+           $camlIfs_and_records__help_interior_if_6,
+           $camlIfs_and_records__help_no_if_7,
+           $camlIfs_and_records__help_no_if_tuple_8,
+           $camlIfs_and_records__main_desired_9,
+           $camlIfs_and_records__main_wrap_10,
+           $camlIfs_and_records__main_variant_11,
+           $camlIfs_and_records__main_wrap_variant_12,
+           $camlIfs_and_records__main_tuple_13,
+           $camlIfs_and_records__main_interior_if_14,
+           $camlIfs_and_records__main_no_if_15,
+           $camlIfs_and_records__main_no_if_tuple_16,
+           $camlIfs_and_records__main_hand_inline_17,
+           $camlIfs_and_records__main_hand_inline_tuple_18)
 in
 cont done ($camlIfs_and_records)

@@ -33,7 +33,7 @@ let code loopify(never) size(44) newer_version_of(f_0)
       let r_unboxed0 = float_add in
       cont k (r_unboxed0)
 in
-let $camlFloat_unboxing__f_1 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlFloat_unboxing__Pmakeblock_2 = Block 0 ($camlFloat_unboxing__f_1) in
-let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock_2) in
+let $camlFloat_unboxing__f_2 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlFloat_unboxing__Pmakeblock_3 = Block 0 ($camlFloat_unboxing__f_2) in
+let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock_3) in
 cont done ($camlFloat_unboxing)

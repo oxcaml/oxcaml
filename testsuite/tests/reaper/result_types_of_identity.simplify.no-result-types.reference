@@ -26,10 +26,10 @@ let code loopify(never) size(16) newer_version_of(always_0_0)
           k1 pop(regular k1) ($camlResult_types_of_identity__Pmakeblock_2)
         | 1 -> k (0)
 in
-let $camlResult_types_of_identity__always_0_1 =
+let $camlResult_types_of_identity__always_0_3 =
   closure always_0_0_1 @always_0 &toplevel.alloc_region
 in
 let $camlResult_types_of_identity =
-  Block 0 ($camlResult_types_of_identity__always_0_1)
+  Block 0 ($camlResult_types_of_identity__always_0_3)
 in
 cont done ($camlResult_types_of_identity)

@@ -46,6 +46,6 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
          where k2 =
            cont k1 pop(regular k1) ($camlF__block_1))
 in
-let $camlF__maxson_1 = closure maxson_0_1 @maxson &toplevel.alloc_region in
-let $camlF = Block 0 ($camlF__maxson_1) in
+let $camlF__maxson_2 = closure maxson_0_1 @maxson &toplevel.alloc_region in
+let $camlF = Block 0 ($camlF__maxson_2) in
 cont done ($camlF)

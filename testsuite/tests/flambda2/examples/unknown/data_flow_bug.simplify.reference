@@ -14,10 +14,10 @@ in
 let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
 (let Popaque_1 = %opaque (1) in
  let untagged = %untag_imm (Popaque_1) in
- let $camlData_flow_bug__Pmakeblock_7 = Block 0 (906850200, Popaque) in
+ let $camlData_flow_bug__Pmakeblock_8 = Block 0 (906850200, Popaque) in
  switch untagged
    | 0 -> k (-453122489)
-   | 1 -> k ($camlData_flow_bug__Pmakeblock_7))
+   | 1 -> k ($camlData_flow_bug__Pmakeblock_8))
   where k (fix : val) =
     ((let prim = %is_int (fix) in
       switch prim

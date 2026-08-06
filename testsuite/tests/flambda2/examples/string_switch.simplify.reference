@@ -60,8 +60,8 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
                                           pop(regular k1)
                                           ($camlString_switch__Pmakeblock_6)))))))
 in
-let $camlString_switch__of_string_1 =
+let $camlString_switch__of_string_7 =
   closure of_string_0_1 @of_string &toplevel.alloc_region
 in
-let $camlString_switch = Block 0 ($camlString_switch__of_string_1) in
+let $camlString_switch = Block 0 ($camlString_switch__of_string_7) in
 cont done ($camlString_switch)

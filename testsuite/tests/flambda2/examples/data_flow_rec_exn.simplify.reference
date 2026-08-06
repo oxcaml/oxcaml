@@ -13,7 +13,7 @@ let code loopify(never) size(3) newer_version_of(do_stuff_0)
       do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k1 pop(regular k1) ($camlData_flow_rec_exn__Pmakeblock_2)
 in
-let $camlData_flow_rec_exn__do_stuff_2 =
+let $camlData_flow_rec_exn__do_stuff_4 =
   closure do_stuff_0_1 @do_stuff &toplevel.alloc_region
 in
 let code loopify(never) size(35) newer_version_of(stuff_1)
@@ -29,7 +29,7 @@ let code loopify(never) size(35) newer_version_of(stuff_1)
       let try_ghost_region = %begin_try_ghost_region (ghost_region) in
       (cont k6 push(k5)
          where k6 =
-           let Popaque = %opaque ($camlData_flow_rec_exn__do_stuff_2) in
+           let Popaque = %opaque ($camlData_flow_rec_exn__do_stuff_4) in
            (apply &my_alloc_region Popaque (env) -> k7 * k5
               where k7 (param) =
                 cont k6
@@ -56,11 +56,11 @@ let code loopify(never) size(35) newer_version_of(stuff_1)
       let unit_1 = %end_ghost_region (ghost_region) in
       cont k (0)
 in
-let $camlData_flow_rec_exn__stuff_3 =
+let $camlData_flow_rec_exn__stuff_5 =
   closure stuff_1_1 @stuff &toplevel.alloc_region
 in
 let $camlData_flow_rec_exn =
-  Block 0 ($camlData_flow_rec_exn__do_stuff_2,
-           $camlData_flow_rec_exn__stuff_3)
+  Block 0 ($camlData_flow_rec_exn__do_stuff_4,
+           $camlData_flow_rec_exn__stuff_5)
 in
 cont done ($camlData_flow_rec_exn)

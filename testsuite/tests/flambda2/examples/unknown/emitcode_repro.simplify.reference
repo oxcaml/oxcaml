@@ -15,7 +15,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(out_0)
   let Popaque = %opaque (0) in
   cont k (Popaque)
 in
-let $camlEmitcode_repro__out_3 = closure out_0_1 @out &toplevel.alloc_region
+let $camlEmitcode_repro__out_6 = closure out_0_1 @out &toplevel.alloc_region
 in
 let code loopify(never) size(50) newer_version_of(emit_instr_1)
       emit_instr_1_1 (param : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
@@ -38,26 +38,26 @@ let code loopify(never) size(50) newer_version_of(emit_instr_1)
         | 1 -> k5
     where k5 =
       apply direct(out_0_1 &my_alloc_region &my_region &my_ghost_region)
-        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+        ($camlEmitcode_repro__out_6 : _ -> imm tagged)
           ($camlEmitcode_repro__const_block_0)
           -> k * k1
     where k4 =
       apply direct(out_0_1 &my_alloc_region &my_region &my_ghost_region)
-        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+        ($camlEmitcode_repro__out_6 : _ -> imm tagged)
           ($camlEmitcode_repro__const_block_1)
           -> k * k1
     where k3 =
       apply direct(out_0_1 &my_alloc_region &my_region &my_ghost_region)
-        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+        ($camlEmitcode_repro__out_6 : _ -> imm tagged)
           ($camlEmitcode_repro__const_block_2)
           -> k * k1
     where k2 =
       apply direct(out_0_1 &my_alloc_region &my_region &my_ghost_region)
-        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+        ($camlEmitcode_repro__out_6 : _ -> imm tagged)
           ($camlEmitcode_repro__const_block_3)
           -> k * k1
 in
-let $camlEmitcode_repro__emit_instr_4 =
+let $camlEmitcode_repro__emit_instr_7 =
   closure emit_instr_1_1 @emit_instr &toplevel.alloc_region
 in
 let code loopify(done) size(121) newer_version_of(emit_2)
@@ -93,7 +93,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                  (apply
                          direct(out_0_1
                          &my_alloc_region &`region` &ghost_region)
-                    ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+                    ($camlEmitcode_repro__out_6 : _ -> imm tagged)
                       ($camlEmitcode_repro__const_block_4)
                       -> k6 * k1
                     where k6 (param_2 : imm tagged) =
@@ -130,7 +130,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                                 (apply
                                         direct(out_0_1
                                         &my_alloc_region &`region` &ghost_region)
-                                   ($camlEmitcode_repro__out_3
+                                   ($camlEmitcode_repro__out_6
                                     : _ -> imm tagged)
                                      ($camlEmitcode_repro__const_block_5)
                                      -> k5 * k1
@@ -149,7 +149,7 @@ let code loopify(done) size(121) newer_version_of(emit_2)
                  (apply
                          direct(emit_instr_1_1
                          &my_alloc_region &`region` &ghost_region)
-                    ($camlEmitcode_repro__emit_instr_4 : _ -> imm tagged)
+                    ($camlEmitcode_repro__emit_instr_7 : _ -> imm tagged)
                       (instr)
                       -> k4 * k1
                     where k4 (param_2 : imm tagged) =
@@ -164,8 +164,8 @@ let code loopify(done) size(121) newer_version_of(emit_2)
            let unit_1 = %end_ghost_region (ghost_region) in
            cont k (0))
 in
-let $camlEmitcode_repro__emit_5 =
+let $camlEmitcode_repro__emit_8 =
   closure emit_2_1 @emit &toplevel.alloc_region
 in
-let $camlEmitcode_repro = Block 0 ($camlEmitcode_repro__emit_5) in
+let $camlEmitcode_repro = Block 0 ($camlEmitcode_repro__emit_8) in
 cont done ($camlEmitcode_repro)

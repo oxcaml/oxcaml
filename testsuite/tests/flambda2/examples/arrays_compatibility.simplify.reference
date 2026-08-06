@@ -58,7 +58,7 @@ in
 let $camlArrays_compatibility__convert_fast_4 =
   closure convert_fast_1_1 @convert_fast &toplevel.alloc_region
 in
-let $camlArrays_compatibility__Pmakeblock_3 =
+let $camlArrays_compatibility__Pmakeblock_5 =
   Block 0 ($camlArrays_compatibility__empty_array_0,
            $camlArrays_compatibility__index_3,
            $camlArrays_compatibility__convert_fast_4)
@@ -110,10 +110,10 @@ let code loopify(never) size(75) newer_version_of(f_2)
            let Pmakeblock = %block.[`0`].my_alloc_region (line, col) in
            cont k (Pmakeblock))
 in
-let $camlArrays_compatibility__f_5 = closure f_2_1 @f &toplevel.alloc_region
+let $camlArrays_compatibility__f_6 = closure f_2_1 @f &toplevel.alloc_region
 in
 let $camlArrays_compatibility =
-  Block 0 ($camlArrays_compatibility__Pmakeblock_3,
-           $camlArrays_compatibility__f_5)
+  Block 0 ($camlArrays_compatibility__Pmakeblock_5,
+           $camlArrays_compatibility__f_6)
 in
 cont done ($camlArrays_compatibility)
