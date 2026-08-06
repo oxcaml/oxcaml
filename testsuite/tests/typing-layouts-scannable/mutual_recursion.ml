@@ -10,9 +10,6 @@ type t_maybeptr_val : value_maybe_separable
 type t_nonptr_val : value non_pointer
 |}]
 
-(* CR layouts-scannable: The current approach does not play nicely with
-   mutually recursive declarations, as demonstrated by the following test: *)
-
 type a : value non_pointer & value non_pointer = #{ b : b }
 and b = #{ i : t_nonptr_val; j : t_nonptr_val }
 [%%expect{|

@@ -307,7 +307,7 @@ val ident_idx_imm : Ident.t
 val ident_idx_mut : Ident.t
 
 (* The jkind used for optional function argument types *)
-val option_argument_jkind : jkind_lr
+val optional_argument_jkind : jkind_lr
 (* The jkind used for list argument types *)
 val list_argument_jkind : jkind_lr
 

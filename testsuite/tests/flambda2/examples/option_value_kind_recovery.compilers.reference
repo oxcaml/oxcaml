@@ -1,0 +1,15 @@
+(let
+  (ret_phantom/0 = (function {nlocal = 0} h/0 (apply h/0 0))
+   ret_sorted/0 =
+     (function {nlocal = 0} h/1 d/0? : (consts (0)) (non_consts ([0: ?]))
+       (seq (ignore d/0) (apply h/1 0)))
+   match_some/0 =
+     (function {nlocal = 0} h/2 : (consts (0)) (non_consts ([0: ?]))
+       (let
+         (*match*/0 =[value<(consts (0)) (non_consts ([0: ?]))>]
+            (apply h/2 0))
+         (apply h/2 0)))
+   match_wild/0 =
+     (function {nlocal = 0} h/3 : int
+       (let (o/0 = (apply h/3 0)) (if (isint o/0) 1 0))))
+  (makeblock 0 ret_phantom/0 ret_sorted/0 match_some/0 match_wild/0))
