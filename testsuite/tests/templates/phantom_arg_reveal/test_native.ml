@@ -9,19 +9,16 @@
     argument, so [outer.cmi] records [module C = Clk[P:P_int]] even though
     [Clk] takes no parameters.
 
-    A consumer with [clk.cmi] but not [p_int.cmi] on its load path should
+    A consumer with [clk.cmi] but not [p_int.cmi] on its load path must
     still be able to resolve [Outer.C]: the excess [P:P_int] argument
-    contributes nothing to the elaborated global, so its value should not
-    be demanded.  Currently it is demanded, and the consumer fails with:
+    contributes nothing to the elaborated global, so its value must not be
+    demanded.  This used to fail with:
 
       Unbound module P_int in instance Clk[P:P_int]
-
-    This test records the buggy behaviour; [consumer.reference] should be
-    removed once the bug is fixed.
  *)
 
  readonly_files = "\
-   clk.ml clk.mli consumer.ml consumer.reference mid.ml outer.ml \
+   clk.ml clk.mli consumer.ml mid.ml outer.ml \
    p.mli p_int.ml p_int.mli \
  ";
 
@@ -81,15 +78,9 @@
  ocamlopt.byte;
 
  (* The consumer has [clk.cmi] but neither [p_int.cmi] nor [mid.cmi] on its
-    load path; resolving [Outer.C] should drop the revealed excess argument
-    [P:P_int] rather than demand [p_int.cmi].  Currently it demands
-    [p_int.cmi] and fails. *)
+    load path; resolving [Outer.C] must drop the revealed excess argument
+    [P:P_int] rather than demand [p_int.cmi]. *)
  flags = "$flg -I outer -I clk";
  module = "consumer.ml";
- compiler_output = "consumer.output";
- ocamlopt_byte_exit_status = "2";
  ocamlopt.byte;
-
- compiler_reference = "consumer.reference";
- check-ocamlopt.byte-output;
 *)
