@@ -37,4 +37,8 @@ val main
     cmr_filename:string ->
     cmx_imports_to_reload:Import_info.t list ->
     Cmm.phrase list)
+  -> reaper_lto_solve:(
+    cmr_files:string list ->
+    ltosol_filename:string ->
+    unit)
   -> int
