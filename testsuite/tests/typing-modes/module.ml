@@ -333,10 +333,10 @@ module Test_incl :
     module type S = sig val foo : 'a -> 'a @@ stateless noalloc_strict end
     module N :
       sig
-        val x : int ref @@ stateless noalloc_strict
+        val x : int ref @@ stateless
         val f : unit -> unit
-        val foo : 'a -> 'a @@ stateless noalloc_strict
-      end
+        val foo : 'a -> 'a @@ stateless
+      end @@ noalloc_strict
   end
 |}]
 

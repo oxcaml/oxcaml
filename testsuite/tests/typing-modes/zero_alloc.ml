@@ -653,7 +653,11 @@ Line 1, characters 49-60:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 37-60,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 let (alloc_closure @ noalloc) (a : int) = fun () -> a
 [%%expect{|
@@ -663,7 +667,11 @@ Line 1, characters 42-53:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 30-53,
          which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* The same closure, but [exclave_]-marked. *)
@@ -838,15 +846,19 @@ let partial_application_omit_earlier_arg (h : (x:int -> y:int -> int)) =
   let _ = require_noalloc () in
   ()
 [%%expect{|
+Line 5, characters 10-28:
+5 |   let _ = require_noalloc () in
+              ^^^^^^^^^^^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
 Line 3, characters 4-12:
 3 |     (h ~y:1)
         ^^^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
-Hint: This is a partial application
-      Adding 1 more argument will make the value non-local
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 2-3, characters 41-12,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 let partial_application_omit_earlier_arg (h : (x:int -> y:int -> int)) =
@@ -1007,22 +1019,20 @@ let (alloc_first_class_module @ noalloc_strict) () = let _ = (module Empty : S) 
 Line 1, characters 69-74:
 1 | let (alloc_first_class_module @ noalloc_strict) () = let _ = (module Empty : S) in ()
                                                                          ^^^^^
-Error: The module is "local"
-         because it is allocated inside the function at line 1, characters 48-85,
-         which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the module highlighted is expected to be "global"
-         because modules always need to be allocated on the heap.
+Error: The module is "alloc" because it is allocated on the heap.
+       However, the module highlighted is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 48-85
+         which is expected to be "noalloc_strict".
 |}]
 let (alloc_first_class_module @ noalloc) () = let _ = (module Empty : S) in ()
 [%%expect{|
 Line 1, characters 62-67:
 1 | let (alloc_first_class_module @ noalloc) () = let _ = (module Empty : S) in ()
                                                                   ^^^^^
-Error: The module is "local"
-         because it is allocated inside the function at line 1, characters 41-78,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the module highlighted is expected to be "global"
-         because modules always need to be allocated on the heap.
+Error: The module is "alloc" because it is allocated on the heap.
+       However, the module highlighted is expected to be "noalloc"
+         because it is used inside the function at line 1, characters 41-78
+         which is expected to be "noalloc".
 |}]
 
 
@@ -1037,44 +1047,46 @@ let (alloc_external @ noalloc_strict) (a : int) = my_extern a
 Line 1, characters 50-59:
 1 | let (alloc_external @ noalloc_strict) (a : int) = my_extern a
                                                       ^^^^^^^^^
-Error: The value "my_extern" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 38-61
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 38-61,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_external @ noalloc) (a : int) = my_extern a
 [%%expect{|
 Line 1, characters 43-52:
 1 | let (alloc_external @ noalloc) (a : int) = my_extern a
                                                ^^^^^^^^^
-Error: The value "my_extern" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 31-54
-         which is expected to be "noalloc".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 31-54,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
-(* Arithmetic boxing is handled conservatively: the arithmetic operators are
-   themselves [alloc] values, so using one is rejected even though the box is
-   created in the backend. No allocation is missed. *)
+(* Boxed arithmetic really does allocate: [%addfloat] boxes its result. The
+   result is [@local_opt], so the checker offers to stack-allocate the box,
+   which is legitimate inside a [noalloc] function; here the box escapes as the
+   return value, so the rejection surfaces as a regionality error rather than
+   an allocation one. See [prim_poly_result] below for the same shape. *)
 let (alloc_float_arith @ noalloc_strict) (a : float) = a +. a
 [%%expect{|
 Line 1, characters 57-59:
 1 | let (alloc_float_arith @ noalloc_strict) (a : float) = a +. a
                                                              ^^
-Error: The value "(+.)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 41-61
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 41-61,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_float_arith @ noalloc) (a : float) = a +. a
 [%%expect{|
 Line 1, characters 50-52:
 1 | let (alloc_float_arith @ noalloc) (a : float) = a +. a
                                                       ^^
-Error: The value "(+.)" is "alloc"
-       but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 34-54
-         which is expected to be "noalloc".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 34-54,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* Likewise for boxed-integer arithmetic via a [Stdlib] primitive. *)
@@ -1083,20 +1095,200 @@ let (alloc_int64_arith @ noalloc_strict) (a : int64) = Int64.add a a
 Line 1, characters 55-64:
 1 | let (alloc_int64_arith @ noalloc_strict) (a : int64) = Int64.add a a
                                                            ^^^^^^^^^
-Error: The value "Int64.add" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 41-68
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 41-68,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 let (alloc_int64_arith @ noalloc) (a : int64) = Int64.add a a
 [%%expect{|
 Line 1, characters 48-57:
 1 | let (alloc_int64_arith @ noalloc) (a : int64) = Int64.add a a
                                                     ^^^^^^^^^
-Error: The value "Int64.add" is "alloc"
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 34-61,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* A fully-applied non-allocating [int] primitive does not force the enclosing
+   function to [alloc], so this is accepted. *)
+let (alloc_int_arith @ noalloc_strict) (a : int) = a + a
+[%%expect{|
+val alloc_int_arith : int -> int = <fun>
+|}]
+let (alloc_int_arith @ noalloc) (a : int) = a + a
+[%%expect{|
+val alloc_int_arith : int -> int = <fun>
+|}]
+
+(* Referencing [(+)] bare eta-expands it into a closure, which allocates. *)
+let (alloc_int_ref @ noalloc_strict) () = ( + )
+[%%expect{|
+Line 1, characters 42-47:
+1 | let (alloc_int_ref @ noalloc_strict) () = ( + )
+                                              ^^^^^
+Error: The value "(+)" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 37-47
+         which is expected to be "noalloc_strict".
+|}]
+let (alloc_int_ref @ noalloc) () = ( + )
+[%%expect{|
+Line 1, characters 35-40:
+1 | let (alloc_int_ref @ noalloc) () = ( + )
+                                       ^^^^^
+Error: The value "(+)" is "alloc"
        but is expected to be "noalloc"
-         because it is used inside the function at line 1, characters 34-61
+         because it is used inside the function at line 1, characters 30-40
          which is expected to be "noalloc".
+|}]
+
+(* A partial application of [(+)] also allocates a closure. *)
+let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
+[%%expect{|
+Line 1, characters 53-58:
+1 | let (alloc_int_partial @ noalloc_strict) (a : int) = ( + ) a
+                                                         ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 41-60,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
+[%%expect{|
+Line 1, characters 46-51:
+1 | let (alloc_int_partial @ noalloc) (a : int) = ( + ) a
+                                                  ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 34-53,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* CR shsong: [( + )] is Prim_global, we do not have the corresponding
+    mode variable in [type_ident], so we just register allocation with
+    legacy mode [alloc], and cannot make its partial application result
+    to local. *)
+(* [(( + ) a) a] forces [( + ) a] to be materialised as its own partial
+   application (a closure), unlike the fully-applied [a + a]. *)
+let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
+[%%expect{|
+Line 1, characters 52-57:
+1 | let (alloc_int_paren @ noalloc_strict) (a : int) = (( + ) a) a
+                                                        ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 39-62,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
+[%%expect{|
+Line 1, characters 45-50:
+1 | let (alloc_int_paren @ noalloc) (a : int) = (( + ) a) a
+                                                 ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 32-55,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
+[%%expect{|
+Line 1, characters 61-66:
+1 | let (alloc_int_paren @ noalloc_strict) (a : int) = exclave_ (( + ) a) a
+                                                                 ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 39-71,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
+[%%expect{|
+Line 1, characters 54-59:
+1 | let (alloc_int_paren @ noalloc) (a : int) = exclave_ (( + ) a) a
+                                                          ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 32-64,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Primitive's mode is kept on aliasing, not modified by its fully-applied
+   exemption. *)
+let (f_alias @ noalloc_strict) = ( + )
+[%%expect{|
+Line 1, characters 33-38:
+1 | let (f_alias @ noalloc_strict) = ( + )
+                                     ^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
+|}]
+
+(* The fully-applied relaxation also reaches primitives applied through [|>]
+   ([%revapply]) and [@@] ([%apply]). Both operators are themselves fully
+   applied and non-allocating, and the actual function's args are threaded
+   through as its own applied arity, so these fully-applied cases are accepted. *)
+
+(* [|>] with a simple (non-application) head: [( ~- )] fully applied. *)
+let (alloc_int_revapply @ noalloc_strict) (a : int) = a |> ( ~- )
+[%%expect{|
+val alloc_int_revapply : int -> int = <fun>
+|}]
+
+(* [|>] with an application head: [( + ) b] fully applied to [a] as well. *)
+let (alloc_int_revapply_app @ noalloc_strict) (a : int) (b : int) =
+  a |> ( + ) b
+[%%expect{|
+val alloc_int_revapply_app : int -> (int -> int) @ local = <fun>
+|}]
+
+let (alloc_int_add_revapply @ noalloc_strict) (a : int) =
+  a |> (( + ) a)
+[%%expect{|
+val alloc_int_add_revapply : int -> int = <fun>
+|}]
+
+(* [@@] with a simple head: [( ~- )] fully applied. *)
+let (alloc_int_apply @ noalloc_strict) (a : int) = ( ~- ) @@ a
+[%%expect{|
+val alloc_int_apply : int -> int = <fun>
+|}]
+
+(* [@@] with an application head: [( + ) a] fully applied to [b] as well. *)
+let (alloc_int_apply_app @ noalloc_strict) (a : int) (b : int) =
+  ( + ) a @@ b
+[%%expect{|
+val alloc_int_apply_app : int -> (int -> int) @ local = <fun>
+|}]
+
+let (alloc_int_add_apply @ noalloc_strict) (a : int) =
+  (( + ) a) @@ a
+[%%expect{|
+val alloc_int_add_apply : int -> int = <fun>
+|}]
+
+(* Guard: a *partial* application through [|>] stays rejected -- [( + ) a] is a
+   closure, so [( + )] is not fully applied and reports the [noalloc] error. *)
+let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
+[%%expect{|
+Line 1, characters 67-72:
+1 | let (alloc_int_revapply_partial @ noalloc_strict) (a : int) = a |> ( + )
+                                                                       ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 50-72,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+let (alloc_int_apply_partial @ noalloc_strict) (a : int) = ( + ) @@ a
+[%%expect{|
+Line 1, characters 59-64:
+1 | let (alloc_int_apply_partial @ noalloc_strict) (a : int) = ( + ) @@ a
+                                                               ^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 47-69,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* CR-soon shsong: revisit exception handling after implementing the
@@ -1238,24 +1430,21 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* CR shsong: these case might be handled too conservatively since referecing a
-  primitive/operator as a value is captured and always considered as [alloc]. *)
-(* array indexing uses the [%array_safe_get] primitive, whose result is
-    [@local_opt] (Prim_poly). It does NOT allocate. *)
+(* Array indexing uses the [%array_safe_get] primitive. Whether it allocates
+   depends on the element type -- [int array] does not box, [float array] does
+   -- which is why the decision is taken at the application site, once the
+   array type is known. *)
 let array_get_prim_poly (a : int array) (i : int) =
   let (f @ noalloc_strict) () = a.(i) in
   f ()
 [%%expect{|
-Line 2, characters 32-37:
-2 |   let (f @ noalloc_strict) () = a.(i) in
-                                    ^^^^^
-Error: The value "Array.get" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 27-37
-         which is expected to be "noalloc_strict".
+val array_get_prim_poly : int array -> int -> int = <fun>
 |}]
 
-(* [Prim_poly] result ([@local_opt]): [%makemutable] allocates. *)
+(* [Prim_poly] result ([@local_opt]): [%makemutable] allocates, at the
+   result's locality. Inside a [noalloc] function that locality is forced to
+   local (a stack allocation is allowed there), so the error we get is about
+   the local ref escaping rather than about the allocation itself. *)
 external mk_poly : 'a -> ('a ref[@local_opt]) = "%makemutable"
 let (prim_poly_result @ noalloc_strict) (x : int) = mk_poly x
 [%%expect{|
@@ -1263,10 +1452,10 @@ external mk_poly : 'a -> ('a ref [@local_opt]) = "%makemutable"
 Line 2, characters 52-59:
 2 | let (prim_poly_result @ noalloc_strict) (x : int) = mk_poly x
                                                         ^^^^^^^
-Error: The value "mk_poly" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 40-61
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 40-61,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* [Prim_global] result: [%makemutable] allocates on the heap. *)
@@ -1277,10 +1466,10 @@ external mk_global : 'a -> 'a ref = "%makemutable"
 Line 2, characters 54-63:
 2 | let (prim_global_result @ noalloc_strict) (x : int) = mk_global x
                                                           ^^^^^^^^^
-Error: The value "mk_global" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 42-65
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 42-65,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* [Prim_global] result with a [Prim_poly] argument: [%makemutable] allocates
@@ -1292,52 +1481,133 @@ external mk_polyarg : ('a [@local_opt]) -> 'a ref = "%makemutable"
 Line 2, characters 63-73:
 2 | let (prim_global_result_poly_arg @ noalloc_strict) (x : int) = mk_polyarg x
                                                                    ^^^^^^^^^^
-Error: The value "mk_polyarg" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 51-75
-         which is expected to be "noalloc_strict".
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 51-75,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
-(* [Prim_local] result: [%makemutable] allocates on the stack. *)
+(* [Prim_local] result: [%makemutable] allocates on the stack, which does not
+   count on the allocation axis. The rejection below is the ordinary
+   regionality error for returning a local value -- it has nothing to do with
+   [noalloc], and happens without the annotation too. *)
 external mk_local : 'a -> local_ 'a ref = "%makemutable"
 let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
 [%%expect{|
 external mk_local : 'a -> 'a ref @ local = "%makemutable"
-Line 2, characters 53-61:
+Line 2, characters 53-63:
 2 | let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
-                                                         ^^^^^^^^
-Error: The value "mk_local" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 41-63
-         which is expected to be "noalloc_strict".
+                                                         ^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
-(* [my_id] do not allocate, but referencing the value is conservatively
-   treated as [alloc]. *)
+(* [my_id] (a fully-applied [%identity]) does not force the enclosing function
+   to [alloc], so this is accepted. *)
 external my_id : ('a[@local_opt]) -> ('a[@local_opt]) = "%identity"
 let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
 [%%expect{|
 external my_id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
-Line 2, characters 55-60:
-2 | let (prim_value_captured @ noalloc_strict) (x : int) = my_id x
-                                                           ^^^^^
-Error: The value "my_id" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 2, characters 43-62
-         which is expected to be "noalloc_strict".
+val prim_value_captured : int -> int = <fun>
 |}]
 
-(* [!] does not allocate, but referencing the value is conservatively
-   treated as [alloc]. *)
+(* [%opaque] compiles to [Popaque], which does not allocate. *)
+external opaque_prim : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+let (f @ noalloc_strict) (x : int) = opaque_prim x
+[%%expect{|
+external opaque_prim : ('a [@local_opt]) -> ('a [@local_opt]) = "%opaque"
+val f : int -> int = <fun>
+|}]
+
+(* [!] compiles to [Pfield], which does not allocate. *)
 let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
 [%%expect{|
-Line 1, characters 60-61:
-1 | let (deref_value_captured @ noalloc_strict) (r : int ref) = !r
-                                                                ^
-Error: The value "(!)" is "alloc"
-       but is expected to be "noalloc_strict"
-         because it is used inside the function at line 1, characters 44-62
-         which is expected to be "noalloc_strict".
+val deref_value_captured : int ref -> int = <fun>
+|}]
+
+(* The allocation behaviour of these primitives depends on the types at the
+   occurrence, so it can only be decided once the arguments have been typed.
+   Cross-check any change here against [ocamlc -dlambda] on the same source.
+   These are written with a single parameter so that no intermediate closure
+   shows up in the printed type. *)
+
+(* [%compare] at [string] compiles to [caml_string_compare], declared
+   [[@@noalloc]]; at [int] it compiles to a [Pscalar] comparison. *)
+let (cmp_string @ noalloc_strict) (x : string) = compare x "a"
+let (cmp_int @ noalloc_strict) (x : int) = compare x 0
+[%%expect{|
+val cmp_string : string -> int = <fun>
+val cmp_int : int -> int = <fun>
+|}]
+
+(* At an unknown type it compiles to [caml_compare], which does allocate. *)
+let (cmp_poly @ noalloc_strict) x = compare x x
+[%%expect{|
+Line 1, characters 36-43:
+1 | let (cmp_poly @ noalloc_strict) x = compare x x
+                                        ^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 32-47,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* CR shsong: Why this is a integer rather than integeter option comparison? *)
+(* A constant constructor as an argument specializes the generic equality to an
+   integer comparison, even though the type alone would not allow it. *)
+let (eq_const @ noalloc_strict) (x : int option) = x = None
+[%%expect{|
+val eq_const : int option -> bool = <fun>
+|}]
+
+(* Reading an [int array] does not box; reading a [float array] does. *)
+let (get_int @ noalloc_strict) (a : int array) = Array.unsafe_get a 0
+[%%expect{|
+val get_int : int array -> int = <fun>
+|}]
+let (get_float @ noalloc_strict) (a : float array) = Array.unsafe_get a 0
+[%%expect{|
+Line 1, characters 53-69:
+1 | let (get_float @ noalloc_strict) (a : float array) = Array.unsafe_get a 0
+                                                         ^^^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 33-73,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* A C external declared [[@@noalloc]] does not allocate; the same symbol
+   declared without the attribute is assumed to. *)
+external eq_nofail : string -> string -> bool = "caml_string_equal" [@@noalloc]
+let (c_noalloc @ noalloc_strict) (x : string) = eq_nofail x "a"
+[%%expect{|
+external eq_nofail : string -> string -> bool = "caml_string_equal"
+  [@@noalloc]
+val c_noalloc : string -> bool = <fun>
+|}]
+external eq_may_alloc : string -> string -> bool = "caml_string_equal"
+let (c_alloc @ noalloc_strict) (x : string) = eq_may_alloc x "a"
+[%%expect{|
+external eq_may_alloc : string -> string -> bool = "caml_string_equal"
+Line 2, characters 46-58:
+2 | let (c_alloc @ noalloc_strict) (x : string) = eq_may_alloc x "a"
+                                                  ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 31-64,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* A [Prim_poly] allocating primitive is accepted when its result does not
+   escape: the allocation can go on the stack, which a [noalloc] function
+   allows. Contrast with [prim_poly_result] above, where the ref escapes. *)
+let (poly_alloc_not_escaping @ noalloc_strict) (x : int) =
+  let r = mk_poly x in
+  !r
+[%%expect{|
+val poly_alloc_not_escaping : int -> int = <fun>
 |}]
 
 (* NOT a gap: [new] does not register the object allocation, but a class is
@@ -1372,17 +1642,17 @@ Error: The allocation is "local"
 |}]
 
 
-(** Test 5.2: an allocation nested inside several enclosing functions forces
-    every enclosing layer. The functions [g] and [h] each capture the parameter
-    [a], so building each inner closure is itself an allocation in its parent;
-    together with the innermost [Just a] this makes every one of the three nested
-    functions an allocation site, so each is forced to [alloc]. *)
+(** Test 5.2: an allocation nested inside several enclosing functions reaches
+    every layer: [g] and [h] each capture [a], so building each inner closure
+    is itself an allocation in its parent. A [noalloc] layer demands that the
+    allocations inside it be stack-allocated, so the error surfaces where a
+    closure made local by that demand then has to escape as a return value. *)
 
 (* All three layers annotated [noalloc_strict]: the capture chain reaches the
    outermost function, so building the closure [g] (which transitively captures
-   [a]) is an allocation inside the outermost function and is reported there --
-   demonstrating that the deepest allocation forces every enclosing layer, not
-   just the immediately enclosing one. *)
+   [a]) is an allocation inside [layers3_ss]. That function demands it be
+   local, and [g] then cannot be returned -- the deepest allocation reaches
+   every enclosing layer, not just the immediately enclosing one. *)
 let (layers3_ss @ noalloc_strict) (a : int) =
   let (g @ noalloc_strict) () =
     let (h @ noalloc_strict) () = Just a in
@@ -1390,13 +1660,18 @@ let (layers3_ss @ noalloc_strict) (a : int) =
   in
   g
 [%%expect{|
-Line 14, characters 34-40:
+Lines 13-15, characters 27-5:
+13 | ...........................() =
 14 |     let (h @ noalloc_strict) () = Just a in
-                                       ^^^^^^
+15 |     h
 Error: The allocation is "local"
-         because it is allocated inside the function at line 14, characters 29-40,
+         because it is allocated inside the function at lines 12-17, characters 34-3,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* The same nesting, all layers [noalloc]. *)
@@ -1407,17 +1682,22 @@ let (layers3_n @ noalloc) (a : int) =
   in
   g
 [%%expect{|
-Line 3, characters 27-33:
+Lines 2-4, characters 20-5:
+2 | ....................() =
 3 |     let (h @ noalloc) () = Just a in
-                               ^^^^^^
+4 |     h
 Error: The allocation is "local"
-         because it is allocated inside the function at line 3, characters 22-33,
+         because it is allocated inside the function at lines 1-6, characters 26-3,
          which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
-(* Annotating only the middle layer still errors: building the closure [h]
-   inside [g] is an allocation that forces [g]. *)
+(* Annotating only the middle layer still errors: building the closure [h] is
+   an allocation that [g] demands be local, and [h] is [g]'s return value. *)
 let layers_middle (a : int) =
   let (g @ noalloc_strict) () =
     let h () = Just a in
@@ -1425,16 +1705,20 @@ let layers_middle (a : int) =
   in
   g
 [%%expect{|
-Line 3, characters 15-21:
+Line 3, characters 10-21:
 3 |     let h () = Just a in
-                   ^^^^^^
+              ^^^^^^^^^^^
 Error: The allocation is "local"
          because it is allocated inside the function at lines 2-4, characters 27-5,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
-(* Annotating only the innermost layer still errors: [Just a] forces [h]. *)
+(* Only the innermost layer: [Just a] is demanded local but must be global. *)
 let layers_inner (a : int) =
   let g () =
     let (h @ noalloc_strict) () = Just a in
@@ -1470,7 +1754,11 @@ Line 1, characters 38-48:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 34-48,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let (f_explicit_exclave @ noalloc_strict) x = exclave_ fun y -> x
@@ -1491,7 +1779,11 @@ Line 1, characters 31-41:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 27-41,
          which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let (f_explicit_exclave @ noalloc) x = exclave_ fun y -> x
@@ -1509,7 +1801,11 @@ Line 1, characters 46-58:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 37-58,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f_explicit_exclave: _ @ noalloc_strict = fun x -> exclave_ (fun y -> x)
@@ -1541,7 +1837,11 @@ Line 1, characters 27-39:
 Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 18-39,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let f_explicit_exclave = (fun x -> exclave_ (fun y -> x) : _ @ noalloc_strict)
@@ -1746,11 +2046,15 @@ let (g_let @ noalloc_strict) (x : int) =
   let h = fun () -> x in
   h ()
 [%%expect{|
-Line 3, characters 2-3:
-3 |   h ()
-      ^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
+Line 2, characters 10-21:
+2 |   let h = fun () -> x in
+              ^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-3, characters 29-6,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
          because it is the function in a tail call.
 |}]
 
@@ -1766,7 +2070,10 @@ Line 3, characters 47-60:
 Error: The allocation is "local"
          because it is allocated inside the function at line 3, characters 31-60,
          which is "noalloc_strict" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is an argument in a tail call.
 |}]
 
 (* Region body ([for]/[while]/comprehension). *)
@@ -1856,22 +2163,19 @@ Line 1, characters 32-51:
 Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
-(** Test 6.4: Nested noalloc functions *)
-(* CR shsong: f cannot be implied as noalloc_strict unless explicitly annotated.
-    Analysis: In walk_locks_for_allocation, we force closures to be alloc until
-    we encounter a [Closure_noalloc_lock]. Everything outside [Closure_noalloc_lock]
-    will still be forced to be alloc.
-    An alternative implementation: loop over all locks and see whether there is a
-    [Closure_noalloc_lock] before adding any submode constraints.
-    Tradeoff:
-    1. the alternative implementation should allow us to accept the
-    [nested_noalloc_func_implicit] case. However, the current implementation is ok
-    if we expect user to always annotate functions if they want it them to be noalloc.
-    2. the alternative implementation avoids the current check on whether the
-    Allocation mode axis is changed while walking locks.
-    3. the alternative implementation requires iterate over the locks twice, which
-    affects the performance.
-*)
+(** Test 6.4: nested noalloc functions.
+
+    [walk_locks_for_allocation] only collects the enclosing closures of an
+    allocation; nothing is constrained until [constrain_allocations],
+    [constrain_closures], and [optimise_allocations] run. An enclosing
+    function therefore does not have to be annotated in order to come out
+    [noalloc]: a requirement imposed on it from elsewhere, such as the
+    coercion at the end of each case below, is enough. *)
+
+(* [f] is not annotated -- the coercion is what requires it to be
+   [noalloc_strict]. Every allocation inside it is [exclave_]-marked and so
+   lands on the stack, and nothing forced [f] to [alloc] along the way, so
+   this is accepted. *)
 let nested_noalloc_func_implicit () =
   let f () = exclave_
     let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
@@ -1879,15 +2183,11 @@ let nested_noalloc_func_implicit () =
   in
   (f : _ @ noalloc_strict)
 [%%expect{|
-Line 6, characters 3-4:
-6 |   (f : _ @ noalloc_strict)
-       ^
-Error: This value is "alloc"
-         because it closes over the allocation at line 3, characters 29-55
-         which is "alloc".
-       However, the highlighted expression is expected to be "noalloc_strict".
+val nested_noalloc_func_implicit : unit -> unit -> (unit -> 'a -> 'a) @ local =
+  <fun>
 |}]
 
+(* The same, with [f] annotated: the annotation is allowed but not needed. *)
 let nested_noalloc_func_explicit () =
   let (f @ noalloc_strict) () = exclave_
     let (g @ noalloc_strict) () = exclave_ (fun x -> x) in
@@ -2009,13 +2309,16 @@ let (secretly_allocates @ noalloc) () =
   let (whitewashed @ alloc) = fun () -> { x = 1.; y = 2. } in
   whitewashed ()
 [%%expect{|
-Line 2, characters 40-58:
+Line 2, characters 30-58:
 2 |   let (whitewashed @ alloc) = fun () -> { x = 1.; y = 2. } in
-                                            ^^^^^^^^^^^^^^^^^^
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local"
          because it is allocated inside the function at lines 1-3, characters 35-16,
          which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+       However, the allocation highlighted is expected to be "global"
+         because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is the function in a tail call.
 |}]
 
 let (secretly_allocates' @ noalloc) () = exclave_
@@ -2082,4 +2385,434 @@ Error: The allocation is "local"
          because it is allocated inside the function at line 1, characters 32-50,
          which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
+|}]
+
+
+(** Test 8: [module type of] and the allocation axis
+
+  [module type of M] must produce a self-contained module type on the spot, so
+  it zaps the modalities of [M]'s items while type-checking -- long before
+  [optimise_allocations] settles the allocation axis. Both settling passes
+  therefore run inside [type_module_type_of]: [constrain_allocations] before
+  [check_nongen_modtype] defaults the arrow modes reachable from the scraped
+  signature, and [constrain_closures] after it, once each allocation's areality
+  is known and before the zap reads the floor of the item modes. *)
+
+(* Case 1: the functions are annotated. The annotation survives. *)
+module M_annot = struct
+  let (f @ noalloc_strict) (x : int) = x + 1
+  let (g @ noalloc) (x : int) = x + 1
+end
+module type S_annot = module type of M_annot
+[%%expect{|
+module M_annot :
+  sig val f : int -> int @@ noalloc_strict val g : int -> int end @@ portable
+  noalloc
+module type S_annot =
+  sig
+    val f : int -> int @@ portable noalloc_strict
+    val g : int -> int @@ portable noalloc
+  end
+|}]
+
+(* Case 2: the functions are not annotated but do not allocate;
+   [noalloc_strict] is still inferred. *)
+module M_infer = struct
+  let f (x : int) = x + 1
+end
+module type S_infer = module type of M_infer
+[%%expect{|
+module M_infer : sig val f : int -> int end @@ portable noalloc_strict
+module type S_infer = sig val f : int -> int @@ portable noalloc_strict end
+|}]
+
+(* Projecting out of the module still works afterwards: the zap reads a floor
+   that is correct, rather than pinning the value to [alloc]. *)
+module M_proj = struct
+  let f (x : int) = x + 1
+end
+module type S_proj = module type of M_proj
+let () = ignore (M_proj.f : _ @ noalloc_strict)
+[%%expect{|
+module M_proj : sig val f : int -> int end @@ portable noalloc_strict
+module type S_proj = sig val f : int -> int @@ portable noalloc_strict end
+|}]
+
+(* Case 3: the function really does allocate on the heap. *)
+module M_alloc = struct
+  let pack x = [| x |]
+end
+module type S_alloc = module type of M_alloc
+[%%expect{|
+module M_alloc : sig val pack : ('a : value_maybe_null). 'a -> 'a array end
+  @@ stateless
+module type S_alloc =
+  sig val pack : ('a : value_maybe_null). 'a -> 'a array @@ stateless end
+|}]
+
+(* Case 4: the allocation is internal to a function body and so never surfaces
+   in the scraped signature. *)
+module M_internal = struct
+  let f () = let g () = (1, 2) in let (a, b) = g () in a + b
+end
+module type S_internal = module type of M_internal
+[%%expect{|
+module M_internal : sig val f : unit -> int end @@ portable
+module type S_internal = sig val f : unit -> int @@ portable end
+|}]
+
+(* Case 5: the allocation lives in a nested module, and the constraint that
+   puts it on the heap ([sink] below) comes after the [module type of]. *)
+module M_nested = struct
+  module Inner = struct let g () = (1, 2) end
+end
+module type S_nested = module type of M_nested
+let sink : (int * int) ref = ref (0, 0)
+let () = sink := M_nested.Inner.g ()
+[%%expect{|
+module M_nested : sig module Inner : sig val g : unit -> int * int end end @@
+  stateless
+module type S_nested =
+  sig module Inner : sig val g : unit -> int * int @@ stateless end end
+val sink : (int * int) ref @@ stateless noalloc_strict = {contents = (0, 0)}
+|}]
+
+(* Case 6: the same, through a functor inside the module. *)
+module M_functor = struct
+  module F (X : sig end) = struct let g () = (1, 2) end
+end
+module type S_functor = module type of M_functor
+[%%expect{|
+module M_functor :
+  sig
+    module F :
+      functor (X : sig end) -> sig val g : unit -> int * int @@ stateless end
+  end @@ stateless
+module type S_functor =
+  sig
+    module F :
+      functor (X : sig end) -> sig val g : unit -> int * int @@ stateless end
+      @@ stateless
+  end
+|}]
+
+module Fm (X : sig end) = struct let g () = (1, 2) end
+module type FT = module type of Fm
+module type S_incl = sig include functor FT end
+[%%expect{|
+module Fm :
+  functor (X : sig end) -> sig val g : unit -> int * int @@ stateless end @@
+  stateless
+module type FT =
+  functor (X : sig end) -> sig val g : unit -> int * int @@ stateless end
+module type S_incl = sig val g : unit -> int * int @@ stateless end
+|}]
+
+(* Test 9: interaction between the [zero_alloc] attribute/annotation and the
+   allocation mode axis. *)
+
+(* Test 9.1:
+
+  CR shsong: [zero_alloc] in let binding is not properly processed. *)
+
+let [@zero_alloc strict] (f @ alloc) () = 1.1
+let (g @ noalloc_strict) () = f ()
+[%%expect{|
+val f : unit -> float [@@zero_alloc strict] = <fun>
+Line 2, characters 30-31:
+2 | let (g @ noalloc_strict) () = f ()
+                                  ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 25-34
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Likewise a *local* [let [@zero_alloc strict] f] is not relaxed: rejected. *)
+let test_local_strict_not_relaxed () =
+  let [@zero_alloc strict] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Local [@zero_alloc] (non-strict) referenced inside [noalloc_strict]:
+   rejected. *)
+let test_local_nonstrict_in_strict () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Local [@zero_alloc] referenced inside [noalloc]: rejected. *)
+let test_local_nonstrict_in_noalloc () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc) () = f () in
+  g
+[%%expect{|
+Line 3, characters 25-26:
+3 |   let (g @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 3, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Signature-sourced zero_alloc functions: unlike a local [let], a [val] in a
+   signature populates [val_zero_alloc], so [relax_alloc] can see it. These
+   replicate the [f () inside a noalloc function] cases above. *)
+module M_strict : sig
+  val f : unit -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] (f @ alloc) () = 42
+end
+[%%expect{|
+module M_strict : sig val f : unit -> int [@@zero_alloc strict] end @@
+  stateless
+|}]
+
+(* [strict] function referenced inside a [noalloc_strict] function: accepted. *)
+let (g @ noalloc_strict) () = M_strict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+module M_nonstrict : sig
+  val f : unit -> int [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f () = 42
+end
+[%%expect{|
+module M_nonstrict : sig val f : unit -> int [@@zero_alloc] end @@ stateless
+  noalloc_strict
+|}]
+
+(* Non-strict function referenced inside [noalloc_strict]: still rejected, but
+   because [f] is [noalloc] (not [alloc]). *)
+let (g @ noalloc_strict) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* Non-strict function referenced inside [noalloc]: accepted. *)
+let (g @ noalloc) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* Test 9.2: A [noalloc] closure must not launder an [alloc] value out
+   of a fully-applied zero_alloc function -- see the two tests below. *)
+module M_ret : sig
+  val g : unit -> float
+  (* [arity 1] because [f] takes one argument and returns a function; it must
+     match the impl's syntactic arity. *)
+  val f : unit -> (unit -> float) [@@zero_alloc strict arity 1]
+end = struct
+  let g () = 1.1
+  let[@zero_alloc strict] f () = g
+end
+[%%expect{|
+module M_ret :
+  sig
+    val g : unit -> float
+    val f : unit -> unit -> float [@@zero_alloc strict arity 1]
+  end @@ stateless noalloc_strict
+|}]
+
+let test () = (M_ret.f () : _ @ noalloc)
+[%%expect{|
+Line 1, characters 15-25:
+1 | let test () = (M_ret.f () : _ @ noalloc)
+                   ^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+(* Rejected: [h] would return [g] (an [alloc] value) obtained from the
+   fully-applied zero_alloc [M_ret.f], laundering it through a [noalloc]
+   closure. *)
+let test () =
+  let (h @ noalloc) () = M_ret.f () in
+  h
+[%%expect{|
+Line 2, characters 25-32:
+2 |   let (h @ noalloc) () = M_ret.f () in
+                             ^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 2, characters 20-35
+         which is expected to be "noalloc".
+|}]
+
+let test_return_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  (f () : _ @ noalloc)
+[%%expect{|
+Line 4, characters 3-7:
+4 |   (f () : _ @ noalloc)
+       ^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+let test_capture_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  let (h @ noalloc) () = f () in
+  h
+[%%expect{|
+Line 4, characters 25-26:
+4 |   let (h @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+         because it closes over the value "g" at line 3, characters 34-35
+         which is "alloc".
+       However, the value "f" highlighted is expected to be "noalloc"
+         because it is used inside the function at line 4, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Test 9.3: a *partial* application of a zero_alloc function allocates a
+   partial-application closure, which is detected. *)
+module M_partial : sig
+  val f : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] f x y = x + y
+end
+[%%expect{|
+module M_partial : sig val f : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+let (h @ noalloc_strict) (x : int) = M_partial.f x
+[%%expect{|
+Line 1, characters 37-48:
+1 | let (h @ noalloc_strict) (x : int) = M_partial.f x
+                                         ^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 25-50,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 9.4: Tests from demo
+   CR shsong: Maybe remove the redundant ones. *)
+module M_strict : sig
+  val span_pair_used : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] span_pair_used (a : int) (b : int) =
+    let (lo, hi) = if a < b then (a, b) else (b, a) in
+    hi - lo
+end
+[%%expect{|
+module M_strict :
+  sig val span_pair_used : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+let (fully_applied @ noalloc_strict) () =
+  M_strict.span_pair_used 1 0
+[%%expect{|
+val fully_applied : unit -> int = <fun>
+|}]
+
+let (partially_applied @ noalloc_strict) () =
+  let _ = M_strict.span_pair_used 1 in ()
+[%%expect{|
+Line 2, characters 10-35:
+2 |   let _ = M_strict.span_pair_used 1 in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
+Line 2, characters 10-33:
+2 |   let _ = M_strict.span_pair_used 1 in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-2, characters 41-41,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+let (ref_partially_applied @ noalloc_strict) () =
+  let f = M_strict.span_pair_used in
+  f 1
+[%%expect{|
+Line 2, characters 10-33:
+2 |   let f = M_strict.span_pair_used in
+              ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The value "M_strict.span_pair_used" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-3, characters 45-5
+         which is expected to be "noalloc_strict".
+|}]
+
+let (ref_only @ noalloc_strict) () =
+  M_strict.span_pair_used
+[%%expect{|
+Line 2, characters 2-25:
+2 |   M_strict.span_pair_used
+      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The value "M_strict.span_pair_used" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-2, characters 32-25
+         which is expected to be "noalloc_strict".
+|}]
+
+module M_strict : sig
+  val span_pair_used : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] span_pair_used (a : int) (b : int) =
+    let (lo, hi) = if a < b then (a, b) else (b, a) in
+    hi - lo
+end
+[%%expect{|
+module M_strict :
+  sig val span_pair_used : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+module Wrapper : sig
+  type t
+  val wrapper : unit -> t [@@zero_alloc strict arity 1]
+  (* val wrapper : unit -> int *)
+end = struct
+  type t = int -> int -> int * int
+  let [@zero_alloc strict] wrapper () =
+    let g = fun a b -> (a, b) in
+    g
+
+  (* type t = int -> int -> int
+  let [@zero_alloc strict] wrapper ()  = M_strict.span_pair_used *)
+  (* let (wrapper @ noalloc_strict) ()  = M_strict.span_pair_used 1 0 *)
+end
+[%%expect{|
+module Wrapper : sig type t val wrapper : unit -> t [@@zero_alloc strict] end
+  @@ stateless
+|}]
+
+let (whitewashed @ noalloc_strict) () = Wrapper.wrapper ()
+[%%expect{|
+Line 1, characters 40-55:
+1 | let (whitewashed @ noalloc_strict) () = Wrapper.wrapper ()
+                                            ^^^^^^^^^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 35-58
+         which is expected to be "noalloc_strict".
 |}]
