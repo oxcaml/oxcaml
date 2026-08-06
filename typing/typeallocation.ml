@@ -64,8 +64,8 @@ let register_mod_allocation ~env ~loc ~desc =
         (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
     closures
 
-let register_prim_application_allocation ~env ~pos
-    (funct : Typedtree.expression) args =
+let register_zero_alloc_application_allocation ~env ~pos
+    (funct : Typedtree.expression) args (mode_ret : Value.l) =
   match funct.exp_desc with
   | Typedtree.Texp_ident
       { desc = { Types.val_kind = Types.Val_prim prim; _ };
@@ -80,13 +80,31 @@ let register_prim_application_allocation ~env ~pos
           register_allocation_mode ~env ~loc:lid.loc
             (Alloc.max_with_comonadic Areality mode)
       end
+  | Typedtree.Texp_ident { desc; lid; _ } ->
+    begin match Type_zero_alloc.val_zero_alloc desc.Types.val_zero_alloc with
+    | Type_zero_alloc.Zero_alloc { arity; _ } ->
+      if List.length args < arity then
+        register_allocation_mode ~env ~loc:lid.loc Alloc.legacy
+      else
+        Env.walk_locks_for_zero_alloc_return ~env ~loc:lid.loc mode_ret
+    | Type_zero_alloc.Default -> ()
+    end
   | _ -> ()
 
 let relax_alloc (desc : Types.value_description) ~is_applied mode =
-  match desc.val_kind with
-  | Types.Val_prim _ when is_applied ->
-    Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
-  | _ -> mode
+  if not is_applied then mode
+  else
+    match desc.val_kind with
+    | Types.Val_prim _ ->
+      Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+    | _ ->
+      begin match Type_zero_alloc.val_zero_alloc desc.val_zero_alloc with
+      | Type_zero_alloc.Zero_alloc { strict = true; _ } ->
+        Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+      | Type_zero_alloc.Zero_alloc { strict = false; _ } ->
+        Value.meet_const_with Allocation Allocation.Const.Noalloc mode
+      | Type_zero_alloc.Default -> mode
+      end
 
 let constrain_enclosing_closures pp closures =
   List.iter
