@@ -159,8 +159,11 @@ let create_archive archive file_list =
                                (quote_files ~response_files:true file_list))
     | _ ->
         assert(String.length Config.ar > 0);
-        command(Printf.sprintf "%s rc %s %s"
-                Config.ar quoted_archive
+        let flags =
+          if !Clflags.thin_library then Config.ar_thin_archives_flags else "rc"
+        in
+        command(Printf.sprintf "%s %s %s %s"
+                Config.ar flags quoted_archive
                 (quote_files ~response_files:Config.ar_supports_response_files
                   file_list))
 

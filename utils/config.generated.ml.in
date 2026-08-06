@@ -105,6 +105,8 @@ let flexdll_dirs = [@flexdll_dir@]
 
 let ar_supports_response_files = @ar_supports_response_files@
 
+let ar_thin_archives_flags = {@QS@|@ar_thin_archives_flags@|@QS@}
+
 let runtime5 = true
 
 let syntax_quotations = "@enable_syntax_quotations@" = "yes"

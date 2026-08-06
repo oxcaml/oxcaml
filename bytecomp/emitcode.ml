@@ -455,7 +455,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       (0, 0) in
   let compunit =
     { cu_name = cu;
-      cu_pos = pos_code;
+      cu_pos = Pos_internal pos_code;
       cu_codesize = !out_position;
       cu_reloc = List.rev !reloc_info;
       cu_arg_descr = arg_descr;

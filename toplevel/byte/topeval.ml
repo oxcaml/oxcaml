@@ -219,9 +219,9 @@ let check_consistency ppf filename cu =
     raise Load_failed
 
 (* This is basically Dynlink.Bytecode.run with no digest *)
-let load_compunit ic filename ppf compunit =
+let load_compunit' ic ofs filename ppf compunit =
   check_consistency ppf filename compunit;
-  seek_in ic compunit.cu_pos;
+  seek_in ic ofs;
   let code =
     Bigarray.Array1.create Bigarray.Char Bigarray.c_layout compunit.cu_codesize
   in
@@ -249,6 +249,17 @@ let load_compunit ic filename ppf compunit =
     print_exception_outcome ppf exn;
     raise Load_failed
   end
+
+let load_compunit ic filename ppf compunit =
+  match compunit.cu_pos with
+  | Pos_internal ofs -> load_compunit' ic ofs filename ppf compunit
+  | Pos_external { filename; offset } ->
+     let filename =
+       try Load_path.find filename with Not_found -> raise Load_failed
+     in
+     let ic = open_in_bin filename in
+     load_compunit' ic offset filename ppf compunit;
+     close_in ic
 
 let rec load_file recursive ppf name =
   let filename =
