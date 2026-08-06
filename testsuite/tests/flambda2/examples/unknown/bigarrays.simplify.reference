@@ -33,7 +33,7 @@ in
                let i = %tag_imm (prim_3) in
                let stdout =
                  %project_value_slot.[print_int].[stdout]
-                   ($Stdlib.camlStdlib__print_int_136)
+                   ($Stdlib.camlStdlib__print_int_136_83)
                in
                (apply ccall inlining_state(depth(20))
                   ($`*extern*`.caml_format_int : val * val -> val)

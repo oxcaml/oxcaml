@@ -1,11 +1,11 @@
-let $camlCode_id_join_b__const_block_2 = Block 0 (2, 0) in
-let $camlCode_id_join_b__const_block_3 =
-  Block 0 (1, $camlCode_id_join_b__const_block_2)
+let $camlCode_id_join_b__const_block_10 = Block 0 (2, 0) in
+let $camlCode_id_join_b__const_block_11 =
+  Block 0 (1, $camlCode_id_join_b__const_block_10)
 in
-let $camlCode_id_join_b__const_block_4 =
-  Block 0 (0, $camlCode_id_join_b__const_block_3)
+let $camlCode_id_join_b__const_block_12 =
+  Block 0 (0, $camlCode_id_join_b__const_block_11)
 in
-cont `self` ($camlCode_id_join_b__const_block_4)
+cont `self` ($camlCode_id_join_b__const_block_12)
   where rec `self` (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
     let prim = %is_int (param) in
     (switch prim
@@ -17,17 +17,17 @@ cont `self` ($camlCode_id_join_b__const_block_4)
            switch prim_1
              | 0 ->
                k1
-                 ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_11`)
+                 ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_6`)
              | 1 -> k2
              where k2 =
                let prim_2 = %int_comp.ne (Pfield, 1) in
                switch prim_2
                  | 0 ->
                    k1
-                     ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_12`)
+                     ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_7`)
                  | 1 ->
                    k1
-                     ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_13`))
+                     ($Code_id_join_a.`camlCode_id_join_a__fn[code_id_join_a.ml:9,24--35]_8`))
             where k1 (full_apply) =
               (apply &toplevel.alloc_region inlining_state(depth(20))
                  full_apply (42) -> k2 * error
