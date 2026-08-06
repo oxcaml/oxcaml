@@ -649,13 +649,44 @@ let rec expand_head_for_modality env ty =
     | _ | (exception Not_found) -> ty)
   | _ -> ty
 
+(* Pure counterpart of [expand_head_for_modality]: the same stopping rules,
+   but lowering no levels and memoizing no expansion. *)
+let rec has_modality_head env fuel ty =
+  (* Backstop only; cyclic abbreviations are rejected by [Typedecl]. *)
+  if fuel <= 0 then true
+  else
+    match get_desc ty with
+    | Tmod _ -> true
+    | Tconstr (path, args, _) -> (
+      match Env.find_type path env with
+      | { type_is_newtype = true; _ } -> false
+      | { type_manifest = Some body; type_private = Public; type_params; _ } ->
+        (* Where the manifest is a parameter, the head of the expansion is
+           the matching argument. *)
+        let body =
+          match get_desc body with
+          | Tvar _ ->
+            let rec argument_for params args =
+              match params, args with
+              | param :: params, arg :: args ->
+                if eq_type param body then arg else argument_for params args
+              | _, _ -> body
+            in
+            argument_for type_params args
+          | _ -> body
+        in
+        has_modality_head env (fuel - 1) body
+      | _ -> false
+      | exception Not_found -> false)
+    | _ -> false
+
 let unpack_modality ~loc:_ env ty =
   let found payload bounds =
     Some (Typemode.modality_of_mod_bounds bounds, payload)
   in
   match get_desc ty with
   | Tmod (payload, bounds) -> found payload bounds
-  | Tconstr _ -> (
+  | Tconstr _ when has_modality_head env 100 ty -> (
     match get_desc (expand_head_for_modality env ty) with
     | Tmod (payload, bounds) -> found payload bounds
     | _ -> None)

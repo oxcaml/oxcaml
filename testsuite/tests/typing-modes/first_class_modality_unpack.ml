@@ -480,3 +480,69 @@ Error: This value is "local"
          which is "local".
        However, the highlighted expression is expected to be "global".
 |}]
+
+(* ABBREVIATIONS. The rule is about the head of the expanded type, not about
+   how the type was spelled, so an abbreviation of a wrapper unpacks. *)
+type ta = (t @@ portable)
+let via_alias (x : ta @ nonportable) = use_portable x
+[%%expect{|
+type ta = (t @@ portable)
+val via_alias : ta -> unit = <fun>
+|}]
+
+(* Including a parameterised abbreviation whose manifest is the parameter --
+   the shape [Univ_map]'s [type 'a data = 'a] has, and the one that decides
+   whether the head is a wrapper by looking at an ARGUMENT. *)
+type 'a id = 'a
+let via_param_alias (x : (t @@ portable) id @ nonportable) = use_portable x
+[%%expect{|
+type 'a id = 'a
+val via_param_alias : (t @@ portable) id -> unit = <fun>
+|}]
+
+(* A private abbreviation keeps its wrapper hidden, so it does not unpack. *)
+module Priv : sig
+  type tp = private (t @@ portable)
+end = struct
+  type tp = (t @@ portable)
+end
+let via_private_alias (x : Priv.tp @ nonportable) = use_portable x
+[%%expect{|
+module Priv : sig type tp = private (t @@ portable) end @@ stateless
+Line 6, characters 65-66:
+6 | let via_private_alias (x : Priv.tp @ nonportable) = use_portable x
+                                                                     ^
+Error: The value "x" has type "Priv.tp" but an expression was expected of type "t"
+|}]
+
+(* An abbreviation revealed only by a local (GADT) equation does not unpack:
+   that would make unpacking depend on non-principal information. *)
+type _ reveals_ta = Reveals_ta : ta reveals_ta
+let via_equation (type a) (e : a reveals_ta) (x : a @ nonportable) =
+  match e with
+  | Reveals_ta -> use_portable x
+[%%expect{|
+type _ reveals_ta = Reveals_ta : ta reveals_ta
+Line 4, characters 31-32:
+4 |   | Reveals_ta -> use_portable x
+                                   ^
+Error: The value "x" has type "a" = "(t @@ portable)"
+       but an expression was expected of type "t"
+|}]
+
+(* Never expanding is not an option either, which is why the two cases above
+   differ. [:>] does expand, so an abbreviation of an [@@ aliased] wrapper
+   that never unpacked could have its modality forgotten by a coercion while
+   the mode side never applied it -- handing out a [unique] value from an
+   [aliased] one. *)
+type tu = (t @@ aliased)
+let coercion_stays_sound (x : tu @ unique) : t @ unique = (x :> t)
+[%%expect{|
+type tu = (t @@ aliased)
+Line 2, characters 59-60:
+2 | let coercion_stays_sound (x : tu @ unique) : t @ unique = (x :> t)
+                                                               ^
+Error: This value is "aliased"
+         because it is the payload of a first-class modality (with some modality).
+       However, the highlighted expression is expected to be "unique".
+|}]
