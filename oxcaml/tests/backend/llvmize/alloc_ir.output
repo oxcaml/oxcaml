@@ -301,7 +301,7 @@ L132:
   %38 = load ptr addrspace(1), ptr %13
   store ptr addrspace(1) %38, ptr %14
   store i64 1, ptr %15
-  %39 = ptrtoint ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 to i64
+  %39 = ptrtoint ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP to i64
   store i64 %39, ptr %16
   %40 = load i64, ptr %16
   store i64 %40, ptr %4
@@ -867,7 +867,7 @@ L201:
   %69 = ptrtoint ptr @camlAlloc__const_block_3 to i64
   store i64 %69, ptr %12
   store i64 1, ptr %13
-  %70 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
+  %70 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_HIDE_STAMP to i64
   store i64 %70, ptr %14
   %71 = load i64, ptr %14
   store i64 %71, ptr %4
@@ -940,7 +940,7 @@ L205:
   %110 = ptrtoint ptr @camlAlloc__const_block_7 to i64
   store i64 %110, ptr %23
   store i64 1, ptr %24
-  %111 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
+  %111 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_HIDE_STAMP to i64
   store i64 %111, ptr %25
   %112 = load i64, ptr %25
   store i64 %112, ptr %4
@@ -1054,7 +1054,7 @@ L209:
   %175 = ptrtoint ptr @camlAlloc__const_block_11 to i64
   store i64 %175, ptr %48
   store i64 1, ptr %49
-  %176 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 to i64
+  %176 = ptrtoint ptr @camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_HIDE_STAMP to i64
   store i64 %176, ptr %50
   %177 = load i64, ptr %50
   store i64 %177, ptr %4
@@ -1133,23 +1133,23 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlAlloc__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlAlloc = global i64 7936, section ".data", align 8
-@camlAlloc = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlAlloc__my_fold_9, ptr @camlAlloc__local_iota_10, ptr @camlAlloc__big_local_alloc_11, ptr @camlAlloc__heap_iota_13, ptr @camlAlloc__big_heap_alloc_14, ptr @camlAlloc__make_ref_16, ptr @camlAlloc__heap_ref_incr_17 }, section ".data", align 8
-@header.camlAlloc__heap_ref_incr_17 = global i64 3063, section ".data", align 8
-@camlAlloc__heap_ref_incr_17 = global { ptr, i64 } { ptr @camlAlloc__heap_ref_incr_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlAlloc__make_ref_16 = global i64 3063, section ".data", align 8
-@camlAlloc__make_ref_16 = global { ptr, i64 } { ptr @camlAlloc__make_ref_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlAlloc__big_heap_alloc_14 = global i64 3063, section ".data", align 8
-@camlAlloc__big_heap_alloc_14 = global { ptr, i64 } { ptr @camlAlloc__big_heap_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlAlloc__heap_iota_13 = global i64 4087, section ".data", align 8
-@camlAlloc__heap_iota_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlAlloc__heap_iota_HIDE_STAMP }, section ".data", align 8
-@header.camlAlloc__big_local_alloc_11 = global i64 3063, section ".data", align 8
-@camlAlloc__big_local_alloc_11 = global { ptr, i64 } { ptr @camlAlloc__big_local_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global i64 4087, section ".data", align 8
-@camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12 = global { ptr, i64, ptr } { ptr @caml_curry2L2, i64 180143985094819847, ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP }, section ".data", align 8
-@header.camlAlloc__local_iota_10 = global i64 4087, section ".data", align 8
-@camlAlloc__local_iota_10 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlAlloc__local_iota_HIDE_STAMP }, section ".data", align 8
-@header.camlAlloc__my_fold_9 = global i64 4087, section ".data", align 8
-@camlAlloc__my_fold_9 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlAlloc__my_fold_HIDE_STAMP }, section ".data", align 8
+@camlAlloc = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlAlloc__my_fold_9_14, ptr @camlAlloc__local_iota_10_15, ptr @camlAlloc__big_local_alloc_11_16, ptr @camlAlloc__heap_iota_13_18, ptr @camlAlloc__big_heap_alloc_14_19, ptr @camlAlloc__make_ref_16_21, ptr @camlAlloc__heap_ref_incr_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__heap_ref_incr_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlAlloc__heap_ref_incr_17_22 = global { ptr, i64 } { ptr @camlAlloc__heap_ref_incr_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__make_ref_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlAlloc__make_ref_16_21 = global { ptr, i64 } { ptr @camlAlloc__make_ref_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__big_heap_alloc_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlAlloc__big_heap_alloc_14_19 = global { ptr, i64 } { ptr @camlAlloc__big_heap_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__heap_iota_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlAlloc__heap_iota_13_18 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlAlloc__heap_iota_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__big_local_alloc_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlAlloc__big_local_alloc_11_16 = global { ptr, i64 } { ptr @camlAlloc__big_local_alloc_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_12_17 = global { ptr, i64, ptr } { ptr @caml_curry2L2, i64 180143985094819847, ptr @camlAlloc__fn$5balloc.ml$3a12$2c13$2d$2d16$5d_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__local_iota_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlAlloc__local_iota_10_15 = global { ptr, i64, ptr } { ptr @caml_curry2L1, i64 180143985094819847, ptr @camlAlloc__local_iota_HIDE_STAMP }, section ".data", align 8
+@header.camlAlloc__my_fold_HIDE_STAMP = global i64 4087, section ".data", align 8
+@camlAlloc__my_fold_9_14 = global { ptr, i64, ptr } { ptr @caml_curry3L1, i64 252201579132747783, ptr @camlAlloc__my_fold_HIDE_STAMP }, section ".data", align 8
 @header.camlAlloc__const_block_3 = global i64 2827, section ".data", align 8
 @camlAlloc__const_block_3 = global { ptr, ptr } { ptr @camlAlloc__immstring_0, ptr @camlAlloc__const_block_2 }, section ".data", align 8
 @header.camlAlloc__immstring_0 = global i64 4092, section ".data", align 8
@@ -1167,7 +1167,7 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 @header.camlAlloc__const_block_1 = global i64 2828, section ".data", align 8
 @camlAlloc__const_block_1 = global { i64, i64 } { i64 21, i64 1 }, section ".data", align 8
 @camlCamlinternalFormat__make_printf_HIDE_STAMP = external global ptr
-@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_545 = external global ptr
+@camlStdlib__Format__fn$5b$2fworkspace_root$2fformat.ml$3a1550$2c4$2d$2d59$5d_HIDE_STAMP = external global ptr
 @caml_apply2 = external global ptr
 @caml_call_gc = external global ptr
 @caml_call_local_realloc = external global ptr
@@ -1180,4 +1180,5 @@ declare i1 @llvm.expect.i1(i1, i1)
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Alloc" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }

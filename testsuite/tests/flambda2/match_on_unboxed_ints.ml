@@ -61,15 +61,15 @@ let map_tagged_ints_to_float_constants = function
   | _ -> #4.
 ;;
 [%%expect_fexpr Simplify{|
-let code map_tagged_ints_to_float_constants_2 deleted in
+let code map_tagged_ints_to_float_constants_1 deleted in
 let $camlTOP2__switch_block_5 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
   0x1.8p+1|]
 in
-let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_constants_2)
-      map_tagged_ints_to_float_constants_2_1 (param : imm tagged)
+let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_constants_1)
+      map_tagged_ints_to_float_constants_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float =
@@ -82,7 +82,7 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
       cont k (arg)
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_4 =
-  closure map_tagged_ints_to_float_constants_2_1
+  closure map_tagged_ints_to_float_constants_1_1
     @map_tagged_ints_to_float_constants &toplevel.alloc_region
 in
 let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4) in
@@ -103,15 +103,15 @@ let match_on_ints = function
   | _ -> ()
 ;;
 [%%expect_fexpr Simplify{|
-let code match_on_ints_12 deleted in
+let code match_on_ints_6 deleted in
 let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP7__match_on_ints_20 =
-  closure match_on_ints_12_1 @match_on_ints &toplevel.alloc_region
-and code loopify(never) size(88) newer_version_of(match_on_ints_12)
-      match_on_ints_12_1 (param : nativeint)
+  closure match_on_ints_6_1 @match_on_ints &toplevel.alloc_region
+and code loopify(never) size(88) newer_version_of(match_on_ints_6)
+      match_on_ints_6_1 (param : nativeint)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -183,16 +183,16 @@ let match_on_tagged_ints = function
   | _ -> ()
 ;;
 [%%expect_fexpr Simplify{|
-let code match_on_tagged_ints_14 deleted in
+let code match_on_tagged_ints_7 deleted in
 let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP8__match_on_tagged_ints_23 =
-  closure match_on_tagged_ints_14_1 @match_on_tagged_ints
+  closure match_on_tagged_ints_7_1 @match_on_tagged_ints
     &toplevel.alloc_region
-and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_14)
-      match_on_tagged_ints_14_1 (param : imm tagged)
+and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
+      match_on_tagged_ints_7_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
