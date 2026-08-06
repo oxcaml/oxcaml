@@ -322,15 +322,18 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
-(** Registers a use of an allocation, constraining every enclosing closure lock.
-    Used for constructs with allocations that force enclosing functions to be
-    alloc (rather than noalloc_strict).
+(** Registers the return mode of a fully-applied zero_alloc function,
+    preventing it from leaking an [alloc] return value. *)
+val walk_locks_for_zero_alloc_return :
+  env:t -> loc:Location.t -> Mode.Value.l -> unit
 
-    Returns the minimum mode of the allocation: if some enclosing closure is
-    required (annotated) to be noalloc, the allocation must be stack-allocated,
-    so the returned mode is [local]; otherwise it is unconstrained ([global]).
-    *)
-val walk_locks_for_allocation : env:t -> Mode.Hint.pinpoint -> Mode.Value.l
+(** Registers a use of an allocation at the given pinpoint.
+
+    Returns the pinpoint and allocation mode of every enclosing closure.
+    The list is ordered from the innermost closure to the outermost one,
+    so that error messages blame the closure nearest to the allocation. *)
+val walk_locks_for_allocation :
+  env:t -> Mode.Hint.pinpoint -> (Mode.Hint.pinpoint * Mode.Allocation.r) list
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
@@ -603,11 +606,6 @@ messages. [ghost = true] means the closure is not a value (such as
 a loop) *)
 val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
   Mode.Value.Comonadic.Const.t -> t -> t
-
-(** Add a lock recording that the enclosing function is not [alloc]. The
-    pinpoint describes that function, and is used in error messages. *)
-val add_closure_noalloc_lock :
-  Mode.Hint.noalloc -> Mode.Hint.pinpoint -> t -> t
 
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
