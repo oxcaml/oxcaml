@@ -2,29 +2,29 @@
 (data
  int 3840
  global "camlInvalid":
- addr G:"camlInvalid__check_3"
- addr G:"camlInvalid__bar_4"
- addr G:"camlInvalid__foo_5")
+ addr G:"camlInvalid__check_4"
+ addr G:"camlInvalid__bar_6"
+ addr G:"camlInvalid__foo_7")
 (data
  int 3063
- global "camlInvalid__foo_5":
+ global "camlInvalid__foo_7":
  addr G:"camlInvalid__foo_2_5_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlInvalid__bar_4":
+ global "camlInvalid__bar_6":
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlInvalid__bar_1_4_code")
 (data
  int 4087
- global "camlInvalid__check_3":
+ global "camlInvalid__check_4":
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlInvalid__check_0_3_code")
 (data
  int 2816
- "camlInvalid__Pmakeblock_4":
+ "camlInvalid__Pmakeblock_5":
  addr G:"caml_exn_Failure"
  addr L:"camlInvalid__immstring_0")
 (data int 2045 "camlInvalid__float_3": double 1.)
@@ -36,7 +36,7 @@
    (!= (or (>>u (<< (load_mut int (+a t1/0 -8)) 8) 17) 1)
      (or (>>u (<< (load_mut int (+a t2/0 -8)) 8) 17) 1))
    (raise_notrace{invalid.ml:25,45-63;stdlib.ml:39,17-33}
-     L:"camlInvalid__Pmakeblock_4")
+     L:"camlInvalid__Pmakeblock_5")
    1) )
 
 (function{invalid.ml:27,17-68} camlInvalid__bar_1_4_code

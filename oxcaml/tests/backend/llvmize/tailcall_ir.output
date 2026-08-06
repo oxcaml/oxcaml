@@ -924,17 +924,17 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlTailcall__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlTailcall = global i64 5888, section ".data", align 8
-@camlTailcall = global { ptr, ptr, ptr, ptr, ptr } { ptr @camlTailcall__fib_general_5_11, ptr @camlTailcall__collatz_odd_6_12, ptr @camlTailcall__collatz_even_7_13, ptr @camlTailcall__tail_call_outside_8_14, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
+@camlTailcall = global { ptr, ptr, ptr, ptr, ptr } { ptr @camlTailcall__fib_general_0_11, ptr @camlTailcall__collatz_odd_1_12, ptr @camlTailcall__collatz_even_2_13, ptr @camlTailcall__tail_call_outside_3_14, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__tail_call_outside_prologue_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlTailcall__tail_call_outside_prologue_9_15 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__tail_call_outside_prologue_4_15 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_prologue_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__tail_call_outside_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlTailcall__tail_call_outside_8_14 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__tail_call_outside_3_14 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__tail_call_outside_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__collatz_even_HIDE_STAMP = global i64 8183, section ".data", align 8
-@camlTailcall__collatz_even_7_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855887, ptr @camlTailcall__collatz_even_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__collatz_even_2_13 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 144115188075855887, ptr @camlTailcall__collatz_even_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__collatz_odd_HIDE_STAMP = global i64 4345, section ".data", align 8
-@camlTailcall__collatz_odd_6_12 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__collatz_odd_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__collatz_odd_1_12 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlTailcall__collatz_odd_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__fib_general_HIDE_STAMP = global i64 4087, section ".data", align 8
-@camlTailcall__fib_general_5_11 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlTailcall__fib_general_HIDE_STAMP }, section ".data", align 8
+@camlTailcall__fib_general_0_11 = global { ptr, i64, ptr } { ptr @caml_curry3, i64 252201579132747783, ptr @camlTailcall__fib_general_HIDE_STAMP }, section ".data", align 8
 @header.camlTailcall__const_block_3 = global i64 2827, section ".data", align 8
 @camlTailcall__const_block_3 = global { ptr, ptr } { ptr @camlTailcall__immstring_0, ptr @camlTailcall__const_block_2 }, section ".data", align 8
 @header.camlTailcall__immstring_0 = global i64 3068, section ".data", align 8
