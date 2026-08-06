@@ -165,11 +165,8 @@ module M = struct
     let f' = let r = ref 42 in fun () -> r := 24; ()
 end
 [%%expect{|
-module M :
-  sig
-    val f : unit -> unit @@ stateless noalloc_strict
-    val f' : unit -> unit
-  end
+module M : sig val f : unit -> unit @@ stateless val f' : unit -> unit end @@
+  noalloc_strict
 |}]
 
 (* Note that M is a nonportable module containing both portable and nonportable items.
@@ -184,7 +181,7 @@ module M = struct
     let f = let r = ref 42 in fun () -> r := 24; ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit end
+module M : sig val f : unit -> unit end @@ noalloc_strict
 |}]
 
 let () =
@@ -194,10 +191,11 @@ let () =
 Line 2, characters 20-25:
 2 |     let module M' = F (M) in
                         ^^^^^
-Error: Modules do not match: sig val f : unit -> unit end @ nonportable
+Error: Modules do not match:
+       sig val f : unit -> unit @@ noalloc_strict end @ nonportable
      is not included in S @ portable
      Values do not match:
-       val f : unit -> unit (* in a structure at nonportable *)
+       val f : unit -> unit @@ noalloc_strict (* in a structure at nonportable *)
      is not included in
        val f : unit -> unit (* in a structure at portable *)
      The first is "nonportable"
@@ -294,7 +292,7 @@ Line 3, characters 20-21:
                         ^
 Error: Signature mismatch in included functor's parameter:
        Values do not match:
-         val f : unit -> unit (* in a structure at nonportable *)
+         val f : unit -> unit @@ noalloc_strict (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The first is "nonportable"
@@ -312,7 +310,7 @@ end
 module M :
   sig
     val f : unit -> unit @@ stateless noalloc_strict
-    val f' : unit -> unit
+    val f' : unit -> unit @@ noalloc_strict
     val g : unit -> unit @@ portable
   end
 |}]
@@ -951,7 +949,7 @@ end
 type t' = F(M).t
 [%%expect{|
 module F : functor (X : S @ portable) -> sig type t = int end @@ stateless
-module M : sig val f : unit -> unit end
+module M : sig val f : unit -> unit end @@ noalloc_strict
 type t' = F(M).t
 |}]
 
@@ -964,7 +962,7 @@ let (foo @ portable) () =
   ()
 [%%expect{|
 module F = F @@ stateless nonportable
-module M = M
+module M = M @@ noalloc_strict
 val foo : unit -> unit = <fun>
 |}]
 
