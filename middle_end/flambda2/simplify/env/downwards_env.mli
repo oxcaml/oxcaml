@@ -141,6 +141,9 @@ val mem_code : t -> Code_id.t -> bool
 (** This function raises if the code ID is unbound. *)
 val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 
+(** This function raises if the code ID is unbound. *)
+val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
+
 val set_inlined_debuginfo : t -> from:t -> t
 
 val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
