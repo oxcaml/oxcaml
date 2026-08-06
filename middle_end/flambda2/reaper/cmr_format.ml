@@ -137,6 +137,8 @@ module File_contents : sig
     resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
     t ->
     cmr_format
+
+  val deserialise_deps : t -> Compilation_unit.t * Global_flow_graph.graph
 end = struct
   type cmr_format = t
 
@@ -196,6 +198,13 @@ end = struct
       rebuild_data
     }
 
+  (* Must happen before anything else can create an identifier. *)
+  let import_renaming ~original_compilation_unit ~id_stamp_counters ~table_data
+      ~used_value_slots =
+    Id_stamp_counters.restore id_stamp_counters;
+    Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
+      ~original_compilation_unit
+
   let deserialise ~machine_width ~resolver
       { original_compilation_unit;
         id_stamp_counters;
@@ -207,11 +216,9 @@ end = struct
         deps;
         rebuild_data
       } : cmr_format =
-    (* Must happen before anything can create an identifier. *)
-    Id_stamp_counters.restore id_stamp_counters;
     let renaming, code_ids =
-      Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
-        ~original_compilation_unit
+      import_renaming ~original_compilation_unit ~id_stamp_counters ~table_data
+        ~used_value_slots
     in
     let final_typing_env =
       Option.map
@@ -232,6 +239,23 @@ end = struct
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
     { unit_metadata; final_typing_env; all_code; deps; rebuild_data }
+
+  let deserialise_deps
+      { original_compilation_unit;
+        id_stamp_counters;
+        table_data;
+        used_value_slots;
+        unit_metadata = _;
+        final_typing_env = _;
+        all_code = _;
+        deps;
+        rebuild_data = _
+      } =
+    let renaming, _code_ids =
+      import_renaming ~original_compilation_unit ~id_stamp_counters ~table_data
+        ~used_value_slots
+    in
+    original_compilation_unit, Deps_with_fields.deserialise deps renaming
 end
 
 type error =
@@ -252,25 +276,29 @@ let save ~filename ~used_value_slots t =
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
 
-let restore ~filename ~machine_width ~resolver =
+let read_file_contents ~filename =
   let ic = open_in_bin filename in
-  let file_contents =
-    Misc.try_finally
-      (fun () ->
-        let magic = Config.cmr_magic_number in
-        let format_code = String.sub magic 0 9 in
-        let buffer = really_input_string ic (String.length magic) in
-        if String.equal buffer magic
-        then
-          try (input_value ic : File_contents.t) with
-          | End_of_file | Failure _ -> raise (Error (Corrupted filename))
-          | Error e -> raise (Error e)
-        else if String.starts_with ~prefix:format_code buffer
-        then raise (Error (Wrong_version filename))
-        else raise (Error (Wrong_format filename)))
-      ~always:(fun () -> close_in ic)
-  in
-  File_contents.deserialise ~machine_width ~resolver file_contents
+  Misc.try_finally
+    (fun () ->
+      let magic = Config.cmr_magic_number in
+      let format_code = String.sub magic 0 9 in
+      let buffer = really_input_string ic (String.length magic) in
+      if String.equal buffer magic
+      then
+        try (input_value ic : File_contents.t) with
+        | End_of_file | Failure _ -> raise (Error (Corrupted filename))
+        | Error e -> raise (Error e)
+      else if String.starts_with ~prefix:format_code buffer
+      then raise (Error (Wrong_version filename))
+      else raise (Error (Wrong_format filename)))
+    ~always:(fun () -> close_in ic)
+
+let restore ~filename ~machine_width ~resolver =
+  File_contents.deserialise ~machine_width ~resolver
+    (read_file_contents ~filename)
+
+let restore_deps filename =
+  File_contents.deserialise_deps (read_file_contents ~filename)
 
 open Format_doc
 

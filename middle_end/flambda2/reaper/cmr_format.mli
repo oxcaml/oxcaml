@@ -43,3 +43,5 @@ val restore :
   machine_width:Target_system.Machine_width.t ->
   resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
   t
+
+val restore_deps : string -> Compilation_unit.t * Global_flow_graph.graph
