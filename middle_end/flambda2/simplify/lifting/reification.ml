@@ -112,15 +112,9 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       dacc, symbol
     | None ->
       let symbol =
-        if !Clflags.canonical_ids
-        then
-          Symbol.manufacture
-            (Current_unit.get_cu_exn ())
-            (Variable.canonical_name bound_to)
-        else
-          Symbol.create
-            (Current_unit.get_cu_exn ())
-            (Linkage_name.of_string (Variable.unique_name bound_to))
+        Symbol.manufacture
+          (Current_unit.get_cu_exn ())
+          (Variable.canonical_name bound_to)
       in
       if not (K.equal (T.kind ty) K.value)
       then

@@ -57,7 +57,7 @@ and $camlUnboxable_local_returning__ret_heap_unboxed_11 =
   closure ret_heap_3_2 @ret_heap_unboxed &toplevel.alloc_region
 in
 apply direct(print_endline_47 &toplevel.alloc_region) inlined(never)
-  ($Stdlib.camlStdlib__print_endline_47_85 : _ -> imm tagged)
+  ($Stdlib.camlStdlib__print_endline_47_98 : _ -> imm tagged)
     ($camlUnboxable_local_returning__immstring_7)
     -> k1 * error
   where k1 (param : imm tagged) =
