@@ -243,9 +243,18 @@ module T = struct
        [amd64.S]. *)
     let reg_class = check_typ_reg_class typ phys_reg in
     let index = index_in_class phys_reg in
+    (* simd slots are above regular slots based at [gc_regs_bucket] *)
+    let num_regular_slots =
+      (* rbp is always spilled even without frame pointers *)
+      Array.length phys_gpr_regs
+    in
+    let gc_regs_kind_slots = 1 in
     match reg_class with
     | GPR -> index
-    | MASK -> Misc.fatal_error "avx512 masks not yet implemented"
+    | MASK ->
+      (* The presence of a mask implies zmm has been saved *)
+      let num_simd_slots = 32 * 8 in
+      num_regular_slots + gc_regs_kind_slots + num_simd_slots + index
     | SIMD ->
       let slot_size_in_vals =
         match simd with
@@ -255,12 +264,6 @@ module T = struct
         | Save_ymm -> 4
         | Save_zmm -> 8
       in
-      (* simd slots are above regular slots based at [gc_regs_bucket] *)
-      let num_regular_slots =
-        (* rbp is always spilled even without frame pointers *)
-        Array.length phys_gpr_regs
-      in
-      let gc_regs_kind_slots = 1 in
       num_regular_slots + gc_regs_kind_slots + (index * slot_size_in_vals)
 end
 

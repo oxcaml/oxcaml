@@ -14,6 +14,12 @@ on:
   merge_group:
   workflow_dispatch:
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 # Overall approach to running the tests:
 #  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
 #  - Build OxCaml (which also requires installing OCaml 5.4).
@@ -70,9 +76,10 @@ jobs:
 
     - name: Checkout the oxcaml repo
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
-      uses: actions/checkout@master
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         path: 'oxcaml'
+        persist-credentials: false
 
     - name: Assert Merlin is in sync with the compiler
       working-directory: oxcaml
@@ -88,7 +95,7 @@ jobs:
 
     - name: Set up Opam
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
-      uses: ocaml/setup-ocaml@v3
+      uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
       with:
         ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
         opam-repositories: |
@@ -105,18 +112,19 @@ jobs:
 
     - name: Restore OxCaml build
       if: env.MERLIN_EMERGENCY_SKIP != 'y'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       id: cache
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
         key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
 
     - name: Clone the OxCaml repo
-      uses: actions/checkout@master
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       with:
         repository: 'oxcaml/oxcaml'
         path: 'flambda-backend'
+        persist-credentials: false
 
     - name: Check out the OxCaml repo to the specified hash
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
@@ -148,7 +156,7 @@ jobs:
 
     - name: Upload OxCaml cache
       if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
         key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}

@@ -262,7 +262,11 @@ let layout_annotation ppf lay_ =
   | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
-  let smode = locality_mode_if_local mode in
+  let smode =
+    match mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> "stack"
+  in
   match kind with
   | Pvalue { raw_kind; nullable } -> begin
     let or_null_suffix =
@@ -271,7 +275,7 @@ let return_kind ppf (mode, kind) =
       | Nullable -> " or_null"
     in
     match raw_kind with
-    | Pgenval when is_heap_mode mode -> ()
+    | Pgenval when is_not_alloc_stack mode -> ()
     | Pgenval -> fprintf ppf ": %s@ " smode
     | Pintval -> fprintf ppf ": int@ "
     | Pboxedfloatval bf ->
@@ -300,6 +304,10 @@ let return_kind ppf (mode, kind) =
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
+
+let return_mode_kind = function
+  | Not_alloc_stack -> ""
+  | Maybe_alloc_stack -> "[L]"
 
 let print_bigarray name unsafe kind ppf layout =
   fprintf ppf "Bigarray.%s[%s,%s]"
@@ -898,6 +906,8 @@ let primitive ppf = function
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
+  | Punbox_mask -> fprintf ppf "unbox_mask"
+  | Pbox_mask m -> fprintf ppf "box_mask%s" (locality_kind m)
   | Pjoin_vec256 -> fprintf ppf "join_vec256"
   | Psplit_vec256 -> fprintf ppf "split_vec256"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
@@ -1110,6 +1120,8 @@ let name_of_primitive = function
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
+  | Punbox_mask -> "Punbox_mask"
+  | Pbox_mask _ -> "Pbox_mask"
   | Pjoin_vec256 -> "Pjoin_vec256"
   | Psplit_vec256 -> "Psplit_vec256"
   | Parray_of_iarray -> "Parray_of_iarray"
@@ -1222,7 +1234,7 @@ let apply_kind name pos mode =
     | Rc_nontail -> name ^ "nontail"
     | Rc_close_at_apply -> name ^ "tail"
   in
-  name ^ locality_kind mode
+  name ^ return_mode_kind mode
 
 let debug_uid ppf duid =
   if !Clflags.dump_debug_uids then
@@ -1297,7 +1309,9 @@ let rec lam ppf = function
   | Lapply ap ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let form =
+        apply_kind "apply" ap.ap_region_close ap.ap_mode
+      in
       let form =
         match ap.ap_yielding with
         | May_yield -> form ^ "[yielding]"

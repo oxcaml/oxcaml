@@ -313,6 +313,7 @@ let native unix
     let extra_libraries_for_eval =
       [ "unix/unix";
         "compiler-libs/ocamlcommon";
+        "compiler-libs/ocamlfrontend";
         "compiler-libs/ocamloptcomp";
         "dynlink/dynlink";
         "compiler-libs/ocamlopttoplevel";

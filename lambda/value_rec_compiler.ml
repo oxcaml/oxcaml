@@ -508,6 +508,8 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
     | Pjoin_vec256
     | Psplit_vec256
     | Pget_header _
@@ -951,7 +953,7 @@ let compile_indirect newval =
     ap_specialised = Default_specialise;
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
-    ap_mode = Lambda.alloc_heap;
+    ap_mode = Lambda.not_alloc_stack;
     (* [indirect] just allocates a forwarding block; it never runs user code,
        so it can't yield *)
     ap_yielding = Unyielding;

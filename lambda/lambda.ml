@@ -51,6 +51,10 @@ include (struct
     | Alloc_heap
     | Alloc_local
 
+  type return_mode =
+    | Maybe_alloc_stack
+    | Not_alloc_stack
+
   type modify_mode =
     | Modify_heap
     | Modify_maybe_stack
@@ -60,6 +64,12 @@ include (struct
   let alloc_local =
     if Config.stack_allocation then Alloc_local
     else Alloc_heap
+
+  let not_alloc_stack = Not_alloc_stack
+
+  let maybe_alloc_stack : return_mode =
+    if Config.stack_allocation then Maybe_alloc_stack
+    else Not_alloc_stack
 
   let modify_heap = Modify_heap
 
@@ -71,11 +81,20 @@ include (struct
     match a, b with
     | Alloc_local, _ | _, Alloc_local -> Alloc_local
     | Alloc_heap, Alloc_heap -> Alloc_heap
+
+  let return_mode_to_locality_mode a =
+    match a with
+    | Maybe_alloc_stack -> Alloc_local
+    | Not_alloc_stack -> Alloc_heap
 end : sig
 
   type locality_mode = private
     | Alloc_heap
     | Alloc_local
+
+  type return_mode = private
+    | Maybe_alloc_stack
+    | Not_alloc_stack
 
   type modify_mode = private
     | Modify_heap
@@ -84,11 +103,16 @@ end : sig
   val alloc_heap : locality_mode
   val alloc_local : locality_mode
 
+  val not_alloc_stack : return_mode
+  val maybe_alloc_stack : return_mode
+
   val modify_heap : modify_mode
 
   val modify_maybe_stack : modify_mode
 
   val join_locality_mode : locality_mode -> locality_mode -> locality_mode
+
+  val return_mode_to_locality_mode : return_mode -> locality_mode
 end)
 
 let is_local_mode = function
@@ -109,8 +133,31 @@ let eq_locality_mode a b =
   match a, b with
   | Alloc_heap, Alloc_heap -> true
   | Alloc_local, Alloc_local -> true
-  | Alloc_heap, Alloc_local -> false
-  | Alloc_local, Alloc_heap -> false
+  | (Alloc_heap | Alloc_local), _ -> false
+
+let is_maybe_alloc_stack = function
+  | Not_alloc_stack -> false
+  | Maybe_alloc_stack -> true
+
+let is_not_alloc_stack = function
+  | Not_alloc_stack -> true
+  | Maybe_alloc_stack -> false
+
+let eq_return_mode a b =
+  match a, b with
+  | Not_alloc_stack, Not_alloc_stack -> true
+  | Maybe_alloc_stack, Maybe_alloc_stack -> true
+  | (Not_alloc_stack | Maybe_alloc_stack), _ -> false
+
+let locality_return_compat a b =
+  match a, b with
+  | Alloc_heap, _ -> true
+  | _, Maybe_alloc_stack -> true
+  | Alloc_local, Not_alloc_stack -> false
+
+let return_mode_of_locality_mode = function
+  | Alloc_heap -> not_alloc_stack
+  | Alloc_local -> maybe_alloc_stack
 
 type staticity =
   | Static
@@ -402,6 +449,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
   | Pjoin_vec256
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
@@ -1043,6 +1092,8 @@ type shared_code = (int * int) list
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -1058,7 +1109,7 @@ type function_attribute = {
   stub: bool;
   tmc_candidate: bool;
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type scoped_location = Debuginfo.Scoped_location.t
@@ -1107,7 +1158,7 @@ type lambda =
   | Lassign of Ident.t * lambda
   | Lsend of
       meth_kind * lambda * lambda * lambda list
-      * region_close * locality_mode * scoped_location * layout
+      * region_close * return_mode * scoped_location * layout
       * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
@@ -1165,7 +1216,7 @@ and lfunction =
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc: scoped_location;
     mode: locality_mode;
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
     yielding: yielding_kind;
     (* [Unyielding] if fully applying the closure can never perform a free
        effect (it neither closes over nor is passed any yielding value).
@@ -1177,7 +1228,7 @@ and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
     ktmpl_return: layout;
     ktmpl_body: lambda;
-    ktmpl_ret_mode: locality_mode;
+    ktmpl_ret_mode: return_mode;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1211,7 +1262,7 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
     ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
@@ -1467,7 +1518,7 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      let nparams = List.length params in
      assert (0 <= nlocal);
      assert (nlocal <= nparams);
-     if is_local_mode ret_mode then assert (nlocal >= 1);
+     if is_maybe_alloc_stack ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
   { kind; params; return; body; attr; loc; mode; ret_mode;
@@ -1630,7 +1681,7 @@ let default_function_attribute = {
      them multi-argument. So, we keep arity fusion turned on by default for now.
   *)
   may_fuse_arity = true;
-  unbox_return = false;
+  unbox_return = None;
 }
 
 let default_stub_attribute =
@@ -2591,9 +2642,13 @@ let find_exact_application kind ~arity args =
 let reset () =
   Static_label.reset static_label_sequence
 
-let locality_mode_of_primitive_description (p : external_call_description) =
+type alloc_mode =
+| Stack
+| Heap
+
+let alloc_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then
-    if p.prim_alloc then Some alloc_heap else None
+    if p.prim_alloc then Some Heap else None
   else
     match p.prim_native_repr_res with
     | Prim_local, _ ->
@@ -2601,7 +2656,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
          whether [caml_c_call] is required, without telling us anything
          about local allocation.  (However if [p.prim_alloc = false] we
          do actually know that the primitive does not allocate on the heap.) *)
-      Some alloc_local
+      Some Stack
     | (Prim_global | Prim_poly), _ ->
       (* For primitives that definitely do not allocate locally,
          [p.prim_alloc = false] actually tells us that the primitive does
@@ -2609,7 +2664,19 @@ let locality_mode_of_primitive_description (p : external_call_description) =
 
          No external call that is [Prim_poly] may allocate locally.
       *)
-      if p.prim_alloc then Some alloc_heap else None
+      if p.prim_alloc then Some Heap else None
+
+let locality_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some alloc_local
+  | Some Heap -> Some alloc_heap
+  | None -> None
+
+let return_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some maybe_alloc_stack
+  | Some Heap -> Some not_alloc_stack
+  | None -> None
 
 let project_from_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list
@@ -2801,6 +2868,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_magic _ -> None
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
+  | Punbox_mask -> None
+  | Pbox_mask m -> Some m
   | Punbox_unit -> None
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
@@ -3001,6 +3070,7 @@ let primitive_can_raise prim =
   | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
   | Pbox_vector (_, _) | Punbox_vector _
+  | Pbox_mask _ | Punbox_mask
   | Pjoin_vec256 | Psplit_vec256
   | Punbox_unit | Pmake_unboxed_product _
   | Punboxed_product_field _ | Pget_header _ ->
@@ -3370,6 +3440,8 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
+  | Pbox_mask _ -> layout_boxed_mask
+  | Punbox_mask -> layout_unboxed_mask
   | Pjoin_vec256 -> layout_unboxed_vector Unboxed_vec256
   | Psplit_vec256 ->
     Punboxed_product
@@ -3599,9 +3671,9 @@ let may_allocate_in_region lam =
       ->
       raise Exit
 
-    | Lapply {ap_mode=Alloc_local}
+    | Lapply {ap_mode=Maybe_alloc_stack}
     | Lkindinstantiate {kinst_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Maybe_alloc_stack,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with

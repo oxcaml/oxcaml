@@ -40,8 +40,9 @@
                     None
                   expression (test.ml[3,104+11]..test.ml[3,104+28])
                     Texp_function
-                    alloc_mode id(modevar#13[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#14[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-                    id(modevar#11[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#12[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                    alloc_mode id(modevar#19[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#1a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                    yielding_mode unyielding
+                    id(modevar#17[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#18[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                     []
                     []
                     Tfunction_body
@@ -85,6 +86,7 @@
               Texp_newtype  t
             Texp_function
             alloc_mode id(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            yielding_mode unyielding
             id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             []
             [
@@ -93,19 +95,20 @@
                 pattern (type.ml[1,0+22]..type.ml[1,0+25])
                   extra (type.ml[1,0+21]..type.ml[1,0+35])
                     Tpat_extra_constraint
-                    core_type (type.ml[1,0+28]..type.ml[1,0+34])
-                      Ttyp_constr \"list!\"
-                      [
-                        core_type (type.ml[1,0+28]..type.ml[1,0+29])
-                          Ttyp_constr \"t\"
-                          []
-                      ]
+                    Some
+                      core_type (type.ml[1,0+28]..type.ml[1,0+34])
+                        Ttyp_constr \"list!\"
+                        [
+                          core_type (type.ml[1,0+28]..type.ml[1,0+29])
+                            Ttyp_constr \"t\"
+                            []
+                        ]
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"foo\"
                   sort value
-                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                id(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
             Tfunction_body
@@ -116,9 +119,10 @@
                     pattern (type.ml[1,0+44]..type.ml[1,0+45])
                       extra (type.ml[1,0+43]..type.ml[1,0+50])
                         Tpat_extra_constraint
-                        core_type (type.ml[1,0+48]..type.ml[1,0+49])
-                          Ttyp_constr \"t\"
-                          []
+                        Some
+                          core_type (type.ml[1,0+48]..type.ml[1,0+49])
+                            Ttyp_constr \"t\"
+                            []
                         global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                         []
                       Tpat_any

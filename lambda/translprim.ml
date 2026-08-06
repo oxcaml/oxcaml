@@ -196,6 +196,14 @@ let to_modify_mode ~poly = function
     | None -> assert false
     | Some mode -> transl_modify_mode mode
 
+let to_return_mode ~poly = function
+  | Prim_global, _ -> not_alloc_stack
+  | Prim_local, _ -> maybe_alloc_stack
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some locality -> transl_return_mode_l locality
+
 let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
   = fun ~poly_sort r -> match r, poly_sort with
@@ -1107,6 +1115,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%unbox_mask" -> Primitive(Punbox_mask, 1)
+    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
@@ -2277,16 +2287,20 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
       Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
-      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
+      Lsend(Public, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_self (pos, layout), [obj; meth] ->
-      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
+      Lsend(Self, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
       if !Clflags.native_code then
-        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout,
+        Lsend(Cached, meth, obj, [cache; pos], apos,
+              not_alloc_stack, loc, layout,
               Unyielding)
       else
-        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout, Unyielding)
+        Lsend(Public, meth, obj, [], apos, not_alloc_stack,
+              loc, layout, Unyielding)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
   | Identity, [arg] -> arg
@@ -2305,7 +2319,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         ap_specialised = Default_specialise;
         ap_probe = None;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
         (* [yielding] is the joined yielding mode of the application of the
            [%apply] / [%revapply] primitive itself. *)
         ap_yielding = yielding;
@@ -2507,7 +2521,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
        ~loc
        ~body
        ~mode:alloc_heap
-       ~ret_mode:(to_locality p.prim_native_repr_res)
+       ~ret_mode:(to_return_mode ~poly:poly_mode p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that MAY raise
@@ -2612,10 +2626,11 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
-  | Pobj_magic _ | Punbox_vector _
+  | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
+  | Pbox_mask _
   | Punbox_unit
     -> false
   | Pmakearray (Punspecializedarray, _, _)

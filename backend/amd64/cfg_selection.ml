@@ -230,7 +230,7 @@ let pseudoregs_for_operation op arg res =
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
   | End_region | Poll | Dls_get | Tls_get | Domain_index ->
@@ -290,7 +290,10 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
 let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
-  | Cconst_int (n, _dbg) when int_is_immediate n ->
+  (* The immediate of a store is never negated, so the full signed 32-bit range
+     applies (hence [is_immediate_natint] rather than [int_is_immediate], whose
+     range is symmetric). *)
+  | Cconst_int (n, _dbg) when is_immediate_natint (Nativeint.of_int n) ->
     Rewritten
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
@@ -331,14 +334,15 @@ let is_offset_out_of_range _byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype src dst :
+let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  let is_mask_reg (reg : Reg.t) =
-    Cmm.equal_machtype_component reg.typ Cmm.Mask
-  in
-  if Array.exists is_mask_reg src || Array.exists is_mask_reg dst
-  then Misc.fatal_error "avx512 masks not yet implemented"
-  else Use_default
+  match src, dst with
+  | [| s |], [| d |]
+    when Cmm.equal_machtype_component s.typ Mask
+         && Cmm.equal_machtype_component d.typ Int ->
+    (* The C ABI passes masks in GPRs. *)
+    Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
+  | _ -> Use_default
 
 (* Recognize float arithmetic with mem *)
 

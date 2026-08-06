@@ -445,7 +445,7 @@ let rec fracture_lam lambda : slambda =
                         ap_args = [fun_r];
                         ap_result_layout = kinst_result_layout;
                         ap_region_close = Rc_normal;
-                        ap_mode = kinst_mode;
+                        ap_mode = return_mode_of_locality_mode kinst_mode;
                         ap_yielding = Unyielding;
                         ap_loc = kinst_loc;
                         ap_tailcall = Default_tailcall;
@@ -562,9 +562,9 @@ and fracture_prim lambda prim args loc =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
   | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field | Popaque _ | Pprobe_is_enabled _ | Pobj_dup
-  | Pobj_magic _ | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Pjoin_vec256
-  | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
-  | Preinterpret_tuple_as_boxed_vector _
+  | Pobj_magic _ | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask
+  | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get

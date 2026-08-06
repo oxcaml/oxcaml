@@ -2343,7 +2343,7 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_args = [ Lprim (Popaque Lambda.layout_lazy, [ varg ], loc) ];
       ap_result_layout = Lambda.layout_lazy_contents;
       ap_region_close = pos;
-      ap_mode = alloc_heap;
+      ap_mode = not_alloc_stack;
       (* Lazy thunks may never be at the yielding mode, so forcing a lazy value
          never yields *)
       ap_yielding = Unyielding;
@@ -2432,7 +2432,7 @@ let inline_lazy_force arg pos loc =
         ap_args = [ Lconst (Const_base (Const_int 0)); arg ];
         ap_result_layout = Lambda.layout_lazy_contents;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
         (* Lazy thunks may never be at the yielding mode, so forcing a lazy
            value never yields *)
         ap_yielding = Unyielding;
@@ -4815,7 +4815,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     let return = Typeopt.layout pat.pat_env pat.pat_loc sort pat.pat_type in
     let mode = Mode.value_to_alloc_r2l mode in
     let locality = Mode.Alloc.proj_comonadic Areality mode in
-    let ret_mode = Translmode.transl_locality_mode_l locality in
+    let ret_mode = Translmode.transl_return_mode_l locality in
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
