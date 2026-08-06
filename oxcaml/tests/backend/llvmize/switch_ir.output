@@ -2019,11 +2019,11 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlSwitch__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlSwitch = global i64 2816, section ".data", align 8
-@camlSwitch = global { ptr, ptr } { ptr @camlSwitch__next_2_13, ptr @camlSwitch__test_next_HIDE_STAMP }, section ".data", align 8
+@camlSwitch = global { ptr, ptr } { ptr @camlSwitch__next_0_13, ptr @camlSwitch__test_next_HIDE_STAMP }, section ".data", align 8
 @header.camlSwitch__test_next_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlSwitch__test_next_3_14 = global { ptr, i64 } { ptr @camlSwitch__test_next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlSwitch__test_next_1_14 = global { ptr, i64 } { ptr @camlSwitch__test_next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlSwitch__next_HIDE_STAMP = global i64 3063, section ".data", align 8
-@camlSwitch__next_2_13 = global { ptr, i64 } { ptr @camlSwitch__next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlSwitch__next_0_13 = global { ptr, i64 } { ptr @camlSwitch__next_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @header.camlSwitch__const_block_10 = global i64 2827, section ".data", align 8
 @camlSwitch__const_block_10 = global { ptr, ptr } { ptr @camlSwitch__immstring_4, ptr @camlSwitch__const_block_9 }, section ".data", align 8
 @header.camlSwitch__const_block_9 = global i64 4868, section ".data", align 8

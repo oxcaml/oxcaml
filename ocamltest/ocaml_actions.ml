@@ -657,6 +657,7 @@ let run_fexpr log env =
   let commandline =
   [
     Ocaml_commands.fexprc;
+    backend_default_flags env Ocaml_backends.Native;
     backend_flags env Ocaml_backends.Native;
     testfile
   ] in
@@ -887,6 +888,7 @@ let run_expect_once input_file principal log env ~backend =
     command;
     expect_flags;
     Ocaml_flags.toplevel_default_flags;
+    backend_default_flags env backend;
     backend_flags env backend;
     Ocaml_flags.stdlib;
     directory_flags env;
