@@ -91,8 +91,8 @@ let expr_tail_positions = function
   | Texp_idx _
   | Texp_atomic_loc _
   | Texp_hole _
-  | Texp_quotation _
-  | Texp_antiquotation _
+  | Texp_quote _
+  | Texp_splice _
   | Texp_unboxed_unit
   | Texp_unboxed_bool _ -> []
   | Texp_match (_, _, cs, _, _) -> List.map cs ~f:(fun c -> Case c)

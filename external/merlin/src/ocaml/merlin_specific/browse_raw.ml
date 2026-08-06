@@ -570,8 +570,8 @@ let rec of_expression_desc loc = function
         alloc_mode = _
       } -> of_expression record
   | Texp_hole _ -> id_fold
-  | Texp_quotation exp -> of_expression exp
-  | Texp_antiquotation exp -> of_expression exp
+  | Texp_quote exp -> of_expression exp
+  | Texp_splice exp -> of_expression exp
   | Texp_apply_layout (exp, _) -> of_expression exp
 
 (* We should consider taking into account param.fp_loc at some point, as it
