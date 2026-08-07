@@ -4786,6 +4786,70 @@ let type_interface ~sourcefile modulename env ast =
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
 
+let functorize_signature ~params ~modules : Types.signature =
+  let make_md md_type : Types.module_declaration =
+    { md_type;
+      md_modalities = Modality.(Const.id |> of_const);
+      md_attributes = [];
+      md_loc = Location.none;
+      md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let wrap_in_named_functor_layers params (body : Types.module_type)
+        : Types.module_type =
+    List.fold_right
+      (fun (p_name, param_id) body ->
+        let impl, param_params, (swg : Signature_with_global_bindings.t) =
+          Env.find_import ~chain:[]
+            (Compilation_unit.Name.of_parameter_name p_name)
+        in
+        assert (Option.is_none impl);
+        assert (List.is_empty param_params);
+        assert (Array.length swg.bound_globals = 0);
+        let sign, _ = swg.sign in
+        let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
+        Mty_functor
+          (Named (Some param_id, param_type, Alloc.legacy), body, Alloc.legacy))
+      params body
+  in
+  let body =
+    List.map
+      (fun (id, sign) ->
+        Sig_module
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
+      modules
+  in
+  let intf_id = Ident.create_local "Intf" in
+  let make_id = Ident.create_local "Make" in
+  let s_id = Ident.create_local "S" in
+  let s_decl : Types.modtype_declaration =
+    { mtd_type = Some (Mty_signature body);
+      mtd_attributes = [];
+      mtd_loc = Location.none;
+      mtd_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let intf_result = [ Sig_modtype (s_id, s_decl, Exported) ] in
+  let intf_mty =
+    wrap_in_named_functor_layers params (Mty_signature intf_result)
+  in
+  (* Fresh idents so [Make]'s binders are distinct from [Intf]'s. *)
+  let make_params =
+    List.map (fun (p_name, id) -> (p_name, Ident.rename id)) params
+  in
+  let intf_applied_path =
+    List.fold_left
+      (fun p (_p_name, arg_id) -> Path.Papply (p, Path.Pident arg_id))
+      (Path.Pident intf_id) make_params
+  in
+  let make_result = Mty_ident (Path.Pdot (intf_applied_path, "S")) in
+  let make_with_unit = Mty_functor (Unit, make_result, Alloc.legacy) in
+  let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
+  [
+    Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
+    Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
+  ]
+
 let package_signatures units =
   let units_with_ids =
     List.map
