@@ -274,28 +274,11 @@ let analyze (src_names : CU.Name.Set.t) : result =
 
 let interface input_module_names (info : Compile_common.info) =
   let unit_info = info.target in
-  let compilation_unit = info.module_name in
   let { module_sigs; params; _ } = analyze input_module_names in
-  let sg = Typemod.functorize_signature ~params ~modules:module_sigs in
-  Ident.reinit ();
   Misc.try_finally
     (fun () ->
-      if not !Clflags.dont_write_files then begin
-        let name = CU.name compilation_unit in
-        let kind =
-          Cmi_format.Normal { cmi_impl = compilation_unit; cmi_arg_for = None }
-        in
-        let cmi =
-          Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
-            (sg, Mode.Staticity.Dynamic)
-            name kind (Unit_info.cmi unit_info)
-        in
-        let decl_deps = Cmt_format.get_declaration_dependencies () in
-        Cmt_format.save_cmt (Unit_info.cmti unit_info) compilation_unit
-          Cmt_format.Functorize (Compmisc.initial_env ()) (Some cmi) None;
-        Cms_format.save_cms (Unit_info.cmsi unit_info) compilation_unit
-          Cmt_format.Functorize (Compmisc.initial_env ()) None decl_deps
-      end)
+      Typemod.functorize_interface (Compmisc.initial_env ()) ~params
+        ~module_sigs unit_info info.module_name)
     ~exceptionally:(fun () ->
       Misc.remove_file (Unit_info.Artifact.filename (Unit_info.cmi unit_info)))
 
@@ -307,74 +290,12 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
     (info : Compile_common.info) : unit =
   let unit_info = info.target in
   let { modules; module_sigs; params } = analyze input_module_names in
-  let sg = Typemod.functorize_signature ~params ~modules:module_sigs in
+  let coercion =
+    Typemod.functorize_implementation (Compmisc.initial_env ()) ~params ~modules
+      ~module_sigs unit_info info.module_name
+  in
   let params = List.map fst params in
   let modulename = info.module_name in
-  Ident.reinit ();
-  let coercion =
-    if !Clflags.dont_write_files then Typedtree.Tcoerce_none
-    else
-      (* Build cmt/cms artifacts directly via [Artifact.from_filename] so they
-         get [raw_source_file = None].  The bundle has no source [.ml];
-         passing the output (the [source_file] [unit_info] was built with)
-         would make [save_cmt]/[save_cms] [Digest.file] it, which doesn't
-         exist yet at type-check time.  The cmt's [Functorize] binary_annots
-         variant already records that this was a functorize output. *)
-      let for_pack_prefix = CU.for_pack_prefix modulename in
-      let target_artifact ext =
-        let filename = Unit_info.prefix unit_info ^ ext in
-        Unit_info.Artifact.from_filename ~for_pack_prefix filename
-      in
-      let save_cmt_cms cmi_opt =
-        let decl_deps = Cmt_format.get_declaration_dependencies () in
-        Cmt_format.save_cmt (target_artifact ".cmt") modulename
-          Cmt_format.Functorize (Compmisc.initial_env ()) cmi_opt None;
-        Cms_format.save_cms (target_artifact ".cms") modulename
-          Cmt_format.Functorize (Compmisc.initial_env ()) None decl_deps
-      in
-      match !Clflags.cmi_file with
-      | Some cmi_file ->
-          let shape =
-            let uid = Types.Uid.of_compilation_unit_id modulename in
-            List.fold_left
-              (fun map (gm : GM.t) ->
-                let name_str = GM.Name.to_string (GM.to_name gm) in
-                let id = Ident.create_persistent name_str in
-                Shape.Map.add_module map id (Shape.for_persistent_unit name_str))
-              Shape.Map.empty modules
-            |> Shape.str ~uid
-          in
-          let for_pack_prefix = CU.for_pack_prefix modulename in
-          let cmi_artifact =
-            Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
-          in
-          let name = CU.to_global_name_without_prefix modulename in
-          let dclsig, staticity = Env.read_signature name cmi_artifact in
-          let cc, _shape =
-            let modes =
-              Includecore.Specific
-                ( (Persistent_env.mode_pers_mod Mode.Staticity.Dynamic, None),
-                  Persistent_env.mode_pers_mod staticity )
-            in
-            Includemod.compunit (Compmisc.initial_env ()) ~mark:true
-              "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
-          in
-          save_cmt_cms None;
-          cc
-      | None ->
-          let name = CU.name modulename in
-          let kind =
-            Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
-          in
-          let cmi =
-            Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
-              (sg, Mode.Staticity.Dynamic)
-              name kind (Unit_info.cmi unit_info)
-              (Array.of_list (Env.imports ()))
-          in
-          save_cmt_cms (Some cmi);
-          Typedtree.Tcoerce_none
-  in
   if not Clflags.(should_stop_after Compiler_pass.Typing) then begin
     let find_impl_by_name ~chain cu =
       let base = Compilation_unit.base_filename cu ^ ext in
