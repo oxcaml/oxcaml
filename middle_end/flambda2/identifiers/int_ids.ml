@@ -580,6 +580,9 @@ module Variable = struct
     let user_visible = if data.user_visible then Some () else None in
     create ?user_visible data.name data.kind
 
+  let import_backwards importer t =
+    Table.import_backwards importer (find_data t)
+
   type stamp_state = int
 
   let export_stamp_state () = !previous_name_stamp
@@ -672,6 +675,9 @@ module Symbol = struct
 
   let import importer t =
     Table.add !grand_table_of_symbols (Table.import importer t)
+
+  let import_backwards importer t =
+    Table.import_backwards importer (find_data t)
 end
 
 module Name = struct
