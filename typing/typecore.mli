@@ -347,7 +347,6 @@ type error =
   | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
-  | Block_index_atomic_unsupported
   | Mutable_block_index_polymorphic_field of Longident.t
   | Submode_failed of Mode.Value.error * submode_reason
   | Curried_application_complete of

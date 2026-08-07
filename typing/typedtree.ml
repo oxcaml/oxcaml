@@ -435,7 +435,7 @@ and meth =
 and block_access =
   | Baccess_field of
       Longident.t loc * label_description * Types.record_representation
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of access_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of

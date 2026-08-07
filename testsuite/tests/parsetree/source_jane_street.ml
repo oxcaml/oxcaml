@@ -1300,6 +1300,28 @@ val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
 |}]
 
+(* Block index as block access (index deepening) *)
+type 'a s = { a : 'a; mutable b: 'a; mutable c: 'a [@atomic] }
+
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect{|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect{|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
+|}]
+
 module Borrow = struct
   let f () =
     let x = "hello" in

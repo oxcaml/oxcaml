@@ -45,6 +45,14 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
+type atomic_flag = Asttypes.atomic_flag
+
+type access_flag = Asttypes.access_flag
+
+let access_atomicity : access_flag -> atomic_flag = function
+  | Immutable_access | Mutable_access -> Nonatomic
+  | Atomic_access -> Atomic
+
 include (struct
 
   type locality_mode =
@@ -476,8 +484,8 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
+  | Pget_idx of layout * access_flag
+  | Pset_idx of layout * modify_mode * atomic_flag
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
