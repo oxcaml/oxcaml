@@ -117,9 +117,6 @@ ref_unsafe_set:
   ret
 |}]
 
-(* CR ttebbi: Stackframe creation is only necessary on the GC-calling path.
-   In this case, this would require moving the stackframe creation into the
-   hidden block where the GC is actually called. *)
 let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
@@ -453,10 +450,6 @@ ref_safe_set:
   jmp   *%r11
 |}]
 
-(* CR ttebbi: The header is loaded twice: once for the bounds check and once
-   for the tag check (to distingish float arrays). The non-float case should
-   be the inline one for code compactness.
-*)
 let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|

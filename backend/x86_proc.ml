@@ -283,8 +283,8 @@ let float_condition_of_imm = function
   | Imm 5L -> NLTf
   | Imm 6L -> NLEf
   | Imm 7L -> ORDf
-  | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _
-  | Mem64_RIP _ | Imm _ ->
+  | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Regmask _
+  | Mem _ | Mem64_RIP _ | Imm _ ->
     Misc.fatal_errorf "Invalid float condition immediate arg"
 
 let string_of_float_condition_imm imm =

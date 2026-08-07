@@ -50,6 +50,7 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
   | Boxed_vec128 v -> RSC.create_boxed_vec128 art ~machine_width (Const v)
   | Boxed_vec256 v -> RSC.create_boxed_vec256 art ~machine_width (Const v)
   | Boxed_vec512 v -> RSC.create_boxed_vec512 art ~machine_width (Const v)
+  | Boxed_mask v -> RSC.create_boxed_mask art ~machine_width (Const v)
   | Immutable_float32_array { fields } ->
     let fields = List.map (fun f -> Or_variable.Const f) fields in
     RSC.create_immutable_float32_array art fields
@@ -83,6 +84,9 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
   | Immutable_vec512_array { fields } ->
     let fields = List.map (fun f -> Or_variable.Const f) fields in
     RSC.create_immutable_vec512_array art fields
+  | Immutable_mask_array { fields } ->
+    let fields = List.map (fun f -> Or_variable.Const f) fields in
+    RSC.create_immutable_mask_array art fields
   | Immutable_value_array { fields } ->
     let fields = convert_fields fields in
     RSC.create_immutable_value_array art fields

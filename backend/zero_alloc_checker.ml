@@ -1736,6 +1736,7 @@ end = struct
       | Alloc_block_kind_vec128 -> pp "vec128"
       | Alloc_block_kind_vec256 -> pp "vec256"
       | Alloc_block_kind_vec512 -> pp "vec512"
+      | Alloc_block_kind_mask -> pp "mask"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1752,6 +1753,7 @@ end = struct
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
       | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
       | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
+      | Alloc_block_kind_mask_u_array -> pp "unboxed_mask_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let aloc = Debuginfo.to_location item.alloc_dbg in
@@ -2622,7 +2624,7 @@ end = struct
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Floatop _
+        | Const_mask _ | Load _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
               | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
@@ -2634,7 +2636,8 @@ end = struct
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ )
+            | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+            | V512_of_vec _ )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then

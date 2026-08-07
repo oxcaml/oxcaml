@@ -173,7 +173,7 @@ in
 let $camlMap_remove__merge_8 =
   closure merge_3_1 @merge &toplevel.alloc_region
 in
-let code loopify(never) size(36) newer_version_of(remove_4)
+let code loopify(never) size(30) newer_version_of(remove_4)
       remove_4_1
         (x : imm tagged,
          param :
@@ -192,10 +192,8 @@ let code loopify(never) size(36) newer_version_of(remove_4)
     where k2 =
       let l = %block_load.[`0`] (param) in
       let Pfield = %block_load.[`1`] (param) in
-      let prim_1 = %int_comp.qmark (x, Pfield) in
-      let int_compare = %tag_imm (prim_1) in
-      let prim_2 = %phys_eq (int_compare, 0) in
-      (switch prim_2
+      let prim_1 = %int_comp.eq (x, Pfield) in
+      (switch prim_1
          | 0 -> k (l)
          | 1 -> k2
          where k2 =

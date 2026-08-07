@@ -36,13 +36,26 @@ type unboxed_vector = Primitive.unboxed_vector =
   | Unboxed_vec256
   | Unboxed_vec512
 
+type scannable_product_element_kind =
+  | Pint_scannable
+  | Paddr_scannable
+  | Pproduct_scannable of scannable_product_element_kind list
+
+type ignorable_product_element_kind =
+  | Pint_ignorable
+  | Punboxedfloat_ignorable of unboxed_float
+  | Punboxedvector_ignorable of unboxed_vector
+  | Punboxedoruntaggedint_ignorable of unboxed_or_untagged_integer
+  | Pproduct_ignorable of ignorable_product_element_kind list
+
 type array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
-  | Pgcscannableproductarray of unit
-  | Pgcignorableproductarray of unit
+  | Punboxedmaskarray
+  | Pgcscannableproductarray of scannable_product_element_kind list
+  | Pgcignorableproductarray of ignorable_product_element_kind list
   | Punspecializedarray
 
 type nullable =

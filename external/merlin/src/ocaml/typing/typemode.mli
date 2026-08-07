@@ -51,6 +51,7 @@ val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
     instead of computing it from mutability. Used when merging explicit
     modalities with existing signature default modalities. *)
 val transl_modalities_with_default :
+  ?allow_redundant_staticity:bool ->
   maturity:Language_extension.maturity ->
   default:Mode.Modality.Const.t ->
   Parsetree.modalities ->

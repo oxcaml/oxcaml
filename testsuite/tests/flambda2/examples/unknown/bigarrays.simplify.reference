@@ -3,7 +3,7 @@ let $camlBigarrays__block24 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlBigarrays__string22)
 in
 (let `region` = %begin_region () in
- (let Pmakearray = %array.`imm`.mut.`toplevel`.`local`[`region`] (3, 3) in
+ (let Pmakearray = %array.`imm`.mut.`toplevel`.local[`region`] (3, 3) in
   apply ccall inlining_state(depth(10))
     ($`*extern*`.caml_ba_create : val * val * val -> val)
       (8, 0, Pmakearray)

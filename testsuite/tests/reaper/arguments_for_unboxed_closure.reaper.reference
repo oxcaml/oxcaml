@@ -12,7 +12,7 @@ let $camlArguments_for_unboxed_closure__id_6 =
 in
 let code inline(never) loopify(never) size(7) newer_version_of(u_4)
       u_4_1
-        (u_into_my_closure_field_g_field_x, u_into_my_closure_field_g_field_y)
+        (u_into_my_closure_field_g_field_y, u_into_my_closure_field_g_field_x)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -58,7 +58,7 @@ let code loopify(never) size(13) newer_version_of(f_0)
   let u_into_u_field_g_field_x = g_into_g_field_x in
   let u_into_u_field_g_field_y = g_into_g_field_y in
   apply direct(u_4_1 &my_alloc_region)
-     (u_into_u_field_g_field_x, u_into_u_field_g_field_y) -> k2 * k1
+     (u_into_u_field_g_field_y, u_into_u_field_g_field_x) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       (apply direct(g_1_1 &my_alloc_region) inlined(never)
          

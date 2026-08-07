@@ -49,7 +49,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
     when not (List.exists
         Lambda.ignorable_product_element_kind_involves_int igns) -> ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-  | Punboxedvectorarray _ ->
+  | Punboxedvectorarray _ | Punboxedmaskarray ->
     ()
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
@@ -196,6 +196,14 @@ let to_modify_mode ~poly = function
     | None -> assert false
     | Some mode -> transl_modify_mode mode
 
+let to_return_mode ~poly = function
+  | Prim_global, _ -> not_alloc_stack
+  | Prim_local, _ -> maybe_alloc_stack
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some locality -> transl_return_mode_l locality
+
 let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
   = fun ~poly_sort r -> match r, poly_sort with
@@ -206,6 +214,7 @@ let extern_repr_of_native_repr:
   | Unboxed_float f, _ -> Unboxed_float f
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
+  | Unboxed_mask, _ -> Unboxed_mask
   | Unpacked_product sort, _ ->
     (* The product sort is unarized into separate C arguments by
        [unarize_extern_repr] in [closure_conversion.ml]. *)
@@ -215,7 +224,7 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _) ->
+     Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.Base Scannable
 
 let to_lambda_prim prim ~poly_sort =
@@ -365,6 +374,12 @@ let indexing_primitives =
           Pbigstring_set_vec
             { size = Boxed_vec512; checks; index_kind;
               aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pbytes_load_i8 { unsafe; index_kind; tagged } );
@@ -420,6 +435,12 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_string_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pstring_load_i8 { unsafe; index_kind; tagged } );
@@ -451,6 +472,9 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_vec { size = Boxed_vec512; unsafe;
                              index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_mask { unsafe; index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
          upstream compatibility. *)
@@ -1106,6 +1130,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%unbox_mask" -> Primitive(Punbox_mask, 1)
+    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
@@ -1320,7 +1346,7 @@ let glb_array_type loc t1 t2 =
   | Punspecializedarray, x | x, Punspecializedarray -> x
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                 | Punboxedvectorarray _) ->
+                 | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray Unboxed_float64, Punboxedfloatarray Unboxed_float64 ->
@@ -1356,6 +1382,10 @@ let glb_array_type loc t1 t2 =
   | Punboxedvectorarray Unboxed_vec512, Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray Unboxed_vec512
   | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray | Punboxedmaskarray), Punboxedmaskarray ->
+    Punboxedmaskarray
+  | Punboxedmaskarray, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1408,7 +1438,7 @@ let glb_array_ref_type loc t1 t2 =
   | t1, Punspecializedarray -> t1
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                       | Punboxedvectorarray _) ->
+                       | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray_ref Unboxed_float64,
@@ -1450,6 +1480,10 @@ let glb_array_ref_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_ref Unboxed_vec512
   | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_ref _ | Punboxedmaskarray_ref), Punboxedmaskarray ->
+    Punboxedmaskarray_ref
+  | Punboxedmaskarray_ref, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1515,7 +1549,7 @@ let glb_array_set_type loc t1 t2 =
   | t1, Punspecializedarray -> t1
   (* Handle unboxed array kinds which can only match with themselves. *)
   | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-                     | Punboxedvectorarray _) ->
+                     | Punboxedvectorarray _ | Punboxedmaskarray) ->
     (* Have a nice error message for a case reachable. *)
     raise(Error(loc, Invalid_floatarray_glb))
   | Punboxedfloatarray_set Unboxed_float64,
@@ -1557,6 +1591,10 @@ let glb_array_set_type loc t1 t2 =
     Punboxedvectorarray Unboxed_vec512 ->
     Punboxedvectorarray_set Unboxed_vec512
   | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_set _ | Punboxedmaskarray_set), Punboxedmaskarray ->
+    Punboxedmaskarray_set
+  | Punboxedmaskarray_set, _ | _, Punboxedmaskarray ->
     unexpected ()
 
   (* Unboxed product arrays. *)
@@ -1629,6 +1667,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
     | Ptop
     | Pvalue _
     | Punboxed_vector _
+    | Punboxed_mask
     | Punboxed_product _
     | Pbottom
     | Psplicevar _ ->
@@ -2214,7 +2253,7 @@ let add_exception_ident id =
 let remove_exception_ident id =
   Hashtbl.remove try_ids id
 
-let lambda_of_prim prim_name prim loc args arg_exps =
+let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   match prim, args with
   | Primitive (prim, arity), args when arity = List.length args ->
       Lprim(prim, args, loc)
@@ -2263,15 +2302,20 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
-      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Public, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_self (pos, layout), [obj; meth] ->
-      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout)
+      Lsend(Self, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
       if !Clflags.native_code then
-        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout)
+        Lsend(Cached, meth, obj, [cache; pos], apos,
+              not_alloc_stack, loc, layout,
+              Unyielding)
       else
-        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout)
+        Lsend(Public, meth, obj, [], apos, not_alloc_stack,
+              loc, layout, Unyielding)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
   | Identity, [arg] -> arg
@@ -2290,7 +2334,10 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         ap_specialised = Default_specialise;
         ap_probe = None;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
+        (* [yielding] is the joined yielding mode of the application of the
+           [%apply] / [%revapply] primitive itself. *)
+        ap_yielding = yielding;
       }
   | Peek None, _ | Poke None, _ ->
       raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))
@@ -2384,7 +2431,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
-let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
+let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2407,7 +2454,9 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
           let arg_mode = to_locality arg in
-          let params, return = make_params ret_ty repr_args repr_res in
+          let params, return =
+            make_params ret_ty repr_args repr_res
+          in
           { name = Ident.create_local "prim";
             debug_uid = Lambda.debug_uid_none;
             (* The eta expansion is not actually visible at the source level,
@@ -2421,15 +2470,18 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
   let args = List.map (fun p -> Lvar p.name) params in
+  let yielding = transl_yielding_mode_l yielding in
   match params with
-  | [] -> lambda_of_prim p.prim_name prim loc args None
+  | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
   | _ ->
      let loc =
        Debuginfo.Scoped_location.map_scopes
          Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
-     let body = lambda_of_prim p.prim_name prim loc args None in
+     let body =
+       lambda_of_prim p.prim_name prim ~yielding loc args None
+     in
      let locality_mode = to_locality p.prim_native_repr_res in
      let () =
        (* CR mshinwell: Write a version of [primitive_may_allocate] that
@@ -2484,7 +2536,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
        ~loc
        ~body
        ~mode:alloc_heap
-       ~ret_mode:(to_locality p.prim_native_repr_res)
+       ~ret_mode:(to_return_mode ~poly:poly_mode p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that MAY raise
@@ -2515,15 +2567,20 @@ let lambda_primitive_needs_event_after = function
   | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
   | Pstring_load_vec _
+  | Pstring_load_mask _
   | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
   | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_load_mask _
   | Pbytes_set_8 _ | Pbytes_set_16 _
   | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+  | Pbytes_set_mask _
   | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _
+  | Pbigstring_load_mask _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_mask _
   | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
@@ -2568,12 +2625,13 @@ let lambda_primitive_needs_event_after = function
   | Pbytessetu
   | Pmakearray ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
                  | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ | Punboxedmaskarray
       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Pmakearray_dynamic
       ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
         | Punboxedfloatarray _
        | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+       | Punboxedmaskarray
        | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
   | Parrayblit _
   | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
@@ -2582,15 +2640,17 @@ let lambda_primitive_needs_event_after = function
   | Patomic_compare_set_field _ | Patomic_fetch_add_field
   | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
-  | Patomic_load_field _ | Patomic_set_field _
+  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get
   | Pdomain_index
-  | Pobj_magic _ | Punbox_vector _
+  | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
+  | Pbox_mask _
   | Punbox_unit
     -> false
   | Pmakearray (Punspecializedarray, _, _)
@@ -2610,7 +2670,7 @@ let primitive_needs_event_after = function
   | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
-    path exp args arg_exps pos =
+    ~yielding path exp args arg_exps pos =
   let prim =
     transl_primitive_common
       loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
@@ -2638,7 +2698,9 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam = lambda_of_prim p.prim_name prim loc args (Some arg_exps) in
+  let lam =
+    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
+  in
   let lam =
     if primitive_needs_event_after prim then begin
       match exp with

@@ -81,6 +81,7 @@ let shift ~bits make_op arg count dbg =
     | Cconst_vec128 (_, _)
     | Cconst_vec256 (_, _)
     | Cconst_vec512 (_, _)
+    | Cconst_mask (_, _)
     | Cconst_symbol (_, _)
     | Cvar _
     | Clet (_, _, _)
@@ -334,6 +335,13 @@ let transl_vec_builtin name args dbg _typ_res =
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   | "caml_vec512_low_to_vec256" ->
     let op = Creinterpret_cast (V256_of_vec Vec512) in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  (* Mask <-> integer reinterprets *)
+  | "caml_mask_of_int64" ->
+    let op = Creinterpret_cast Mask_of_int64 in
+    if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
+  | "caml_int64_of_mask" ->
+    let op = Creinterpret_cast Int64_of_mask in
     if_operation_supported op ~f:(fun () -> Cop (op, args, dbg))
   (* Scalar casts. These leave the top bits of the vector unspecified. *)
   | "caml_float64x2_low_of_float" ->
@@ -962,6 +970,7 @@ let transl_builtin name args dbg typ_res =
         | Cconst_vec128 (_, _)
         | Cconst_vec256 (_, _)
         | Cconst_vec512 (_, _)
+        | Cconst_mask (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)

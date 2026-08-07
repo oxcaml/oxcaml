@@ -61,7 +61,11 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
     let desc =
       C.Int_test
         { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
@@ -134,7 +138,7 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
       begin if f (Array.unsafe_get arr idx)
       then
         begin match acc with
-        | None -> find arr (idx - 1) f None
+        | None -> find arr (idx - 1) f (Some idx)
         | Some _ -> None
         end
       else find arr (idx - 1) f acc
@@ -287,8 +291,8 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         end
       | Op
           ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Int128op _
-          | Intop_atomic _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Int128op _ | Intop_atomic _
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _

@@ -2405,7 +2405,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     (* we are constructing a closure here, and therefore any implicit
        borrowing of free variables in the closure is in fact using aliased. *)
     lift_implicit_borrowing uf
-  | Texp_apply (fn, args, _, _, _) ->
+  | Texp_apply (fn, args, _, _, _, _) ->
     let uf_fn = check_uniqueness_exp ~overwrite:None ienv fn in
     let uf_args =
       List.map
@@ -2674,12 +2674,12 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
-  (* CR metaprogramming aivaskovic:
-     it might be reasonable to treat `Texp_quotation e` as `e` *)
-  | Texp_quotation e ->
+  (* CR-someday quoted-modes jbachurski: The uniqueness analysis should be
+     stage-aware for <[once]>/<[unique]> to work when they are added. *)
+  | Texp_quote e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.quote uf
-  | Texp_antiquotation e ->
+  | Texp_splice e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
 

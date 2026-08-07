@@ -56,7 +56,7 @@ let code loopify(never) size(22) newer_version_of(i_3)
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  (let a = %array.mut.my_alloc_region.`local`[`region`] (x) in
+  (let a = %array.mut.my_alloc_region.local[`region`] (x) in
    (let untagged = %untag_imm (w) in
     switch untagged
       | 0 -> k3

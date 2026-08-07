@@ -64,6 +64,8 @@ module Unboxed_or_untagged_array_tags : sig
 
   val unboxed_vec512_array_tag : int
 
+  val unboxed_mask_array_tag : int
+
   (* Given the length of an int8 array, return its tag *)
   val untagged_int8_array_tag : int -> int
 
@@ -239,6 +241,10 @@ val box_vec512 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
 
 val unbox_vec512 : Debuginfo.t -> expression -> expression
 
+val box_mask : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_mask : Debuginfo.t -> expression -> expression
+
 (** Make the given expression return a unit value *)
 val return_unit : Debuginfo.t -> expression -> expression
 
@@ -366,6 +372,7 @@ module Extended_machtype_component : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 end
 
@@ -389,6 +396,8 @@ module Extended_machtype : sig
   val typ_vec256 : t
 
   val typ_vec512 : t
+
+  val typ_mask : t
 
   (** Conversion from a normal Cmm machtype. *)
   val of_machtype : machtype -> t
@@ -626,6 +635,17 @@ val aligned_set_512 :
   Debuginfo.t ->
   expression
 
+val load_mask :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val set_mask :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
 (** Primitives *)
 
 type unary_primitive = expression -> Debuginfo.t -> expression
@@ -707,7 +727,7 @@ val send :
   expression list ->
   Extended_machtype.t list ->
   Extended_machtype.t ->
-  Lambda.region_close * Cmx_format.alloc_mode ->
+  Lambda.region_close * Cmx_format.return_mode ->
   Debuginfo.t ->
   expression
 
@@ -771,6 +791,8 @@ val emit_int64_constant : symbol -> int64 -> data_item list -> data_item list
 val emit_nativeint_constant :
   symbol -> nativeint -> data_item list -> data_item list
 
+val emit_mask_constant : symbol -> int64 -> data_item list -> data_item list
+
 val emit_vec128_constant :
   symbol -> Cmm.vec128_bits -> data_item list -> data_item list
 
@@ -823,6 +845,9 @@ val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
 
 (** Create a constant vec512 expression from eight int64s. *)
 val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
+
+(** Create a constant mask expression from its int64 bit pattern. *)
+val mask : dbg:Debuginfo.t -> int64 -> expression
 
 (** Create a constant int expression from a nativeint. *)
 val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
@@ -1054,7 +1079,7 @@ val indirect_call :
   dbg:Debuginfo.t ->
   Extended_machtype.t ->
   Lambda.region_close ->
-  Cmx_format.alloc_mode ->
+  Cmx_format.return_mode ->
   expression ->
   Extended_machtype.t list ->
   expression list ->
@@ -1163,6 +1188,14 @@ val cmm_arith_size : expression -> int option
 (* CR lmaurer: Return [Linkage_name.t] instead *)
 val make_symbol : ?compilation_unit:Compilation_unit.t -> string -> string
 
+(** Linkage name of the module initialization ("entry") function of the given
+    compilation unit (default: the current unit). The startup file references
+    this symbol for every linked unit, and the dissector passes it to the linker
+    via -u to select the required archive members. Object files contain the
+    assembler-encoded form of this name (see [Asm_targets.Asm_symbol.encode]).
+*)
+val entry_symbol_name : ?compilation_unit:Compilation_unit.t -> unit -> string
+
 val machtype_of_layout : Lambda.layout -> machtype
 
 val machtype_of_layout_changing_tagged_int_to_val : Lambda.layout -> machtype
@@ -1177,10 +1210,10 @@ val curry_function :
   Lambda.function_kind * Cmm.machtype list * Cmm.machtype -> Cmm.phrase list
 
 val send_function :
-  Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val apply_function :
-  Cmm.machtype list * Cmm.machtype * Cmx_format.alloc_mode -> Cmm.phrase
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
@@ -1318,6 +1351,11 @@ val allocate_unboxed_int64_array :
 val allocate_unboxed_nativeint_array :
   elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
 
+(** Allocate a block to hold an unboxed mask array for the given number of
+    elements. *)
+val allocate_unboxed_mask_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
 (** Allocate a block to hold an unboxed vec128 array for the given number of
     elements. *)
 val allocate_unboxed_vec128_array :
@@ -1349,6 +1387,9 @@ val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
     array. *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
   expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed mask array. *)
+val unboxed_mask_array_length : expression -> Debuginfo.t -> expression
 
 (** Compute the length of an unboxed vec128 array. *)
 val unboxed_vec128_array_length : expression -> Debuginfo.t -> expression
@@ -1488,6 +1529,10 @@ val unboxed_mutable_int32_unboxed_product_array_set :
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
   expression -> array_index:expression -> Debuginfo.t -> expression
 
+(** Read from an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
 (** Update an unboxed float32 array (without bounds check). *)
 val unboxed_float32_array_set :
   expression ->
@@ -1523,6 +1568,14 @@ val unboxed_int32_array_set :
 (** Update an unboxed int64 or unboxed nativeint or untagged int array (without
     bounds check). *)
 val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_set :
   expression ->
   index:expression ->
   new_value:expression ->
