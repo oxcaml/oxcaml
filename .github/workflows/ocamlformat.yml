@@ -25,8 +25,14 @@ jobs:
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
 
-      - name: Checkout the parent branch
-        run: git fetch origin HEAD --deepen 1
+      - name: Fetch the base for diff checks
+        # In a pull_request job, HEAD is a synthetic merge of the PR into its
+        # base branch. Right now we have a shallow checkout of _just_ that
+        # merge commit, giving us nothing to diff against. A `git fetch` with
+        # `--deepen 1` fixes it, but we have to be careful _what_ we deepen:
+        # `HEAD` refers to the _remote's_ head, which may have shifted under
+        # us. "$GITHUB_SHA" is the HEAD we actually want.
+        run: git fetch origin "$GITHUB_SHA" --deepen 1
 
       - name: Pretend we're running in a container (makes setup-ocaml go faster)
         run: sudo touch /.dockerenv
