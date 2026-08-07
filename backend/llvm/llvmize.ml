@@ -1994,9 +1994,11 @@ let write_module_metadata t =
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;
-  (* Tell LLVM's frametable printer which frame-descriptor layout this runtime
-     expects. 0 is the classic layout. *)
-  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }|};
+  (* Tell LLVM's frametable printer to emit the short frame-descriptor format
+     expected by this runtime: an escape byte before each descriptor, and no
+     alignment padding. (The printer only emits escaped descriptors, whose wire
+     format is shared with the classic layout.) *)
+  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }|};
   F.pp_line t.ppf {|!llvm.module.flags = !{ !0, !1 }|}
 
 let write_llvmir_to_file t =

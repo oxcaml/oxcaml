@@ -56,6 +56,7 @@ type t =
   | Probes
   | Note_ocaml_eh
   | Note_gnu_stack
+  | Debuginfo_strings
   | Custom of
       { names : string list;
         flags : string option;
@@ -88,7 +89,7 @@ let is_delayed = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
-  | Note_gnu_stack ->
+  | Note_gnu_stack | Debuginfo_strings ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -119,6 +120,7 @@ let print ppf t =
     | Probes -> "Probes"
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
+    | Debuginfo_strings -> "Debuginfo_strings"
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -142,7 +144,8 @@ let section_is_text = function
   | Text | Function_text _ -> true
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
-  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack ->
+  | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
+  | Debuginfo_strings ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -262,6 +265,18 @@ let details t first_occurrence =
     | Probes, _, _ -> [".probes"], Some "wa", ["\"progbits\""]
     | Note_ocaml_eh, _, _ -> [".note.ocaml_eh"], Some "?", ["\"note\""]
     | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["@progbits"]
+    | Debuginfo_strings, _, MacOS_like ->
+      (* cstring_literals: de-duped by linker *)
+      ["__TEXT"; "__cstring"], None, ["cstring_literals"]
+    | Debuginfo_strings, arch, _ ->
+      (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
+      let progbits =
+        match arch with
+        | ARM | AArch64 -> "%progbits"
+        | IA32 | X86_64 | POWER | Z | Riscv -> "@progbits"
+      in
+      [".rodata.str1.1"], Some "aMS", [progbits; "1"]
+    (* 1 = characters *)
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

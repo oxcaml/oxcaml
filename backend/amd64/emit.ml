@@ -624,9 +624,8 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
 (* CR sspies: Consider whether more of [record_frame_label] can be shared with
    the Arm backend. *)
 
-let record_frame_label live dbg =
+let compute_live_offset live =
   let encode_reg_offset n = (n lsl 1) + 1 in
-  let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   let simd = must_save_simd_regs live in
   Reg.Set.iter
@@ -654,10 +653,14 @@ let record_frame_label live dbg =
       | { typ = Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask; _ } ->
         ())
     live;
+  !live_offset
+
+let record_frame_label live dbg =
+  let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of Linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(frame_size ())
-    ~live_offset:!live_offset dbg;
+    ~live_offset:(compute_live_offset live) dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame live dbg =
@@ -669,7 +672,14 @@ let record_frame live dbg =
 type gc_call =
   { gc_lbl : L.t; (* Entry label *)
     gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame : L.t; (* Label of frame descriptor *)
+    (* The frame descriptor is recorded (and its return-address label defined)
+       when the out-of-line GC stub is emitted, rather than at the allocation
+       site, so that frame descriptors are emitted in increasing return-address
+       order. *)
+    gc_frame_lbl : Label.t; (* Linear label of the frame descriptor *)
+    gc_frame_size : int;
+    gc_live_offset : int list;
+    gc_frame_dbg : frame_debuginfo; (* debuginfo for the frame descriptor *)
     gc_dbg : Debuginfo.t; (* Location of the original instruction *)
     gc_save_simd : Regs.Save_simd_regs.t
         (* What SIMD regs, if any, we need to save *)
@@ -687,7 +697,12 @@ let emit_call_gc gc =
   D.define_label gc.gc_lbl;
   emit_debug_info gc.gc_dbg;
   emit_call (call_gc_local_sym ~simd:gc.gc_save_simd);
-  D.define_label gc.gc_frame;
+  (* Record the frame descriptor here, where its return-address label is about
+     to be defined, so that frame descriptors are recorded (and hence emitted)
+     in increasing return-address order. *)
+  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+  D.define_label (label_to_asm_label ~section:Text gc.gc_frame_lbl);
   I.jmp (emit_asm_label_arg gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
@@ -2311,7 +2326,7 @@ let emit_instr ~first ~last ~fallthrough i =
       I.sub (int n) r15;
       I.cmp (domain_field Domainstate.Domain_young_limit) r15;
       let lbl_call_gc = L.create Text in
-      let lbl_frame = record_frame_label i.live (Dbg_alloc dbginfo) in
+      let lbl_frame = Cmm.new_label () in
       I.jb (emit_asm_label_arg lbl_call_gc);
       let lbl_after_alloc = L.create Text in
       D.define_label lbl_after_alloc;
@@ -2320,7 +2335,10 @@ let emit_instr ~first ~last ~fallthrough i =
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
              gc_dbg = i.dbg;
-             gc_frame = lbl_frame;
+             gc_frame_lbl = lbl_frame;
+             gc_frame_size = frame_size ();
+             gc_live_offset = compute_live_offset i.live;
+             gc_frame_dbg = Dbg_alloc dbginfo;
              gc_save_simd
            }
            :: !call_gc_sites)
@@ -2358,13 +2376,16 @@ let emit_instr ~first ~last ~fallthrough i =
     I.cmp (domain_field Domainstate.Domain_young_limit) r15;
     let gc_call_label = L.create Text in
     let lbl_after_poll = L.create Text in
-    let lbl_frame = record_frame_label i.live (Dbg_alloc []) in
+    let lbl_frame = Cmm.new_label () in
     I.jbe (emit_asm_label_arg gc_call_label);
     call_gc_sites
       := { gc_lbl = gc_call_label;
            gc_return_lbl = lbl_after_poll;
            gc_dbg = i.dbg;
-           gc_frame = lbl_frame;
+           gc_frame_lbl = lbl_frame;
+           gc_frame_size = frame_size ();
+           gc_live_offset = compute_live_offset i.live;
+           gc_frame_dbg = Dbg_alloc [];
            gc_save_simd = must_save_simd_regs i.live
          }
          :: !call_gc_sites;
@@ -3246,18 +3267,22 @@ let end_assembly () =
   (* PR#6329 *)
   emit_global_label ~section:Data "data_end";
   D.int64 0L;
-  let frametable_section : Asm_targets.Asm_section.t =
-    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Text
-  in
-  D.switch_to_section frametable_section;
-  I.ud2 ();
-  D.align
-    ~fill:(if !Oxcaml_flags.frametables_in_rodata then Zero else Nop)
-    ~bytes:8;
+  D.switch_to_section Read_only_data;
+  D.align ~fill:Zero ~bytes:8;
   (* PR#7591 *)
-  emit_global_label ~section:frametable_section "frametable";
+  emit_global_label ~section:Read_only_data "frametable";
+  (* MASM can't assemble computed ULEB128 constants, so can't do short frame
+     descriptors *)
+  Emitaux.disable_short_descriptors := X86_proc.masm;
+  (* The binary emitter keeps the strings inline in the frametable section:
+     same-section label differences need no relocations. *)
+  let debug_strings_section : Asm_targets.Asm_section.t =
+    if Option.is_some !X86_proc.internal_assembler
+    then Read_only_data
+    else Debuginfo_strings
+  in
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
-  emit_frames
+  emit_frames ~debug_strings_section
     { efa_code_label =
         (fun l ->
           let l = label_to_asm_label ~section:Text l in
@@ -3273,18 +3298,23 @@ let end_assembly () =
       efa_u16 = (fun n -> D.uint16 n);
       efa_u32 = (fun n -> D.uint32 n);
       efa_word = (fun n -> D.targetint (Targetint.of_int_exn n));
-      efa_align = (fun n -> D.align ~fill:Nop ~bytes:n);
+      efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
+      efa_label_delta =
+        (fun upper lower ->
+          (* The return-address labels live in the text section. *)
+          let upper = label_to_asm_label ~section:Text upper in
+          let lower = label_to_asm_label ~section:Text lower in
+          D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:frametable_section l in
-          D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+          let lbl = label_to_asm_label ~section:Read_only_data l in
+          D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
