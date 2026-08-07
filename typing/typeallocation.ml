@@ -1,10 +1,23 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                   Shixin Song, Jane Street, New York                   *)
+(*                                                                        *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* Registration and settling of the modes of allocations. *)
 
 open Mode
 
 type t =
   { alloc_mode : Alloc.r;
-    (** The mode of the allocation. *)
     closures : (Hint.pinpoint * Allocation.r) list;
     (** Closures enclosing the allocation, from the innermost
         to the outermost one. *)
@@ -99,6 +112,8 @@ let constrain_enclosing_closures pp closures =
 let enclosing_noalloc_closure closures =
   List.find_map
     (fun (closure_pp, closure_mode) ->
+      (* This function must only be called before zapping the allocation axis of
+         closure modes, so it is ok to call get_ceil here. *)
       match Allocation.Guts.get_ceil closure_mode with
       | Noalloc -> Some (closure_pp, Hint.Noalloc)
       | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
@@ -109,6 +124,8 @@ let constrain_closures () =
   let heap, pending =
     !allocations
     |> List.partition (fun {alloc_mode; _} ->
+      (* This function must only be called before zapping the allocation axis of
+         closure modes, so it is ok to call get_ceil here. *)
       match
         Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
       with
