@@ -50,6 +50,8 @@ module type S = sig
 
   val instantiate : src:string -> args:string list -> string -> unit
 
+  val functorize : Compilation_unit.Name.Set.t -> string -> unit
+
   val package_files :
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
 end
@@ -250,6 +252,20 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     Instantiator.instantiate ~src ~args targetcmx
       ~expected_extension:ext_flambda_obj ~read_unit_info
       ~compile:(instance ~keep_symbol_tables:false)
+
+  let compile_program info program =
+    if !Oxcaml_flags.internal_assembler
+    then Emitaux.binary_backend_available := true;
+    Compilenv.reset info.Compile_common.target;
+    if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
+    compile_from_tlambda info program ~as_arg_for:None ~keep_symbol_tables:false
+
+  let functorize input_module_names target =
+    Functorizer.functorize input_module_names target ~with_info ~impl_ext:"cmx"
+      ~read_format:(fun filename ->
+        let unit_info, _crc = Compilenv.read_unit_info filename in
+        unit_info.ui_format, unit_info.ui_arg_descr)
+      ~compile_program
 end
 
 let native unix

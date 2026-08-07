@@ -27,6 +27,10 @@ type kind =
     }
   | Parameter
 
+let kind_is_parameter = function
+  | Normal _ -> false
+  | Parameter -> true
+
 type error =
   | Not_an_interface of filepath
   | Wrong_version_interface of filepath * string

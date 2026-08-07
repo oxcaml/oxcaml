@@ -95,7 +95,7 @@ type error =
   | Compiling_as_parameterised_parameter
   | Cannot_compile_implementation_as_parameter
   | Cannot_implement_parameter of Compilation_unit.Name.t * Misc.filepath
-  | Argument_for_non_parameter of Global_module.Name.t * Misc.filepath
+  | Argument_for_non_parameter of Compilation_unit.Name.t * Misc.filepath
   | Cannot_find_argument_type of Global_module.Parameter_name.t
   | Inconsistent_argument_types of {
       new_arg_type : Global_module.Parameter_name.t option;
@@ -4477,9 +4477,10 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
       let arg_sig, arg_staticity = Env.read_signature arg_module arg_cmi in
-      if not (Env.is_parameter_unit arg_module) then
+      if not (Cmi_format.kind_is_parameter (Env.imported_unit_kind arg_import))
+      then
         raise (Error (Location.none, env,
-                      Argument_for_non_parameter (arg_module, arg_filename)));
+                      Argument_for_non_parameter (arg_import, arg_filename)));
       let modes =
         Includecore.Specific
           ((Persistent_env.mode_pers_mod actual_staticity, None),
@@ -4592,7 +4593,7 @@ let type_implementation target modulename initial_env ast =
           let dclsig, staticity =
             Env.read_signature global_name compiled_intf_file
           in
-          if Env.is_parameter_unit global_name then
+          if Cmi_format.kind_is_parameter (Env.imported_unit_kind cu_name) then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi = Env.implemented_parameter global_name in
           if not (Option.equal Global_module.Parameter_name.equal
@@ -4755,6 +4756,173 @@ let type_interface ~sourcefile modulename env ast =
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
+
+(* Build the signature exposed by a [-functorize] bundle. Roughly:
+
+   {[
+     module Intf : functor (P1) ... (Pn) -> sig
+       module type S = sig
+         module M1 : <sig of M1>
+         ...
+         module Mk : <sig of Mk>
+       end
+     end
+     module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
+   ]}
+
+   where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
+   modules. *)
+let functorize_signature ~params ~modules : Types.signature =
+  let make_md md_type : Types.module_declaration =
+    { md_type;
+      md_modalities = Modality.(Const.id |> of_const);
+      md_attributes = [];
+      md_loc = Location.none;
+      md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let wrap_in_named_functor_layers params (body : Types.module_type)
+        : Types.module_type =
+    List.fold_right
+      (fun (p_name, param_id) body ->
+        let kind, param_params, (swg : Signature_with_global_bindings.t) =
+          Env.find_import ~chain:[]
+            (Compilation_unit.Name.of_parameter_name p_name)
+        in
+        assert (Cmi_format.kind_is_parameter kind);
+        assert (List.is_empty param_params);
+        assert (Array.length swg.bound_globals = 0);
+        let sign, _ = swg.sign in
+        let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
+        Mty_functor
+          (Named (Some param_id, param_type, Alloc.legacy), body, Alloc.legacy))
+      params body
+  in
+  let body =
+    List.map
+      (fun (id, sign) ->
+        Sig_module
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
+      modules
+  in
+  let intf_id = Ident.create_local "Intf" in
+  let make_id = Ident.create_local "Make" in
+  let s_id = Ident.create_local "S" in
+  let s_decl : Types.modtype_declaration =
+    { mtd_type = Some (Mty_signature body);
+      mtd_attributes = [];
+      mtd_loc = Location.none;
+      mtd_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let intf_result = [ Sig_modtype (s_id, s_decl, Exported) ] in
+  let intf_mty =
+    wrap_in_named_functor_layers params (Mty_signature intf_result)
+  in
+  (* Fresh idents so [Make]'s binders are distinct from [Intf]'s. *)
+  let make_params =
+    List.map (fun (p_name, id) -> (p_name, Ident.rename id)) params
+  in
+  let intf_applied_path =
+    List.fold_left
+      (fun p (_p_name, arg_id) -> Path.Papply (p, Path.Pident arg_id))
+      (Path.Pident intf_id) make_params
+  in
+  let make_result = Mty_ident (Path.Pdot (intf_applied_path, "S")) in
+  let make_with_unit = Mty_functor (Unit, make_result, Alloc.legacy) in
+  let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
+  [
+    Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
+    Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
+  ]
+
+let functorize_interface initial_env ~params ~module_sigs unit_info
+      modulename =
+  let sg = functorize_signature ~params ~modules:module_sigs in
+  Ident.reinit ();
+  if not !Clflags.dont_write_files then begin
+    let name = Compilation_unit.name modulename in
+    let kind =
+      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+    in
+    let cmi =
+      Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
+        (sg, Staticity.Dynamic) name kind (Unit_info.cmi unit_info)
+    in
+    let decl_deps = Cmt_format.get_declaration_dependencies () in
+    Cmt_format.save_cmt (Unit_info.cmti unit_info) modulename
+      Cmt_format.Functorize initial_env (Some cmi) None;
+    Cms_format.save_cms (Unit_info.cmsi unit_info) modulename
+      Cmt_format.Functorize initial_env None decl_deps
+  end
+
+let functorize_implementation initial_env ~params ~modules ~module_sigs
+      unit_info modulename =
+  let sg = functorize_signature ~params ~modules:module_sigs in
+  Ident.reinit ();
+  if !Clflags.dont_write_files then Tcoerce_none
+  else begin
+    (* Build cmt/cms artifacts directly via [Artifact.from_filename] so they
+       get [raw_source_file = None].  The bundle has no source [.ml]; passing
+       the output (the [source_file] [unit_info] was built with) would make
+       [save_cmt]/[save_cms] [Digest.file] it, which doesn't exist yet at
+       type-check time.  The cmt's [Functorize] binary_annots variant already
+       records that this was a functorize output. *)
+    let for_pack_prefix = Compilation_unit.for_pack_prefix modulename in
+    let target_artifact ext =
+      let filename = Unit_info.prefix unit_info ^ ext in
+      Unit_info.Artifact.from_filename ~for_pack_prefix filename
+    in
+    let save_cmt_cms cmi_opt =
+      let decl_deps = Cmt_format.get_declaration_dependencies () in
+      Cmt_format.save_cmt (target_artifact ".cmt") modulename
+        Cmt_format.Functorize initial_env cmi_opt None;
+      Cms_format.save_cms (target_artifact ".cms") modulename
+        Cmt_format.Functorize initial_env None decl_deps
+    in
+    match !Clflags.cmi_file with
+    | Some cmi_file ->
+        let shape =
+          let uid = Uid.of_compilation_unit_id modulename in
+          List.fold_left
+            (fun map gm ->
+              let name =
+                Global_module.Name.to_string (Global_module.to_name gm)
+              in
+              let id = Ident.create_persistent name in
+              Shape.Map.add_module map id (Shape.for_persistent_unit name))
+            Shape.Map.empty modules
+          |> Shape.str ~uid
+        in
+        let cmi_artifact =
+          Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
+        in
+        let name = Compilation_unit.to_global_name_without_prefix modulename in
+        let dclsig, staticity = Env.read_signature name cmi_artifact in
+        let cc, _shape =
+          let modes =
+            Includecore.Specific
+              ((Persistent_env.mode_pers_mod Staticity.Dynamic, None),
+               Persistent_env.mode_pers_mod staticity)
+          in
+          Includemod.compunit initial_env ~mark:true
+            "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
+        in
+        save_cmt_cms None;
+        cc
+    | None ->
+        let name = Compilation_unit.name modulename in
+        let kind =
+          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+        in
+        let cmi =
+          Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
+            (sg, Staticity.Dynamic) name kind (Unit_info.cmi unit_info)
+            (Array.of_list (Env.imports ()))
+        in
+        save_cmt_cms (Some cmi);
+        Tcoerce_none
+  end
 
 let package_signatures units =
   let units_with_ids =
@@ -5189,7 +5357,7 @@ let report_error ~loc _env = function
         "Interface %a@ found for module@ %a@ is not flagged as a parameter.@ \
          It cannot be the parameter type for this argument module."
         Style.inline_code path
-        (Style.as_inline_code Global_module.Name.print) param
+        (Style.as_inline_code Compilation_unit.Name.print) param
   | Inconsistent_argument_types
         { new_arg_type; old_source_file; old_arg_type } ->
       let pp_arg_type ppf arg_type =

@@ -29,6 +29,8 @@ type kind =
     }
   | Parameter
 
+val kind_is_parameter : kind -> bool
+
 type 'sg cmi_infos_generic = {
     cmi_name : Compilation_unit.Name.t;
     cmi_kind : kind;

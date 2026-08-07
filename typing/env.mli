@@ -641,6 +641,14 @@ val save_signature_with_imports:
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
+(** See [Persistent_env.find_import]. *)
+val find_import:
+  chain:Compilation_unit.Name.t list ->
+  Compilation_unit.Name.t ->
+  Cmi_format.kind
+  * Global_module.Parameter_name.t list
+  * Signature_with_global_bindings.t
+
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
 
@@ -670,18 +678,15 @@ val is_imported_opaque: Compilation_unit.Name.t -> bool
 (* [register_import_as_opaque md] registers [md] as an opaque imported module *)
 val register_import_as_opaque: Compilation_unit.Name.t -> unit
 
-(* [is_parameter_unit md] returns true if [md] was compiled with
-   -as-parameter *)
-val is_parameter_unit: Global_module.Name.t -> bool
+(* [imported_unit_kind md] is the kind of the already-imported unit [md]:
+   a normal implementation, or a parameter (compiled with -as-parameter).
+   Raises [Not_found] if [md]'s cmi has not been loaded. *)
+val imported_unit_kind: Compilation_unit.Name.t -> Cmi_format.kind
 
 (* [implemented_parameter md] is the argument given to -as-argument-for when
    [md] was compiled *)
 val implemented_parameter:
   Global_module.Name.t -> Global_module.Parameter_name.t option
-
-(* [is_imported_parameter md] is true if [md] has been imported and is a
-   parameter to this module *)
-val is_imported_parameter: Global_module.Name.t -> bool
 
 (* Summaries -- compact representation of an environment, to be
    exported in debugging information. *)
@@ -704,6 +709,12 @@ type error =
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
+  | Cmi_not_found of
+      { modname : Compilation_unit.Name.t;
+        chain : Compilation_unit.Name.t list;
+            (** Dependency chain leading to [modname], in reversed order
+                (most-recent loader first). *)
+      }
 
 exception Error of error
 

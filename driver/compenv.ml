@@ -770,7 +770,10 @@ let process_action
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
-      if Filename.check_suffix name ocaml_mod_ext
+      if !Clflags.functorize then
+        (* Anonymous args are module names, not filepaths. *)
+        objfiles := name :: !objfiles
+      else if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
