@@ -96,51 +96,66 @@ module Staged = struct
           code_deps;
           all_sets_of_closures
         } renaming =
-      { toplevel_expr = Rev_expr.apply_renaming toplevel_expr renaming;
-        code =
-          Code_id.Map.fold
-            (fun code_id rev_code code ->
-              Code_id.Map.add
-                (Renaming.apply_code_id renaming code_id)
-                (Rev_expr.apply_renaming_code rev_code renaming)
-                code)
-            code Code_id.Map.empty;
-        ordered_code_ids =
-          Array.map (Renaming.apply_code_id renaming) ordered_code_ids;
-        kinds =
-          Name.Map.fold
-            (fun name kind kinds ->
-              Name.Map.add (Renaming.apply_name renaming name) kind kinds)
-            kinds Name.Map.empty;
-        fixed_arity_continuations =
-          Continuation.Set.fold
-            (fun cont conts ->
-              Continuation.Set.add
-                (Renaming.apply_continuation renaming cont)
-                conts)
-            fixed_arity_continuations Continuation.Set.empty;
-        continuation_info =
-          Continuation.Map.fold
-            (fun cont info map ->
-              Continuation.Map.add
-                (Renaming.apply_continuation renaming cont)
-                (Traverse_acc.apply_renaming_continuation_info info renaming)
-                map)
-            continuation_info Continuation.Map.empty;
-        code_deps =
-          Code_id.Map.fold
-            (fun code_id code_dep map ->
-              Code_id.Map.add
-                (Renaming.apply_code_id renaming code_id)
-                (Traverse_acc.apply_renaming_code_dep code_dep renaming)
-                map)
-            code_deps Code_id.Map.empty;
-        all_sets_of_closures =
-          List.map
-            (Function_slot.Lmap.map (fun (name, code_id) ->
-                 ( Renaming.apply_name renaming name,
-                   Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
-            all_sets_of_closures
+      let toplevel_expr' = Rev_expr.apply_renaming toplevel_expr renaming in
+      let code' =
+        Code_id.Map.fold
+          (fun code_id rev_code code ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Rev_expr.apply_renaming_code rev_code renaming)
+              code)
+          code Code_id.Map.empty
+      in
+      let ordered_code_ids' =
+        Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+      in
+      let kinds' =
+        Name.Map.fold
+          (fun name kind kinds ->
+            Name.Map.add (Renaming.apply_name renaming name) kind kinds)
+          kinds Name.Map.empty
+      in
+      let fixed_arity_continuations' =
+        Continuation.Set.fold
+          (fun cont conts ->
+            Continuation.Set.add
+              (Renaming.apply_continuation renaming cont)
+              conts)
+          fixed_arity_continuations Continuation.Set.empty
+      in
+      let continuation_info' =
+        Continuation.Map.fold
+          (fun cont info map ->
+            Continuation.Map.add
+              (Renaming.apply_continuation renaming cont)
+              (Traverse_acc.apply_renaming_continuation_info info renaming)
+              map)
+          continuation_info Continuation.Map.empty
+      in
+      let code_deps' =
+        Code_id.Map.fold
+          (fun code_id code_dep map ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+              map)
+          code_deps Code_id.Map.empty
+      in
+      let all_sets_of_closures' =
+        List.map
+          (Function_slot.Lmap.map (fun (name, code_id) ->
+               ( Renaming.apply_name renaming name,
+                 Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
+          all_sets_of_closures
+      in
+      { toplevel_expr = toplevel_expr';
+        code = code';
+        ordered_code_ids = ordered_code_ids';
+        kinds = kinds';
+        fixed_arity_continuations = fixed_arity_continuations';
+        continuation_info = continuation_info';
+        code_deps = code_deps';
+        all_sets_of_closures = all_sets_of_closures'
       }
 
     let map_result_types t ~f =
