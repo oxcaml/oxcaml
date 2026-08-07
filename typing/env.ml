@@ -1291,11 +1291,8 @@ let is_imported_opaque modname =
 let register_import_as_opaque modname =
   Persistent_env.register_import_as_opaque !persistent_env modname
 
-let is_parameter_unit modname =
-  Persistent_env.is_parameter_import !persistent_env modname
-
-let is_imported_parameter modname =
-  Persistent_env.is_imported_parameter !persistent_env modname
+let imported_unit_kind modname =
+  Persistent_env.imported_unit_kind !persistent_env modname
 
 let implemented_parameter modname =
   Persistent_env.implemented_parameter !persistent_env modname
@@ -2062,9 +2059,12 @@ let find_modtype_expansion_lazy path env =
 let find_modtype_expansion path env =
   Subst.Lazy.force_modtype (find_modtype_expansion_lazy path env)
 
+(* Whether [id] is one of the current unit's [-parameter]s.  Note this is
+   about registration, not about the cmi's kind. *)
 let is_parameter_module_ident id =
   match Ident.to_global id with
-  | Some global -> Persistent_env.is_parameter_import !persistent_env global
+  | Some global ->
+      Persistent_env.is_registered_parameter !persistent_env global
   | None -> false
 
 let rec is_functor_arg path env =

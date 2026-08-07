@@ -634,7 +634,7 @@ val save_signature_with_imports:
 val find_import:
   chain:Compilation_unit.Name.t list ->
   Compilation_unit.Name.t ->
-  Compilation_unit.t option
+  Cmi_format.kind
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
 
@@ -667,18 +667,15 @@ val is_imported_opaque: Compilation_unit.Name.t -> bool
 (* [register_import_as_opaque md] registers [md] as an opaque imported module *)
 val register_import_as_opaque: Compilation_unit.Name.t -> unit
 
-(* [is_parameter_unit md] returns true if [md] was compiled with
-   -as-parameter *)
-val is_parameter_unit: Global_module.Name.t -> bool
+(* [imported_unit_kind md] is the kind of the already-imported unit [md]:
+   a normal implementation, or a parameter (compiled with -as-parameter).
+   Raises [Not_found] if [md]'s cmi has not been loaded. *)
+val imported_unit_kind: Compilation_unit.Name.t -> Cmi_format.kind
 
 (* [implemented_parameter md] is the argument given to -as-argument-for when
    [md] was compiled *)
 val implemented_parameter:
   Global_module.Name.t -> Global_module.Parameter_name.t option
-
-(* [is_imported_parameter md] is true if [md] has been imported and is a
-   parameter to this module *)
-val is_imported_parameter: Global_module.Name.t -> bool
 
 (* Summaries -- compact representation of an environment, to be
    exported in debugging information. *)

@@ -95,7 +95,7 @@ type error =
   | Compiling_as_parameterised_parameter
   | Cannot_compile_implementation_as_parameter
   | Cannot_implement_parameter of Compilation_unit.Name.t * Misc.filepath
-  | Argument_for_non_parameter of Global_module.Name.t * Misc.filepath
+  | Argument_for_non_parameter of Compilation_unit.Name.t * Misc.filepath
   | Cannot_find_argument_type of Global_module.Parameter_name.t
   | Inconsistent_argument_types of {
       new_arg_type : Global_module.Parameter_name.t option;
@@ -4473,9 +4473,10 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
       in
       let arg_module = Global_module.Name.of_parameter_name arg_param in
       let arg_sig, arg_staticity = Env.read_signature arg_module arg_cmi in
-      if not (Env.is_parameter_unit arg_module) then
+      if not (Cmi_format.kind_is_parameter (Env.imported_unit_kind arg_import))
+      then
         raise (Error (Location.none, env,
-                      Argument_for_non_parameter (arg_module, arg_filename)));
+                      Argument_for_non_parameter (arg_import, arg_filename)));
       let modes =
         Includecore.Specific
           ((Persistent_env.mode_pers_mod actual_staticity, None),
@@ -4588,7 +4589,7 @@ let type_implementation target modulename initial_env ast =
           let dclsig, staticity =
             Env.read_signature global_name compiled_intf_file
           in
-          if Env.is_parameter_unit global_name then
+          if Cmi_format.kind_is_parameter (Env.imported_unit_kind cu_name) then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi = Env.implemented_parameter global_name in
           if not (Option.equal Global_module.Parameter_name.equal
@@ -5185,7 +5186,7 @@ let report_error ~loc _env = function
         "Interface %a@ found for module@ %a@ is not flagged as a parameter.@ \
          It cannot be the parameter type for this argument module."
         Style.inline_code path
-        (Style.as_inline_code Global_module.Name.print) param
+        (Style.as_inline_code Compilation_unit.Name.print) param
   | Inconsistent_argument_types
         { new_arg_type; old_source_file; old_arg_type } ->
       let pp_arg_type ppf arg_type =

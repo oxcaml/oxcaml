@@ -83,10 +83,10 @@ let assert_subset ~gm ~chain sub sup =
       (chain_to_string chain)
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
-  let cu, cmi_params, swg =
+  let kind, cmi_params, swg =
     Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
   in
-  assert (Option.is_some cu);
+  assert (not (Cmi_format.kind_is_parameter kind));
   let tracked_set =
     gm.GM.hidden_args @ gm.GM.visible_args
     |> List.map (fun (a : _ GM.Argument.t) -> a.param)
@@ -99,10 +99,10 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
 
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
     =
-  let cu, cmi_params, swg =
+  let kind, cmi_params, swg =
     Env.find_import ~chain (CU.Name.of_head_of_global_name (GM.to_name gm))
   in
-  assert (Option.is_some cu);
+  assert (not (Cmi_format.kind_is_parameter kind));
   let param_set args =
     List.map (fun (a : _ GM.Argument.t) -> a.param) args
     |> GM.Parameter_name.Set.of_list
@@ -221,17 +221,17 @@ let analyze (src_names : CU.Name.Set.t) : result =
     CU.Name.Set.fold
       (fun cu_name state ->
         match Env.find_import ~chain cu_name with
-        | None, _, _ ->
+        | Parameter, _, _ ->
             Compenv.fatal
               (Printf.sprintf
                  "Invalid -functorize input: '%s' is a parameter module"
                  (CU.Name.to_string cu_name))
-        | Some _, [], _ ->
+        | Normal _, [], _ ->
             Compenv.fatal
               (Printf.sprintf
                  "Invalid -functorize input: '%s' is not a parameterised module"
                  (CU.Name.to_string cu_name))
-        | Some _, cmi_params, swg ->
+        | Normal _, cmi_params, swg ->
             let gm =
               GM.create_exn
                 (CU.Name.to_string cu_name)
@@ -280,10 +280,11 @@ let wrap_in_named_functor_layers (params : (GM.Parameter_name.t * Ident.t) list)
     (body : Types.module_type) : Types.module_type =
   List.fold_right
     (fun (p_name, param_id) body ->
-      let cu, params, swg =
+      let kind, params, swg =
         Env.find_import ~chain:[] (CU.Name.of_parameter_name p_name)
       in
-      assert (Option.is_none cu && List.is_empty params);
+      assert (Cmi_format.kind_is_parameter kind);
+      assert (List.is_empty params);
       assert (Array.length swg.bound_globals = 0);
       let sign, _ = swg.sign in
       let param_type = Types.Mty_signature (Subst.Lazy.force_signature sign) in

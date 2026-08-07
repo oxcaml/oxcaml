@@ -122,6 +122,11 @@ val read_cmi_file :
      'a t -> string
   -> Global_module.Name.t * Subst.Lazy.persistent_signature
 
+(** The kind of an already-imported unit: a normal implementation or a
+    parameter.  Consults the import cache only; raises [Not_found] if the
+    unit's cmi has not been loaded. *)
+val imported_unit_kind : 'a t -> Compilation_unit.Name.t -> Cmi_format.kind
+
 (** Read a CU and register it as an "import" of the current compilation
     unit — i.e., type checking of the current CU relies on the content
     of that CU.  Does NOT register it as a persistent module, which
@@ -129,7 +134,7 @@ val read_cmi_file :
     persistent module, such as the "parameter subset rule". *)
 val find_import :
   'a t -> Compilation_unit.Name.t ->
-  Compilation_unit.t option
+  Cmi_format.kind
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
@@ -145,9 +150,10 @@ val check : allow_hidden:bool -> 'a t -> 'a sig_reader
    been imported as a non-parameter. *)
 val register_parameter : 'a t -> Global_module.Parameter_name.t -> unit
 
-(* [is_parameter_import penv md] checks if [md] is a loaded parameter or has
-   been registered as a parameter. *)
-val is_parameter_import : 'a t -> Global_module.Name.t -> bool
+(* [is_registered_parameter penv md] checks if [md] has been registered
+   as a parameter of the current unit (i.e. was passed via [-parameter]).
+   Does not consult the cmi. *)
+val is_registered_parameter : 'a t -> Global_module.Name.t -> bool
 
 (* [looked_up penv md] checks if one has already tried
    to read the signature for [md] in the environment
@@ -233,11 +239,6 @@ val runtime_parameter_bindings : 'a t -> (Global_module.t * Ident.t) list
 (* Return whether the given identifier is a local that appears in
    [runtime_parameter_bindings]. *)
 val is_bound_to_runtime_parameter : 'a t -> Ident.t -> bool
-
-(* Find whether a module has been imported as a parameter. This means that it
-   is a registered parameter import (see [register_parameter_import]) _and_ it has
-   been actually imported (i.e., it has occurred at least once). *)
-val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
 
 (* Return the list of parameters specified for the current unit, in alphabetical order.
    All of these will have been specified by [-parameter] but not all of them are

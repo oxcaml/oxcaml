@@ -1174,8 +1174,13 @@ let transl_implementation compilation_unit impl ~loc =
           | bindings ->
               List.map
                 (fun (global, ident) ->
+                  let cu_name =
+                    Compilation_unit.Name.of_head_of_global_name
+                      (Global_module.to_name global)
+                  in
                   let runtime_param =
-                    if Env.is_parameter_unit (Global_module.to_name global)
+                    if Cmi_format.kind_is_parameter
+                         (Env.imported_unit_kind cu_name)
                     then Rp_argument_block global
                     else Rp_main_module_block global
                   in
@@ -1518,13 +1523,13 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
     ~main_module_block_repr ~arg_block_idx
 
 let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
-  let impl, _params, _sig =
+  let kind, _params, _sig =
     Env.find_import ~chain:[]
       (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
   in
-  match impl with
-  | Some cu -> cu
-  | None ->
+  match kind with
+  | Normal { cmi_impl; _ } -> cmi_impl
+  | Parameter ->
       Misc.fatal_errorf_doc
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm

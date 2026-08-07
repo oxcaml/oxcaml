@@ -99,10 +99,8 @@ type global_name_info = {
 
 (* Data relating directly to a .cmi - does not depend on arguments *)
 type import = {
-  imp_is_param : bool;
+  imp_kind : Cmi_format.kind;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Global_module.Parameter_name.t option;
-  imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
   imp_uid : Shape.Uid.t;
@@ -253,7 +251,7 @@ let register_parameter ({param_imports; _} as penv) modname =
       (* Not loaded yet; if it's wrong, we'll get an error at load time *)
       ()
   | Some imp ->
-      if not imp.imp_is_param then
+      if not (kind_is_parameter imp.imp_kind) then
         raise (Error (Not_compiled_as_parameter
                         (Global_module.Name.of_parameter_name modname)))
   end;
@@ -288,14 +286,8 @@ let check_consistency penv imp =
     | (Normal _ | Parameter), _ ->
       error (Inconsistent_import(name, auth, source))
 
-let is_registered_parameter_import {param_imports; _} name =
+let is_registered_parameter {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
-
-let is_parameter_import t modname =
-  let import = CU.Name.of_head_of_global_name modname in
-  match find_import_info_in_cache t import with
-  | Some { imp_is_param; _ } -> imp_is_param
-  | None -> is_registered_parameter_import t modname
 
 let can_load_cmis penv =
   !(penv.can_load_cmis)
@@ -361,16 +353,6 @@ let acknowledge_import penv ~check modname pers_sig =
         error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
   | _, _ -> ()
   end;
-  let is_param =
-    match kind with
-    | Normal _ -> false
-    | Parameter -> true
-  in
-  let arg_for, impl =
-    match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
-    | Parameter -> None, None
-  in
   let uid =
     (* Awkwardly, we need to make sure the uid includes the pack prefix, which
        is only stored in the [cmi_impl], which only exists for the kind
@@ -384,10 +366,8 @@ let acknowledge_import penv ~check modname pers_sig =
   in
   let {imports; _} = penv in
   let import =
-    { imp_is_param = is_param;
+    { imp_kind = kind;
       imp_params = params;
-      imp_arg_for = arg_for;
-      imp_impl = impl;
       imp_raw_sign = sign;
       imp_filename = filename;
       imp_uid = uid;
@@ -539,7 +519,7 @@ let check_for_unset_parameters penv global =
   List.iter
     (fun ({ param = parameter; value = arg_value } : Global_module.argument) ->
        let value_name = Global_module.to_name arg_value in
-       if not (is_registered_parameter_import penv value_name) then
+       if not (is_registered_parameter penv value_name) then
          error (Imported_module_has_unset_parameter {
              imported = Global_module.to_name global;
              parameter;
@@ -624,12 +604,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                 ~allow_excess_args
             in
             let actual_type =
-              match pn.pn_import.imp_arg_for with
-              | None ->
+              match pn.pn_import.imp_kind with
+              | Parameter | Normal { cmi_arg_for = None; _ } ->
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
                              filename = pn.pn_import.imp_filename })
-              | Some ty -> ty
+              | Normal { cmi_arg_for = Some ty; _ } -> ty
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
@@ -721,7 +701,13 @@ and acknowledge_new_pers_name penv check global_name global import =
           [ mode;
             Mode.Value.min_with_monadic Staticity
               (Mode.Staticity.of_const
-                 ~hint:(Cmx_not_guaranteed import.imp_impl)
+                 ~hint:
+                   (Cmx_not_guaranteed
+                      (match import.imp_kind with
+                       | Normal { cmi_impl; _ } -> Some cmi_impl
+                       (* CR-soon zqian: [Parameter] should carry [CU.t] and we
+                          can remove [cmi_name]. *)
+                       | Parameter -> None))
                  Mode.Staticity.Dynamic) ]
     in
     signature, mode
@@ -770,7 +756,7 @@ let need_local_ident penv (global : Global_module.t) =
      can happen exactly once). *)
   let global_name = global |> Global_module.to_name in
   let name = global_name |> CU.Name.of_head_of_global_name in
-  if is_registered_parameter_import penv global_name
+  if is_registered_parameter penv global_name
   then
     (* Already a parameter *)
     true
@@ -795,15 +781,16 @@ let need_local_ident penv (global : Global_module.t) =
        so it's not a compile-time constant *)
     true
 
-let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding =
+let make_binding penv (global : Global_module.t) (kind : Cmi_format.kind)
+      : binding =
   let name = Global_module.to_name global in
   if need_local_ident penv global
   then Runtime_parameter (Ident.create_local_binding_for_global name)
   else
     let unit_from_cmi =
-      match impl with
-      | Some unit -> unit
-      | None ->
+      match kind with
+      | Normal { cmi_impl; _ } -> cmi_impl
+      | Parameter ->
           Misc.fatal_errorf_doc
             "Can't bind a parameter statically:@ %a"
             Global_module.print global
@@ -845,12 +832,11 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
   let sign = pers_name.pn_sign in
-  let is_param = import.imp_is_param in
-  let impl = import.imp_impl in
   let filename = import.imp_filename in
   let uid = import.imp_uid in
   let flags = import.imp_flags in
-  begin match is_param, is_registered_parameter_import penv modname with
+  begin match kind_is_parameter import.imp_kind,
+              is_registered_parameter penv modname with
   | true, false ->
       error (Illegal_import_of_parameter(modname, filename))
   | false, true ->
@@ -858,16 +844,17 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   | true, true
   | false, false -> ()
   end;
-  let binding = make_binding penv global impl in
+  let binding = make_binding penv global import.imp_kind in
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
     | Constant unit -> Aunit unit
   in
   let shape =
-    match import.imp_impl, import.imp_params with
-    | Some unit, [] -> Shape.for_persistent_unit (CU.full_path_as_string unit)
-    | _, _ ->
+    match import.imp_kind, import.imp_params with
+    | Normal { cmi_impl; _ }, [] ->
+        Shape.for_persistent_unit (CU.full_path_as_string cmi_impl)
+    | (Normal _ | Parameter), _ ->
         (* TODO Implement shapes for parameters and parameterised modules *)
         Shape.error ~uid "parameter or parameterised module"
   in
@@ -1090,19 +1077,19 @@ let loaded_transitive_dependencies penv intfs =
   Compilation_unit.Name.Set.iter add_loaded_deps intfs;
   !names
 
+let imported_unit_kind penv modname : Cmi_format.kind =
+  match find_import_info_in_cache penv modname with
+  | Some import -> import.imp_kind
+  | None -> raise Not_found
+
 let find_import penv modname =
   let import = find_import ~allow_hidden:true penv ~check:true modname in
-  import.imp_impl, import.imp_params, import.imp_raw_sign
+  import.imp_kind, import.imp_params, import.imp_raw_sign
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
 
 let quoted_impls {quoted_impls; _} = !quoted_impls
-
-let is_imported_parameter penv modname =
-  match find_info_in_cache penv modname with
-  | Some pers_struct -> pers_struct.ps_name_info.pn_import.imp_is_param
-  | None -> false
 
 let runtime_parameter_bindings {persistent_structures; _} =
   (* This over-approximates the runtime parameters that are actually needed:
@@ -1146,7 +1133,9 @@ let is_imported_opaque {imported_opaque_units; _} s =
 
 let implemented_parameter penv modname =
   match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
+  | Some { pn_import = { imp_kind = Normal { cmi_arg_for; _ }; _ }; _ } ->
+      cmi_arg_for
+  | Some { pn_import = { imp_kind = Parameter; _ }; _ } -> None
   | None -> None
 
 let make_cmi penv modname kind sign alerts =
