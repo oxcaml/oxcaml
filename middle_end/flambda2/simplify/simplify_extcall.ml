@@ -168,6 +168,234 @@ let simplify_caml_array_make dacc ~len_ty ~init_value_ty : t =
   in
   Unchanged { return_types = Known [type_of_returned_array] }
 
+(* Constant folding of the bit-counting, mulhi and int32-shift [@@builtin]
+   externals (see [Cmm_builtins] for their lowerings). Folding implements the
+   documented OCaml-level contract of each intrinsic; it is restricted to 64-bit
+   targets so that word-level semantics (e.g. the tagged clz trick, or [ctz] of
+   zero being the word size) are unambiguous. Shifts are only folded for
+   in-range counts. *)
+
+let clz64 x =
+  if Int64.equal x 0L
+  then 64
+  else
+    let rec loop count x =
+      if Int64.compare x 0L < 0
+      then count
+      else loop (count + 1) (Int64.shift_left x 1)
+    in
+    loop 0 x
+
+let ctz64 x =
+  if Int64.equal x 0L
+  then 64
+  else
+    let rec loop count x =
+      if Int64.equal (Int64.logand x 1L) 1L
+      then count
+      else loop (count + 1) (Int64.shift_right_logical x 1)
+    in
+    loop 0 x
+
+let popcnt64 x =
+  let rec loop count x =
+    if Int64.equal x 0L
+    then count
+    else
+      loop
+        (count + Int64.to_int (Int64.logand x 1L))
+        (Int64.shift_right_logical x 1)
+  in
+  loop 0 x
+
+(* High 64 bits of the full 128-bit product, via 32-bit half products. The
+   signed variant is derived from the unsigned one with the usual correction. *)
+let mulhi64 ~signed a b =
+  let mask32 = 0xFFFF_FFFFL in
+  let al = Int64.logand a mask32
+  and ah = Int64.shift_right_logical a 32
+  and bl = Int64.logand b mask32
+  and bh = Int64.shift_right_logical b 32 in
+  let ll = Int64.mul al bl
+  and lh = Int64.mul al bh
+  and hl = Int64.mul ah bl
+  and hh = Int64.mul ah bh in
+  let mid =
+    Int64.add
+      (Int64.add (Int64.shift_right_logical ll 32) (Int64.logand lh mask32))
+      (Int64.logand hl mask32)
+  in
+  let unsigned_high =
+    Int64.add
+      (Int64.add hh (Int64.shift_right_logical lh 32))
+      (Int64.add
+         (Int64.shift_right_logical hl 32)
+         (Int64.shift_right_logical mid 32))
+  in
+  if not signed
+  then unsigned_high
+  else
+    let high =
+      if Int64.compare a 0L < 0
+      then Int64.sub unsigned_high b
+      else unsigned_high
+    in
+    if Int64.compare b 0L < 0 then Int64.sub high a else high
+
+let simplify_builtin_constant_fold dacc ~dbg ~cont fun_name ~arg_types :
+    t option =
+  let tenv = DA.typing_env dacc in
+  let machine_width = DE.machine_width (DA.denv dacc) in
+  match (machine_width : Target_system.Machine_width.t) with
+  | Thirty_two | Thirty_two_no_gc_tag_bit -> None
+  | Sixty_four -> (
+    (* Argument extraction: each function proves that the argument is a
+       statically-known constant of the given kind; a [None] result simply means
+       "do not fold". *)
+    let tagged_int ty =
+      match T.meet_equals_single_tagged_immediate tenv ty with
+      | Known_result i -> Some (Target_ocaml_int.to_int64 i)
+      | Need_meet | Invalid -> None
+    in
+    let naked_int ty =
+      match T.meet_naked_immediates tenv ty with
+      | Known_result s ->
+        Option.map Target_ocaml_int.to_int64
+          (Target_ocaml_int.Set.get_singleton s)
+      | Need_meet | Invalid -> None
+    in
+    let naked_int8 ty =
+      match T.meet_naked_int8s tenv ty with
+      | Known_result s ->
+        Option.map
+          (fun i -> Int64.of_int (Numeric_types.Int8.to_int i))
+          (Numeric_types.Int8.Set.get_singleton s)
+      | Need_meet | Invalid -> None
+    in
+    let naked_int16 ty =
+      match T.meet_naked_int16s tenv ty with
+      | Known_result s ->
+        Option.map
+          (fun i -> Int64.of_int (Numeric_types.Int16.to_int i))
+          (Numeric_types.Int16.Set.get_singleton s)
+      | Need_meet | Invalid -> None
+    in
+    let naked_int32 ty =
+      match T.meet_naked_int32s tenv ty with
+      | Known_result s -> Numeric_types.Int32.Set.get_singleton s
+      | Need_meet | Invalid -> None
+    in
+    let naked_int64 ty =
+      match T.meet_naked_int64s tenv ty with
+      | Known_result s -> Numeric_types.Int64.Set.get_singleton s
+      | Need_meet | Invalid -> None
+    in
+    let naked_nativeint ty =
+      match T.meet_naked_nativeints tenv ty with
+      | Known_result s ->
+        Option.map Targetint_32_64.to_int64
+          (Targetint_32_64.Set.get_singleton s)
+      | Need_meet | Invalid -> None
+    in
+    let return_const const =
+      let apply_cont = Apply_cont.create cont ~args:[Simple.const const] ~dbg in
+      Some (Specialised (dacc, Expr.create_apply_cont apply_cont, RO.call))
+    in
+    let return_untagged k =
+      return_const
+        (Const.naked_immediate (Target_ocaml_int.of_int machine_width k))
+    in
+    let return_int64 v = return_const (Const.naked_int64 v) in
+    let return_int32 v = return_const (Const.naked_int32 v) in
+    let zext bits v =
+      Int64.logand v (Int64.sub (Int64.shift_left 1L bits) 1L)
+    in
+    (* The tagged representation of the OCaml integer [n], i.e. [2n + 1]: the
+       63-bit views of clz/popcnt are computed through it, mirroring
+       [Cmm_builtins]. *)
+    let clz_ocaml_int n = clz64 (Int64.logor (Int64.shift_left n 1) 1L) in
+    let clz_width bits v = clz64 (zext bits v) - (64 - bits) in
+    let ctz_width bits v =
+      ctz64 (Int64.logor (zext bits v) (Int64.shift_left 1L bits))
+    in
+    match fun_name, arg_types with
+    | "caml_int_clz_tagged_to_untagged", [ty] ->
+      Option.bind (tagged_int ty) (fun n -> return_untagged (clz_ocaml_int n))
+    | "caml_int_clz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int ty) (fun n -> return_untagged (clz_ocaml_int n))
+    | "caml_int8_clz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int8 ty) (fun v -> return_untagged (clz_width 8 v))
+    | "caml_int16_clz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int16 ty) (fun v -> return_untagged (clz_width 16 v))
+    | "caml_int32_clz_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_int32 ty) (fun v ->
+          return_untagged (clz_width 32 (Int64.of_int32 v)))
+    | "caml_int64_clz_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_int64 ty) (fun v -> return_untagged (clz64 v))
+    | "caml_nativeint_clz_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_nativeint ty) (fun v -> return_untagged (clz64 v))
+    | "caml_int_popcnt_tagged_to_untagged", [ty] ->
+      Option.bind (tagged_int ty) (fun n ->
+          return_untagged (popcnt64 (zext 63 n)))
+    | "caml_int_popcnt_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int ty) (fun n ->
+          return_untagged (popcnt64 (zext 63 n)))
+    | "caml_int8_popcnt_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int8 ty) (fun v ->
+          return_untagged (popcnt64 (zext 8 v)))
+    | "caml_int16_popcnt_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int16 ty) (fun v ->
+          return_untagged (popcnt64 (zext 16 v)))
+    | "caml_int32_popcnt_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_int32 ty) (fun v ->
+          return_untagged (popcnt64 (zext 32 (Int64.of_int32 v))))
+    | "caml_int64_popcnt_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_int64 ty) (fun v -> return_untagged (popcnt64 v))
+    | "caml_nativeint_popcnt_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_nativeint ty) (fun v -> return_untagged (popcnt64 v))
+    | "caml_int_ctz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int ty) (fun n ->
+          return_untagged (if Int64.equal n 0L then 63 else ctz64 n))
+    | "caml_int8_ctz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int8 ty) (fun v -> return_untagged (ctz_width 8 v))
+    | "caml_int16_ctz_untagged_to_untagged", [ty] ->
+      Option.bind (naked_int16 ty) (fun v -> return_untagged (ctz_width 16 v))
+    | "caml_int32_ctz_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_int32 ty) (fun v ->
+          return_untagged (ctz_width 32 (Int64.of_int32 v)))
+    | "caml_int64_ctz_unboxed_to_untagged", [ty] ->
+      (* [ctz64 0L] is 64, matching the documented contract of the intrinsic
+         (and TZCNT semantics). *)
+      Option.bind (naked_int64 ty) (fun v -> return_untagged (ctz64 v))
+    | "caml_nativeint_ctz_unboxed_to_untagged", [ty] ->
+      Option.bind (naked_nativeint ty) (fun v -> return_untagged (ctz64 v))
+    | ( (("caml_signed_int64_mulh_unboxed" | "caml_unsigned_int64_mulh_unboxed")
+         as name),
+        [a_ty; b_ty] ) -> (
+      match naked_int64 a_ty, naked_int64 b_ty with
+      | Some a, Some b ->
+        let signed = String.equal name "caml_signed_int64_mulh_unboxed" in
+        return_int64 (mulhi64 ~signed a b)
+      | (Some _ | None), _ -> None)
+    | ( (( "caml_int32_shift_left_by_int32_unboxed"
+         | "caml_int32_shift_right_by_int32_unboxed"
+         | "caml_int32_shift_right_logical_by_int32_unboxed" ) as name),
+        [v_ty; c_ty] ) -> (
+      match naked_int32 v_ty, naked_int32 c_ty with
+      | Some v, Some c when Int32.compare c 0l >= 0 && Int32.compare c 32l < 0
+        ->
+        let c = Int32.to_int c in
+        let result =
+          if String.equal name "caml_int32_shift_left_by_int32_unboxed"
+          then Int32.shift_left v c
+          else if String.equal name "caml_int32_shift_right_by_int32_unboxed"
+          then Int32.shift_right v c
+          else Int32.shift_right_logical v c
+        in
+        return_int32 result
+      | (Some _ | None), _ -> None)
+    | _, _ -> None)
+
 let simplify_returning_extcall ~dbg ~cont ~exn_cont:_ dacc fun_name args
     ~arg_types =
   match fun_name, args, arg_types with
@@ -212,7 +440,12 @@ let simplify_returning_extcall ~dbg ~cont ~exn_cont:_ dacc fun_name args
       ~boxed_int_prim:(fun kind -> Int_comp (kind, Yielding_bool (Gt Signed)))
   | "caml_array_make", [_; _], [len_ty; init_value_ty] ->
     simplify_caml_array_make dacc ~len_ty ~init_value_ty
-  | _ -> Unchanged { return_types = Unknown }
+  | _ -> (
+    match
+      simplify_builtin_constant_fold dacc ~dbg ~cont fun_name ~arg_types
+    with
+    | Some t -> t
+    | None -> Unchanged { return_types = Unknown })
 
 (* Exported simplification function *)
 (* ******************************** *)
