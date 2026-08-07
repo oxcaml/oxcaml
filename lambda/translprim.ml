@@ -2640,35 +2640,52 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
   in
   lam
 
-(* Whether a primitive allocates when fully applied.
-   Exception should be raised at later stage, so here we just be conservative
-   when there are exceptions.
+type allocation_registration =
+  | No_allocation
+  | Allocation_at_locality of Mode.Locality.lr
 
-   This mirrors, for the allocation axis only, what [lambda_of_prim] above
+let result_allocation p ~poly_mode =
+  match p.prim_native_repr_res, poly_mode with
+  | (Prim_poly, _), Some mode -> Allocation_at_locality mode
+  | (Prim_poly, _), None -> assert false
+  | (Prim_global, _), _ -> Allocation_at_locality Mode.Locality.global
+  | (Prim_local, _), _ -> No_allocation
+
+(* This mirrors, for the allocation axis only, what [lambda_of_prim] above
    builds for each [prim].  Keep the two in step. *)
-let prim_may_allocate ~arity prim =
+let prim_may_allocate ~arity prim result_allocation_mode =
   let primitive_may_allocate prim =
-    try Option.is_some (Lambda.primitive_may_allocate prim) with
-    | _ -> true
+    match Lambda.primitive_may_allocate prim with
+    | None -> No_allocation
+    | Some Alloc_heap -> Allocation_at_locality Mode.Locality.global
+    | Some Alloc_local -> result_allocation_mode
   in
   match prim with
   | Primitive (prim, _) -> primitive_may_allocate prim
-  | Sys_argv -> primitive_may_allocate (Pccall prim_sys_argv)
-  | External prim -> primitive_may_allocate (Pccall prim)
+  | Sys_argv -> Allocation_at_locality Mode.Locality.global
+  | External _ ->
+    (* CR shsong: Utilize prim_alloc later.
+       I may need to check return value Allocation mode axis. *)
+    Allocation_at_locality Mode.Locality.global
   | Comparison (comp, knd) ->
       primitive_may_allocate (comparison_primitive comp knd)
-  | Raise _ -> false
-  | Raise_with_backtrace -> false
-  | Lazy_force _ -> true
-  | Loc _ -> arity > 0
-  | Send _ | Send_self _ | Send_cache _ -> true
-  | Frame_pointers -> false
-  | Identity -> false
-  | Apply _ | Revapply _ -> false
-  | Peek None | Poke None -> true
-  | Peek (Some _) -> false
-  | Poke (Some _) -> false
-  | Unsupported _ -> true
+  | Raise _ -> No_allocation
+  | Raise_with_backtrace -> No_allocation
+  | Lazy_force _ -> Allocation_at_locality Mode.Locality.global
+  | Loc _ ->
+    if arity > 0 then Allocation_at_locality Mode.Locality.global
+    else No_allocation
+  | Send _ | Send_self _ | Send_cache _ ->
+    Allocation_at_locality Mode.Locality.global
+  | Frame_pointers -> No_allocation
+  | Identity -> No_allocation
+  | Apply _ | Revapply _ -> No_allocation
+  | Peek None | Poke None ->
+    Allocation_at_locality Mode.Locality.global
+  | Peek (Some _) -> No_allocation
+  | Poke (Some _) -> No_allocation
+  | Unsupported _ ->
+    Allocation_at_locality Mode.Locality.global
   | Atomic (op, _, immediate_or_pointer) ->
       primitive_may_allocate (atomic_lambda_primitive op immediate_or_pointer)
 
@@ -2682,9 +2699,9 @@ let fully_applied_may_allocate env loc p ~ty ~arg_exps =
         transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
           None arg_exps
       in
-      prim_may_allocate ~arity:p.prim_arity prim
+      prim_may_allocate ~arity:p.prim_arity prim (result_allocation p ~poly_mode)
     with
-    | _ -> true
+    | _ -> Allocation_at_locality Mode.Locality.global
   in
   Btype.backtrack snap;
   result
@@ -2714,17 +2731,6 @@ let can_apply_primitive p pmode pos args ~check_poly_mode =
     end
   end
 
-type allocation_registration =
-  | No_allocation
-  | Allocation_at_locality of Mode.Locality.lr
-
-let result_allocation p ~poly_mode =
-  match p.prim_native_repr_res, poly_mode with
-  | (Prim_poly, _), Some mode -> Allocation_at_locality mode
-  | (Prim_poly, _), None -> assert false
-  | (Prim_global, _), _ -> Allocation_at_locality Mode.Locality.global
-  | (Prim_local, _), _ -> No_allocation
-
 let application_allocation env loc p pos args ~poly_mode ~ty =
   if can_apply_primitive p poly_mode pos args ~check_poly_mode:false then
     let rec cut_args n args =
@@ -2735,9 +2741,7 @@ let application_allocation env loc p pos args ~poly_mode ~ty =
       | _, ((_, Omitted _) :: _) -> assert false
     in
     let arg_exps = cut_args p.prim_arity args in
-    if fully_applied_may_allocate env loc p ~ty ~arg_exps then
-      result_allocation p ~poly_mode
-    else No_allocation
+    fully_applied_may_allocate env loc p ~ty ~arg_exps
   else
     Allocation_at_locality Mode.Locality.global
 
