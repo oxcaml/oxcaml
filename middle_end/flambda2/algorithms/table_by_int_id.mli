@@ -50,4 +50,9 @@ end) : sig
   val export : t -> iter:((Id.t -> unit) -> unit) -> serializable
 
   val import : serializable -> Id.t -> E.t
+
+  (* Returns the original identifier associated with a given [E.t]. This is
+     useful to implement delayed maps, where we don't rename the keys in the map
+     until they are looked up. *)
+  val import_backwards : serializable -> E.t -> Id.t
 end
