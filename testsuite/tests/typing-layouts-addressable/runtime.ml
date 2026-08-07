@@ -1,14 +1,14 @@
 (* TEST
  include stdlib_upstream_compatible;
  flambda2;
+ flags = "-extension layouts_beta";
  {
-   flags = "-extension layouts_alpha";
    native;
  } {
-   flags = "-extension layouts_alpha";
    bytecode;
  }
 *)
+(* CR-soon rtjoa: remove layouts_beta once records-containing-any is stable *)
 
 (* This just tests that values at [addressable] kinds still act the same at
    runtime. Not much interesting is going on here yet, as addressability does
