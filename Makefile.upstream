@@ -1184,7 +1184,8 @@ runtime_BYTECODE_STATIC_LIBRARIES = $(addprefix runtime/, \
   ld.conf libcamlrun.$(A))
 runtime_BYTECODE_SHARED_LIBRARIES =
 runtime_NATIVE_STATIC_LIBRARIES = \
-  runtime/libasmrun.$(A) runtime/libcomprmarsh.$(A)
+  runtime/libasmrun.$(A) runtime/libcomprmarsh.$(A) \
+  runtime/libasmrunbaremetal.$(A)
 runtime_NATIVE_SHARED_LIBRARIES =
 
 ifeq "$(RUNTIMED)" "true"
@@ -1232,6 +1233,9 @@ libasmrund_OBJECTS = \
 libasmruni_OBJECTS = \
   $(runtime_NATIVE_C_SOURCES:.c=.ni.$(O)) $(runtime_ASM_OBJECTS:.$(O)=.i.$(O))
 
+libasmrunbaremetal_OBJECTS = \
+  $(runtime_NATIVE_C_SOURCES:.c=.nbm.$(O)) $(runtime_ASM_OBJECTS)
+
 libasmrunpic_OBJECTS = $(runtime_NATIVE_C_SOURCES:.c=.npic.$(O)) \
   $(runtime_ASM_OBJECTS:.$(O)=_libasmrunpic.$(O))
 
@@ -1242,6 +1246,11 @@ libcomprmarsh_OBJECTS = runtime/zstd.npic.$(O)
 runtime_CPPFLAGS = -DCAMLDLLIMPORT= -DIN_CAML_RUNTIME
 ocamlrund_CPPFLAGS = -DDEBUG
 ocamlruni_CPPFLAGS = -DCAML_INSTR
+ocamlrunbaremetal_CPPFLAGS = -DCAML_BARE_METAL
+ocamlrunbaremetal_CFLAGS = -std=gnu17
+ifneq (,$(findstring aarch64,$(TARGET)))
+  ocamlrunbaremetal_CFLAGS += -march=armv8-a -mtune=cortex-a72
+endif
 
 ## Runtime targets
 
@@ -1353,6 +1362,9 @@ runtime/libasmrund.$(A): $(libasmrund_OBJECTS)
 runtime/libasmruni.$(A): $(libasmruni_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
+runtime/libasmrunbaremetal.$(A): $(libasmrunbaremetal_OBJECTS)
+	$(V_MKLIB)$(call MKLIB,$@, $^)
+
 runtime/libasmrun_pic.$(A): $(libasmrunpic_OBJECTS)
 	$(V_MKLIB)$(call MKLIB,$@, $^)
 
@@ -1388,6 +1400,12 @@ runtime/%.ni.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS)
 runtime/%.ni.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
 $(DEPDIR)/runtime/%.ni.$(D): \
   OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlruni_CPPFLAGS)
+
+runtime/%.nbm.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(ocamlrunbaremetal_CFLAGS)
+runtime/%.nbm.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
+
+$(DEPDIR)/runtime/%.nbm.$(D): \
+  OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS) $(ocamlrunbaremetal_CPPFLAGS)
 
 runtime/%.npic.$(O): OC_CFLAGS += $(OC_NATIVE_CFLAGS) $(SHAREDLIB_CFLAGS)
 runtime/%.npic.$(O): OC_CPPFLAGS += $(OC_NATIVE_CPPFLAGS)
@@ -1436,7 +1454,7 @@ $(DEPDIR)/runtime:
 
 runtime_OBJECT_TYPES = % %.b %.bd %.bi %.bpic
 ifeq "$(NATIVE_COMPILER)" "true"
-runtime_OBJECT_TYPES += %.n %.nd %.ni %.np %.npic
+runtime_OBJECT_TYPES += %.n %.nd %.ni %.nbm %.np %.npic
 endif
 
 $(foreach runtime_OBJECT_TYPE, $(runtime_OBJECT_TYPES), \
@@ -1496,6 +1514,9 @@ endif
 runtime_DEP_FILES += $(addsuffix d, $(runtime_DEP_FILES)) \
              $(addsuffix i, $(runtime_DEP_FILES)) \
              $(addsuffix pic, $(runtime_DEP_FILES))
+ifeq "$(NATIVE_COMPILER)" "true"
+runtime_DEP_FILES += $(addsuffix .nbm, $(basename $(runtime_NATIVE_C_SOURCES)))
+endif
 runtime_DEP_FILES := $(addsuffix .$(D), $(runtime_DEP_FILES))
 
 ifeq "$(COMPUTE_DEPS)" "true"

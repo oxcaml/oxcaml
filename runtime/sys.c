@@ -67,11 +67,43 @@
 #include "caml/major_gc.h"
 #include "caml/shared_heap.h"
 
+#ifdef CAML_BARE_METAL
+static int caml_bare_syscall_error(void)
+{
+  errno = ENOSYS;
+  return -1;
+}
+
+static int caml_bare_open(const char_os *path, int flags, int perm)
+{
+  (void)path;
+  (void)flags;
+  (void)perm;
+  return caml_bare_syscall_error();
+}
+
+static int caml_bare_close(int fd)
+{
+  (void)fd;
+  return 0;
+}
+
+#undef open_os
+#define open_os caml_bare_open
+#define close caml_bare_close
+#define getenv(var) ((void)(var), NULL)
+#endif
+
 CAMLexport char * caml_strerror(int errnum, char * buf, size_t buflen)
 {
 #ifdef _WIN32
   /* Windows has a thread-safe strerror */
   return strerror(errnum);
+#elif defined(CAML_BARE_METAL)
+  /* Avoid the host libc's strerror_r ABI (glibc redirects this to
+     __xpg_strerror_r, which newlib does not provide). */
+  snprintf(buf, buflen, "Error %d", errnum);
+  return buf;
 #else
   int res = strerror_r(errnum, buf, buflen);
   /* glibc<2.13 returns -1/sets errno, >2.13 returns +ve errno.
@@ -279,6 +311,8 @@ CAMLprim value caml_sys_close(value fd_v)
   return Val_unit;
 }
 
+#ifndef CAML_BARE_METAL
+
 static int caml_sys_file_mode(value name)
 {
 #ifdef _WIN32
@@ -421,6 +455,8 @@ CAMLprim value caml_sys_getcwd(value unit)
   return caml_copy_string_of_os(buff);
 }
 
+#endif /* !CAML_BARE_METAL */
+
 CAMLprim value caml_sys_unsafe_getenv(value var)
 {
   char_os * res, * p;
@@ -543,6 +579,16 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 #endif
 #endif
 
+#ifdef CAML_BARE_METAL
+
+double caml_sys_time_include_children_unboxed(value include_children)
+{
+  /* The program owns the core, so time since boot is processor time. */
+  (void)include_children;
+  return (double)caml_bare_metal_time_ns() / 1e9;
+}
+
+#else
 #ifdef HAS_SYSTEM
 CAMLprim value caml_sys_system_command(value command)
 {
@@ -614,6 +660,7 @@ double caml_sys_time_include_children_unboxed(value include_children)
   #endif
 #endif
 }
+#endif
 
 CAMLprim value caml_sys_time_include_children(value include_children)
 {
@@ -632,6 +679,22 @@ CAMLprim value caml_sys_time(value unit)
 
 #ifdef _WIN32
 extern int caml_win32_random_seed(intnat data[16]);
+#elif defined(CAML_BARE_METAL)
+int caml_unix_random_seed(intnat data[16])
+{
+  /* Derive the seed from the application's time source, spread with
+     SplitMix64.  Same quality caveat as the time-based fallback below:
+     this is not real entropy. */
+  uint64_t x = caml_bare_metal_time_ns();
+  for (int i = 0; i < 16; i++) {
+    x += UINT64_C(0x9E3779B97F4A7C15);
+    uint64_t z = x;
+    z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+    data[i] = (intnat)(z ^ (z >> 31));
+  }
+  return 16;
+}
 #else
 int caml_unix_random_seed(intnat data[16])
 {
@@ -688,6 +751,7 @@ CAMLprim value caml_sys_random_seed(value unit)
   return res;
 }
 
+#ifndef CAML_BARE_METAL
 CAMLprim value caml_sys_const_big_endian(value unit)
 {
 #ifdef ARCH_BIG_ENDIAN
@@ -713,11 +777,6 @@ CAMLprim value caml_sys_const_int_size(value unit)
 CAMLprim value caml_sys_const_max_wosize(value unit)
 {
   return Val_long(Max_wosize) ;
-}
-
-CAMLprim value caml_sys_io_buffer_size(value unit)
-{
-  return Val_long(IO_BUFFER_SIZE);
 }
 
 CAMLprim value caml_sys_const_ostype_unix(value unit)
@@ -763,23 +822,6 @@ CAMLprim value caml_sys_const_arch_arm64(value unit)
 #endif
 }
 
-CAMLprim value caml_sys_get_config(value unit)
-{
-  CAMLparam0 ();   /* unit is unused */
-  CAMLlocal2 (result, ostype);
-
-  ostype = caml_copy_string(OCAML_OS_TYPE);
-  result = caml_alloc_small (3, 0);
-  Field(result, 0) = ostype;
-  Field(result, 1) = Val_long (8 * sizeof(value));
-#ifdef ARCH_BIG_ENDIAN
-  Field(result, 2) = Val_true;
-#else
-  Field(result, 2) = Val_false;
-#endif
-  CAMLreturn (result);
-}
-
 CAMLprim value caml_sys_read_directory(value path)
 {
   CAMLparam1(path);
@@ -822,11 +864,6 @@ CAMLprim value caml_sys_isatty(value chan)
   return ret;
 }
 
-CAMLprim value caml_sys_const_naked_pointers_checked(value unit)
-{
-  return Val_false;
-}
-
 /* On Windows, returns a string list of directories to search for configuration
    files. On Unix, this list is more easily computed in OCaml, so the list
    returned by the primitive is empty. */
@@ -849,4 +886,32 @@ CAMLprim value caml_sys_temp_dir_name(value unit)
 #else
   return caml_copy_string("");
 #endif
+}
+#endif /* !CAML_BARE_METAL */
+
+CAMLprim value caml_sys_io_buffer_size(value unit)
+{
+  return Val_long(IO_BUFFER_SIZE);
+}
+
+CAMLprim value caml_sys_get_config(value unit)
+{
+  CAMLparam0 ();   /* unit is unused */
+  CAMLlocal2 (result, ostype);
+
+  ostype = caml_copy_string(OCAML_OS_TYPE);
+  result = caml_alloc_small (3, 0);
+  Field(result, 0) = ostype;
+  Field(result, 1) = Val_long (8 * sizeof(value));
+#ifdef ARCH_BIG_ENDIAN
+  Field(result, 2) = Val_true;
+#else
+  Field(result, 2) = Val_false;
+#endif
+  CAMLreturn (result);
+}
+
+CAMLprim value caml_sys_const_naked_pointers_checked(value unit)
+{
+  return Val_false;
 }

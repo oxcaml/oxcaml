@@ -51,7 +51,9 @@
 
 CAMLexport atomic_uintnat caml_pending_signals[NSIG_WORDS];
 
+#ifndef CAML_BARE_METAL
 static caml_plat_mutex signal_install_mutex = CAML_PLAT_MUTEX_INITIALIZER;
+#endif
 
 /* Only used in signals_nat.c, but defined here to avoid link errors
    on bytecode builds */
@@ -647,7 +649,7 @@ CAMLexport int caml_rev_convert_signal_number(int signo)
   return signo;
 }
 
-#ifdef __linux__
+#if defined(__linux__) && defined(POSIX_SIGNALS)
 static size_t max_size_t(size_t a, size_t b)
 {
   return (a > b) ? a : b;
@@ -784,6 +786,7 @@ void caml_terminate_signals(void)
 #endif
 }
 
+#ifndef CAML_BARE_METAL
 /* Installation of a signal handler (as per [Sys.signal]) */
 
 static void handle_signal(int signal_number)
@@ -880,3 +883,5 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
   caml_plat_unlock(&signal_install_mutex);
   caml_sys_error(NO_ARG);
 }
+
+#endif /* !CAML_BARE_METAL */

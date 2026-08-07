@@ -43,6 +43,13 @@
 #include <unistd.h>
 #endif
 
+/* An events ring needs an OS (files, mmap), so the whole producer is
+   compiled out on bare metal: the CAML_EV_* / CAML_RUNTIME_EVENTS_*
+   macros in runtime_events.h compile to nothing there, and the
+   primitives backing the [Runtime_events] module are not defined, so a
+   program using it fails at link time. */
+#ifndef CAML_BARE_METAL
+
 #define RUNTIME_EVENTS_VERSION 1
 
 /*
@@ -870,6 +877,8 @@ CAMLexport value caml_runtime_events_user_resolve(
 
   CAMLreturn (Val_none);
 }
+
+#endif /* !CAML_BARE_METAL */
 
 /* Linker compatibility with unused 4 stdlib externals */
 

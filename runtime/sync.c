@@ -26,8 +26,10 @@
 #include "caml/sys.h"
 #include "caml/runtime_events.h"
 
+#ifndef CAML_BARE_METAL
 /* System-dependent part */
 #include "sync_posix.h"
+#endif
 
 /* Reporting errors */
 
@@ -50,6 +52,7 @@ CAMLexport void caml_check_error(int retcode, char const * msg)
   caml_raise_sys_error(str);
 }
 
+#ifndef CAML_BARE_METAL
 /* Mutex operations */
 
 static void caml_mutex_finalize(value wrapper)
@@ -211,3 +214,5 @@ CAMLprim value caml_ml_condition_broadcast(value wrapper)
                  "Condition.broadcast");
   return Val_unit;
 }
+
+#endif /* !CAML_BARE_METAL */
