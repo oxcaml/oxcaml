@@ -24,10 +24,15 @@ let next_stamp () =
   incr previous_stamp;
   !previous_stamp
 
-let get_stamp_counter () = !previous_stamp
+let export_stamp_counter () = !previous_stamp
 
 let restore_stamp_counter counter =
-  previous_stamp := max !previous_stamp counter
+  if !previous_stamp = 0
+  then previous_stamp := counter
+  else
+    Misc.fatal_errorf
+      "Restoring continuation stamp counter would overwrite modified value %d"
+      !previous_stamp
 
 module Sort = struct
   type t =

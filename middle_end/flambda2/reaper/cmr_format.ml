@@ -35,14 +35,14 @@ module Id_stamp_counters = struct
     }
 
   let save () =
-    { variables = Variable.get_name_stamp_counter ();
-      code_ids = Code_id.get_name_stamp_counter ();
-      continuations = Continuation.get_stamp_counter ();
-      function_slots = Function_slot.get_stamp_counter ();
-      value_slots = Value_slot.get_stamp_counter ()
+    { variables = Variable.export_name_stamp_counter ();
+      code_ids = Code_id.export_name_stamp_counter ();
+      continuations = Continuation.export_stamp_counter ();
+      function_slots = Function_slot.export_stamp_counter ();
+      value_slots = Value_slot.export_stamp_counter ()
     }
 
-  let restore
+  let restore_for_resume
       { variables; code_ids; continuations; function_slots; value_slots } =
     Variable.restore_name_stamp_counter variables;
     Code_id.restore_name_stamp_counter code_ids;
@@ -125,7 +125,7 @@ module Deps_with_fields = struct
     Global_flow_graph.apply_renaming deps renaming ~rename_field
 end
 
-module File_contents : sig
+module Serialisable : sig
   type cmr_format = t
 
   type t
@@ -141,8 +141,7 @@ end = struct
   type cmr_format = t
 
   type t =
-    { id_stamp_counters : Id_stamp_counters.t;
-      table_data : Flambda_cmx_format.table_data;
+    { table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
@@ -184,8 +183,7 @@ end = struct
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
-    { id_stamp_counters = Id_stamp_counters.save ();
-      table_data = Flambda_cmx_format.create_table_data exported_ids;
+    { table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
       unit_metadata;
       final_typing_env;
@@ -195,8 +193,7 @@ end = struct
     }
 
   let deserialise ~machine_width ~resolver
-      { id_stamp_counters;
-        table_data;
+      { table_data;
         used_value_slots;
         unit_metadata;
         final_typing_env;
@@ -204,8 +201,6 @@ end = struct
         deps;
         rebuild_data
       } : cmr_format =
-    (* Must happen before anything can create an identifier. *)
-    Id_stamp_counters.restore id_stamp_counters;
     let renaming, code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit:(Compilation_unit.get_current_exn ())
@@ -240,34 +235,32 @@ type error =
 exception Error of error
 
 let save ~filename ~used_value_slots t =
-  let file_contents = File_contents.create ~used_value_slots t in
+  let serialisable = Serialisable.create ~used_value_slots t in
+  let id_stamp_counters = Id_stamp_counters.save () in
   let oc = open_out_bin filename in
   Misc.try_finally
     (fun () ->
       output_string oc Config.cmr_magic_number;
-      output_value oc file_contents)
+      output_value oc (serialisable, id_stamp_counters))
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
 
-let restore ~filename ~machine_width ~resolver =
+let load filename =
   let ic = open_in_bin filename in
-  let file_contents =
-    Misc.try_finally
-      (fun () ->
-        let magic = Config.cmr_magic_number in
-        let format_code = String.sub magic 0 9 in
-        let buffer = really_input_string ic (String.length magic) in
-        if String.equal buffer magic
-        then
-          try (input_value ic : File_contents.t) with
-          | End_of_file | Failure _ -> raise (Error (Corrupted filename))
-          | Error e -> raise (Error e)
-        else if String.starts_with ~prefix:format_code buffer
-        then raise (Error (Wrong_version filename))
-        else raise (Error (Wrong_format filename)))
-      ~always:(fun () -> close_in ic)
-  in
-  File_contents.deserialise ~machine_width ~resolver file_contents
+  Misc.try_finally
+    (fun () ->
+      let magic = Config.cmr_magic_number in
+      let format_code = String.sub magic 0 9 in
+      let buffer = really_input_string ic (String.length magic) in
+      if String.equal buffer magic
+      then
+        try (input_value ic : Serialisable.t * Id_stamp_counters.t) with
+        | End_of_file | Failure _ -> raise (Error (Corrupted filename))
+        | Error e -> raise (Error e)
+      else if String.starts_with ~prefix:format_code buffer
+      then raise (Error (Wrong_version filename))
+      else raise (Error (Wrong_format filename)))
+    ~always:(fun () -> close_in ic)
 
 open Format_doc
 

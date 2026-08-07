@@ -393,6 +393,11 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~cmr_filename ~cmx_imports_to_reload =
+  let cmr_serialisable, id_stamp_counters =
+    Flambda2_reaper.Cmr_format.load cmr_filename
+  in
+  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_resume
+    id_stamp_counters;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
@@ -400,8 +405,9 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         deps;
         rebuild_data
       } =
-    Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename ~machine_width
+    Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
+      cmr_serialisable
   in
   (* Reload all cmx files used in the paused compilation. This registers their
      slot offsets for [finalize_offsets] and populates [Compilenv]'s imports for

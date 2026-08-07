@@ -24,6 +24,32 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
+module Id_stamp_counters : sig
+  type t
+
+  (** Restore all stamp counters to the values they had when the file this came
+      from was serialised. This can only be called once, before any stamps have
+      been created, and will error otherwise. The affected stamp counters are
+      for value slots, function slots, variables, code IDs and continuations. *)
+  val restore_for_resume : t -> unit
+end
+
+module Serialisable : sig
+  type cmr_format = t
+
+  type t
+
+  (** Turn serialised file contents back into usable data types, inserting the
+      necessary objects into the global hashcons tables and then updating
+      hashcons IDs as appropriate. The resuming invocation must use the same
+      machine width and compilation unit as the one that wrote the field.*)
+  val deserialise :
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+    t ->
+    cmr_format
+end
+
 type error =
   | Wrong_format of string
   | Wrong_version of string
@@ -36,10 +62,5 @@ exception Error of error
     for the unit being stored; it describes the data written alongside it. *)
 val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
 
-(** The resuming invocation must use the same machine width and compilation unit
-    as the one that wrote the file. *)
-val restore :
-  filename:string ->
-  machine_width:Target_system.Machine_width.t ->
-  resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
-  t
+(** Read and unmarshal a cmr file from disk. *)
+val load : string -> Serialisable.t * Id_stamp_counters.t

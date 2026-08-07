@@ -42,7 +42,7 @@ module type S = sig
 
   val rename : t -> t
 
-  val get_stamp_counter : unit -> int
+  val export_stamp_counter : unit -> int
 
   val restore_stamp_counter : int -> unit
 end
@@ -118,9 +118,15 @@ end) : S = struct
     incr next_stamp;
     stamp
 
-  let get_stamp_counter () = !next_stamp
+  let export_stamp_counter () = !next_stamp
 
-  let restore_stamp_counter counter = next_stamp := max !next_stamp counter
+  let restore_stamp_counter counter =
+    if !next_stamp = 0
+    then next_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring slot stamp counter would overwrite modified value %d"
+        !next_stamp
 
   let create compilation_unit ~name ~is_always_immediate kind =
     { compilation_unit;
