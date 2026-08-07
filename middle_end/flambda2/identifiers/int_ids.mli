@@ -139,6 +139,9 @@ module Variable : sig
   val import : importer -> t -> t
 
   val import_and_rename : importer -> t -> t
+
+  (* Returns the original identifier in the imported unit. *)
+  val import_backwards : importer -> t -> t
 end
 
 module Symbol : sig
@@ -168,6 +171,9 @@ module Symbol : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  (* Returns the original identifier in the imported unit. *)
+  val import_backwards : importer -> t -> t
 
   val external_symbols_compilation_unit : unit -> Compilation_unit.t
 end
