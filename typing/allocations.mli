@@ -1,0 +1,65 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                   Shixin Song, Jane Street, New York                   *)
+(*                                                                        *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* Registration and settling of the modes of allocations. *)
+
+open Mode
+
+val reset_allocations : unit -> unit
+
+val register_mode_for_optimisation :
+  Hint.pinpoint ->
+  ?closures:(Hint.pinpoint * Allocation.r) list ->
+  ('l * allowed) Alloc.t ->
+  unit
+
+val register_allocation_mode :
+  env:Env.t -> loc:Location.t -> ('l * allowed) Alloc.t -> unit
+
+val register_allocation_value_mode :
+  env:Env.t ->
+  loc:Location.t ->
+  ?desc:Hint.allocation_desc ->
+  Value.r ->
+  Alloc.r * Value.r
+
+val register_closure_allocation :
+  env:Env.t -> Value.r -> loc:Location.t -> Alloc.lr * Value.r
+
+val register_mod_allocation :
+  env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit
+
+val register_prim_application_allocation :
+  env:Env.t ->
+  pos:Typedtree.apply_position ->
+  Typedtree.expression ->
+  (Typedtree.arg_label * Typedtree.apply_arg * 'a) list ->
+  unit
+
+val relax_alloc :
+  Types.value_description -> is_applied:bool -> Value.l -> Value.l
+
+(** For every allocation that has to be on heap ([global]), constrain
+    the enclosing closures to be [alloc].
+    Must only be called before zapping the allocation axis of
+    closure modes. *)
+val constrain_closures : unit -> unit
+
+(** For every closure that has to be [noalloc_strict]/[noalloc],
+    constrain allocations it encloses to be [local] and on the stack.
+    Must only be called before zapping the locality axis of allocation
+    modes. *)
+val constrain_allocations : unit -> unit
+
+val optimise_allocations : unit -> unit

@@ -173,8 +173,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Unknown -> Unknown
         | Legacy x -> Legacy x
         | Stack_expression -> Stack_expression
-        | Allocated_in_noalloc_closure (annot, pp) ->
-          Allocated_in_noalloc_closure (annot, pp)
+        | Allocated_on_heap -> Allocated_on_heap
+        | Allocated_in_noalloc_closure (pp, m) ->
+          Allocated_in_noalloc_closure (pp, m)
         | Mutable_read m -> Mutable_read m
         | Mutable_write m -> Mutable_write m
         | Lazy_forced -> Lazy_forced
@@ -221,8 +222,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
-        | Allocated_in_noalloc_closure (annot, pp) ->
-          Allocated_in_noalloc_closure (annot, pp)
+        | Allocated_on_heap -> Allocated_on_heap
+        | Allocated_in_noalloc_closure (pp, m) ->
+          Allocated_in_noalloc_closure (pp, m)
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -250,8 +252,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lazy_forced -> Lazy_forced
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
-        | Allocated_in_noalloc_closure (annot, pp) ->
-          Allocated_in_noalloc_closure (annot, pp)
+        | Allocated_on_heap -> Allocated_on_heap
+        | Allocated_in_noalloc_closure (pp, m) ->
+          Allocated_in_noalloc_closure (pp, m)
         | Module_allocated_on_heap -> Module_allocated_on_heap
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
@@ -5050,18 +5053,20 @@ module Report = struct
          value"
     | Stack_expression ->
       Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
-    | Allocated_in_noalloc_closure (annot, closure) ->
-      let print_closure = print_pinpoint closure |> Option.get in
-      let annot =
-        match annot with
-        | Noalloc -> "noalloc"
-        | Noalloc_strict -> "noalloc_strict"
+    | Allocated_on_heap -> Fmt.pp_print_string ppf "it is allocated on the heap"
+    | Allocated_in_noalloc_closure (pp, noalloc) ->
+      let print_pp = print_pinpoint pp |> Option.get in
+      let closure_mode : C.Allocation.t =
+        match noalloc with
+        | Noalloc -> Noalloc
+        | Noalloc_strict -> Noalloc_strict
       in
       Fmt.fprintf ppf
         "it is allocated inside %t,@ which is %a and thus cannot allocate on \
          the heap"
-        (print_closure ~definite:true ~capitalize:false)
-        Misc.Style.inline_code annot
+        (print_pp ~definite:true ~capitalize:false)
+        (Misc.Style.as_inline_code (C.print C.Allocation))
+        closure_mode
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }
@@ -5732,6 +5737,8 @@ module Locality = struct
       let floor = Guts.get_loose_floor m in
       let ceil = Guts.get_loose_ceil m in
       if Const.le ceil floor then Some ceil else None
+
+    let get_ceil m = Guts.get_ceil m
   end
 end
 
@@ -5975,6 +5982,10 @@ module Allocation = struct
   let legacy = of_const Const.legacy
 
   let zap_to_legacy = zap_to_ceil
+
+  module Guts = struct
+    let get_ceil m = Guts.get_ceil m
+  end
 end
 
 module type Areality = sig
