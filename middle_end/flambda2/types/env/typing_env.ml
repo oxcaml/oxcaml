@@ -1135,6 +1135,8 @@ end = struct
     in
     { defined_symbols_without_equations; code_age_relation; just_after_level }
 
+  (* CR mvellacott: this function may not be needed once we remove
+     compilation-against-dependency metadata from .reaped.cmx files. *)
   let create_without_pruning (env : Pre_serializable.t) : t =
     if is_bottom env
     then Misc.fatal_error "[create_without_pruning]: environment is bottom";
