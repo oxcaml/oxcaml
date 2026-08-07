@@ -580,8 +580,14 @@ CAMLprim value caml_with_async_exns(value body_callback)
   // Save and restore the current dynamic binding state so that local bindings
   // are not leaked upon raising an async exception.
   dynamic_table_s tbl;
-  if(!caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&Caml_state->current_stack->dyn)) {
-    caml_raise_out_of_memory();
+
+  dynamic_node_t node = Caml_state->current_stack->dyn_node;
+  if(node != NULL) {
+    if(!caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&node->table)) {
+      caml_raise_out_of_memory();
+    }
+  } else {
+    caml_dynamic_table_init(&tbl);
   }
 
   // The saved table must be updated if its contents are promoted.
@@ -589,8 +595,14 @@ CAMLprim value caml_with_async_exns(value body_callback)
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
   caml_dynamic_table_unregister_roots(&tbl);
 
-  caml_dynamic_table_free(&Caml_state->current_stack->dyn);
-  Caml_state->current_stack->dyn = tbl;
+  // The body may have created the node.
+  node = Caml_state->current_stack->dyn_node;
+  if(node != NULL) {
+    caml_dynamic_table_free(&node->table);
+    node->table = tbl;
+  } else {
+    CAMLassert(tbl.bindings == NULL);
+  }
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   /* raised as a normal exn, even if it was asynchronous */

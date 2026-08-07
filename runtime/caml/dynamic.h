@@ -109,6 +109,18 @@ extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action_flags,
                                           void *);
 
+
+/* Per-fiber binding state. Owned by the fiber, but separately allocated
+   for stability (the stack_info allocation may be resized).
+
+   Scanned by the GC via the owning fiber only. */
+typedef struct dynamic_node_s {
+  dynamic_table_s table;
+} dynamic_node_s, *dynamic_node_t;
+
+/* Free a dynamic node and its contents. */
+extern void caml_dynamic_node_free(dynamic_node_t node);
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_DYNAMIC_H */

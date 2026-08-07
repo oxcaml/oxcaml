@@ -72,8 +72,9 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
-  /* Temporary dynamic bindings, applying only in this fiber */
-  struct dynamic_table_s dyn;
+  /* Temporary dynamic bindings, applying only in this fiber.
+     Allocated lazily; may be NULL. */
+  dynamic_node_t dyn_node;
 };
 
 #ifdef STACK_GUARD_PAGES
