@@ -41,3 +41,7 @@
 (.y) = hello
 (.y) <- world
 (.y) = world
+== Basic idx_atomic (stack-allocated record) ==
+(.x) = hello
+(.x) <- "world"
+(.x) = world

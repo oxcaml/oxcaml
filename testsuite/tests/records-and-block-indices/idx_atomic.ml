@@ -117,3 +117,20 @@ module Void = struct
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     ()
 end
+
+(* test reading/writing from stack-allocated record *)
+
+module Stack = struct
+  type t = { mutable x: string [@atomic] }
+
+  (* because printf does not accept format arguments @ local *)
+  external globalize_string : string @ local -> string @ unique @@ portable = "%obj_dup"
+
+  let () =
+    Printf.printf "== Basic idx_atomic (stack-allocated record) ==\n";
+    let t = stack_ { x = "hello" } in
+    Printf.printf "(.x) = %s\n" (Idx_atomic.get t (.x) |> globalize_string);
+    Printf.printf "(.x) <- \"world\"\n"; Idx_atomic.set t (.x) "world";
+    Printf.printf "(.x) = %s\n" (Idx_atomic.get t (.x) |> globalize_string);
+    ()
+end

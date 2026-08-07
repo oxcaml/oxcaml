@@ -43,7 +43,7 @@ let simplify_atomic_compare_and_set_or_exchange_args
     else Any_value
 
 let simplify_atomic_compare_and_set_field
-    (args_kind : P.Block_access_field_kind.t) ~original_prim:_ dacc
+    (args_kind : P.Block_access_field_kind.t) mode ~original_prim:_ dacc
     ~original_term:_ dbg ~arg1:atomic ~arg1_ty:_ ~arg2:field ~arg2_ty:_
     ~arg3:expected ~arg3_ty:comparison_value_ty ~arg4:desired
     ~arg4_ty:new_value_ty ~result_var =
@@ -54,7 +54,7 @@ let simplify_atomic_compare_and_set_field
   let new_term =
     Named.create_prim
       (Quaternary
-         ( Atomic_compare_and_set_field args_kind,
+         ( Atomic_compare_and_set_field (args_kind, mode),
            atomic,
            field,
            expected,
@@ -69,7 +69,7 @@ let simplify_atomic_compare_and_set_field
 
 let simplify_atomic_compare_exchange_field
     ~(atomic_kind : P.Block_access_field_kind.t)
-    ~(args_kind : P.Block_access_field_kind.t) ~original_prim:_ dacc
+    ~(args_kind : P.Block_access_field_kind.t) ~mode ~original_prim:_ dacc
     ~original_term:_ dbg ~arg1:atomic ~arg1_ty:_ ~arg2:field ~arg2_ty:_
     ~arg3:expected ~arg3_ty:comparison_value_ty ~arg4:desired
     ~arg4_ty:new_value_ty ~result_var =
@@ -80,7 +80,7 @@ let simplify_atomic_compare_exchange_field
   let new_term =
     Named.create_prim
       (Quaternary
-         ( Atomic_compare_exchange_field { atomic_kind; args_kind },
+         ( Atomic_compare_exchange_field { atomic_kind; args_kind; mode },
            atomic,
            field,
            expected,
@@ -101,10 +101,10 @@ let simplify_quaternary_primitive dacc original_prim
   let original_term = Named.create_prim original_prim dbg in
   let simplifier =
     match prim with
-    | Atomic_compare_and_set_field access_kind ->
-      simplify_atomic_compare_and_set_field access_kind ~original_prim
-    | Atomic_compare_exchange_field { atomic_kind; args_kind } ->
-      simplify_atomic_compare_exchange_field ~atomic_kind ~args_kind
+    | Atomic_compare_and_set_field (access_kind, mode) ->
+      simplify_atomic_compare_and_set_field access_kind mode ~original_prim
+    | Atomic_compare_exchange_field { atomic_kind; args_kind; mode } ->
+      simplify_atomic_compare_exchange_field ~atomic_kind ~args_kind ~mode
         ~original_prim
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3

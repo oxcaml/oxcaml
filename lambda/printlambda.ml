@@ -127,6 +127,10 @@ let array_ref_kind ppf k =
     fprintf ppf "ignorableproduct %s" (ignorable_product_element_kinds kinds)
   | Punspecializedarray_ref mode -> fprintf ppf "unspecialized%a" pp_mode mode
 
+let modify_mode = function
+  | Modify_heap -> ""
+  | Modify_maybe_stack -> "(maybe-stack)"
+
 let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
@@ -867,26 +871,33 @@ let primitive ppf = function
       fprintf ppf "atomic_load_mixed_field %a %a"
         pp_print_int index
         (mixed_block_shape (fun _ () -> ())) shape
-  | Patomic_set_field {immediate_or_pointer} ->
+  | Patomic_set_field {immediate_or_pointer; mode} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_set_field_imm"
-        | Pointer -> fprintf ppf "atomic_set_field_ptr")
-  | Patomic_set_mixed_field { index ; shape } ->
-      fprintf ppf "atomic_set_mixed_field %a %a"
+        | Immediate -> fprintf ppf "atomic_set_field_imm%s" (modify_mode mode)
+        | Pointer -> fprintf ppf "atomic_set_field_ptr%s" (modify_mode mode))
+  | Patomic_set_mixed_field { index ; shape ; mode } ->
+      fprintf ppf "atomic_set_mixed_field%s %a %a"
+        (modify_mode mode)
         pp_print_int index
         (mixed_block_shape (fun _ () -> ())) shape
-  | Patomic_exchange_field {immediate_or_pointer} ->
+  | Patomic_exchange_field {immediate_or_pointer; mode} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_exchange_field_imm"
-        | Pointer -> fprintf ppf "atomic_exchange_field_ptr")
-  | Patomic_compare_exchange_field {immediate_or_pointer} ->
+        | Immediate ->
+          fprintf ppf "atomic_exchange_field_imm%s" (modify_mode mode)
+        | Pointer ->
+          fprintf ppf "atomic_exchange_field_ptr%s" (modify_mode mode))
+  | Patomic_compare_exchange_field {immediate_or_pointer; mode} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_exchange_field_imm"
-        | Pointer -> fprintf ppf "atomic_compare_exchange_field_ptr")
-  | Patomic_compare_set_field {immediate_or_pointer} ->
+        | Immediate ->
+          fprintf ppf "atomic_compare_exchange_field_imm%s" (modify_mode mode)
+        | Pointer ->
+          fprintf ppf "atomic_compare_exchange_field_ptr%s" (modify_mode mode))
+  | Patomic_compare_set_field {immediate_or_pointer; mode} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_compare_set_field_imm"
-        | Pointer -> fprintf ppf "atomic_compare_set_field_ptr")
+        | Immediate ->
+          fprintf ppf "atomic_compare_set_field_imm%s" (modify_mode mode)
+        | Pointer ->
+          fprintf ppf "atomic_compare_set_field_ptr%s" (modify_mode mode))
   | Patomic_fetch_add_field -> fprintf ppf "atomic_fetch_add_field"
   | Patomic_add_field -> fprintf ppf "atomic_add_field"
   | Patomic_sub_field -> fprintf ppf "atomic_sub_field"
@@ -1085,20 +1096,20 @@ let name_of_primitive = function
         | Immediate -> "atomic_load_field_imm"
         | Pointer -> "atomic_load_field_ptr")
   | Patomic_load_mixed_field _ -> "atomic_load_mixed_field"
-  | Patomic_set_field {immediate_or_pointer} ->
+  | Patomic_set_field {immediate_or_pointer; _} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_set_field_imm"
         | Pointer -> "atomic_set_field_ptr")
   | Patomic_set_mixed_field _ -> "atomic_set_mixed_field"
-  | Patomic_exchange_field {immediate_or_pointer} ->
+  | Patomic_exchange_field {immediate_or_pointer; _} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_exchange_field_imm"
         | Pointer -> "atomic_exchange_field_ptr")
-  | Patomic_compare_exchange_field {immediate_or_pointer} ->
+  | Patomic_compare_exchange_field {immediate_or_pointer; _} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_compare_exchange_field_imm"
         | Pointer -> "atomic_compare_exchange_field_ptr")
-  | Patomic_compare_set_field {immediate_or_pointer} ->
+  | Patomic_compare_set_field {immediate_or_pointer; _} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_compare_set_field_imm"
         | Pointer -> "atomic_compare_set_field_ptr")

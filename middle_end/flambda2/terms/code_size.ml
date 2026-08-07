@@ -491,17 +491,20 @@ let ternary_prim_size ~machine_width prim =
   (* ~ 1 block_load + 1 block_set *)
   | Atomic_field_int_arith _ -> 1
   | Atomic_set_field _ -> 1
-  | Atomic_exchange_field Immediate -> 1
-  | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+  | Atomic_exchange_field (Immediate, (Heap | Local)) -> 1
+  | Atomic_exchange_field (Any_value, (Heap | Local)) ->
+    does_not_need_caml_c_call_extcall_size
   | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
-  | Atomic_compare_and_set_field Immediate -> 3
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Immediate } ->
+  | Atomic_compare_and_set_field (Immediate, (Heap | Local)) -> 3
+  | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Immediate; mode = Heap | Local } ->
     1
-  | Atomic_compare_and_set_field Any_value
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
+  | Atomic_compare_and_set_field (Any_value, (Heap | Local))
+  | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Any_value; mode = Heap | Local } ->
     does_not_need_caml_c_call_extcall_size
 
 let block num_fields = alloc_size + num_fields
