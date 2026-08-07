@@ -40,7 +40,7 @@ let set_label l =
   if l < !label_counter
   then
     Misc.fatal_errorf "Cannot set label counter to %d, it must be >= %d" l
-      !label_counter ();
+      !label_counter;
   label_counter := l
 
 let cur_label () = !label_counter
