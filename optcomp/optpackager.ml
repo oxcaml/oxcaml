@@ -182,9 +182,18 @@ end) : S = struct
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
     in
+    let static_data =
+      Slambdaeval.CU_data.package
+        (Misc.Stdlib.Array.of_list_map
+           (fun info ->
+             Slambdaeval.CU_data.read ~sections:info.ui_file_sections
+               info.ui_static_data)
+           units)
+    in
     let ui =
       (* [arg_descr] is None because we don't allow packs to be arguments. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
+        ~static_data
     in
     let file_sections =
       let length =
@@ -234,6 +243,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = ui.ui_static_data;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in
