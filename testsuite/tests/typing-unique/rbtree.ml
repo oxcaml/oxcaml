@@ -429,6 +429,7 @@ module IntOrder = struct
   let compare t1 t2 = t1 - t2
 end
 
+(* CR-soon shsong: balance_left balance_right set_black should not be noalloc_strict *)
 let () =
   let module Ord = IntOrder in
   let module M1 = Make_Okasaki(Ord) in

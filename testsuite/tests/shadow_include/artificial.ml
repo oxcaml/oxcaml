@@ -63,8 +63,8 @@ end
 module type Extended =
   sig
     type t = Foo.t
-    val to_ : t -> Foo.Bar.t @@ stateless
-    val from : Foo.Bar.t -> t @@ stateless
+    val to_ : t -> Foo.Bar.t @@ stateless noalloc_strict
+    val from : Foo.Bar.t -> t @@ stateless noalloc_strict
     module Bar : sig type t = Foo.Bar.t val int : int end
   end
 |}]

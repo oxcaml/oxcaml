@@ -24,6 +24,7 @@ val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
 module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+  noalloc_strict
 val foo : unit -> unit = <fun>
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
@@ -161,7 +162,7 @@ module M : S = struct
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S @@ stateless nonportable
+module M : S @@ stateless nonportable noalloc_strict
 |}]
 
 let (bar @ portable) () =
@@ -260,7 +261,9 @@ module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
+module F :
+  functor () ->
+    sig val foo : unit -> unit @@ stateless noalloc_strict end @ once
   @@ stateless
 |}]
 
@@ -326,14 +329,14 @@ end
 [%%expect{|
 module Test_incl :
   sig
-    module M : sig val foo : 'a -> 'a @@ stateless end
-    module type S = sig val foo : 'a -> 'a @@ stateless end
+    module M : sig val foo : 'a -> 'a @@ stateless noalloc_strict end
+    module type S = sig val foo : 'a -> 'a @@ stateless noalloc_strict end
     module N :
       sig
         val x : int ref @@ stateless
         val f : unit -> unit
         val foo : 'a -> 'a @@ stateless
-      end
+      end @@ noalloc_strict
   end
 |}]
 
@@ -387,6 +390,8 @@ Error: The module is "nonportable"
        However, the module highlighted is expected to be "portable".
 |}]
 
+(* CR-soon shsong: construction of functor calls register_allocation,
+    will be fixed after that *)
 module (F @ portable) (X : sig val x : int -> int end) = struct
     let bar = X.x
 end

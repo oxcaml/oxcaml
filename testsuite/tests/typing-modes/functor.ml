@@ -110,7 +110,7 @@ module M = struct
     let f () = ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit end @@ stateless
+module M : sig val f : unit -> unit end @@ stateless noalloc_strict
 |}]
 
 module _ @ portable = F(M)
@@ -165,7 +165,8 @@ module M = struct
     let f' = let r = ref 42 in fun () -> r := 24; ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit @@ stateless val f' : unit -> unit end
+module M : sig val f : unit -> unit @@ stateless val f' : unit -> unit end @@
+  noalloc_strict
 |}]
 
 (* Note that M is a nonportable module containing both portable and nonportable items.
@@ -180,7 +181,7 @@ module M = struct
     let f = let r = ref 42 in fun () -> r := 24; ()
 end
 [%%expect{|
-module M : sig val f : unit -> unit end
+module M : sig val f : unit -> unit end @@ noalloc_strict
 |}]
 
 let () =
@@ -190,10 +191,11 @@ let () =
 Line 2, characters 20-25:
 2 |     let module M' = F (M) in
                         ^^^^^
-Error: Modules do not match: sig val f : unit -> unit end @ nonportable
+Error: Modules do not match:
+       sig val f : unit -> unit @@ noalloc_strict end @ nonportable
      is not included in S @ portable
      Values do not match:
-       val f : unit -> unit (* in a structure at nonportable *)
+       val f : unit -> unit @@ noalloc_strict (* in a structure at nonportable *)
      is not included in
        val f : unit -> unit (* in a structure at portable *)
      The first is "nonportable"
@@ -290,7 +292,7 @@ Line 3, characters 20-21:
                         ^
 Error: Signature mismatch in included functor's parameter:
        Values do not match:
-         val f : unit -> unit (* in a structure at nonportable *)
+         val f : unit -> unit @@ noalloc_strict (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The first is "nonportable"
@@ -307,8 +309,8 @@ end
 [%%expect{|
 module M :
   sig
-    val f : unit -> unit @@ stateless
-    val f' : unit -> unit
+    val f : unit -> unit @@ stateless noalloc_strict
+    val f' : unit -> unit @@ noalloc_strict
     val g : unit -> unit @@ portable
   end
 |}]
@@ -750,7 +752,7 @@ module type Nonportable_Nonportable = sig module F : functor (M : S) -> T end
 module F (M : Nonportable_Portable) = (M : Portable_Portable)
 [%%expect{|
 module F : functor (M : Nonportable_Portable) -> Portable_Portable @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : Portable_Portable) = (M : Nonportable_Portable)
@@ -819,7 +821,7 @@ Error: Signature mismatch:
 module F (M : Portable_Portable) = (M : Portable_Nonportable)
 [%%expect{|
 module F : functor (M : Portable_Portable) -> Portable_Nonportable @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : S @ shareable -> S) = (M : S -> S)
@@ -847,11 +849,13 @@ Error: Signature mismatch:
 module F (M : S -> S) = (M : S @ shareable -> S)
 [%%expect{|
 module F : functor (M : S -> S) -> S @ shareable -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> S @ shareable) = (M : S -> S)
 [%%expect{|
 module F : functor (M : S -> S @ shareable) -> S -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> S) = (M : S -> S @ shareable)
@@ -904,11 +908,13 @@ Error: Signature mismatch:
 module F (M : T @ immutable -> S) = (M : T -> S)
 [%%expect{|
 module F : functor (M : T @ immutable -> S) -> T -> S @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> T) = (M : S -> T @ immutable)
 [%%expect{|
 module F : functor (M : S -> T) -> S -> T @ immutable @@ stateless
+  noalloc_strict
 |}]
 
 module F (M : S -> T @ immutable) = (M : S -> T)
@@ -943,7 +949,7 @@ end
 type t' = F(M).t
 [%%expect{|
 module F : functor (X : S @ portable) -> sig type t = int end @@ stateless
-module M : sig val f : unit -> unit end
+module M : sig val f : unit -> unit end @@ noalloc_strict
 type t' = F(M).t
 |}]
 
@@ -956,7 +962,7 @@ let (foo @ portable) () =
   ()
 [%%expect{|
 module F = F @@ stateless nonportable
-module M = M
+module M = M @@ noalloc_strict
 val foo : unit -> unit = <fun>
 |}]
 
@@ -1043,7 +1049,7 @@ module F : functor (G : S -> S) -> sig module H : S @ portable -> S end @@
 module F (M : (S @ portable -> S) -> S) = (M : (S -> S) -> S)
 [%%expect{|
 module F : functor (M : (S @ portable -> S) -> S) -> (S -> S) -> S @@
-  stateless
+  stateless noalloc_strict
 |}]
 
 module F (M : (S -> S) -> S) = (M : (S @ portable -> S) -> S)
@@ -1096,5 +1102,5 @@ Error: Signature mismatch:
 module F (M : (S -> S) -> S) = (M : (S -> S @ portable) -> S)
 [%%expect{|
 module F : functor (M : (S -> S) -> S) -> (S -> S @ portable) -> S @@
-  stateless
+  stateless noalloc_strict
 |}]
