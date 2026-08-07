@@ -113,7 +113,7 @@ let enclosing_noalloc_closure closures =
   List.find_map
     (fun (closure_pp, closure_mode) ->
       (* This function must only be called before zapping the allocation axis of
-         closure modes, so it is ok to call get_ceil here. *)
+         closure modes, so it is ok to call [Allocation.Guts.get_ceil] here. *)
       match Allocation.Guts.get_ceil closure_mode with
       | Noalloc -> Some (closure_pp, Hint.Noalloc)
       | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
@@ -124,8 +124,8 @@ let constrain_closures () =
   let heap, pending =
     !allocations
     |> List.partition (fun {alloc_mode; _} ->
-      (* This function must only be called before zapping the allocation axis of
-         closure modes, so it is ok to call get_ceil here. *)
+      (* This function must only be called before zapping the locality axis of
+         allocation modes, so it is ok to call [Locality.Guts.get_ceil] here. *)
       match
         Locality.Guts.get_ceil (Alloc.proj_comonadic Areality alloc_mode)
       with
