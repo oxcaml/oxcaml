@@ -89,7 +89,7 @@ val set_levels: levels -> unit
 
 val create_scope : unit -> int
 
-val mark_toplevel_in_quotations : Env.t -> Env.t
+val mark_persistent_in_quotations : Env.t -> Env.t
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
@@ -153,7 +153,7 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
-val contains_toplevel_splice: int -> type_expr -> bool
+val contains_initial_stage_splice: int -> type_expr -> bool
 val iter_type_expr_with_stages:
         (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
 
@@ -277,6 +277,11 @@ val instance_prim:
         type_expr *
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
         Jkind.Sort.t option
+
+(** The join of the yielding modes of the first [arity] parameters of a
+    primitive of type [ty]; [Yielding.max] if [ty] has fewer arrows. *)
+val prim_params_yielding:
+        Env.t -> type_expr -> arity:int -> Mode.Yielding.l
 
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c

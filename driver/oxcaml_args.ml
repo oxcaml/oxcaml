@@ -123,10 +123,20 @@ let mk_no_x86_peephole_remove_redundant_cmp f =
     Arg.Unit f,
     " Disable x86 peephole: remove redundant cmp" )
 
+let mk_no_x86_peephole_remove_redundant_extension f =
+  ( "-no-x86-peephole-remove-redundant-extension",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant sign/zero extension" )
+
 let mk_no_x86_peephole_combine_add_rsp f =
   ( "-no-x86-peephole-combine-add-rsp",
     Arg.Unit f,
     " Disable x86 peephole: combine adjacent add rsp" )
+
+let mk_no_x86_peephole_remove_redundant_test f =
+  ( "-no-x86-peephole-remove-redundant-test",
+    Arg.Unit f,
+    " Disable x86 peephole: remove redundant test" )
 
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
@@ -190,6 +200,17 @@ let mk_cfg_prologue_shrink_wrap_threshold f =
   ( "-cfg-prologue-shrink-wrap-threshold",
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be shrink-wrapped" )
+
+let mk_omit_leaf_frame_pointers f =
+  ( "-omit-leaf-frame-pointers",
+    Arg.Unit f,
+    " Do not set up frames in leaf functions on frame-pointer-enabled builds" )
+
+let mk_no_omit_leaf_frame_pointers f =
+  ( "-no-omit-leaf-frame-pointers",
+    Arg.Unit f,
+    " Set up frames in all functions on frame-pointer-enabled builds (default)"
+  )
 
 let mk_cfg_merge_blocks f =
   ("-cfg-merge-blocks", Arg.Unit f, " Merge equivalent CFG blocks")
@@ -1319,7 +1340,9 @@ module type Oxcaml_options = sig
   val no_x86_peephole_optimize : unit -> unit
   val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
   val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
+  val no_x86_peephole_remove_redundant_test : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1330,6 +1353,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
@@ -1509,7 +1534,11 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.no_x86_peephole_remove_mov_to_dead_register;
       mk_no_x86_peephole_remove_redundant_cmp
         F.no_x86_peephole_remove_redundant_cmp;
+      mk_no_x86_peephole_remove_redundant_extension
+        F.no_x86_peephole_remove_redundant_extension;
       mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
+      mk_no_x86_peephole_remove_redundant_test
+        F.no_x86_peephole_remove_redundant_test;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1521,6 +1550,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
       mk_no_cfg_prologue_shrink_wrap F.no_cfg_prologue_shrink_wrap;
       mk_cfg_prologue_shrink_wrap_threshold F.cfg_prologue_shrink_wrap_threshold;
+      mk_omit_leaf_frame_pointers F.omit_leaf_frame_pointers;
+      mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
       mk_cfg_value_propagation F.cfg_value_propagation;
@@ -1850,8 +1881,14 @@ module Oxcaml_options_impl = struct
   let no_x86_peephole_remove_redundant_cmp =
     clear' Oxcaml_flags.x86_peephole_remove_redundant_cmp
 
+  let no_x86_peephole_remove_redundant_extension =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_extension
+
   let no_x86_peephole_combine_add_rsp =
     clear' Oxcaml_flags.x86_peephole_combine_add_rsp
+
+  let no_x86_peephole_remove_redundant_test =
+    clear' Oxcaml_flags.x86_peephole_remove_redundant_test
 
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks
@@ -1872,6 +1909,8 @@ module Oxcaml_options_impl = struct
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
   let no_cfg_prologue_shrink_wrap = clear' Oxcaml_flags.cfg_prologue_shrink_wrap
+  let omit_leaf_frame_pointers = set' Oxcaml_flags.omit_leaf_frame_pointers
+  let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
@@ -2459,6 +2498,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
+    | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
