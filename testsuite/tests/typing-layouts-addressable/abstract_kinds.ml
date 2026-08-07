@@ -1,13 +1,16 @@
 (* TEST
- flags = "-extension layouts_alpha -no-ikinds";
- expect;
+ {
+   expect;
+ }{
+   flags = "-no-ikinds";
+   expect;
+ }
 *)
 
 (* Tests for the [addressable] kind operator applied to abstract kinds. The
    operator cannot be pushed into an unexpanded kind path, so it is recorded
    on the kind constructor and applied when the path is expanded or
-   substituted. This file is duplicated as [abstract_kinds_ikinds.ml], without
-   [-no-ikinds]. *)
+   substituted. *)
 
 kind_ k
 

@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -g -gno-upstream-dwarf -gdwarf-pedantic";
+ flags = "-g -gno-upstream-dwarf -gdwarf-pedantic";
  native;
 *)
 
