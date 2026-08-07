@@ -1085,6 +1085,43 @@ let mk_not dbg cmm =
     (* 1 -> 3, 3 -> 1 *)
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
 
+(** Whether two expressions are known to denote the same machine word. Only
+    variables and constants are recognised, so that evaluating one of the two
+    expressions instead of both is equivalent. *)
+let same_simple_value (e1 : expression) (e2 : expression) =
+  match e1, e2 with
+  | Cvar v1, Cvar v2 -> V.same v1 v2
+  | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
+  | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
+  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
+    String.equal s1.sym_name s2.sym_name
+  | _ -> false
+
+(** Whether [cond] is an equality test between the two arms of a [csel], so that
+    the arms hold the same word on the edge where the test succeeds. Float
+    comparisons are excluded, since equal floats need not have the same
+    representation. *)
+let condition_equates_arms cond ~ifso ~ifnot =
+  match cond with
+  | Cop (Ccmpi (Ceq | Cne), [c1; c2], _) ->
+    (same_simple_value c1 ifso && same_simple_value c2 ifnot)
+    || (same_simple_value c1 ifnot && same_simple_value c2 ifso)
+  | _ -> false
+
+let csel ~dbg ty ~cond ~ifso ~ifnot =
+  match cond with
+  | Cconst_int (0, _) -> ifnot
+  | Cconst_int (1, _) -> ifso
+  | Cop (Ccmpi Ceq, _, _) when condition_equates_arms cond ~ifso ~ifnot -> ifnot
+  | Cop (Ccmpi Cne, _, _) when condition_equates_arms cond ~ifso ~ifnot -> ifso
+  | _ ->
+    if same_simple_value ifso ifnot
+    then
+      (* [cond] is still evaluated for its effects; dead code elimination drops
+         it when it has none. *)
+      Csequence (cond, ifso)
+    else Cop (Ccsel ty, [cond; ifso; ifnot], dbg)
+
 let mk_compare_ints_untagged dbg a1 a2 =
   bind "int_cmp" a2 (fun a2 ->
       bind "int_cmp" a1 (fun a1 ->
@@ -1101,7 +1138,7 @@ let mk_compare_ints_untagged dbg a1 a2 =
           let cond = Cop (Ccmpi Cge, [a1; a2], dbg) in
           let ifso = Cop (Ccmpi Cgt, [a1; a2], dbg) in
           let ifnot = Cconst_int (-1, dbg) in
-          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
+          csel ~dbg typ_int ~cond ~ifso ~ifnot))
 
 let mk_unsigned_compare_ints_untagged dbg a1 a2 =
   bind "uint_cmp" a2 (fun a2 ->
@@ -1111,7 +1148,7 @@ let mk_unsigned_compare_ints_untagged dbg a1 a2 =
           let cond = Cop (Ccmpi Cuge, [a1; a2], dbg) in
           let ifso = Cop (Ccmpi Cugt, [a1; a2], dbg) in
           let ifnot = Cconst_int (-1, dbg) in
-          Cop (Ccsel typ_int, [cond; ifso; ifnot], dbg)))
+          csel ~dbg typ_int ~cond ~ifso ~ifnot))
 
 let mk_compare_ints dbg a1 a2 =
   match a1, a2 with

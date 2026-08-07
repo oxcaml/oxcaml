@@ -961,29 +961,7 @@ let transl_builtin name args dbg typ_res =
          *   (csel val (!= cond/306 1) ifso/304 ifnot/305))
          * [test_bool] goes from a tagged to an untagged bool. *)
         let cond = test_bool dbg cond in
-        match cond with
-        | Cconst_int (0, _) -> ifnot
-        | Cconst_int (1, _) -> ifso
-        | Cconst_int _ | Cconst_natint _
-        | Cconst_float32 (_, _)
-        | Cconst_float (_, _)
-        | Cconst_vec128 (_, _)
-        | Cconst_vec256 (_, _)
-        | Cconst_vec512 (_, _)
-        | Cconst_mask (_, _)
-        | Cconst_symbol (_, _)
-        | Cvar _
-        | Clet (_, _, _)
-        | Cphantom_let (_, _, _)
-        | Ctuple _
-        | Cop (_, _, _)
-        | Csequence (_, _)
-        | Cifthenelse (_, _, _, _, _, _)
-        | Cswitch (_, _, _, _)
-        | Ccatch (_, _, _)
-        | Cexit (_, _, _)
-        | Cinvalid _ ->
-          Cop (op, [cond; ifso; ifnot], dbg))
+        csel ~dbg typ_res ~cond ~ifso ~ifnot)
   | "caml_int8_shift_left_by_int8_untagged" ->
     let arg, count = two_args name args in
     shift ~bits:8 lsl_int arg count dbg

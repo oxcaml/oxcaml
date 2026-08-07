@@ -193,6 +193,17 @@ val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
 (** Boolean negation *)
 val mk_not : Debuginfo.t -> expression -> expression
 
+(** Conditional selection: [ifso] when [cond] is non-zero, [ifnot] otherwise.
+    Both arms are always evaluated. Simplifies away the conditional move when
+    the result does not depend on the condition. *)
+val csel :
+  dbg:Debuginfo.t ->
+  machtype ->
+  cond:expression ->
+  ifso:expression ->
+  ifnot:expression ->
+  expression
+
 (** Integer and float comparison that returns int not bool. The untagged
     versions do not tag the result and do not optimise known-constant cases. *)
 val mk_compare_ints : Debuginfo.t -> expression -> expression -> expression

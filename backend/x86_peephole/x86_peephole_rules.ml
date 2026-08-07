@@ -131,10 +131,7 @@ let remove_mov_to_dead_register stats cell =
     | _, _ -> U.No_match)
   | _ -> U.No_match
 
-(* Find a redundant CMP instruction with the same operands. [src_reg] and
-   [dst_reg] are the underlying 64-bit registers of [src] and [dst]. Returns
-   Some cell if found, None otherwise. *)
-let find_redundant_cmp src dst src_reg dst_reg start_cell =
+let find_redundant_cmp src dst start_cell =
   let rec loop cell_opt =
     match cell_opt with
     | None -> None
@@ -145,46 +142,40 @@ let find_redundant_cmp src dst src_reg dst_reg start_cell =
       else
         match value with
         | Ins instr -> (
-          match instr with
-          | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2 ->
-            Some cell
-          | _ ->
-            if U.maybe_writes_flags instr
-            then None
-            else if
-              U.writes_to_reg64 src_reg instr || U.writes_to_reg64 dst_reg instr
-            then None
-            else loop (DLL.next cell))
+          if not (U.arg_unchanged_by src instr && U.arg_unchanged_by dst instr)
+          then None
+          else
+            match instr with
+            | CMP (src2, dst2) when equal_args src src2 && equal_args dst dst2
+              ->
+              Some cell
+            | _ ->
+              if U.maybe_writes_flags instr then None else loop (DLL.next cell))
         | Directive _ -> loop (DLL.next cell))
   in
   loop (DLL.next start_cell)
 
-(* Rewrite rule: remove redundant CMP with identical operands. Pattern: cmp A,
-   B; ...; cmp A, B (where ... doesn't write flags or modify A or B) Rewrite:
-   cmp A, B; ...
+(** Rewrite rule: remove redundant CMP with identical operands. Pattern: cmp A,
+    B; ...; cmp A, B (where ... doesn't write flags or modify A or B) Rewrite:
+    cmp A, B; ...
 
-   This is safe when: - Both operands are registers (to avoid memory aliasing
-   issues) - Neither operand is modified between the two CMPs - Flags are not
-   written between the two CMPs (but can be read) - No hard barriers like
-   control flow between the CMPs *)
+    This is safe when:
+    - Neither operand is modified between the two CMPs (we currently only allow
+      immediates and registers)
+    - Flags are not written between the two CMPs (but can be read)
+    - No hard barriers like control flow between the CMPs *)
 let remove_redundant_cmp stats cell =
   match DLL.value cell with
-  (* Only optimize comparisons between general-purpose registers, to avoid
-     issues with mutable memory. [underlying_reg64] returns None for the other
-     kinds of arguments, including float registers. *)
   | Ins (CMP (src, dst)) -> (
-    match U.underlying_reg64 src, U.underlying_reg64 dst with
-    | Some src_reg, Some dst_reg -> (
-      (* Search for a redundant CMP *)
-      match find_redundant_cmp src dst src_reg dst_reg cell with
-      | Some redundant_cell ->
-        (* Delete the redundant CMP *)
-        DLL.delete_curr redundant_cell;
-        stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
-        (* Return the first CMP cell to allow iterative removal *)
-        U.Matched (Some cell)
-      | None -> U.No_match)
-    | (Some _ | None), _ -> U.No_match)
+    (* Search for a redundant CMP *)
+    match find_redundant_cmp src dst cell with
+    | Some redundant_cell ->
+      (* Delete the redundant CMP *)
+      DLL.delete_curr redundant_cell;
+      stats.remove_redundant_cmp <- stats.remove_redundant_cmp + 1;
+      (* Return the first CMP cell to allow iterative removal *)
+      U.Matched (Some cell)
+    | None -> U.No_match)
   | _ -> U.No_match
 
 (* Rewrite rule: remove a sign/zero-extension instruction that immediately
