@@ -1,0 +1,21 @@
+live extent not freed: ok
+heap pointer from extent block survives: ok
+extent-to-extent pointer survives: ok
+partially-dead extent not freed: ok
+block kept alive via extent block: ok
+dead extent freed: ok
+interleaved extent not freed: ok
+surviving blocks intact after neighbours swept: ok
+interleaved extent freed after survivors dropped: ok
+no custom finalisers run while live: ok
+finalisers run for dead custom blocks: ok
+partially-dead custom extent not freed: ok
+all custom finalisers run: ok
+custom extent freed: ok
+single-block extent not freed while live: ok
+last field of single-block extent intact: ok
+single-block extent freed: ok
+chained extent not freed: ok
+intra-extent chain survives: ok
+long heap list via extent survives: ok
+chained extent freed: ok

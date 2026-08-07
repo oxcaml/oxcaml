@@ -1,0 +1,10 @@
+extent live while referenced from other domains: ok
+blocks intact in all domains: ok
+extent live while referenced from main domain only: ok
+extent freed after all domains dropped it: ok
+orphaned extent not freed while blocks live: ok
+orphaned extent blocks intact after adoption: ok
+adopted extent freed when dead: ok
+orphaned extents not freed while published blocks live: ok
+published blocks intact: ok
+all orphaned extents freed: ok
