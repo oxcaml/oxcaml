@@ -1,7 +1,7 @@
 let $camlData_flow_opam_bug__immstring20 = "plop" in
 let $camlData_flow_opam_bug__immstring22 = "plip" in
 let code to_string_0 deleted in
-let code loopify(never) size(11) newer_version_of(to_string_0)
+let code loopify(never) size(12) newer_version_of(to_string_0)
       to_string_0_1 (context : val, t : [ 0 | 0 of val ])
         my_closure &my_alloc_region my_depth
         -> k * k1
