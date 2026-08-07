@@ -13,14 +13,37 @@
  compile_only = "false";
  flags = "-reaper-rebuild cmr_creation_and_rebuild.cmr";
  all_modules = "";
- ocamlopt_opt_exit_status = "2";
  ocamlopt.opt;
 
- check-ocamlopt.opt-output;
+ file = "cmr_creation_and_rebuild.reaped.cmx";
+ file-exists;
+
+ flags = "-flambda2-reaper";
+ compile_only = "true";
+ all_modules = "cmr_creation_and_rebuild.ml";
+ ocamlopt.opt;
+
+ script = "cmp cmr_creation_and_rebuild.reaped.o cmr_creation_and_rebuild.o";
+ script;
 *)
 
-(* CR mvellacott: This tests placeholder functionality: that a hello world
-   message is successfully roundtripped through a CMR file. It will be
-   removed. *)
+(* Pausing and resuming the Reaper via -support-lto and -reaper-rebuild
+   should produce the same object file as running the Reaper in a single
+   -flambda2-reaper invocation. *)
 
-let () = ()
+module M : sig
+  val go : int -> int
+end = struct
+  type t =
+    { used : int;
+      unused : int
+    }
+
+  let[@inline never] make x = { used = x; unused = Sys.opaque_identity (x * 100) }
+
+  let[@inline never] read t = t.used
+
+  let go x = read (make x)
+end
+
+let () = ignore (Sys.opaque_identity (M.go 3) : int)

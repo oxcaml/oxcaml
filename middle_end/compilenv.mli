@@ -79,6 +79,12 @@ val save_unit_info:
   arg_descr:Lambda.arg_descr option ->
   unit
         (* Save the infos for the current unit in the given file *)
+
+val save_resumed_unit_info: string -> paused:unit_infos -> unit
+        (* Like [save_unit_info] but for a resumed compilation: the fields
+           that normally come from the frontend and typechecker are taken from
+           [paused] instead. *)
+
 val cache_unit_info: unit_infos -> unit
         (* Enter the given infos in the cache.  The infos will be
            honored by [symbol_for_global] and [global_approx]

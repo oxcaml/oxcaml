@@ -52,6 +52,10 @@ val export : t -> exported
 
 val import : exported -> t
 
+val export_stamp_counter : unit -> int
+
+val restore_stamp_counter : int -> unit
+
 val initialise : unit -> unit
 
 val reset : unit -> unit

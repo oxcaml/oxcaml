@@ -87,3 +87,11 @@ and rev_expr =
   }
 
 type t = rev_expr
+
+val ids_for_export : t -> Ids_for_export.t
+
+val ids_for_export_code : rev_code -> Ids_for_export.t
+
+val apply_renaming : t -> Renaming.t -> t
+
+val apply_renaming_code : rev_code -> Renaming.t -> rev_code

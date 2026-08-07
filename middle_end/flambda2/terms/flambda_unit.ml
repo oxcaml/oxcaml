@@ -26,6 +26,44 @@ module Metadata = struct
     }
 
   let module_symbol t = t.module_symbol
+
+  let ids_for_export
+      { return_continuation;
+        exn_continuation;
+        toplevel_my_region;
+        toplevel_my_ghost_region;
+        toplevel_my_alloc_region;
+        module_symbol;
+        used_value_slots = _
+      } =
+    let ids = Ids_for_export.empty in
+    let ids = Ids_for_export.add_continuation ids return_continuation in
+    let ids = Ids_for_export.add_continuation ids exn_continuation in
+    let ids = Ids_for_export.add_variable ids toplevel_my_region in
+    let ids = Ids_for_export.add_variable ids toplevel_my_ghost_region in
+    let ids = Ids_for_export.add_variable ids toplevel_my_alloc_region in
+    Ids_for_export.add_symbol ids module_symbol
+
+  let apply_renaming
+      { return_continuation;
+        exn_continuation;
+        toplevel_my_region;
+        toplevel_my_ghost_region;
+        toplevel_my_alloc_region;
+        module_symbol;
+        used_value_slots
+      } renaming =
+    { return_continuation =
+        Renaming.apply_continuation renaming return_continuation;
+      exn_continuation = Renaming.apply_continuation renaming exn_continuation;
+      toplevel_my_region = Renaming.apply_variable renaming toplevel_my_region;
+      toplevel_my_ghost_region =
+        Renaming.apply_variable renaming toplevel_my_ghost_region;
+      toplevel_my_alloc_region =
+        Renaming.apply_variable renaming toplevel_my_alloc_region;
+      module_symbol = Renaming.apply_symbol renaming module_symbol;
+      used_value_slots
+    }
 end
 
 type t =

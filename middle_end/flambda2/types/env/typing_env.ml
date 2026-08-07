@@ -1082,6 +1082,14 @@ module Serializable : sig
 
   val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
 
+  val create_without_pruning : Pre_serializable.t -> t
+
+  val to_typing_env :
+    t ->
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> t option) ->
+    typing_env
+
   val create_from_closure_conversion_approx :
     machine_width:Target_system.Machine_width.t ->
     'a Value_approximation.t Symbol.Map.t ->
@@ -1126,6 +1134,63 @@ end = struct
         env.defined_symbols []
     in
     { defined_symbols_without_equations; code_age_relation; just_after_level }
+
+  (* CR mvellacott: this function may not be needed once we remove
+     compilation-against-dependency metadata from .reaped.cmx files. *)
+  let create_without_pruning (env : Pre_serializable.t) : t =
+    if is_bottom env
+    then Misc.fatal_error "[create_without_pruning]: environment is bottom";
+    let names_to_keep =
+      Name.Map.fold
+        (fun name (ty, _binding_time_and_mode) names_to_keep ->
+          match TG.get_alias_opt ty with
+          | Some _ ->
+            names_to_keep (* Names with alias types aren't pointed to anymore *)
+          | None ->
+            Name_occurrences.add_name names_to_keep name Name_mode.normal)
+        (names_to_types env) Name_occurrences.empty
+    in
+    let names_to_keep =
+      Symbol.Set.fold
+        (fun symbol names_to_keep ->
+          Name_occurrences.add_symbol names_to_keep symbol Name_mode.normal)
+        env.defined_symbols names_to_keep
+    in
+    let names_to_keep =
+      Code_id.Set.fold
+        (fun code_id names_to_keep ->
+          Name_occurrences.add_code_id names_to_keep code_id Name_mode.normal)
+        (Code_age_relation.all_code_ids_for_export env.code_age_relation)
+        names_to_keep
+    in
+    create env ~reachable_names:names_to_keep
+
+  let to_typing_env (t : t) ~machine_width ~resolver : typing_env =
+    let just_after_level = t.just_after_level in
+    (* Add the symbols that have equations to those that don't. *)
+    let defined_symbols =
+      Name.Map.fold
+        (fun name _ defined_symbols ->
+          Name.pattern_match name
+            ~var:(fun _ -> defined_symbols)
+            ~symbol:(fun symbol -> Symbol.Set.add symbol defined_symbols))
+        (Cached_level.names_to_types just_after_level)
+        (Symbol.Set.of_list t.defined_symbols_without_equations)
+    in
+    { machine_width;
+      resolver;
+      binding_time_resolver = binding_time_resolver resolver;
+      defined_symbols;
+      code_age_relation = t.code_age_relation;
+      prev_levels = [];
+      current_level =
+        One_level.create (Scope.next Scope.initial) TEL.empty ~just_after_level;
+      (* Every variable had binding time set to imported-variables binding time,
+         so fresh definitions bind later. *)
+      next_binding_time = Binding_time.earliest_var;
+      min_binding_time = Binding_time.earliest_var;
+      is_bottom = false
+    }
 
   let predefined_exceptions symbols : t =
     let defined_symbols_without_equations = Symbol.Set.elements symbols in

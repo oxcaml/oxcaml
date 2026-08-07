@@ -543,3 +543,55 @@ let sort_code_ids t =
     r
 
 let get_all_sets_of_closures t = t.all_sets_of_closures
+
+let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
+  Ids_for_export.create ~variables:(Variable.Set.of_list params) ()
+
+let ids_for_export_code_dep
+    { arity = _;
+      params;
+      my_closure;
+      return;
+      exn;
+      is_tupled = _;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } =
+  let variables =
+    Variable.Set.of_list (List.concat [params; return; [my_closure; exn]])
+  in
+  let ids = Ids_for_export.create ~variables () in
+  let ids = Ids_for_export.add_code_id_or_name ids known_arity_call_witness in
+  List.fold_left Ids_for_export.add_code_id_or_name ids
+    unknown_arity_call_witnesses
+
+let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
+    =
+  { is_exn_handler;
+    params = List.map (Renaming.apply_variable renaming) params;
+    arity
+  }
+
+let apply_renaming_code_dep
+    { arity;
+      params;
+      my_closure;
+      return;
+      exn;
+      is_tupled;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } renaming =
+  { arity;
+    params = List.map (Renaming.apply_variable renaming) params;
+    my_closure = Renaming.apply_variable renaming my_closure;
+    return = List.map (Renaming.apply_variable renaming) return;
+    exn = Renaming.apply_variable renaming exn;
+    is_tupled;
+    known_arity_call_witness =
+      Renaming.apply_code_id_or_name renaming known_arity_call_witness;
+    unknown_arity_call_witnesses =
+      List.map
+        (Renaming.apply_code_id_or_name renaming)
+        unknown_arity_call_witnesses
+  }

@@ -35,5 +35,6 @@ val main
     machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
     cmr_filename:string ->
+    cmx_imports_to_reload:Import_info.t list ->
     Cmm.phrase list)
   -> int
