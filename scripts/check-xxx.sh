@@ -53,5 +53,3 @@ should_check_file() {
 }
 
 run_added_lines_check should_check_file check_marker
-
-# XXX Temporary marker to live-test this check; revert before merge.
