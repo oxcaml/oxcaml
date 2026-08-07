@@ -34,7 +34,9 @@ val cfg_peephole_optimize: bool ref
 val x86_peephole_optimize : bool ref
 val x86_peephole_remove_mov_to_dead_register : bool ref
 val x86_peephole_remove_redundant_cmp : bool ref
+val x86_peephole_remove_redundant_extension : bool ref
 val x86_peephole_combine_add_rsp : bool ref
+val x86_peephole_remove_redundant_test : bool ref
 
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
@@ -44,6 +46,7 @@ val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
+val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
 

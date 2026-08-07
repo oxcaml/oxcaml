@@ -93,7 +93,7 @@ boot_targets = \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	$(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+	$(dune) build $(ws_boot) $(coverage_dune_flags) @merlin-support $(boot_targets)
 
 boot-runtest: boot-compiler
 	$(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
@@ -366,6 +366,7 @@ install_for_test: install
 	# various things.
 	mkdir _runtest/utils
 	cp _install/lib/ocaml/compiler-libs/*.{cmi,cmx} _runtest/utils
+	cp $(main_build)/$(ocamldir)/.ocamlfrontend.objs/byte/*.cmo _runtest/utils
 	cp $(main_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
@@ -479,7 +480,7 @@ promote-one-no-rebuild:
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking
 hacking: _build/_bootinstall
-	$(dune) build $(ws_boot) -w $(boot_targets)
+	$(dune) build $(ws_boot) -w @merlin-support $(boot_targets)
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
@@ -493,7 +494,7 @@ hacking-emacs-poller: _build/_bootinstall
 
 .PHONY: hacking-emacs-builder
 hacking-emacs-builder: _build/_bootinstall
-	$(dune) rpc build $(ws_boot) -w $(boot_targets)
+	$(dune) rpc build $(ws_boot) -w @merlin-support $(boot_targets)
 	$(dune) diagnostics
 
 .PHONY: debug-printers

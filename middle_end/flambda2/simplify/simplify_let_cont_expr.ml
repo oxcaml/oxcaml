@@ -307,8 +307,22 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
   let required_extra_args =
     Continuation.Map.find cont continuation_parameters
   in
-  Variable.Set.fold
-    (fun var epa ->
+  (* We don't want to add the extra params and args according to the order of
+     the Int_ids hash, because that is unstable and produces noise in fexpr
+     dumps.
+
+     Ideally, we'd want to create the parameters according to the binding times
+     of the original variables, but currently binding times are not comparable
+     across scopes, so we instead sort the extra args according to their name
+     stamp, which should be a good enough approximation for now. *)
+  let extra_args_for_aliases_sorted_by_stamp =
+    Variable.Set.fold
+      (fun var acc -> (Variable.name_stamp var, var) :: acc)
+      required_extra_args.extra_args_for_aliases []
+    |> List.sort (fun (stamp1, _) (stamp2, _) -> Int.compare stamp2 stamp1)
+  in
+  List.fold_left
+    (fun epa (_stamp, var) ->
       let extra_args =
         Apply_cont_rewrite_id.Map.of_set
           (fun _id -> EPA.Extra_arg.Already_in_scope (Simple.var var))
@@ -326,7 +340,7 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
       EPA.add
         ~extra_param:(Bound_parameter.create var var_kind var_duid)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
-    required_extra_args.extra_args_for_aliases EPA.empty
+    EPA.empty extra_args_for_aliases_sorted_by_stamp
 
 let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =
   let Flow_types.Mutable_unboxing_result.{ additional_epa; _ } =

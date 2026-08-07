@@ -701,6 +701,18 @@ let box_vec512 mode (arg : H.expr_primitive) ~current_alloc_region
 let unbox_vec512 (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Unbox_number Naked_vec512, arg))
 
+let box_mask mode (arg : H.expr_primitive) ~current_alloc_region ~current_region
+    : H.expr_primitive =
+  Unary
+    ( Box_number
+        ( Naked_mask,
+          Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+            ~current_region ),
+      Prim arg )
+
+let unbox_mask (arg : H.simple_or_prim) : H.simple_or_prim =
+  Prim (Unary (Unbox_number Naked_mask, arg))
+
 let convert_lambda_index_to_standard_int_or_float
     (index_kind : L.array_index_kind) : I_or_f.t =
   match index_kind with
@@ -933,9 +945,13 @@ let string_like_load ~dbg ~checks
         if boxed_or_tagged
         then box_vec512 mode ~current_alloc_region ~current_region
         else Fun.id
+      | Mask, Some mode ->
+        if boxed_or_tagged
+        then box_mask mode ~current_alloc_region ~current_region
+        else Fun.id
       | (Eight | Eight_signed | Sixteen | Sixteen_signed), Some _
       | ( ( Thirty_two | Single | Sixty_four | One_twenty_eight _
-          | Two_fifty_six _ | Five_twelve _ ),
+          | Two_fifty_six _ | Five_twelve _ | Mask ),
           None ) ->
         Misc.fatal_error "Inconsistent alloc_mode for string or bytes load"
     in
@@ -977,6 +993,7 @@ let bytes_like_set ~dbg ~checks
       | One_twenty_eight _ -> if boxed_or_tagged then unbox_vec128 else Fun.id
       | Two_fifty_six _ -> if boxed_or_tagged then unbox_vec256 else Fun.id
       | Five_twelve _ -> if boxed_or_tagged then unbox_vec512 else Fun.id
+      | Mask -> if boxed_or_tagged then unbox_mask else Fun.id
     in
     H.Ternary
       (Bytes_or_bigstring_set (kind, access_size), bytes, index, wrap new_value)
@@ -2453,6 +2470,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
               Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
                 ~current_region ),
           arg ) ]
+  | Punbox_mask, [[arg]] -> [Unary (Unbox_number Naked_mask, arg)]
+  | Pbox_mask mode, [[arg]] ->
+    [ Unary
+        ( Box_number
+            ( Naked_mask,
+              Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+                ~current_region ),
+          arg ) ]
   | Punbox_unit, [[_]] -> [Unboxed_product []]
   | Pfield_computed sem, [[obj]; [field]] ->
     (* We are reinterpreting a block(/object) as a value array, so it needs to
@@ -2634,6 +2659,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~checks ~dbg ~machine_width ~access_size Bytes
         ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
         ~current_alloc_region ~current_region ]
+  | Pstring_load_mask { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask String
+        ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
+        ~current_alloc_region ~current_region ]
+  | Pbytes_load_mask { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask Bytes
+        ~boxed_or_tagged:boxed (Some mode) bytes ~index_kind index
+        ~current_alloc_region ~current_region ]
   | Pbytes_set_8 { unsafe; index_kind; tagged }, [[bytes]; [index]; [new_value]]
     ->
     let checks = string_or_bytes_checks Eight unsafe in
@@ -2664,6 +2699,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let access_size = vec_accessor_width ~aligned:false size in
     let checks = string_or_bytes_checks access_size unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bytes
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
+  | ( Pbytes_set_mask { unsafe; index_kind; boxed },
+      [[bytes]; [index]; [new_value]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Mask Bytes
         ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
@@ -3077,6 +3117,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~checks ~dbg ~machine_width ~access_size Bigstring
         (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
         ~current_alloc_region ~current_region ]
+  | ( Pbigstring_load_mask { unsafe; index_kind; mode; boxed },
+      [[big_str]; [index]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask Bigstring
+        (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_alloc_region ~current_region ]
   | ( Pbigstring_set_8 { unsafe; index_kind; tagged },
       [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Eight unsafe in
@@ -3108,6 +3154,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[bigstring]; [index]; [new_value]] ) ->
     let access_size = vec_accessor_width ~aligned size in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring
+        ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
+  | ( Pbigstring_set_mask { unsafe; index_kind; boxed },
+      [[bigstring]; [index]; [new_value]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Mask Bigstring
         ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] )
@@ -3385,9 +3436,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Poffsetref _ | Pisint _ | Pisnull | Pint_as_pointer _ | Pbigarraydim _
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Patomic_load_mixed_field _ | Pmixedfield _
-      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Punbox_mask | Pbox_mask _ | Punboxed_product_field _ | Pget_header _
+      | Pufloatfield _ | Patomic_load_field _ | Patomic_load_mixed_field _
+      | Pmixedfield _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
@@ -3403,12 +3454,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
       | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
-      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
-      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pint_array_load_vec _
+      | Pstring_load_mask _ | Pbytes_load_16 _ | Pbytes_load_32 _
+      | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout
+      | Pfield_computed _ | Pbytes_load_mask _ | Psetfloatfield _
+      | Psetufloatfield _ | Psetmixedfield _ | Pbigstring_load_i8 _
+      | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+      | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+      | Pfloatarray_load_vec _ | Pint_array_load_vec _ | Pbigstring_load_mask _
       | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
       | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
       | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
@@ -3459,15 +3511,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
-      | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-      | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
-      | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
-      | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
-      | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
-      | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-      | Patomic_set_field _ | Patomic_exchange_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lxor_field | Patomic_lor_field | Pset_idx _ ),
+      | Pbytes_set_mask _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+      | Pfloatarray_set_vec _ | Pbigstring_set_mask _ | Pint_array_set_vec _
+      | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
+      | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+      | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
+      | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
+      | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
+      | Patomic_lor_field | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]

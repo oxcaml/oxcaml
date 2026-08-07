@@ -196,6 +196,14 @@ let to_modify_mode ~poly = function
     | None -> assert false
     | Some mode -> transl_modify_mode mode
 
+let to_return_mode ~poly = function
+  | Prim_global, _ -> not_alloc_stack
+  | Prim_local, _ -> maybe_alloc_stack
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some locality -> transl_return_mode_l locality
+
 let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
   = fun ~poly_sort r -> match r, poly_sort with
@@ -366,6 +374,12 @@ let indexing_primitives =
           Pbigstring_set_vec
             { size = Boxed_vec512; checks; index_kind;
               aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pbytes_load_i8 { unsafe; index_kind; tagged } );
@@ -421,6 +435,12 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_mask { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_string_geti8%s%s%s",
         fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
           Pstring_load_i8 { unsafe; index_kind; tagged } );
@@ -452,6 +472,9 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_vec { size = Boxed_vec512; unsafe;
                              index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_mask { unsafe; index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
          upstream compatibility. *)
@@ -1107,6 +1130,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%unbox_mask" -> Primitive(Punbox_mask, 1)
+    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
@@ -2277,16 +2302,20 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
       Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
             [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
-      Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
+      Lsend(Public, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_self (pos, layout), [obj; meth] ->
-      Lsend(Self, meth, obj, [], pos, alloc_heap, loc, layout, Unyielding)
+      Lsend(Self, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
       if !Clflags.native_code then
-        Lsend(Cached, meth, obj, [cache; pos], apos, alloc_heap, loc, layout,
+        Lsend(Cached, meth, obj, [cache; pos], apos,
+              not_alloc_stack, loc, layout,
               Unyielding)
       else
-        Lsend(Public, meth, obj, [], apos, alloc_heap, loc, layout, Unyielding)
+        Lsend(Public, meth, obj, [], apos, not_alloc_stack,
+              loc, layout, Unyielding)
   | Frame_pointers, [] ->
      (of_bool (!Clflags.native_code && Config.with_frame_pointers))
   | Identity, [arg] -> arg
@@ -2305,7 +2334,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         ap_specialised = Default_specialise;
         ap_probe = None;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
         (* [yielding] is the joined yielding mode of the application of the
            [%apply] / [%revapply] primitive itself. *)
         ap_yielding = yielding;
@@ -2507,7 +2536,7 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
        ~loc
        ~body
        ~mode:alloc_heap
-       ~ret_mode:(to_locality p.prim_native_repr_res)
+       ~ret_mode:(to_return_mode ~poly:poly_mode p.prim_native_repr_res)
 
 let lambda_primitive_needs_event_after = function
   (* We add an event after any primitive resulting in a C call that MAY raise
@@ -2538,15 +2567,20 @@ let lambda_primitive_needs_event_after = function
   | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
   | Pstring_load_vec _
+  | Pstring_load_mask _
   | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
   | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_load_mask _
   | Pbytes_set_8 _ | Pbytes_set_16 _
   | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+  | Pbytes_set_mask _
   | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
   | Pbigstring_load_vec _
+  | Pbigstring_load_mask _
   | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_mask _
   | Pfloatarray_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
   | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
@@ -2612,10 +2646,11 @@ let lambda_primitive_needs_event_after = function
   | Pdls_get
   | Ptls_get
   | Pdomain_index
-  | Pobj_magic _ | Punbox_vector _
+  | Pobj_magic _ | Punbox_vector _ | Punbox_mask
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
   | Pbox_vector (_, _)
+  | Pbox_mask _
   | Punbox_unit
     -> false
   | Pmakearray (Punspecializedarray, _, _)

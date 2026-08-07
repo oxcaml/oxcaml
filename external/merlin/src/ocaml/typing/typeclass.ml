@@ -1263,6 +1263,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                            lid = mknoloc (Longident.Lident (Ident.name id));
                            desc = vd; kind = Id_value;
                            unique_use = aliased_many_use;
+                           staticity = Mode.Staticity.(disallow_left legacy);
                            mode = Mode.Value.(disallow_right legacy) };
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
@@ -1474,6 +1475,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                              lid = mknoloc (Longident.Lident (Ident.name id));
                              desc = vd; kind = Id_value;
                              unique_use = aliased_many_use;
+                             staticity =
+                               Mode.Staticity.(disallow_left legacy);
                              mode = Mode.Value.(disallow_right legacy) };
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;

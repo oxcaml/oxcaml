@@ -466,7 +466,9 @@ let compute_static_size lam =
 
     | Psetufloatfield (_, _)
     | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
@@ -493,8 +495,11 @@ let compute_static_size lam =
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
@@ -508,6 +513,8 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
     | Pjoin_vec256
     | Psplit_vec256
     | Pget_header _
@@ -951,7 +958,7 @@ let compile_indirect newval =
     ap_specialised = Default_specialise;
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
-    ap_mode = Lambda.alloc_heap;
+    ap_mode = Lambda.not_alloc_stack;
     (* [indirect] just allocates a forwarding block; it never runs user code,
        so it can't yield *)
     ap_yielding = Unyielding;

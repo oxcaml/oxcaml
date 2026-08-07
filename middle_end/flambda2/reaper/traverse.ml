@@ -108,7 +108,6 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   let names_and_code_ids =
     Function_slot.Lmap.mapi
       (fun function_slot name ->
-        Acc.kind acc name K.value;
         let code_id =
           (Function_slot.Map.find function_slot funs
             : Function_declarations.code_id_in_function_declaration)
@@ -147,9 +146,6 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
 
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
     ~(default_bp : (Code_id_or_name.t -> unit) -> unit) =
-  Acc.kind acc
-    (Bound_var.name (Bound_pattern.must_be_singleton bound_pattern))
-    (Flambda_primitive.result_kind' prim);
   match prim with
   | Variadic (Make_block (block_kind, _mutability, _), fields) ->
     let _tag, block_shape = Flambda_primitive.Block_kind.to_shape block_kind in
@@ -546,9 +542,6 @@ let rec traverse_let denv acc let_expr : rev_expr =
   | Prim (prim, _dbg) ->
     traverse_prim denv acc ~bound_pattern prim ~default ~default_bp
   | Simple s ->
-    Acc.alias_kind acc
-      (Name.var (Bound_var.var (Bound_pattern.must_be_singleton bound_pattern)))
-      s;
     default_bp (fun to_ ->
         Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
   | Rec_info _ -> default acc);
@@ -676,13 +669,6 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
         Env.add_cont denv cont (Normal params))
       handlers denv
   in
-  Bound_parameters.iter
-    (fun bp -> Acc.bound_parameter_kind acc bp)
-    invariant_params;
-  Continuation.Lmap.iter
-    (fun _ (_, bp, _) ->
-      Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) bp)
-    handlers;
   let handlers =
     Continuation.Lmap.map
       (fun (cont_handler, bound_parameters, handler) ->
@@ -706,9 +692,6 @@ and traverse_cont_handler : type a.
   let is_cold = Continuation_handler.is_cold cont_handler in
   Continuation_handler.pattern_match cont_handler
     ~f:(fun bound_parameters ~handler ->
-      Bound_parameters.iter
-        (fun bp -> Acc.bound_parameter_kind acc bp)
-        bound_parameters;
       let expr = traverse denv acc handler in
       let handler = { bound_parameters; expr; is_exn_handler; is_cold } in
       k handler acc)
@@ -784,16 +767,6 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
       ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
   in
-  Bound_parameters.iter (fun bp -> Acc.bound_parameter_kind acc bp) params;
-  Acc.kind acc (Name.var my_closure) K.value;
-  (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-  | Heap { alloc_region } ->
-    Acc.kind acc (Name.var alloc_region) Flambda_kind.region
-  | Local { alloc_region; region; ghost_region } ->
-    Acc.kind acc (Name.var alloc_region) Flambda_kind.region;
-    Acc.kind acc (Name.var region) Flambda_kind.region;
-    Acc.kind acc (Name.var ghost_region) Flambda_kind.region);
-  Acc.kind acc (Name.var my_depth) K.rec_info;
   if not is_opaque
   then (
     List.iter2
@@ -818,8 +791,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_closure;
     any_source my_depth;
     (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region } -> any_source alloc_region
-    | Local { alloc_region; region; ghost_region } ->
+    | Not_alloc_stack { alloc_region } -> any_source alloc_region
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       any_source alloc_region;
       any_source region;
       any_source ghost_region);
@@ -852,7 +825,6 @@ type result =
     code : Rev_expr.rev_code Code_id.Map.t;
     ordered_code_ids : Code_id.t array;
     deps : Global_flow_graph.graph;
-    kinds : K.t Name.Map.t;
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
@@ -907,7 +879,6 @@ let run (unit : Flambda_unit.t) =
     Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
-  let kinds = Acc.kinds acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
@@ -916,7 +887,6 @@ let run (unit : Flambda_unit.t) =
     code = Acc.get_all_code acc;
     ordered_code_ids = Acc.sort_code_ids acc;
     deps;
-    kinds;
     fixed_arity_continuations;
     continuation_info;
     code_deps;

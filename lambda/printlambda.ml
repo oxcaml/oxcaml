@@ -262,7 +262,11 @@ let layout_annotation ppf lay_ =
   | _ -> fprintf ppf "[%a]" layout lay_
 
 let return_kind ppf (mode, kind) =
-  let smode = locality_mode_if_local mode in
+  let smode =
+    match mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> "stack"
+  in
   match kind with
   | Pvalue { raw_kind; nullable } -> begin
     let or_null_suffix =
@@ -271,7 +275,7 @@ let return_kind ppf (mode, kind) =
       | Nullable -> " or_null"
     in
     match raw_kind with
-    | Pgenval when is_heap_mode mode -> ()
+    | Pgenval when is_not_alloc_stack mode -> ()
     | Pgenval -> fprintf ppf ": %s@ " smode
     | Pintval -> fprintf ppf ": int@ "
     | Pboxedfloatval bf ->
@@ -300,6 +304,10 @@ let return_kind ppf (mode, kind) =
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
+
+let return_mode_kind = function
+  | Not_alloc_stack -> ""
+  | Maybe_alloc_stack -> "[L]"
 
 let print_bigarray name unsafe kind ppf layout =
   fprintf ppf "Bigarray.%s[%s,%s]"
@@ -673,6 +681,10 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pstring_load_mask {unsafe; index_kind; mode; boxed} ->
+     fprintf ppf "string.%sgetmask%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+       (locality_kind mode) array_index_kind index_kind
   | Pbytes_load_i8 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sgeti8[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -702,6 +714,10 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pbytes_load_mask {unsafe; index_kind; mode; boxed} ->
+     fprintf ppf "bytes.%sgetmask%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+       (locality_kind mode) array_index_kind index_kind
   | Pbytes_set_8 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sset8[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -726,6 +742,10 @@ let primitive ppf = function
      fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
+  | Pbytes_set_mask {unsafe; index_kind; boxed} ->
+     fprintf ppf "bytes.%ssetmask%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+       array_index_kind index_kind
   | Pbigstring_load_i8 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sgeti8[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -754,6 +774,10 @@ let primitive ppf = function
        (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
        array_index_kind index_kind
+  | Pbigstring_load_mask { unsafe; mode; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgetmask%s%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+       (locality_kind mode) array_index_kind index_kind
   | Pbigstring_set_8 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset8[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -778,6 +802,10 @@ let primitive ppf = function
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
+  | Pbigstring_set_mask { unsafe; boxed; index_kind } ->
+     fprintf ppf "bigarray.array1.%ssetmask%s[indexed by %a]"
+       (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
+       array_index_kind index_kind
   | Pfloatarray_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "floatarray.%sget%s%s%s"
        (if unsafe then "unsafe_" else "") (vector_width size)
@@ -898,6 +926,8 @@ let primitive ppf = function
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
+  | Punbox_mask -> fprintf ppf "unbox_mask"
+  | Pbox_mask m -> fprintf ppf "box_mask%s" (locality_kind m)
   | Pjoin_vec256 -> fprintf ppf "join_vec256"
   | Psplit_vec256 -> fprintf ppf "split_vec256"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
@@ -1018,6 +1048,7 @@ let name_of_primitive = function
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
   | Pstring_load_vec _ -> "Pstring_load_vec"
+  | Pstring_load_mask _ -> "Pstring_load_mask"
   | Pbytes_load_i8 _ -> "Pbytes_load_i8"
   | Pbytes_load_i16 _ -> "Pbytes_load_i16"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
@@ -1025,12 +1056,14 @@ let name_of_primitive = function
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
   | Pbytes_load_64 _ -> "Pbytes_load_64"
   | Pbytes_load_vec _ -> "Pbytes_load_vec"
+  | Pbytes_load_mask _ -> "Pbytes_load_mask"
   | Pbytes_set_8 _ -> "Pbytes_set_8"
   | Pbytes_set_16 _ -> "Pbytes_set_16"
   | Pbytes_set_32 _ -> "Pbytes_set_32"
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
   | Pbytes_set_vec _ -> "Pbytes_set_vec"
+  | Pbytes_set_mask _ -> "Pbytes_set_mask"
   | Pbigstring_load_i8 _ -> "Pbigstring_load_i8"
   | Pbigstring_load_i16 _ -> "Pbigstring_load_i16"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
@@ -1038,12 +1071,14 @@ let name_of_primitive = function
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"
   | Pbigstring_load_64 _ -> "Pbigstring_load_64"
   | Pbigstring_load_vec _ -> "Pbigstring_load_vec"
+  | Pbigstring_load_mask _ -> "Pbigstring_load_mask"
   | Pbigstring_set_8 _ -> "Pbigstring_set_8"
   | Pbigstring_set_16 _ -> "Pbigstring_set_16"
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
   | Pbigstring_set_64 _ -> "Pbigstring_set_64"
   | Pbigstring_set_vec _ -> "Pbigstring_set_vec"
+  | Pbigstring_set_mask _ -> "Pbigstring_set_mask"
   | Pfloatarray_load_vec _ -> "Pfloatarray_load_vec"
   | Pint_array_load_vec _ -> "Pint_array_load_vec"
   | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
@@ -1110,6 +1145,8 @@ let name_of_primitive = function
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
+  | Punbox_mask -> "Punbox_mask"
+  | Pbox_mask _ -> "Pbox_mask"
   | Pjoin_vec256 -> "Pjoin_vec256"
   | Psplit_vec256 -> "Psplit_vec256"
   | Parray_of_iarray -> "Parray_of_iarray"
@@ -1222,7 +1259,7 @@ let apply_kind name pos mode =
     | Rc_nontail -> name ^ "nontail"
     | Rc_close_at_apply -> name ^ "tail"
   in
-  name ^ locality_kind mode
+  name ^ return_mode_kind mode
 
 let debug_uid ppf duid =
   if !Clflags.dump_debug_uids then
@@ -1297,7 +1334,9 @@ let rec lam ppf = function
   | Lapply ap ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let form =
+        apply_kind "apply" ap.ap_region_close ap.ap_mode
+      in
       let form =
         match ap.ap_yielding with
         | May_yield -> form ^ "[yielding]"
