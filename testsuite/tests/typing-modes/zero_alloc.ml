@@ -1,4 +1,5 @@
 (* TEST
+ flat-float-array;
  flags+="-extension mode_alpha -extension comprehensions";
  expect;
 *)
