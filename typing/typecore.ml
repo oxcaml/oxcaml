@@ -800,7 +800,7 @@ let dynamic_pat_mode pat_mode =
     of potential subcomponents. *)
 let register_allocation ~env ~loc ?desc (expected_mode : expected_mode) =
   let alloc_mode, mode =
-    Typeallocation.register_allocation_value_mode ~env ~loc
+    Allocations.register_allocation_value_mode ~env ~loc
       ?desc (as_single_mode expected_mode)
   in
   alloc_mode, mode_default mode
@@ -5032,7 +5032,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
-             Typeallocation.register_allocation_mode ~env ~loc mode_closure;
+             Allocations.register_allocation_mode ~env ~loc mode_closure;
              let arg =
               Omitted {
                 mode_closure = Alloc.disallow_left mode_closure;
@@ -6151,7 +6151,7 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closed_over_mode =
-    Typeallocation.register_closure_allocation ~env ~loc
+    Allocations.register_closure_allocation ~env ~loc
       (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
@@ -7168,7 +7168,7 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      Typeallocation.register_prim_application_allocation ~env
+      Allocations.register_prim_application_allocation ~env
         ~pos:pm.apply_position funct args;
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
@@ -7917,7 +7917,7 @@ and type_expect_
          registration is currently redundant -- [Env.lookup_class] above
          already walks the locks and forces enclosing closures to [alloc] --
          but we register it anyway so every allocation site is covered. *)
-      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
+      Allocations.register_allocation_mode ~env ~loc Alloc.legacy;
       Value.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
         cl_mode Value.legacy;
       let pm = position_and_mode env expected_mode sexp in
@@ -7964,7 +7964,7 @@ and type_expect_
         exp_env = env }
   | Pexp_override lst ->
       submode ~loc ~env Value.legacy expected_mode;
-      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
+      Allocations.register_allocation_mode ~env ~loc Alloc.legacy;
       let _ =
        List.fold_right
         (fun (lab, _) l ->
@@ -8105,7 +8105,7 @@ and type_expect_
       let to_unify = Predef.type_lazy_t ty in
       with_explanation (fun () ->
         unify_exp_types loc env to_unify (generic_instance ty_expected));
-      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
+      Allocations.register_allocation_mode ~env ~loc Alloc.legacy;
       let env = Env.add_closure_lock (loc, Lazy) closure_mode.comonadic env in
       let arg = type_expect env expected_mode e (mk_expected ty) in
       re {
@@ -8118,7 +8118,7 @@ and type_expect_
   | Pexp_object s ->
       Env.check_no_open_quotations loc env Object_qt;
       submode ~loc ~env Value.legacy expected_mode;
-      Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
+      Allocations.register_allocation_mode ~env ~loc Alloc.legacy;
       let desc, meths = !type_object env loc s in
       rue {
         exp_desc = Texp_object (desc, meths);
@@ -8987,7 +8987,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
   associative, the order of which we apply those join does not matter.
   *)
   (* CR modes: codify the above per-axis argument. *)
-  let relax_mode = Typeallocation.relax_alloc desc ~is_applied mode in
+  let relax_mode = Allocations.relax_alloc desc ~is_applied mode in
   let actual_mode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Value (Some desc.val_type)
       (relax_mode, locks)
@@ -9025,7 +9025,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           Typeallocation.register_mode_for_optimisation
+           Allocations.register_mode_for_optimisation
              (lid.loc, Ident {category = Value; lid = lid.txt})
              (Alloc.max_with_comonadic Areality mode)
        | _ -> ()
@@ -9034,7 +9034,7 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           referenced are considered [noalloc_strict] by mode crossing,
           so we manually register allocation for them. *)
        if Translprim.non_arrow_prim_allocates lid.loc prim then
-         Typeallocation.register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
+         Allocations.register_allocation_mode ~env ~loc:lid.loc Alloc.legacy;
        [], ty, Id_prim (mode, sort)
     | _ ->
        let lvars = Lpoly.get_exn desc.val_lpoly in
@@ -10292,7 +10292,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
   let alloc_mode, value_mode =
-    Typeallocation.register_allocation_value_mode ~env ~loc expected_mode.mode
+    Allocations.register_allocation_value_mode ~env ~loc expected_mode.mode
   in
   let argument_mode =
     value_mode
@@ -10323,7 +10323,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
           List.map (fun (mode, _) ->
-            snd (Typeallocation.register_allocation_value_mode ~env ~loc mode))
+            snd (Allocations.register_allocation_value_mode ~env ~loc mode))
             tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
@@ -11844,7 +11844,7 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
        "What modes should comprehensions use?", above *)
     type_expect new_env mode_legacy sbody (mk_expected element_ty)
   in
-  Typeallocation.register_allocation_mode ~env ~loc Alloc.legacy;
+  Allocations.register_allocation_mode ~env ~loc Alloc.legacy;
   re { exp_desc       = make_texp { comp_body ; comp_clauses }
      ; exp_loc        = loc
      ; exp_extra      = []
