@@ -1795,7 +1795,7 @@ let block_index_access_offsets ~machine_width layout idx =
     in
     snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
-(* [block_index_access_offests] produces untagged byte offsets, but
+(* [block_index_access_offsets] produces untagged byte offsets, but
    [Atomic_load_field] and [Atomic_set_field] expect a tagged word index. *)
 let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
   let log2_size_addr =

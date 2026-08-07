@@ -62,15 +62,16 @@ Specifically, it consists of one "block access" followed by zero or more
 
 Block accesses take the following forms:
 - Record field: `.foo`
-- Mutable or immutable block index: `.idx_mut(idx)` or `.idx_imm(idx)`
+- Block index: `.idx_imm(idx)`, `.idx_mut(idx)`, or `.idx_atomic(idx)`.
 
 Unboxed accesses take the following forms:
 - Unboxed record field: `.#bar`
 
-The type of the index that gets created is determined by the kind of block access:
-- If the block access is atomic (atomic record fields), an `idx_atomic` is created.
-- If the block access is mutable (mutable record fields and mutable block indices), an `idx_mut` is created.
-- If the block access is immutable (immutable record fields and immutable block indices), an `idx_imm` is created.
+To determine whether a use of the block index syntax should result in an
+`idx_imm`, `idx_mut`, or `idx_atomic`, we look at its block access component.
+If it is a reference to a record field, we use the corresponding index type.
+If we are deepening an existing index, the new index has the same variety as
+the original.
 
 **Array indices.** Array indices are created via functions in `Stdlib_stable`:
 - `Idx_mut.unsafe_create_into_array : int -> ('a array, 'a) idx_mut`
@@ -94,8 +95,6 @@ signature `'a -> ('a, 'b) idx -> 'b -> unit`.
 access so that indices can be _deepened_. For example, given
 `idx : ('a, pt#) idx_imm`, one may obtain
 `(.idx_imm(idx).#y) : ('a, int) idx_imm`.
-
-Deepening atomic indices is not currently supported.
 
 # Example use cases
 

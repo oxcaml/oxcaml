@@ -27,7 +27,7 @@ external get
 
 (** [set a i v] uses the index [i] to set [a] to [v] atomically.
 
-    It can take [a] locally and [v] globally because mutable indices can only be
+    It can take [a] locally and [v] globally because atomic indices can only be
     created to elements with the [global] modality. *)
 external set
   : ('a : value_or_null) ('b : any).
