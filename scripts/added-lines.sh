@@ -40,6 +40,15 @@ else
   feature_base="$(git merge-base HEAD main@{upstream})"
 fi
 
+# If the base doesn't resolve (say, the checkout is too shallow), every
+# `git diff` below fails with empty output, which run_added_lines_check
+# would read as a clean check. Fail loudly instead.
+if ! git rev-parse --verify --quiet "$feature_base" >/dev/null; then
+  printf '::error title=Cannot resolve diff base::%s\n' \
+    "'$feature_base' does not name a commit; cannot check added lines"
+  exit 1
+fi
+
 # Usage: for_each_added_line <file> <callback>
 # Invoke `<callback> <file> <line-number> <line-content>` for each line of
 # <file> added since $feature_base.
