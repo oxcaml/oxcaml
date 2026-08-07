@@ -37,7 +37,7 @@ in
           in
           let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
           cont k (Pmakeblock_1)))
-  where k (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+  where k (y : [ 0 | 0 of [ 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
     let $camlFrom_odoc_texi =
       Block 0 ($`camlFrom_odoc_texi__!_2`,
                esc_8bits,
