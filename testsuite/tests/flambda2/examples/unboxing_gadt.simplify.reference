@@ -13,7 +13,7 @@ let code loopify(never) size(13) newer_version_of(f_0)
       let Pfield = %block_load.[`0`] (param) in
       cont k (Pfield)
 in
-let $camlUnboxing_gadt__f_2 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlUnboxing_gadt__f_1 = closure f_0_1 @f &toplevel.alloc_region in
 let code loopify(never) size(23) newer_version_of(baz_1)
       baz_1_1
         (p : imm tagged,
@@ -28,7 +28,7 @@ let code loopify(never) size(23) newer_version_of(baz_1)
      | 1 -> k4)
     where k4 =
       apply direct(f_0_1 &my_alloc_region)
-        ($camlUnboxing_gadt__f_2 : _ -> [ 0 of float boxed |1 of imm tagged ]
+        ($camlUnboxing_gadt__f_1 : _ -> [ 0 of float boxed |1 of imm tagged ]
          )
           (x)
           -> k2 * k1
@@ -39,9 +39,9 @@ let code loopify(never) size(23) newer_version_of(baz_1)
       let Popaque = %opaque (a) in
       cont k (Popaque)
 in
-let $camlUnboxing_gadt__baz_3 = closure baz_1_1 @baz &toplevel.alloc_region
+let $camlUnboxing_gadt__baz_2 = closure baz_1_1 @baz &toplevel.alloc_region
 in
 let $camlUnboxing_gadt =
-  Block 0 ($camlUnboxing_gadt__f_2, $camlUnboxing_gadt__baz_3)
+  Block 0 ($camlUnboxing_gadt__f_1, $camlUnboxing_gadt__baz_2)
 in
 cont done ($camlUnboxing_gadt)

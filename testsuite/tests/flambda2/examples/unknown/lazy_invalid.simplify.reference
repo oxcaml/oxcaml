@@ -1,9 +1,9 @@
 let code foo_0 deleted in
 let code `fn[lazy_invalid.ml:13,13--29]_1` deleted in
-let $camlLazy_invalid__immstring11 = "" in
+let $camlLazy_invalid__immstring_0 = "" in
 apply ccall noalloc
   ($`*extern*`.caml_obj_tag : val -> val)
-    ($camlLazy_invalid__immstring11)
+    ($camlLazy_invalid__immstring_0)
     -> k1 * error
   where k1 (tag) =
     let prim = %int_comp.eq (tag, 250) in
@@ -11,7 +11,7 @@ apply ccall noalloc
        | 0 -> k1
        | 1 -> k2
        where k2 =
-         let Pfield = %block_load.mut.[`0`] ($camlLazy_invalid__immstring11)
+         let Pfield = %block_load.mut.[`0`] ($camlLazy_invalid__immstring_0)
          in
          cont k (Pfield)
        where k1 =
@@ -22,13 +22,13 @@ apply ccall noalloc
              where k2 =
                let prim_2 = %int_comp.eq (tag, 244) in
                switch prim_2
-                 | 0 -> k ($camlLazy_invalid__immstring11)
+                 | 0 -> k ($camlLazy_invalid__immstring_0)
                  | 1 -> k1)
             where k1 =
-              let Popaque = %opaque ($camlLazy_invalid__immstring11) in
+              let Popaque = %opaque ($camlLazy_invalid__immstring_0) in
               apply direct(force_lazy_block_4 &toplevel.alloc_region)
                      inlined(never)
-                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11
+                $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_4_5
                   (Popaque)
                   -> k * error))
   where k (region_return : val) =
@@ -42,7 +42,7 @@ apply ccall noalloc
                  : imm tagged =
            cont k (x)
          in
-         let $camlLazy_invalid__foo_2 =
+         let $camlLazy_invalid__foo_1 =
            closure foo_0_1 @foo &toplevel.alloc_region
          in
          let code loopify(never) size(44) newer_version_of(`fn[lazy_invalid.ml:13,13--29]_1`)
@@ -51,7 +51,7 @@ apply ccall noalloc
                  -> k * k1 =
            apply ccall noalloc
              ($`*extern*`.caml_obj_tag : val -> val)
-               ($camlLazy_invalid__foo_2)
+               ($camlLazy_invalid__foo_1)
                -> k2 * k1
              where k2 (tag) =
                let prim = %int_comp.eq (tag, 250) in
@@ -59,7 +59,7 @@ apply ccall noalloc
                   | 0 -> k2
                   | 1 -> k3
                   where k3 =
-                    invalid "(Defining_expr_of_let (bound_pattern Pfield/59N)\n (defining_expr\n  (((Block_load (Values (tag \226\138\164) (size \226\138\164) (field_kind Any_value)) Mutable 0)\n    foo/42N) lazy_invalid.ml:13,13--29)))"
+                    invalid "(Defining_expr_of_let (bound_pattern Pfield/57N)\n (defining_expr\n  (((Block_load (Values (tag \226\138\164) (size \226\138\164) (field_kind Any_value)) Mutable 0)\n    foo/40N) lazy_invalid.ml:13,13--29)))"
                   where k2 =
                     ((let prim_1 = %int_comp.eq (tag, 246) in
                       switch prim_1
@@ -68,23 +68,23 @@ apply ccall noalloc
                         where k3 =
                           let prim_2 = %int_comp.eq (tag, 244) in
                           switch prim_2
-                            | 0 -> k ($camlLazy_invalid__foo_2)
+                            | 0 -> k ($camlLazy_invalid__foo_1)
                             | 1 -> k2)
                        where k2 =
-                         let Popaque = %opaque ($camlLazy_invalid__foo_2) in
+                         let Popaque = %opaque ($camlLazy_invalid__foo_1) in
                          apply direct(force_lazy_block_4 &my_alloc_region)
                                 inlined(never)
-                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11
+                           $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_4_5
                              (Popaque)
                              -> k * k1))
          in
-         let $`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_3` =
+         let $`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_2` =
            closure `fn[lazy_invalid.ml:13,13--29]_1_1`
              @`fn[lazy_invalid.ml:13,13--29]` &toplevel.alloc_region
          in
          let Pmakelazyblock =
            %lazy.`toplevel`
-             ($`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_3`)
+             ($`camlLazy_invalid__fn[lazy_invalid.ml:13,13--29]_2`)
          in
          (apply ccall
             ($`*extern*`.caml_update_dummy_lazy : val * val -> val)
@@ -94,6 +94,6 @@ apply ccall noalloc
               cont k
             where k =
               let $camlLazy_invalid =
-                Block 0 (region_return, $camlLazy_invalid__foo_2, t)
+                Block 0 (region_return, $camlLazy_invalid__foo_1, t)
               in
               cont done ($camlLazy_invalid)))

@@ -37,10 +37,10 @@ let code loopify(never) size(49) newer_version_of(sum_0)
                   | 0 -> k (return_val0)
                   | 1 -> k2 (for_next_naked, return_val0)))
 in
-let $camlArray_element_kind_meet__sum_2 =
+let $camlArray_element_kind_meet__sum_1 =
   closure sum_0_1 @sum &toplevel.alloc_region
 in
 let $camlArray_element_kind_meet =
-  Block 0 ($camlArray_element_kind_meet__sum_2)
+  Block 0 ($camlArray_element_kind_meet__sum_1)
 in
 cont done ($camlArray_element_kind_meet)

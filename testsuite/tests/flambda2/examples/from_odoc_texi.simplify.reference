@@ -1,7 +1,7 @@
 let code `!_0` deleted in
 let code foo_1 deleted in
-let $camlFrom_odoc_texi__immstring26 = "b" in
-let $camlFrom_odoc_texi__immstring24 = "a" in
+let $camlFrom_odoc_texi__immstring_1 = "b" in
+let $camlFrom_odoc_texi__immstring_0 = "a" in
 let code loopify(never) size(2) newer_version_of(`!_0`)
       `!_0_1` (param : val)
         my_closure &my_alloc_region my_depth
@@ -28,12 +28,12 @@ in
    where k1 =
      (apply direct(foo_1_1 &toplevel.alloc_region)
         ($camlFrom_odoc_texi__foo_3 : _ -> val)
-          ($camlFrom_odoc_texi__immstring24)
+          ($camlFrom_odoc_texi__immstring_0)
           -> k1 * error
         where k1 (apply_result : val) =
           let Pmakeblock =
             %block.[`0`].`toplevel`
-              (apply_result, $camlFrom_odoc_texi__immstring26)
+              (apply_result, $camlFrom_odoc_texi__immstring_1)
           in
           let Pmakeblock_1 = %block.[`0`].`toplevel` (Pmakeblock, 0) in
           cont k (Pmakeblock_1)))

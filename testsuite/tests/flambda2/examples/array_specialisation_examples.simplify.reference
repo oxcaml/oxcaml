@@ -1,7 +1,7 @@
-let $camlArray_specialisation_examples__string13 = "index out of bounds" in
-let $camlArray_specialisation_examples__block15 =
+let $camlArray_specialisation_examples__string_0 = "index out of bounds" in
+let $camlArray_specialisation_examples__block_1 =
   Block 0 ($`*predef*`.caml_exn_Invalid_argument,
-           $camlArray_specialisation_examples__string13)
+           $camlArray_specialisation_examples__string_0)
 in
 let code f_0 deleted in
 let code g_1 deleted in
@@ -21,9 +21,9 @@ let code loopify(never) size(22) newer_version_of(f_0)
       let ifnot_result = %array_load.mut (arr, 0) in
       cont k (ifnot_result)
     where k2 =
-      cont k1 pop(regular k1) ($camlArray_specialisation_examples__block15)
+      cont k1 pop(regular k1) ($camlArray_specialisation_examples__block_1)
 in
-let $camlArray_specialisation_examples__f_4 =
+let $camlArray_specialisation_examples__f_2 =
   closure f_0_1 @f &toplevel.alloc_region
 in
 let code loopify(never) size(8) newer_version_of(g_1)
@@ -35,7 +35,7 @@ let code loopify(never) size(8) newer_version_of(g_1)
   let ifnot_result = %array_load.mut (a, 0) in
   cont k (ifnot_result)
 in
-let $camlArray_specialisation_examples__g_5 =
+let $camlArray_specialisation_examples__g_3 =
   closure g_1_1 @g &toplevel.alloc_region
 in
 let code loopify(never) size(8) newer_version_of(h_2)
@@ -47,7 +47,7 @@ let code loopify(never) size(8) newer_version_of(h_2)
   let Parrayrefs = %array_load.`imm`.mut (ifnot_result, 0) in
   cont k (Parrayrefs)
 in
-let $camlArray_specialisation_examples__h_6 =
+let $camlArray_specialisation_examples__h_4 =
   closure h_2_1 @h &toplevel.alloc_region
 in
 let code loopify(never) size(62) newer_version_of(i_3)
@@ -88,18 +88,18 @@ let code loopify(never) size(62) newer_version_of(i_3)
               where k3 =
                 cont k1
                        pop(regular k1)
-                       ($camlArray_specialisation_examples__block15)))
+                       ($camlArray_specialisation_examples__block_1)))
     where k2 (region_return : imm tagged) =
       let `unit` = %end_region (`region`) in
       cont k (region_return)
 in
-let $camlArray_specialisation_examples__i_7 =
+let $camlArray_specialisation_examples__i_5 =
   closure i_3_1 @i &toplevel.alloc_region
 in
 let $camlArray_specialisation_examples =
-  Block 0 ($camlArray_specialisation_examples__f_4,
-           $camlArray_specialisation_examples__g_5,
-           $camlArray_specialisation_examples__h_6,
-           $camlArray_specialisation_examples__i_7)
+  Block 0 ($camlArray_specialisation_examples__f_2,
+           $camlArray_specialisation_examples__g_3,
+           $camlArray_specialisation_examples__h_4,
+           $camlArray_specialisation_examples__i_5)
 in
 cont done ($camlArray_specialisation_examples)

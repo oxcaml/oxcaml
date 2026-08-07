@@ -1,4 +1,4 @@
-let $camlCross_function_cse_b__first_const = Block 0 () in
+let $camlCross_function_cse_b__first_const_0 = Block 0 () in
 (let code inline(always) size(7)
        some_0 (x)
          my_closure &my_alloc_region my_depth
