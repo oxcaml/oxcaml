@@ -103,6 +103,30 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
+        (** [k addressable] is like [k], but additionally promises that, when
+            boxed, all of its information is stored in the data portion of the
+            block.
+
+            Currently, addressability has no effect (boxing does not respect the
+            promise), and there is no way to make unaddressable data
+            addressable.
+
+            It will always be the case that addressability does not change how a
+            sort is represented outside of a block.
+
+            Addressability has the following properties:
+            - Some base sorts are inherently addressable, for which the
+              addressable operator does nothing, e.g.
+              [bits64 addressable = bits64]. See [Sort.base_is_addressable].
+            - [k] and [k addressable] are incomparable, unless [k] is
+              addressable, in which case they are equal.
+            - Addressability is idempotent:
+              [k addressable addressable = k addressable].
+            - If all the components of a product are addressable, then so is the
+              product.
+            - Mechanically, we consider [k] to be addressable if it is a subkind
+              of [any addressable]. *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -119,6 +143,8 @@ module Layout : sig
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t

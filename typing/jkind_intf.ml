@@ -57,7 +57,7 @@ module type Sort = sig
   type var
 
   module Const : sig
-    type t =
+    type t = private
       | Base of base
       | Product of t list
       | Univar of univar
@@ -67,12 +67,27 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** Invariant: this constructor is never redundantly applied. I.e.,
+              given [Addressable t], [not (is_surely_addressable t)] *)
+
+    val of_base : base -> t
+
+    val product : t list -> t
+
+    val univar : univar -> t
+
+    val genvar : var -> t
 
     val equal : t -> t -> bool
 
     val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
+
+    val is_surely_addressable : t -> bool
+
+    val addressable : t -> t
 
     val scannable : t
 
