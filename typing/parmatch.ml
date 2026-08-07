@@ -897,7 +897,8 @@ let full_match closing env =  match env with
   match discr.pat_desc with
   | Any -> assert false
   | Construct ({ cstr_tag = Extension _ ; _ }, _, _) -> false
-  | Construct (c, _, _) -> List.length env = c.cstr_consts + c.cstr_nonconsts
+  | Construct (c, _, _) ->
+      List.length env = c.cstr_consts + c.cstr_nonconsts
   | Unboxed_unit -> List.length env = 1
   | Unboxed_bool _ -> List.length env = 2
   | Variant { type_row; _ } ->

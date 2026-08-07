@@ -221,7 +221,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     let cstr_shape =
       match cstr_layouts.(src_index) with
       | Cstr_layout_known { shape; _ } -> shape
-      | Cstr_layout_variable -> Constructor_variable
+      | Cstr_layout_variable -> Constructor_undetermined
     in
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
