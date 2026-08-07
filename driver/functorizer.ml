@@ -191,17 +191,11 @@ and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
       let swg = load_exact ~chain gm in
       maybe_insert_module_exact ~chain gm swg state
 
-let make_md md_type : Types.module_declaration =
-  {
-    md_type;
-    md_modalities = Mode.Modality.(Const.id |> of_const);
-    md_attributes = [];
-    md_loc = Location.none;
-    md_uid = Types.Uid.internal_not_actually_unique;
-  }
-
 type result = {
-  modules : (GM.t * Ident.t * Types.signature) list;
+  modules : GM.t list;  (** The modules to bundle, for translation. *)
+  module_sigs : (Ident.t * Types.signature) list;
+      (** The substituted signatures of [modules] (same order), for the bundle's
+          own signature. *)
   params : (GM.Parameter_name.t * Ident.t) list;
 }
 
@@ -263,7 +257,7 @@ let analyze (src_names : CU.Name.Set.t) : result =
         Subst.add_module (Ident.create_global n) (Path.Pident p_id) subst)
       subst params
   in
-  let modules =
+  let modules, module_sigs =
     List.rev_map
       (fun (gm, sign_lazy) ->
         (* CR-soon zqian: introduce substitution as a constructor of the
@@ -272,91 +266,17 @@ let analyze (src_names : CU.Name.Set.t) : result =
         let sign_lazy = Subst.Lazy.signature Keep subst sign_lazy in
         let sign = Subst.Lazy.force_signature sign_lazy in
         let id = GM.Name.Map.find (GM.to_name gm) id_map in
-        (gm, id, sign))
+        (gm, (id, sign)))
       state.rev_modules
+    |> List.split
   in
-  { modules; params }
-
-let wrap_in_named_functor_layers (params : (GM.Parameter_name.t * Ident.t) list)
-    (body : Types.module_type) : Types.module_type =
-  List.fold_right
-    (fun (p_name, param_id) body ->
-      let cu, params, swg =
-        Env.find_import ~chain:[] (CU.Name.of_parameter_name p_name)
-      in
-      assert (Option.is_none cu && List.is_empty params);
-      assert (Array.length swg.bound_globals = 0);
-      let sign, _ = swg.sign in
-      let param_type = Types.Mty_signature (Subst.Lazy.force_signature sign) in
-      Types.Mty_functor
-        ( Named (Some param_id, param_type, Mode.Alloc.legacy),
-          body,
-          Mode.Alloc.legacy ))
-    params body
-
-(** Build the signature exposed by the bundle. Roughly:
-
-    {[
-      module Intf : functor (P1) ... (Pn) -> sig
-        module type S = sig
-          module M1 : <sig of M1>
-          ...
-          module Mk : <sig of Mk>
-        end
-      end
-      module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
-    ]}
-
-    where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
-    modules (in topological order). *)
-let compute_signature (params : (GM.Parameter_name.t * Ident.t) list)
-    (modules : (GM.t * Ident.t * Types.signature) list) : Types.signature =
-  let body =
-    List.map
-      (fun (_name, id, sign) ->
-        Types.Sig_module
-          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
-      modules
-  in
-  let intf_id = Ident.create_local "Intf" in
-  let make_id = Ident.create_local "Make" in
-  let s_id = Ident.create_local "S" in
-  let s_decl : Types.modtype_declaration =
-    {
-      mtd_type = Some (Mty_signature body);
-      mtd_attributes = [];
-      mtd_loc = Location.none;
-      mtd_uid = Types.Uid.internal_not_actually_unique;
-    }
-  in
-  let intf_result = [ Types.Sig_modtype (s_id, s_decl, Exported) ] in
-  let intf_mty =
-    wrap_in_named_functor_layers params (Mty_signature intf_result)
-  in
-  (* Fresh idents so [Make]'s binders are distinct from [Intf]'s. *)
-  let make_params =
-    List.map (fun (p_name, id) -> (p_name, Ident.rename id)) params
-  in
-  let intf_applied_path =
-    List.fold_left
-      (fun p (_p_name, arg_id) -> Path.Papply (p, Path.Pident arg_id))
-      (Path.Pident intf_id) make_params
-  in
-  let make_result = Types.Mty_ident (Path.Pdot (intf_applied_path, "S")) in
-  let make_with_unit =
-    Types.Mty_functor (Unit, make_result, Mode.Alloc.legacy)
-  in
-  let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
-  [
-    Types.Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
-    Types.Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
-  ]
+  { modules; module_sigs; params }
 
 let interface input_module_names (info : Compile_common.info) =
   let unit_info = info.target in
   let compilation_unit = info.module_name in
-  let { modules; params } = analyze input_module_names in
-  let sg = compute_signature params modules in
+  let { module_sigs; params; _ } = analyze input_module_names in
+  let sg = Typemod.functorize_signature ~params ~modules:module_sigs in
   Ident.reinit ();
   Misc.try_finally
     (fun () ->
@@ -386,10 +306,9 @@ let implementation (input_module_names : CU.Name.Set.t) ~ext
     ~(compile_program : Compile_common.info -> Lambda.program -> unit)
     (info : Compile_common.info) : unit =
   let unit_info = info.target in
-  let { modules; params } = analyze input_module_names in
-  let sg = compute_signature params modules in
+  let { modules; module_sigs; params } = analyze input_module_names in
+  let sg = Typemod.functorize_signature ~params ~modules:module_sigs in
   let params = List.map fst params in
-  let modules = List.map (fun (name, _id, _sign) -> name) modules in
   let modulename = info.module_name in
   Ident.reinit ();
   let coercion =
