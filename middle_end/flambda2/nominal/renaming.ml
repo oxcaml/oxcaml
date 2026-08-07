@@ -26,12 +26,12 @@ module Import_map : sig
   type t
 
   val create :
-    symbols:Symbol.t Symbol.Map.t ->
-    variables:Variable.t Variable.Map.t ->
-    simples:Simple.t Simple.Map.t ->
-    consts:Const.t Const.Map.t ->
-    code_ids:Code_id.t Code_id.Map.t ->
-    continuations:Continuation.t Continuation.Map.t ->
+    symbols:Symbol.importer ->
+    variables:Variable.importer ->
+    simples:Simple.importer ->
+    consts:Const.importer ->
+    code_ids:Code_id.importer ->
+    continuations:Continuation.importer ->
     used_value_slots:Value_slot.Set.t ->
     original_compilation_unit:Compilation_unit.t ->
     t
@@ -42,7 +42,12 @@ module Import_map : sig
 
   val symbol : t -> Symbol.t -> Symbol.t
 
-  val simple : t -> Simple.t -> Simple.t
+  val simple :
+    t ->
+    Simple.t ->
+    name:(Name.t -> coercion:Coercion.t -> 'a) ->
+    const:(Const.t -> 'a) ->
+    'a
 
   val code_id : t -> Code_id.t -> Code_id.t
 
@@ -51,12 +56,12 @@ module Import_map : sig
   val value_slot_is_used : t -> Value_slot.t -> bool
 end = struct
   type t =
-    { symbols : Symbol.t Symbol.Map.t;
-      variables : Variable.t Variable.Map.t;
-      simples : Simple.t Simple.Map.t;
-      consts : Const.t Const.Map.t;
-      code_ids : Code_id.t Code_id.Map.t;
-      continuations : Continuation.t Continuation.Map.t;
+    { symbols : Symbol.importer;
+      variables : Variable.importer;
+      simples : Simple.importer;
+      consts : Const.importer;
+      code_ids : Code_id.importer;
+      continuations : Continuation.importer;
       used_value_slots : Value_slot.Set.t;
       (* CR vlaviron: [used_value_slots] is here because we need to rewrite the
          types to remove occurrences of unused value slots, as otherwise the
@@ -90,24 +95,20 @@ end = struct
       original_compilation_unit
     }
 
-  let rename map orig ~find =
-    match find orig map with a -> a | exception Not_found -> orig
+  let symbol t orig = Symbol.import t.symbols orig
 
-  let symbol t orig = rename t.symbols orig ~find:Symbol.Map.find
+  let variable t orig = Variable.import t.variables orig
 
-  let variable t orig = rename t.variables orig ~find:Variable.Map.find
+  let const t orig = Const.import t.consts orig
 
-  let const t orig = rename t.consts orig ~find:Const.Map.find
+  let code_id t orig = Code_id.import t.code_ids orig
 
-  let code_id t orig = rename t.code_ids orig ~find:Code_id.Map.find
+  let continuation t orig = Continuation.import t.continuations orig
 
-  let continuation t orig =
-    rename t.continuations orig ~find:Continuation.Map.find
-
-  let simple t simple =
+  let simple t simple ~name ~const =
     (* [t.simples] only holds those [Simple]s with [Coercion] (analogously to
-       the grand table of [Simple]s, see reg_width_things.ml). *)
-    rename t.simples simple ~find:Simple.Map.find
+       the grand table of [Simple]s, see int_ids.ml). *)
+    Simple.import t.simples simple ~name ~const
 
   let value_slot_is_used t var =
     if Value_slot.in_compilation_unit var t.original_compilation_unit
@@ -303,25 +304,31 @@ let apply_const t cst =
   | Some import_map -> Import_map.const import_map cst
 
 let apply_simple t simple =
-  let simple =
-    match t.import_map with
-    | None -> simple
-    | Some import_map -> Import_map.simple import_map simple
-  in
-  let[@inline always] name old_name ~coercion:old_coercion =
-    let new_name = apply_name t old_name in
-    let new_coercion =
-      Coercion.map_depth_variables old_coercion ~f:(fun dv ->
-          apply_variable t dv)
-    in
-    if old_name == new_name && old_coercion == new_coercion
-    then simple
-    else Simple.with_coercion (Simple.name new_name) new_coercion
-  in
   (* Constants are never permuted, only freshened upon import. *)
-  Simple.pattern_match simple ~name ~const:(fun cst ->
-      assert (not (Simple.has_coercion simple));
-      Simple.const (apply_const t cst))
+  let[@inline always] const cst = Simple.const (apply_const t cst) in
+  match t.import_map with
+  | None ->
+    let[@inline always] name old_name ~coercion:old_coercion =
+      let new_name = apply_name t old_name in
+      let new_coercion =
+        Coercion.map_depth_variables old_coercion ~f:(fun dv ->
+            apply_variable t dv)
+      in
+      if old_name == new_name && old_coercion == new_coercion
+      then simple
+      else Simple.with_coercion (Simple.name new_name) new_coercion
+    in
+    Simple.pattern_match simple ~name ~const
+  | Some import_map ->
+    let[@inline always] name old_name ~coercion:old_coercion =
+      let new_name = apply_name t old_name in
+      let new_coercion =
+        Coercion.map_depth_variables old_coercion ~f:(fun dv ->
+            apply_variable t dv)
+      in
+      Simple.with_coercion (Simple.name new_name) new_coercion
+    in
+    Import_map.simple import_map simple ~name ~const
 
 let value_slot_is_used t value_slot =
   match t.import_map with

@@ -34,12 +34,12 @@ val print : Format.formatter -> t -> unit
 val is_identity : t -> bool
 
 val create_import_map :
-  symbols:Symbol.t Symbol.Map.t ->
-  variables:Variable.t Variable.Map.t ->
-  simples:Simple.t Simple.Map.t ->
-  consts:Reg_width_const.t Reg_width_const.Map.t ->
-  code_ids:Code_id.t Code_id.Map.t ->
-  continuations:Continuation.t Continuation.Map.t ->
+  symbols:Symbol.importer ->
+  variables:Variable.importer ->
+  simples:Simple.importer ->
+  consts:Reg_width_const.importer ->
+  code_ids:Code_id.importer ->
+  continuations:Continuation.importer ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
   t
