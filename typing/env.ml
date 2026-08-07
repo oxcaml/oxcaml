@@ -3836,9 +3836,12 @@ let walk_locks_for_allocation ~env pp =
               comonadic
           in
           (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
-      (* A [Const_closure_lock] is at a constant mode which is always [alloc]
-         on the allocation axis, so there is nothing to constrain. *)
-      | Region_lock | Const_closure_lock _ | Exclave_lock
+      | Const_closure_lock (_, closure, comonadic) ->
+          let comonadic =
+            Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
+          in
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+      | Region_lock | Exclave_lock
       | Unboxed_lock -> acc
     ) [] locks
 
