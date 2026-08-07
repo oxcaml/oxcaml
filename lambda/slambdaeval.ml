@@ -448,9 +448,9 @@ and eval_prim env prim =
   | Pobj_magic old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pobj_magic new_layout
-  | Pget_idx (old_layout, mut) ->
+  | Pget_idx (old_layout, access) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pget_idx (new_layout, mut)
+    if new_layout == old_layout then prim else Pget_idx (new_layout, access)
   | Pset_idx (old_layout, mode, atomicity) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout

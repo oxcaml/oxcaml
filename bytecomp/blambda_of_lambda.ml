@@ -749,9 +749,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx (layout, mut) ->
+    | Pget_idx (layout, access) ->
       let prim =
-        match Lambda.access_atomicity mut with
+        match Lambda.access_atomicity access with
         | Nonatomic -> Ccall "caml_get_idx_bytecode"
         | Atomic -> Ccall "caml_get_idx_atomic_bytecode"
       in

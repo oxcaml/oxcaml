@@ -7880,9 +7880,10 @@ and type_expect_
         (el_ty, modality)
         uas
     in
-    if Types.is_mutable mut then check_index_not_to_poly_field ~env ba uas;
+    let is_mutable = Types.is_mutable mut in
+    if is_mutable then check_index_not_to_poly_field ~env ba uas;
     let expected_modality =
-      Typemode.idx_expected_modalities ~mut:(Types.is_mutable mut)
+      Typemode.idx_expected_modalities ~mut:is_mutable
     in
     begin
       match Modality.Const.equate modality expected_modality with
@@ -7890,7 +7891,7 @@ and type_expect_
       | Error err ->
         raise (Error(
           loc, env,
-          Block_index_modality_mismatch { mut = Types.is_mutable mut; err }
+          Block_index_modality_mismatch { mut = is_mutable; err }
         ))
     end;
     let ty = match mut with
