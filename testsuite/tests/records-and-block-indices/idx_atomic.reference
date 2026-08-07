@@ -2,7 +2,7 @@
 (.x) = 1
 (.y) = two
 (.x) <- 3
-(.y) <- "four"
+(.y) <- four
 (.x) = 3
 (.y) = four
 == idx_atomic with unboxed singleton ==
@@ -27,7 +27,7 @@
 (.x) = 42
 (.y) = two
 (.z) = 67
-(.y) <- "three"
+(.y) <- three
 (.x) = 42
 (.y) = three
 (.z) = 67
@@ -39,5 +39,5 @@
 (.y) = 6.000000
 == Basic idx_atomic (void record) ==
 (.y) = hello
-(.y) <- "world"
+(.y) <- world
 (.y) = world

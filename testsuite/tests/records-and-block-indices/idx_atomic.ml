@@ -23,7 +23,7 @@ module Basic = struct
     Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     Printf.printf "(.x) <- 3\n"; Idx_atomic.set t (.x) 3;
-    Printf.printf "(.y) <- \"four\"\n"; Idx_atomic.set t (.y) "four";
+    Printf.printf "(.y) <- four\n"; Idx_atomic.set t (.y) "four";
     Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     ()
@@ -80,7 +80,7 @@ module Mixed = struct
     Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
-    Printf.printf "(.y) <- \"three\"\n"; Idx_atomic.set t (.y) "three";
+    Printf.printf "(.y) <- three\n"; Idx_atomic.set t (.y) "three";
     Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
@@ -113,7 +113,7 @@ module Void = struct
     Printf.printf "== Basic idx_atomic (void record) ==\n";
     let t = { x = #(); y = "hello"; z = #() } in
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
-    Printf.printf "(.y) <- \"world\"\n"; Idx_atomic.set t (.y) "world";
+    Printf.printf "(.y) <- world\n"; Idx_atomic.set t (.y) "world";
     Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
     ()
 end

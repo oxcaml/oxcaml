@@ -524,7 +524,7 @@ val idx_atomic : ('a, 'b) idx_atomic -> ('a, 'b) idx_atomic = <fun>
 
 (* Invalid index deepening *)
 
-type t = { imm: int; mutable mut: int; mutable atomic: int [@atomic]}
+type t = { imm: int; mutable mut: int; mutable atomic: int [@atomic] }
 [%%expect{|
 type t = { imm : int; mutable mut : int; mutable atomic : int [@atomic]; }
 |}]
