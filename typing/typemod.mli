@@ -78,6 +78,26 @@ val package_units:
   Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
   -> Typedtree.module_coercion
 
+(** Build the signature exposed by a [-functorize] bundle. Roughly:
+
+    {[
+      module Intf : functor (P1) ... (Pn) -> sig
+        module type S = sig
+          module M1 : <sig of M1>
+          ...
+          module Mk : <sig of Mk>
+        end
+      end
+      module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
+    ]}
+
+    where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
+    modules. *)
+val functorize_signature:
+  params:(Global_module.Parameter_name.t * Ident.t) list ->
+  modules:(Ident.t * Types.signature) list ->
+  Types.signature
+
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
   loc:Location.t ->
