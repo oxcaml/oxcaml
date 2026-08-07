@@ -155,10 +155,6 @@
       (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.const 0)))
 
-   (func (export "caml_sys_const_runtime5")
-      (param (ref eq)) (result (ref eq))
-      (ref.i31 (i32.const 0)))
-
    (func (export "caml_sys_const_arch_amd64")
       (param (ref eq)) (result (ref eq))
       (ref.i31 (i32.eqz (global.get $on_arm64))))

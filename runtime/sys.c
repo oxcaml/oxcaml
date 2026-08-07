@@ -740,11 +740,6 @@ CAMLprim value caml_sys_const_backend_type(value unit)
   return Val_int(1); /* Bytecode backed */
 }
 
-CAMLprim value caml_sys_const_runtime5(value unit)
-{
-  return Val_true;
-}
-
 CAMLprim value caml_sys_const_arch_amd64(value unit)
 {
 #if defined(__x86_64__)

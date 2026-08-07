@@ -29,7 +29,6 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
-  | Runtime5
   | Arch_amd64
   | Arch_arm64
 
@@ -3571,7 +3570,7 @@ let primitive_result_layout (p : primitive) =
     end
   | Pctconst (
     Big_endian | Word_size | Int_size | Max_wosize
-    | Ostype_unix | Ostype_cygwin | Ostype_win32 | Backend_type | Runtime5
+    | Ostype_unix | Ostype_cygwin | Ostype_win32 | Backend_type
     | Arch_amd64 | Arch_arm64
   ) ->
     (* Compile-time constants only ever return ints for now,

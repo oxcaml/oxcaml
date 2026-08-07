@@ -301,9 +301,7 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 
 #define Handle_val(v) (*((void **) (v)))
 
-/* The mode argument is here for compatibility with runtime4. */
-/* CR ocaml 5 all-runtime5: Remove [mode] when all-runtime5. */
-CAMLprim value caml_dynlink_open_lib(value mode, value filename)
+CAMLprim value caml_dynlink_open_lib(value filename)
 {
   void * handle;
   value result;
