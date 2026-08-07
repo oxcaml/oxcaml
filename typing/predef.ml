@@ -1001,7 +1001,7 @@ let decl_of_type_constr type_constr =
            position = 1;
            arity = 2;
          }),
-         Jkind.Builtin.any ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_atomic;
            position = 2;
            arity = 2;

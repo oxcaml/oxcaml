@@ -960,7 +960,7 @@ let prim_has_valid_reprs ~loc prim =
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
-        any
+        is (Same_as_ocaml_repr C.scannable)
       ]
     | "%set_idx" ->
       check [
@@ -973,7 +973,7 @@ let prim_has_valid_reprs ~loc prim =
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
-        any;
+        is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]
     | "%unsafe_array_idx" ->

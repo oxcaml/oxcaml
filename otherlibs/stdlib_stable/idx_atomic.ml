@@ -14,17 +14,15 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'b : any) t : bits64 mod everything =
+type ('a : value_or_null, 'b : value_or_null) t : bits64 mod everything =
   ('a, 'b) idx_atomic
 
 external get
-  : ('a : value_or_null) ('b : any).
+  : ('a : value_or_null) ('b : value_or_null).
   ('a[@local_opt]) -> ('a, 'b) idx_atomic -> ('b[@local_opt])
   = "%get_idx_atomic"
-[@@layout_poly]
 
 external set
-  : ('a : value_or_null) ('b : any).
+  : ('a : value_or_null) ('b : value_or_null).
   ('a[@local_opt]) -> ('a, 'b) idx_atomic -> 'b -> unit
   = "%set_idx_atomic"
-[@@layout_poly]
