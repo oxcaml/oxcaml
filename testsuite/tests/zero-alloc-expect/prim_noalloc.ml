@@ -1,4 +1,5 @@
 (* TEST
+ flat-float-array;
  flags += " -extension mode_alpha";
  flags += " -zero-alloc-check default";
  flags += " -zero-alloc-checker-details-cutoff 20";
