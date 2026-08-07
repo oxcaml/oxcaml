@@ -1612,7 +1612,7 @@ let rec tree_of_modal_typexp mode modal ty =
             out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
-          (Env.enter_quotation !printing_env)
+          (Env.enter_quote !printing_env)
           (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
@@ -1629,7 +1629,7 @@ let rec tree_of_modal_typexp mode modal ty =
             let tyl = apply_subst_opt s [ty] in
             let tyl =
               wrap_printing_env_unguarded
-                (Env.enter_quotation !printing_env)
+                (Env.enter_quote !printing_env)
                 (fun () -> tree_of_typlist mode tyl)
             in
             Otyp_constr (tree_of_path (Some Type) p', tyl)
