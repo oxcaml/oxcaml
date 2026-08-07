@@ -387,6 +387,21 @@ let transl_mod_bounds annots =
   ( create crossing ~externality,
     (raw_modifiers.nullability, raw_modifiers.separability) )
 
+(* [t @@ m] is, for mode-crossing purposes, the unboxed one-field record
+   [{ x : t @@ m }]: the wrapper's crossing IS the modality. Externality is
+   pinned to [max] (no claim), which is what distinguishes a surface [Tmod]
+   from one manufactured by the with-bounds engine. *)
+let mod_bounds_of_modality modality =
+  let open Jkind.Mod_bounds in
+  create (Crossing.modality modality Crossing.max) ~externality:Externality.max
+
+(* The inverse of [mod_bounds_of_modality]: [Crossing.to_modality] is
+   documented as the inverse of [Crossing.modality _ max], so this recovers
+   exactly the modality a surface [Tmod] was built from. Externality is not
+   part of a crossing and is dropped; surface [Tmod]s pin it to [max]. *)
+let modality_of_mod_bounds bounds =
+  Crossing.to_modality (Jkind.Mod_bounds.crossing bounds)
+
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
      is [global] or [local]. *)

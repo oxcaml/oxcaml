@@ -777,6 +777,9 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_repr (_, ct) -> sub.typ sub ct
   | Ttyp_newlayout (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
+  | Ttyp_modality (ct, m) ->
+    sub.typ sub ct;
+    sub.modalities sub m
   | Ttyp_call_pos -> ()
 
 let class_structure sub {cstr_self; cstr_fields; _} =

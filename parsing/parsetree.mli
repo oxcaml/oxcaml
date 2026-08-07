@@ -224,6 +224,13 @@ and core_type_desc =
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_repr of string loc list * core_type
+  | Ptyp_modality of core_type * modalities
+      (** [(T @@ modalities)] — a first-class modality.
+
+          Only written in delimited positions, so that the existing [@@]
+          positions ([val], record fields, constructor arguments, [include],
+          jkind with-bounds) keep their current meaning. An identity modality
+          is erased during translation. *)
   | Ptyp_extension of extension  (** [[%id]]. *)
 
 and arg_label = Asttypes.arg_label =
