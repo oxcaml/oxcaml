@@ -78,25 +78,25 @@ val package_units:
   Env.t -> string list -> Unit_info.Artifact.t -> Compilation_unit.t
   -> Typedtree.module_coercion
 
-(** Build the signature exposed by a [-functorize] bundle. Roughly:
-
-    {[
-      module Intf : functor (P1) ... (Pn) -> sig
-        module type S = sig
-          module M1 : <sig of M1>
-          ...
-          module Mk : <sig of Mk>
-        end
-      end
-      module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
-    ]}
-
-    where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
-    modules. *)
-val functorize_signature:
+(** Type-check a [-functorize] bundle interface ([.cmi] target): build the
+    bundle's signature and save the cmi/cmti/cmsi artifacts.  [params] and
+    [module_sigs] come from the driver's analysis of the bundled units. *)
+val functorize_interface:
+  Env.t ->
   params:(Global_module.Parameter_name.t * Ident.t) list ->
-  modules:(Ident.t * Types.signature) list ->
-  Types.signature
+  module_sigs:(Ident.t * Types.signature) list ->
+  Unit_info.t -> Compilation_unit.t -> unit
+
+(** Type-check a [-functorize] bundle implementation: build the bundle's
+    signature, check it against the [-cmi-file] interface if one is given, and
+    save the cmi/cmt/cms artifacts.  Returns the coercion into the declared
+    interface ([Tcoerce_none] if there is none). *)
+val functorize_implementation:
+  Env.t ->
+  params:(Global_module.Parameter_name.t * Ident.t) list ->
+  modules:Global_module.t list ->
+  module_sigs:(Ident.t * Types.signature) list ->
+  Unit_info.t -> Compilation_unit.t -> Typedtree.module_coercion
 
 (* Should be in Envaux, but it breaks the build of the debugger *)
 val initial_env:
