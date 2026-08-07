@@ -103,6 +103,99 @@ end = struct
   let bump_scope t = { t with scope = Scope.next t.scope }
 end
 
+module Name_map_with_delayed_import : sig
+  type 'a t
+
+  val create : 'a Name.Map.t -> 'a t
+
+  val descr :
+    'a t -> apply_renaming_to_value:('a -> Renaming.t -> 'a) -> 'a Name.Map.t
+
+  val with_import_map : 'a t -> Renaming.import_map -> 'a t
+
+  (* Note: the name *MUST* be from the corresponding compilation unit. *)
+  val find_or_null :
+    Name.t ->
+    'a t ->
+    apply_renaming_to_value:('a -> Renaming.t -> 'a) ->
+    'a Or_null.t
+end = struct
+  type 'a t =
+    { mutable already_imported : 'a Name.Map.t;
+      mutable not_yet_imported : 'a Name.Map.t;
+      import_map : Renaming.import_map option
+    }
+
+  let create already_imported =
+    { not_yet_imported = Name.Map.empty; already_imported; import_map = None }
+
+  let descr t ~apply_renaming_to_value =
+    match t.import_map with
+    | None -> Name.Map.disjoint_union t.not_yet_imported t.already_imported
+    | Some import_map ->
+      let already_imported =
+        Name.Map.fold
+          (fun orig_name orig_value already_imported ->
+            let name =
+              Name.pattern_match orig_name
+                ~var:(fun var ->
+                  let variables = Renaming.imported_variables import_map in
+                  Name.var (Variable.import variables var))
+                ~symbol:(fun symbol ->
+                  let symbols = Renaming.imported_symbols import_map in
+                  Name.symbol (Symbol.import symbols symbol))
+            in
+            let value =
+              apply_renaming_to_value orig_value
+                (Renaming.from_import_map import_map)
+            in
+            Name.Map.add name value already_imported)
+          t.not_yet_imported t.already_imported
+      in
+      t.not_yet_imported <- Name.Map.empty;
+      t.already_imported <- already_imported;
+      already_imported
+
+  let with_import_map t import_map =
+    match t.import_map with
+    | None ->
+      let not_yet_imported =
+        Name.Map.disjoint_union t.not_yet_imported t.already_imported
+      in
+      let already_imported = Name.Map.empty in
+      { not_yet_imported; already_imported; import_map = Some import_map }
+    | Some _ ->
+      Misc.fatal_error
+        "Name map already has an import map, cannot import it a second time."
+
+  let find_or_null name t ~apply_renaming_to_value =
+    let already_imported = t.already_imported in
+    match Name.Map.find_or_null name already_imported with
+    | This value -> Or_null.this value
+    | Null -> (
+      match t.import_map with
+      | None -> Or_null.null
+      | Some import_map -> (
+        let orig =
+          Name.pattern_match name
+            ~var:(fun var ->
+              let variables = Renaming.imported_variables import_map in
+              Name.var (Variable.import_backwards variables var))
+            ~symbol:(fun symbol ->
+              let symbols = Renaming.imported_symbols import_map in
+              Name.symbol (Symbol.import_backwards symbols symbol))
+        in
+        let not_yet_imported = t.not_yet_imported in
+        match Name.Map.find_or_null orig not_yet_imported with
+        | This orig_value ->
+          let renaming = Renaming.from_import_map import_map in
+          let value = apply_renaming_to_value orig_value renaming in
+          t.not_yet_imported <- Name.Map.remove orig not_yet_imported;
+          t.already_imported <- Name.Map.add name value already_imported;
+          Or_null.this value
+        | Null -> Or_null.null))
+end
+
 type t =
   { machine_width : Target_system.Machine_width.t;
     resolver : Compilation_unit.t -> serializable option;
@@ -122,7 +215,9 @@ type t =
 and serializable =
   { defined_symbols_without_equations : Symbol.t list;
     code_age_relation : Code_age_relation.t;
-    names_to_types : (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t
+    names_to_types :
+      (Type_grammar.t * Binding_time.With_name_mode.t)
+      Name_map_with_delayed_import.t
   }
 
 type typing_env = t
@@ -172,6 +267,14 @@ let [@ocamlformat "disable"] print ppf
       levels
       Aliases.print (aliases t)
 
+let apply_renaming_type_with_binding_time_and_mode
+    type_with_binding_time_and_mode renaming =
+  let ty, binding_time_and_mode = type_with_binding_time_and_mode in
+  let ty' = TG.apply_renaming ty renaming in
+  if ty == ty'
+  then type_with_binding_time_and_mode
+  else ty', binding_time_and_mode
+
 let [@ocamlformat "disable"] print_serializable ppf
     { defined_symbols_without_equations; code_age_relation; names_to_types } =
   Format.fprintf ppf
@@ -183,7 +286,8 @@ let [@ocamlformat "disable"] print_serializable ppf
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Symbol.print) defined_symbols_without_equations
     Code_age_relation.print code_age_relation
     (Name.Map.print (fun ppf (ty, _bt_and_mode) -> TG.print ppf ty))
-    names_to_types
+    (Name_map_with_delayed_import.descr names_to_types
+      ~apply_renaming_to_value:apply_renaming_type_with_binding_time_and_mode)
 
 module Meet_or_join_env_base : sig
   type t
@@ -328,7 +432,10 @@ let binding_time_resolver resolver name =
       (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
   | None -> raise Binding_time_resolver_failure
   | Some t -> (
-    match Name.Map.find_or_null name t.names_to_types with
+    match
+      Name_map_with_delayed_import.find_or_null name t.names_to_types
+        ~apply_renaming_to_value:apply_renaming_type_with_binding_time_and_mode
+    with
     | Null ->
       Misc.fatal_errorf "Binding time resolver cannot find name %a in:@ %a"
         Name.print name print_serializable t
@@ -444,8 +551,12 @@ let find_with_binding_time_and_mode' t name kind =
             check_optional_kind_matches name ty kind;
             ty, Binding_time.With_name_mode.imported_variables)
       | Some t -> (
-        match Name.Map.find name t.names_to_types with
-        | exception Not_found ->
+        match
+          Name_map_with_delayed_import.find_or_null name t.names_to_types
+            ~apply_renaming_to_value:
+              apply_renaming_type_with_binding_time_and_mode
+        with
+        | Null ->
           Name.pattern_match name
             ~symbol:(fun symbol ->
               (* The symbol has no equation. Check that it is defined and return
@@ -462,7 +573,7 @@ let find_with_binding_time_and_mode' t name kind =
                 "Variable %a not bound in imported typing environment (maybe \
                  the wrong .cmx file is present?):@ %a"
                 Variable.print var print_serializable t)
-        | type_and_binding_time ->
+        | This type_and_binding_time ->
           (* All variables in exported maps already have the right name mode
              (see [Cached_level.clean_for_export]) *)
           type_and_binding_time))
@@ -1088,7 +1199,7 @@ module Serializable : sig
 
   val ids_for_export : t -> Ids_for_export.t
 
-  val apply_renaming : t -> Renaming.t -> t
+  val import_names : t -> Renaming.import_map -> t
 
   val merge : t -> t -> t
 
@@ -1114,13 +1225,14 @@ end = struct
           else defined_symbols_without_equations)
         env.defined_symbols []
     in
+    let names_to_types = Name_map_with_delayed_import.create names_to_types in
     { defined_symbols_without_equations; code_age_relation; names_to_types }
 
   let predefined_exceptions symbols : t =
     let defined_symbols_without_equations = Symbol.Set.elements symbols in
     { defined_symbols_without_equations;
       code_age_relation = Code_age_relation.empty;
-      names_to_types = Name.Map.empty
+      names_to_types = Name_map_with_delayed_import.create Name.Map.empty
     }
 
   let create_from_closure_conversion_approx ~machine_width
@@ -1150,6 +1262,7 @@ end = struct
             (type_from_approx approx, Binding_time.With_name_mode.symbols)
             cached)
         symbols Name.Map.empty
+      |> Name_map_with_delayed_import.create
     in
     { defined_symbols_without_equations; code_age_relation; names_to_types }
 
@@ -1164,7 +1277,9 @@ end = struct
         Name_occurrences.union free_names
           (Name_occurrences.restrict_to_value_slots_and_function_slots
              free_names_of_ty))
-      names_to_types Name_occurrences.empty
+      (Name_map_with_delayed_import.descr names_to_types
+         ~apply_renaming_to_value:apply_renaming_type_with_binding_time_and_mode)
+      Name_occurrences.empty
 
   let print = print_serializable
 
@@ -1179,11 +1294,14 @@ end = struct
            Ids_for_export.add_name
              (Ids_for_export.union ids (Type_grammar.ids_for_export typ))
              name)
-         names_to_types
+         (Name_map_with_delayed_import.descr names_to_types
+            ~apply_renaming_to_value:
+              apply_renaming_type_with_binding_time_and_mode)
 
-  let apply_renaming
+  let import_names
       { defined_symbols_without_equations; code_age_relation; names_to_types }
-      renaming =
+      import_map =
+    let renaming = Renaming.from_import_map import_map in
     let defined_symbols_without_equations =
       List.map
         (Renaming.apply_symbol renaming)
@@ -1193,13 +1311,7 @@ end = struct
       Code_age_relation.apply_renaming code_age_relation renaming
     in
     let names_to_types =
-      Name.Map.fold
-        (fun name (ty, binding_time_and_mode) acc ->
-          Name.Map.add
-            (Renaming.apply_name renaming name)
-            (Type_grammar.apply_renaming ty renaming, binding_time_and_mode)
-            acc)
-        names_to_types Name.Map.empty
+      Name_map_with_delayed_import.with_import_map names_to_types import_map
     in
     { defined_symbols_without_equations; code_age_relation; names_to_types }
 
@@ -1212,7 +1324,15 @@ end = struct
       Code_age_relation.union t1.code_age_relation t2.code_age_relation
     in
     let names_to_types =
-      Name.Map.disjoint_union t1.names_to_types t2.names_to_types
+      (* CR-someday bclement: think about supporting packs. *)
+      Name.Map.disjoint_union
+        (Name_map_with_delayed_import.descr t1.names_to_types
+           ~apply_renaming_to_value:
+             apply_renaming_type_with_binding_time_and_mode)
+        (Name_map_with_delayed_import.descr t2.names_to_types
+           ~apply_renaming_to_value:
+             apply_renaming_type_with_binding_time_and_mode)
+      |> Name_map_with_delayed_import.create
     in
     { defined_symbols_without_equations; code_age_relation; names_to_types }
 
@@ -1327,8 +1447,11 @@ end = struct
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in
-    let symbol_ty, _binding_time_and_mode =
-      Name.Map.find (Name.symbol symbol) env.names_to_types
-    in
-    type_to_approx symbol_ty
+    match
+      Name_map_with_delayed_import.find_or_null (Name.symbol symbol)
+        env.names_to_types
+        ~apply_renaming_to_value:apply_renaming_type_with_binding_time_and_mode
+    with
+    | This (symbol_ty, _binding_time_and_mode) -> type_to_approx symbol_ty
+    | Null -> raise Not_found
 end

@@ -118,4 +118,30 @@ struct
     try HT.find t id
     with Not_found ->
       Misc.fatal_error "Id was not exported from this compilation unit."
+
+  exception Found_id
+
+  let import_backwards t elt =
+    try
+      let id = Id.create (E.hash elt) E.flags in
+      match HT.find t id with
+      | existing_elt when E.equal elt existing_elt -> id
+      | _ | (exception Not_found) -> (
+        let starting_id = id in
+        let id = ref (Id.next starting_id) in
+        try
+          (* Replicate the search for another that was performed in the original
+             map to compute the actual id for [elt], skipping over empty slots
+             that have not been exported. *)
+          while !id <> starting_id do
+            assert (Id.flags !id = E.flags);
+            match HT.find t !id with
+            | existing_elt when E.equal elt existing_elt ->
+              raise_notrace Found_id
+            | _ | (exception Not_found) -> id := Id.next !id
+          done;
+          Misc.fatal_errorf "No hash values left for@ %a" E.print elt
+        with Found_id -> !id)
+    with Not_found ->
+      Misc.fatal_errorf "Element was not exported@ %a" E.print elt
 end

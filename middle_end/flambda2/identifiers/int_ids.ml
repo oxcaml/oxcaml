@@ -561,6 +561,9 @@ module Variable = struct
     let data = Table.import importer t in
     let user_visible = if data.user_visible then Some () else None in
     create ?user_visible data.name data.kind
+
+  let import_backwards importer t =
+    Table.import_backwards importer (find_data t)
 end
 
 module Symbol = struct
@@ -640,6 +643,9 @@ module Symbol = struct
 
   let import importer t =
     Table.add !grand_table_of_symbols (Table.import importer t)
+
+  let import_backwards importer t =
+    Table.import_backwards importer (find_data t)
 end
 
 module Name = struct
