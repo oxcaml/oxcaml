@@ -1286,6 +1286,13 @@ and module_expr_desc =
       *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
+  | Pmod_hole
+      (** [_], a "hole".
+
+          Holes are recognized by the parser anywhere a module
+          expression is allowed, but they are unconditionally
+          rejected by the type-checker: they are intended to be
+          eliminated by a ppx rewriter before type-checking. *)
   | Pmod_instance of module_instance
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]]
 

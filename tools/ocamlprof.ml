@@ -478,6 +478,7 @@ and rewrite_mod iflag smod =
   | Pmod_constraint(smod, _smty) -> rewrite_mod iflag smod
   | Pmod_unpack(sexp) -> rewrite_exp iflag sexp
   | Pmod_extension _ -> ()
+  | Pmod_hole -> ()
 
 and rewrite_str_item iflag item =
   match item.pstr_desc with
