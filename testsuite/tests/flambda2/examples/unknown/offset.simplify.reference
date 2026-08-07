@@ -110,7 +110,7 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
          (10)
          -> k * error
        where k (s : imm tagged) =
-         let code loopify(never) size(0) newer_version_of(g_3_1)
+         let code loopify(never) size(1) newer_version_of(g_3_1)
                g_3_2 (x : imm tagged, y : imm tagged)
                  my_closure &my_alloc_region my_depth
                  -> k * k1
@@ -158,21 +158,21 @@ apply direct(partial_apply1_44 &toplevel.alloc_region) inlined(never)
                    (10)
                    -> k * error
                  where k (s_1 : imm tagged) =
-                   let code loopify(never) size(0) newer_version_of(f_2_1)
+                   let code loopify(never) size(1) newer_version_of(f_2_1)
                          f_2_3 (x : imm tagged)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
                            : imm tagged =
                      cont k (0)
                    in
-                   let code loopify(never) size(0) newer_version_of(g_3_1)
+                   let code loopify(never) size(1) newer_version_of(g_3_1)
                          g_3_3 (x : imm tagged, y : imm tagged)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
                            : imm tagged =
                      cont k (0)
                    in
-                   let code loopify(never) size(0) newer_version_of(h_4_1)
+                   let code loopify(never) size(1) newer_version_of(h_4_1)
                          h_4_3 (x : imm tagged, y : imm tagged)
                            my_closure &my_alloc_region my_depth
                            -> k * k1
