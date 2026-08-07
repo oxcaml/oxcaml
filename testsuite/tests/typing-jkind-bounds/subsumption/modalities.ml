@@ -767,12 +767,9 @@ Line 1, characters 0-91:
 1 | type packed_not_portable : value mod portable = T : 'a t -> packed_not_portable [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "packed_not_portable" is
-           value mod portable external_ with 'a @@ external_
-         because of the definition of t at line 1, characters 0-61.
+           value mod everything mod dynamic with (type : value) t
+         because it's an unboxed variant type.
        But the kind of type "packed_not_portable" must be a subkind of
            value mod portable
          because of the annotation on the declaration of the type packed_not_portable.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
 |}]
