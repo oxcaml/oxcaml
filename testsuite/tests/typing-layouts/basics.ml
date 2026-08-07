@@ -2914,7 +2914,7 @@ Error: This function application uses an expression with type "'a"
 |}]
 
 let f (x : ('a : value)) = x ()
-let f (x : ('a : value mod uncontended)) = x ()
+let f (x : ('a : value mod aliased)) = x ()
 
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>
