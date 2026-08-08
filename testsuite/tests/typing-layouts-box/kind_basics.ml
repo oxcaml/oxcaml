@@ -393,6 +393,38 @@ type t : void box
 (**** Mode crossing: [k box] crosses like [mutable_data] joined with
       [k] (see kind_crossing.ml) ****)
 
+type ('a : value mod portable) portable_req
+type ok = int box portable_req
+type also_ok = string box portable_req
+type bad = (int -> int) box portable_req
+[%%expect{|
+type ('a : value mod portable) portable_req
+type ok = int box portable_req
+type also_ok = string box portable_req
+Line 4, characters 11-27:
+4 | type bad = (int -> int) box portable_req
+               ^^^^^^^^^^^^^^^^
+Error: This type "(int -> int) box" should be an instance of type
+         "('a : value mod portable)"
+       The kind of (int -> int) box is value non_float box
+         because it's a boxed type.
+       But the kind of (int -> int) box must be a subkind of
+           value mod portable
+         because of the definition of portable_req at line 1, characters 0-43.
+|}, Principal{|
+type ('a : value mod portable) portable_req
+Line 2, characters 10-17:
+2 | type ok = int box portable_req
+              ^^^^^^^
+Error: This type "int box" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int box is immediate box with int
+         because it's a boxed type.
+       But the kind of int box must be a subkind of value mod portable
+         because of the definition of portable_req at line 1, characters 0-43.
+|}]
+(* CR layouts v2.8: fix principal mode. Internal ticket 5111 *)
+
 (* In particular, [immediate box] does not cross externality *)
 type t : immediate box
 type ('a : value mod external_) ext_req
@@ -431,6 +463,30 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 box".
 
 type t : bits8 box
+|}]
+
+(* Boxing a made-addressable sort is a value even before the sort is
+   known: any sort boxes to at most a float block once addressable, unlike
+   [any] (above), which also ranges over layouts that don't exist yet *)
+let apply_v (_ : ('b : value)) = ()
+let ok (x : 'a) (_ : 'a addr_req) (y : 'a box) = apply_v y
+[%%expect{|
+val apply_v : 'b -> unit = <fun>
+val ok : 'a -> 'a addr_req -> 'a box -> unit = <fun>
+|}]
+
+(* Without addressability, a sort variable's box implies nothing *)
+let bad (x : 'a) (y : 'a box) = apply_v y
+[%%expect{|
+Line 1, characters 40-41:
+1 | let bad (x : 'a) (y : 'a box) = apply_v y
+                                            ^
+Error: The value "y" has type "'a box" but an expression was expected of type
+         "('b : value)"
+       The layout of 'a box is value_or_null
+         because it's a boxed type.
+       But the layout of 'a box must be a sublayout of value
+         because of the definition of apply_v at line 1, characters 12-35.
 |}]
 
 (**** Kind aliases expand under [box], but truly-abstract kinds and layout
