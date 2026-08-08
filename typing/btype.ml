@@ -599,6 +599,7 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
     | Addressable l -> Addressable (instance_layout l)
+    | Box (l, sa) -> Box (instance_layout l, sa)
   in
   match t.jkind.base with
   | Kconstr _ -> t
@@ -1337,13 +1338,12 @@ module Jkind0 = struct
           name = "any mod everything"
         }
 
+      let scannable_desc sa =
+        mk_jkind (base Scannable sa) ~crossing:Mode.Crossing.max
+          ~externality:Mod_bounds.Externality.max
+
       let scannable =
-        { jkind =
-            mk_jkind (base Scannable Scannable_axes.max)
-              ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max;
-          name = "scannable"
-        }
+        { jkind = scannable_desc Scannable_axes.max; name = "scannable" }
 
       let value_or_null =
         { jkind =
@@ -1912,7 +1912,9 @@ module Jkind0 = struct
     module Builtin = struct
       let any = max
 
-      let scannable = of_const Const.Builtin.scannable.jkind
+      let scannable_with_axes sa = of_const (Const.Builtin.scannable_desc sa)
+
+      let scannable = scannable_with_axes Jkind_types.Scannable_axes.max
 
       let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
@@ -2112,6 +2114,13 @@ module Jkind0 = struct
       let scannable ~why =
         fresh_jkind Jkind_desc.Builtin.scannable
           ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
+
+      let scannable_with_separability separability
+          ~(why : Jkind_intf.History.scannable_creation_reason) =
+        fresh_jkind
+          (Jkind_desc.Builtin.scannable_with_axes
+             { Jkind_types.Scannable_axes.max with separability })
+          ~annotation:None ~why:(Scannable_creation why)
 
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with

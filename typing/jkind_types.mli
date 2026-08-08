@@ -142,6 +142,10 @@ module Scannable_axes : sig
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val meet : t -> t -> t
+
+  (** [residual sa sa'] is the greatest [r] such that [meet sa r = meet sa sa'].
+  *)
+  val residual : t -> t -> t
 end
 
 module Layout : sig
@@ -164,6 +168,11 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
+        (** The contents of a box imply some scannable axes (see
+            [Const.implied_box_axes]), so the scannable axes of a box are the
+            meet of those implied axes and the axes applied outside of the box
+            constructor. *)
 
   module Const : sig
     type t = private
@@ -182,6 +191,10 @@ module Layout : sig
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
+      | Box of t * Scannable_axes.t
+          (** Invariant: axes on const boxes incorporate the axes implied by the
+              contents. I.e., given [Box (t, sa)],
+              [Scannable_axes.meet (implied_box_axes t) sa = sa]. *)
 
     val any : Scannable_axes.t -> t
 
@@ -208,6 +221,13 @@ module Layout : sig
     val addressable : t -> t
 
     val apply_operator : t -> Kind_operator.t -> t
+
+    (** The scannable axes implied by boxing data of layout [t]. *)
+    val implied_box_axes : t -> Scannable_axes.t
+
+    (** Given a layout [t] and scannable axes [sa], this function constructs the
+        layout [(t box) sa] while maintaining the invariant on [Box] above. *)
+    val box : t -> Scannable_axes.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
