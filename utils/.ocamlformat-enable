@@ -20,3 +20,5 @@ structured_mangling.ml
 structured_mangling.mli
 opt_fuel.ml
 opt_fuel.mli
+breadcrumbs.ml
+breadcrumbs.mli

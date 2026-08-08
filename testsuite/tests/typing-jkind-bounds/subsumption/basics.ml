@@ -1,5 +1,6 @@
 (* TEST
-    flags = "-extension layouts_alpha -no-ikinds";
+    flags = "-extension layouts_alpha -no-ikinds -I ${ocamlsrcdir}/utils";
+    include ocamlcommon;
     expect;
 *)
 
@@ -342,7 +343,9 @@ module M : sig
 end = struct
   type 'a t = 'a
 end
-(* CR layouts v2.8: This should get accepted. But we should wait until we have kind_of *)
+let () =
+  (* This should get accepted. But we should wait until we have kind_of *)
+  Breadcrumbs.until_kind_of
 [%%expect {|
 Lines 3-5, characters 6-3:
 3 | ......struct
