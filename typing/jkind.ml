@@ -2022,6 +2022,10 @@ module Const = struct
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
+  (* The mod bounds of [k box], given [k]'s *)
+  let box_mod_bounds mod_bounds =
+    Mod_bounds.join Builtin.mutable_data.jkind.mod_bounds mod_bounds
+
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
         [Not_verbose], the jkind is written in terms of the built-in jkind that
@@ -2122,6 +2126,17 @@ module Const = struct
 
     (* CR rtjoa: revisit *)
 
+    (* The mod bounds that the printed form denotes. A kind is printed as a
+       named base [B] plus layout operators, and that text denotes re-applying
+       the operators to [B]'s kind: each printed "box" applies [box_mod_bounds];
+       no other layout constructor affects mod bounds. The mod-bounds diff must
+       be taken against this, not against [B]'s bounds. *)
+    let printed_mod_bounds (l : Layout.Const.t) base_mod_bounds =
+      match l with
+      | Box _ -> box_mod_bounds base_mod_bounds
+      | Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _ ->
+        base_mod_bounds
+
     (** Write [actual] in terms of [base] *)
     let convert_with_base (type l r) env ~verbosity ~(base : Builtin.t)
         (actual : (l * r) t) =
@@ -2189,8 +2204,12 @@ module Const = struct
           actual_scannable_axes
       in
       let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
-          actual.mod_bounds
+        let base_mod_bounds =
+          match actual.base with
+          | Layout l -> printed_mod_bounds l base_jkind.mod_bounds
+          | Kconstr _ -> base_jkind.mod_bounds
+        in
+        get_modal_bounds ~verbosity ~base:base_mod_bounds actual.mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -2286,12 +2305,23 @@ module Const = struct
             | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
             | Not_verbose | Expanded -> Layout.Const.to_string
           in
+          (* A bare box layout name denotes a box of nothing; other layout
+             names take part in the max-bounds lie *)
+          let layout_mod_bounds =
+            match jkind.base with
+            | Layout (Box _ as l) -> printed_mod_bounds l Mod_bounds.min
+            | Layout
+                ( Base _ | Any _ | Product _ | Univar _ | Genvar _
+                | Addressable _ )
+            | Kconstr _ ->
+              Mod_bounds.max
+          in
           let out_jkind_verbose =
             convert_with_base ~verbosity env
               ~base:
                 { jkind =
                     { base = jkind.base;
-                      mod_bounds = Mod_bounds.max;
+                      mod_bounds = layout_mod_bounds;
                       with_bounds = No_with_bounds
                     };
                   name = Base.to_string layout_to_string jkind.base
@@ -2402,11 +2432,9 @@ module Const = struct
     let t = Base_and_axes.fully_expand_aliases_const env t in
     match t.base with
     | Layout layout ->
-      (* The argument's mod bounds don't transfer to the box kind (e.g.
-         [immediate box] does not cross externality). *)
       { base = Layout (Layout.Const.box layout Scannable_axes.max);
-        mod_bounds = Mod_bounds.max;
-        with_bounds = No_with_bounds
+        mod_bounds = box_mod_bounds t.mod_bounds;
+        with_bounds = t.with_bounds
       }
     | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
 
