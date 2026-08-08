@@ -1013,41 +1013,71 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
       | `Too_costly -> Profile.Counters.incr "not_beneficial" counters
       | `Specialized _ -> Profile.Counters.incr "specialized" counters)
 
+let simplify_switch_with_constant_scrutinee dacc ~scrutinee ~arms ~down_to_up =
+  let[@local] invalid_switch () =
+    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+        let uacc =
+          UA.notify_removed ~operation:Removed_operations.branch uacc
+        in
+        after_rebuild (RE.create_invalid Zero_switch_arms) uacc)
+  in
+  match Reg_width_const.is_naked_immediate scrutinee with
+  | None -> invalid_switch ()
+  | Some arm -> (
+    match TI.Map.find arm arms with
+    | exception Not_found -> invalid_switch ()
+    | apply_cont ->
+      Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
+        ~down_to_up:(fun dacc ~rebuild ->
+          down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+              let uacc =
+                UA.notify_removed ~operation:Removed_operations.branch uacc
+              in
+              rebuild uacc ~after_rebuild)))
+
 let simplify_switch dacc switch ~down_to_up =
   let scrutinee = Switch.scrutinee switch in
   let scrutinee_ty, scrutinee =
     S.simplify_simple dacc scrutinee ~min_name_mode:NM.normal
   in
-  let dacc_before_switch = dacc in
-  let typing_env_at_use = DA.typing_env dacc in
-  let arms, dacc =
-    TI.Map.fold
-      (simplify_arm ~typing_env_at_use ~scrutinee_ty)
-      (Switch.arms switch) (TI.Map.empty, dacc)
-  in
-  let dacc =
-    if TI.Map.cardinal arms <= 1
-    then dacc
-    else
-      DA.map_flow_acc dacc
-        ~f:(Flow.Acc.add_used_in_current_handler (Simple.free_names scrutinee))
-  in
-  let condition_dbg =
-    DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
-  in
-  let dacc =
-    match decide_continuation_specialization ~dacc ~switch ~scrutinee with
-    | `Specialized (continuation, lifting_cost) ->
-      let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
-      let dacc =
-        DA.with_are_lifting_conts dacc
-          (Are_lifting_conts.lift_continuations_out_of continuation)
-      in
-      let dacc = DA.add_continuation_to_specialize dacc continuation in
-      dacc
-    | _ -> dacc
-  in
-  down_to_up dacc
-    ~rebuild:
-      (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~dacc_before_switch)
+  match Simple.must_be_const scrutinee with
+  | Some const ->
+    (* We rewrite these to regular [apply_cont]s so that they are seen as
+       inlinable uses. *)
+    simplify_switch_with_constant_scrutinee dacc ~scrutinee:const
+      ~arms:(Switch.arms switch) ~down_to_up
+  | None ->
+    let dacc_before_switch = dacc in
+    let typing_env_at_use = DA.typing_env dacc in
+    let arms, dacc =
+      TI.Map.fold
+        (simplify_arm ~typing_env_at_use ~scrutinee_ty)
+        (Switch.arms switch) (TI.Map.empty, dacc)
+    in
+    let dacc =
+      if TI.Map.cardinal arms <= 1
+      then dacc
+      else
+        DA.map_flow_acc dacc
+          ~f:
+            (Flow.Acc.add_used_in_current_handler (Simple.free_names scrutinee))
+    in
+    let condition_dbg =
+      DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
+    in
+    let dacc =
+      match decide_continuation_specialization ~dacc ~switch ~scrutinee with
+      | `Specialized (continuation, lifting_cost) ->
+        let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
+        let dacc =
+          DA.with_are_lifting_conts dacc
+            (Are_lifting_conts.lift_continuations_out_of continuation)
+        in
+        let dacc = DA.add_continuation_to_specialize dacc continuation in
+        dacc
+      | _ -> dacc
+    in
+    down_to_up dacc
+      ~rebuild:
+        (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+           ~dacc_before_switch)
