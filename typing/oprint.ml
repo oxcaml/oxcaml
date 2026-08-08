@@ -669,6 +669,9 @@ and print_out_jkind ppf ojkind =
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_addressable t ->
       fprintf ppf "%a addressable" (pp_element ~nested:true) t
+    | Ojkind_box (t, axes) ->
+      fprintf ppf "%a %s" (pp_element ~nested:true) t
+        (String.concat " " ("box" :: axes))
   in
   pp_element ~nested:false ppf ojkind
 
