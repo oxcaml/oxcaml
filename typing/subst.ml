@@ -585,6 +585,10 @@ let rec layout s l =
     let l'' = layout s l' in
     if l' == l'' then l
     else Addressable l''
+  | Box (l', ax) ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Box (l'', ax)
 
 let jkind_desc s jkind =
   match jkind.base with

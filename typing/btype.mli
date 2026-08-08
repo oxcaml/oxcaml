@@ -695,10 +695,15 @@ module Jkind0 : sig
         Jkind_axis.Separability.t ->
         why:Jkind_intf.History.any_creation_reason ->
         'd jkind
+
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :
         why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
+      val scannable_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.scannable_creation_reason ->
+        'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind

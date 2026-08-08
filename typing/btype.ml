@@ -576,6 +576,7 @@ let instance_jkind (t : jkind_lr) : jkind_lr =
     | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
     | Product ts -> Product (List.map instance_layout ts)
     | Addressable l -> Addressable (instance_layout l)
+    | Box (l, sa) -> Box (instance_layout l, sa)
   in
   match t.jkind.base with
   | Kconstr _ -> t
@@ -2160,6 +2161,18 @@ module Jkind0 = struct
       let scannable ~why =
         fresh_jkind Jkind_desc.Builtin.scannable
           ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
+
+      let scannable_with_separability separability
+          ~(why : Jkind_intf.History.scannable_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.scannable with
+            base =
+              Layout
+                (Jkind_types.Layout.Sort
+                   ( Jkind_types.Sort.Base Jkind_types.Sort.Scannable,
+                     { Jkind_types.Scannable_axes.max with separability } ))
+          }
+          ~annotation:None ~why:(Scannable_creation why)
 
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with
