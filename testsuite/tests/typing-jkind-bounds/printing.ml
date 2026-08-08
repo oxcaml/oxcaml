@@ -35,7 +35,8 @@ type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
 Line 1, characters 0-61:
 1 | type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a with 'b
+Error: The kind of type "t" is
+           (value & value) box mod immutable with 'a with 'b
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -175,7 +176,7 @@ Line 3, characters 11-12:
                ^
 Error: This type "a" = "int ref" should be an instance of type
          "('a : immutable_data)"
-       The kind of a is mutable_data.
+       The kind of a is value_or_null mod everything box.
        But the kind of a must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
 |}, Principal{|
@@ -186,7 +187,9 @@ Line 3, characters 11-12:
                ^
 Error: This type "a" = "int ref" should be an instance of type
          "('a : immutable_data)"
-       The kind of a is mutable_data with int @@ forkable unyielding many.
+       The kind of a is
+           value_or_null mod everything box
+             with int @@ forkable unyielding many.
        But the kind of a must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
 

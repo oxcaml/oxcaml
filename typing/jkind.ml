@@ -330,6 +330,10 @@ module Layout = struct
     | Product ts -> List.exists has_unknown_sort ts
     | Addressable t -> has_unknown_sort t
 
+  (* The layout of a pointer to a non-float block: tuples, rows, ... *)
+  let non_float_block : Sort.t t =
+    Sort (Sort.of_base Sort.Scannable, Scannable_axes.non_float_block_axes)
+
   let rec flat_has_unknown_sort : Sort.Flat.t t -> bool = function
     | Any _ -> true
     | Box _ -> false
@@ -2901,12 +2905,38 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
-let for_boxed_tuple elts =
-  List.fold_right
-    (fun (_, type_expr) ->
-      add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr)
-    elts
-    (Builtin.immutable_data ~why:Tuple |> mark_best)
+(* The layout of a boxed block (record or tuple) whose unboxed version is the
+   product of [component_layouts] *)
+let layout_for_boxed_block component_layouts : Sort.t Layout.t =
+  Box
+    ( Layout.product component_layouts,
+      Jkind_types.Scannable_axes.non_float_block_axes )
+
+(* CR rtjoa: revisit *)
+(* [component_layouts = None] gives the coarse layout [any box] (with a
+   block's axes, which hold whatever the components are); see the [Ttuple]
+   cases of [Ctype.estimate_type_jkind] and [Ctype.constrain_type_jkind]. *)
+let for_boxed_tuple ~component_layouts elts =
+  match elts with
+  (* The class machinery uses [Ttuple []] as a marker type *)
+  | [] -> Builtin.immutable_data ~why:Tuple |> mark_best
+  | _ :: _ ->
+    let jkind =
+      List.fold_right
+        (fun (_, type_expr) ->
+          add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr)
+        elts
+        (Builtin.immutable_data ~why:Tuple |> mark_best)
+    in
+    let layout : Sort.t Layout.t =
+      match component_layouts with
+      | Some component_layouts -> layout_for_boxed_block component_layouts
+      | None ->
+        Box
+          ( Any Jkind_types.Scannable_axes.max,
+            Jkind_types.Scannable_axes.non_float_block_axes )
+    in
+    { jkind with jkind = { jkind.jkind with base = Layout layout } }
 
 let for_open_boxed_row =
   let mod_bounds =

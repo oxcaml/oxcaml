@@ -45,7 +45,7 @@ Line 2, characters 32-33:
                                     ^
 Error: The value "v" has type "'a t" but an expression was expected of type
          "('b : immutable_data)"
-       The kind of 'a t is immutable_data with 'b. 'b t
+       The kind of 'a t is mutable_data box mod immutable with 'b. 'b t
          because of the definition of t at line 1, characters 0-28.
        But the kind of 'a t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
@@ -59,7 +59,7 @@ type 'a t : immutable_data = { f : 'b. 'b t }
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = { f : 'b. 'b t }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'b. 'b t/2
+Error: The kind of type "t" is mutable_data box mod immutable with 'b. 'b t/2
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -101,7 +101,8 @@ Line 7, characters 27-28:
                                ^
 Error: The value "t" has type "t" but an expression was expected of type
          "('a : immutable_data)"
-       The kind of t is immutable_data with Abs.t
+       The kind of t is
+           (value & value non_pointer) box box mod immutable with Abs.t
          because of the definition of t at line 3, characters 0-47.
        But the kind of t must be a subkind of immutable_data
          because of the definition of require_immutable_data at line 2, characters 27-58.
@@ -117,7 +118,8 @@ type 'a u
 Line 2, characters 0-66:
 2 | type t : immutable_data with (type : value) u = { foo : 'a. 'a u }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a. 'a u
+Error: The kind of type "t" is
+           value mod everything box mod immutable with 'a. 'a u
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of
            immutable_data with (type : value) u

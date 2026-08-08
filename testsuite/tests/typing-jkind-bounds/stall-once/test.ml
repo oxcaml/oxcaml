@@ -34,7 +34,8 @@ Line 1, characters 52-53:
 Error: The value "t" has type "int list list list t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of int list list list t is
-           immutable_data
+           (value & value non_float) box
+             mod immutable
              with int list list list
              with int list list list list list list list list list list list list list
                     @@
@@ -68,7 +69,8 @@ Line 1, characters 56-57:
 Error: The value "t" has type "int list list list Foo.t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of int list list list Foo.t is
-           immutable_data
+           (value & value non_float) box
+             mod immutable
              with int list list list
              with int list list list list list list list list list list list list list
                     @@

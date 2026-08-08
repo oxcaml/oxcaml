@@ -2477,7 +2477,12 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           let lbls_with_sorts =
             List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
           in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
+          let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
+          if record_gets_unboxed_version (List.map fst lbls) rep
+          then
+            Jkind.set_layout jkind
+              (Jkind.layout_for_boxed_block (field_layouts ()))
+          else jkind
       | Unboxed_product ->
         let lbls_with_layouts =
           List.map2

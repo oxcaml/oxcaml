@@ -264,7 +264,7 @@ type t = private u
 Line 3, characters 0-46:
 3 | type v : immutable_data with u = { value : t }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "v" is immutable_data with t
+Error: The kind of type "v" is value mod everything box mod immutable with t
          because it's a boxed record type.
        But the kind of type "v" must be a subkind of immutable_data with u
          because of the annotation on the declaration of the type v.
@@ -456,7 +456,8 @@ Error: Signature mismatch:
          type 'a t = 'a t2 t1 * unit t2
        is not included in
          type 'a t : immutable_data with 'a t1 t2 with unit t1
-       The kind of the first is immutable_data with 'a t2 t1 with unit t2
+       The kind of the first is
+           (value & value) box mod immutable with 'a t2 t1 with unit t2
          because it's a tuple type.
        But the kind of the first must be a subkind of
            immutable_data with 'a t1 t2 with unit t1
@@ -498,7 +499,8 @@ Error: Signature mismatch:
          type 'a t = 'a t2 t1 * unit t1
        is not included in
          type 'a t : immutable_data with 'a t1 t2 with unit t2
-       The kind of the first is immutable_data with 'a t2 t1 with unit t1
+       The kind of the first is
+           (value & value) box mod immutable with 'a t2 t1 with unit t1
          because it's a tuple type.
        But the kind of the first must be a subkind of
            immutable_data with 'a t1 t2 with unit t2
@@ -647,7 +649,8 @@ type should_likewise_fail : immutable_data = (int ref * (int -> int))
 Line 1, characters 0-69:
 1 | type should_likewise_fail : immutable_data = (int ref * (int -> int))
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int ref * (int -> int)" is value non_float
+Error: The kind of type "int ref * (int -> int)" is
+           (value_or_null box & value non_float) box
          because it's a tuple type.
        But the kind of type "int ref * (int -> int)" must be a subkind of
            immutable_data

@@ -53,7 +53,8 @@ end =
 Line 7, characters 2-48:
 7 |   type t : value mod portable = { x : int T1.t }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with int T1.t
+Error: The kind of type "t" is
+           value mod everything box mod immutable with int T1.t
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of value mod portable
          because of the annotation on the declaration of the type t.

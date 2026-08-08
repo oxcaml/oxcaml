@@ -3043,7 +3043,19 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
-  | Ttuple elts -> Jkind.for_boxed_tuple elts
+  | Ttuple elts ->
+    let component_layouts =
+      if expand_components
+      then
+        let visited = [get_id ty] in
+        Some
+          (List.map
+             (fun (_, ty) ->
+                estimate_type_layout ~expand_components env ~visited ty)
+             elts)
+      else None
+    in
+    Jkind.for_boxed_tuple ~component_layouts elts
   | Tunboxed_tuple ltys ->
       let tys = List.map snd ltys in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
@@ -3179,9 +3191,7 @@ and estimate_type_layout ~expand_components env ~visited ty
          not recurse into its elements: type abbreviations can share tuple
          subterms, making structural recursion (and downstream traversals of
          the resulting layout) exponential. *)
-      Jkind.Layout.Sort
-        ( Jkind.Sort.of_base Jkind_types.Sort.Scannable,
-          Jkind_types.Scannable_axes.non_float_block_axes )
+      Jkind.Layout.non_float_block
     | Tbox payload ->
       Jkind.Layout.Box
         ( estimate_type_layout ~expand_components env ~visited payload,
@@ -3584,6 +3594,31 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
+          | Ttuple ltys ->
+            (* The cheap tuple estimate is [any box] (see
+               [estimate_type_jkind]); estimate the component layouts and
+               retry when a check needs them. The retried kind's payload is
+               a product, so this fires at most once. *)
+            let error () =
+              Error (Jkind.Violation.of_ ~context env
+                  (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            in
+            (match Jkind.extract_layout env ty's_jkind with
+             | Ok (Box (Any _, _)) when ltys <> [] ->
+               let visited = [get_id ty] in
+               let component_layouts =
+                 List.map
+                   (fun (_, ty) ->
+                      estimate_type_layout ~expand_components:false env
+                        ~visited ty)
+                   ltys
+               in
+               let ty's_jkind =
+                 Jkind.for_boxed_tuple
+                   ~component_layouts:(Some component_layouts) ltys
+               in
+               loop ~fuel ~expanded env ty ty's_jkind jkind
+             | _ -> error ())
           | _ ->
             Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))

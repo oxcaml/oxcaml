@@ -121,12 +121,10 @@ type r : void = {a:string}
 Line 1, characters 0-26:
 1 | type r : void = {a:string}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "r" is value non_float
+Error: The layout of type "r" is a value layout
          because it's a boxed record type.
        But the layout of type "r" must be a sublayout of void
          because of the annotation on the declaration of the type r.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}];;
 
 (* Boxed_variant *)
@@ -195,12 +193,10 @@ Line 1, characters 40-45:
                                             ^^^^^
 Error: This expression has type "'b * 'c"
        but an expression was expected of type "('a : void)"
-       The layout of 'a * 'b is value non_float
+       The layout of 'a * 'b is a value layout
          because it's a tuple type.
        But the layout of 'a * 'b must be a sublayout of void
          because of the annotation on the type variable 'a.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}];;
 
 (* Row_variable *)

@@ -17,7 +17,7 @@ type t : sync_data = { mutable x : int }
 Line 1, characters 0-40:
 1 | type t : sync_data = { mutable x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
+Error: The kind of type "t" is immediate box
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of sync_data
          because of the annotation on the declaration of the type t.

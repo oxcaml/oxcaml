@@ -575,7 +575,7 @@ type t : immutable_data = { mutable x : int}
 Line 1, characters 0-44:
 1 | type t : immutable_data = { mutable x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
+Error: The kind of type "t" is immediate box
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -586,7 +586,7 @@ type ('a : mutable_data) t : immutable_data = { x : 'a }
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immutable_data with 'a
+Error: The kind of type "t" is mutable_data box mod immutable with 'a
          because it's a boxed record type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.

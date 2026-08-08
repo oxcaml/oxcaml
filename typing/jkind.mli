@@ -139,6 +139,9 @@ module Layout : sig
     val has_genvar : t -> bool
   end
 
+  (** The layout of a pointer to a non-float block: tuples, rows, ... *)
+  val non_float_block : Sort.t t
+
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
@@ -569,8 +572,17 @@ val for_or_null_variant :
   payload_jkind:Types.jkind_l ->
   (Types.jkind_l, unit) result
 
-(** Choose an appropriate jkind for a boxed tuple type. *)
-val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
+(** Choose an appropriate jkind for a boxed tuple type. [None] component layouts
+    give the coarse layout [any box]; callers must then be prepared to
+    re-estimate (see [Ctype.constrain_type_jkind]). *)
+val for_boxed_tuple :
+  component_layouts:Sort.t Layout.t list option ->
+  (string option * Types.type_expr) list ->
+  Types.jkind_l
+
+(** The layout of a boxed block (record or tuple) whose unboxed version is the
+    product of [component_layouts]. *)
+val layout_for_boxed_block : Sort.t Layout.t list -> Sort.t Layout.t
 
 (** Choose an appropriate jkind for a row type. *)
 val for_boxed_row : Types.row_desc -> Types.jkind_l
