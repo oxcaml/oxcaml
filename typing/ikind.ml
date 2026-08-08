@@ -429,6 +429,8 @@ module Solver = struct
       | Types.Tunivar { name = _name; jkind } ->
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
+      | Types.Tconstr (path, [t], _) when Path.same path Predef.path_box ->
+        box_payload_kind ctx t
       | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
       | Types.Tmod (ty, mod_bounds) ->
         Ldd.meet
@@ -461,9 +463,7 @@ module Solver = struct
         kind ~check_principality:false ~use_tables:true ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
-      | Types.Tbox t ->
-        let base = Ldd.const Axis_lattice.mutable_data in
-        Ldd.join base (kind ~use_tables:true ctx t)
+      | Types.Tbox t -> box_payload_kind ctx t
       | Types.Tfield _ -> failwith "Tfield shouldn't appear in kind"
       | Types.Tnil -> failwith "Tnil shouldn't appear in kind"
       | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
@@ -503,6 +503,22 @@ module Solver = struct
         Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
     in
     kind_poly
+
+  (* The kind of a box type, given its payload [t]. Reduce like
+     [Ctype.try_reduce_box] ([t# box] ==> [t], [#(t1 * t2) box] ==>
+     [t1 * t2]) for the boxed type's more accurate kind; otherwise, boxes
+     cross like [mutable_data] with the payload, since the payload could be
+     the unboxed version of a mutable record. *)
+  and box_payload_kind (ctx : ctx) (t : Types.type_expr) : Ldd.node =
+    match Types.get_desc t with
+    | Types.Tconstr (p, args, _) when Option.is_some (Path.boxed_version p) ->
+      constr ctx (Option.get (Path.boxed_version p)) args
+    | Types.Tunboxed_tuple elts ->
+      let base = Ldd.const Axis_lattice.immutable_data in
+      Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
+    | _ ->
+      let base = Ldd.const Axis_lattice.mutable_data in
+      Ldd.join base (kind ~use_tables:true ctx t)
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : Ldd.node) : Ldd.node =
@@ -1124,8 +1140,8 @@ let fast_sub_of_any_super : type r.
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
-      (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
-    ->
+      ( Jkind_types.Layout.Sort (_, { nullability = _; separability = _ })
+      | Jkind_types.Layout.Box _ ) ->
     fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
@@ -1140,6 +1156,14 @@ let fast_sub_of_sort_super : type r.
       (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
+    then false
+    else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+  | Types.Layout (Jkind_types.Layout.Box _) ->
+    if
+      not
+        (Jkind_types.Sort.equate
+           (Jkind_types.Sort.of_base Jkind_types.Sort.Scannable)
+           super_sort)
     then false
     else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
   | Types.Layout _ | Types.Kconstr _ -> false

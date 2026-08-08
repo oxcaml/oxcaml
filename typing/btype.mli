@@ -696,6 +696,8 @@ module Jkind0 : sig
         why:Jkind_intf.History.any_creation_reason ->
         'd jkind
 
+      val any_box :
+        why:Jkind_intf.History.value_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :

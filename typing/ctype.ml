@@ -3125,7 +3125,12 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     estimate_type_jkind ~expand_components ~ignore_mod_bounds (incr_stage env)
       ty
     |> Jkind.map_type_expr new_quote_ty
-  | Tbox _ -> Jkind.Builtin.value ~why:Boxed
+  | Tbox payload ->
+    Jkind.for_box
+      ~payload_layout:
+        (estimate_type_layout ~expand_components env ~visited:[get_id ty]
+           payload)
+      payload
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3158,6 +3163,40 @@ and estimate_unboxed_product_jkind
     |> List.split
   in
   Jkind.Builtin.product ~why tys_modalities layouts
+(* An upper approximation of [ty]'s layout, for the components of block
+   layouts. Boxing is monotonic, so approximating upward is sound. [visited]
+   guards against cyclic types under [-rectypes]: a type recursively
+   containing itself approximates to [any]. *)
+and estimate_type_layout ~expand_components env ~visited ty
+  : Jkind.Sort.t Jkind.Layout.t =
+  if List.memq (get_id ty) visited
+  then Jkind.Layout.Any Jkind_types.Scannable_axes.max
+  else
+    let visited = get_id ty :: visited in
+    match get_desc ty with
+    | Ttuple _ ->
+      (* A nested tuple is a box of layout [scannable non_null non_float]. Do
+         not recurse into its elements: type abbreviations can share tuple
+         subterms, making structural recursion (and downstream traversals of
+         the resulting layout) exponential. *)
+      Jkind.Layout.Sort
+        ( Jkind.Sort.of_base Jkind_types.Sort.Scannable,
+          Jkind_types.Scannable_axes.non_float_block_axes )
+    | Tbox payload ->
+      Jkind.Layout.Box
+        ( estimate_type_layout ~expand_components env ~visited payload,
+          Jkind_types.Scannable_axes.max )
+    | Tmod (inner, _) | Trepr (inner, _) ->
+      estimate_type_layout ~expand_components env ~visited inner
+    | _ -> (
+      let jkind =
+        estimate_type_jkind ~expand_components ~ignore_mod_bounds:true env ty
+      in
+      (* [extract_layout] expands kind aliases; only a truly abstract kind
+         falls back to [any] *)
+      match Jkind.extract_layout env jkind with
+      | Ok layout -> layout
+      | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
 
 let rec estimate_type_jkind_unwrapped
       level ~expand_components env ~unwrapped_ty =

@@ -1377,7 +1377,7 @@ module Base_and_axes = struct
           match Types.get_desc ty with
           | Tmod (ty, _) -> check ~relevant_axes t ty
           | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
-          | Ttuple _ ->
+          | Ttuple _ | Tbox _ ->
             if tuple_fuel > 0
             then
               Continue
@@ -1472,7 +1472,7 @@ module Base_and_axes = struct
              belong in the next case. What is the right behaviour here? *)
           | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -2970,6 +2970,19 @@ let for_arrow =
     ~annotation:None ~why:(Value_creation Arrow)
   |> mark_best
 
+(* CR rtjoa: revisit *)
+(* The kind of ['a box]: layout [(layout of 'a) box], mod bounds
+   [box_mod_bounds] of the payload's - deferred to normalize via the
+   with-bound *)
+let for_box ~(payload_layout : Sort.t Layout.t) type_expr : jkind_l =
+  fresh_jkind
+    { base = Layout (Box (payload_layout, Scannable_axes.max));
+      mod_bounds = Const.box_mod_bounds Mod_bounds.min;
+      with_bounds = No_with_bounds
+    }
+    ~annotation:None ~why:(Value_creation Boxed)
+  |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr
+
 let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
@@ -3578,6 +3591,9 @@ module Format_history = struct
       fprintf ppf "it's the type of an expression inside of a quote"
     | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
     | Old_style_unboxed_type -> fprintf ppf "it's an [@@@@unboxed] type"
+    | Unboxed_version_of_boxed_kind p ->
+      fprintf ppf "it's the unboxed version of %a, which has a box kind"
+        !printtyp_path p
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -4722,6 +4738,8 @@ module Debug_printers = struct
     | Inside_quote -> fprintf ppf "Inside_quote"
     | Evaluated_quote -> fprintf ppf "Evaluated_quote"
     | Old_style_unboxed_type -> fprintf ppf "Old_style_unboxed_type"
+    | Unboxed_version_of_boxed_kind p ->
+      fprintf ppf "Unboxed_version_of_boxed_kind %a" (Fmt.compat Path.print) p
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function

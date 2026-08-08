@@ -725,12 +725,12 @@ val f : foo -> foo = <fun>
 let require_boxed (_ : _ box) = ()
 type 'a st = T : string st
 type 'a ft = T : float ft
-type 'a bt = T : _ box bt
+type ('a : value_or_null) bt = T : _ box bt
 [%%expect{|
 val require_boxed : ('a : any). 'a box -> unit = <fun>
 type 'a st = T : string st
 type 'a ft = T : float ft
-type 'a bt = T : 'b box bt
+type ('a : value_or_null) bt = T : 'b box bt
 |}]
 
 (* We can match on a GADT to learn that something is boxed *)
@@ -768,13 +768,15 @@ let bad (x : 'a st) (a : 'a) =
   | T ->
     ()
 [%%expect{|
-Line 4, characters 4-5:
-4 |   | T ->
-        ^
-Error: This pattern matches values of type "string st"
-       but a pattern was expected which matches values of type "$0 box st"
-       Type "string" is not compatible with type "$0 box"
-       The type constructor "$0" would escape its scope
+Line 2, characters 16-17:
+2 |   require_boxed a;
+                    ^
+Error: The value "a" has type "('a : value)"
+       but an expression was expected of type "'b box"
+       The layout of 'a box is value_or_null
+         because it's a boxed type.
+       But the layout of 'a box must be a sublayout of value
+         because of the definition of st at line 2, characters 0-26.
 |}]
 
 (* Test 30: [(T box)#] = [T] -- the unboxed version of a [_ box] alias is
@@ -1350,9 +1352,11 @@ Error: The type "t1" has no unboxed version.
    are introduced: learning [a = au box] and [a = float] (hence [au = float#])
    typechecks regardless of which equation comes first. *)
 
-type (_, _ : any) boxes = Boxes : ('a : any). ('a box, 'a) boxes
+type (_ : value_or_null, _ : any) boxes =
+  | Boxes : ('a : any). ('a box, 'a) boxes
 [%%expect{|
-type (_, _ : any) boxes = Boxes : ('a : any). ('a box, 'a) boxes
+type (_ : value_or_null, _ : any) boxes =
+    Boxes : ('a : any). ('a box, 'a) boxes
 |}]
 
 (* Matching [Boxes] before [Equal] *)
@@ -1490,21 +1494,14 @@ end = struct
   let f (x : 'a box) : 'c = Obj.magic x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 38-39:
 4 |   let f (x : 'a box) : 'c = Obj.magic x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : ('a : any) 'c. 'a box -> 'c end
-       is not included in
-         sig val f : 'b -> 'c end
-       Values do not match:
-         val f : ('a : any) 'c. 'a box -> 'c
-       is not included in
-         val f : 'b -> 'c
-       The type "'a box -> 'b" is not compatible with the type "'c -> 'd"
-       Type "'a box" is not compatible with type "'c"
+                                          ^
+Error: The value "x" has type "'a box" but an expression was expected of type
+         "('b : value)"
+       The layout of 'a box is value_or_null
+         because it's a boxed type.
+       But the layout of 'a box must be a sublayout of value.
 |}]
 
 (* [box] is covariant *)
@@ -1560,7 +1557,8 @@ end
 module M : sig type t = float end
 |}]
 
-(* Test 44: Signature avoidance can cause errors at functor application *)
+(* Test 44: Signature avoidance at functor application: [y] gets a box kind,
+   which gives it an unboxed version *)
 
 module type S = sig
   type t
@@ -1578,10 +1576,5 @@ end)
 module type S = sig type t end
 module F :
   functor (X : S) -> sig type x = X.t type y = X.t box type yu = y# end
-Lines 10-12, characters 11-4:
-10 | ...........F(struct
-11 |   type t
-12 | end)
-Error: In the signature of this functor application: The type "y"
-       has no unboxed version.
+module M : sig type x type y : value box type yu = y# end
 |}]

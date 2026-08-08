@@ -2144,6 +2144,18 @@ module Jkind0 = struct
           }
           ~annotation:None ~why:(Any_creation why)
 
+      let any_box ~(why : Jkind_intf.History.value_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Box
+                   ( Jkind_types.Layout.Any Jkind_types.Scannable_axes.max,
+                     Jkind_types.Scannable_axes.max ));
+            mod_bounds = Const.Builtin.mutable_data.jkind.mod_bounds
+          }
+          ~annotation:None ~why:(Value_creation why)
+
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
           annotation = mk_annot "value";

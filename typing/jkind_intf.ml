@@ -523,6 +523,7 @@ module History = struct
     | Inside_quote
     | Evaluated_quote
     | Old_style_unboxed_type
+    | Unboxed_version_of_boxed_kind of Path.t
 
   type product_creation_reason =
     | Unboxed_tuple

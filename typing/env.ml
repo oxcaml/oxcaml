@@ -1468,12 +1468,64 @@ let type_of_cstr path = function
       end
   | _ -> assert false
 
+let find_jkind p env =
+  match p with
+  | Pident id -> (IdTbl.find_same id env.jkinds).jkda_declaration
+  | Pdot(p, s) ->
+    let sc = find_structure_components p env in
+    (NameMap.find s sc.comp_jkinds).jkda_declaration
+  | Papply _ | Pextra_ty _ -> raise Not_found
+
+(* The unboxed payload of a box kind, expanding kind aliases (analogous to
+   [Jkind.Base.expand_once], which is unavailable here) *)
+let unboxed_payload_of_boxed_jkind env (jkind : jkind_l) =
+  let rec of_const_base (base : _ Types.jkind_base) =
+    match base with
+    | Layout (Jkind_types.Layout.Const.Box (payload, _)) ->
+      Some (Jkind_types.Layout.of_const payload)
+    | Layout _ -> None
+    | Kconstr (p, sa, op) ->
+      match find_jkind p env with
+      | exception Not_found -> None
+      | { jkind_manifest = None; _ } -> None
+      | { jkind_manifest = Some { base; _ }; _ } ->
+        let base = Jkind.Base_and_axes.apply_operator base op in
+        of_const_base (Jkind.Base_and_axes.meet_scannable_axes base sa)
+  in
+  match jkind.jkind.base with
+  | Layout (Jkind_types.Layout.Box (payload, _)) -> Some payload
+  | Layout _ -> None
+  | Kconstr (p, sa, op) -> of_const_base (Kconstr (p, sa, op))
+
+(* The externality the layout would have were it written as a kind
+   annotation: layouts with no scannable component are external. *)
+let rec sort_implied_externality (s : Jkind_types.Sort.t) :
+    Jkind_axis.Externality.t =
+  let open Jkind_axis.Externality in
+  match Jkind_types.Sort.get s with
+  | Base Scannable | Var _ | Univar _ -> max
+  | Base _ -> min
+  | Product ss ->
+    List.fold_left (fun e s -> join e (sort_implied_externality s)) min ss
+  | Addressable s -> sort_implied_externality s
+
+let rec layout_implied_externality :
+    Jkind_types.Sort.t Jkind_types.Layout.t -> Jkind_axis.Externality.t =
+  let open Jkind_axis.Externality in
+  function
+  | Sort (s, _) -> sort_implied_externality s
+  | Product ls ->
+    List.fold_left (fun e l -> join e (layout_implied_externality l)) min ls
+  | Any _ | Box _ -> max
+  | Addressable l -> layout_implied_externality l
+
 type unboxed_version_step =
   | Lacks_unboxed_version
   | Aliases of Path.t * type_expr list
   | Boxes of type_expr
+  | Boxed_kind of Jkind_types.Sort.t Jkind_types.Layout.t
   | Has_unboxed_version of type_declaration
-let step_find_unboxed_version decl =
+let step_find_unboxed_version env decl =
   match decl.type_unboxed_version with
   | Some ud -> Has_unboxed_version ud
   | None ->
@@ -1487,7 +1539,10 @@ let step_find_unboxed_version decl =
       Lacks_unboxed_version
     | Type_abstract _ ->
       match decl.type_manifest with
-      | None -> Lacks_unboxed_version
+      | None -> (
+        match unboxed_payload_of_boxed_jkind env decl.type_jkind with
+        | Some payload -> Boxed_kind payload
+        | None -> Lacks_unboxed_version)
       | Some ty ->
         match Btype.simple_unbox_ty ty with
         | Some ty -> Boxes ty
@@ -1540,9 +1595,44 @@ and find_type_unboxed_version path env seen =
   if Path.Set.mem path seen then raise Not_found else
   let seen = Path.Set.add path seen in
   let decl = (find_type_data path env seen).tda_declaration in
-  match step_find_unboxed_version decl with
+  match step_find_unboxed_version env decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
+  | Boxed_kind payload ->
+    (* The type has kind [k box], so its unboxed version is abstract with
+       kind [k]. The payload layout is shared with the boxed decl's jkind,
+       like the [Aliases] case reuses [ud.type_jkind]. *)
+    {
+      type_params = decl.type_params;
+      type_arity = decl.type_arity;
+      type_kind = Type_abstract Definition;
+      type_jkind =
+        Jkind.fresh_jkind
+          { base = Layout payload;
+            mod_bounds =
+              Jkind.Mod_bounds.create Mode.Crossing.max
+                ~externality:(layout_implied_externality payload);
+            with_bounds = No_with_bounds
+          }
+          ~annotation:None
+          ~why:(Any_creation (Unboxed_version_of_boxed_kind path));
+      type_ikind =
+        Types.ikinds_todo
+          (Format_doc.asprintf
+             "env unboxed boxed-kind path=%a" Path.print path);
+      type_private = decl.type_private;
+      type_manifest = None;
+      type_variance = decl.type_variance;
+      type_separability =
+        Types.Separability.default_signature ~arity:decl.type_arity;
+      type_is_newtype = false;
+      type_expansion_scope = Btype.lowest_level;
+      type_loc = decl.type_loc;
+      type_attributes = decl.type_attributes;
+      type_unboxed_default = false;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
   | Boxes inner ->
     {
       type_params = decl.type_params;
@@ -1685,14 +1775,6 @@ let find_type p env =
   (find_type_data p env Path.Set.empty).tda_declaration
 let find_type_descrs p env =
   (find_type_data p env Path.Set.empty).tda_descriptions
-
-let find_jkind p env =
-  match p with
-  | Pident id -> (IdTbl.find_same id env.jkinds).jkda_declaration
-  | Pdot(p, s) ->
-    let sc = find_structure_components p env in
-    (NameMap.find s sc.comp_jkinds).jkda_declaration
-  | Papply _ | Pextra_ty _ -> raise Not_found
 
 let rec find_module_address path env =
   match path with

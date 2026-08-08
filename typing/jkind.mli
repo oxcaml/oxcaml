@@ -578,6 +578,10 @@ val for_boxed_row : Types.row_desc -> Types.jkind_l
 (** The jkind of an arrow type. *)
 val for_arrow : Types.jkind_l
 
+(** The jkind of a boxed type ([Tbox]): [mutable_data] with the payload, except
+    with a box layout around [payload_layout]. *)
+val for_box : payload_layout:Sort.t Layout.t -> Types.type_expr -> Types.jkind_l
+
 (** The jkind of an object type. *)
 val for_object : Types.jkind_l
 
