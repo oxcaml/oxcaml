@@ -148,6 +148,8 @@ module Scannable_axes : sig
 
   val value_axes : t
 
+  val non_float_block_axes : t
+
   val equal : t -> t -> bool
 
   val less_or_equal : t -> t -> Misc.Le_result.t
@@ -175,6 +177,7 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
 
   module Const : sig
     type t = private
@@ -193,6 +196,18 @@ module Layout : sig
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
+      | Box of t * Scannable_axes.t
+          (** See the [Box] constructor of [Jkind.Layout.t] for what box kinds
+              mean.
+
+              Invariant: the axes incorporate the axes implied by the contents.
+              I.e., given [Box (t, sa)], [sa] is at most
+              [scannable_axes_of_boxed t]. Maintained by [box].
+
+              The invariant is relative to [scannable_axes_of_boxed], so raising
+              an axis implied there is a compatibility event for marshaled
+              constants (e.g. [kind_] aliases in cmis). *)
+    (* CR rtjoa: self further reword *)
 
     val any : Scannable_axes.t -> t
 
@@ -219,6 +234,16 @@ module Layout : sig
     val addressable : t -> t
 
     val apply_operator : t -> Kind_operator.t -> t
+
+    (** The scannable axes of the boxed form of a base layout. *)
+    val scannable_axes_of_boxed_base : Sort.base -> Scannable_axes.t
+
+    (** The scannable axes of [t box]. *)
+    val scannable_axes_of_boxed : t -> Scannable_axes.t
+
+    (** [box t sa] is the kind of boxed data whose unboxed form has layout [t],
+        met with [any sa]. *)
+    val box : t -> Scannable_axes.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

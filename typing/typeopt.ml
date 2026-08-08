@@ -123,6 +123,7 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Product sorts ->
     List.for_all layout_is_representable sorts
   | Addressable layout -> layout_is_representable layout
+  | Box _ -> true
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
@@ -200,7 +201,7 @@ let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
   | Addressable layout -> classify ~classify_product env ty layout
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
-  | Base (Scannable, _sa) -> begin
+  | Base (Scannable, _) | Box _ -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
      these calls. *)
   match scrape_ty env ty with
@@ -308,7 +309,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
   match layout with
   | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
-  | Base (Scannable, { separability; _ }) ->
+  | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
       let open Jkind_axis.Separability in
       if le separability (upper_bound_if_is_always_gc_ignorable ())
         then Pint_scannable else Paddr_scannable
@@ -343,7 +344,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
                                with non-representable layout"
   (* Scannable axes are irrelevant, since we already know we can ignore *)
-  | Base (Scannable, _sa) -> Pint_ignorable
+  | Base (Scannable, _) | Box _ -> Pint_ignorable
   | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
   | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
   | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
@@ -507,7 +508,7 @@ let value_kind_of_scannable_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   let rec of_layout : Jkind.Layout.Const.t -> _ = function
-    | Base (Scannable, { separability; _ }) -> (
+    | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) -> (
       (* use the better of the two [immediate_or_pointer]s *)
       match pointerness_of_separability separability,
             pointerness_of_scannable_with_externality externality_upper_bound

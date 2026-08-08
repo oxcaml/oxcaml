@@ -94,6 +94,10 @@ module Scannable_axes : sig
 
   (** Omits all axes that are max, for printing *)
   val to_string_list : t -> string list
+
+  (** Omits axes that equal [base], for printing. Returns [None] when some axis
+      exceeds [base]. *)
+  val to_string_list_diff : base:t -> t -> string list option
 end
 
 (* The layout of a type describes its memory layout. A layout is either the
@@ -104,6 +108,22 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
+    | Box of 'sort t * Scannable_axes.t
+        (** [Box (k, sa)] represents the kind [k box], met with [any sa]: data
+            of kind [k] represented in its boxed form.
+
+            Box kinds have the following properties:
+            - [box] is a free, monotonic kind constructor: [k1 box <= k2 box]
+              exactly when [k1 <= k2] (and the axes permit), and only box kinds
+              lie below a box kind.
+            - [k box] lies strictly below [scannable]: boxed data is always a
+              scannable value. How far below is determined by how [k] is boxed
+              (see [scannable_axes_of_boxed]): e.g. a [bits8] boxes as a tagged
+              immediate, so [bits8 box < value non_pointer], whereas [any box]
+              is only a subkind of [scannable].
+            - Box kinds are addressable.
+            - A type of kind [k box] has an unboxed version, of kind [k]. *)
+  (* CR rtjoa: self reword *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -123,11 +143,8 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  (** Updates the nullability on the layout's scannable axis. *)
-  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
-
-  (** Updates the separability on the layout's scannable axis. *)
-  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
+  (** The scannable axes of [t box] *)
+  val scannable_axes_of_boxed_flat : Sort.Flat.t t -> Scannable_axes.t
 
   module Debug_printers : sig
     val t :
@@ -337,6 +354,11 @@ module Builtin : sig
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
   val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
+
+  val scannable_with_separability :
+    Jkind_axis.Separability.t ->
+    why:History.scannable_creation_reason ->
+    'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
@@ -684,10 +706,14 @@ val apply_modality_r :
     [Maybe_null], fails. *)
 val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
 
+(* CR rtjoa: reword *)
+
 (** Change a jkind to be appropriate for an expectation of a type passed to the
     [or_null] constructor. Adjusts nullability to be [Non_null], and
-    separability to be [Non_float] if it is demanded to be [Separable]. If the
-    jkind is already [Non_null], fails. *)
+    separability to be [Non_float] if it is demanded to be [Separable]. Fails if
+    the jkind is already [Non_null], or if no or_null type could have it: the
+    layouts of or_null types are [any] and scannable sorts (possibly made
+    addressable), so e.g. box kinds fail. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product

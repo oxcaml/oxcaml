@@ -2098,7 +2098,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         Option.map
           (fun l -> Jkind.Layout.Addressable l)
           (instance_layout layout)
-      | Sort _ | Product _ -> None
+      | Sort _ | Product _ | Box _ -> None
     in
     match Jkind.extract_layout env jkind with
     | Error _ -> None
@@ -3003,14 +3003,11 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r env jkind with
-      | Ok jkind -> jkind
-      | Error () ->
-        Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
+      Jkind.apply_or_null_r env jkind
     else
-      jkind
+      Ok jkind
   end
-  |> Jkind.apply_modality_r modality
+  |> Result.map (Jkind.apply_modality_r modality)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3391,9 +3388,15 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind =
+                      match
                         apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
-                      in
+                      with
+                      | Error () ->
+                        Error
+                          (Jkind.Violation.of_ ~context env
+                             (Not_a_subjkind
+                                (ty's_jkind, jkind, sub_failure_reasons)))
+                      | Ok jkind ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3612,18 +3615,11 @@ let type_is_gc_ignorable_scannable env ty =
      a type of kind [value non_pointer & value non_pointer] will fail to be
      recognized as being always_gc_ignorable, even though it is. To avoid this,
      [non_pointer(64)] should imply [external(64)]. *)
-  let scannable = Jkind.Builtin.scannable ~why:Dummy_jkind in
-  let l =
-    match scannable.jkind.base with
-    | Layout l -> l
-    | Kconstr _ ->
-      Misc.fatal_error "Ctype.type_is_gc_ignorable_scannable: abstract Kconstr"
-  in
   let sep =
     Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ()
   in
   let upper_bound =
-    Jkind.set_layout scannable (Jkind.Layout.set_root_separability l sep)
+    Jkind.Builtin.scannable_with_separability sep ~why:Dummy_jkind
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true

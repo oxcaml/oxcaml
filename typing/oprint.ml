@@ -621,7 +621,10 @@ and print_out_jkind_const ppf ojkind =
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
     | Ojkind_const_abbreviation (abbrev, sa) ->
-      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
+      (* CR rtjoa: revisit *)
+      (* Unbreakable: an abbreviation with its axes and operators (e.g.
+         [value non_pointer box]) reads as one unit *)
+      pp_print_string ppf (String.concat " " (abbrev :: sa))
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -664,6 +667,9 @@ and print_out_jkind ppf ojkind =
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_addressable t ->
       fprintf ppf "%a addressable" (pp_element ~nested:true) t
+    | Ojkind_box (t, axes) ->
+      fprintf ppf "%a box" (pp_element ~nested:true) t;
+      List.iter (fun axis -> fprintf ppf " %s" axis) axes
   in
   pp_element ~nested:false ppf ojkind
 

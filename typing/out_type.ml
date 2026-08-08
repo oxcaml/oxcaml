@@ -1260,7 +1260,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze structure (products and addressability) before calling
+  (* Analyze structure (products, addressability, and boxes) before calling
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
   | Layout (Product lays) ->
@@ -1274,6 +1274,16 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
       out_jkind_of_desc env { desc with base = Layout lay }
     else
       Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
+  (* A constant [Box] is printed by [Jkind.Const.to_out_jkind_const], which
+     puts the kind's mod- and with-bounds outside the layout *)
+  | Layout (Box (lay, sa)) when Option.is_none (Jkind.Desc.get_const desc) ->
+    let axes =
+      Option.value
+        (Jkind.Scannable_axes.to_string_list_diff
+           ~base:(Jkind.Layout.scannable_axes_of_boxed_flat lay) sa)
+        ~default:[]
+    in
+    Ojkind_box (out_jkind_of_desc env { desc with base = Layout lay }, axes)
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)

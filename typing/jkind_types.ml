@@ -1195,6 +1195,9 @@ module Scannable_axes = struct
 
   let value_axes = { nullability = Non_null; separability = Separable }
 
+  let non_float_block_axes =
+    { nullability = Non_null; separability = Non_float }
+
   let equal { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
     Nullability.equal n1 n2 && Separability.equal s1 s2
@@ -1220,6 +1223,7 @@ module Layout = struct
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
 
   module Const = struct
     type t =
@@ -1229,6 +1233,7 @@ module Layout = struct
       | Univar of Sort.univar
       | Genvar of Sort.var
       | Addressable of t
+      | Box of t * Scannable_axes.t
 
     let any sa = Any sa
 
@@ -1252,7 +1257,13 @@ module Layout = struct
       | Addressable c1, Addressable c2 ->
         (* Relies on invariant that constants don't have redundant [Addressable] *)
         equal c1 c2
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
+      | Box (c1, sa1), Box (c2, sa2) ->
+        (* Relies on invariant that axes on constant boxes incorporate axes
+           implied by contents *)
+        equal c1 c2 && Scannable_axes.equal sa1 sa2
+      | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
+          | Box _ ),
+          _ ) ->
         false
 
     let rec get_sort : t -> Sort.Const.t option = function
@@ -1265,6 +1276,7 @@ module Layout = struct
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
+      | Box _ -> Sort.Const.some (Base Scannable)
 
     let rec is_scannable_or_any = function
       | Any _ | Base (Scannable, _) -> true
@@ -1277,18 +1289,88 @@ module Layout = struct
       | Univar _ -> false
       | Genvar _ -> false
       | Addressable t -> is_scannable_or_any t
+      | Box _ -> true
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
       | Product cs -> List.for_all is_surely_addressable cs
       | Any _ | Univar _ | Genvar _ -> false
       | Addressable _ -> true
+      | Box _ -> true
 
     let addressable c = if is_surely_addressable c then c else Addressable c
 
     let apply_operator c : Kind_operator.t -> t = function
       | Id -> c
       | Addressable -> addressable c
+
+    let scannable_axes_of_boxed_base : Sort.base -> Scannable_axes.t = function
+      | Void | Bits8 | Bits16 | Untagged_immediate ->
+        { nullability = Non_null; separability = Non_pointer }
+      | Bits32 | Float32 ->
+        { nullability = Non_null; separability = Non_pointer64 }
+      (* A boxed [float64] is a float block *)
+      | Float64 -> Scannable_axes.value_axes
+      | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
+        Scannable_axes.non_float_block_axes
+
+    let rec has_unknown_sort = function
+      | Any _ | Univar _ | Genvar _ -> true
+      | Base _ | Box _ -> false
+      | Product cs -> List.exists has_unknown_sort cs
+      | Addressable c -> has_unknown_sort c
+
+    (* The two rules below are independently sound upper bounds on the
+       scannable axes of [t box]; [scannable_axes_of_boxed] is their meet.
+
+       Addressability: boxing an addressable [t] may be the identity, so the
+       box is the pointer itself: a value. Unknown sorts cannot break this -
+       any sort boxes to at most a float block once addressable - but [any]
+       can, since it also ranges over layouts that do not exist yet.
+
+       Structure: what the root of a fully known [t] boxes to. Under an
+       [Addressable], boxing may be the identity, so only a product - a
+       block of at least two fields, which is never a float - says more
+       than addressability already does. *)
+    let rec has_any = function
+      | Any _ -> true
+      | Base _ | Univar _ | Genvar _ | Box _ -> false
+      | Product cs -> List.exists has_any cs
+      | Addressable c -> has_any c
+
+    let boxed_axes_from_addressability t =
+      if is_surely_addressable t && not (has_any t)
+      then Scannable_axes.value_axes
+      else Scannable_axes.max
+
+    let rec boxed_axes_from_structure_addressable : t -> Scannable_axes.t =
+      function
+      | Product _ -> Scannable_axes.non_float_block_axes
+      | Base _ | Box _ -> Scannable_axes.max
+      | Addressable c -> boxed_axes_from_structure_addressable c
+      | Any _ | Univar _ | Genvar _ ->
+        Misc.fatal_error "unexpected unknown sort"
+
+    let boxed_axes_from_structure : t -> Scannable_axes.t = function
+      | Base (b, _) -> scannable_axes_of_boxed_base b
+      | Box _ -> scannable_axes_of_boxed_base Scannable
+      | t -> (
+        if has_unknown_sort t
+        then Scannable_axes.max
+        else
+          match t with
+          | Product _ -> Scannable_axes.non_float_block_axes
+          | Addressable c -> boxed_axes_from_structure_addressable c
+          | Base _ | Box _ -> Misc.fatal_error "disallowed by outer match"
+          | Any _ | Univar _ | Genvar _ ->
+            Misc.fatal_error "unexpected unknown sort")
+
+    let scannable_axes_of_boxed t =
+      Scannable_axes.meet
+        (boxed_axes_from_addressability t)
+        (boxed_axes_from_structure t)
+
+    let box c sa = Box (c, Scannable_axes.meet sa (scannable_axes_of_boxed c))
 
     let rec get_root_scannable_axes t =
       match t with
@@ -1298,6 +1380,7 @@ module Layout = struct
       | Univar _ -> None
       | Genvar _ -> None
       | Addressable t -> get_root_scannable_axes t
+      | Box (_, sa) -> Some sa
 
     let rec set_root_scannable_axes t sa =
       match t with
@@ -1307,6 +1390,7 @@ module Layout = struct
       | Univar _ -> t
       | Genvar _ -> t
       | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
+      | Box (t', _) -> box t' sa
 
     let meet_root_scannable_axes t sa =
       match get_root_scannable_axes t with
@@ -1489,6 +1573,7 @@ module Layout = struct
     | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
     | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
     | Addressable c -> Addressable (of_const c)
+    | Box (c, sa) -> Box (of_const c, sa)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
@@ -1507,6 +1592,7 @@ module Layout = struct
         (fun x -> Const.Product x)
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
     | Addressable t -> Option.map Const.addressable (get_const of_sort t)
+    | Box (t, sa) -> Option.map (fun c -> Const.box c sa) (get_const of_sort t)
 
   let get_flat_const t = get_const Const.of_flat_sort t
 
