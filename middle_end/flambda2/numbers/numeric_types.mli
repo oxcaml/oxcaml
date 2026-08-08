@@ -49,6 +49,12 @@ module Int8 : sig
 
   val of_float : float -> t
 
+  val leading_zeros : t -> int
+
+  val trailing_zeros : t -> int
+
+  val popcount : t -> int
+
   include Container_types.S with type t := t
 end
 
@@ -73,12 +79,18 @@ module Int16 : sig
 
   val of_float : float -> t
 
+  val leading_zeros : t -> int
+
+  val trailing_zeros : t -> int
+
+  val popcount : t -> int
+
   include Container_types.S with type t := t
 end
 
 module Int32 : sig
   include module type of struct
-    include Int32
+    include Misc.Stdlib.Int32
   end
 
   include Container_types.S with type t := Int32.t
@@ -92,7 +104,7 @@ end
 
 module Int64 : sig
   include module type of struct
-    include Int64
+    include Misc.Stdlib.Int64
   end
 
   include Container_types.S with type t := Int64.t

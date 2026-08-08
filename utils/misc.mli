@@ -355,6 +355,29 @@ module Stdlib : sig
 
     val min : t -> t -> t
     val max : t -> t -> t
+
+    (* CR bclement: these are in the upstream stdlib in 5.5 *)
+    val leading_zeros : t -> int
+    val trailing_zeros : t -> int
+    val popcount : t -> int
+  end
+
+  module Int32 : sig
+    include module type of Int32
+
+    (* CR bclement: these are in the upstream stdlib in 5.5 *)
+    val leading_zeros : t -> int
+    val trailing_zeros : t -> int
+    val popcount : t -> int
+  end
+
+  module Int64 : sig
+    include module type of Int64
+
+    (* CR bclement: these are in the upstream stdlib in 5.5 *)
+    val leading_zeros : t -> int
+    val trailing_zeros : t -> int
+    val popcount : t -> int
   end
 
   external compare : 'a -> 'a -> int = "%compare"
