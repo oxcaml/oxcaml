@@ -2420,28 +2420,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     let reprs, repr_summary =
       compute_repr_summary env lbls jkinds ~default_to_scannable:true
     in
-    let jkind =
-      match form with
-      | Legacy ->
-          let lbls_with_sorts =
-            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-          in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
-      | Unboxed_product ->
-        let lbls_with_layouts =
-          List.map2
-            (fun (lbl, ty) jkind ->
-                let layout =
-                  match Jkind.extract_layout env jkind with
-                  | Ok layout -> layout
-                  | Error _ ->
-                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
-                in
-                lbl, ty, layout)
-            lbls jkinds
-        in
-        Jkind.for_unboxed_record_with_updates lbls_with_layouts
-    in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
       let { values; floats; atomic_floats; float64s;
@@ -2484,6 +2462,29 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         (match form with
          | Legacy -> Record_undetermined
          | Unboxed_product -> Record_unboxed_product_undetermined)
+    in
+    let field_layouts () =
+      List.map
+        (fun jkind ->
+            match Jkind.extract_layout env jkind with
+            | Ok layout -> layout
+            | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
+        jkinds
+    in
+    let jkind =
+      match form with
+      | Legacy ->
+          let lbls_with_sorts =
+            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
+          in
+          Jkind.for_boxed_record_with_updates lbls_with_sorts
+      | Unboxed_product ->
+        let lbls_with_layouts =
+          List.map2
+            (fun (lbl, ty) layout -> lbl, ty, layout)
+            lbls (field_layouts ())
+        in
+        Jkind.for_unboxed_record_with_updates lbls_with_layouts
     in
     sorts, rep, jkind
   | Legacy, _,
