@@ -3270,17 +3270,18 @@ type step_result =
   | Is_cyclic
 let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
   let contained_parameters tyl layout =
-    (* A type whose layout has [any] could contain all its parameters.
+    (* A type whose layout is not representable could contain all its
+       parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
-    let rec has_any : Jkind_types.Layout.Const.t -> bool = function
-      | Any _ -> true
-      | Base _ -> false
-      | Product l -> List.exists has_any l
-      | Addressable layout -> has_any layout
+    let rec is_representable : Jkind_types.Layout.Const.t -> bool = function
+      | Any _ -> false
+      | Base _ -> true
+      | Product l -> List.for_all is_representable l
+      | Addressable layout -> is_representable layout
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
       | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
-    if has_any layout then tyl else []
+    if is_representable layout then [] else tyl
   in
   let step_once parents ty =
     match get_desc ty with
