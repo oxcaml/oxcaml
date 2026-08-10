@@ -560,6 +560,31 @@ and eval_prim env prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_idx { layout = new_layout; mode }
+  | Patomic_load_ptr { layout = old_layout } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_load_ptr { layout = new_layout }
+  | Patomic_set_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_set_ptr { layout = new_layout; mode }
+  | Patomic_exchange_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_exchange_ptr { layout = new_layout; mode }
+  | Patomic_compare_exchange_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_compare_exchange_ptr { layout = new_layout; mode }
+  | Patomic_compare_set_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_compare_set_ptr { layout = new_layout; mode }
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
@@ -599,10 +624,11 @@ and eval_prim env prim =
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
-  | Patomic_lor_idx | Patomic_lxor_idx | Pprobe_is_enabled _ | Pobj_dup
-  | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _
-  | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
-  | Preinterpret_tuple_as_boxed_vector _
+  | Patomic_lor_idx | Patomic_lxor_idx | Patomic_fetch_add_ptr | Patomic_add_ptr
+  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
+  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
@@ -641,6 +667,11 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pset_idx (layout, _)
   | Patomic_load_idx { layout }
   | Patomic_set_idx { layout; _ }
+  | Patomic_load_ptr { layout }
+  | Patomic_set_ptr { layout; _ }
+  | Patomic_exchange_ptr { layout; _ }
+  | Patomic_compare_exchange_ptr { layout; _ }
+  | Patomic_compare_set_ptr { layout; _ }
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)

@@ -1251,6 +1251,78 @@ CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
   return caml_set_idx_bytecode(base, Field(ptr, 1), v);
 }
 
+Caml_inline void check_atomic_ptr(value ptr)
+{
+  if (Is_null(Field(ptr, 0)))
+    caml_failwith("Atomic ptr primitives do not support external ptrs");
+}
+
+CAMLprim value caml_atomic_load_ptr_bytecode(value ptr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_load_idx_bytecode(Field(ptr, 0), Field(ptr, 1));
+}
+
+CAMLprim value caml_atomic_set_ptr_bytecode(value ptr, value v)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_set_idx_bytecode(Field(ptr, 0), Field(ptr, 1), v);
+}
+
+CAMLprim value caml_atomic_exchange_ptr_bytecode(value ptr, value v)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_exchange_idx_bytecode(Field(ptr, 0), Field(ptr, 1), v);
+}
+
+CAMLprim value caml_atomic_compare_exchange_ptr_bytecode(value ptr, value oldv, value newv)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_compare_exchange_idx_bytecode(Field(ptr, 0), Field(ptr, 1), oldv, newv);
+}
+
+CAMLprim value caml_atomic_cas_ptr_bytecode(value ptr, value oldv, value newv)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_cas_idx_bytecode(Field(ptr, 0), Field(ptr, 1), oldv, newv);
+}
+
+CAMLprim value caml_atomic_fetch_add_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_fetch_add_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
+CAMLprim value caml_atomic_add_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_add_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
+CAMLprim value caml_atomic_sub_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_sub_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
+CAMLprim value caml_atomic_land_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_land_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
+CAMLprim value caml_atomic_lor_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_lor_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
+CAMLprim value caml_atomic_lxor_ptr_bytecode(value ptr, value incr)
+{
+  check_atomic_ptr(ptr);
+  return caml_atomic_lxor_idx_bytecode(Field(ptr, 0), Field(ptr, 1), incr);
+}
+
 CAMLprim value caml_get_ext_ptr_bytecode(value idx)
 {
   caml_failwith("External ptr primitives are unimplemented on bytecode");
