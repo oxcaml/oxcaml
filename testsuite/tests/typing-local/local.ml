@@ -1182,8 +1182,18 @@ let bar () =
 Line 3, characters 2-8:
 3 |   foo ()
       ^^^^^^
-Error: This application is local-returning, but is at the tail
-       position of a function that is not local-returning.
+Error: This local-returning application is in a tail position that is not
+       enclosed in an exclave_ expression.
+       Hint: Use exclave_ to return a local value.
+|}]
+
+let bar () : int @ local = foo ()
+[%%expect{|
+Line 1, characters 27-33:
+1 | let bar () : int @ local = foo ()
+                               ^^^^^^
+Error: This local-returning application is in a tail position that is not
+       enclosed in an exclave_ expression.
        Hint: Use exclave_ to return a local value.
 |}]
 
@@ -1221,8 +1231,8 @@ let bar (f : _ -> _ @ local) = foo (fun () -> f ())
 Line 1, characters 46-50:
 1 | let bar (f : _ -> _ @ local) = foo (fun () -> f ())
                                                   ^^^^
-Error: This application is local-returning, but is at the tail
-       position of a function that is not local-returning.
+Error: This local-returning application is in a tail position that is not
+       enclosed in an exclave_ expression.
        Hint: Use exclave_ to return a local value.
 |}]
 
@@ -2130,8 +2140,8 @@ val foo : unit -> bool @ local = <fun>
 Line 2, characters 27-35:
 2 | let testboo3 () =  true && (foo ())
                                ^^^^^^^^
-Error: This application is local-returning, but is at the tail
-       position of a function that is not local-returning.
+Error: This local-returning application is in a tail position that is not
+       enclosed in an exclave_ expression.
        Hint: Use exclave_ to return a local value.
 |}]
 (* since the tailcall calls a local-returning function, it will only type-check
