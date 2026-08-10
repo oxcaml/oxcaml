@@ -109,12 +109,6 @@ val update_constructor_representation:
     default_to_scannable:bool ->
     (Types.constructor_representation, unrepresentable_constructor) Result.t
 
-val update_constructor_representation_or_variable:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t ->
-    sorts_and_types:(Jkind.sort * type_expr) array ->
-    Types.constructor_representation
-
 (* Same as above, but also computes sorts of arguments *)
 val update_constructor_representation_and_arg_sorts :
   Env.t -> Location.t -> Types.constructor_arguments ->
