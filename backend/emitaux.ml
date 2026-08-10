@@ -245,12 +245,13 @@ let emit_frames ~debug_strings_section a =
      descriptor layouts: present iff the debug flag is set, one word per
      allocation for an alloc descriptor, otherwise one word. *)
   let emit_debug_words fd =
+    let flags = get_flags fd.fd_debuginfo in
     match fd.fd_debuginfo with
-    | _ when get_flags fd.fd_debuginfo = 0 -> ()
+    | _ when flags = 0 -> ()
     | Dbg_other dbg -> a.efa_label_rel (label_debuginfos false dbg) Int32.zero
     | Dbg_raise dbg -> a.efa_label_rel (label_debuginfos true dbg) Int32.zero
     | Dbg_alloc dbg ->
-      if get_flags fd.fd_debuginfo = 3
+      if flags = 3
       then
         List.iter
           (fun Cmm.{ alloc_dbg; _ } ->
@@ -277,10 +278,7 @@ let emit_frames ~debug_strings_section a =
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
-    match fd.fd_debuginfo with
-    | _ when flags = 0 -> ()
-    | Dbg_other dbg -> a.efa_label_rel (label_debuginfos false dbg) Int32.zero
-    | Dbg_raise dbg -> a.efa_label_rel (label_debuginfos true dbg) Int32.zero
+    begin match fd.fd_debuginfo with
     | Dbg_alloc dbg ->
       assert (List.length dbg < 256);
       emit_u8 (List.length dbg);
@@ -292,15 +290,10 @@ let emit_frames ~debug_strings_section a =
             && alloc_words - 1 <= Config.max_young_wosize
             && Config.max_young_wosize <= 256);
           emit_u8 (alloc_words - 2))
-        dbg;
-      if flags = 3
-      then
-        List.iter
-          (fun Cmm.{ alloc_dbg; _ } ->
-            if is_none_dbg alloc_dbg
-            then emit_i32 0
-            else a.efa_label_rel (label_debuginfos false alloc_dbg) Int32.zero)
-          dbg
+        dbg
+    | Dbg_other _ | Dbg_raise _ -> () (* no alloc lengths *)
+    end;
+    emit_debug_words fd
   in
   let emit_merged_string str lbl =
     D.define_label (string_label ~section:debug_strings_section lbl);
