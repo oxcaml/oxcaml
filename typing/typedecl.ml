@@ -2444,7 +2444,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         assert_any_args_support loc;
         (match form with
          | Legacy -> Record_undetermined
-         | Unboxed_product -> Record_unboxed_product_variable)
+         | Unboxed_product -> Record_unboxed_product_undetermined)
     in
     sorts, rep, jkind
   | Legacy, _,
@@ -2500,17 +2500,19 @@ let update_record_representation
          Misc.fatal_error
            "Typedecl.update_record_representation: unexpected variant \
             representation")
-    | Unboxed_product, Record_unboxed_product_variable -> old_repres
+    | Unboxed_product, Record_unboxed_product_undetermined ->
+      Record_unboxed_product_variable (Array.of_list sorts)
     | Legacy,
       (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
       | Record_ufloat | Record_mixed _ | Record_dummy _
       | Record_variable _)
-    | Unboxed_product, Record_unboxed_product ->
+    | Unboxed_product,
+      (Record_unboxed_product | Record_unboxed_product_variable _) ->
         Misc.fatal_error
           "Typedecl.update_record_representation: representation already \
            determined"
   in
-  sorts, rep
+  rep
 
 let finalize_typechecked_shape env loc sorts_and_types kind =
   let consts =

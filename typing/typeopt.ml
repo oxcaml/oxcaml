@@ -757,7 +757,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
-        | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
+        | Type_record_unboxed_product
+            (_, (Record_unboxed_product_undetermined
+                | Record_unboxed_product_variable _), _) ->
           num_nodes_visited, nullable Pgenval
         | Type_record_unboxed_product ([{ld_type}],
                                        Record_unboxed_product, _) ->

@@ -853,7 +853,8 @@ let rec expression : Typedtree.expression -> term_judg =
                                     representation = rep } ->
       begin match rep with
       | Record_unboxed_product
-      | Record_unboxed_product_variable ->
+      | Record_unboxed_product_undetermined
+      | Record_unboxed_product_variable _ ->
         let field (_, _, field_def) =
           let env =
             match field_def with

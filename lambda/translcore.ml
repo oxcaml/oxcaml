@@ -934,15 +934,17 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       | None -> targ
       | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
       end
-  | Texp_unboxed_field{ record = arg; record_sort = arg_sort; record_sorts;
+  | Texp_unboxed_field{ record = arg; record_sort = arg_sort;
                         label = lbl; record_repres; _ } ->
     begin match record_repres with
-    | Record_unboxed_product_variable
+    | Record_unboxed_product_undetermined ->
+      fatal_error "transl_exp0: undetermined record representation"
+    | Record_unboxed_product_variable _
     | Record_unboxed_product ->
       let lbl_layout l =
         let sort =
           Jkind.Sort.default_for_transl_and_get
-            (unboxed_label_sort l record_sorts)
+            (unboxed_label_sort l record_repres)
         in
         if l.lbl_pos = lbl.lbl_pos then
           (* This is the field being projected, so give it a precise value kind
@@ -965,16 +967,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Lprim (Punboxed_product_field (lbl.lbl_pos, layouts), [targ],
                of_location ~scopes e.exp_loc)
     end
-  | Texp_setfield{ record = arg; record_repres; record_sorts;
+  | Texp_setfield{ record = arg; record_repres;
                    modality = arg_mode; lid = _id; label = lbl; newval } ->
       (* CR layouts v2.5: When we allow `any` in record fields and check
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
-      let record_repres =
-        Typedecl.finalize_record_representation arg.exp_env e.exp_loc
-          record_repres
-      in
       let mode =
         Assignment (transl_modify_mode arg_mode)
       in
@@ -985,9 +983,15 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Jkind.Sort.Const.for_boxed_record
       in
       let sort_newval =
-        match label_sort Legacy lbl record_sorts with
+        (* Computed before finalizing [record_repres]: a variable
+           representation carries the fields' sorts. *)
+        match label_sort Legacy lbl record_repres with
         | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort_arg
+      in
+      let record_repres =
+        Typedecl.finalize_record_representation arg.exp_env e.exp_loc
+          record_repres
       in
       let arg_layout = layout_exp sort_arg arg in
       let arg_lambda = transl_exp ~scopes arg_layout arg in
@@ -2682,7 +2686,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
 
 and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   match repres with
-  | Record_unboxed_product_variable
+  | Record_unboxed_product_undetermined ->
+    fatal_error
+      "transl_record_unboxed_product: undetermined record representation"
+  | Record_unboxed_product_variable _
   | Record_unboxed_product ->
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
@@ -2737,10 +2744,10 @@ and transl_idx ~scopes loc env ba uas =
     let idx = transl_exp ~scopes Lambda.layout_block_idx idx in
     begin match uas with
     | [] -> idx
-    | Uaccess_unboxed_field (_, lbl, sorts) :: _ ->
+    | Uaccess_unboxed_field (_, lbl, repres) :: _ ->
       let sorts =
         Array.map Jkind.Sort.default_for_transl_and_get
-          (unboxed_label_all_sorts lbl sorts)
+          (unboxed_label_all_sorts lbl repres)
       in
       (* Preserve the invariant that products have at least two elements *)
       let base_sort =

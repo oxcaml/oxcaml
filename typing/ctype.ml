@@ -3016,7 +3016,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
       let type_decl = Env.find_type p env in
       let jkind =
         match type_decl.type_kind with
-        | Type_record_unboxed_product (lbls, Record_unboxed_product_variable, _)
+        | Type_record_unboxed_product
+            (lbls, Record_unboxed_product_undetermined, _)
           when expand_components ->
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)

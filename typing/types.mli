@@ -980,9 +980,11 @@ and record_representation =
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  | Record_unboxed_product_variable
-  (* Counterpart of [Record_undetermined] for unboxed product records that
-     have at least one field of layout [any]. *)
+  | Record_unboxed_product_undetermined
+  (* Counterpart of [Record_undetermined] for unboxed records. When typing uses,
+     this is replaced by [Record_unboxed_product_variable].*)
+  | Record_unboxed_product_variable of Jkind_types.Sort.t array
+  (* Counterpart of [Record_variable] for unboxed records. *)
 
 and variant_representation =
   | Variant_unboxed
