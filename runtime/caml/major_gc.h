@@ -65,6 +65,13 @@ void caml_finish_major_cycle(int compaction_mode);
  */
 void caml_init_major_pacing(void);
 void caml_reset_major_pacing(bool add_overhead);
+
+/* Reserve idle-phase work, retrying if [completed] has changed since
+   [*observed] was loaded. Updates [*observed] to the committed value. */
+intnat caml_reserve_major_idle_work(atomic_uintnat *completed,
+                                   atomic_uintnat *incurred,
+                                   uintnat limit,
+                                   uintnat *observed);
 #ifdef DEBUG
 int caml_mark_stack_is_empty(void);
 #endif

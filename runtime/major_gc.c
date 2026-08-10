@@ -857,6 +857,29 @@ static inline intnat diffmod (uintnat x1, uintnat x2)
   return (intnat) (x1 - x2);
 }
 
+intnat caml_reserve_major_idle_work(atomic_uintnat *completed,
+                                    atomic_uintnat *incurred,
+                                    uintnat limit,
+                                    uintnat *observed)
+{
+  uintnat current = *observed;
+  while (1) {
+    intnat until_limit = diffmod(limit, current);
+    if (until_limit <= 0) {
+      *observed = current;
+      return 0;
+    }
+
+    intnat available = diffmod(atomic_load(incurred), current);
+    intnat reserved = min2(available, until_limit);
+    uintnat desired = current + reserved;
+    if (atomic_compare_exchange_weak(completed, &current, desired)) {
+      *observed = desired;
+      return reserved;
+    }
+  }
+}
+
 /* Reset the work and alloc counters to be equal to each other, by
  * setting them both equal to the "larger" (in the wrapping-around
  * sense we are using here for total_work_completed/incurred).
@@ -2235,17 +2258,19 @@ static void major_collection_slice(intnat howmuch,
     /* Idle phase: defer marking until the work counter passes the floor
        armed at the start of this sweep phase. */
     uintnat wkcnt = atomic_load (&total_work_completed);
-    intnat idle = diffmod (work_counter_min_before_mark, wkcnt);
+    uintnat limit = atomic_load (&work_counter_min_before_mark);
+    intnat idle = diffmod (limit, wkcnt);
     bool want_mark;
     if (idle <= 0){
       want_mark = true;
     }else{
-      intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
-      todo = min2 (todo, idle);
-      /* Commit even when todo == 0: this also clears
-         [requested_global_major_slice]. */
-      commit_major_slice_sweepwork (todo);
-      want_mark = (todo == idle);
+      intnat todo = caml_reserve_major_idle_work(
+        &total_work_completed, &total_work_incurred, limit, &wkcnt);
+      domain_state->slice_budget -= todo;
+      if (diffmod(domain_state->slice_target,
+                  atomic_load(&total_work_completed)) <= 0)
+        domain_state->requested_global_major_slice = 0;
+      want_mark = diffmod(limit, wkcnt) <= 0;
       CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
                        todo, want_mark ? " [finished]" : "");
     }
