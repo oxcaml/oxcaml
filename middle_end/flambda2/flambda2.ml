@@ -428,7 +428,11 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         used_value_slots = _;
         reachable_names
       } =
-    build_run_result flambda ~free_names ~final_typing_env
+    build_run_result flambda ~free_names
+      ~final_typing_env
+        (* Pass a mutable reference to the (currently empty) list of .cmx
+           sections so that [build_run_result] can append the sections that it
+           creates. *)
       ~sections:(Compilenv.current_sections ())
       ~all_code slot_offsets
   in
