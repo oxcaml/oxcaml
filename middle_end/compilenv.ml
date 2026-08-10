@@ -355,6 +355,8 @@ let save_resumed_unit_info filename ~paused =
         Import_info.create_normal (Import_info.cu import) ~crc:None)
       paused.ui_imports_cmx
   in
+  (* CR mvellacott: we only use the resulting cmx for linking, not compiling
+     against, so we may be able to be more selective in what we store here. *)
   let info =
     { (* Set by [reset], should equal [paused.ui_unit]. *)
       ui_unit = current_unit.uib_unit;
