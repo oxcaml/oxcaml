@@ -3234,23 +3234,10 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
-      (* A functor that takes a [dynamic] parameter and one that takes a
-         [static] parameter are incompatible: they cannot be converted in
-         either direction. They are morally distinct types, rather than being
-         related by modes.
-
-         As an approximation, upon functor definition we equate the staticity
-         of the functor and its parameter, giving
-         [module F : (functor (M @ m) -> ...) @ m].
-
-         Upon application of [F] we see [(functor (M @ m0) -> ...) @ m1], where
-         [m0 <= m] and [m1 >= m] due to weakening. To restore the original [m]
-         we require [m1 <= m0], which forces [m0 = m1 = m]. *)
       let staticity = Value.proj_monadic Staticity closed_over_mode in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
-          (* Generative functors are always dynamic. *)
           Staticity.submode_err (smod.pmod_loc, Functor)
             (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
                Dynamic)
@@ -3260,15 +3247,12 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (* unspecified mode axes defaults to legacy *)
           let tmode = Typemode.transl_alloc_mode smode in
           let mode = Alloc.of_const tmode.mode_modes in
-          let functor_pp : Mode.Hint.pinpoint = (smod.pmod_loc, Functor) in
-          (* View the parameter's staticity as the functor's, then equate. *)
-          let functor_st = staticity in
           let param_st =
             Staticity.apply_hint (Parameter_to_functor param.loc)
               (Alloc.proj_monadic Staticity mode)
           in
-          Staticity.submode_err functor_pp functor_st param_st;
-          Staticity.submode_err functor_pp param_st functor_st;
+          (* See "Staticity of functors" in [typedtree.mli] *)
+          Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
@@ -3636,17 +3620,13 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~mode_arg:(Some mm_param);
       let mode_funct = mode_without_locks_exn funct.mod_mode in
       let funct_staticity = Value.proj_monadic Staticity mode_funct in
-      (* Require [m1 <= m0] (see [Pmod_functor]) to recover the functor's
-         staticity [m], which we attach to [Tmod_apply]. The functor's location
-         is known, but its parameter's is not (we only have the argument's), so
-         we view the parameter as the functor with an unknown pinpoint. *)
+      (* The following [submode] recovers the functor's original staticity [m].
+         See "Staticity of functors" in [typedtree.mli]  *)
       let staticity =
         Staticity.apply_hint (Parameter_to_functor Location.none)
           (Value.proj_monadic Staticity mm_param)
       in
       Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
-      (* The result is at least as dynamic as the functor: evaluating it
-         requires evaluating the functor. *)
       let mode_res =
         Value.join
           [ Value.disallow_right mm_res;

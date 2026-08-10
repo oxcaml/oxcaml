@@ -1010,18 +1010,35 @@ and functor_parameter =
   | Named of Ident.t option * string option loc * module_type *
              Mode.Alloc.Const.t modes
 
+
+(* Staticity of functors
+
+By the generic mode weakening rule, a functor that takes a [dynamic] parameter
+can be weakened into taking a [static] parameter. However, this weakening is not
+admitted by the actual implementation - these two kinds of functors are
+incompatible.
+
+To make this work, upon functor definition we equate the staticity of the
+functor and its parameter, giving [module F : (functor (M @ m) -> ...) @ m].
+
+Upon application of [F : (functor (M @ m0) -> ...) @ m1], where [m0 <= m] and
+[m1 >= m] due to weakening, we restore the original [m] by requiring [m1 <= m0],
+which forces [m0 = m1 = m]. *)
+
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
   | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
-    (** The [Mode.Staticity.r] is the staticity of the functor. *)
+    (** The [Mode.Staticity.r] specifies which kind of functor is constructed;
+    see "Staticity of functors". *)
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
       * Mode.Staticity.r
         (** The [Mode.Yielding.l] is the join of the yielding modes of the
             functor and its argument: if it is [Unyielding], applying the
-            functor can never perform a free effect. The [Mode.Staticity.r] is
-            the staticity of the application. *)
+            functor can never perform a free effect. The [Mode.Staticity.r]
+            specifies which kind of functor is applied; see "Staticity of
+            functors". *)
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion

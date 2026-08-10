@@ -170,7 +170,11 @@ module type Common = sig
   val submode_err :
     Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
-  val equate : lr -> lr -> (unit, equate_error) result
+  (** Similar to [submode_err], but checks the two modes are equal by submoding
+      in both directions. *)
+  val equate_err : Mode_hint.pinpoint -> lr -> lr -> unit
+
+  val equate : ?pp:Mode_hint.pinpoint -> lr -> lr -> (unit, equate_error) result
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
       function if the submode is guaranteed to succeed. *)

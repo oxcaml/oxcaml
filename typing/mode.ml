@@ -5506,7 +5506,12 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -5608,7 +5613,12 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -6055,6 +6065,13 @@ module Comonadic_with (Areality : Areality) = struct
       let (Error (ax, _)) = to_simple_error e in
       raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) ->
+      let (Error (ax, _)) = to_simple_error e in
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
     Error.print_proj pp Obj.obj ax err
@@ -6195,6 +6212,13 @@ module Monadic = struct
     match submode ~pp a b with
     | Ok () -> ()
     | Error e ->
+      let (Error (ax, _)) = to_simple_error e in
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
       raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
@@ -6693,7 +6717,11 @@ module Value_with (Areality : Areality) = struct
     Comonadic.submode_err pp a.comonadic b.comonadic;
     Monadic.submode_err pp a.monadic b.monadic
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate_err pp a b =
+    Comonadic.equate_err pp a.comonadic b.comonadic;
+    Monadic.equate_err pp a.monadic b.monadic
+
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
 
   let submode_exn ?pp m1 m2 =
     match submode ?pp m1 m2 with
