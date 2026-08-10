@@ -118,7 +118,7 @@ val instance_record_representation:
     'rep
 
 (* Finalize variable (inlined) record representations, defaulting any unfilled
-   sorts. *)
+   sorts. This should not be called until the end of typechecking. *)
 val finalize_record_representation:
     Env.t -> Location.t -> Types.record_representation ->
     Types.record_representation
