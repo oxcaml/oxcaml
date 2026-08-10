@@ -27,9 +27,10 @@
  script;
 *)
 
-(* Pausing and resuming the Reaper via -support-lto and -reaper-rebuild
-   should produce the same object file as running the Reaper in a single
-   -flambda2-reaper invocation. *)
+(* CR mvellacott: the following line would cause this test to fail, because we
+   don't restore [Translmod.primitive_declarations] on resume. *)
+
+(* external unused_stub : unit -> unit = "caml_cmr_test_stub" *)
 
 module M : sig
   val go : int -> int
