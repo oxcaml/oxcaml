@@ -111,6 +111,7 @@ type atomic_kind =
   | Ref   (* operation on an atomic reference (takes only a pointer) *)
   | Field (* operation on an atomic field (takes a pointer and an offset) *)
   | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
+  | Idx of layout (* operation on an idx_atomic (takes a pointer and an idx) *)
 
 type atomic_op =
   | Load
@@ -1136,45 +1137,76 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
     | "%atomic_load_loc" -> Atomic(Load, Loc, Pointer)
+    | "%atomic_load_idx" -> Atomic(Load, Idx layout, Pointer)
     | "%atomic_set" -> Atomic(Set (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_set_field" -> Atomic(Set (get_first_arg_mode ()), Field, Pointer)
     | "%atomic_set_loc" -> Atomic(Set (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_set_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Set (get_first_arg_mode ()), Idx layout, Pointer)
     | "%atomic_exchange" ->
       Atomic(Exchange (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_exchange_field" ->
       Atomic(Exchange (get_first_arg_mode ()), Field, Pointer)
     | "%atomic_exchange_loc" ->
       Atomic(Exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_exchange_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Exchange (get_first_arg_mode ()), Idx layout, Pointer)
     | "%atomic_compare_exchange" ->
       Atomic(Compare_exchange (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_compare_exchange_field" ->
       Atomic(Compare_exchange (get_first_arg_mode ()), Field, Pointer)
     | "%atomic_compare_exchange_loc" ->
       Atomic(Compare_exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_compare_exchange_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Compare_exchange (get_first_arg_mode ()), Idx layout, Pointer)
     | "%atomic_cas" ->
       Atomic(Compare_and_set (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_cas_field" ->
       Atomic(Compare_and_set (get_first_arg_mode ()), Field, Pointer)
     | "%atomic_cas_loc" ->
       Atomic(Compare_and_set (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_cas_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Compare_and_set (get_first_arg_mode ()), Idx layout, Pointer)
     | "%atomic_fetch_add" -> Atomic(Fetch_add, Ref, Immediate)
     | "%atomic_fetch_add_field" -> Atomic(Fetch_add, Field, Immediate)
     | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Loc, Immediate)
+    | "%atomic_fetch_add_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Fetch_add, Idx layout, Immediate)
     | "%atomic_add" -> Atomic(Add, Ref, Immediate)
     | "%atomic_add_field" -> Atomic(Add, Field, Immediate)
     | "%atomic_add_loc" -> Atomic(Add, Loc, Immediate)
+    | "%atomic_add_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Add, Idx layout, Immediate)
     | "%atomic_sub" -> Atomic(Sub, Ref, Immediate)
     | "%atomic_sub_field" -> Atomic(Sub, Field, Immediate)
     | "%atomic_sub_loc" -> Atomic(Sub, Loc, Immediate)
+    | "%atomic_sub_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Sub, Idx layout, Immediate)
     | "%atomic_land" -> Atomic(Land, Ref, Immediate)
     | "%atomic_land_field" -> Atomic(Land, Field, Immediate)
     | "%atomic_land_loc" -> Atomic(Land, Loc, Immediate)
+    | "%atomic_land_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Land, Idx layout, Immediate)
     | "%atomic_lor" -> Atomic(Lor, Ref, Immediate)
     | "%atomic_lor_field" -> Atomic(Lor, Field, Immediate)
     | "%atomic_lor_loc" -> Atomic(Lor, Loc, Immediate)
+    | "%atomic_lor_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Lor, Idx layout, Immediate)
     | "%atomic_lxor" -> Atomic(Lxor, Ref, Immediate)
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
+    | "%atomic_lxor_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Lxor, Idx layout, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
     | "%with_stack" -> Primitive (Pwith_stack, 5)
     | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
@@ -1217,14 +1249,9 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          as [Mutable_access] just restricts the optimizations that can be
          performed. *)
       Primitive(Pget_idx (layout, Mutable_access), 2)
-    | "%get_idx_atomic" ->
-      Primitive(Pget_idx (layout, Atomic_access), 2)
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode (), Nonatomic), 3)
-    | "%set_idx_atomic" ->
-      let layout = List.nth (get_arg_layouts ()) 2 in
-      Primitive(Pset_idx (layout, get_first_arg_mode (), Atomic), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -1946,6 +1973,14 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     (match fst (maybe_pointer_type env v) with
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
+  | Atomic (Set _ as op, Idx _, Pointer), [_; _; v]
+  | Atomic (Exchange _ as op, Idx _, Pointer), [_; _; v]
+  | Atomic (Compare_and_set _ as op, Idx _, Pointer), [_; _; _; v]
+  | Atomic (Compare_exchange _ as op, Idx _, Pointer), [_; _; _; v] ->
+    let l = layout_of_ty_for_idx_set env loc v in
+    (* no need to refine [Pointer] -- [idx_atomic] operations look at
+       [layout] instead *)
+    Some (Atomic (op, Idx l, Pointer))
   | Primitive (Pset_idx (_, m, a), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
     Some (Primitive (Pset_idx (l, m, a), arity))
@@ -2179,7 +2214,7 @@ let atomic_arity op (kind : atomic_kind) =
   let extra_kind_arity =
     match kind with
     | Ref | Loc -> 0
-    | Field -> 1
+    | Field | Idx _ -> 1
   in
   arity_of_op + extra_kind_arity
 
@@ -2195,20 +2230,39 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
         first, rest
   in
   let prim =
-    match op with
-    | Load -> Patomic_load_field { immediate_or_pointer }
-    | Set mode -> Patomic_set_field { immediate_or_pointer; mode }
-    | Exchange mode -> Patomic_exchange_field { immediate_or_pointer; mode }
-    | Compare_exchange mode ->
-      Patomic_compare_exchange_field { immediate_or_pointer; mode }
-    | Compare_and_set mode ->
-      Patomic_compare_set_field { immediate_or_pointer; mode }
-    | Fetch_add -> Patomic_fetch_add_field
-    | Add -> Patomic_add_field
-    | Sub -> Patomic_sub_field
-    | Land -> Patomic_land_field
-    | Lor -> Patomic_lor_field
-    | Lxor -> Patomic_lxor_field
+    match kind with
+    | Ref | Loc | Field -> begin
+        match op with
+        | Load -> Patomic_load_field { immediate_or_pointer }
+        | Set mode -> Patomic_set_field { immediate_or_pointer; mode }
+        | Exchange mode -> Patomic_exchange_field { immediate_or_pointer; mode }
+        | Compare_exchange mode ->
+          Patomic_compare_exchange_field { immediate_or_pointer; mode }
+        | Compare_and_set mode ->
+          Patomic_compare_set_field { immediate_or_pointer; mode }
+        | Fetch_add -> Patomic_fetch_add_field
+        | Add -> Patomic_add_field
+        | Sub -> Patomic_sub_field
+        | Land -> Patomic_land_field
+        | Lor -> Patomic_lor_field
+        | Lxor -> Patomic_lxor_field
+    end
+    | Idx layout -> begin
+        match op with
+        | Load -> Pget_idx (layout, Atomic_access)
+        | Set mode -> Pset_idx (layout, mode, Atomic)
+        | Exchange mode -> Patomic_exchange_idx { layout; mode }
+        | Compare_exchange mode ->
+          Patomic_compare_exchange_idx { layout; mode }
+        | Compare_and_set mode ->
+          Patomic_compare_set_idx { layout; mode }
+        | Fetch_add -> Patomic_fetch_add_idx
+        | Add -> Patomic_add_idx
+        | Sub -> Patomic_sub_idx
+        | Land -> Patomic_land_idx
+        | Lor -> Patomic_lor_idx
+        | Lxor -> Patomic_lxor_idx
+    end
   in
   match kind with
   | Ref ->
@@ -2225,6 +2279,13 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
            [Lprim(%atomic_exchange_field, [ptr; ofs; v])]
          becomes
            [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])] *)
+      Lprim (prim, args, loc)
+  | Idx _ ->
+      (* the primitive application
+           [Lprim(%atomic_exchange_idx, [ptr; idx; v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])]
+         where [ofs] is the field offset corresponding to [idx]. *)
       Lprim (prim, args, loc)
   | Loc ->
       (* the primitive application
@@ -2665,6 +2726,10 @@ let lambda_primitive_needs_event_after = function
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_load_field _ | Patomic_load_mixed_field _
   | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
+  | Patomic_add_idx | Patomic_sub_idx
+  | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get
