@@ -25,17 +25,27 @@ module Int8 = struct
   let min_int = 0x80s
   let max_int = 0x7Fs
 
-  external leading_zeros : (t [@unboxed]) -> (int [@untagged]) =
+  external leading_zeros : int8# -> int8# =
     "" "caml_int8_clz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external trailing_zeros : (t [@unboxed]) -> (int [@untagged]) =
+  external trailing_zeros : int8# -> int8# =
     "" "caml_int8_ctz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external popcount : (t [@unboxed]) -> (int [@untagged]) =
+  external popcount : int8# -> int8# =
     "" "caml_int8_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external untag : t -> int8# = "%int8#_of_int8"
+  external tag_as_int : int8# -> int = "%int_of_int8#"
+
+  let wrap f n = tag_as_int (f (untag n))
+  [@@inline]
+
+  let leading_zeros n = wrap leading_zeros n
+  let trailing_zeros n = wrap trailing_zeros n
+  let popcount n = wrap popcount n
 end
 
 module Int16 = struct
@@ -54,17 +64,27 @@ module Int16 = struct
   let min_int = 0x8000S
   let max_int = 0x7FFFS
 
-  external leading_zeros : (t [@unboxed]) -> (int [@untagged]) =
+  external leading_zeros : int16# -> int16# =
     "" "caml_int16_clz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external trailing_zeros : (t [@unboxed]) -> (int [@untagged]) =
+  external trailing_zeros : int16# -> int16# =
     "" "caml_int16_ctz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external popcount : (t [@unboxed]) -> (int [@untagged]) =
+  external popcount : int16# -> int16# =
     "" "caml_int16_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external untag : t -> int16# = "%int16#_of_int16"
+  external tag_as_int : int16# -> int = "%int_of_int16#"
+
+  let wrap f n = tag_as_int (f (untag n))
+  [@@inline]
+
+  let leading_zeros n = wrap leading_zeros n
+  let trailing_zeros n = wrap trailing_zeros n
+  let popcount n = wrap popcount n
 end
 
 module Int32 = struct

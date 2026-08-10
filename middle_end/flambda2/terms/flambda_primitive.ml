@@ -1595,7 +1595,15 @@ let result_kind_of_unary_primitive p : result_kind =
     Singleton K.value
   | Opaque_identity { middle_end_only = _; kind } -> Singleton kind
   | Int_arith (kind, _) -> Singleton (K.Standard_int.to_kind kind)
-  | Int_bit_counting _ -> Singleton K.naked_immediate
+  | Int_bit_counting (((Naked_int8 | Naked_int16) as kind), _) ->
+    (* Bit-counting primitives return naked immediates, except small integers
+       that return at their own kind. *)
+    Singleton (K.Standard_int.to_kind kind)
+  | Int_bit_counting
+      ( ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+        | Naked_nativeint ),
+        _ ) ->
+    Singleton K.naked_immediate
   | Num_conv { src = _; dst } -> Singleton (K.Standard_int_or_float.to_kind dst)
   | Boolean_not -> Singleton K.value
   | Reinterpret_boxed_vector -> Singleton K.value

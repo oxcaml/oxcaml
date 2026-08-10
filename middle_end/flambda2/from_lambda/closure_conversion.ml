@@ -900,19 +900,28 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       then extcall ()
       else
         let src_kind : Lambda.extern_repr =
+          (* Bit-counting primitives take [@untagged] or [@unboxed] arguments,
+             except that small integers take the corresponding unboxed type. *)
           match (kind : K.Standard_int.t) with
           | Tagged_immediate -> Same_as_ocaml_repr (Base Scannable)
           | Naked_immediate -> Unboxed_or_untagged_integer Untagged_int
-          | Naked_int8 -> Unboxed_or_untagged_integer Untagged_int8
-          | Naked_int16 -> Unboxed_or_untagged_integer Untagged_int16
           | Naked_int32 -> Unboxed_or_untagged_integer Unboxed_int32
           | Naked_int64 -> Unboxed_or_untagged_integer Unboxed_int64
           | Naked_nativeint -> Unboxed_or_untagged_integer Unboxed_nativeint
+          | Naked_int8 -> Same_as_ocaml_repr (Base Bits8)
+          | Naked_int16 -> Same_as_ocaml_repr (Base Bits16)
         in
-        let arg =
-          external_is_known_unary_primitive ~src_kind
-            ~dst_kind:(Unboxed_or_untagged_integer Untagged_int)
+        let dst_kind : Lambda.extern_repr =
+          (* Bit-counting primitives return naked immediates, except small
+             integers that return at their own kind. *)
+          match (kind : K.Standard_int.t) with
+          | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+          | Naked_nativeint ->
+            Unboxed_or_untagged_integer Untagged_int
+          | Naked_int8 -> Same_as_ocaml_repr (Base Bits8)
+          | Naked_int16 -> Same_as_ocaml_repr (Base Bits16)
         in
+        let arg = external_is_known_unary_primitive ~src_kind ~dst_kind in
         let prim = P.Unary (Int_bit_counting (kind, op), arg) in
         builtin "bits" prim
     in
