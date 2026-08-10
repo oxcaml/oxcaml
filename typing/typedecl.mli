@@ -99,17 +99,6 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
-(* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any].
-   Without [default_to_scannable], unfilled sort variables are treated as
-   unrepresentable, resulting in an [Error] *)
-val update_constructor_representation:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t -> is_extension_constructor:bool ->
-    default_to_scannable:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
-
-(* Same as above, but also computes sorts of arguments *)
 val update_constructor_representation_and_arg_sorts :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
