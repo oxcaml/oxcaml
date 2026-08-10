@@ -403,15 +403,19 @@ type primitive =
         into [shape] -- not a field index. *)
     shape : mixed_block_shape;
   }
-  | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
+    mode : modify_mode;
   }
-  | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_exchange_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_compare_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
