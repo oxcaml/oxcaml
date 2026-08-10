@@ -772,7 +772,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         let apply_cont = Apply_cont.create dest ~args ~dbg in
         let expr = RE.create_apply_cont apply_cont in
         let uacc = UA.add_free_names uacc (Apply_cont.free_names apply_cont) in
-        expr, uacc
+        expr, UA.notify_added ~code_size:(Code_size.apply_cont apply_cont) uacc
       | None -> (
         match switch_is_identity with
         | Some dest ->
