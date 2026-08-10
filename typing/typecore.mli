@@ -332,7 +332,6 @@ type error =
   | Atomic_in_functional_update of label
   | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
-  | Undetermined_record_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string

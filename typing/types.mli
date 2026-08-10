@@ -989,9 +989,9 @@ and record_representation =
   | Record_undetermined
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
-     [any]. When typing uses, this refines to [Record_{boxed,mixed,variable}] *)
+     [any]. When typing uses, this is replaced by [Record_variable]. *)
   | Record_variable of (Jkind_types.Sort.t * type_expr) array
-  (* After typechecking, a [Record_undetermined] can still have variable sorts.
+  (* What [Record_undetermined] becomes after typechecking a use of the record.
      In translation, this refines to [Record_{boxed,mixed}]. *)
 
 and record_unboxed_product_representation =
