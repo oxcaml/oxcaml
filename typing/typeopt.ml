@@ -1051,7 +1051,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
               match cstr_layouts.(idx) with
               | Cstr_layout_known { shape; _ } ->
                 ~variable_repr:false, Some shape, constructor
-              | Cstr_layout_variable ->
+              | Cstr_layout_undetermined ->
                 (match substitute_cd_args constructor.cd_args with
                  | exception Ctype.Cannot_apply ->
                    ~variable_repr:true, None, constructor

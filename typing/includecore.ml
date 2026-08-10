@@ -1311,7 +1311,7 @@ module Variant_diffing = struct
     =
     let shape_of_layout = function
       | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_undetermined -> None
     in
     let shapes1, shapes2 =
       match rep1, rep2 with
