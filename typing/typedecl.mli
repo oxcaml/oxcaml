@@ -126,7 +126,7 @@ val update_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    Jkind.sort list * 'rep
+    'rep
 
 (* Finalize variable (inlined) record representations, defaulting any unfilled
    sorts. *)

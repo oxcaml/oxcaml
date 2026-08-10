@@ -1937,8 +1937,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
                          ~name:None ~fixed:None ~closed:false))
       in
       ty, mode
-  | Tpat_record (lpl,_,_,_) -> build_record_as_type lpl
-  | Tpat_record_unboxed_product (lpl,_,_,_) -> build_record_as_type lpl
+  | Tpat_record (lpl,_,_) -> build_record_as_type lpl
+  | Tpat_record_unboxed_product (lpl,_,_) -> build_record_as_type lpl
   | Tpat_or(p1, p2, row) ->
       begin match row with
         None ->
@@ -1974,7 +1974,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
 
 (* Returns [None] when the representation cannot be determined from the
    declaration alone (i.e. [Record_undetermined] /
-   [Record_unboxed_product_variable]); otherwise [Some rep]. *)
+   [Record_unboxed_product_undetermined]); otherwise [Some rep]. *)
 let determined_lbl_repres (type rep) (form : rep record_form)
       (rep : rep) : rep option =
   match form, rep with
@@ -1982,12 +1982,12 @@ let determined_lbl_repres (type rep) (form : rep record_form)
     (Record_undetermined | Record_inlined (_, Constructor_undetermined, _))
     ->
     None
-  | Unboxed_product, Record_unboxed_product_variable -> None
+  | Unboxed_product, Record_unboxed_product_undetermined -> None
   | _ -> Some rep
 
 let update_labels (type rep) env (form : rep record_form) ~representative_label
       ~why ~loc ~containing_type
-    : record_sorts * rep =
+    : rep =
   (* Might be good to short-circuit this. Possible we could do so by noticing
      that [containing_type] has no arguments (or only variables as
      arguments). *)
@@ -1995,26 +1995,20 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
     Ctype.instance_labels ~fixed:false representative_label.lbl_all
   in
   unify_exp_types loc env containing_type ty_res;
-  let sorts, rep =
-    match determined_lbl_repres form representative_label.lbl_repres with
-    | Some rep -> Fixed, rep
-    | None ->
-      let lbls_and_ty_args =
-        Array.map2
-          (fun lbl (_vars, ty_arg) ->
-             (lbl |> Data_types.label_declaration_of_label_description),
-             ty_arg)
-          representative_label.lbl_all
-          vars_and_ty_args
-      in
-      let sorts, rep =
-        Typedecl.update_record_representation ~why env loc form
-          ~old_repres:representative_label.lbl_repres
-          (lbls_and_ty_args |> Array.to_list)
-      in
-      Variable (Array.of_list sorts), rep
-  in
-  sorts, rep
+  match determined_lbl_repres form representative_label.lbl_repres with
+  | Some rep -> rep
+  | None ->
+    let lbls_and_ty_args =
+      Array.map2
+        (fun lbl (_vars, ty_arg) ->
+           (lbl |> Data_types.label_declaration_of_label_description),
+           ty_arg)
+        representative_label.lbl_all
+        vars_and_ty_args
+    in
+    Typedecl.update_record_representation ~why env loc form
+      ~old_repres:representative_label.lbl_repres
+      (lbls_and_ty_args |> Array.to_list)
 
 (* Constraint solving during typing of patterns *)
 
@@ -2896,7 +2890,8 @@ module Unboxed_label = NameChoice (struct
       env
   let in_env (lbl : t) =
     match lbl.lbl_repres with
-    | Record_unboxed_product | Record_unboxed_product_variable -> true
+    | Record_unboxed_product | Record_unboxed_product_undetermined
+    | Record_unboxed_product_variable _ -> true
 end)
 
 let label_get_type_path
@@ -3448,8 +3443,8 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
-      let type_label_pat sorts (label_lid, (label : rep gen_label_description),
-                                sarg) =
+      let type_label_pat rep (label_lid, (label : rep gen_label_description),
+                              sarg) =
         let ty_arg =
           solve_Ppat_record_field loc penv label label_lid
             record_ty record_form in
@@ -3466,21 +3461,21 @@ and type_pat_aux
         in
         let alloc_mode = simple_pat_mode mode in
         let ty_sort =
-          match label_sort record_form label sorts with
+          match label_sort record_form label rep with
           | `Sort s -> s
           | `Same_as_record_sort -> record_sort
         in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
       in
       let make_record_pat
-            sorts (rep : rep)
+            (rep : rep)
             (lbl_pat_list : (_ * rep gen_label_description * _) list) amb =
         check_recordpat_labels loc lbl_pat_list closed record_form;
         List.iter (forbid_atomic_field_patterns loc penv) lbl_pat_list;
         let pat_desc = match record_form with
-          | Legacy -> Tpat_record (lbl_pat_list, sorts, rep, closed)
+          | Legacy -> Tpat_record (lbl_pat_list, rep, closed)
           | Unboxed_product ->
-            Tpat_record_unboxed_product (lbl_pat_list, sorts, rep, closed)
+            Tpat_record_unboxed_product (lbl_pat_list, rep, closed)
         in
         {
           pat_desc;
@@ -3506,13 +3501,13 @@ and type_pat_aux
         | [] -> assert false
         | (_, label, _) :: _ -> label
       in
-      let sorts, rep =
+      let rep =
         update_labels !!penv record_form ~representative_label ~loc
           ~why:Field_projection
           ~containing_type:(instance record_ty)
       in
-      let lbl_a_list = List.map (type_label_pat sorts) lbl_a_list in
-      rvp @@ solve_expected (make_record_pat sorts rep lbl_a_list ambiguity)
+      let lbl_a_list = List.map (type_label_pat rep) lbl_a_list in
+      rvp @@ solve_expected (make_record_pat rep lbl_a_list ambiguity)
   in
   match sp.ppat_desc with
     Ppat_any ->
@@ -4396,7 +4391,7 @@ let rec check_counter_example_pat
     | Refine_or {inside_nonsplit_or} -> inside_nonsplit_or
   in
   let type_label_pats (type rep)
-        (fields : (_ * rep gen_label_description * _) list) sorts (rep : rep)
+        (fields : (_ * rep gen_label_description * _) list) (rep : rep)
         closed (record_form : rep record_form) =
     let record_ty = generic_instance expected_ty in
     let type_label_pat (label_lid, label, targ) k =
@@ -4409,11 +4404,11 @@ let rec check_counter_example_pat
     | Legacy ->
       map_fold_cont type_label_pat fields
         (fun fields ->
-           mkp k (Tpat_record (fields, sorts, rep, closed)))
+           mkp k (Tpat_record (fields, rep, closed)))
     | Unboxed_product ->
       map_fold_cont type_label_pat fields
         (fun fields ->
-           mkp k (Tpat_record_unboxed_product (fields, sorts, rep, closed)))
+           mkp k (Tpat_record_unboxed_product (fields, rep, closed)))
   in
   match tp.pat_desc with
     Tpat_any | Tpat_var _ | Tpat_fun_layout _ ->
@@ -4505,10 +4500,10 @@ let rec check_counter_example_pat
           Some p, [ty] -> check_rec p ty (fun p -> k (Some p))
         | _            -> k None
       end
-  | Tpat_record(fields, sorts, repr, closed) ->
-      type_label_pats fields sorts repr closed Legacy
-  | Tpat_record_unboxed_product(fields, sorts, repr, closed) ->
-      type_label_pats fields sorts repr closed Unboxed_product
+  | Tpat_record(fields, repr, closed) ->
+      type_label_pats fields repr closed Legacy
+  | Tpat_record_unboxed_product(fields, repr, closed) ->
+      type_label_pats fields repr closed Unboxed_product
   | Tpat_array (mutability, original_arg_sort, tpl) ->
       let mut : mutable_flag =
         match mutability with
@@ -6764,7 +6759,9 @@ and type_expect_
             Misc.fatal_error "type_expect: dummy record representation"
         end
         | Unboxed_product -> begin match rep with
-          | Record_unboxed_product | Record_unboxed_product_variable -> false
+          | Record_unboxed_product
+          | Record_unboxed_product_undetermined
+          | Record_unboxed_product_variable _ -> false
         end
       in
       let is_boxed =
@@ -6986,12 +6983,9 @@ and type_expect_
             (* XXX This is redundantly going to get the sort and jkind for
                each label all over again. Possibly we're doing things in the
                wrong order. *)
-            let _sorts, rep =
-              Typedecl.update_record_representation ~why env
-                sexp.pexp_loc record_form ~old_repres:representation
-                labels_with_updated_types
-            in
-            rep
+            Typedecl.update_record_representation ~why env
+              sexp.pexp_loc record_form ~old_repres:representation
+              labels_with_updated_types
       in
       let fields =
         Array.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
@@ -7606,7 +7600,7 @@ and type_expect_
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       type_expect_record ~overwrite Unboxed_product lid_sexp_list opt_sexp
   | Pexp_field(srecord, lid) ->
-      let record, record_sort, _record_sorts, mode, label, ambiguity,
+      let record, record_sort, mode, label, ambiguity,
           ty_arg, record_repres =
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
           lid
@@ -7674,7 +7668,7 @@ and type_expect_
         exp_env = env }
   | Pexp_unboxed_field(srecord, lid) ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-      let record, record_sort, record_sorts, mode, label, ambiguity,
+      let record, record_sort, mode, label, ambiguity,
           ty_arg, record_repres =
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
           Unboxed_product lid
@@ -7701,7 +7695,7 @@ and type_expect_
       rue {
         exp_desc =
           Texp_unboxed_field
-            { record; record_sort; record_sorts; record_repres; lid;
+            { record; record_sort; record_repres; lid;
               label; unique_use = uu };
         exp_loc = loc; exp_extra = [];
         exp_type = ty_arg;
@@ -7737,7 +7731,7 @@ and type_expect_
             :: record.exp_extra }
       in
       unify_exp ~sexp env record ty_record;
-      let record_sorts, record_repres =
+      let record_repres =
         update_labels env Legacy ~representative_label:label ~loc
           ~why:Field_assignment
           ~containing_type:ty_record
@@ -7746,7 +7740,6 @@ and type_expect_
         exp_desc = Texp_setfield {
           record;
           record_repres;
-          record_sorts;
           modality =
             Locality.disallow_right
               (Alloc.proj_comonadic Areality
@@ -8651,7 +8644,7 @@ and type_expect_
                     { pexp_desc = Pexp_field (srecord, lid); _ } as sexp, _
                   )
                } ] ->
-          let record, record_sort, _, rmode, label, ambiguity, ty_arg,
+          let record, record_sort, rmode, label, ambiguity, ty_arg,
               record_repres =
             solve_Pexp_field ~label_usage:Env.Mutation loc env sexp srecord
               Legacy lid
@@ -8914,7 +8907,7 @@ and type_block_access env expected_base_ty principal
     let mut = is_mutable label.lbl_mut in
     let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
     if mut then Env.mark_label_used Mutation label.lbl_uid;
-    let _sorts, rep =
+    let rep =
       update_labels env Legacy ~representative_label:label ~loc:lid.loc
         ~why:Field_in_indexed_record
         ~containing_type:expected_base_ty
@@ -8994,12 +8987,12 @@ and type_unboxed_access env loc el_ty ua =
         let err = Invalid_unboxed_access { prev_el_type = el_ty; ua } in
         raise (Error (lid.loc, env, err))
     end;
-    let sorts, _rep =
+    let rep =
       update_labels env Unboxed_product ~representative_label:label ~loc:lid.loc
         ~why:Field_in_indexed_record
         ~containing_type:el_ty
     in
-    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, sorts)
+    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, rep)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->
@@ -9793,12 +9786,12 @@ and type_label_access
 
 and solve_Pexp_field
   : 'rep . label_usage:_ -> _ -> _ -> _ -> _ -> 'rep record_form -> _ ->
-    _ * _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
+    _ * _ * _ * 'rep gen_label_description * _ * _ * 'rep =
   fun ~label_usage loc env sexp srecord record_form lid ->
   let (record, record_sort, rmode, label, _expected_type, ambiguity) =
     type_label_access record_form env srecord label_usage lid
   in
-  let ty_arg, record_sorts, record_repres =
+  let ty_arg, record_repres =
     (* XXX Not clear to me why this can't be done in [type_label_access] so that
        the [Texp_setfield] case wouldn't have to have its own call to
        [update_label], but doing it that way causes principality issues.
@@ -9810,7 +9803,7 @@ and solve_Pexp_field
       let (_, ty_arg, ty_res) = instance_label ~fixed:false label in
       (* we now link the two record types *)
       unify_exp ~sexp env record ty_res;
-      let record_sorts, record_repres =
+      let record_repres =
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)
@@ -9821,11 +9814,10 @@ and solve_Pexp_field
         update_labels env record_form ~representative_label:label ~loc
           ~why:Field_projection ~containing_type:record.exp_type
       in
-      ty_arg, record_sorts, record_repres
+      ty_arg, record_repres
     end
   in
-  (record, record_sort, record_sorts, rmode, label,
-   ambiguity, ty_arg, record_repres)
+  (record, record_sort, rmode, label, ambiguity, ty_arg, record_repres)
 
 (* Typing format strings for printing or reading.
    These formats are used by functions in modules Printf, Format, and Scanf.

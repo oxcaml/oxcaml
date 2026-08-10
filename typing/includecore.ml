@@ -1133,13 +1133,18 @@ module Record_diffing = struct
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product_undetermined,
+          Record_unboxed_product_undetermined
         | Record_unboxed_product, Record_unboxed_product ->
             None
-        | Record_unboxed_product, Record_unboxed_product_variable ->
+        | Record_unboxed_product, Record_unboxed_product_undetermined ->
             Some (Fixed_representation First)
-        | Record_unboxed_product_variable, Record_unboxed_product ->
+        | Record_unboxed_product_undetermined, Record_unboxed_product ->
             Some (Fixed_representation Second)
+        | Record_unboxed_product_variable _, _
+        | _, Record_unboxed_product_variable _ ->
+            Misc.fatal_error
+              "compare_with_representation: typechecked record representation"
         end
 end
 
