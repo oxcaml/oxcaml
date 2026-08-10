@@ -3627,7 +3627,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           (Value.proj_monadic Staticity mm_param)
       in
       Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
-      let mode_res =
+      let mm_res =
         Value.join
           [ Value.disallow_right mm_res;
             Value.min_with_monadic Staticity
@@ -3641,7 +3641,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                ~arg_mode:(fst arg.mod_mode),
              Staticity.disallow_left staticity);
         mod_type = mty_appl;
-        mod_mode = mode_res, None;
+        mod_mode = mm_res, None;
         mod_env = env;
         mod_attributes = app_attributes;
         mod_loc = app_loc },
