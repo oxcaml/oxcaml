@@ -177,16 +177,18 @@ for file in $(git diff --no-ext-diff --name-only); do
   tgt=src/ocaml/$tgt
 
   if [ -e "$file" ]; then
-    # ignore patch output if it worked
-    if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
-      sed -i \
-          -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
-          -e 's!^|||||||$!& '"$parent_marker"'!' \
-          -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
-          $tgt
-      cat $tgt.out
+    # Three-way merge of Merlin's copy with the old and new upstream copies.
+    git show "HEAD:${subtree_prefix}${file}" > "$tgt.base"
+    # We use a marker size greater than 7 to be able to distinguish from git
+    # conflict markers.
+    marker_size=14
+    if ! git merge-file --diff3 --marker-size="$marker_size" \
+           -L "$old_marker" -L "$parent_marker" -L "$new_marker" \
+           "$tgt" "$tgt.base" "$file"
+    then
+      echo "Merge conflicts in $tgt"
     fi
-    rm -f $tgt.orig $tgt.out
+    rm -f "$tgt.base"
   else
     # The file was deleted from the compiler, so delete Merlin's copy too. If
     # Merlin had local changes relative to the previously imported copy, record
