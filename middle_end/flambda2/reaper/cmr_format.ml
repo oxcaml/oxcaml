@@ -60,6 +60,10 @@ module All_code_with_sections = struct
 
   let create ~used_value_slots ~canonicalise all_code =
     let all_code =
+      (* CR mvellacott: [Exported_code.prepare_for_export] only uses
+         [reachable_names] to prune code IDs, so it is sufficient to pass all
+         present code IDs. However an implementation change could break this, it
+         would be better to have some [prepare_all_for_export] function. *)
       let all_names =
         Code_id.Set.fold
           (fun code_id names ->
@@ -171,10 +175,14 @@ end = struct
         Some (Typing_env.Serializable.create_without_pruning env), canonicalise
     in
     (* Code metadata is stored twice ([all_code] and [rebuild_data]); both must
-       have their types canonicalised. *)
+       have their types canonicalised. [unit_metadata] doesn't have types, so
+       doesn't need canonicalising. *)
     let all_code, all_code_ids =
       All_code_with_sections.create ~used_value_slots ~canonicalise all_code
     in
+    (* Apply the canonicalisation and unused value slot removal that
+       [Pre_serializable.create] applied to the typing env to the [rebuild_data]
+       types so that they are consistent. *)
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.map_result_types rebuild_data ~f:(fun ty ->
           Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
@@ -212,6 +220,12 @@ end = struct
         deps;
         rebuild_data
       } : cmr_format =
+    (* Insert hashconsed objects from the paused process into this process'
+       tables, and create a mapping from the IDs in the old process to the ones
+       in this process. [code_ids] contains a copy of this mapping for code IDs,
+       needed because [Exported_code.apply_renaming] takes that as a separate
+       argument. [used_value_slots] here was computed by [finalize_offsets] in
+       the paused process, see [Slot_offsets.result]. *)
     let renaming, code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit:(Compilation_unit.get_current_exn ())
@@ -253,6 +267,8 @@ exception Error of error
 
 let save ~filename ~used_value_slots t =
   let serialisable = Serialisable.create ~used_value_slots t in
+  (* We need to store ID stamp counters so that stamp-based identifiers in the
+     resumed process don't conflict with the ones created in this process. *)
   let id_stamp_counters = Id_stamp_counters.save () in
   let oc = open_out_bin filename in
   Misc.try_finally
