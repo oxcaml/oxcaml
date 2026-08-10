@@ -1246,7 +1246,13 @@ let builtin_sign_extends = function
   | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
   | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed"
   | "caml_int16_shift_right_by_int16_untagged"
-  | "caml_int8_shift_right_by_int8_untagged" ->
+  | "caml_int8_shift_right_by_int8_untagged"
+  (* popcnt/clz/ctz are never negative. *)
+  | "caml_int8_popcnt_untagged_to_untagged"
+  | "caml_int16_popcnt_untagged_to_untagged"
+  | "caml_int8_clz_untagged_to_untagged" | "caml_int16_clz_untagged_to_untagged"
+  | "caml_int8_ctz_untagged_to_untagged" | "caml_int16_ctz_untagged_to_untagged"
+    ->
     true
   | _ -> false
 
