@@ -830,8 +830,9 @@ static atomic_uintnat total_work_completed;
    (Nonatomic: only accessed during STW) */
 static uintnat total_work_incurred_at_mark_start;
 
-/* total_work_completed at the latest color rotation, and the work
-   incurred during the latest sweep phase. Only written under stw. */
+/* Value of total_work_completed at the latest color rotation (start of sweep)
+   and number of allocations done during the latest sweep phase.
+   Not atomic because these are only accessed in stw. */
 static uintnat work_counter_at_sweep_start;
 static uintnat latest_sweep_allocs;
 
@@ -876,8 +877,10 @@ static inline intnat diffmod (uintnat x1, uintnat x2)
  * collection.
  */
 
-/* For caml_init_gc, while still single-threaded. Requires the gc tweaks
-   to have been parsed, so that caml_small_heap_limit is set. */
+/* Initialize the counters for GC pacing.
+   This is for use in caml_init_gc, when everything is still single-threaded.
+   caml_small_heap_limit must be initialized before calling this function.
+*/
 void caml_init_major_pacing (void)
 {
   total_work_incurred = 0;
@@ -886,8 +889,9 @@ void caml_init_major_pacing (void)
   work_counter_min_before_mark = caml_small_heap_limit;
 }
 
-/* add_overhead: the latest collection was synchronous, so the sweep
-   phase counted only live data, with no floating garbage. */
+/* add_overhead is true if the latest collection was synchronous (with
+   caml_gc_full_major) and thus the sweep phase counted only the live
+   data (with no floating garbage). */
 void caml_reset_major_pacing(bool add_overhead)
 {
   bool res;
@@ -2274,6 +2278,8 @@ static void major_collection_slice(intnat howmuch,
                        todo, want_mark ? " [finished]" : "");
     }
     if (want_mark){
+      bool mark_was_requested =
+        atomic_load_relaxed (&caml_gc_mark_phase_requested) != 0;
       /* We do not immediately trigger a minor GC, but instead wait for
          the next one to happen normally, when marking will start. This
          gives some chance that other domains will finish sweeping as
@@ -2283,8 +2289,8 @@ static void major_collection_slice(intnat howmuch,
          then minor GC has not occurred naturally between major slices -
          so we should force one now. (Gated on want_mark so the idle
          phase cannot spin forced minor collections.) */
-      if (sweep_work == 0 && !caml_marking_started()) {
-          caml_request_minor_gc();
+      if (mark_was_requested && sweep_work == 0 && !caml_marking_started()) {
+        caml_request_minor_gc();
       }
     }
   }
