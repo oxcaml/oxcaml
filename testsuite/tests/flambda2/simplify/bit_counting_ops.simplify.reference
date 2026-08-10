@@ -1,0 +1,2 @@
+let $camlBit_counting_ops = Block 0 () in
+cont done ($camlBit_counting_ops)
