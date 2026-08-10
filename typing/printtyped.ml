@@ -281,7 +281,9 @@ let record_representation i ppf = let open Types in function
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
-  | Record_unboxed_product_variable ->
+  | Record_unboxed_product_undetermined ->
+    line i ppf "Record_unboxed_product_undetermined\n"
+  | Record_unboxed_product_variable _ ->
     line i ppf "Record_unboxed_product_variable\n"
 
 let attribute i ppf k a =
@@ -525,10 +527,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _, _, _c) ->
+  | Tpat_record (l, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _, _, _c) ->
+  | Tpat_record_unboxed_product (l, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
