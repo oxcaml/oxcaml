@@ -100,7 +100,23 @@ Lines 4-5, characters 2-66:
 Error: allocation of 24 bytes for boxed_int64
 |}]
 
-module Primitive_made_non_allocating_with_coercion : sig
+module Primitive_could_be_made_non_allocating_with_constraint : sig
+  val array_get : 'a array -> int -> 'a [@@zero_alloc]
+end = struct
+  external array_get : 'a array -> int -> 'a = "%array_safe_get"
+end
+[%%expect {|
+Line 2, characters 43-53:
+2 |   val array_get : 'a array -> int -> 'a [@@zero_alloc]
+                                               ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP7.Primitive_could_be_made_non_allocating_with_constraint.(partial) (camlTOP7__fn[:4,2--64]_14_7_code).
+Line 4, characters 2-64:
+4 |   external array_get : 'a array -> int -> 'a = "%array_safe_get"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: allocation of 16 bytes for float
+|}]
+
+module Primitive_made_non_allocating_with_constraint : sig
   val array_get :
     ('a : value mod non_float). 'a array -> int -> 'a [@@zero_alloc]
 end = struct
@@ -109,7 +125,7 @@ end = struct
      [array_get] never allocates. *)
 end
 [%%expect {|
-module Primitive_made_non_allocating_with_coercion :
+module Primitive_made_non_allocating_with_constraint :
   sig
     val array_get : ('a : value non_float). 'a array -> int -> 'a
       [@@zero_alloc]
@@ -181,4 +197,14 @@ Error: Signature mismatch:
        When using "zero_alloc" in a signature, the syntactic arity of
        the implementation must match the function type in the interface.
        Here the former is 2 and the latter is 1.
+|}]
+
+module Allocating_primitive_not_checked_with_zero_alloc_opt : sig
+  val add : int32 -> int32 -> int32 [@@zero_alloc opt]
+end = struct
+  external add : int32 -> int32 -> int32 = "%int32_add"
+end
+[%%expect {|
+module Allocating_primitive_not_checked_with_zero_alloc_opt :
+  sig val add : int32 -> int32 -> int32 [@@zero_alloc opt] end
 |}]

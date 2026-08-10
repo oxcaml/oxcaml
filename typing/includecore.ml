@@ -211,16 +211,9 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
     raise (Dont_match (Layout_poly_coercion
       (Extra_rhs { extra = List.length subj_rest })))
 
-let value_descriptions ~loc env name
-    ~mmodes
+let value_descriptions_zero_alloc
     (vd1 : Types.value_description)
     (vd2 : Types.value_description) =
-  Builtin_attributes.check_alerts_inclusion
-    ~def:vd1.val_loc
-    ~use:vd2.val_loc
-    loc
-    vd1.val_attributes vd2.val_attributes
-    name;
   let vd1_zero_alloc, prim_coercion_zero_alloc_check =
     match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
     | Val_prim p, Check check ->
@@ -231,10 +224,21 @@ let value_descriptions ~loc env name
         (Default_zero_alloc | Ignore_assert_all | Check _ | Assume _) ) ->
       vd1.val_zero_alloc, None
   in
-  begin match Zero_alloc.sub vd1_zero_alloc vd2.val_zero_alloc with
-  | Ok () -> ()
+  match Zero_alloc.sub vd1_zero_alloc vd2.val_zero_alloc with
+  | Ok () -> prim_coercion_zero_alloc_check
   | Error e -> raise (Dont_match (Zero_alloc e))
-  end;
+
+let value_descriptions ~loc env name
+    ~mmodes
+    (vd1 : Types.value_description)
+    (vd2 : Types.value_description) =
+  Builtin_attributes.check_alerts_inclusion
+    ~def:vd1.val_loc
+    ~use:vd2.val_loc
+    loc
+    vd1.val_attributes vd2.val_attributes
+    name;
+  let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =
