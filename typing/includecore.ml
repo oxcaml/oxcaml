@@ -211,6 +211,8 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
     raise (Dont_match (Layout_poly_coercion
       (Extra_rhs { extra = List.length subj_rest })))
 
+let moregen_rep = Sys.getenv_opt "NO_MOREGEN_REP" = None
+
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -290,6 +292,7 @@ let value_descriptions ~loc env name
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
+       if moregen_rep then moregeneral_lpoly env val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type;
        match vd2.val_kind with
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ -> Tcoerce_none
