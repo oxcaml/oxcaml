@@ -2181,16 +2181,6 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
-let update_constructor_representation_or_variable env cd_args jkinds ~loc
-    ~sorts_and_types =
-  match
-    update_constructor_representation env cd_args jkinds ~loc
-      ~is_extension_constructor:false ~default_to_scannable:false
-  with
-  | Ok shape -> shape
-  | Error (Unrepresentable_argument _ | Unrepresentable_argument_field _) ->
-      Constructor_variable sorts_and_types
-
 let update_constructor_representation_and_arg_sorts env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =

@@ -3133,7 +3133,7 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
-let representation_for_tuple_constructor env constr ~loc ~types ~why
+let representation_for_tuple_constructor env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
   | (Constructor_uniform_value | Constructor_mixed _) as shape ->
@@ -3148,29 +3148,21 @@ let representation_for_tuple_constructor env constr ~loc ~types ~why
   | Constructor_undetermined ->
       begin match
         Misc.Stdlib.List.mapi_result
-          (fun _ (ty, loc) ->
-             type_jkind_and_sort env ty ~why ~fixed:false
-             |> Result.map_error
-                  (fun err -> Unrepresentable_arg (loc, ty, err)))
+          (fun i (ty, loc) ->
+             match (List.nth constr.cstr_args i).ca_sort with
+             | Some sort -> Ok (Jkind.Sort.of_const sort)
+             | None ->
+                 type_sort env ty ~why ~fixed:false
+                 |> Result.map_error
+                      (fun err -> Unrepresentable_arg (loc, ty, err)))
           types
         with
-        | Ok jkinds_and_sorts ->
-            let jkinds, sorts = List.split jkinds_and_sorts in
-            let args =
-              List.map2
-                (fun (ca : Types.constructor_argument) (ty, _loc) ->
-                   { ca with ca_type = ty })
-                constr.cstr_args types
-            in
+        | Ok sorts ->
             let sorts_and_types =
               List.map2 (fun sort (ty, _loc) -> sort, ty) sorts types
               |> Array.of_list
             in
-            let shape =
-              Typedecl.update_constructor_representation_or_variable env
-                (Cstr_tuple args) jkinds ~loc ~sorts_and_types
-            in
-            Ok (shape, sorts)
+            Ok (Constructor_variable sorts_and_types, sorts)
         | Error err -> Error err
       end
   | Constructor_variable _ ->
@@ -3836,7 +3828,7 @@ and type_pat_aux
            representable, and the call to [representation_for_tuple_constructor]
            below, are quite redundant. We should refactor. *)
         match
-          representation_for_tuple_constructor !!penv constr ~loc ~types
+          representation_for_tuple_constructor !!penv constr ~types
             ~why:Constructor_arg_projection
         with
         | Ok (repr, sorts) -> repr, sorts
@@ -10880,7 +10872,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   let shape, sorts =
     let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
     match
-      representation_for_tuple_constructor env constr ~loc:sexp.pexp_loc
+      representation_for_tuple_constructor env constr
         ~types ~why:Constructor_arg_assignment
     with
     | Ok (shape, sorts) -> shape, sorts
