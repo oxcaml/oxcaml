@@ -1120,11 +1120,18 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLreturn (res);
 }
 
-CAMLprim value caml_get_idx_atomic_bytecode(value base, value idx) {
-  CAMLparam2 (base, idx);
+Caml_inline void check_atomic_idx(value base, value idx)
+{
   CAMLassert (Tag_val(idx) == 0);
   CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
   CAMLassert (Tag_val(base) != Double_array_tag);
+  (void)base;
+  (void)idx;
+}
+
+CAMLprim value caml_get_idx_atomic_bytecode(value base, value idx) {
+  CAMLparam2 (base, idx);
+  check_atomic_idx(base, idx);
   CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
 }
 
@@ -1154,11 +1161,78 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 CAMLprim value caml_set_idx_atomic_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
-  CAMLassert (Tag_val(idx) == 0);
-  CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
-  CAMLassert (Tag_val(base) != Double_array_tag);
+  check_atomic_idx(base, idx);
   caml_atomic_exchange_field(base, Field(idx, 0), v);
   CAMLreturn (Val_unit);
+}
+
+CAMLprim value caml_atomic_exchange_idx_bytecode(value base, value idx,
+                                                 value v)
+{
+  CAMLparam3 (base, idx, v);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_exchange_field(base, Field(idx, 0), v));
+}
+
+CAMLprim value caml_atomic_compare_exchange_idx_bytecode(value base, value idx,
+                                                         value oldv,
+                                                         value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_compare_exchange_field(base, Field(idx, 0),
+                                                 oldv, newv));
+}
+
+CAMLprim value caml_atomic_cas_idx_bytecode(value base, value idx,
+                                            value oldv, value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_cas_field(base, Field(idx, 0), oldv, newv));
+}
+
+CAMLprim value caml_atomic_fetch_add_idx_bytecode(value base, value idx,
+                                                  value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_fetch_add_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_add_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_add_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_sub_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_sub_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_land_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_land_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_lor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_lor_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_lxor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_lxor_field(base, Field(idx, 0), incr));
 }
 
 CAMLprim value caml_get_ptr_bytecode(value ptr)

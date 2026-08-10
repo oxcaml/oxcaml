@@ -49,6 +49,14 @@ CAMLextern void caml_initialize (volatile value *, value);
 CAMLextern value caml_atomic_load_field (value, value);
 CAMLextern value caml_atomic_exchange_field (value, value, value);
 CAMLextern value caml_atomic_cas_field (value, value, value, value);
+CAMLextern value caml_atomic_compare_exchange_field (value, value,
+                                                     value, value);
+CAMLextern value caml_atomic_fetch_add_field (value, value, value);
+CAMLextern value caml_atomic_add_field (value, value, value);
+CAMLextern value caml_atomic_sub_field (value, value, value);
+CAMLextern value caml_atomic_land_field (value, value, value);
+CAMLextern value caml_atomic_lor_field (value, value, value);
+CAMLextern value caml_atomic_lxor_field (value, value, value);
 CAMLextern value caml_check_urgent_gc (value);
 
 /* Donate [size] bytes at [base] to the major heap, as an "extent"
