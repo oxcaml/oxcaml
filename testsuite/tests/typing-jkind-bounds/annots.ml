@@ -9,6 +9,12 @@
  }
 *)
 
+(* These tests enumerate modifiers, including redundant ones, so silence the
+   redundant-modifier warning throughout. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 type t_value : value
 type t_imm : immediate
 type t_imm64 : immediate64
@@ -206,7 +212,7 @@ Error: Unrecognized modifier fizzbuzz.
 let x : int as ('a: value) = 5
 let x : int as ('a : immediate) = 5
 let x : int as ('a : any) = 5;;
-let x : int as ('a: value mod global aliased many contended portable external_) = 5
+let x : int as ('a: value mod global many contended portable external_) = 5
 
 [%%expect{|
 val x : int = 5
