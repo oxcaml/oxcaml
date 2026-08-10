@@ -31,22 +31,8 @@ sed \
   -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_[0-9]\+_code|\1_XXX_XXX_code|g' \
   -e 's|\([a-z_][a-zA-Z0-9_]*\)_[0-9]\+_unboxed|\1_XXX_unboxed|g' | \
 # Second sed: Conceal unstable pointer values in C runtime function parameters
-# Note: Previous LLDB plugin versions used OCaml formatting (#140737333164432L),
-# current versions use native C formatting (140737333164432)
 sed \
-  -e '/caml_blit_bytes/s|s1=#\?[0-9]\{10,\}L\?|s1=<PTR>|g' \
-  -e '/caml_blit_bytes/s|s2=#\?[0-9]\{10,\}L\?|s2=<PTR>|g' \
-  -e '/caml_hash_exn/s|obj=#\?[0-9]\{5,\}L\?|obj=<PTR>|g' \
-  -e '/caml_compare/s|v1=#\?[0-9]\{5,\}L\?|v1=<PTR>|g' \
-  -e '/caml_compare/s|v2=#\?[0-9]\{5,\}L\?|v2=<PTR>|g' \
-  -e '/caml_output_value_to_buffer/s|buf=#\?[0-9]\{10,\}L\?|buf=<PTR>|g' \
-  -e '/caml_output_value_to_buffer/s|v=#\?[0-9]\{5,\}L\?|v=<PTR>|g' \
-  -e '/caml_input_value_from_bytes/s|str=#\?[0-9]\{10,\}L\?|str=<PTR>|g' \
-  -e '/caml_md5_string/s|str=#\?[0-9]\{5,\}L\?|str=<PTR>|g' \
-  -e '/caml_sys_getenv/s|var=#\?[0-9]\{5,\}L\?|var=<PTR>|g' \
-  -e '/caml_ba_create/s|vdim=#\?[0-9]\{5,\}L\?|vdim=<PTR>|g' \
-  -e 's|closure=#\?[0-9]\{5,\}L\?|closure=<PTR>|g' \
-  -e 's|body_callback=#\?[0-9]\{5,\}L\?|body_callback=<PTR>|g' | \
+  -e '/frame.*`caml_/s/([^)]*)/(...)/' | \
 # grep: Remove LLDB noise
 grep -v \
   -e '^(lldb) ' \
