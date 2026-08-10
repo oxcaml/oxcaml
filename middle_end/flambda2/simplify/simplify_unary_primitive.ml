@@ -330,26 +330,46 @@ module Unary_bit_counting (I : A.Int_number_kind) = struct
     match I.unboxed_prover (DA.typing_env dacc) arg_ty with
     | Known_result ints ->
       assert (not (I.Num.Set.is_empty ints));
-      let machine_width = DE.machine_width (DA.denv dacc) in
       let f =
         match op with
         | Leading_zeros -> I.Num.leading_zeros
         | Trailing_zeros -> I.Num.trailing_zeros
         | Popcount -> I.Num.popcount
       in
-      let possible_results =
-        I.Num.Set.fold
-          (fun int acc ->
-            Target_ocaml_int.Set.add
-              (Target_ocaml_int.of_int machine_width (f int))
-              acc)
-          ints Target_ocaml_int.Set.empty
+      let ty =
+        (* Bit-counting primitives return naked immediates, except small
+           integers that return at their own kind. *)
+        match I.standard_int_kind with
+        | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+        | Naked_nativeint ->
+          let machine_width = DE.machine_width (DA.denv dacc) in
+          let possible_results =
+            I.Num.Set.fold
+              (fun int acc ->
+                Target_ocaml_int.Set.add
+                  (Target_ocaml_int.of_int machine_width (f int))
+                  acc)
+              ints Target_ocaml_int.Set.empty
+          in
+          T.these_naked_immediates possible_results
+        | Naked_int8 ->
+          let module Int8 = Numeric_types.Int8 in
+          I.Num.Set.fold
+            (fun int acc -> Int8.Set.add (Int8.of_int (f int)) acc)
+            ints Int8.Set.empty
+          |> T.these_naked_int8s
+        | Naked_int16 ->
+          let module Int16 = Numeric_types.Int16 in
+          I.Num.Set.fold
+            (fun int acc -> Int16.Set.add (Int16.of_int (f int)) acc)
+            ints Int16.Set.empty
+          |> T.these_naked_int16s
       in
-      let ty = T.these_naked_immediates possible_results in
       let dacc = DA.add_variable dacc result_var ty in
       SPR.create original_term ~try_reify:true dacc
     | Need_meet ->
-      SPR.create_unknown dacc ~result_var K.naked_immediate ~original_term
+      let kind = Named.kind original_term in
+      SPR.create_unknown dacc ~result_var kind ~original_term
     | Invalid -> SPR.create_invalid dacc
 end
 
