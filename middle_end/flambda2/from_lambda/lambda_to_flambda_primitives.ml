@@ -1844,16 +1844,28 @@ let check_single_element offsets kinds =
     Misc.fatal_error "check_single_element: expected value for atomic op";
   offset, full_kind
 
-let convert_pget_indirect ~machine_width ~dbg primitive layout
-    (access : L.access_flag) ~ptr ~idx : H.expr_primitive list =
+let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
   needs_64_bit_target primitive dbg;
   let offsets = block_index_access_offsets ~machine_width layout idx in
   let kinds =
     Flambda_arity.unarize
       (Flambda_arity.from_lambda_list [layout] ~machine_width)
   in
+  let offset, full_kind = check_single_element offsets kinds in
+  let field_kind = P.Block_access_field_kind.from_kind full_kind in
+  let field = tagged_field_index_of_offset ~machine_width offset in
+  field, field_kind
+
+let convert_pget_indirect ~machine_width ~dbg primitive layout
+    (access : L.access_flag) ~ptr ~idx : H.expr_primitive list =
+  needs_64_bit_target primitive dbg;
   match Lambda.access_atomicity access with
   | Nonatomic ->
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
     let mut =
       match access with
       | Immutable_access -> Asttypes.Immutable
@@ -1869,9 +1881,9 @@ let convert_pget_indirect ~machine_width ~dbg primitive layout
     in
     [H.maybe_create_unboxed_product reads]
   | Atomic ->
-    let offset, full_kind = check_single_element offsets kinds in
-    let field_kind = P.Block_access_field_kind.from_kind full_kind in
-    let field = tagged_field_index_of_offset ~machine_width offset in
+    let field, field_kind =
+      convert_atomic_idx_field ~machine_width primitive dbg layout ~idx
+    in
     [Binary (Atomic_load_field field_kind, ptr, field)]
 
 let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
@@ -1879,13 +1891,13 @@ let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
     H.expr_primitive list =
   needs_64_bit_target primitive dbg;
   let mode = Alloc_mode.For_assignments.from_lambda mode in
-  let offsets = block_index_access_offsets ~machine_width layout idx in
-  let kinds =
-    Flambda_arity.unarize
-      (Flambda_arity.from_lambda_list [layout] ~machine_width)
-  in
   match atomicity with
   | Nonatomic ->
+    let offsets = block_index_access_offsets ~machine_width layout idx in
+    let kinds =
+      Flambda_arity.unarize
+        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    in
     let writes =
       Misc.Stdlib.List.map3
         (fun kind offset new_value ->
@@ -1898,23 +1910,11 @@ let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
     in
     [H.Sequence writes]
   | Atomic ->
-    let offset, full_kind = check_single_element offsets kinds in
-    let field_kind = P.Block_access_field_kind.from_kind full_kind in
-    let field = tagged_field_index_of_offset ~machine_width offset in
+    let field, field_kind =
+      convert_atomic_idx_field ~machine_width primitive dbg layout ~idx
+    in
     let new_value = List.hd new_values in
     [Ternary (Atomic_set_field (field_kind, mode), ptr, field, new_value)]
-
-let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
-  needs_64_bit_target primitive dbg;
-  let offsets = block_index_access_offsets ~machine_width layout idx in
-  let kinds =
-    Flambda_arity.unarize
-      (Flambda_arity.from_lambda_list [layout] ~machine_width)
-  in
-  let offset, full_kind = check_single_element offsets kinds in
-  let field_kind = P.Block_access_field_kind.from_kind full_kind in
-  let field = tagged_field_index_of_offset ~machine_width offset in
-  field, field_kind
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
