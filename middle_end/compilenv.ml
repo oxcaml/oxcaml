@@ -345,28 +345,48 @@ let save_unit_info filename ~main_module_block_format ~arg_descr =
   write_unit_info current_unit filename
 
 let save_resumed_unit_info filename ~paused =
-  let info =
-    build_unit_info ~main_module_block_format:paused.ui_format
-      ~arg_descr:paused.ui_arg_descr
+  (* On resume we skip the frontend and typechecker, so we need to take the
+     fields they normally produce from [paused], the unit infos saved by the
+     paused compilation. Fields describing generated code are taken from
+     [current_unit] so they describe the reaped code. *)
+  let paused_imports_cmx_without_crcs =
+    List.map
+      (fun import ->
+        Import_info.create_normal (Import_info.cu import) ~crc:None)
+      paused.ui_imports_cmx
   in
-  (* We should take fields produced by the frontend and typechecker from the
-     old pre-Reaper cmx, since neither run after resume. *)
   let info =
-    { info with
+    { (* Set by [reset], should equal [paused.ui_unit]. *)
+      ui_unit = current_unit.uib_unit;
+      (* Set by [reset], a resumed compilation defines a single unit. *)
+      ui_defines = current_unit.uib_defines;
+      (* Computed by the typechecker. *)
+      ui_arg_descr = paused.ui_arg_descr;
       ui_imports_cmi = paused.ui_imports_cmi;
+      (* Resume reads a subset of what pause did, so take the list from pause.
+         We will link .reaped.cmx files, not the originals, so the old CRCs
+         would be wrong. *)
+      ui_imports_cmx = paused_imports_cmx_without_crcs;
+      (* Computed by the typechecker. *)
       ui_quoted_cmi = paused.ui_quoted_cmi;
-      ui_quoted_cmx = paused.ui_quoted_cmx
-    }
-  in
-  (* We want .reaped.cmx files to link against each other, not against the
-     .cmx files they saw during compilation, and we don't know those CRCs. *)
-  let info =
-    { info with
-      ui_imports_cmx =
-        List.map
-          (fun import ->
-            Import_info.create_normal (Import_info.cu import) ~crc:None)
-          info.ui_imports_cmx
+      ui_quoted_cmx = paused.ui_quoted_cmx;
+      (* Computed by [Translmod]. *)
+      ui_format = paused.ui_format;
+      (* Registered during Cmm conversion of the reaped code. *)
+      ui_generic_fns = current_unit.uib_generic_fns;
+      (* The reaped flambda2 export info. *)
+      ui_export_info = current_unit.uib_export_info;
+      (* Recomputed by the backend from the reaped code. *)
+      ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
+      (* Set by [-linkall] on the paused command line. *)
+      ui_force_link = paused.ui_force_link;
+      (* Set by [-requires-metaprogramming] on the paused command line. *)
+      ui_requires_metaprogramming = paused.ui_requires_metaprogramming;
+      (* [ui_export_info] contains offsets into these sections. *)
+      ui_file_sections =
+        File_sections.Builder.build current_unit.uib_file_sections;
+      (* From the [external] declarations in the source. *)
+      ui_external_symbols = paused.ui_external_symbols;
     }
   in
   write_unit_info info filename
