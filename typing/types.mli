@@ -1006,7 +1006,7 @@ and cstr_layout =
            [Constructor_mixed] if the inlined record has any unboxed fields.
         *)
       }
-  | Cstr_layout_variable
+  | Cstr_layout_undetermined
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
      typedecl time. Counterpart of [Record_undetermined] for variants. *)

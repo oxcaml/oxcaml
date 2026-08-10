@@ -246,8 +246,8 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_boxed %a\n"
       (array (i+1) (fun _ ppf l ->
          match (l : Types.cstr_layout) with
-         | Cstr_layout_variable ->
-           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_undetermined ->
+           line (i+1) ppf "Cstr_layout_undetermined\n"
          | Cstr_layout_known { sorts; _ } ->
            sort_array (i+1) ppf sorts))
       layouts
