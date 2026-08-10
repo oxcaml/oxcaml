@@ -19,7 +19,7 @@ let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
 let regalloc_linscan_threshold = ref max_int (* -regalloc-linscan-threshold *)
 let regalloc_params = ref ([] : string list)  (* -regalloc-param *)
-let regalloc_validate = ref true        (* -[no-]regalloc-validate *)
+let regalloc_validate = ref false        (* -[no-]regalloc-validate *)
 
 let vectorize = ref false                (* -[no-]vectorize *)
 let dump_vectorize = ref false          (* -dvectorize *)
@@ -41,7 +41,7 @@ let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 let cfg_eliminate_dead_trap_handlers = ref true
                                        (* -cfg-eliminate-dead-trap-handlers *)
 
-let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
+let cfg_prologue_validate = ref false     (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
