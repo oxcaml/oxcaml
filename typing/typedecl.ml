@@ -2468,31 +2468,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.compute_record_kind: unexpected record representation"
 
-let update_inlined_record_representation env loc lbls jkinds tag vrep
-      ~sorts_and_types =
-  match vrep with
-  | Variant_unboxed ->
-    (* The shape of an unboxed constructor is always
-       [Constructor_uniform_value], as at declaration time. *)
-    Record_inlined (tag, Constructor_uniform_value, Variant_unboxed)
-  | Variant_boxed _ as vrep ->
-    let lbl_decls =
-      List.map (fun (ld, ty) -> { ld with Types.ld_type = ty }) lbls
-    in
-    let shape =
-      update_constructor_representation_or_variable env
-        (Cstr_record lbl_decls) jkinds ~loc ~sorts_and_types
-    in
-    Record_inlined (tag, shape, vrep)
-  | Variant_extensible | Variant_with_null ->
-    (* Extension constructors always have a known shape, and
-       [Variant_with_null] cannot have an inlined record argument. *)
-    Misc.fatal_error
-      "Typedecl.update_inlined_record_representation: unexpected variant \
-       representation"
-
-(* Given a record with a variable representation, but updated labels, compute
-   the fields' sorts and the updated representation. *)
 let update_record_representation
       (type rep) ~why ~(old_repres : rep)
       env loc (form : rep record_form) lbls_and_types =
@@ -2506,13 +2481,6 @@ let update_record_representation
       (fun (_lbl, ld_type) -> representable_sort ~why env loc kloc ld_type)
       lbls_and_types
   in
-  let types = List.map snd lbls_and_types in
-  let _sorts, jkinds =
-    update_label_sorts env loc types ~form ~default_to_scannable:false
-  in
-  let reprs, repr_summary =
-    compute_repr_summary env lbls_and_types jkinds ~default_to_scannable:false
-  in
   let sorts_and_types () =
     List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
     |> Array.of_list
@@ -2524,44 +2492,30 @@ let update_record_representation
   let rep : rep =
     match form, old_repres with
     | Legacy, Record_undetermined ->
-      (* CR layouts: improve the readability of this match *)
-      let { values; floats; atomic_floats; float64s;
-              non_float64_unboxed_fields; atomic_fields; voids;
-              first_any } = repr_summary
-      in
-      let rep =
-        compute_record_repr loc reprs lbls_and_types
-          ~represent_as_float_array:false ~flatten_floats:false ~warn:false
-          ~refining_block_with_any:true ~values ~floats ~atomic_floats
-          ~float64s ~non_float64_unboxed_fields ~atomic_fields ~voids
-          ~first_any
-      in
-      begin match rep with
-      | Ok ((Record_boxed | Record_mixed _) as rep) -> rep
-      | Ok _ ->
-        Misc.fatal_error "undetermined became something other than mixed"
-      | Error (Unrepresentable_field _) ->
-        add_delayed_all_void_check ();
-        Record_variable (sorts_and_types ())
-      end
+      add_delayed_all_void_check ();
+      Record_variable (sorts_and_types ())
     | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
-      let rep =
-        update_inlined_record_representation env loc lbls_and_types jkinds tag
-          vrep ~sorts_and_types:(sorts_and_types ())
-      in
-      (match rep with
-       | Record_inlined (_, Constructor_variable _, _) ->
-         add_delayed_all_void_check ()
-       | _ -> ());
-      rep
-    | Unboxed_product, _ ->
-      (match repr_summary.first_any with
-      | Some _ -> old_repres
-      | None -> Record_unboxed_product)
+      (match vrep with
+       | Variant_unboxed ->
+         (* The shape of an unboxed constructor is always
+            [Constructor_uniform_value], as at declaration time. *)
+         Record_inlined (tag, Constructor_uniform_value, Variant_unboxed)
+       | Variant_boxed _ ->
+         add_delayed_all_void_check ();
+         Record_inlined
+           (tag, Constructor_variable (sorts_and_types ()), vrep)
+       | Variant_extensible | Variant_with_null ->
+         (* Extension constructors always have a known shape, and
+            [Variant_with_null] cannot have an inlined record argument. *)
+         Misc.fatal_error
+           "Typedecl.update_record_representation: unexpected variant \
+            representation")
+    | Unboxed_product, Record_unboxed_product_variable -> old_repres
     | Legacy,
       (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
       | Record_ufloat | Record_mixed _ | Record_dummy _
-      | Record_variable _) ->
+      | Record_variable _)
+    | Unboxed_product, Record_unboxed_product ->
         Misc.fatal_error
           "Typedecl.update_record_representation: representation already \
            determined"
