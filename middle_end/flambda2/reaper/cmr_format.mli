@@ -20,6 +20,7 @@ type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
+    imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }

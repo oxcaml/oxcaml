@@ -286,7 +286,6 @@ let native unix
        machine_width:Target_system.Machine_width.t ->
        keep_symbol_tables:bool ->
        cmr_filename:string ->
-       cmx_imports_to_reload:Import_info.t list ->
        Cmm.phrase list) =
   (module Make (struct
     let backend = Compile_common.Native
@@ -348,9 +347,7 @@ let native unix
             ~prefixname:(Unit_info.prefix info.target)
             ~ppf_dump:info.ppf_dump
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
-               ~cmr_filename:cmr_file
-               ~cmx_imports_to_reload:
-                 paused_unit_infos.Cmx_format.ui_imports_cmx);
+               ~cmr_filename:cmr_file);
           Compilenv.save_resumed_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact info.target ~extension:ext_flambda_obj))
