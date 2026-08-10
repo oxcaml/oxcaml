@@ -947,8 +947,12 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
   | Constructor_undetermined, Constructor_undetermined -> true
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
-  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_undetermined
-    | Constructor_variable _), _
+  | Constructor_variable _, _ | _, Constructor_variable _ ->
+      Misc.fatal_error
+        "equal_constructor_representation_up_to_scannable_axes: typechecked \
+         representation"
+  | (Constructor_mixed _ | Constructor_uniform_value
+    | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -995,9 +999,13 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       Bool.equal a1 a2 && Bool.equal b1 b2
   | Record_undetermined, Record_undetermined -> true
   (* [Record_variable] only appears in the typedtree, never in a decl. *)
+  | Record_variable _, _ | _, Record_variable _ ->
+      Misc.fatal_error
+        "equal_record_representation_up_to_scannable_axes: typechecked \
+         representation"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined
-    | Record_variable _), _ ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined),
+    _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
@@ -1007,8 +1015,12 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
     -> true
   (* [Record_unboxed_product_variable] only appears in the typedtree, never in
      a decl. *)
-  | (Record_unboxed_product | Record_unboxed_product_undetermined
-    | Record_unboxed_product_variable _), _ -> false
+  | Record_unboxed_product_variable _, _
+  | _, Record_unboxed_product_variable _ ->
+      Misc.fatal_error
+        "equal_record_unboxed_product_representation_up_to_scannable_axes: \
+         typechecked representation"
+  | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
