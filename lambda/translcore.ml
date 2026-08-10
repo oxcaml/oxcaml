@@ -817,6 +817,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             |])
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let record_repres =
+        Typedecl.finalize_record_representation e.exp_env e.exp_loc
+          record_repres
+      in
       let repres = match record_repres with
         | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
             record_repres
