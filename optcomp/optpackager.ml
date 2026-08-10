@@ -182,18 +182,11 @@ end) : S = struct
           match m.pm_kind with PM_intf -> accu | PM_impl info -> info :: accu)
         members []
     in
-    let static_data =
-      Slambdaeval.CU_data.package
-        (Misc.Stdlib.Array.of_list_map
-           (fun info ->
-             Slambdaeval.CU_data.read ~sections:info.ui_file_sections
-               info.ui_static_data)
-           units)
-    in
     let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments. *)
+      (* [arg_descr] is None because we don't allow packs to be arguments.
+         [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
-        ~static_data
+        ~static_data:Slambdaeval.CU_data.empty
     in
     let file_sections =
       let length =

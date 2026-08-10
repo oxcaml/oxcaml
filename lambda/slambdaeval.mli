@@ -51,11 +51,11 @@ module CU_data : sig
 
   type raw
 
+  val empty : t
+
   val write : t -> sections:File_sections.Builder.t -> raw
 
   val read : raw -> sections:File_sections.t -> t
-
-  val package : t array -> t
 
   val print : Format_doc.formatter -> t -> unit
 end

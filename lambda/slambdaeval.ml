@@ -138,11 +138,11 @@ module CU_data = struct
 
   type raw = File_sections.Idx.t
 
+  let empty = Or_missing.Missing
+
   let read raw ~sections = Obj.obj (File_sections.get sections raw)
 
   let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
-
-  let package ts = Or_missing.Present (SLVrecord ts)
 
   let print = print
 end
