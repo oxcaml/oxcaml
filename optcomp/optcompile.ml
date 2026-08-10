@@ -348,6 +348,9 @@ let native unix
             ~ppf_dump:info.ppf_dump
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
                ~cmr_filename:cmr_file);
+          (* Unlike [compile_implementation] we also create the .reaped.cmx file
+             here, using the old .cmx file and data accumulated in
+             [Compilenv].*)
           Compilenv.save_resumed_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact info.target ~extension:ext_flambda_obj))
