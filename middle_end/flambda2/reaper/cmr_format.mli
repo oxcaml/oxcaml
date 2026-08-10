@@ -33,6 +33,11 @@ module Id_stamp_counters : sig
       been created, and will error otherwise. The affected stamp counters are
       for value slots, function slots, variables, code IDs and continuations. *)
   val restore_for_resume : t -> unit
+
+  (** Restore the stamp counters in preparation for merging the data of several
+      units, setting each counter to its maximum value across all of the units.
+      Like [restore_for_resume], can only be called once. *)
+  val restore_for_merge : t list -> unit
 end
 
 module Serialisable : sig
@@ -49,6 +54,13 @@ module Serialisable : sig
     resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
     t ->
     cmr_format
+
+  (** The unit that was being compiled when the file was saved. *)
+  val compilation_unit : t -> Compilation_unit.t
+
+  (** Get just the renamed dependency graph from the .cmr file, for use in
+      solving. *)
+  val deserialise_deps : t -> Global_flow_graph.graph
 end
 
 type error =

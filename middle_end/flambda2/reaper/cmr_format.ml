@@ -50,6 +50,28 @@ module Id_stamp_counters = struct
     Continuation.restore_stamp_counter continuations;
     Function_slot.restore_stamp_counter function_slots;
     Value_slot.restore_stamp_counter value_slots
+
+  (* CR mvellacott: instead of taking the maximum, consider keeping separate
+     per-unit stamp counters. *)
+  let restore_for_merge all_counters =
+    let max_counters =
+      List.fold_left
+        (fun acc counters ->
+          { variables = max acc.variables counters.variables;
+            code_ids = max acc.code_ids counters.code_ids;
+            continuations = max acc.continuations counters.continuations;
+            function_slots = max acc.function_slots counters.function_slots;
+            value_slots = max acc.value_slots counters.value_slots
+          })
+        { variables = 0;
+          code_ids = 0;
+          continuations = 0;
+          function_slots = 0;
+          value_slots = 0
+        }
+        all_counters
+    in
+    restore_for_resume max_counters
 end
 
 module All_code_with_sections = struct
@@ -142,6 +164,10 @@ module Serialisable : sig
     resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
     t ->
     cmr_format
+
+  val compilation_unit : t -> Compilation_unit.t
+
+  val deserialise_deps : t -> Global_flow_graph.graph
 end = struct
   type cmr_format = t
 
@@ -258,6 +284,25 @@ end = struct
       deps;
       rebuild_data
     }
+
+  let compilation_unit t = t.original_compilation_unit
+
+  let deserialise_deps
+      { original_compilation_unit;
+        table_data;
+        used_value_slots;
+        unit_metadata = _;
+        final_typing_env = _;
+        all_code = _;
+        imported_offsets = _;
+        deps;
+        rebuild_data = _
+      } =
+    let renaming, _code_ids =
+      Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
+        ~original_compilation_unit
+    in
+    Deps_with_fields.deserialise deps renaming
 end
 
 type error =

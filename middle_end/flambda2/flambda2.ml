@@ -393,11 +393,30 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   Profile.record_call "flambda2" run
 
 let reaper_lto_solve ~cmr_files ~ltosol_filename =
-  (* CR mvellacott: combine the dependency graphs from [cmr_files], run the
-     Reaper solve stage on the combined graph, and write the solution to
-     [ltosol_filename]. *)
-  Format.eprintf "reaper_lto_solve: cmr files: [%s]; ltosol output: %s@."
-    (String.concat "; " cmr_files)
+  let cmrs, counters =
+    List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
+  in
+  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_merge counters;
+  let combined_graph =
+    List.fold_left
+      (fun combined cmr ->
+        Flambda2_reaper.Global_flow_graph.union combined
+          (Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps cmr))
+      (Flambda2_reaper.Global_flow_graph.create ())
+      cmrs
+  in
+  (* CR mvellacott: serialise the solution to [ltosol_filename], in
+     per-compilation-unit portions, instead of discarding it. *)
+  let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
+    Flambda2_reaper.Reaper.Staged.solve combined_graph
+  in
+  Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
+    (String.concat "; "
+       (List.map
+          (fun cmr ->
+            Compilation_unit.full_path_as_string
+              (Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr))
+          cmrs))
     ltosol_filename
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
