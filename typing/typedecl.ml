@@ -2468,7 +2468,13 @@ let update_record_representation
   in
   let sorts =
     List.map
-      (fun (_lbl, ld_type) -> representable_sort ~why env loc kloc ld_type)
+      (fun (lbl, ld_type) ->
+         match lbl.ld_sort with
+         | Some sort ->
+           (* Optimization: avoid recomputing the label sort if it was fixed in
+              the type declaration *)
+           Jkind.Sort.of_const sort
+         | None -> representable_sort ~why env loc kloc ld_type)
       lbls_and_types
   in
   let sorts_and_types () =
