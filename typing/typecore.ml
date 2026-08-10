@@ -13553,8 +13553,8 @@ let report_error ~loc env =
         "This function is local-returning, but was expected otherwise."
   | Tail_call_local_returning ->
       Location.errorf ~loc
-        "@[This application is local-returning, but is at the tail@ \
-          position of a function that is not local-returning.@ \
+        "@[This local-returning application is in a tail position that is not@ \
+          enclosed in an exclave_ expression.@ \
           Hint: Use exclave_ to return a local value.@]"
   | Unboxed_int_literals_not_supported ->
       Location.errorf ~loc
