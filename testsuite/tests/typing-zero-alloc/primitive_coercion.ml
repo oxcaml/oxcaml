@@ -101,35 +101,30 @@ Error: allocation of 24 bytes for boxed_int64
 |}]
 
 module Primitive_could_be_made_non_allocating_with_constraint : sig
-  val array_get : 'a array -> int -> 'a [@@zero_alloc]
+  val equal : 'a -> 'a -> bool [@@zero_alloc]
 end = struct
-  external array_get : 'a array -> int -> 'a = "%array_safe_get"
+  external equal : 'a -> 'a -> bool = "%equal"
 end
 [%%expect {|
-Line 2, characters 43-53:
-2 |   val array_get : 'a array -> int -> 'a [@@zero_alloc]
-                                               ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP7.Primitive_could_be_made_non_allocating_with_constraint.(partial) (camlTOP7__fn[:4,2--64]_14_7_code).
-Line 4, characters 2-64:
-4 |   external array_get : 'a array -> int -> 'a = "%array_safe_get"
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: allocation of 16 bytes for float
+Line 2, characters 34-44:
+2 |   val equal : 'a -> 'a -> bool [@@zero_alloc]
+                                      ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP7.Primitive_could_be_made_non_allocating_with_constraint.(partial) (camlTOP7__fn[:4,2--46]_14_7_code).
+Line 4, characters 2-46:
+4 |   external equal : 'a -> 'a -> bool = "%equal"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (external call to caml_equal)
 |}]
 
 module Primitive_made_non_allocating_with_constraint : sig
-  val array_get :
-    ('a : value mod non_float). 'a array -> int -> 'a [@@zero_alloc]
+  val equal : ('a : immediate). 'a -> 'a -> bool [@@zero_alloc]
 end = struct
-  external array_get : 'a array -> int -> 'a = "%array_safe_get"
-  (* [array_get] allocates, but after ['a] is restricted to be [non_float],
-     [array_get] never allocates. *)
+  external equal : 'a -> 'a -> bool = "%equal"
+  (* Polymorphic equality allocates, but only if ['a] is a pointer *)
 end
 [%%expect {|
 module Primitive_made_non_allocating_with_constraint :
-  sig
-    val array_get : ('a : value non_float). 'a array -> int -> 'a
-      [@@zero_alloc]
-  end
+  sig val equal : ('a : immediate). 'a -> 'a -> bool [@@zero_alloc] end
 |}]
 
 module Overapplied_primitive : sig
