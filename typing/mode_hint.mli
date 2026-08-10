@@ -181,7 +181,7 @@ type 'd morph =
   | Functor_to_application : Location.t -> ('l * disallowed) neg morph
       (** The identity morphism from a functor's staticity to its application
           result's staticity (a monadic axis, hence [neg]). Carries the
-          application's location. *)
+          functor's location. *)
   | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
       (** The dual of [Functor_to_application]: from the result's staticity back
           to the functor's. Carries the application's location. *)
