@@ -338,10 +338,6 @@ let native unix
       Some
         (fun ~keep_symbol_tables ~cmr_file (info : Compile_common.info) ->
           let machine_width = Target_system.Machine_width.Sixty_four in
-          let paused_unit_infos, (_ : Digest.t) =
-            Compilenv.read_unit_info
-              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
-          in
           Asmgen.compile_implementation_from_cmm unix
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)
@@ -351,6 +347,10 @@ let native unix
           (* Unlike [compile_implementation] we also create the .reaped.cmx file
              here, using the old .cmx file and data accumulated in
              [Compilenv].*)
+          let paused_unit_infos, (_ : Digest.t) =
+            Compilenv.read_unit_info
+              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
+          in
           Compilenv.save_resumed_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact info.target ~extension:ext_flambda_obj))
