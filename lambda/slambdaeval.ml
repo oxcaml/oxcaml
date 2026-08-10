@@ -517,14 +517,12 @@ and eval_prim env prim =
   | Pobj_magic old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pobj_magic new_layout
-  | Pget_idx (old_layout, access) ->
+  | Pget_idx (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pget_idx (new_layout, access)
-  | Pset_idx (old_layout, mode, atomicity) ->
+    if new_layout == old_layout then prim else Pget_idx (new_layout, mut)
+  | Pset_idx (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Pset_idx (new_layout, mode, atomicity)
+    if new_layout == old_layout then prim else Pset_idx (new_layout, mode)
   | Pget_ptr (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pget_ptr (new_layout, mut)
@@ -537,6 +535,16 @@ and eval_prim env prim =
   | Pset_ext_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pset_ext_ptr (new_layout, mode)
+  | Patomic_load_idx { layout = old_layout } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_load_idx { layout = new_layout }
+  | Patomic_set_idx { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_set_idx { layout = new_layout; mode }
   | Patomic_exchange_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
@@ -630,7 +638,9 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
-  | Pset_idx (layout, _, _)
+  | Pset_idx (layout, _)
+  | Patomic_load_idx { layout }
+  | Patomic_set_idx { layout; _ }
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)

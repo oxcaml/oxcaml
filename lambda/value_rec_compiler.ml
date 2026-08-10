@@ -472,6 +472,8 @@ let compute_static_size lam =
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
     | Patomic_fetch_add_field
+    | Patomic_load_idx _
+    | Patomic_set_idx _
     | Patomic_exchange_idx _
     | Patomic_compare_exchange_idx _
     | Patomic_compare_set_idx _

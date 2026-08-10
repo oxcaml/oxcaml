@@ -47,6 +47,7 @@ CAMLextern void caml_modify (volatile value *, value);
 CAMLextern void caml_modify_local (value obj, intnat i, value val);
 CAMLextern void caml_initialize (volatile value *, value);
 CAMLextern value caml_atomic_load_field (value, value);
+CAMLextern value caml_atomic_set_field (value, value, value);
 CAMLextern value caml_atomic_exchange_field (value, value, value);
 CAMLextern value caml_atomic_cas_field (value, value, value, value);
 CAMLextern value caml_atomic_compare_exchange_field (value, value,

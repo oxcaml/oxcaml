@@ -1251,16 +1251,15 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%get_idx_imm" ->
       (* This primitive requires the indexed data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
-      Primitive(Pget_idx (layout, Immutable_access), 2)
+      Primitive(Pget_idx (layout, Immutable), 2)
     | "%get_idx" ->
       (* Whenever it's safe to use the "_imm" counterpart to this primitive
-         (just above), it's also safe to use this one. Marking the primitive
-         as [Mutable_access] just restricts the optimizations that can be
-         performed. *)
-      Primitive(Pget_idx (layout, Mutable_access), 2)
+         (just above), it's also safe to use this one. Marking the primitive as
+         [Mutable] just restricts the optimizations that can be performed. *)
+      Primitive(Pget_idx (layout, Mutable), 2)
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
-      Primitive(Pset_idx (layout, get_first_arg_mode (), Nonatomic), 3)
+      Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -1994,9 +1993,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Atomic (Compare_exchange _ as op, Idx_like (Idx, _)), [_; _; _; v] ->
     let l = layout_of_ty_for_idx_set env loc v in
     Some (Atomic (op, Idx_like (Idx, l)))
-  | Primitive (Pset_idx (_, m, a), arity), (_ :: _ :: p3 :: _) ->
+  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
-    Some (Primitive (Pset_idx (l, m, a), arity))
+    Some (Primitive (Pset_idx (l, m), arity))
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))
@@ -2261,8 +2260,8 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
     end
     | Idx_like (Idx, layout) -> begin
         match op with
-        | Load -> Pget_idx (layout, Atomic_access)
-        | Set mode -> Pset_idx (layout, mode, Atomic)
+        | Load -> Patomic_load_idx { layout }
+        | Set mode -> Patomic_set_idx { layout; mode }
         | Exchange mode -> Patomic_exchange_idx { layout; mode }
         | Compare_exchange mode ->
           Patomic_compare_exchange_idx { layout; mode }
@@ -2729,6 +2728,7 @@ let lambda_primitive_needs_event_after = function
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_load_field _ | Patomic_load_mixed_field _
   | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
   | Patomic_add_idx | Patomic_sub_idx
