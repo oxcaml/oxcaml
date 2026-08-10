@@ -489,7 +489,7 @@ module Type_decl_shape = struct
         | Constructor_undetermined | Constructor_variable _ ->
           Misc.fatal_error
             "Type_shape: unexpected variable constructor representation")
-      | Cstr_layout_variable ->
+      | Cstr_layout_undetermined ->
         Misc.Stdlib.Array.of_list_map
           (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
             ly)
