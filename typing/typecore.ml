@@ -612,6 +612,116 @@ let mode_modality modality expected_mode =
   |> Modality.Const.apply_right modality
   |> mode_default
 
+(* First-class modalities: automatic unpacking.
+
+   A [Tmod] must never survive at the top level of an actual or of an expected
+   type. Where one is found there, the modality leaves the type and enters the
+   mode, in the same direction as for the one-field unboxed record
+   [type 'a w = { x : 'a @@ m } [@@unboxed]]: reading the payload out of a
+   wrapper at mode [a] gives [m] applied to [a] (as [w.x] does), and putting a
+   payload into a wrapper expected at mode [a] demands [m] applied to [a] (as
+   [{ x = e }] does). The map is the same on both sides; only the mode
+   allowance differs.
+
+   [unpack_modality] is the single place that decides whether a type has a
+   top-level modality. *)
+let modality_hint ~loc : Mode.Hint.is_contained_by =
+  { containing = First_class_modality Modality;
+    container = (loc, Expression) }
+
+(* No [-principal] warning is emitted here, deliberately: a [Tmod] only ever
+   enters a type from a written annotation, so this is not a guess made from
+   inferred information in the way record-field disambiguation is. The usual
+   proxy, [is_principal], is unusable at this site anyway -- an expression's
+   expected type is essentially never at [generic_level], so gating on it
+   would warn on every use of the feature. Not covered: an annotation reaching
+   a type by unification with a later expression, as in
+   [fun y -> ignore (y : (t @@ portable)); y]. *)
+(* Expand manifest aliases far enough to reveal a wrapper, without consulting
+   local (GADT) equations.
+
+   Both extremes are wrong here. Never expanding is unsound: [:>] does expand,
+   so it can forget a public alias for [(t @@ aliased)] while the mode side
+   never applies the modality, yielding a [unique] value from an [aliased]
+   one. Always expanding would make unpacking depend on non-principal
+   information. Stopping at locally abstract types gives a globally manifest
+   alias that always unpacks and a locally revealed one that never does, in
+   either mode. *)
+let rec expand_head_for_modality env ty =
+  match get_desc ty with
+  | Tconstr (path, _, _) -> (
+    match Env.find_type path env with
+    | { type_is_newtype = true; _ } -> ty
+    | { type_manifest = Some _; type_private = Public; _ } -> (
+      match try_expand_safe env ty with
+      | expanded -> expand_head_for_modality env expanded
+      | exception Cannot_expand -> ty)
+    | _ | (exception Not_found) -> ty)
+  | _ -> ty
+
+(* Pure counterpart of [expand_head_for_modality]: the same stopping rules,
+   but lowering no levels and memoizing no expansion. *)
+let rec has_modality_head env fuel ty =
+  (* Backstop only; cyclic abbreviations are rejected by [Typedecl]. *)
+  if fuel <= 0 then true
+  else
+    match get_desc ty with
+    | Tmod _ -> true
+    | Tconstr (path, args, _) -> (
+      match Env.find_type path env with
+      | { type_is_newtype = true; _ } -> false
+      | { type_manifest = Some body; type_private = Public; type_params; _ } ->
+        (* Where the manifest is a parameter, the head of the expansion is
+           the matching argument. *)
+        let body =
+          match get_desc body with
+          | Tvar _ ->
+            let rec argument_for params args =
+              match params, args with
+              | param :: params, arg :: args ->
+                if eq_type param body then arg else argument_for params args
+              | _, _ -> body
+            in
+            argument_for type_params args
+          | _ -> body
+        in
+        has_modality_head env (fuel - 1) body
+      | _ -> false
+      | exception Not_found -> false)
+    | _ -> false
+
+let unpack_modality ~loc:_ env ty =
+  let found payload bounds =
+    Some (Typemode.modality_of_mod_bounds bounds, payload)
+  in
+  match get_desc ty with
+  | Tmod (payload, bounds) -> found payload bounds
+  | Tconstr _ when has_modality_head env 100 ty -> (
+    match get_desc (expand_head_for_modality env ty) with
+    | Tmod (payload, bounds) -> found payload bounds
+    | _ -> None)
+  | _ -> None
+
+(* Expected side: the payload is checked at the modality applied to the
+   expected mode of the wrapper. *)
+let mode_unpack_modality ~loc modality expected_mode =
+  mode_morph
+    (apply_right_is_contained_by (modality_hint ~loc) ~modalities:modality)
+    expected_mode
+
+(* Actual side: the payload's mode is the modality applied to the mode of the
+   wrapper. Iterated, so nested wrappers unpack in one go. *)
+let unpack_modality_actual ~loc env ty mode =
+  let rec loop ty (mode : Value.l) =
+    match unpack_modality ~loc env ty with
+    | None -> ty, mode
+    | Some (modality, payload) ->
+        loop payload
+          (apply_left_is_contained_by (modality_hint ~loc) ~modalities:modality
+             mode)
+  in
+  loop ty (Value.disallow_right mode)
+
 (* used when entering a function;
 mode is the mode of the function region *)
 let mode_return mode =
@@ -6649,6 +6759,35 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)
     env (expected_mode : expected_mode) sexp ty_expected_explained =
+  (* [(e : ty)] and [(e :> ty)] carry their own type and unify it with
+     [ty_expected] themselves, so the hook below must not fire on them: it
+     would strip the wrapper from the expectation while the node still reports
+     the annotation as written, and the two would fail to unify. Their
+     recursive call on the subexpression reaches this hook with the annotation
+     as the expected type, so [(e : (t @@ m))] packs. Explicit unpacking is
+     [(e : t)], handled by the actual side. *)
+  let carries_own_type =
+    match sexp.pexp_desc with
+    | Pexp_constraint (_, Some _, _) | Pexp_coerce _ -> true
+    | _ -> false
+  in
+  match
+    if carries_own_type then None
+    else unpack_modality ~loc:sexp.pexp_loc env ty_expected_explained.ty
+  with
+  | Some (modality, payload) ->
+      (* Check the expression against the payload, at [m] applied to the
+         expected mode. [exp_type] keeps the wrapper; consumers that want the
+         payload unpack on the actual side. *)
+      let expected_mode =
+        mode_unpack_modality ~loc:sexp.pexp_loc modality expected_mode
+      in
+      let exp =
+        type_expect_ ~recarg ~overwrite env expected_mode sexp
+          { ty_expected_explained with ty = payload }
+      in
+      { exp with exp_type = ty_expected_explained.ty }
+  | None ->
   let { ty = ty_expected; explanation } = ty_expected_explained in
   let loc = sexp.pexp_loc in
   (* Record the expression type before unifying it with the expected type *)
@@ -7383,6 +7522,9 @@ and type_expect_
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      let ty_ret, mode_ret =
+        unpack_modality_actual ~loc env ty_ret mode_ret
+      in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -7614,6 +7756,7 @@ and type_expect_
         apply_left_is_contained_by is_contained_by
           ~modalities:label.lbl_modalities mode
       in
+      let ty_arg, mode = unpack_modality_actual ~loc env ty_arg mode in
       let boxing : texp_field_boxing =
         let is_float_boxing =
           match record_repres with
@@ -7683,6 +7826,7 @@ and type_expect_
         apply_left_is_contained_by is_contained_by
           ~modalities:label.lbl_modalities mode
       in
+      let ty_arg, mode = unpack_modality_actual ~loc env ty_arg mode in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
       let uu = unique_use ~loc ~env mode (as_single_mode expected_mode) in
@@ -9269,6 +9413,10 @@ and type_ident env ?(recarg=Rejected) lid =
   in
   (* after layout instantiation, the value loses layout polymorphism. *)
   let val_lpoly = Lpoly.determined [] in
+  (* A value of type [(t @@ m)] is seen as a [t] at [m] applied to its mode. *)
+  let val_type, actual_mode =
+    unpack_modality_actual ~loc:lid.loc env val_type actual_mode
+  in
   path, actual_mode, layout_args,
   { desc with val_type; val_lpoly }, kind
 

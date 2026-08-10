@@ -67,7 +67,7 @@ let parameter_list_from_arrows typ =
         (l, t1) :: (iter t2)
     | Types.Tlink texp
     | Types.Tpoly (texp, _) | Types.Trepr (texp, _) -> iter texp
-    | Types.Tmod _ -> Misc.fatal_error "Odoc_value: unexpected Tmod"
+    | Types.Tmod (texp, _) -> iter texp
     | Types.Tvar _
     | Types.Ttuple _
     | Types.Tunboxed_tuple _

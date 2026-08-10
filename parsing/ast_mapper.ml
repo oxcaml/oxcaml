@@ -220,6 +220,8 @@ module T = struct
         splice ~loc ~attrs (sub.typ sub t)
     | Ptyp_of_kind jkind ->
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
+    | Ptyp_modality (t, m) ->
+        modality ~loc ~attrs (sub.typ sub t) (sub.modalities sub m)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_newlayout (lvars, t) ->

@@ -264,6 +264,10 @@ let rec core_type i ppf x =
       core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
+  | Ptyp_modality (ct, m) ->
+      line i ppf "Ptyp_modality\n";
+      core_type i ppf ct;
+      modalities i ppf m
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg

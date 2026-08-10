@@ -4828,6 +4828,9 @@ module Report = struct
             Fmt.dprintf "contains %t%a defined as %t"
               (print_structure_item ~capitalize:false x)
               maybe_modality moda print_pp
+          | First_class_modality moda ->
+            Fmt.dprintf "is a first-class modality wrapping%a %t" maybe_modality
+              moda print_pp
         in
         pr, contained)
 
@@ -4858,6 +4861,9 @@ module Report = struct
         maybe_modality moda
         (Location.Doc.loc ~capitalize_first:false)
         container
+    | First_class_modality moda ->
+      Fmt.dprintf "is the payload of a first-class modality%a" maybe_modality
+        moda
 
   let print_is_contained_by :
       fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =

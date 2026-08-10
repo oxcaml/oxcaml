@@ -597,6 +597,8 @@ and core_type ctxt f x =
           (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
+    | Ptyp_modality (ct, m) ->
+      pp f "@[<1>(%a%a)@]" (core_type ctxt) ct optional_space_atat_modalities m
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
 
 and tuple_type_component ctxt f (label, ty) =
@@ -686,6 +688,7 @@ and core_type1 ctxt f x =
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
+    | Ptyp_modality _ -> core_type ctxt f x
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
       | Ptyp_newlayout _ | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
