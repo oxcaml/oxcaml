@@ -1129,12 +1129,6 @@ Caml_inline void check_atomic_idx(value base, value idx)
   (void)idx;
 }
 
-CAMLprim value caml_get_idx_atomic_bytecode(value base, value idx) {
-  CAMLparam2 (base, idx);
-  check_atomic_idx(base, idx);
-  CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
-}
-
 CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
@@ -1158,12 +1152,18 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLreturn (Val_unit);
 }
 
-CAMLprim value caml_set_idx_atomic_bytecode(value base, value idx, value v)
+CAMLprim value caml_atomic_load_idx_bytecode(value base, value idx)
+{
+  CAMLparam2 (base, idx);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
+}
+
+CAMLprim value caml_atomic_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
   check_atomic_idx(base, idx);
-  caml_atomic_exchange_field(base, Field(idx, 0), v);
-  CAMLreturn (Val_unit);
+  CAMLreturn (caml_atomic_set_field(base, Field(idx, 0), v));
 }
 
 CAMLprim value caml_atomic_exchange_idx_bytecode(value base, value idx,
