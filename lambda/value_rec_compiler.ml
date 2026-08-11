@@ -295,6 +295,8 @@ let compute_static_size lam =
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
+    | Patomic_set_field _
+    | Patomic_set_mixed_field _
     | Patomic_add_field
     | Patomic_sub_field
     | Patomic_land_field
@@ -437,8 +439,6 @@ let compute_static_size lam =
     | Pint_as_pointer _
     | Patomic_load_field _
     | Patomic_load_mixed_field _
-    | Patomic_set_field _
-    | Patomic_set_mixed_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
