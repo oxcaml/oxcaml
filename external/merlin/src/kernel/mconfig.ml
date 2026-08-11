@@ -781,7 +781,7 @@ let ocaml_ignored_flags =
     "-frametables-in-rodata";
     "-no-frametables-in-rodata";
     "-flambda2-no-simplify-stubs";
-    "-flambda2-simplify-stubs";
+    "-flambda2-simplify-stubs"
   ]
 
 let ocaml_ignored_parametrized_flags =
