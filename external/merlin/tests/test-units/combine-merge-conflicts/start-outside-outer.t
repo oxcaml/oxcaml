@@ -1,5 +1,4 @@
 An inner conflict starts outside the outer conflict, but finishes within it.
-  
   $ cat > input.ml <<EOF
   > <<<<<<< current
   > A
