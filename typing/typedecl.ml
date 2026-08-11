@@ -1767,7 +1767,7 @@ let narrow_to_manifest_jkind env loc path decl =
              raise
                (Error
                   (loc,
-                   Jkind_mismatch_of_type (env, ty, Ikind.Jkind_error v))))
+                   Jkind_mismatch_of_type (env, ty, Jkind_error v))))
     end;
     let type_ikind =
       Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
