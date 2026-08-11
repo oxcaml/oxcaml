@@ -149,6 +149,8 @@ val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
 val create : unit -> graph
 
+val union : graph -> graph -> graph
+
 val add_opaque_let_dependency :
   graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit
 

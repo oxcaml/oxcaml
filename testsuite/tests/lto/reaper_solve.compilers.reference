@@ -1,1 +1,1 @@
-reaper_lto_solve: cmr files: [reaper_solve_dependency.cmr; reaper_solve.cmr]; ltosol output: reaper_solve.ltosol
+reaper_lto_solve: solved units: [Reaper_solve_dependency; Reaper_solve]; ltosol output: reaper_solve.ltosol
