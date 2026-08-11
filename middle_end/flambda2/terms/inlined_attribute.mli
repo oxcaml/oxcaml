@@ -47,3 +47,5 @@ val from_lambda : Lambda.inlined_attribute -> t
 val with_use_info : t -> Use_info.t -> t
 
 val use_info : t -> Use_info.t option
+
+val forward_inlined : unit -> t
