@@ -187,6 +187,20 @@ for file in $(git diff --no-ext-diff --name-only); do
            "$tgt" "$tgt.base" "$file"
     then
       echo "Merge conflicts in $tgt"
+      combine_status=0
+      scripts/combine-merge-conflicts.py "$tgt" || combine_status="$?"
+      case "$combine_status" in
+        0) ;;
+        21)
+          echo "Warning: malformed merge conflicts in $tgt;" \
+               "leaving them uncombined."
+          ;;
+        *)
+          echo "Error: combining merge conflicts failed on $tgt with status" \
+               "$combine_status" >&2
+          exit "$combine_status"
+          ;;
+      esac
     fi
     rm -f "$tgt.base"
   else
