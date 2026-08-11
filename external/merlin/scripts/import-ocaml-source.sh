@@ -179,9 +179,15 @@ for file in $(git diff --no-ext-diff --name-only); do
   if [ -e "$file" ]; then
     # Three-way merge of Merlin's copy with the old and new upstream copies.
     git show "HEAD:${subtree_prefix}${file}" > "$tgt.base"
-    # We use a marker size greater than 7 to be able to distinguish from git
-    # conflict markers.
-    marker_size=14
+    # If any of the inputs already contain git conflict markers, we use a
+    # marker size greater than 7 to be able to distinguish import-script
+    # conflict markers from pre-existing conflict markers. Otherwise, we use the
+    # default size of 7 since some tooling expects size 7 markers.
+    if grep -qE '^<<<<<<<' "$tgt" "$tgt.base" "$file"; then
+      marker_size=14
+    else
+      marker_size=7
+    fi
     if ! git merge-file --diff3 --marker-size="$marker_size" \
            -L "$old_marker" -L "$parent_marker" -L "$new_marker" \
            "$tgt" "$tgt.base" "$file"
