@@ -333,11 +333,15 @@ val walk_locks_for_zero_alloc_return :
 
 (** Registers a use of an allocation at the given pinpoint.
 
-    Returns the pinpoint and allocation mode of every enclosing closure.
-    The list is ordered from the innermost closure to the outermost one,
-    so that error messages blame the closure nearest to the allocation. *)
+    Returns the pinpoint and allocation mode of every enclosing closure,
+    split into those that do not enclose an [alloc_and_raise_] around the
+    allocation, and those that do. Each list is ordered from the innermost
+    closure to the outermost one, so that error messages blame the closure
+    nearest to the allocation. *)
 val walk_locks_for_allocation :
-  env:t -> Mode.Hint.pinpoint -> (Mode.Hint.pinpoint * Mode.Allocation.r) list
+  env:t -> Mode.Hint.pinpoint ->
+  (Mode.Hint.pinpoint * Mode.Allocation.r) list
+  * (Mode.Hint.pinpoint * Mode.Allocation.r) list
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->

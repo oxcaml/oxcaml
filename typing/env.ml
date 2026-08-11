@@ -3833,16 +3833,18 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
 
 (** Registers a use of an allocation at the given pinpoint.
 
-    Returns the pinpoint and allocation mode of every enclosing closure.
-    The list is ordered from the innermost closure to the outermost one,
-    so that error messages blame the closure nearest to the allocation. *)
+    Returns the pinpoint and allocation mode of every enclosing closure,
+    split into those that do not enclose an [alloc_and_raise_] around the
+    allocation, and those that do. Each list is ordered from the innermost
+    closure to the outermost one, so that error messages blame the closure
+    nearest to the allocation. *)
 (* CR shsong: currently it only considers noalloc_strict and alloc,
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
   List.fold_left
-    (fun acc lock ->
+    (fun (acc_no_raise, acc_raise) lock ->
       match lock with
       | Closure_lock (closure, comonadic) ->
           let comonadic =
@@ -3850,15 +3852,18 @@ let walk_locks_for_allocation ~env pp =
               (Is_closed_by (Comonadic, {closure; closed = pp}))
               comonadic
           in
-          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc_no_raise,
+          acc_raise
       | Const_closure_lock (_, closure, comonadic) ->
           let comonadic =
             Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
           in
-          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
-      | Region_lock | Exclave_lock | Raise_lock
-      | Unboxed_lock -> acc
-    ) [] locks
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc_no_raise,
+          acc_raise
+      | Raise_lock -> [], acc_no_raise @ acc_raise
+      | Region_lock | Exclave_lock
+      | Unboxed_lock -> acc_no_raise, acc_raise
+    ) ([], []) locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either

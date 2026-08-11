@@ -2822,21 +2822,13 @@ type r10 = { x : int; }
 (* Test 10.1: Allocation wrapped by [alloc_and_raise_] only forces the closure
    that closes over the keyword to be [noalloc] rather than [alloc]. *)
 
-(* CR shsong: This test is expected to pass once we finish the impl.
-   But it should fail for now. *)
 let (f @ noalloc) (x : int) =
   if x < 0 then alloc_and_raise_
     let _ = { x } in
     raise (E10 (x, x))
   else ()
 [%%expect{|
-Line 4, characters 10-22:
-4 |     raise (E10 (x, x))
-              ^^^^^^^^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at lines 1-5, characters 18-9,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+val f : int -> unit = <fun>
 |}]
 
 (* The same allocations without [alloc_and_raise_] are rejected, and stay
@@ -2858,7 +2850,6 @@ Error: The allocation is "local"
 
 (* [alloc_and_raise_] does not help a [noalloc_strict] function, which cannot
    allocate at all. *)
-(* CR shsong: This test should keep failing once we finish the impl. *)
 let (f @ noalloc_strict) (x : int) =
   if x < 0 then alloc_and_raise_
     let _ = { x } in
@@ -2877,7 +2868,7 @@ Error: The allocation is "local"
 (* Test 10.2: [noalloc] functions called within a [try ... with] block still
    force the enclosing closure to be [alloc]. *)
 (* CR shsong: This test will fail on checking [g] once we finish.
-   But for now it should fail on checking [f]. *)
+   But for now it passes. *)
 let wrapper () =
   let (f @ noalloc) (x : int) =
     if x < 0 then alloc_and_raise_
@@ -2891,15 +2882,10 @@ let wrapper () =
     with
     | _ -> ()
   in
+  let _ = g in
   ()
 [%%expect{|
-Line 5, characters 12-24:
-5 |       raise (E10 (x, x))
-                ^^^^^^^^^^^^
-Error: The allocation is "local"
-         because it is allocated inside the function at lines 2-6, characters 20-11,
-         which is "noalloc" and thus cannot allocate on the heap.
-       However, the allocation highlighted is expected to be "global".
+val wrapper : unit -> unit = <fun>
 |}]
 
 (* Test 10.3: [alloc_and_raise_] can only wrap an expression that definitely

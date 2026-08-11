@@ -18,9 +18,12 @@ open Mode
 
 type t =
   { alloc_mode : Alloc.r;
-    closures : (Hint.pinpoint * Allocation.r) list;
-    (** Closures enclosing the allocation, from the innermost
-        to the outermost one. *)
+    no_raise_closures : (Hint.pinpoint * Allocation.r) list;
+    (** Closures enclosing the allocation with no [alloc_and_raise_] in
+        between, from the innermost to the outermost one. *)
+    raise_closures : (Hint.pinpoint * Allocation.r) list;
+    (** Closures enclosing an [alloc_and_raise_] that in turn encloses the
+        allocation, from the innermost to the outermost one. *)
     pp : Hint.pinpoint
   }
 
@@ -28,9 +31,11 @@ let allocations : t list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
-let register_mode_for_optimisation pp ?(closures=[]) alloc_mode =
+let register_mode_for_optimisation pp ?(closures = ([], [])) alloc_mode =
+  let no_raise_closures, raise_closures = closures in
   let alloc_mode = Alloc.disallow_left alloc_mode in
-  allocations := {alloc_mode; closures; pp} :: !allocations
+  allocations :=
+    {alloc_mode; no_raise_closures; raise_closures; pp} :: !allocations
 
 let register_allocation_mode ~env ~loc alloc_mode =
   let pp : Hint.pinpoint = (loc, Allocation) in
@@ -67,19 +72,22 @@ let register_closure_allocation ~env (mode : Value.r) ~loc
   in
   alloc_mode, closed_over_mode
 
-let constrain_enclosing_closures pp closures =
+let constrain_closures_at pp mode closures =
   List.iter
     (fun (_, closure_mode) ->
       Allocation.submode_err pp
-        (Allocation.of_const ~hint:Allocated_on_heap Alloc)
+        (Allocation.of_const ~hint:Allocated_on_heap mode)
         closure_mode)
     closures
 
-(* Module is always allocated on the heap, so every enclosing closure
-   is forced to be [alloc]. *)
+(* Module is always allocated on the heap, no need to delay constraining
+   closures. *)
 let register_mod_allocation ~env ~loc ~desc =
-  let closures = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
-  constrain_enclosing_closures (loc, desc) closures
+  let no_raise_closures, raise_closures =
+    Env.walk_locks_for_allocation ~env (loc, Hint.Allocation)
+  in
+  constrain_closures_at (loc, desc) Alloc no_raise_closures;
+  constrain_closures_at (loc, desc) Noalloc raise_closures
 
 let register_zero_alloc_application_allocation ~env ~pos
     (funct : Typedtree.expression) args (mode_ret : Value.l) =
@@ -123,16 +131,25 @@ let relax_alloc (desc : Types.value_description) ~is_applied mode =
       | Type_zero_alloc.Default -> mode
       end
 
-let enclosing_noalloc_closure closures =
-  List.find_map
-    (fun (closure_pp, closure_mode) ->
-      (* This function must only be called before zapping the allocation axis of
-         closure modes, so it is ok to call [Allocation.Guts.get_ceil] here. *)
-      match Allocation.Guts.get_ceil closure_mode with
-      | Noalloc -> Some (closure_pp, Hint.Noalloc)
-      | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
-      | Alloc -> None)
-    closures
+let constrain_enclosing_closures {no_raise_closures; raise_closures; pp; _} =
+  constrain_closures_at pp Alloc no_raise_closures;
+  constrain_closures_at pp Noalloc raise_closures
+
+let enclosing_noalloc_closure {no_raise_closures; raise_closures; _} =
+  (* This function must only be called before zapping the allocation axis of
+     closure modes, so it is ok to call [Allocation.Guts.get_ceil] here. *)
+  let find ~strict_only closures =
+    List.find_map
+      (fun (closure_pp, closure_mode) ->
+        match Allocation.Guts.get_ceil closure_mode with
+        | Noalloc_strict -> Some (closure_pp, Hint.Noalloc_strict)
+        | Noalloc when not strict_only -> Some (closure_pp, Hint.Noalloc)
+        | Noalloc | Alloc -> None)
+      closures
+  in
+  match find ~strict_only:false no_raise_closures with
+  | Some _ as closure -> closure
+  | None -> find ~strict_only:true raise_closures
 
 let constrain_closures () =
   let heap, pending =
@@ -149,14 +166,13 @@ let constrain_closures () =
   allocations := pending;
   (* Visited in registration (i.e. source) order, so that the first offending
      allocation is the one reported. *)
-  List.iter (fun {closures; pp; _} -> constrain_enclosing_closures pp closures)
-    (List.rev heap)
+  List.iter constrain_enclosing_closures (List.rev heap)
 
 let constrain_allocations () =
   let local, pending =
     !allocations
-    |> List.partition_map (fun ({closures; _} as allocation) ->
-      match enclosing_noalloc_closure closures with
+    |> List.partition_map (fun allocation ->
+      match enclosing_noalloc_closure allocation with
       | Some closure -> Left (allocation, closure)
       | None -> Right allocation)
   in
@@ -187,9 +203,9 @@ let optimise_allocations () =
   (* Reset first: the loop below can raise. *)
   reset_allocations ();
   List.iter
-    (fun {alloc_mode; closures; pp} ->
+    (fun ({alloc_mode; _} as allocation) ->
       match Locality.zap_to_ceil (Alloc.proj_comonadic Areality alloc_mode)
       with
       | Local -> ()
-      | Global -> constrain_enclosing_closures pp closures)
+      | Global -> constrain_enclosing_closures allocation)
     allocations
