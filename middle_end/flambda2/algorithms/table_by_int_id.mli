@@ -51,6 +51,8 @@ end) : sig
 
   exception Not_exported
 
+  val import_exn : serializable -> Id.t -> E.t
+
   val import : serializable -> Id.t -> E.t
 
   (* Returns the original identifier associated with a given [E.t]. This is

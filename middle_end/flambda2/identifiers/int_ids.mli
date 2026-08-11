@@ -138,6 +138,8 @@ module Variable : sig
 
   exception Not_exported
 
+  val import_exn : importer -> t -> t
+
   val import : importer -> t -> t
 
   val import_and_rename : importer -> t -> t
