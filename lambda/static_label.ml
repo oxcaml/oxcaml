@@ -24,4 +24,6 @@ let get_and_incr seq =
 
 let of_int_unsafe i = i
 
-let min = Int.min
+(* Eta-expanded: [Int.min] is [noalloc_strict], so its inner arrow is [local].
+   Aliasing it directly would propagate that into this module's signature. *)
+let min a b = Int.min a b

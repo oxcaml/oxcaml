@@ -45,13 +45,14 @@ let pred u =
   if u = min then invalid_arg err_no_pred else
   u - 1
 
-let is_valid i = (min <= i && i <= lo_bound) || (hi_bound <= i && i <= max)
+let (is_valid @ noalloc_strict) i =
+  (min <= i && i <= lo_bound) || (hi_bound <= i && i <= max)
 let of_int i = if is_valid i then i else invalid_arg (err_not_sv i)
 external unsafe_of_int : int -> t @@ portable = "%identity"
 external to_int : t -> int @@ portable = "%identity"
 
-let is_char u = u < 256
-let of_char c = Char.code c
+let (is_char @ noalloc_strict) u = u < 256
+let (of_char @ noalloc_strict) c = Char.code c
 let to_char u =
   if u > 255 then invalid_arg (err_not_latin1 u) else
   Char.unsafe_chr u
@@ -67,7 +68,7 @@ let compare : int -> int -> int = Stdlib.compare
 external seeded_hash_param :
   int -> int -> int -> 'a -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x
 
 (* UTF codecs tools *)
 
@@ -98,7 +99,7 @@ let utf_8_decode_length_of_byte = function
 
 let max_utf_8_decode_length = 4
 
-let utf_8_byte_length u = match to_int u with
+let (utf_8_byte_length @ noalloc_strict) u = match to_int u with
 | u when u < 0 -> assert false
 | u when u <= 0x007F -> 1
 | u when u <= 0x07FF -> 2
@@ -106,7 +107,7 @@ let utf_8_byte_length u = match to_int u with
 | u when u <= 0x10FFFF -> 4
 | _ -> assert false
 
-let utf_16_byte_length u = match to_int u with
+let (utf_16_byte_length @ noalloc_strict) u = match to_int u with
 | u when u < 0 -> assert false
 | u when u <= 0xFFFF -> 2
 | u when u <= 0x10FFFF -> 4

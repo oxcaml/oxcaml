@@ -7,7 +7,9 @@ type t = int
 
 let none = -1
 
-let max = Int.max
+(* Eta-expanded: [Int.max] is [noalloc_strict], so its inner arrow is [local].
+   Aliasing it directly would propagate that into this module's signature. *)
+let max a b = Int.max a b
 
 let to_string = Int.to_string
 

@@ -16,8 +16,8 @@
 type ('a, 'b) t = 'a * 'b
 
 let make a b = (a, b)
-let fst (a, _) = a
-let snd (_, b) = b
+let (fst @ noalloc_strict) (a, _) = a
+let (snd @ noalloc_strict) (_, b) = b
 let swap (a, b) = (b, a)
 
 let fold f (a, b) = f a b

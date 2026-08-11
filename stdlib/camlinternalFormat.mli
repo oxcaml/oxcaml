@@ -24,12 +24,13 @@ open! Stdlib
 
 open CamlinternalFormatBasics
 
-val is_in_char_set : char_set -> char -> bool
+val is_in_char_set : char_set -> (char -> bool) @ local @@ noalloc_strict
 val rev_char_set : char_set -> char_set
 
 type mutable_char_set = bytes
 val create_char_set : unit -> mutable_char_set
 val add_in_char_set : mutable_char_set -> char -> unit
+[@@zero_alloc strict]
 val freeze_char_set : mutable_char_set -> char_set
 
 type ('a, 'b, 'c, 'd, 'e, 'f) param_format_ebb = Param_format_EBB :

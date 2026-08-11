@@ -27,8 +27,8 @@ external ignore : 'a -> unit = "%ignore"
 type 'a t = {mutable v: 'a}
 
 let make v = {v}
-let get r = r.v
-let set r v = r.v <- v
+let (get @ noalloc_strict) r = r.v
+let (set @ noalloc_strict) r v = r.v <- v
 
 (* The following functions are set to never be inlined: Flambda is
    allowed to move surrounding code inside the critical section,
@@ -51,12 +51,12 @@ let[@inline never] compare_and_set r seen v =
   ) else
     false
 
-let[@inline never] fetch_and_add r n =
+let[@inline never] (fetch_and_add @ noalloc_strict) r n =
   (* BEGIN ATOMIC *)
   let cur = r.v in
   r.v <- (cur + n);
   (* END ATOMIC *)
   cur
 
-let incr r = ignore (fetch_and_add r 1)
-let decr r = ignore (fetch_and_add r (-1))
+let (incr @ noalloc_strict) r = ignore (fetch_and_add r 1)
+let (decr @ noalloc_strict) r = ignore (fetch_and_add r (-1))
