@@ -1,0 +1,57 @@
+# Test 1: pinning across reparenting
+child1 d_lex [expect 1]: 1
+child1 d_worker [expect 100]: 100
+child1 d_both [expect 2]: 2
+child1 subfiber d_lex [expect 1]: 1
+child2 d_lex [expect 1]: 1
+unpinned d_lex [expect null]: null
+parent d_lex after join [expect 1]: 1
+parent d_worker after join [expect null]: null
+
+# Test 2: shadowing inside the child
+child d_lex shadowed [expect 5]: 5
+child d_lex unshadowed [expect 1]: 1
+parent d_lex after join [expect 1]: 1
+
+# Test 3: nested fork_join
+grandchild d_lex [expect 1]: 1
+grandchild d_child [expect 3]: 3
+grandchild d_worker [expect 200]: 200
+child d_worker after nested join [expect 100]: 100
+
+# Test 4: intermediate fiber captured with the fork
+child d_inter [expect 7]: 7
+child d_lex [expect 1]: 1
+child d_worker [expect 100]: 100
+forker d_inter after join [expect 7]: 7
+
+# Test 5: suspend and resume under a new parent
+child d_lex before yield [expect 1]: 1
+child d_worker before yield [expect 100]: 100
+child d_lex after yield [expect 1]: 1
+child d_worker after yield [expect 999]: 999
+child2 d_worker [expect 100]: 100
+
+# Test 6: child stack growth
+child d_lex after deep recursion [expect 1]: 1
+
+# Test 7: root flag stops detours at the task base
+child d_lex from live parent [expect 1]: 1
+child d_worker from own worker [expect 222]: 222
+parent d_worker [expect 111]: 111
+
+# Test 8: fiber escaping the scheduler is reparented
+generator inside task d_lex [expect 1]: 1
+escaped generator d_lex [expect 9]: 9
+escaped generator own binding [expect 42]: 42
+
+# Test 9: handle survives fork-point stack growth
+child d_lex after growth [expect 1]: 1
+child d_worker [expect 222]: 222
+
+# Test 10: re-freeze after reparenting the fork point
+child1 d_inter [expect 7]: 7
+child1b d_inter [expect 7]: 7
+F d_inter before capture [expect 7]: 7
+F d_inter after resume [expect 8]: 8
+child2 d_inter [expect 8]: 8

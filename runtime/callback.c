@@ -595,7 +595,8 @@ CAMLprim value caml_with_async_exns(value body_callback)
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
   caml_dynamic_table_unregister_roots(&tbl);
 
-  // The body may have created the node.
+  // The body may have created the node. Only the table is restored; lexical
+  // edges belong to the fiber, not to the unwound bindings.
   node = Caml_state->current_stack->dyn_node;
   if(node != NULL) {
     caml_dynamic_table_free(&node->table);

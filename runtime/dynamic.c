@@ -468,6 +468,8 @@ static dynamic_node_t dynamic_node_get_or_init(struct stack_info *stack)
       caml_raise_out_of_memory();
     }
     caml_dynamic_table_init(&node->table);
+    node->lexical_parent = NULL;
+    node->is_task = false;
     stack->dyn_node = node;
   }
   return node;
@@ -497,9 +499,36 @@ static value dynamic_lookup(struct stack_info *stack, value dyn)
 {
   value val;
 
+  // Outer loop traverses the Stack_parent chain. In the absence of structured
+  // concurrency, this is all we need.
   for(; stack != NULL; stack = Stack_parent(stack)) {
-    if(dynamic_node_find(stack->dyn_node, dyn, &val)) {
+
+    dynamic_node_t node = stack->dyn_node;
+    if(node == NULL) {
+      continue;
+    }
+    if(dynamic_node_find(node, dyn, &val)) {
       return val;
+    }
+
+    // If the current node is a task whose lexical parent disagrees with its
+    // dynamic parent, traverse the lexical chain. Note we ignore plain nodes:
+    // their lexical parents only cache frozen parent pointers.
+    if(node->is_task &&
+       /* If lexical_parent is NULL, this is the root task. */
+       node->lexical_parent != NULL &&
+        /* If the lexical parent is suspended, its Stack_parent is NULL. */
+        (Stack_parent(stack) == NULL ||
+         Stack_parent(stack)->dyn_node != node->lexical_parent)) {
+
+      dynamic_node_t lex_node = node->lexical_parent;
+
+      // Inner loop traverses the lexical parent chain.
+      for(; lex_node != NULL; lex_node = lex_node->lexical_parent) {
+        if(dynamic_node_find(lex_node, dyn, &val)) {
+          return val;
+        }
+      }
     }
   }
   return Val_null;
@@ -528,6 +557,9 @@ CAMLprim value caml_dynamic_get(value dyn)
 CAMLprim value caml_dynamic_push(value dyn, value val)
 {
   CAMLparam2(dyn, val);
+
+  /* Val_null is reserved as the "unbound" sentinel */
+  CAMLassert(Is_this(val));
 
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
@@ -562,5 +594,62 @@ CAMLprim value caml_dynamic_pop(value dyn)
     entry->dyn = Val_null;
   }
 
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_freeze_scope(value unit)
+{
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  dynamic_node_t node = dynamic_node_get_or_init(stack);
+
+  // Link fibers up to the enclosing task into the lexical parent chain.
+  dynamic_node_t cur = node;
+  while(!cur->is_task && Stack_parent(stack) != NULL) {
+
+    stack = Stack_parent(stack);
+    dynamic_node_t next = stack->dyn_node;
+    if(next == NULL) {
+      // Skip empty bindings
+      continue;
+    }
+
+    // Avoid writing the parent if we've already frozen it
+    // (children may be reading it concurrently)
+    if(cur->lexical_parent != next) {
+      cur->lexical_parent = next;
+    }
+    cur = next;
+  }
+
+  // Freezing must happen inside a root task, so the walk ends at a task node.
+  CAMLassert(cur->is_task);
+
+  return Val_ptr(node);
+}
+
+CAMLprim value caml_dynamic_use_scope(value scope)
+{
+  struct stack_info *stack = Caml_state->current_stack;
+  CAMLassert(stack);
+
+  dynamic_node_t parent = Ptr_val(scope);
+  CAMLassert(parent);
+
+  dynamic_node_t node = dynamic_node_get_or_init(stack);
+  node->lexical_parent = parent;
+  node->is_task = true;
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
+  return Val_unit;
+}
+
+CAMLprim value caml_dynamic_set_root(value unit)
+{
+  dynamic_node_t node = dynamic_node_get_or_init(Caml_state->current_stack);
+  node->lexical_parent = NULL;
+  node->is_task = true;
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
   return Val_unit;
 }
