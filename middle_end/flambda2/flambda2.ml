@@ -392,7 +392,7 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
-let reaper_lto_solve ~cmr_files ~ltosol_filename =
+let reaper_lto_solve ~cmr_files ~ltosol_file =
   (* ID stamp counters are process-global monotonically increasing counters that
      give us an easy way of creating fresh identifiers. These identifiers get
      persisted across processes, and we need to prevent collisions when this
@@ -441,7 +441,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_filename =
             Compilation_unit.full_path_as_string
               (Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr))
           cmrs))
-    ltosol_filename
+    ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~cmr_filename =

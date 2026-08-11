@@ -38,6 +38,6 @@ val main
     Cmm.phrase list)
   -> reaper_lto_solve:(
     cmr_files:string list ->
-    ltosol_filename:string ->
+    ltosol_file:string ->
     unit)
   -> int

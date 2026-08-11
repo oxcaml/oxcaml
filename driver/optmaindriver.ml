@@ -179,20 +179,20 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
     else if !reaper_solve then begin
       Compmisc.init_path ();
       (* CR mvellacott: change validation: should take .cmx files. *)
-      let cmr_files = Compenv.get_objfiles ~with_ocamlparam:false in
-      (match
-         List.find_opt (fun f -> not (Filename.check_suffix f ".cmr"))
-           cmr_files
-       with
-      | None -> ()
-      | Some non_cmr_file ->
-        Printf.ksprintf Compenv.fatal
-          "Only .cmr files may be given with -reaper-solve (found [%s])"
-          non_cmr_file);
-      if List.is_empty cmr_files then
-        Compenv.fatal "Must specify at least one .cmr file with -reaper-solve";
-      let ltosol_filename = Compenv.extract_output !output_name in
-      reaper_lto_solve ~cmr_files ~ltosol_filename;
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let cmr_files = match
+        List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
+      with
+        | [], _ ->
+          Compenv.fatal "Must specify at least one .cmr file with -reaper-solve"
+        | cmr_files, [] -> cmr_files
+        | _, other_files ->
+          Printf.ksprintf Compenv.fatal
+            "Got unexpected files: [%s] (-reaper-solve expects .cmr files only)"
+            (String.concat ", " other_files)
+      in
+      let ltosol_file = Compenv.extract_output !output_name in
+      reaper_lto_solve ~cmr_files ~ltosol_file;
       Warnings.check_fatal ();
     end
     else if !shared then begin
