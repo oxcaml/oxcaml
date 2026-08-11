@@ -45,6 +45,14 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
+type atomic_flag = Asttypes.atomic_flag
+
+type access_flag = Asttypes.access_flag
+
+let access_atomicity : access_flag -> atomic_flag = function
+  | Immutable_access | Mutable_access -> Nonatomic
+  | Atomic_access -> Atomic
+
 include (struct
 
   type locality_mode =
@@ -430,15 +438,19 @@ type primitive =
     index : int;
     shape : mixed_block_shape;
   }
-  | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_set_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
+    mode : modify_mode;
   }
-  | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_exchange_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
   | Patomic_compare_exchange_field of
-    {immediate_or_pointer : immediate_or_pointer}
-  | Patomic_compare_set_field of {immediate_or_pointer : immediate_or_pointer}
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
+  | Patomic_compare_set_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
@@ -476,8 +488,8 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
+  | Pget_idx of layout * access_flag
+  | Pset_idx of layout * modify_mode * atomic_flag
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
@@ -3600,13 +3612,13 @@ let primitive_result_layout (p : primitive) =
   | Patomic_load_mixed_field { index ; shape } ->
     layout_of_mixed_block_shape shape ~path:[index]
   | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
-  | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
+  | Patomic_exchange_field { immediate_or_pointer = Immediate; _ } ->
     layout_int_or_null
-  | Patomic_exchange_field { immediate_or_pointer = Pointer } ->
+  | Patomic_exchange_field { immediate_or_pointer = Pointer; _ } ->
     layout_any_value
-  | Patomic_compare_exchange_field { immediate_or_pointer = Immediate } ->
+  | Patomic_compare_exchange_field { immediate_or_pointer = Immediate; _ } ->
     layout_int_or_null
-  | Patomic_compare_exchange_field { immediate_or_pointer = Pointer } ->
+  | Patomic_compare_exchange_field { immediate_or_pointer = Pointer; _ } ->
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int

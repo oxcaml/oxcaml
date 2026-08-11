@@ -65,15 +65,15 @@ end
          (atomic_set_field_imm r 1 v))
      cas =
        (function {nlocal = 0} r oldv newv : int
-         (atomic_compare_set_field_ptr r 1 oldv newv))
+         (atomic_compare_set_field_ptr(maybe-stack) r 1 oldv newv))
      get_loc =
        (function {nlocal = 0} r never_inline
          (makeblock 0 (*,value<int>) r 1))
      slow_cas =
        (function {nlocal = 0} r oldv newv : int
          (let (atomic_arg = (apply get_loc r))
-           (atomic_compare_set_field_ptr (field_imm 0 atomic_arg)
-             (field_int 1 atomic_arg) oldv newv))))
+           (atomic_compare_set_field_ptr(maybe-stack)
+             (field_imm 0 atomic_arg) (field_int 1 atomic_arg) oldv newv))))
     (makeblock 0 get get_imm set set_imm cas get_loc slow_cas)))
 module Basic :
   sig
