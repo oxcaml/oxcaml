@@ -76,5 +76,5 @@ Line 1, characters 24-32:
 Warning 47 [attribute-payload]: illegal payload for attribute "tailcall".
   Only an optional boolean literal is supported.
 
-val test : 'a -> 'b = <fun>
+val test : 'a ('b : any). 'a -> 'b = <fun>
 |}]

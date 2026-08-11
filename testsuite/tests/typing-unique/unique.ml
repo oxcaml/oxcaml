@@ -284,12 +284,13 @@ val tail_unique : 'a list @ unique -> 'a list @ unique = <fun>
 
 let higher_order (f : 'a @ unique -> 'b @ unique) (x : 'a @ unique) = (f x : @ unique)
 [%%expect{|
-val higher_order : ('a @ unique -> 'b @ unique) -> 'a @ unique -> 'b = <fun>
+val higher_order :
+  'a ('b : any). ('a @ unique -> 'b @ unique) -> 'a @ unique -> 'b = <fun>
 |}]
 
 let higher_order2 (f : 'a -> 'b @ unique) (x : 'a) = (f x : @ unique)
 [%%expect{|
-val higher_order2 : ('a -> 'b @ unique) -> 'a -> 'b = <fun>
+val higher_order2 : 'a ('b : any). ('a -> 'b @ unique) -> 'a -> 'b = <fun>
 |}]
 
 let higher_order3 (f : 'a -> 'b) (x : 'a @ unique) = (f x : @ unique)

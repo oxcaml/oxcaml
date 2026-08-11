@@ -23,22 +23,22 @@ Static data:
     Cross_module_static_lib/counted_id/2;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure ⟨env⟩ layout_16 ->
+    (closure ⟨env⟩ layout_18 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/351[L] x/342[$layout_16] : $layout_16
+        ⟪(function {nlocal = 0} closure/351[L] x/342[$layout_18] : $layout_18
            (let (calls/348 =a (mixedfield 0  (*) closure/351))
              (seq (+:=1 calls/348) x/342)))⟫ }))
   (Cross_module_static_lib/id/0
-    (closure ⟨env⟩ layout_2 ->
+    (closure ⟨env⟩ layout_3 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/349[L] x/334[$layout_2] : $layout_2
+        ⟪(function {nlocal = 0} closure/349[L] x/334[$layout_3] : $layout_3
            x/334)⟫ }))
   (Cross_module_static_lib/pair/1
-    (closure ⟨env⟩ layout_5 layout_7 ->
+    (closure ⟨env⟩ layout_10 layout_11 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/350[L] x/337[$layout_5]
-           y/338[$layout_7] : #($layout_5, $layout_7)
-           (make_unboxed_product #($layout_5, $layout_7) x/337 y/338))⟫ }))
+        ⟪(function {nlocal = 0} closure/350[L] x/337[$layout_10]
+           y/338[$layout_11] : #($layout_10, $layout_11)
+           (make_unboxed_product #($layout_10, $layout_11) x/337 y/338))⟫ }))

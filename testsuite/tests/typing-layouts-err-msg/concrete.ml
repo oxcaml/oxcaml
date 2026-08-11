@@ -134,15 +134,7 @@ Error: This pattern matches values of type "t_any"
 let f (): t_any = assert false
 
 [%%expect{|
-Line 1, characters 18-30:
-1 | let f (): t_any = assert false
-                      ^^^^^^^^^^^^
-Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_5)"
-       The layout of t_any is any
-         because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be representable
-         because we must know concretely how to return a function result.
+val f : unit -> t_any = <fun>
 |}]
 
 (* Structure_item_expression *)
@@ -192,7 +184,7 @@ Line 1, characters 9-21:
 1 | let _ = (assert false : t_any); ()
              ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_6)"
+         "('a : '_representable_layout_5)"
        because it is in the left-hand side of a sequence
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.

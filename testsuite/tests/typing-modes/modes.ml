@@ -480,7 +480,8 @@ let use_local (f : (_ -> _ -> _) @ local) x y =
   f x y
 let result = use_local (^) "hello" " world"
 [%%expect{|
-val use_local : ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c = <fun>
+val use_local : 'a 'b ('c : any). ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c =
+  <fun>
 val result : string = "hello world"
 |}]
 
@@ -513,7 +514,8 @@ let portable_ret : string -> (string -> string) @ portable =
   fun x y -> y
 let result = use_nonportable_ret portable_ret "hello" " world"
 [%%expect{|
-val use_nonportable_ret : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
+val use_nonportable_ret :
+  'a 'b ('c : any). ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
 val portable_ret : string -> (string -> string) @ portable = <fun>
 val result : string = " world"
 |}]
@@ -573,8 +575,9 @@ let bar (local_ x) (local_ y) = let _ = x +. y in ()
 
 let result = use_local foo 1. 2.
 [%%expect{|
-val use_local : ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c = <fun>
-val use_global : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
+val use_local : 'a 'b ('c : any). ('a -> 'b -> 'c) @ local -> 'a -> 'b -> 'c =
+  <fun>
+val use_global : 'a 'b ('c : any). ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
 val foo : float -> float -> float = <fun>
 val bar : float @ local -> float @ local -> unit = <fun>
 val result : float = 3.
@@ -604,7 +607,7 @@ let nonportable_arg (f @ nonportable) = f ()
 let result = use_portable_arg nonportable_arg (fun () -> ())
 [%%expect{|
 val use_portable_arg :
-  ('a : any) ('b : any) 'c.
+  ('a : any) ('b : any) ('c : any).
     (('a -> 'b) @ portable -> 'c) -> ('a -> 'b) @ portable -> 'c =
   <fun>
 val nonportable_arg : (unit -> 'a) -> 'a = <fun>
@@ -616,7 +619,8 @@ let portable_arg (f @ portable) = f ()
 let bad_use = use_nonportable_arg portable_arg (fun () -> ())
 [%%expect{|
 val use_nonportable_arg :
-  ('a : any) ('b : any) 'c. (('a -> 'b) -> 'c) -> ('a -> 'b) -> 'c = <fun>
+  ('a : any) ('b : any) ('c : any). (('a -> 'b) -> 'c) -> ('a -> 'b) -> 'c =
+  <fun>
 val portable_arg : (unit -> 'a) @ portable -> 'a = <fun>
 Line 3, characters 34-46:
 3 | let bad_use = use_nonportable_arg portable_arg (fun () -> ())
@@ -629,7 +633,7 @@ let use_uncontended_arg (f : _ @ uncontended -> _) x = f x
 let contended_arg (x @ contended) = ()
 let result = use_uncontended_arg contended_arg ()
 [%%expect{|
-val use_uncontended_arg : ('a -> 'b) -> 'a -> 'b = <fun>
+val use_uncontended_arg : 'a ('b : any). ('a -> 'b) -> 'a -> 'b = <fun>
 val contended_arg : 'a @ contended -> unit = <fun>
 val result : unit = ()
 |}]
@@ -638,7 +642,8 @@ let use_contended_arg (f : _ @ contended -> _) x = f x
 let uncontended_arg (x @ uncontended) = ()
 let bad_use = use_contended_arg uncontended_arg ()
 [%%expect{|
-val use_contended_arg : ('a @ contended -> 'b) -> 'a -> 'b = <fun>
+val use_contended_arg : 'a ('b : any). ('a @ contended -> 'b) -> 'a -> 'b =
+  <fun>
 val uncontended_arg : 'a -> unit = <fun>
 Line 3, characters 32-47:
 3 | let bad_use = use_contended_arg uncontended_arg ()

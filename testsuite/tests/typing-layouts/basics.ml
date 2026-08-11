@@ -369,15 +369,7 @@ Error: The type constraints are not consistent.
 
 let f1 () : t_any = assert false;;
 [%%expect{|
-Line 1, characters 20-32:
-1 | let f1 () : t_any = assert false;;
-                        ^^^^^^^^^^^^
-Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_4)"
-       The layout of t_any is any
-         because of the definition of t_any at line 5, characters 0-18.
-       But the layout of t_any must be representable
-         because we must know concretely how to return a function result.
+val f1 : unit -> t_any = <fun>
 |}];;
 
 let f1 (x : t_any) = ();;
@@ -387,7 +379,7 @@ Line 1, characters 7-18:
            ^^^^^^^^^^^
 Error: This pattern matches values of type "t_any"
        but a pattern was expected which matches values of type
-         "('a : '_representable_layout_5)"
+         "('a : '_representable_layout_4)"
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
        But the layout of t_any must be representable
@@ -1709,7 +1701,7 @@ let q () =
 
 [%%expect{|
 val ( let* ) : 'a -> 'b -> unit = <fun>
-val ( and* ) : 'a -> 'b -> 'c = <fun>
+val ( and* ) : 'a 'b ('c : any). 'a -> 'b -> 'c = <fun>
 Line 4, characters 9-22:
 4 |     let* x : t_float64 = assert false
              ^^^^^^^^^^^^^
@@ -1915,7 +1907,7 @@ Line 1, characters 10-22:
 1 | let () = (assert false : t_any); ()
               ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_6)"
+         "('a : '_representable_layout_5)"
        because it is in the left-hand side of a sequence
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -1934,7 +1926,7 @@ Line 1, characters 25-37:
 1 | let () = while false do (assert false : t_any); done
                              ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_7)"
+         "('a : '_representable_layout_6)"
        because it is in the body of a while-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -1953,7 +1945,7 @@ Line 1, characters 28-40:
 1 | let () = for i = 0 to 0 do (assert false : t_any); done
                                 ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_8)"
+         "('a : '_representable_layout_7)"
        because it is in the body of a for-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -2786,7 +2778,7 @@ let refute (x : t is_value) =
 [%%expect{|
 type ('a : any) is_value = V : 'a is_value
 type t : float64
-val refute : t is_value -> 'a = <fun>
+val refute : ('a : any). t is_value -> 'a = <fun>
 |}]
 
 type ('a : any) is_value =
@@ -2801,7 +2793,7 @@ let refute (x : 'a t is_value) =
 [%%expect{|
 type ('a : any) is_value = V : 'a is_value
 type 'a t : float64
-val refute : 'a t is_value -> 'b = <fun>
+val refute : 'a ('b : any). 'a t is_value -> 'b = <fun>
 |}]
 
 (***********************************)
@@ -2841,13 +2833,24 @@ type ('a : any) s = 'a
 module F :
   functor (X : S) ->
     sig
-      val f1 : ([ `K of 'a X.bits64 inj ], [ `K of 'a X.value inj ]) eq -> 'b
+      val f1 :
+        'a ('b : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of 'a X.value inj ]) eq -> 'b
       val f2 :
-        ([ `K of 'a X.bits64 inj ], [ `K of (int -> int) inj ]) eq -> 'b
-      val f3 : ([ `K of 'a X.bits64 inj ], [ `K of 'b inj ]) eq -> 'c
-      val f4 : ([ `K of 'b inj ], [ `K of 'a X.bits64 inj ]) eq -> 'c
-      val f5 : ([ `K of 'a X.bits64 s inj ], [ `K of 'b s inj ]) eq -> 'c
-      val f6 : ([ `K of 'b s inj ], [ `K of 'a X.bits64 s inj ]) eq -> 'c
+        'a ('b : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of (int -> int) inj ]) eq -> 'b
+      val f3 :
+        'a 'b ('c : any).
+          ([ `K of 'a X.bits64 inj ], [ `K of 'b inj ]) eq -> 'c
+      val f4 :
+        'b 'a ('c : any).
+          ([ `K of 'b inj ], [ `K of 'a X.bits64 inj ]) eq -> 'c
+      val f5 :
+        'a 'b ('c : any).
+          ([ `K of 'a X.bits64 s inj ], [ `K of 'b s inj ]) eq -> 'c
+      val f6 :
+        'b 'a ('c : any).
+          ([ `K of 'b s inj ], [ `K of 'a X.bits64 s inj ]) eq -> 'c
     end
 |}]
 

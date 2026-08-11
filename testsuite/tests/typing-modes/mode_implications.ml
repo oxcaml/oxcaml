@@ -84,7 +84,7 @@ let () = with_effect (fun k -> run_default k)
 let _ = !storage
 [%%expect{|
 val storage : string ref = {contents = ""}
-val with_effect : ((string -> unit) @ local -> 'a) -> 'a = <fun>
+val with_effect : ('a : any). ((string -> unit) @ local -> 'a) -> 'a = <fun>
 val run_default : (string -> unit) @ local -> unit = <fun>
 - : string = "some string"
 |}]

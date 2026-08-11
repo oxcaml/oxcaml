@@ -171,7 +171,7 @@ Error: This argument has type "'c. 'c -> 'c" which is less general than
 
 let with_id (f : ('a. 'a -> 'a) -> 'b) = f (fun x -> x)
 [%%expect {|
-val with_id : (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+val with_id : ('b : any). (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let _ = with_id (fun id -> id 4, id "four")
@@ -183,7 +183,7 @@ let non_principal1 p f =
   if p then with_id f
   else f (fun x -> x)
 [%%expect {|
-val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+val non_principal1 : ('b : any). bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}, Principal{|
 Line 3, characters 7-21:
 3 |   else f (fun x -> x)
@@ -191,7 +191,7 @@ Line 3, characters 7-21:
 Warning 18 [not-principal]: applying a higher-rank function here is not
   principal.
 
-val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+val non_principal1 : ('b : any). bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let non_principal2 p f =
@@ -210,7 +210,7 @@ let principal1 p (f : ('a. 'a -> 'a) -> 'b) =
   if p then f (fun x -> x)
   else with_id f
 [%%expect {|
-val principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+val principal1 : ('b : any). bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
@@ -218,7 +218,7 @@ let principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b =
     if p then f (fun x -> x)
     else with_id f
 [%%expect {|
-val principal2 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
+val principal2 : ('b : any). bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
 
 type poly = ('a. 'a -> 'a) -> int * string
