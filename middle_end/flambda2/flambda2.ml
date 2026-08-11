@@ -405,8 +405,10 @@ let reaper_lto_solve ~cmr_files ~ltosol_filename =
       (Flambda2_reaper.Global_flow_graph.create ())
       cmrs
   in
-  (* CR mvellacott: serialise the solution to [ltosol_filename], in
-     per-compilation-unit portions, instead of discarding it. *)
+  (* CR mvellacott: serialise the solution to [ltosol_filename] instead of
+     discarding it. *)
+  (* CR mvellacott: split the resulting solution into per-compilation-unit
+     portions. *)
   let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
     Flambda2_reaper.Reaper.Staged.solve combined_graph
   in
