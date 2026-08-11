@@ -284,6 +284,12 @@ type cross_alloc : value mod alloc
 type cross_noalloc : value mod noalloc
 type cross_noalloc_strict : value mod noalloc_strict
 [%%expect{|
+Line 11, characters 29-34:
+11 | type cross_alloc : value mod alloc
+                                  ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant
+  because "alloc" is the default bound on its axis, so it has no effect.
+
 type cross_alloc
 type cross_noalloc : value mod noalloc
 type cross_noalloc_strict : value mod noalloc_strict
@@ -1555,7 +1561,6 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* CR shsong: Why this is a integer rather than integeter option comparison? *)
 (* A constant constructor as an argument specializes the generic equality to an
    integer comparison, even though the type alone would not allow it. *)
 let (eq_const @ noalloc_strict) (x : int option) = x = None
@@ -2110,10 +2115,7 @@ Error: The value "( let* )" is "alloc"
          which is expected to be "noalloc_strict".
 |}]
 
-(** Test 6.4: Misc test regarding abstract type
-
-    CR shsong: Chek whether backend guarantee that foo does not allocate for the
-    returned global closure g0. *)
+(** Test 6.4: Misc test regarding abstract type *)
 module M : sig
   type t
   val foo : int -> t @ noalloc_strict @@ noalloc_strict
