@@ -191,8 +191,8 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
             "Got unexpected files: [%s] (-reaper-solve expects .cmr files only)"
             (String.concat ", " other_files)
       in
-      let ltosol_filename = Compenv.extract_output !output_name in
-      reaper_lto_solve ~cmr_files ~ltosol_filename;
+      let ltosol_file = Compenv.extract_output !output_name in
+      reaper_lto_solve ~cmr_files ~ltosol_file;
       Warnings.check_fatal ();
     end
     else if !shared then begin

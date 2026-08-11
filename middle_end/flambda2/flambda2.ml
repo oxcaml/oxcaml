@@ -392,13 +392,13 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
-let reaper_lto_solve ~cmr_files ~ltosol_filename =
+let reaper_lto_solve ~cmr_files ~ltosol_file =
   (* CR mvellacott: combine the dependency graphs from [cmr_files], run the
      Reaper solve stage on the combined graph, and write the solution to
-     [ltosol_filename]. *)
+     [ltosol_file]. *)
   Format.eprintf "reaper_lto_solve: cmr files: [%s]; ltosol output: %s@."
     (String.concat "; " cmr_files)
-    ltosol_filename
+    ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~cmr_filename =
