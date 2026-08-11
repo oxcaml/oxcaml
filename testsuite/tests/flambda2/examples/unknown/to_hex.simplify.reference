@@ -27,7 +27,7 @@ apply ccall
           failwith_0_1 (s : val)
             my_closure &my_alloc_region my_depth
             -> k * k1
-            : val =
+            : bottom =
       let Pmakeblock =
         %block.[`0`].my_alloc_region ($`*predef*`.caml_exn_Failure, s)
       in
@@ -40,7 +40,7 @@ apply ccall
           invalid_arg_1_1 (s : val)
             my_closure &my_alloc_region my_depth
             -> k * k1
-            : val =
+            : bottom =
       let Pmakeblock =
         %block.[`0`].my_alloc_region
           ($`*predef*`.caml_exn_Invalid_argument, s)

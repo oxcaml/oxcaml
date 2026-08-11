@@ -1354,6 +1354,12 @@ let layout_or_sort env loc sort ty =
   try layout env loc sort ty
   with Error (_, Non_value_layout _) -> layout_of_sort loc sort
 
+let layout_or_top env loc sort ty =
+  try layout env loc sort ty
+  with
+  | Error (_, Non_value_layout (_, _, Some _)) -> Lambda.Ptop
+  | Error (_, Non_value_layout (_, _, None)) -> layout_of_sort loc sort
+
 let function_return_layout env loc sort ty =
   match is_function_type env ty with
   | Some (_lhs, rhs) -> layout env loc sort rhs

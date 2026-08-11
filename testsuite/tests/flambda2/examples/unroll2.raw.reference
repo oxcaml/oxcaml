@@ -1,6 +1,9 @@
 let $camlUnroll2__first_const = Block 0 () in
 (let code rec loopify(never) size(25)
-       foo_0 (x : imm tagged) my_closure &my_alloc_region my_depth -> k1 * k2 =
+       foo_0 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : unknown =
    let next_depth = rec_info (succ my_depth) in
    (let Popaque = %opaque (1) in
     (let untagged = %untag_imm (Popaque) in
@@ -14,17 +17,25 @@ let $camlUnroll2__first_const = Block 0 () in
      where k4 =
        let int_sub = %int_barith.sub (x, 1) in
        apply direct(foo_0 &my_alloc_region)
-         my_closure ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
+         (my_closure ~ depth my_depth -> next_depth : _ -> unknown)
+           (int_sub)
+           -> k1 * k2
      where k3 =
        let int_add = %int_barith.add (x, 1) in
        apply direct(foo_0 &my_alloc_region)
-         my_closure ~ depth my_depth -> next_depth (int_add) -> k1 * k2
+         (my_closure ~ depth my_depth -> next_depth : _ -> unknown)
+           (int_add)
+           -> k1 * k2
  in
  let code size(5)
-       bar_1 (x : imm tagged) my_closure &my_alloc_region my_depth -> k1 * k2 =
+       bar_1 (x : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : unknown =
    let next_depth = rec_info (succ my_depth) in
    let foo = %project_value_slot.[bar].[foo] (my_closure) in
-   apply direct(foo_0 &my_alloc_region) unroll(2) foo (x) -> k1 * k2
+   apply direct(foo_0 &my_alloc_region) unroll(2)
+     (foo : _ -> unknown) (x) -> k1 * k2
  in
  let foo = closure foo_0 @foo &toplevel.alloc_region in
  let bar = closure bar_1 @bar &toplevel.alloc_region with { foo = foo } in

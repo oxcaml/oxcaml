@@ -228,8 +228,8 @@ let sort_of_native_repr ~poly_sort repr =
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.Base Scannable
   | Repr_never_returns ->
-    (* CR dkalinichenko: use bottom return layout instead *)
-    Jkind.Sort.Const.Base Scannable
+    Misc.fatal_error
+      "sort_of_native_repr: Repr_never_returns has no sort"
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
@@ -2459,6 +2459,7 @@ let transl_primitive
   let error_loc = to_location loc in
   let rec make_params ty repr_args repr_res =
     match repr_args, repr_res with
+    | [], (_, Primitive.Repr_never_returns) -> [], Lambda.layout_bottom
     | [], (_, res_repr) ->
       let res_sort = sort_of_native_repr res_repr ~poly_sort in
       [], Typeopt.layout env error_loc res_sort ty

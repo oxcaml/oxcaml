@@ -10,7 +10,10 @@ let code do_stuff_0 deleted in
 let $camlData_flow_rec_exn__const_block58 = Block 0 (12) in
 let code stuff_1 deleted in
 let code loopify(never) size(3) newer_version_of(do_stuff_0)
-      do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
+      do_stuff_0_1 (env)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : bottom =
   cont k1 pop(regular k1) ($camlData_flow_rec_exn__Pmakeblock17)
 in
 let $camlData_flow_rec_exn__do_stuff_2 =

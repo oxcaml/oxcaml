@@ -48,3 +48,4 @@ dissector/huge_module*.ml
 dissector/module_a.ml
 dissector/module_b.ml
 dissector/module_c.ml
+backend/cached_generic_functions/test_cached_genfns.ml

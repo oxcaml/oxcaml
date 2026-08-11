@@ -5,7 +5,10 @@ let code test3_3 deleted in
 let $camlUnroll5__foo_4 =
   closure foo_0_1 @foo &toplevel.alloc_region
 and code rec loopify(never) size(80) newer_version_of(foo_0)
-      foo_0_1 (x : imm tagged) my_closure &my_alloc_region my_depth -> k * k1 =
+      foo_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : unknown =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
    switch untagged
@@ -29,14 +32,16 @@ and code rec loopify(never) size(80) newer_version_of(foo_0)
                 let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(20))
-                  $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                  ($camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                   : _ -> unknown)
                     (int_add_2)
                     -> k * k1
               where k4 =
                 let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(20))
-                  $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                  ($camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                   : _ -> unknown)
                     (int_sub)
                     -> k * k1)
          where k3 =
@@ -50,35 +55,41 @@ and code rec loopify(never) size(80) newer_version_of(foo_0)
                 let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(20))
-                  $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                  ($camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                   : _ -> unknown)
                     (int_add_1)
                     -> k * k1
               where k3 =
                 let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(20))
-                  $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                  ($camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
+                   : _ -> unknown)
                     (int_sub_1)
                     -> k * k1))
     where k2 =
       let int_sub = %int_barith.sub (x, 1) in
       apply direct(foo_0_1 &my_alloc_region)
-        $camlUnroll5__foo_4 ~ depth my_depth -> succ my_depth
+        ($camlUnroll5__foo_4 ~ depth my_depth -> succ my_depth : _ -> unknown
+         )
           (int_sub)
           -> k * k1
 in
 let code loopify(never) size(4) newer_version_of(test1_1)
       test1_1_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
-        -> k * k1 =
-  apply direct(foo_0_1 &my_alloc_region) $camlUnroll5__foo_4 (x) -> k * k1
+        -> k * k1
+        : unknown =
+  apply direct(foo_0_1 &my_alloc_region)
+    ($camlUnroll5__foo_4 : _ -> unknown) (x) -> k * k1
 in
 let $camlUnroll5__test1_5 = closure test1_1_1 @test1 &toplevel.alloc_region
 in
 let code loopify(never) size(80) newer_version_of(test2_2)
       test2_2_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
-        -> k * k1 =
+        -> k * k1
+        : unknown =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
    switch untagged
@@ -102,14 +113,16 @@ let code loopify(never) size(80) newer_version_of(test2_2)
                 let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_add_2)
                     -> k * k1
               where k4 =
                 let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_sub)
                     -> k * k1)
          where k3 =
@@ -123,20 +136,22 @@ let code loopify(never) size(80) newer_version_of(test2_2)
                 let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_add_1)
                     -> k * k1
               where k3 =
                 let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_sub_1)
                     -> k * k1))
     where k2 =
       let int_sub = %int_barith.sub (x, 1) in
       apply direct(foo_0_1 &my_alloc_region) inlining_state(depth(10))
-        $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 1
+        ($camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 1 : _ -> unknown)
           (int_sub)
           -> k * k1
 in
@@ -145,7 +160,8 @@ in
 let code loopify(never) size(232) newer_version_of(test3_3)
       test3_3_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
-        -> k * k1 =
+        -> k * k1
+        : unknown =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
    switch untagged
@@ -169,14 +185,16 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                 let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_add_2)
                     -> k * k1
               where k4 =
                 let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_sub)
                     -> k * k1)
          where k3 =
@@ -190,14 +208,16 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                 let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_add_1)
                     -> k * k1
               where k3 =
                 let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
+                   : _ -> unknown)
                     (int_sub_1)
                     -> k * k1))
     where k2 =
@@ -225,14 +245,16 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                      let int_add_2 = %int_barith.add (int_add_1, 1) in
                      apply direct(foo_0_1 &my_alloc_region)
                             inlining_state(depth(40))
-                       $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                       ($camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                        : _ -> unknown)
                          (int_add_2)
                          -> k * k1
                    where k4 =
                      let int_sub_1 = %int_barith.sub (int_add_1, 1) in
                      apply direct(foo_0_1 &my_alloc_region)
                             inlining_state(depth(40))
-                       $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                       ($camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                        : _ -> unknown)
                          (int_sub_1)
                          -> k * k1)
               where k3 =
@@ -246,14 +268,16 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                      let int_add_1 = %int_barith.add (int_sub_1, 1) in
                      apply direct(foo_0_1 &my_alloc_region)
                             inlining_state(depth(40))
-                       $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                       ($camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                        : _ -> unknown)
                          (int_add_1)
                          -> k * k1
                    where k3 =
                      let int_sub_2 = %int_barith.sub (int_sub_1, 1) in
                      apply direct(foo_0_1 &my_alloc_region)
                             inlining_state(depth(40))
-                       $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                       ($camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
+                        : _ -> unknown)
                          (int_sub_2)
                          -> k * k1))
          where k2 =
@@ -281,14 +305,16 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                           let int_add_2 = %int_barith.add (int_add_1, 1) in
                           apply direct(foo_0_1 &my_alloc_region)
                                  inlining_state(depth(50))
-                            $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                            ($camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                             : _ -> unknown)
                               (int_add_2)
                               -> k * k1
                         where k4 =
                           let int_sub_2 = %int_barith.sub (int_add_1, 1) in
                           apply direct(foo_0_1 &my_alloc_region)
                                  inlining_state(depth(50))
-                            $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                            ($camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                             : _ -> unknown)
                               (int_sub_2)
                               -> k * k1)
                    where k3 =
@@ -302,21 +328,24 @@ let code loopify(never) size(232) newer_version_of(test3_3)
                           let int_add_1 = %int_barith.add (int_sub_2, 1) in
                           apply direct(foo_0_1 &my_alloc_region)
                                  inlining_state(depth(50))
-                            $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                            ($camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                             : _ -> unknown)
                               (int_add_1)
                               -> k * k1
                         where k3 =
                           let int_sub_3 = %int_barith.sub (int_sub_2, 1) in
                           apply direct(foo_0_1 &my_alloc_region)
                                  inlining_state(depth(50))
-                            $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                            ($camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
+                             : _ -> unknown)
                               (int_sub_3)
                               -> k * k1))
               where k2 =
                 let int_sub_2 = %int_barith.sub (int_sub_1, 1) in
                 apply direct(foo_0_1 &my_alloc_region)
                        inlining_state(depth(30))
-                  $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 3
+                  ($camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 3
+                   : _ -> unknown)
                     (int_sub_2)
                     -> k * k1))
 in

@@ -36,13 +36,25 @@ let must_be_singleton_simple simples =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space IR.print_simple)
       simples
 
-let concrete_result_arity_of_layout (layout : L.layout) ~machine_width :
+let result_arity_of_layout (layout : L.layout) ~machine_width : Result_arity.t =
+  match layout with
+  | Ptop -> Unknown
+  | Pbottom -> Bottom
+  | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+    Result_arity.ok
+      (Flambda_arity.unarize_t
+         (Flambda_arity.create
+            [ Flambda_arity.Component_for_creation.from_lambda layout
+                ~machine_width ]))
+
+let concrete_result_arity_of_layout (layout : L.layout) ~machine_width ~what :
     Result_arity.t =
-  Result_arity.ok
-    (Flambda_arity.unarize_t
-       (Flambda_arity.create
-          [ Flambda_arity.Component_for_creation.from_lambda layout
-              ~machine_width ]))
+  match result_arity_of_layout layout ~machine_width with
+  | Ok _ as arity -> arity
+  | Unknown | Bottom ->
+    Misc.fatal_errorf "%s with non-representable return layout %a" what
+      Printlambda.layout layout
 
 let print_compact_location ppf (loc : Location.t) =
   if String.equal loc.loc_start.pos_fname "//toplevel//"
@@ -934,6 +946,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         return_arity =
                           concrete_result_arity_of_layout layout
                             ~machine_width:(Acc.machine_width acc)
+                            ~what:"Method send"
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1129,6 +1142,17 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (* Here we need to build the region closure continuation (see long comment
        above). Since we're not in tail position, we also need to have a new
        continuation for the code after the body. *)
+    (* The region closure continuation only receives results that are returned
+       normally: never for a [Pbottom] body, and a single value for a [Ptop]
+       body (an unknown return layout implies the value sort; tail calls
+       generate their own [End_region]s and do not use this continuation). *)
+    let layout =
+      match (layout : L.layout) with
+      | Ptop | Pbottom -> L.layout_any_value
+      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+        layout
+    in
     let region = Ident.create_local "region" in
     let region_duid = Flambda_debug_uid.none in
     let ghost_region = Ident.create_local "ghost_region" in
@@ -1290,7 +1314,7 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               alloc_region = Env.current_alloc_region env;
               args_arity = Flambda_arity.create args_arity;
               return_arity =
-                concrete_result_arity_of_layout ap_return
+                result_arity_of_layout ap_return
                   ~machine_width:(Acc.machine_width acc)
             }
           in
@@ -1618,8 +1642,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
   let return =
-    concrete_result_arity_of_layout return
-      ~machine_width:(Env.machine_width env)
+    result_arity_of_layout return ~machine_width:(Env.machine_width env)
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)

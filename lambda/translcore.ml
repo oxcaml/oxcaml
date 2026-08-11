@@ -111,16 +111,42 @@ let layout_of_function_return (return_sort : function_return_sort) body =
     | Tfunction_body exp -> exp.exp_env, exp.exp_loc, exp.exp_type
     | Tfunction_cases cases -> cases.fc_env, cases.fc_loc, cases.fc_ret_type
   in
-  let sort =
-    match return_sort with
-    | Function_returns sort -> Jkind.Sort.default_for_transl_and_get sort
-    | Function_forwards | Function_never_returns -> (
-        (* CR dkalinichenko: support any layout here. *)
-        match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
-        | Ok sort -> Jkind.Sort.default_for_transl_and_get sort
-        | Error _ -> Jkind.Sort.Const.Base Scannable)
-  in
-  layout_or_sort env loc sort ty
+  match return_sort with
+  | Function_returns sort ->
+      layout_or_top env loc (Jkind.Sort.default_for_transl_and_get sort) ty
+  | Function_forwards -> begin
+      match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
+      | Ok sort ->
+          layout_or_sort env loc (Jkind.Sort.default_for_transl_and_get sort) ty
+      | Error _ -> Lambda.Ptop
+    end
+  | Function_never_returns -> Lambda.layout_bottom
+
+(* Matches with exception or effect cases and try-expressions always have
+   representable result types (checked during typing), so their layouts can
+   be refined when the ambient expected layout is unknown.  Plain matches
+   have no such guarantee and keep the ambient layout: a forwarder may
+   legitimately dispatch through one. *)
+let refine_ptop_layout_from_result layout e =
+  match layout with
+  | Pbottom | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+      layout
+  | Ptop ->
+      match
+        Ctype.type_sort ~why:Match_or_try_result ~fixed:true e.exp_env
+          e.exp_type
+      with
+      | Ok sort ->
+          layout_or_sort e.exp_env e.exp_loc
+            (Jkind.Sort.default_for_transl_and_get sort) e.exp_type
+      | Error _ ->
+          fatal_errorf_doc
+            "Translcore: unrepresentable match or try result in an unknown \
+             return position at %a (typing should have rejected it with \
+             Match_or_try_result)"
+            (Location.Doc.loc ~capitalize_first:false)
+            e.exp_loc
 
 let field_offset_for_label lbl repres =
   match repres with
@@ -585,6 +611,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         partial
   | Texp_match(arg, arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let layout = refine_ptop_layout_from_result layout e in
   (* need to separate the values from exceptions for transl_handler *)
       let split_case (val_cases, exn_cases as acc)
             ({ c_lhs; c_rhs } as case) =
@@ -609,6 +636,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (Some (pat_expr_list, partial, arg_sort)) exn_pat_expr_list
         eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
+      let layout = refine_ptop_layout_from_result layout e in
       let id, id_duid =
         Typecore.name_cases ~pattern_kind:Exception_pattern "exn"
           pat_expr_list
@@ -619,6 +647,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  (transl_cases_try ~scopes layout pat_expr_list),
                layout)
   | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
+      let layout = refine_ptop_layout_from_result layout e in
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
   | Texp_unboxed_unit ->
@@ -2837,6 +2866,13 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
   (arg, lbl)
 
 and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
+  let return_layout =
+    if List.exists
+         (fun { c_lhs; _ } -> Option.is_some (snd (split_pattern c_lhs)))
+         pat_expr_list
+    then refine_ptop_layout_from_result return_layout e
+    else return_layout
+  in
   let rewrite_case (val_cases, exn_cases, static_handlers as acc)
         ({ c_lhs; c_guard; c_rhs } as case) =
     if c_rhs.exp_desc = Texp_unreachable then acc else
