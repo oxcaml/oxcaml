@@ -224,8 +224,6 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
     match function_type with
     | None ->
       (* No rec info available, prevent inlining to avoid problems *)
-      if Flambda_features.debug_flambda2 ()
-      then Format.eprintf "no rec info :( @.";
       Do_not_inline { erase_attribute = false }
     | Some function_type -> (
       let decision =
@@ -1248,15 +1246,14 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~from_env:(DE.get_inlining_state (DA.denv dacc))
         ~from_metadata:(Apply.inlining_state apply)
     in
-    let inlined =
-      let[@local] inlined_from_apply () = Apply.inlined apply in
+    let inlined : Inlined_attribute.t =
       match Apply.inlined apply with
-      | Never_inlined | Default_inlined | Unroll _ | Always_inlined _
-      | Hint_inlined ->
-        inlined_from_apply ()
+      | ( Never_inlined | Default_inlined | Unroll _ | Always_inlined _
+        | Hint_inlined ) as inlined ->
+        inlined
       | Forward_inlined -> (
-        match DE.forward_inlined (DA.denv dacc) with
-        | None -> inlined_from_apply ()
+        match DE.inlined_attribute_to_forward (DA.denv dacc) with
+        | None -> Forward_inlined
         | Some inlined_from_env -> inlined_from_env)
     in
     let apply =

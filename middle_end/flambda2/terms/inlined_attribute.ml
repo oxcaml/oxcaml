@@ -147,3 +147,6 @@ let use_info t =
   match t with
   | Always_inlined use_info | Unroll (_, use_info) -> Some use_info
   | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> None
+
+let forward_inlined () =
+  if !Clflags.stubs_forward_inlining then Forward_inlined else Default_inlined

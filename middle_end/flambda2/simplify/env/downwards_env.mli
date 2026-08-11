@@ -198,7 +198,12 @@ val disable_inlining : t -> Disable_inlining.t
 
 val disable_partial_application_stub_generation : t -> bool
 
-val forward_inlined : t -> Inlined_attribute.t option
+(** This is the [@inlined] attribute (after forwarding) that was provided on the
+    [apply] to the innermost inlined function we are currently simplifying, and
+    the value that should be used for [@inlined forward] calls within.
+
+    It is [None] if we are not currently inside an inlined body. *)
+val inlined_attribute_to_forward : t -> Inlined_attribute.t option
 
 val enter_set_of_closures : t -> t
 

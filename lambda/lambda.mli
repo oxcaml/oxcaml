@@ -787,6 +787,8 @@ type inlined_attribute =
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
 
+val forward_inlined_attribute : unit -> inlined_attribute
+
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
 

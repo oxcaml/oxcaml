@@ -1650,7 +1650,8 @@ and transl_apply ~scopes
       ~result_layout
       lam sargs loc
   =
-  let lapply ?(inlined = inlined) funct args loc pos mode result_layout =
+  let original_inlined = inlined in
+  let lapply ~inlined funct args loc pos mode result_layout =
     match funct, pos with
     | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
         Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
@@ -1721,6 +1722,59 @@ and transl_apply ~scopes
      * side-effects occurring after receiving a parameter
        will occur exactly when all the arguments up to this parameter
        have been received.
+
+     The [inlined] attribute passed to [build_apply] is initlally the [@inlined]
+     attribute for the apply we are translating, but switches to forward
+     inlining if we need to build a stub.
+
+     Calls *outside* a stub needs to use the original [@inlined] attribute, so
+     calls to [lapply] for an out-of-order partial application always use the
+     original value of the inlined attribute. For instance, if we have [let f x
+     ~omitted y = ...] we want a call [f x y] to be translated as:
+
+     {[
+     let f_x = f x in
+     fun[@stub] ~omitted -> (f_x [@inlined forward]) ~omitted y
+     ]}
+
+     We certainly don't want [let f_x = (f [@inlined forward]) x], as this
+     would pick up the `[@inlined]` attribute of the application we are
+     currently translating.
+
+     Note that in this case [f x] is itself a partial application, so after
+     translation to flambda this will become:
+
+     {[
+     let[@stub] f_x ~omitted y = (f [@inlined forward]) x ~omitted y in
+     fun[@stub] ~omitted -> (f_x [@inlined forward]) x
+     ]}
+
+     and any attribute on the partial application stub we have created will get
+     forwarded to the application of [f].
+
+     If the original call has existing explicit inlining annotations, we
+     preserve them on all the intermediate calls we introduce.
+
+     This means that [(f [@inlined hint]) x y] becomes:
+
+     {[
+     let f_x = (f [@inlined hint]) x in
+     fun[@stub] ~omitted -> (f_x [@inlined hint]) ~omitted y
+     ]}
+
+     If [f x] is a partial application, the [@inlined hint] attribute on [f] is
+     ignored, and we get:
+
+     {[
+     let[@stub] f_x ~omitted y = (f [@inlined forward]) x ~omitted y in
+     fun[@stub] ~omitted -> (f_x [@inlined hint]) ~omitted y
+     ]}
+
+     and the [@inlined hint] attribute on [f_x] gets forwarded to [f].
+
+     If an inlined attribute is present, we effectively treat an apply with
+     multiple arguments [(f [@inlined hint]) x y] as if the attribute was
+     present on each of the arguments, matching the behaviour of simplify.
   *)
   let rec build_apply ~inlined lam args loc pos ap_mode result_layout = function
     | Omitted { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret } :: l ->
@@ -1740,6 +1794,7 @@ and transl_apply ~scopes
             lam
           else
             lapply lam (List.rev args) loc pos ap_mode layout_function
+              ~inlined:original_inlined
         in
         (* Evaluate the function, applied to the arguments in [args] *)
         let handle, _ = protect "func" (lam, layout_function) in
@@ -1766,8 +1821,7 @@ and transl_apply ~scopes
           let result_layout = layout_of_sort (to_location loc) sort_ret in
           let inlined =
             match inlined with
-            | Default_inlined when !Clflags.stubs_forward_inlining ->
-              Forward_inlined
+            | Default_inlined -> forward_inlined_attribute ()
             | _ -> inlined
           in
           let body =
