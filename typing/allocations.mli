@@ -40,11 +40,12 @@ val register_closure_allocation :
 val register_mod_allocation :
   env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit
 
-val register_prim_application_allocation :
+val register_zero_alloc_application_allocation :
   env:Env.t ->
   pos:Typedtree.apply_position ->
   Typedtree.expression ->
   (Typedtree.arg_label * Typedtree.apply_arg * 'a) list ->
+  Value.l ->
   unit
 
 val relax_alloc :

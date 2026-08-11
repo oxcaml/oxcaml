@@ -7168,11 +7168,11 @@ and type_expect_
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
-      Allocations.register_prim_application_allocation ~env
-        ~pos:pm.apply_position funct args;
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
+      Allocations.register_zero_alloc_application_allocation ~env
+        ~pos:pm.apply_position funct args mode_ret;
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true

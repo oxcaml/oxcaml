@@ -4816,6 +4816,9 @@ module Report = struct
     | Effect_try ->
       Some (print_article_noun Consonant "try-with with effect cases")
     | Allocation -> Some (print_article_noun Vowel "allocation")
+    | Zero_alloc_func_appl ->
+      Some
+        (print_article_noun Consonant "return value of a zero_alloc function")
     | Class -> Some (print_article_noun Consonant "class")
     | Object -> Some (print_article_noun Vowel "object")
     | Loop -> Some (print_article_noun Consonant "loop")

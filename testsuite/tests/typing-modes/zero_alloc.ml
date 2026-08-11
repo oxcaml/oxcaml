@@ -2500,3 +2500,312 @@ module type FT =
   functor (X : sig end) -> sig val g : unit -> int * int @@ stateless end
 module type S_incl = sig val g : unit -> int * int @@ stateless end
 |}]
+
+(* Test 9: interaction between the [zero_alloc] attribute/annotation and the
+   allocation mode axis. *)
+
+(* Test 9.1:
+
+  CR shsong: [zero_alloc] in let binding is not properly processed. *)
+
+let [@zero_alloc strict] (f @ alloc) () = 1.1
+let (g @ noalloc_strict) () = f ()
+[%%expect{|
+val f : unit -> float [@@zero_alloc strict] = <fun>
+Line 2, characters 30-31:
+2 | let (g @ noalloc_strict) () = f ()
+                                  ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 2, characters 25-34
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Likewise a *local* [let [@zero_alloc strict] f] is not relaxed: rejected. *)
+let test_local_strict_not_relaxed () =
+  let [@zero_alloc strict] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Local [@zero_alloc] (non-strict) referenced inside [noalloc_strict]:
+   rejected. *)
+let test_local_nonstrict_in_strict () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc_strict) () = f () in
+  g
+[%%expect{|
+Line 3, characters 32-33:
+3 |   let (g @ noalloc_strict) () = f () in
+                                    ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 3, characters 27-36
+         which is expected to be "noalloc_strict".
+|}]
+
+(* Local [@zero_alloc] referenced inside [noalloc]: rejected. *)
+let test_local_nonstrict_in_noalloc () =
+  let [@zero_alloc] (f @ alloc) () = 1.1 in
+  let (g @ noalloc) () = f () in
+  g
+[%%expect{|
+Line 3, characters 25-26:
+3 |   let (g @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 3, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Signature-sourced zero_alloc functions: unlike a local [let], a [val] in a
+   signature populates [val_zero_alloc], so [relax_alloc] can see it. These
+   replicate the [f () inside a noalloc function] cases above. *)
+module M_strict : sig
+  val f : unit -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] (f @ alloc) () = 42
+end
+[%%expect{|
+module M_strict : sig val f : unit -> int [@@zero_alloc strict] end @@
+  stateless
+|}]
+
+(* [strict] function referenced inside a [noalloc_strict] function: accepted. *)
+let (g @ noalloc_strict) () = M_strict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+module M_nonstrict : sig
+  val f : unit -> int [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f () = 42
+end
+[%%expect{|
+module M_nonstrict : sig val f : unit -> int [@@zero_alloc] end @@ stateless
+  noalloc_strict
+|}]
+
+(* Non-strict function referenced inside [noalloc_strict]: still rejected, but
+   because [f] is [noalloc] (not [alloc]). *)
+let (g @ noalloc_strict) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* Non-strict function referenced inside [noalloc]: accepted. *)
+let (g @ noalloc) () = M_nonstrict.f ()
+[%%expect{|
+val g : unit -> int = <fun>
+|}]
+
+(* Test 9.2: A [noalloc] closure must not launder an [alloc] value out
+   of a fully-applied zero_alloc function -- see the two tests below. *)
+module M_ret : sig
+  val g : unit -> float
+  (* [arity 1] because [f] takes one argument and returns a function; it must
+     match the impl's syntactic arity. *)
+  val f : unit -> (unit -> float) [@@zero_alloc strict arity 1]
+end = struct
+  let g () = 1.1
+  let[@zero_alloc strict] f () = g
+end
+[%%expect{|
+module M_ret :
+  sig
+    val g : unit -> float
+    val f : unit -> unit -> float [@@zero_alloc strict arity 1]
+  end @@ stateless noalloc_strict
+|}]
+
+let test () = (M_ret.f () : _ @ noalloc)
+[%%expect{|
+Line 1, characters 15-25:
+1 | let test () = (M_ret.f () : _ @ noalloc)
+                   ^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+(* Rejected: [h] would return [g] (an [alloc] value) obtained from the
+   fully-applied zero_alloc [M_ret.f], laundering it through a [noalloc]
+   closure. *)
+let test () =
+  let (h @ noalloc) () = M_ret.f () in
+  h
+[%%expect{|
+Line 2, characters 25-32:
+2 |   let (h @ noalloc) () = M_ret.f () in
+                             ^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at line 2, characters 20-35
+         which is expected to be "noalloc".
+|}]
+
+let test_return_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  (f () : _ @ noalloc)
+[%%expect{|
+Line 4, characters 3-7:
+4 |   (f () : _ @ noalloc)
+       ^^^^
+Error: This value is "alloc" but is expected to be "noalloc".
+|}]
+
+let test_capture_alloc_value () =
+  let (g @ alloc) () = 1.1 in
+  let [@zero_alloc strict] f () = g in
+  let (h @ noalloc) () = f () in
+  h
+[%%expect{|
+Line 4, characters 25-26:
+4 |   let (h @ noalloc) () = f () in
+                             ^
+Error: The value "f" is "alloc"
+         because it closes over the value "g" at line 3, characters 34-35
+         which is "alloc".
+       However, the value "f" highlighted is expected to be "noalloc"
+         because it is used inside the function at line 4, characters 20-29
+         which is expected to be "noalloc".
+|}]
+
+(* Test 9.3: a *partial* application of a zero_alloc function allocates a
+   partial-application closure, which is detected. *)
+module M_partial : sig
+  val f : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] f x y = x + y
+end
+[%%expect{|
+module M_partial : sig val f : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+let (h @ noalloc_strict) (x : int) = M_partial.f x
+[%%expect{|
+Line 1, characters 37-48:
+1 | let (h @ noalloc_strict) (x : int) = M_partial.f x
+                                         ^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 1, characters 25-50,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 9.4: Tests from demo
+   CR shsong: Maybe remove the redundant ones. *)
+module M_strict : sig
+  val span_pair_used : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] span_pair_used (a : int) (b : int) =
+    let (lo, hi) = if a < b then (a, b) else (b, a) in
+    hi - lo
+end
+[%%expect{|
+module M_strict :
+  sig val span_pair_used : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+let (fully_applied @ noalloc_strict) () =
+  M_strict.span_pair_used 1 0
+[%%expect{|
+val fully_applied : unit -> int = <fun>
+|}]
+
+let (partially_applied @ noalloc_strict) () =
+  let _ = M_strict.span_pair_used 1 in ()
+[%%expect{|
+Line 2, characters 10-35:
+2 |   let _ = M_strict.span_pair_used 1 in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 5 [ignored-partial-application]: this function application is partial,
+  maybe some arguments are missing.
+
+Line 2, characters 10-33:
+2 |   let _ = M_strict.span_pair_used 1 in ()
+              ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-2, characters 41-41,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+let (ref_partially_applied @ noalloc_strict) () =
+  let f = M_strict.span_pair_used in
+  f 1
+[%%expect{|
+Line 2, characters 10-33:
+2 |   let f = M_strict.span_pair_used in
+              ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The value "M_strict.span_pair_used" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-3, characters 45-5
+         which is expected to be "noalloc_strict".
+|}]
+
+let (ref_only @ noalloc_strict) () =
+  M_strict.span_pair_used
+[%%expect{|
+Line 2, characters 2-25:
+2 |   M_strict.span_pair_used
+      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The value "M_strict.span_pair_used" is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at lines 1-2, characters 32-25
+         which is expected to be "noalloc_strict".
+|}]
+
+module M_strict : sig
+  val span_pair_used : int -> int -> int [@@zero_alloc strict]
+end = struct
+  let[@zero_alloc strict] span_pair_used (a : int) (b : int) =
+    let (lo, hi) = if a < b then (a, b) else (b, a) in
+    hi - lo
+end
+[%%expect{|
+module M_strict :
+  sig val span_pair_used : int -> int -> int [@@zero_alloc strict] end @@
+  portable
+|}]
+
+module Wrapper : sig
+  type t
+  val wrapper : unit -> t [@@zero_alloc strict arity 1]
+  (* val wrapper : unit -> int *)
+end = struct
+  type t = int -> int -> int * int
+  let [@zero_alloc strict] wrapper () =
+    let g = fun a b -> (a, b) in
+    g
+
+  (* type t = int -> int -> int
+  let [@zero_alloc strict] wrapper ()  = M_strict.span_pair_used *)
+  (* let (wrapper @ noalloc_strict) ()  = M_strict.span_pair_used 1 0 *)
+end
+[%%expect{|
+module Wrapper : sig type t val wrapper : unit -> t [@@zero_alloc strict] end
+  @@ stateless
+|}]
+
+let (whitewashed @ noalloc_strict) () = Wrapper.wrapper ()
+[%%expect{|
+Line 1, characters 40-55:
+1 | let (whitewashed @ noalloc_strict) () = Wrapper.wrapper ()
+                                            ^^^^^^^^^^^^^^^
+Error: The return value of a zero_alloc function is "alloc"
+       but is expected to be "noalloc_strict"
+         because it is used inside the function at line 1, characters 35-58
+         which is expected to be "noalloc_strict".
+|}]
