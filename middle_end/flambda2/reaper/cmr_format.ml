@@ -298,6 +298,9 @@ end = struct
         deps;
         rebuild_data = _
       } =
+    (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
+       requires as a separate argument. We're not deserialising any
+       [Exported_code], so we drop it here. *)
     let renaming, _code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit
