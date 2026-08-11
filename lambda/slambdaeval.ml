@@ -113,10 +113,10 @@ end = struct
     | SLVrecord fields ->
       let print_fields ppf =
         Array.iter
-          (fun field -> Fmt.fprintf ppf "%a;@ " print_value_or_missing field)
+          (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
           fields
       in
-      Fmt.fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
+      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
     | SLVclosure id -> Template_store.print_id ppf id
 
   and print_value_or_missing ppf = function
@@ -169,9 +169,6 @@ and Template_store : sig
     Types.closure ->
     id
 
-  (** Adds all templates from the second argument into the first. *)
-  val add_all_templates : templates -> templates -> unit
-
   val add_foreign_templates : t -> templates -> unit
 
   val instantiate :
@@ -221,16 +218,13 @@ end = struct
     Misc.Stdlib.String.Tbl.add t.templates id closure;
     id
 
-  let add_all_templates target source =
+  let add_foreign_templates t templates =
     Misc.Stdlib.String.Tbl.iter
       (fun id closure ->
-        if Misc.Stdlib.String.Tbl.mem target id
+        if Misc.Stdlib.String.Tbl.mem t.foreign_templates id
         then Misc.fatal_errorf "duplicate template id: %s" id;
-        Misc.Stdlib.String.Tbl.add target id closure)
-      source
-
-  let add_foreign_templates t templates =
-    add_all_templates t.foreign_templates templates
+        Misc.Stdlib.String.Tbl.add t.foreign_templates id closure)
+      templates
 
   let find_template t id =
     try Misc.Stdlib.String.Tbl.find t.templates id
@@ -306,20 +300,16 @@ end = struct
     if Misc.Stdlib.String.Tbl.length templates = 0
     then ()
     else begin
-      Fmt.fprintf ppf "@ @[<hv>";
       Misc.Stdlib.String.Tbl.iter
         (fun id closure ->
-          Fmt.fprintf ppf "@[<2>(%s@ %a)@]" id Types.print_closure closure)
-        templates;
-      Fmt.fprintf ppf "@]"
+          Fmt.fprintf ppf "@ @[<2>(%s@ %a)@]" id Types.print_closure closure)
+        templates
     end
 end
 
 include Types
 
 type closure = Template_store.id
-
-let print = print_value_or_missing
 
 module CU_data = struct
   type t =
@@ -329,21 +319,15 @@ module CU_data = struct
 
   type raw = File_sections.Idx.t
 
+  let empty () = { templates = Template_store.empty_templates (); cu = Missing }
+
   let read raw ~sections = Obj.obj (File_sections.get sections raw)
 
   let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
 
-  let package ts =
-    let templates = Template_store.empty_templates () in
-    Array.iter
-      (fun t -> Template_store.add_all_templates templates t.templates)
-      ts;
-    let cu = Or_missing.Present (SLVrecord (Array.map (fun t -> t.cu) ts)) in
-    { templates; cu }
-
   let print ppf { templates; cu } =
-    Fmt.fprintf ppf "@[<v 0>%a%a@]" print cu Template_store.print_templates
-      templates
+    Fmt.fprintf ppf "@[<v 0>%a%a@]" print_value_or_missing cu
+      Template_store.print_templates templates
 end
 
 module Ctx = struct

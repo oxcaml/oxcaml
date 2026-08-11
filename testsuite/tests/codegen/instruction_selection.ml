@@ -111,8 +111,8 @@ combine_comparisons:
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, even though we realise
-   it is the same one. *)
+(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
+   for the second branch. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
@@ -123,7 +123,6 @@ repeat_comparisons:
   xorl  %eax, %eax
   cmpq  $11, %rbx
   setg  %al
-  cmpq  $11, %rbx
   jle   .L0
   testq %rax, %rax
   je    .L0

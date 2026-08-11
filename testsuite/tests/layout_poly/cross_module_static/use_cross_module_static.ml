@@ -21,6 +21,18 @@
  ocamlopt.byte;
  run;
  check-program-output;
+
+ program = "-no-code -no-approx cross_module_static_lib.cmx";
+ output = "cross_module_static_lib.objinfo.output";
+ reference = "${test_source_directory}/cross_module_static_lib.objinfo.reference";
+ ocamlobjinfo;
+ check-program-output;
+
+ program = "-no-code -no-approx cross_module_static_relay.cmx";
+ output = "cross_module_static_relay.objinfo.output";
+ reference = "${test_source_directory}/cross_module_static_relay.objinfo.reference";
+ ocamlobjinfo;
+ check-program-output;
 *)
 
 (* Instantiating a layout-polymorphic value defined in another compilation unit

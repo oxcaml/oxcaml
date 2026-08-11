@@ -170,7 +170,7 @@ type t17b : value & value
 |}]
 
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
-  ('a : value mod immutable global aliased)
+  ('a : value mod immutable global)
 [%%expect{|
 type ('a : value mod everything non_float) t18 = 'a
 |}]
@@ -1348,15 +1348,15 @@ type existential_abstract =
 |}]
 
 module M : sig
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end = struct
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end
