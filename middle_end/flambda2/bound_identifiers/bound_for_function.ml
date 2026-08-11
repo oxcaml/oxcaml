@@ -242,3 +242,32 @@ let renaming
       ~first:renaming
   in
   Renaming.add_fresh_variable renaming my_depth1 ~guaranteed_fresh:my_depth2
+
+let import_and_rename
+    { return_continuation;
+      exn_continuation;
+      params;
+      my_closure;
+      my_alloc_mode;
+      my_depth
+    } renaming =
+  let renaming, return_continuation =
+    Renaming.bind_continuation renaming return_continuation
+  in
+  let renaming, exn_continuation =
+    Renaming.bind_continuation renaming exn_continuation
+  in
+  let renaming, params = Bound_parameters.import_and_rename params renaming in
+  let renaming, my_closure = Renaming.bind_variable renaming my_closure in
+  let renaming, my_alloc_mode =
+    Alloc_mode.For_applications.import_and_rename my_alloc_mode renaming
+  in
+  let renaming, my_depth = Renaming.bind_variable renaming my_depth in
+  ( renaming,
+    { return_continuation;
+      exn_continuation;
+      params;
+      my_closure;
+      my_alloc_mode;
+      my_depth
+    } )

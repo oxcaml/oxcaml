@@ -52,6 +52,8 @@ val export : Set.t -> importer
 
 val import : importer -> t -> t
 
+val import_and_rename : importer -> t -> t
+
 val initialise : unit -> unit
 
 val reset : unit -> unit
