@@ -195,7 +195,35 @@ Error: This expression has type "(< to_string : string; .. > -> unit) signal"
        The second object type has no method "to_string"
 |}]
 
-(* GADT equation scoping (trefis's example): error message comparison. *)
+(* No propagation into a bare expected variable: here the variable's kind
+   requires portability, which [id]'s result only satisfies once [x]
+   has instantiated the kind's with-bounds. *)
+
+type 'a box = Box of 'a
+let require_portable : ('a : value mod portable). 'a -> unit = fun _ -> ()
+
+let f (x : int) = require_portable (id (Box x))
+[%%expect{|
+type 'a box = Box of 'a
+val require_portable : ('a : value mod portable). 'a -> unit = <fun>
+val f : int -> unit = <fun>
+|}, Principal{|
+type 'a box = Box of 'a
+val require_portable : ('a : value mod portable). 'a -> unit = <fun>
+Line 4, characters 35-47:
+4 | let f (x : int) = require_portable (id (Box x))
+                                       ^^^^^^^^^^^^
+Error: This expression has type "int box"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int box is immutable_data with int
+         because of the definition of box at line 1, characters 0-23.
+       But the kind of int box must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+(* GADT equation scoping (trefis's example): the expected type here is a
+   bare variable, into which we do not propagate, so the error is
+   unchanged. *)
 
 type _ g = Int : int g
 let ky x y = ignore (x = y); x
