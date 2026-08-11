@@ -1,0 +1,66 @@
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets cached-generic-functions.a)
+ (action
+  (run %{bin:generate_cached_generic_functions.exe} cached-generic-functions)))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets test_cached_genfns.exe test_cached_genfns.exe.startup.s)
+ (deps test_cached_genfns.ml cached-generic-functions.a)
+ (action
+  (run
+   %{bin:ocamlopt.opt}
+   -extension
+   layouts_beta
+   -use-cached-generic-functions
+   -cached-generic-functions-path
+   cached-generic-functions.a
+   -dstartup
+   test_cached_genfns.ml
+   -o
+   test_cached_genfns.exe)))
+
+(rule
+ (enabled_if
+  (= %{context_name} "main"))
+ (targets test_cached_genfns.output)
+ (deps test_cached_genfns.exe)
+ (action
+  (with-outputs-to
+   test_cached_genfns.output
+   (run ./test_cached_genfns.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps test_cached_genfns.expected test_cached_genfns.output)
+ (action
+  (diff test_cached_genfns.expected test_cached_genfns.output)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{system} "linux")))
+ (deps test_cached_genfns.exe.startup.s)
+ (action
+  (bash
+   "s=test_cached_genfns.exe.startup.s
+ok=1
+for sym in caml_apply2_Runknown caml_curry2_Runknown; do
+  grep -q \"^$sym:\" $s || { echo \"$sym is not defined in $s\"; ok=0; }
+done
+if grep -q '^caml_apply2:' $s; then
+  echo 'caml_apply2 is defined in the startup object; it must come from the cache'
+  ok=0
+fi
+if [ $ok -ne 1 ]; then
+  echo 'generic-function symbols in the startup assembly:'
+  grep -nE 'caml_(apply|curry)' $s || true
+  exit 1
+fi")))

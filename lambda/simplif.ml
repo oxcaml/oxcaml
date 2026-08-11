@@ -242,7 +242,10 @@ let simplify_exits lam =
   let rec simplif ~layout ~try_depth l =
     (* layout is the expected layout of the result: [None] if we want to
        leave it unchanged, [Some layout] if we need to update the layout of
-       the result to [layout]. *)
+       the result to [layout].
+
+       Ignore [layout] if it's [Ptop] and we can give a better layout. *)
+    let layout = match layout with Some Ptop -> None | _ -> layout in
     let result_layout ly = Option.value layout ~default:ly in
     match l with
   | Lvar _| Lmutvar _ | Lconst _ -> l
@@ -971,6 +974,7 @@ type slot =
     function_scope: lambda;
     mutable scope: lambda option;
     mutable closed_region: lambda option;
+    mutable use_layout: layout option;
   }
 
 type exclave_status =
@@ -1027,12 +1031,13 @@ let simplify_local_functions lam =
           { func = lf;
             function_scope = !current_function_scope;
             scope = None;
-            closed_region = None }
+            closed_region = None;
+            use_layout = None }
         in
         Hashtbl.add slots id r;
         tail cont;
         begin match Hashtbl.find_opt slots id with
-        | Some {scope = Some scope; closed_region; _} ->
+        | Some {scope = Some scope; closed_region; use_layout; _} ->
             let st = next_raise_count () in
             let sc, exclave =
               (* Do not move higher than current lambda *)
@@ -1046,7 +1051,12 @@ let simplify_local_functions lam =
               end else scope, No_exclave
             in
             Hashtbl.add static_id id st;
-            LamTbl.add static sc (st, lf, exclave);
+            let catch_kind =
+              match lf.return, use_layout with
+              | (Ptop | Pbottom), Some layout -> layout
+              | _, _ -> lf.return
+            in
+            LamTbl.add static sc (st, lf, exclave, catch_kind);
             (* The body of the function will become an handler
                in that "scope". *)
             with_scope ~scope lf.body
@@ -1055,7 +1065,8 @@ let simplify_local_functions lam =
             (* note: if scope = None, the function is unused *)
             function_definition lf
         end
-    | Lapply {ap_func = Lvar id; ap_args; ap_region_close; _} ->
+    | Lapply {ap_func = Lvar id; ap_args; ap_region_close;
+              ap_result_layout; _} ->
         let curr_scope, closed_region =
           match ap_region_close with
           | Rc_normal | Rc_nontail -> !current_scope, None
@@ -1077,7 +1088,14 @@ let simplify_local_functions lam =
         | Some ({scope = None; _} as slot) ->
             (* First use of the function: remember the current tail scope *)
             slot.scope <- Some curr_scope;
-            slot.closed_region <- closed_region
+            slot.closed_region <- closed_region;
+            slot.use_layout <- Some ap_result_layout
+        | Some {func = {return = Ptop | Pbottom; _};
+                use_layout = Some use_layout; _}
+          when not (Lambda.equal_layout use_layout ap_result_layout) ->
+            (* The catch kind comes from the use sites: give up if they
+               disagree *)
+            Hashtbl.remove slots id
         | Some ({closed_region = Some old_closed_region} as slot) -> begin
             match closed_region with
             | Some closed_region when closed_region == old_closed_region ->
@@ -1150,7 +1168,7 @@ let simplify_local_functions lam =
         (fun (p: lparam) -> (p.name, p.debug_uid, p.layout)) lf.params
     in
     List.fold_right
-      (fun (st, lf, exclave) lam ->
+      (fun (st, lf, exclave, catch_kind) lam ->
          let body = rewrite lf.body in
          let body, r =
            match exclave with
@@ -1158,7 +1176,7 @@ let simplify_local_functions lam =
            | Exclave -> Lexclave body, Same_region
            | Within_exclave -> body, Popped_region
          in
-         Lstaticcatch (lam, (st, new_params lf), body, r, lf.return)
+         Lstaticcatch (lam, (st, new_params lf), body, r, catch_kind)
       )
       (LamTbl.find_all static lam0)
       lam
