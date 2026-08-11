@@ -73,93 +73,95 @@
  module = "util/util.mli util/util.ml";
  ocamlopt.byte;
 
- (* (1) [.cmi] target → only [.cmi].  Verify cmi signature via objinfo. *)
+ {
+   (* (1) [.cmi] target → only [.cmi].  Verify cmi signature via objinfo. *)
 
- flags = "$flg -functorize -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_phases/bundle.cmi";
- all_modules = "";
- ocamlopt.byte;
+   flags = "$flg -functorize -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_phases/bundle.cmi";
+   all_modules = "";
+   ocamlopt.byte;
 
- script = "sh -c 'test -f bundle_phases/bundle.cmi && \
-                  ! test -f bundle_phases/bundle.cmx && \
-                  ! test -f bundle_phases/bundle.cmti && \
-                  ! test -f bundle_phases/bundle.cmsi'";
- script;
+   script = "sh -c 'test -f bundle_phases/bundle.cmi && \
+                    ! test -f bundle_phases/bundle.cmx && \
+                    ! test -f bundle_phases/bundle.cmti && \
+                    ! test -f bundle_phases/bundle.cmsi'";
+   script;
 
- program = "-no-approx -no-code bundle_phases/bundle.cmi";
- output = "bundle_phases.cmi.objinfo.output";
- ocamlobjinfo;
+   program = "-no-approx -no-code bundle_phases/bundle.cmi";
+   output = "bundle_phases.cmi.objinfo.output";
+   ocamlobjinfo;
 
- reference = "bundle_phases.cmi.objinfo.reference";
- check-program-output;
+   reference = "bundle_phases.cmi.objinfo.reference";
+   check-program-output;
+ }{
+   (* (2) [.cmx] target → both [.cmx] and [.cmi]. *)
 
- (* (2) [.cmx] target → both [.cmx] and [.cmi]. *)
+   flags = "$flg -functorize -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_onestep/bundle.cmx";
+   all_modules = "";
+   ocamlopt.byte;
 
- flags = "$flg -functorize -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_onestep/bundle.cmx";
- all_modules = "";
- ocamlopt.byte;
+   script = "sh -c 'test -f bundle_onestep/bundle.cmx && \
+                    test -f bundle_onestep/bundle.cmi && \
+                    ! test -f bundle_onestep/bundle.cmt && \
+                    ! test -f bundle_onestep/bundle.cms'";
+   script;
+ }{
+   (* (3) [.cmi] target with [-bin-annot] → also [.cmti]. *)
 
- script = "sh -c 'test -f bundle_onestep/bundle.cmx && \
-                  test -f bundle_onestep/bundle.cmi && \
-                  ! test -f bundle_onestep/bundle.cmt && \
-                  ! test -f bundle_onestep/bundle.cms'";
- script;
+   flags = "$flg -functorize -bin-annot -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_cmti/bundle.cmi";
+   all_modules = "";
+   ocamlopt.byte;
 
- (* (3) [.cmi] target with [-bin-annot] → also [.cmti]. *)
+   script = "sh -c 'test -f bundle_cmti/bundle.cmti && \
+                    ! test -f bundle_cmti/bundle.cmt'";
+   script;
+ }{
+   (* (4) [.cmx] target with [-bin-annot] → also [.cmt]. *)
 
- flags = "$flg -functorize -bin-annot -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_cmti/bundle.cmi";
- all_modules = "";
- ocamlopt.byte;
+   flags = "$flg -functorize -bin-annot -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_cmt/bundle.cmx";
+   all_modules = "";
+   ocamlopt.byte;
 
- script = "sh -c 'test -f bundle_cmti/bundle.cmti && \
-                  ! test -f bundle_cmti/bundle.cmt'";
- script;
+   script = "sh -c 'test -f bundle_cmt/bundle.cmt && \
+                    ! test -f bundle_cmt/bundle.cmti'";
+   script;
+ }{
+   (* (5) [.cmi] target with [-bin-annot-cms] → also [.cmsi]. *)
 
- (* (4) [.cmx] target with [-bin-annot] → also [.cmt]. *)
+   flags = "$flg -functorize -bin-annot-cms -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_cmsi/bundle.cmi";
+   all_modules = "";
+   ocamlopt.byte;
 
- flags = "$flg -functorize -bin-annot -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_cmt/bundle.cmx";
- all_modules = "";
- ocamlopt.byte;
+   script = "sh -c 'test -f bundle_cmsi/bundle.cmsi && \
+                    ! test -f bundle_cmsi/bundle.cms'";
+   script;
+ }{
+   (* (6) [.cmx] target with [-bin-annot-cms] → also [.cms]. *)
 
- script = "sh -c 'test -f bundle_cmt/bundle.cmt && \
-                  ! test -f bundle_cmt/bundle.cmti'";
- script;
+   flags = "$flg -functorize -bin-annot-cms -I p -I basic -I util Basic Util";
+   module = "";
+   program = "bundle_cms/bundle.cmx";
+   all_modules = "";
+   ocamlopt.byte;
 
- (* (5) [.cmi] target with [-bin-annot-cms] → also [.cmsi]. *)
+   script = "sh -c 'test -f bundle_cms/bundle.cms && \
+                    ! test -f bundle_cms/bundle.cmsi'";
+   script;
 
- flags = "$flg -functorize -bin-annot-cms -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_cmsi/bundle.cmi";
- all_modules = "";
- ocamlopt.byte;
+   program = "bundle_cms/bundle.cms";
+   output = "bundle_cms.cms.objinfo.output";
+   ocamlobjinfo;
 
- script = "sh -c 'test -f bundle_cmsi/bundle.cmsi && \
-                  ! test -f bundle_cmsi/bundle.cms'";
- script;
-
- (* (6) [.cmx] target with [-bin-annot-cms] → also [.cms]. *)
-
- flags = "$flg -functorize -bin-annot-cms -I p -I basic -I util Basic Util";
- module = "";
- program = "bundle_cms/bundle.cmx";
- all_modules = "";
- ocamlopt.byte;
-
- script = "sh -c 'test -f bundle_cms/bundle.cms && \
-                  ! test -f bundle_cms/bundle.cmsi'";
- script;
-
- program = "bundle_cms/bundle.cms";
- output = "bundle_cms.cms.objinfo.output";
- ocamlobjinfo;
-
- reference = "bundle_cms.cms.objinfo_native.reference";
- check-program-output;
+   reference = "bundle_cms.cms.objinfo_native.reference";
+   check-program-output;
+ }
 *)

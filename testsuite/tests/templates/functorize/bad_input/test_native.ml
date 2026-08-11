@@ -53,42 +53,44 @@
  module = "plain/plain.mli plain/plain.ml";
  ocamlopt.byte;
 
- (* Case 1: [-functorize P] where P is [-as-parameter]. *)
+ {
+   (* Case 1: [-functorize P] where P is [-as-parameter]. *)
 
- flags = "$flg -functorize -I p P";
- module = "";
- program = "bundle/bundle.cmi";
- all_modules = "";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_param_input.output";
- ocamlopt.byte;
+   flags = "$flg -functorize -I p P";
+   module = "";
+   program = "bundle/bundle.cmi";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_param_input.output";
+   ocamlopt.byte;
 
- compiler_reference = "bad_param_input.reference";
- check-ocamlopt.byte-output;
+   compiler_reference = "bad_param_input.reference";
+   check-ocamlopt.byte-output;
+ }{
+   (* Case 2: [-functorize Plain] where Plain has no parameters. *)
 
- (* Case 2: [-functorize Plain] where Plain has no parameters. *)
+   flags = "$flg -functorize -I plain Plain";
+   module = "";
+   program = "bundle/bundle.cmi";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_plain_input.output";
+   ocamlopt.byte;
 
- flags = "$flg -functorize -I plain Plain";
- module = "";
- program = "bundle/bundle.cmi";
- all_modules = "";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_plain_input.output";
- ocamlopt.byte;
+   compiler_reference = "bad_plain_input.reference";
+   check-ocamlopt.byte-output;
+ }{
+   (* Case 3: [-functorize No_such_module] where the cmi can't be found. *)
 
- compiler_reference = "bad_plain_input.reference";
- check-ocamlopt.byte-output;
+   flags = "$flg -functorize No_such_module";
+   module = "";
+   program = "bundle/bundle.cmi";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_input_cmi_not_found.output";
+   ocamlopt.byte;
 
- (* Case 3: [-functorize No_such_module] where the cmi can't be found. *)
-
- flags = "$flg -functorize No_such_module";
- module = "";
- program = "bundle/bundle.cmi";
- all_modules = "";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_input_cmi_not_found.output";
- ocamlopt.byte;
-
- compiler_reference = "bad_input_cmi_not_found.reference";
- check-ocamlopt.byte-output;
+   compiler_reference = "bad_input_cmi_not_found.reference";
+   check-ocamlopt.byte-output;
+ }
 *)

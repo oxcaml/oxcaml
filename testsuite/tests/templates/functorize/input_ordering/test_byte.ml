@@ -84,51 +84,53 @@
  module = "derived/derived.mli derived/derived.ml";
  ocamlc.byte;
 
- (* Bundle [Derived Basic] (wrong order). [-functorize] re-orders so
-    [Basic] precedes [Derived] in the bundle. *)
+ {
+   (* Bundle [Derived Basic] (wrong order). [-functorize] re-orders so
+      [Basic] precedes [Derived] in the bundle. *)
 
- flags = "$flg -functorize -I p -I basic -I derived Derived Basic";
- module = "";
- program = "bundle_derived/bundle_derived.cmo";
- all_modules = "";
- ocamlc.byte;
+   flags = "$flg -functorize -I p -I basic -I derived Derived Basic";
+   module = "";
+   program = "bundle_derived/bundle_derived.cmo";
+   all_modules = "";
+   ocamlc.byte;
 
- flags = "$flg -I bundle_derived -I p -I p_int -I basic -I derived";
- module = "main_functorize_derived.ml";
- ocamlc.byte;
+   flags = "$flg -I bundle_derived -I p -I p_int -I basic -I derived";
+   module = "main_functorize_derived.ml";
+   ocamlc.byte;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_derived.bc";
- all_modules = "\
-   basic/basic__.cmo \
-   basic/basic.cmo \
-   derived/derived.cmo \
-   p_int/p_int__.cmo \
-   p_int/p_int.cmo \
-   bundle_derived/bundle_derived.cmo \
-   main_functorize_derived.cmo \
- ";
- ocamlc.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_derived.bc";
+   all_modules = "\
+     basic/basic__.cmo \
+     basic/basic.cmo \
+     derived/derived.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_derived/bundle_derived.cmo \
+     main_functorize_derived.cmo \
+   ";
+   ocamlc.byte;
 
- stdout = "test_functorize_derived.output";
- stderr = "test_functorize_derived.output";
- output = "test_functorize_derived.output";
- run;
+   stdout = "test_functorize_derived.output";
+   stderr = "test_functorize_derived.output";
+   output = "test_functorize_derived.output";
+   run;
 
- reference = "test_functorize_derived.reference";
- check-program-output;
+   reference = "test_functorize_derived.reference";
+   check-program-output;
+ }{
+   (* (2) Duplicate rejection: [-functorize Basic Basic] is a user error. *)
 
- (* (2) Duplicate rejection: [-functorize Basic Basic] is a user error. *)
+   flags = "$flg -functorize -I p -I basic Basic Basic";
+   module = "";
+   program = "bundle_dup/bundle.cmo";
+   all_modules = "";
+   ocamlc_byte_exit_status = "2";
+   compiler_output = "bad_dup_input.output";
+   ocamlc.byte;
 
- flags = "$flg -functorize -I p -I basic Basic Basic";
- module = "";
- program = "bundle_dup/bundle.cmo";
- all_modules = "";
- ocamlc_byte_exit_status = "2";
- compiler_output = "bad_dup_input.output";
- ocamlc.byte;
-
- compiler_reference = "bad_dup_input.reference";
- check-ocamlc.byte-output;
+   compiler_reference = "bad_dup_input.reference";
+   check-ocamlc.byte-output;
+ }
 *)

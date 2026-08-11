@@ -141,134 +141,139 @@
  all_modules = "";
  ocamlopt.byte;
 
- (* (1) Positive: transparent sharing — within one [R = Make(P_int)()]
-    and also across [R1 = Make(P_int)()], [R2 = Make(P_int)()]. *)
+ {
+   (* (1) Positive: transparent sharing — within one [R = Make(P_int)()]
+      and also across [R1 = Make(P_int)()], [R2 = Make(P_int)()]. *)
 
- flags = "$flg -I bundle2 -I p -I p_int -I basic_transparent -I util_transparent";
- module = "main_functorize_share.ml";
- ocamlopt.byte;
+   flags = "$flg -I bundle2 -I p -I p_int -I basic_transparent \
+     -I util_transparent";
+   module = "main_functorize_share.ml";
+   ocamlopt.byte;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_share.exe";
- all_modules = "\
-   basic_transparent/basic_transparent.cmx \
-   util_transparent/util_transparent.cmx \
-   p_int/p_int__.cmx \
-   p_int/p_int.cmx \
-   bundle2/bundle2.cmx \
-   main_functorize_share.cmx \
- ";
- ocamlopt.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_share.exe";
+   all_modules = "\
+     basic_transparent/basic_transparent.cmx \
+     util_transparent/util_transparent.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle2/bundle2.cmx \
+     main_functorize_share.cmx \
+   ";
+   ocamlopt.byte;
 
- stdout = "test_functorize_share.output";
- stderr = "test_functorize_share.output";
- output = "test_functorize_share.output";
- run;
+   stdout = "test_functorize_share.output";
+   stderr = "test_functorize_share.output";
+   output = "test_functorize_share.output";
+   run;
 
- reference = "test_functorize_share.reference";
- check-program-output;
+   reference = "test_functorize_share.reference";
+   check-program-output;
+ }{
+   (* (2) Positive: abstract+eq sharing — within one [R = Make(P_int)()]. *)
 
- (* (2) Positive: abstract+eq sharing — within one [R = Make(P_int)()]. *)
+   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   module = "main_functorize_type_share.ml";
+   ocamlopt.byte;
 
- flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
- module = "main_functorize_type_share.ml";
- ocamlopt.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_type_share.exe";
+   all_modules = "\
+     basic_share/basic_share.cmx \
+     util_share/util_share.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle_share/bundle_share.cmx \
+     main_functorize_type_share.cmx \
+   ";
+   ocamlopt.byte;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_type_share.exe";
- all_modules = "\
-   basic_share/basic_share.cmx \
-   util_share/util_share.cmx \
-   p_int/p_int__.cmx \
-   p_int/p_int.cmx \
-   bundle_share/bundle_share.cmx \
-   main_functorize_type_share.cmx \
- ";
- ocamlopt.byte;
+   stdout = "test_functorize_type_share.output";
+   stderr = "test_functorize_type_share.output";
+   output = "test_functorize_type_share.output";
+   run;
 
- stdout = "test_functorize_type_share.output";
- stderr = "test_functorize_type_share.output";
- output = "test_functorize_type_share.output";
- run;
+   reference = "test_functorize_type_share.reference";
+   check-program-output;
+ }{
+   (* (3) Instance independence — each [Make] application has its own
+      counter. *)
 
- reference = "test_functorize_type_share.reference";
- check-program-output;
+   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   module = "main_instance_state.ml";
+   ocamlopt.byte;
 
- (* (3) Instance independence — each [Make] application has its own counter. *)
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_instance_state.exe";
+   all_modules = "\
+     basic_share/basic_share.cmx \
+     util_share/util_share.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle_share/bundle_share.cmx \
+     main_instance_state.cmx \
+   ";
+   ocamlopt.byte;
 
- flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
- module = "main_instance_state.ml";
- ocamlopt.byte;
+   stdout = "test_instance_state.output";
+   stderr = "test_instance_state.output";
+   output = "test_instance_state.output";
+   run;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_instance_state.exe";
- all_modules = "\
-   basic_share/basic_share.cmx \
-   util_share/util_share.cmx \
-   p_int/p_int__.cmx \
-   p_int/p_int.cmx \
-   bundle_share/bundle_share.cmx \
-   main_instance_state.cmx \
- ";
- ocamlopt.byte;
+   reference = "test_instance_state.reference";
+   check-program-output;
+ }{
+   (* (4) [Make(M0)()] satisfies [Intf(M1).S] when the bundle sig is
+      P-free. *)
 
- stdout = "test_instance_state.output";
- stderr = "test_instance_state.output";
- output = "test_instance_state.output";
- run;
+   flags = "$flg -I bundle_pfree -I p -I p_int -I p_int_alt -I basic_pfree";
+   module = "main_intf_sig.ml";
+   ocamlopt.byte;
 
- reference = "test_instance_state.reference";
- check-program-output;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_intf_sig.exe";
+   all_modules = "\
+     basic_pfree/basic_pfree.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     p_int_alt/p_int_alt.cmx \
+     bundle_pfree/bundle_pfree.cmx \
+     main_intf_sig.cmx \
+   ";
+   ocamlopt.byte;
 
- (* (4) [Make(M0)()] satisfies [Intf(M1).S] when the bundle sig is P-free. *)
+   stdout = "test_intf_sig.output";
+   stderr = "test_intf_sig.output";
+   output = "test_intf_sig.output";
+   run;
 
- flags = "$flg -I bundle_pfree -I p -I p_int -I p_int_alt -I basic_pfree";
- module = "main_intf_sig.ml";
- ocamlopt.byte;
+   reference = "test_intf_sig.reference";
+   check-program-output;
+ }{
+   (* (5) [Make(M0)()] does NOT satisfy [Intf(M1).S] when the bundle sig
+      references [P] (here [Basic_transparent.t = P.t]). *)
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_intf_sig.exe";
- all_modules = "\
-   basic_pfree/basic_pfree.cmx \
-   p_int/p_int__.cmx \
-   p_int/p_int.cmx \
-   p_int_alt/p_int_alt.cmx \
-   bundle_pfree/bundle_pfree.cmx \
-   main_intf_sig.cmx \
- ";
- ocamlopt.byte;
+   flags = "$flg -I bundle2 -I p -I p_int -I p_int_alt \
+     -I basic_transparent -I util_transparent";
+   module = "bad_intf_sig_mismatch.ml";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_intf_sig_mismatch.output";
+   ocamlopt.byte;
 
- stdout = "test_intf_sig.output";
- stderr = "test_intf_sig.output";
- output = "test_intf_sig.output";
- run;
+   compiler_reference = "bad_intf_sig_mismatch.reference";
+   check-ocamlopt.byte-output;
+ }{
+   (* (6) Negative: a value from [R1 = Make(P_int)()] cannot be used
+      where an [R2 = Make(P_int)()] value is expected — each [Make]
+      application gives fresh abstract types. *)
 
- reference = "test_intf_sig.reference";
- check-program-output;
-
- (* (5) [Make(M0)()] does NOT satisfy [Intf(M1).S] when the bundle sig
-    references [P] (here [Basic_transparent.t = P.t]). *)
-
- flags = "$flg -I bundle2 -I p -I p_int -I p_int_alt \
-   -I basic_transparent -I util_transparent";
- module = "bad_intf_sig_mismatch.ml";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_intf_sig_mismatch.output";
- ocamlopt.byte;
-
- compiler_reference = "bad_intf_sig_mismatch.reference";
- check-ocamlopt.byte-output;
-
- (* (6) Negative: a value from [R1 = Make(P_int)()] cannot be used
-    where an [R2 = Make(P_int)()] value is expected — each [Make]
-    application gives fresh abstract types. *)
-
- flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
- module = "bad_mix_share.ml";
- ocamlopt_byte_exit_status = "2";
- ocamlopt.byte;
+   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   module = "bad_mix_share.ml";
+   ocamlopt_byte_exit_status = "2";
+   ocamlopt.byte;
+ }
 *)
