@@ -556,6 +556,11 @@ module Variable = struct
 
   let import importer t =
     Table.add !grand_table_of_variables (Table.import importer t)
+
+  let import_and_rename importer t =
+    let data = Table.import importer t in
+    let user_visible = if data.user_visible then Some () else None in
+    create ?user_visible data.name data.kind
 end
 
 module Symbol = struct

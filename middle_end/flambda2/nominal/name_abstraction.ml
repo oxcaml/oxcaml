@@ -37,6 +37,13 @@ module With_delayed_renaming : sig
     ('bindable, 'term) t ->
     apply_renaming_to_term:('term -> Renaming.t -> 'term) ->
     'bindable * 'term
+
+  val pattern_match :
+    (module Bindable.S with type t = 'bindable) ->
+    ('bindable, 'term) t ->
+    apply_renaming_to_term:('term -> Renaming.t -> 'term) ->
+    f:('bindable -> 'term -> 'a) ->
+    'a
 end = struct
   type ('bindable, 'term) t =
     { mutable bindable : 'bindable;
@@ -65,20 +72,22 @@ end = struct
       t.term <- term;
       t.delayed_renaming <- Renaming.empty;
       bindable, term
+
+  let[@inline always] pattern_match (type bindable)
+      (module Bindable : Bindable.S with type t = bindable) t
+      ~apply_renaming_to_term ~f =
+    let renaming, fresh_bindable =
+      Bindable.import_and_rename t.bindable t.delayed_renaming
+    in
+    let fresh_term = apply_renaming_to_term t.term renaming in
+    f fresh_bindable fresh_term
 end
 
 type ('bindable, 'term) t = ('bindable, 'term) With_delayed_renaming.t
 
 let descr = With_delayed_renaming.descr
 
-let[@inline always] pattern_match (type bindable)
-    (module Bindable : Bindable.S with type t = bindable) t
-    ~apply_renaming_to_term ~f =
-  let bindable, term = descr (module Bindable) t ~apply_renaming_to_term in
-  let fresh_bindable = Bindable.rename bindable in
-  let renaming = Bindable.renaming bindable ~guaranteed_fresh:fresh_bindable in
-  let fresh_term = apply_renaming_to_term term renaming in
-  f fresh_bindable fresh_term
+let pattern_match = With_delayed_renaming.pattern_match
 
 let[@inline always] pattern_match_for_printing bindable_impl t
     ~apply_renaming_to_term ~f =
@@ -91,18 +100,18 @@ let[@inline always] pattern_match_for_printing bindable_impl t
 let[@inline always] pattern_match_pair (type bindable)
     (module Bindable : Bindable.S with type t = bindable) t0 t1
     ~apply_renaming_to_term ~f =
-  let bindable0, term0 = descr (module Bindable) t0 ~apply_renaming_to_term in
-  let bindable1, term1 = descr (module Bindable) t1 ~apply_renaming_to_term in
-  let fresh_bindable = Bindable.rename bindable0 in
-  let renaming0 =
-    Bindable.renaming bindable0 ~guaranteed_fresh:fresh_bindable
-  in
-  let renaming1 =
-    Bindable.renaming bindable1 ~guaranteed_fresh:fresh_bindable
-  in
-  let fresh_term0 = apply_renaming_to_term term0 renaming0 in
-  let fresh_term1 = apply_renaming_to_term term1 renaming1 in
-  f fresh_bindable fresh_term0 fresh_term1
+  pattern_match
+    (module Bindable)
+    t0 ~apply_renaming_to_term
+    ~f:(fun fresh_bindable fresh_term0 ->
+      let bindable1, term1 =
+        descr (module Bindable) t1 ~apply_renaming_to_term
+      in
+      let renaming1 =
+        Bindable.renaming bindable1 ~guaranteed_fresh:fresh_bindable
+      in
+      let fresh_term1 = apply_renaming_to_term term1 renaming1 in
+      f fresh_bindable fresh_term0 fresh_term1)
 
 let apply_renaming (type bindable)
     (module _ : Bindable.S with type t = bindable) t renaming

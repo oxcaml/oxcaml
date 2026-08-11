@@ -38,6 +38,8 @@ module Import_map : sig
 
   val variable : t -> Variable.t -> Variable.t
 
+  val fresh_variable : t -> Variable.t -> Variable.t
+
   val symbol : t -> Symbol.t -> Symbol.t
 
   val simple :
@@ -46,6 +48,8 @@ module Import_map : sig
   val code_id : t -> Code_id.t -> Code_id.t
 
   val continuation : t -> Continuation.t -> Continuation.t
+
+  val fresh_continuation : t -> Continuation.t -> Continuation.t
 
   val value_slot_is_used : t -> Value_slot.t -> bool
 end = struct
@@ -93,11 +97,16 @@ end = struct
 
   let variable t orig = Variable.import t.variables orig
 
+  let fresh_variable t orig = Variable.import_and_rename t.variables orig
+
   let const t orig = Const.import t.consts orig
 
   let code_id t orig = Code_id.import t.code_ids orig
 
   let continuation t orig = Continuation.import t.continuations orig
+
+  let fresh_continuation t orig =
+    Continuation.import_and_rename t.continuations orig
 
   let simple t simple ~import_var =
     (* Constants and symbols are never permuted, only freshened upon import. *)
@@ -116,13 +125,19 @@ end
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
-    import_map : Import_map.t option
+    import_map : Import_map.t option;
+    (* [bound_variables] and [bound_continuations] replace importing and must
+       not go through the import map. *)
+    bound_variables : Variable.t Variable.Map.t;
+    bound_continuations : Continuation.t Continuation.Map.t
   }
 
 let empty =
   { continuations = Continuations.empty;
     variables = Variables.empty;
-    import_map = None
+    import_map = None;
+    bound_variables = Variable.Map.empty;
+    bound_continuations = Continuation.Map.empty
   }
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
@@ -139,17 +154,30 @@ let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
 let has_import_map t = Option.is_some t.import_map
 
 let [@ocamlformat "disable"] print ppf
-      { continuations; variables; import_map = _; } =
+      { continuations; variables; import_map = _;
+        bound_variables; bound_continuations } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(continuations@ %a)@]@ \
+      @[<hov 1>(bound_continuations@ %a)@])@ \
       @[<hov 1>(variables@ %a)@])@ \
+      @[<hov 1>(bound_variables@ %a)@])@ \
       @]"
     Continuations.print continuations
+    (Continuation.Map.print Continuation.print) bound_continuations
     Variables.print variables
+    (Variable.Map.print Variable.print) bound_variables
 
-let is_identity { continuations; variables; import_map } =
+let is_identity
+    { continuations;
+      variables;
+      import_map;
+      bound_variables;
+      bound_continuations
+    } =
   Continuations.is_empty continuations
   && Variables.is_empty variables
+  && Continuation.Map.is_empty bound_continuations
+  && Variable.Map.is_empty bound_variables
   &&
   match import_map with
   | None -> true
@@ -163,12 +191,16 @@ let compose0
     ~second:
       ({ continuations = continuations2;
          variables = variables2;
-         import_map = import_map2
+         import_map = import_map2;
+         bound_variables = bound_variables2;
+         bound_continuations = bound_continuations2
        } as second)
     ~first:
       ({ continuations = continuations1;
          variables = variables1;
-         import_map = import_map1
+         import_map = import_map1;
+         bound_variables = bound_variables1;
+         bound_continuations = bound_continuations1
        } as first) =
   { continuations =
       Continuations.compose ~second:continuations2 ~first:continuations1;
@@ -184,7 +216,23 @@ let compose0
         Misc.fatal_errorf
           "Cannot compose renamings; only the [first] renaming may have an \
            import map.  first:@ %a@ second:@ %a"
-          print first print second)
+          print first print second);
+    bound_variables =
+      (if Variable.Map.is_empty bound_variables2
+       then bound_variables1
+       else
+         Misc.fatal_errorf
+           "Cannot compose renamings; only the [first] renaming may have bound \
+            variables.  first:@ %a@ second:@ %a"
+           print first print second);
+    bound_continuations =
+      (if Continuation.Map.is_empty bound_continuations2
+       then bound_continuations1
+       else
+         Misc.fatal_errorf
+           "Cannot compose renamings; only the [first] renaming may have bound \
+            continuations.  first:@ %a@ second:@ %a"
+           print first print second)
   }
 
 let compose ~second ~first =
@@ -206,9 +254,22 @@ let apply_variable t var =
   let var =
     match t.import_map with
     | None -> var
-    | Some import_map -> Import_map.variable import_map var
+    | Some import_map -> (
+      match Variable.Map.find_or_null var t.bound_variables with
+      | This var -> var
+      | Null -> Import_map.variable import_map var)
   in
   Variables.apply t.variables var
+
+let bind_variable t var1 =
+  match t.import_map with
+  | None ->
+    let var2 = Variable.rename var1 in
+    add_fresh_variable t (apply_variable t var1) ~guaranteed_fresh:var2, var2
+  | Some import_map ->
+    let var2 = Import_map.fresh_variable import_map var1 in
+    let bound_variables = Variable.Map.add var1 var2 t.bound_variables in
+    { t with bound_variables }, var2
 
 let apply_variable_set t vars =
   Variable.Set.fold
@@ -248,9 +309,24 @@ let apply_continuation t k =
   let k =
     match t.import_map with
     | None -> k
-    | Some import_map -> Import_map.continuation import_map k
+    | Some import_map -> (
+      match Continuation.Map.find_or_null k t.bound_continuations with
+      | This k -> k
+      | Null -> Import_map.continuation import_map k)
   in
   Continuations.apply t.continuations k
+
+let bind_continuation t k1 =
+  match t.import_map with
+  | None ->
+    let k2 = Continuation.rename k1 in
+    add_fresh_continuation t (apply_continuation t k1) ~guaranteed_fresh:k2, k2
+  | Some import_map ->
+    let k2 = Import_map.fresh_continuation import_map k1 in
+    let bound_continuations =
+      Continuation.Map.add k1 k2 t.bound_continuations
+    in
+    { t with bound_continuations }, k2
 
 let apply_code_id t code_id =
   match t.import_map with
