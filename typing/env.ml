@@ -2334,13 +2334,13 @@ let extension_declaration_address (_ : t) id (_ : extension_constructor) =
 let class_declaration_address (_ : t) id (_ : class_declaration) =
   Lazy_backtrack.create_forced (Alocal id)
 
-let module_declaration_address ~env_ref id presence md =
+let module_declaration_address env id presence md =
   match presence with
   | Mp_absent -> begin
       let open Subst.Lazy in
       match md.md_type with
       | Mty_alias path ->
-          Lazy_backtrack.create (ModAlias {env = env_ref; path})
+          Lazy_backtrack.create (ModAlias {env; path})
       | _ -> Misc.fatal_error "Env.module_declaration_address"
     end
   | Mp_present ->
@@ -2365,10 +2365,10 @@ let rec components_of_module_maker
         prefix_idents cm_path cm_prefixing_subst sg
       in
       (* [env] is write-only in the loop; its final value is published
-         to [inner_env_ref] after the loop so lazies forced later see
+         to [inner_full_env] after the loop so lazies forced later see
          all items in the signature. *)
       let env = ref cm_env in
-      let inner_env_ref = Env_ref.empty () in
+      let inner_full_env = Env_ref.empty () in
       let pos = ref 0 in
       let module_repr =
         List.filter_map
@@ -2492,7 +2492,7 @@ let rec components_of_module_maker
                   match md.md_type with
                   | Mty_alias path ->
                       Lazy_backtrack.create
-                        (ModAlias {env = inner_env_ref; path})
+                        (ModAlias {env = inner_full_env; path})
                   | _ -> assert false
                 end
               | Mp_present -> next_address ()
@@ -2502,7 +2502,7 @@ let rec components_of_module_maker
             in
             let shape = Shape.proj cm_shape (Shape.Item.module_ id) in
             let comps =
-              components_of_module ~alerts ~uid:md.md_uid inner_env_ref
+              components_of_module ~alerts ~uid:md.md_uid inner_full_env
                 sub path addr md.md_type mode shape
             in
             let mda =
@@ -2514,11 +2514,11 @@ let rec components_of_module_maker
             in
             c.comp_modules <-
               NameMap.add (Ident.name id) mda c.comp_modules;
-            (* Share [inner_env_ref] with [store_module]'s
+            (* Share [inner_full_env] with [store_module]'s
                [components_of_module] so mda lazies see the fully-
                populated env when forced. *)
             env :=
-              store_module ~update_summary:false ~env_ref:inner_env_ref
+              store_module ~update_summary:false ~full_env:inner_full_env
                 ~check:None
                 id addr pres md mode shape locks_empty !env
         | Sig_modtype(id, decl, _) ->
@@ -2559,7 +2559,7 @@ let rec components_of_module_maker
             c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
       )
         items_and_paths;
-      Env_ref.set inner_env_ref !env;
+      Env_ref.set inner_full_env !env;
       Ok (Structure_comps c)
   | Mty_functor(arg, ty_res, _) ->
       let sub = cm_prefixing_subst in
@@ -2834,7 +2834,7 @@ and store_extension ~check ~rebind id addr ext shape env =
     constrs = TycompTbl.add id cda env.constrs;
     summary = Env_extension(env.summary, id, ext) }
 
-and store_module ?(update_summary=true) ~env_ref ~check
+and store_module ?(update_summary=true) ~full_env ~check
                  id addr presence md mode shape alias_locks env =
   let open Subst.Lazy in
   let loc = md.md_loc in
@@ -2845,7 +2845,7 @@ and store_module ?(update_summary=true) ~env_ref ~check
   let md, mode = Normalize_mode.md Normalize md mode in
   let comps =
     components_of_module ~alerts ~uid:md.md_uid
-      env_ref Subst.identity (Pident id) addr md.md_type mode shape
+      full_env Subst.identity (Pident id) addr md.md_type mode shape
   in
   let mda =
     { mda_declaration = md;
@@ -2981,7 +2981,7 @@ and add_extension ~check ?shape ~rebind id ext env =
   store_extension ~check ~rebind id addr ext shape env
 
 and add_module_declaration_lazy
-      ~update_summary ?(arg=false) ?shape ?env_ref ~check id presence md
+      ~update_summary ?(arg=false) ?shape ?full_env ~check id presence md
       ?(mode = Mode.Value.(allow_right max)) ?(locks = []) env =
   let check =
     if not check then
@@ -2991,14 +2991,14 @@ and add_module_declaration_lazy
     else
       Some (fun s -> Warnings.Unused_module s)
   in
-  let env_ref =
-    match env_ref with Some r -> r | None -> Env_ref.of_value env
+  let full_env =
+    match full_env with Some r -> r | None -> Env_ref.of_value env
   in
-  let addr = module_declaration_address ~env_ref id presence md in
+  let addr = module_declaration_address full_env id presence md in
   let shape = shape_or_leaf md.Subst.Lazy.md_uid shape in
   let mode = Mode.Value.disallow_right mode in
   let env =
-    store_module ~update_summary ~env_ref ~check id addr presence md mode shape
+    store_module ~update_summary ~full_env ~check id addr presence md mode shape
       locks env
   in
   if arg then add_functor_arg id env else env
@@ -3205,7 +3205,7 @@ module Add_signature(T : Types.Wrapped)(M : sig
   val add_value: ?shape:Shape.t -> mode:(Mode.allowed * 'r0) Mode.Value.t -> Ident.t ->
     T.value_description  -> t -> t
   val add_module_declaration: ?arg:bool -> ?shape:Shape.t
-    -> env_ref:t Env_ref.t -> check:bool
+    -> full_env:t Env_ref.t -> check:bool
     -> Ident.t -> module_presence -> T.module_declaration
     -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks ->
     t -> t
@@ -3213,7 +3213,7 @@ module Add_signature(T : Types.Wrapped)(M : sig
 end) = struct
   open T
 
-  let add_item map mod_shape comp mode ~env_ref env =
+  let add_item map mod_shape comp mode ~full_env env =
     match comp with
     | Sig_value(id, decl, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.value id) in
@@ -3226,7 +3226,7 @@ end) = struct
         map, add_extension ~check:false ?shape ~rebind:false id ext env
     | Sig_module(id, presence, md, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_ id) in
-        map, M.add_module_declaration ~check:false ?shape ~env_ref id presence
+        map, M.add_module_declaration ~check:false ?shape ~full_env id presence
           md ~mode env
     | Sig_modtype(id, decl, _)  ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_type id) in
@@ -3243,15 +3243,15 @@ end) = struct
 
   let add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max))
     env =
-    let env_ref = Env_ref.empty () in
+    let full_env = Env_ref.empty () in
     let rec go map env = function
       | [] -> map, env
       | comp :: rem ->
-          let map, env = add_item map mod_shape comp mode ~env_ref env in
+          let map, env = add_item map mod_shape comp mode ~full_env env in
           go map env rem
     in
     let map, env = go map env sg in
-    Env_ref.set env_ref env;
+    Env_ref.set full_env env;
     map, env
 end
 
@@ -3259,9 +3259,9 @@ let add_signature map mod_shape sg ?mode env =
   let module M = Add_signature(Types)(struct
     let add_value ?shape ~mode id vd =
       add_value_lazy ?shape ~mode id (Subst.Lazy.of_value_description vd)
-    let add_module_declaration ?arg ?shape ~env_ref ~check id presence md
+    let add_module_declaration ?arg ?shape ~full_env ~check id presence md
       ?mode ?locks env =
-      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~env_ref
+      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
         ~check id presence (Subst.Lazy.of_module_decl md) ?mode ?locks env
     let add_modtype = add_modtype
   end)
@@ -3271,9 +3271,9 @@ let add_signature map mod_shape sg ?mode env =
 let add_signature_lazy =
   let module M = Add_signature(Subst.Lazy)(struct
     let add_value ?shape ~mode = add_value_lazy ?check:None ?shape ~mode
-    let add_module_declaration ?arg ?shape ~env_ref ~check id pres md
+    let add_module_declaration ?arg ?shape ~full_env ~check id pres md
       ?mode ?locks env =
-      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~env_ref
+      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
         ~check id pres md ?mode ?locks env
     let add_modtype = add_modtype_lazy ~update_summary:true
   end)
@@ -3303,7 +3303,7 @@ let add_cltype = add_cltype ?shape:None
 let add_modtype_lazy = add_modtype_lazy ?shape:None
 let add_modtype = add_modtype ?shape:None
 let add_module_declaration_lazy ?(arg=false) =
-  add_module_declaration_lazy ~arg ?shape:None ?env_ref:None ~check:false
+  add_module_declaration_lazy ~arg ?shape:None ?full_env:None ~check:false
 let add_signature sg env =
   let _, env = add_signature Shape.Map.empty None sg env in
   env
