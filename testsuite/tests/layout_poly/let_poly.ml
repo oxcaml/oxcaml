@@ -312,7 +312,11 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 (* [assert false] is layout poly *)
 let poly_ f () = assert false
 [%%expect{|
-val poly_ f : unit -> 'a = <lpoly>
+Line 1, characters 10-11:
+1 | let poly_ f () = assert false
+              ^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic

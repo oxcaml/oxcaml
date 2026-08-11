@@ -24,7 +24,7 @@ let with_effect : ((string -> unit) @ local yielding -> 'a) -> 'a =
 
 [%%expect{|
 val storage : string ref = {contents = ""}
-val with_effect : ((string -> unit) @ local -> 'a) -> 'a = <fun>
+val with_effect : ('a : any). ((string -> unit) @ local -> 'a) -> 'a = <fun>
 |}]
 
 let () = with_effect (fun k -> k "Hello, world!")
@@ -99,7 +99,8 @@ type 'a t1 = Mk1 of 'a @@ global
 type 'a t2 = Mk2 of 'a @@ global yielding
 type 'a t3 = Mk3 of 'a @@ unyielding
 type 'a t4 = Mk4 of 'a
-val with_global_effect : ((string -> unit) @ yielding -> 'a) -> 'a = <fun>
+val with_global_effect :
+  ('a : any). ((string -> unit) @ yielding -> 'a) -> 'a = <fun>
 |}]
 
 (* [global] modality implies [unyielding]. *)

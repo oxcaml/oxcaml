@@ -954,7 +954,7 @@ let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
 [%%expect{|
 val z : int = 4
 val punned : int = 5
-val x_must_be_even : 'a -> 'b = <fun>
+val x_must_be_even : 'a ('b : any). 'a -> 'b = <fun>
 exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
