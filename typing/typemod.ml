@@ -3251,7 +3251,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             Staticity.apply_hint (Parameter_to_functor param.loc)
               (Alloc.proj_monadic Staticity mode)
           in
-          (* See "Staticity of functors" in [typedtree.mli] *)
+          (* See Note [Staticity of functors] in [typedtree.mli] *)
           Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
@@ -3621,7 +3621,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       let mode_funct = mode_without_locks_exn funct.mod_mode in
       let funct_staticity = Value.proj_monadic Staticity mode_funct in
       (* The following [submode] recovers the functor's original staticity [m].
-         See "Staticity of functors" in [typedtree.mli]  *)
+         See Note [Staticity of functors] in [typedtree.mli] *)
       let staticity =
         Staticity.apply_hint (Parameter_to_functor Location.none)
           (Value.proj_monadic Staticity mm_param)
