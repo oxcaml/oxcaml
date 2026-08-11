@@ -2006,7 +2006,7 @@ let update_labels (type rep) env (form : rep record_form) ~representative_label
         representative_label.lbl_all
         vars_and_ty_args
     in
-    Typedecl.update_record_representation ~why env loc form
+    Typedecl.instance_record_representation ~why env loc form
       ~old_repres:representative_label.lbl_repres
       (lbls_and_ty_args |> Array.to_list)
 
@@ -6983,7 +6983,7 @@ and type_expect_
             (* XXX This is redundantly going to get the sort and jkind for
                each label all over again. Possibly we're doing things in the
                wrong order. *)
-            Typedecl.update_record_representation ~why env
+            Typedecl.instance_record_representation ~why env
               sexp.pexp_loc record_form ~old_repres:representation
               labels_with_updated_types
       in
