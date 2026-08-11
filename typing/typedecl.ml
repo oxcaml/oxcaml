@@ -2789,7 +2789,7 @@ let rec update_decl_jkind env dpath decl =
     raise
       (Error
          (decl.type_loc,
-          Jkind_mismatch_of_path (env, dpath, Ikind.Jkind_error err)))
+          Jkind_mismatch_of_path (env, dpath, Jkind_error err)))
 
 let update_decls_jkind_reason decls =
   List.map
