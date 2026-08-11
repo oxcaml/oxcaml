@@ -2,7 +2,7 @@
  (* Type identity across bundle applications. *)
 
  readonly_files = "\
-   basic_share.mli basic_share.ml util_share.mli util_share.ml \
+   basic_opaque.mli basic_opaque.ml util_opaque.mli util_opaque.ml \
    basic_transparent.ml util_transparent.ml \
    basic_pfree.mli basic_pfree.ml \
    p_int_alt.mli p_int_alt.ml \
@@ -18,9 +18,9 @@
 
  set OCAMLPARAM = "";
 
- script = "mkdir p p_int p_int_alt basic_share util_share \
+ script = "mkdir p p_int p_int_alt basic_opaque util_opaque \
                  basic_transparent util_transparent \
-                 basic_pfree bundle_share bundle2 bundle_pfree";
+                 basic_pfree bundle_opaque bundle2 bundle_pfree";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -34,12 +34,12 @@
  dst = "p_int/";
  copy;
 
- src = "basic_share.mli basic_share.ml";
- dst = "basic_share/";
+ src = "basic_opaque.mli basic_opaque.ml";
+ dst = "basic_opaque/";
  copy;
 
- src = "util_share.mli util_share.ml";
- dst = "util_share/";
+ src = "util_opaque.mli util_opaque.ml";
+ dst = "util_opaque/";
  copy;
 
  src = "basic_transparent.ml";
@@ -97,16 +97,16 @@
  module = "basic_pfree/basic_pfree.mli basic_pfree/basic_pfree.ml";
  ocamlopt.byte;
 
- (* [Basic_share] (abstract [t] with counter). *)
+ (* [Basic_opaque] (abstract [t] with counter). *)
 
- flags = "$flg -parameter P -I p -I basic_share";
- module = "basic_share/basic_share.mli basic_share/basic_share.ml";
+ flags = "$flg -parameter P -I p -I basic_opaque";
+ module = "basic_opaque/basic_opaque.mli basic_opaque/basic_opaque.ml";
  ocamlopt.byte;
 
- (* [Util_share]: [type t = Basic_share.t]. *)
+ (* [Util_opaque]: [type t = Basic_opaque.t]. *)
 
- flags = "$flg -parameter P -I p -I basic_share -I util_share";
- module = "util_share/util_share.mli util_share/util_share.ml";
+ flags = "$flg -parameter P -I p -I basic_opaque -I util_opaque";
+ module = "util_opaque/util_opaque.mli util_opaque/util_opaque.ml";
  ocamlopt.byte;
 
  (* [Basic_transparent] and [Util_transparent]: transparent [type t = P.t]. *)
@@ -121,10 +121,10 @@
 
  (* Bundle the two flavours. *)
 
- flags = "$flg -functorize -I p -I basic_share -I util_share \
-   Basic_share Util_share";
+ flags = "$flg -functorize -I p -I basic_opaque -I util_opaque \
+   Basic_opaque Util_opaque";
  module = "";
- program = "bundle_share/bundle_share.cmx";
+ program = "bundle_opaque/bundle_opaque.cmx";
  all_modules = "";
  ocamlopt.byte;
 
@@ -173,7 +173,7 @@
  }{
    (* (2) Positive: abstract+eq sharing — within one [R = Make(P_int)()]. *)
 
-   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
    module = "main_functorize_type_share.ml";
    ocamlopt.byte;
 
@@ -181,11 +181,11 @@
    module = "";
    program = "$test_build_directory/test_functorize_type_share.exe";
    all_modules = "\
-     basic_share/basic_share.cmx \
-     util_share/util_share.cmx \
+     basic_opaque/basic_opaque.cmx \
+     util_opaque/util_opaque.cmx \
      p_int/p_int__.cmx \
      p_int/p_int.cmx \
-     bundle_share/bundle_share.cmx \
+     bundle_opaque/bundle_opaque.cmx \
      main_functorize_type_share.cmx \
    ";
    ocamlopt.byte;
@@ -201,7 +201,7 @@
    (* (3) Instance independence — each [Make] application has its own
       counter. *)
 
-   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
    module = "main_instance_state.ml";
    ocamlopt.byte;
 
@@ -209,11 +209,11 @@
    module = "";
    program = "$test_build_directory/test_instance_state.exe";
    all_modules = "\
-     basic_share/basic_share.cmx \
-     util_share/util_share.cmx \
+     basic_opaque/basic_opaque.cmx \
+     util_opaque/util_opaque.cmx \
      p_int/p_int__.cmx \
      p_int/p_int.cmx \
-     bundle_share/bundle_share.cmx \
+     bundle_opaque/bundle_opaque.cmx \
      main_instance_state.cmx \
    ";
    ocamlopt.byte;
@@ -271,7 +271,7 @@
       where an [R2 = Make(P_int)()] value is expected — each [Make]
       application gives fresh abstract types. *)
 
-   flags = "$flg -I bundle_share -I p -I p_int -I basic_share -I util_share";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
    module = "bad_mix_share.ml";
    ocamlopt_byte_exit_status = "2";
    ocamlopt.byte;
