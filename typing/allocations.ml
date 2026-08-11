@@ -67,15 +67,19 @@ let register_closure_allocation ~env (mode : Value.r) ~loc
   in
   alloc_mode, closed_over_mode
 
+let constrain_enclosing_closures pp closures =
+  List.iter
+    (fun (_, closure_mode) ->
+      Allocation.submode_err pp
+        (Allocation.of_const ~hint:Allocated_on_heap Alloc)
+        closure_mode)
+    closures
+
 (* Module is always allocated on the heap, so every enclosing closure
    is forced to be [alloc]. *)
 let register_mod_allocation ~env ~loc ~desc =
   let closures = Env.walk_locks_for_allocation ~env (loc, Hint.Allocation) in
-  List.iter
-    (fun (_, closure_mode) ->
-      Allocation.submode_err (loc, desc)
-        (Allocation.of_const ~hint:Allocated_on_heap Alloc) closure_mode)
-    closures
+  constrain_enclosing_closures (loc, desc) closures
 
 let register_prim_application_allocation ~env ~pos
     (funct : Typedtree.expression) args =
@@ -100,14 +104,6 @@ let relax_alloc (desc : Types.value_description) ~is_applied mode =
   | Types.Val_prim _ when is_applied ->
     Value.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
   | _ -> mode
-
-let constrain_enclosing_closures pp closures =
-  List.iter
-    (fun (_, closure_mode) ->
-      Allocation.submode_err pp
-        (Allocation.of_const ~hint:Allocated_on_heap Alloc)
-        closure_mode)
-    closures
 
 let enclosing_noalloc_closure closures =
   List.find_map
