@@ -24,56 +24,6 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
-module Id_stamp_counters = struct
-  (** Identifiers are compared by compilation unit and stamp only, so a resuming
-      process must not mint stamps that collide with the imported ones. *)
-  type t =
-    { variables : int;
-      code_ids : int;
-      continuations : int;
-      function_slots : int;
-      value_slots : int
-    }
-
-  let save () =
-    { variables = Variable.export_name_stamp_counter ();
-      code_ids = Code_id.export_name_stamp_counter ();
-      continuations = Continuation.export_stamp_counter ();
-      function_slots = Function_slot.export_stamp_counter ();
-      value_slots = Value_slot.export_stamp_counter ()
-    }
-
-  let restore_for_resume
-      { variables; code_ids; continuations; function_slots; value_slots } =
-    Variable.restore_name_stamp_counter variables;
-    Code_id.restore_name_stamp_counter code_ids;
-    Continuation.restore_stamp_counter continuations;
-    Function_slot.restore_stamp_counter function_slots;
-    Value_slot.restore_stamp_counter value_slots
-
-  (* CR mvellacott: instead of taking the maximum, consider keeping separate
-     per-unit stamp counters. *)
-  let restore_for_merge all_counters =
-    let max_counters =
-      List.fold_left
-        (fun acc counters ->
-          { variables = max acc.variables counters.variables;
-            code_ids = max acc.code_ids counters.code_ids;
-            continuations = max acc.continuations counters.continuations;
-            function_slots = max acc.function_slots counters.function_slots;
-            value_slots = max acc.value_slots counters.value_slots
-          })
-        { variables = 0;
-          code_ids = 0;
-          continuations = 0;
-          function_slots = 0;
-          value_slots = 0
-        }
-        all_counters
-    in
-    restore_for_resume max_counters
-end
-
 module All_code_with_sections = struct
   type t =
     { all_code : Exported_code.raw;

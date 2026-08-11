@@ -417,7 +417,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   let cmrs, counters =
     List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
   in
-  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_merge counters;
+  Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
   let combined_graph =
     List.fold_left
       (fun combined cmr ->
@@ -448,8 +448,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   let cmr_serialisable, id_stamp_counters =
     Flambda2_reaper.Cmr_format.load cmr_filename
   in
-  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_resume
-    id_stamp_counters;
+  Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
