@@ -164,11 +164,12 @@ let create () =
     code_id_my_closure = NN.empty
   }
 
-(* CR mvellacott: this is a naive union: nodes with the same identity (such as a
+(* CR mvellacott: This is a naive union: nodes with the same identity (such as a
    symbol defined in one unit and used from another) are combined, but the
    conservative facts each unit's traversal records at its boundary (e.g.
-   [any_source] on imported symbols) are all kept, so the combined solution
-   cannot yet prove anything that per-unit solutions could not. *)
+   [any_source] on imported symbols) are all kept. This means we can't yet
+   determine anything more from analysis of the combined graph than we could
+   from analysis of per-unit graphs. *)
 let union g1 g2 =
   (* Relations can carry data on each edge, but for these types it is always
      unit. *)
