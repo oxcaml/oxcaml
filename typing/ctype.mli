@@ -358,6 +358,8 @@ val unify_delaying_jkind_checks :
            return the checks that would have been performed.  For use in
            typedecl before well-foundedness checks have made jkind checking
            safe. *)
+val unify_delaying_quote_evals :
+  Env.t -> type_expr -> type_expr -> (type_expr * type_expr) list
 
 type filtered_arrow =
   { ty_arg : type_expr;

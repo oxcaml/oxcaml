@@ -586,6 +586,17 @@ let delay_jkind_checks_in f =
   Misc.protect_refs [Misc.R (lmode, Delay_checks r)] f;
   !r
 
+type quote_eval_unification_mode =
+  | Decide_quote_evals
+  | Delay_quote_evals of (type_expr * type_expr) list ref
+
+let qeval_umode = ref Decide_quote_evals
+
+let delay_quote_evals_in f =
+  let r = ref [] in
+  Misc.protect_refs [Misc.R (qeval_umode, Delay_quote_evals r)] f;
+  List.rev !r
+
 (*** Checks for type definitions ***)
 
 let rec in_current_module = function
@@ -4288,6 +4299,10 @@ let rec is_flexible_ty ty =
   | Tsplice ty' -> is_flexible_ty ty'
   | _ -> false
 
+let is_flexible_staged_desc = function
+  | Tquote ty | Tsplice ty -> is_flexible_ty ty
+  | _ -> false
+
 let is_aliasable p decl =
   not (non_aliasable p decl) && not (is_datatype decl)
 
@@ -5100,6 +5115,15 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
+  | (Tquote_eval _, _) | (_, Tquote_eval _)
+    when (match !qeval_umode with
+          | Delay_quote_evals _ ->
+              not (is_flexible_staged_desc d1 || is_flexible_staged_desc d2)
+          | Decide_quote_evals -> false) ->
+      begin match !qeval_umode with
+      | Delay_quote_evals r -> r := (t1', t2') :: !r
+      | Decide_quote_evals -> ()
+      end
   | (Tquote t1, Tquote t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tsplice t1, Tsplice t2) ->
@@ -5694,6 +5718,10 @@ let unify env ty1 ty2 =
 
 let unify_delaying_jkind_checks env ty1 ty2 =
   delay_jkind_checks_in (fun () ->
+    unify_pairs env ty1 ty2 [])
+
+let unify_delaying_quote_evals env ty1 ty2 =
+  delay_quote_evals_in (fun () ->
     unify_pairs env ty1 ty2 [])
 
 (* Lower the level of a type to the current level *)
