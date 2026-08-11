@@ -2120,6 +2120,20 @@ let atomic_arity op (kind : atomic_kind) =
   in
   arity_of_op + extra_kind_arity
 
+let atomic_lambda_primitive op immediate_or_pointer : Lambda.primitive =
+  match op with
+  | Load -> Patomic_load_field { immediate_or_pointer }
+  | Set -> Patomic_set_field { immediate_or_pointer }
+  | Exchange -> Patomic_exchange_field { immediate_or_pointer }
+  | Compare_exchange -> Patomic_compare_exchange_field { immediate_or_pointer }
+  | Compare_and_set -> Patomic_compare_set_field { immediate_or_pointer }
+  | Fetch_add -> Patomic_fetch_add_field
+  | Add -> Patomic_add_field
+  | Sub -> Patomic_sub_field
+  | Land -> Patomic_land_field
+  | Lor -> Patomic_lor_field
+  | Lxor -> Patomic_lxor_field
+
 let lambda_of_atomic prim_name loc op (kind : atomic_kind)
                      immediate_or_pointer args =
   if List.length args <> atomic_arity op kind then
@@ -2131,22 +2145,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
     | first :: rest ->
         first, rest
   in
-  let prim =
-    match op with
-    | Load -> Patomic_load_field { immediate_or_pointer }
-    | Set -> Patomic_set_field { immediate_or_pointer }
-    | Exchange -> Patomic_exchange_field { immediate_or_pointer }
-    | Compare_exchange ->
-      Patomic_compare_exchange_field { immediate_or_pointer }
-    | Compare_and_set ->
-      Patomic_compare_set_field { immediate_or_pointer }
-    | Fetch_add -> Patomic_fetch_add_field
-    | Add -> Patomic_add_field
-    | Sub -> Patomic_sub_field
-    | Land -> Patomic_land_field
-    | Lor -> Patomic_lor_field
-    | Lxor -> Patomic_lxor_field
-  in
+  let prim = atomic_lambda_primitive op immediate_or_pointer in
   match kind with
   | Ref ->
       (* the primitive application
@@ -2311,19 +2310,26 @@ let lambda_of_prim prim_name prim loc args arg_exps =
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
-let check_primitive_arity loc p =
+let get_poly_mode_sort ~poly p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
-      (* We assume all primitives are compiled to have the same arity for
-         different modes and types, so just pick one of the modes in the
-         [Prim_poly] case. *)
-      Some Mode.Locality.global
+    | Prim_global, _ -> Some Mode.Locality.global
     | Prim_local, _ -> Some Mode.Locality.local
+    | Prim_poly, _ -> Some poly
   in
-  (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
-     to lie here. *)
   let sort = Some (Jkind.Sort.of_base Scannable) in
+  mode, sort
+
+let get_default_poly_mode_sort p =
+  get_poly_mode_sort ~poly:Mode.Locality.global p
+
+let check_primitive_arity loc p =
+  (* We assume all primitives are compiled to have the same arity for
+     different modes and types, so just pick one of the modes in the
+     [Prim_poly] case.
+     By a similar assumption, the sort shouldn't change the arity.  So it's ok
+     to lie here. *)
+  let mode, sort = get_default_poly_mode_sort p in
   let prim =
     lookup_primitive_unspecialized loc
       ~poly_mode:mode ~poly_sort:sort Rc_normal p
@@ -2637,6 +2643,125 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     end
   in
   lam
+
+type allocation_registration =
+  | No_allocation
+  | Allocation_at_locality of Mode.Locality.lr
+
+let result_allocation p ~poly_mode =
+  match p.prim_native_repr_res, poly_mode with
+  | (Prim_poly, _), Some mode -> Allocation_at_locality mode
+  | (Prim_poly, _), None -> assert false
+  | (Prim_global, _), _ -> Allocation_at_locality Mode.Locality.global
+  | (Prim_local, _), _ -> No_allocation
+
+(* This mirrors, for the allocation axis only, what [lambda_of_prim] above
+   builds for each [prim].  Keep the two in step. *)
+let prim_may_allocate ~arity prim result_allocation_mode =
+  let primitive_may_allocate prim =
+    match (prim : Lambda.primitive) with
+    | Pccall p ->
+      if p.prim_alloc then Allocation_at_locality Mode.Locality.global
+      else No_allocation
+    | _ ->
+      match Lambda.primitive_may_allocate prim with
+      | None -> No_allocation
+      | Some Alloc_heap -> Allocation_at_locality Mode.Locality.global
+      | Some Alloc_local -> result_allocation_mode
+  in
+  match prim with
+  | Primitive (prim, _) -> primitive_may_allocate prim
+  | Sys_argv -> primitive_may_allocate (Pccall prim_sys_argv)
+  | External prim -> primitive_may_allocate (Pccall prim)
+  | Comparison (comp, knd) ->
+      primitive_may_allocate (comparison_primitive comp knd)
+  | Raise _ -> No_allocation
+  | Raise_with_backtrace -> No_allocation
+  | Lazy_force _ -> Allocation_at_locality Mode.Locality.global
+  | Loc _ ->
+    if arity > 0 then Allocation_at_locality Mode.Locality.global
+    else No_allocation
+  | Send _ | Send_self _ | Send_cache _ ->
+    Allocation_at_locality Mode.Locality.global
+  | Frame_pointers -> No_allocation
+  | Identity -> No_allocation
+  | Apply _ | Revapply _ -> No_allocation
+  | Peek None | Poke None ->
+    Allocation_at_locality Mode.Locality.global
+  | Peek (Some _) -> No_allocation
+  | Poke (Some _) -> No_allocation
+  | Unsupported _ ->
+    Allocation_at_locality Mode.Locality.global
+  | Atomic (op, _, immediate_or_pointer) ->
+      primitive_may_allocate (atomic_lambda_primitive op immediate_or_pointer)
+
+let fully_applied_may_allocate env loc p ~ty ~arg_exps ~poly_mode =
+  let snap = Btype.snapshot () in
+  let result =
+    try
+      let sloc = of_location ~scopes:empty_scopes loc in
+      (* Specializing [Prim_poly] to [local] helps identify primitives
+         that still trigger a heap allocation even when their result is
+         [local]. For these primitives we return [Allocation_at_locality
+         Mode.Locality.global] rather than [at_result_mode]. *)
+      let spec_mode, spec_sort =
+        get_poly_mode_sort ~poly:Mode.Locality.local p
+      in
+      let prim =
+        transl_primitive_common sloc ~poly_mode:spec_mode ~poly_sort:spec_sort
+          Rc_normal p env ty None arg_exps
+      in
+      let at_result_mode = result_allocation p ~poly_mode in
+      prim_may_allocate ~arity:p.prim_arity prim at_result_mode
+    with
+    | _ -> Allocation_at_locality Mode.Locality.global
+  in
+  Btype.backtrack snap;
+  result
+
+let is_omitted = function
+  | Arg _ -> false
+  | Omitted _ -> true
+
+let can_apply_primitive p pmode pos args ~check_poly_mode =
+  if List.exists (fun (_, arg) -> is_omitted arg) args then false
+  else begin
+    let nargs = List.length args in
+    if nargs = p.prim_arity then true
+    else if nargs < p.prim_arity then false
+    else if pos <> Typedtree.Tail then true
+    else begin
+      (* Cannot directly apply primitive under this case if pmode is local *)
+      if check_poly_mode then
+        let return_mode = Ctype.prim_mode pmode p.prim_native_repr_res in
+        is_heap_mode (transl_locality_mode_l return_mode)
+      else
+        match p.prim_native_repr_res with
+        | Prim_global, _ -> true
+        (* Being conservative if not checking pmode *)
+        | Prim_poly, _
+        | Prim_local, _ -> false
+    end
+  end
+
+let application_allocation env loc p pos args ~poly_mode ~ty =
+  if can_apply_primitive p poly_mode pos args ~check_poly_mode:false then
+    let rec cut_args n args =
+      match n, args with
+      | 0, _ -> []
+      | _, [] -> failwith "Translprim cut_args"
+      | _, ((_, Arg (x, _)) :: oargs) -> x :: (cut_args (n - 1) oargs)
+      | _, ((_, Omitted _) :: _) -> assert false
+    in
+    let arg_exps = cut_args p.prim_arity args in
+    fully_applied_may_allocate env loc p ~ty ~arg_exps ~poly_mode
+  else
+    Allocation_at_locality Mode.Locality.global
+
+let non_arrow_prim_allocates loc p =
+  let poly_mode, poly_sort = get_default_poly_mode_sort p in
+  lookup_primitive_unspecialized loc ~poly_mode ~poly_sort Rc_normal p
+    = Sys_argv
 
 (* Error report *)
 

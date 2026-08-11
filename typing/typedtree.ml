@@ -416,7 +416,7 @@ and expression_desc =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of Mode.Locality.lr option * Jkind.Sort.t option
 
 and meth =
   | Tmeth_name of string
