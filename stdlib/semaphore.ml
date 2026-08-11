@@ -55,7 +55,7 @@ let try_acquire s =
   Mutex.unlock s.mut;
   ret
 
-let get_value s = s.v
+let (get_value @ noalloc_strict) s = s.v
 
 end
 

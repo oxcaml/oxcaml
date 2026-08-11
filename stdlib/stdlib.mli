@@ -350,7 +350,7 @@ external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%modint"
    @raise Division_by_zero if [y] is zero.
 *)
 
-val abs : int -> int
+val abs : int -> int @@ noalloc_strict
 (** [abs x] is the absolute value of [x]. On [min_int] this
    is [min_int] itself and thus remains negative. *)
 
@@ -378,7 +378,7 @@ external ( lxor ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%xorint"
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-val lnot : int -> int
+val lnot : int -> int @@ noalloc_strict
 (** Bitwise logical negation. *)
 
 external ( lsl ) : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lslint"
@@ -684,6 +684,7 @@ external int_of_char : char -> int = "%identity"
 (** Return the ASCII code of the argument. *)
 
 val char_of_int : int -> char
+[@@zero_alloc strict]
 (** Return the character with the given ASCII code.
    @raise Invalid_argument if the argument is
    outside the range 0--255. *)
@@ -707,12 +708,13 @@ external ignore_contended : ('a : value_or_null) . 'a @ contended local once -> 
 
 (** {1 String conversion functions} *)
 
-val string_of_bool : bool -> string
+val string_of_bool : bool -> string @@ noalloc_strict
 (** Return the string representation of a boolean. As the returned values
    may be shared, the user should not modify them directly.
 *)
 
 val bool_of_string_opt: string -> bool option
+[@@zero_alloc strict]
 (** Convert the given string to a boolean.
 
    Return [None] if the string is not ["true"] or ["false"].
@@ -1306,7 +1308,8 @@ type ('a, 'b, 'c, 'd) format4 = ('a, 'b, 'c, 'c, 'c, 'd) format6
 
 type ('a, 'b, 'c) format = ('a, 'b, 'c, 'c) format4
 
-val string_of_format : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string
+val string_of_format :
+  ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string @@ noalloc_strict
 (** Converts a format string into a string. *)
 
 external format_of_string :
