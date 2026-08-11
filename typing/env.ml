@@ -663,7 +663,7 @@ type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
 
-(** Lazily-populated reference.  Used to give lazies inside a signature
+(** Write-once reference.  Used to give lazies inside a signature
     an env value that isn't ready until the enclosing signature finishes
     processing (see [components_of_module_maker] and [ModAlias]). *)
 module Env_ref : sig
@@ -683,7 +683,10 @@ end = struct
         Misc.fatal_error
           "Env_ref.get_exn: ref forced before its enclosing signature \
            finished processing"
-  let set r v = r := Some v
+  let set r v =
+    match !r with
+    | None -> r := Some v
+    | Some _ -> Misc.fatal_error "Env_ref.set: already set"
 end
 
 type t = {
