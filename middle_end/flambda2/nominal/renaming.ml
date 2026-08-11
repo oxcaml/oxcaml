@@ -29,10 +29,13 @@ module Import_map : sig
     simples:Simple.importer ->
     consts:Const.importer ->
     code_ids:Code_id.importer ->
-    continuations:Continuation.importer ->
     used_value_slots:Value_slot.Set.t ->
     original_compilation_unit:Compilation_unit.t ->
     t
+
+  val with_extra_variables : t -> Variable.importer -> t
+
+  val with_extra_continuations : t -> Continuation.importer -> t
 
   val const : t -> Const.t -> Const.t
 
@@ -60,10 +63,11 @@ end = struct
   type t =
     { symbols : Symbol.importer;
       variables : Variable.importer;
+      extra_variables : Variable.importer option;
       simples : Simple.importer;
       consts : Const.importer;
       code_ids : Code_id.importer;
-      continuations : Continuation.importer;
+      extra_continuations : Continuation.importer option;
       used_value_slots : Value_slot.Set.t;
       (* CR vlaviron: [used_value_slots] is here because we need to rewrite the
          types to remove occurrences of unused value slots, as otherwise the
@@ -85,36 +89,69 @@ end = struct
              they are defined in. *)
     }
 
-  let create ~symbols ~variables ~simples ~consts ~code_ids ~continuations
-      ~used_value_slots ~original_compilation_unit =
+  let create ~symbols ~variables ~simples ~consts ~code_ids ~used_value_slots
+      ~original_compilation_unit =
     { symbols;
       variables;
+      extra_variables = None;
       simples;
       consts;
       code_ids;
-      continuations;
+      extra_continuations = None;
       used_value_slots;
       original_compilation_unit
     }
+
+  let with_extra_variables t extra_variables =
+    match t.extra_variables with
+    | None -> { t with extra_variables = Some extra_variables }
+    | Some _ -> Misc.fatal_error "Import map already has extra variables"
+
+  let with_extra_continuations t extra_continuations =
+    match t.extra_continuations with
+    | None -> { t with extra_continuations = Some extra_continuations }
+    | Some _ -> Misc.fatal_error "Import map already has extra continuations"
 
   let symbol t orig = Symbol.import t.symbols orig
 
   let symbols t = t.symbols
 
-  let variable t orig = Variable.import t.variables orig
+  let variable t orig =
+    let[@local] default_case () = Variable.import t.variables orig in
+    match t.extra_variables with
+    | None -> default_case ()
+    | Some extra_variables -> (
+      try Variable.import_exn extra_variables orig
+      with Variable.Not_exported -> default_case ())
 
-  let variables t = t.variables
+  let variables t =
+    match t.extra_variables with
+    | None -> t.variables
+    | Some _ ->
+      Misc.fatal_error
+        "Can't extract imported variables from import map with extra variables"
 
-  let fresh_variable t orig = Variable.import_and_rename t.variables orig
+  let fresh_variable t orig =
+    let[@local] default_case () = Variable.import_and_rename t.variables orig in
+    match t.extra_variables with
+    | None -> default_case ()
+    | Some extra_variables -> (
+      try Variable.import_and_rename extra_variables orig
+      with Variable.Not_exported -> default_case ())
 
   let const t orig = Const.import t.consts orig
 
   let code_id t orig = Code_id.import t.code_ids orig
 
-  let continuation t orig = Continuation.import t.continuations orig
+  let continuation t orig =
+    match t.extra_continuations with
+    | None -> Misc.fatal_error "Continuation was not exported"
+    | Some continuations -> Continuation.import continuations orig
 
   let fresh_continuation t orig =
-    Continuation.import_and_rename t.continuations orig
+    match t.extra_continuations with
+    | None -> Misc.fatal_error "Continuation was not exported"
+    | Some continuations -> Continuation.import_and_rename continuations orig
 
   let simple t simple ~import_var =
     (* Constants and symbols are never permuted, only freshened upon import. *)
@@ -136,6 +173,10 @@ let imported_variables = Import_map.variables
 
 let imported_symbols = Import_map.symbols
 
+let with_extra_imported_variables = Import_map.with_extra_variables
+
+let with_extra_imported_continuations = Import_map.with_extra_continuations
+
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
@@ -155,9 +196,9 @@ let empty =
   }
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
-    ~continuations ~used_value_slots ~original_compilation_unit =
+    ~used_value_slots ~original_compilation_unit =
   Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
-    ~continuations ~used_value_slots ~original_compilation_unit
+    ~used_value_slots ~original_compilation_unit
 
 let from_import_map import_map =
   (* It's tempting to set [import_map] to [None] if everything is empty, but

@@ -21,8 +21,7 @@ type table_data =
     variables : Variable.importer;
     simples : Simple.importer;
     consts : Reg_width_const.importer;
-    code_ids : Code_id.importer;
-    continuations : Continuation.importer
+    code_ids : Code_id.importer
   }
 
 type t0 =
@@ -50,24 +49,24 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   let typing_env_exported_ids =
     Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env
   in
-  let all_code_exported_ids = Exported_code.ids_for_export all_code in
+  let all_code, all_code_exported_ids =
+    Exported_code.to_raw
+      ~add_section:(File_sections.Builder.add sections)
+      all_code
+  in
   let exported_ids =
     Ids_for_export.union typing_env_exported_ids all_code_exported_ids
   in
+  if not (Continuation.Set.is_empty exported_ids.continuations)
+  then
+    Misc.fatal_error
+      "All exported continuations should be stored in code sections";
   let symbols = Symbol.export exported_ids.symbols in
   let variables = Variable.export exported_ids.variables in
   let simples = Simple.export exported_ids.simples in
   let consts = Reg_width_const.export exported_ids.consts in
   let code_ids = Code_id.export exported_ids.code_ids in
-  let continuations = Continuation.export exported_ids.continuations in
-  let table_data =
-    { symbols; variables; simples; consts; code_ids; continuations }
-  in
-  let all_code =
-    Exported_code.to_raw
-      ~add_section:(File_sections.Builder.add sections)
-      all_code
-  in
+  let table_data = { symbols; variables; simples; consts; code_ids } in
   let t =
     [ { original_compilation_unit = Current_unit.get_cu_exn ();
         final_typing_env;
@@ -85,15 +84,13 @@ let import_typing_env_and_code0 ~sections t =
   let simples = t.table_data.simples in
   let consts = t.table_data.consts in
   let code_ids = t.table_data.code_ids in
-  let continuations = t.table_data.continuations in
   let used_value_slots = t.used_value_slots in
   let original_compilation_unit = t.original_compilation_unit in
   let import_map =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
         Renaming.create_import_map ~symbols ~variables ~simples ~consts
-          ~code_ids ~continuations ~used_value_slots ~original_compilation_unit)
+          ~code_ids ~used_value_slots ~original_compilation_unit)
   in
-  let renaming = Renaming.from_import_map import_map in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
         Flambda2_types.Typing_env.Serializable.import_names t.final_typing_env
@@ -101,11 +98,7 @@ let import_typing_env_and_code0 ~sections t =
   in
   let all_code =
     Profile.record_call ~accumulate:true "exported_code_from_raw" (fun () ->
-        Exported_code.from_raw ~sections t.all_code)
-  in
-  let all_code =
-    Profile.record_call ~accumulate:true "exported_code_apply_renaming"
-      (fun () -> Exported_code.apply_renaming code_ids renaming all_code)
+        Exported_code.from_raw ~sections ~import_map t.all_code)
   in
   typing_env, all_code
 

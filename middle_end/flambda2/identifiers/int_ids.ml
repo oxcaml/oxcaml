@@ -556,8 +556,12 @@ module Variable = struct
 
   exception Not_exported = Table.Not_exported
 
+  let import_exn importer t =
+    Table.add !grand_table_of_variables (Table.import_exn importer t)
+
   let import importer t =
-    Table.add !grand_table_of_variables (Table.import importer t)
+    try import_exn importer t
+    with Not_exported -> Misc.fatal_error "Variable was not exported"
 
   let import_and_rename importer t =
     let data = Table.import importer t in

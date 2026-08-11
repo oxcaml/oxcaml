@@ -127,10 +127,13 @@ struct
 
   exception Not_exported
 
-  let import t id =
+  let import_exn t id =
     assert (Id.flags id = E.flags);
-    try HT.find t.exported id
-    with Not_found ->
+    try HT.find t.exported id with Not_found -> raise Not_exported
+
+  let import t id =
+    try import_exn t id
+    with Not_exported ->
       Misc.fatal_error "Id was not exported from this compilation unit."
 
   exception Found_id
