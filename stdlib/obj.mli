@@ -38,7 +38,7 @@ external magic_at_unique : ('a[@local_opt]) @ unique -> ('b[@local_opt]) @ uniqu
 val is_block : t @ contended -> bool
 external is_int : t @ contended -> bool = "%obj_is_int"
 external tag : t @ contended -> int = "caml_obj_tag" [@@noalloc]
-val size : t @ contended -> int
+val size : t @ contended -> int @@ noalloc_strict
 val reachable_words : t -> int
   (**
      Computes the total size (in words, including the headers) of all
@@ -206,4 +206,3 @@ module Uniform_or_mixed : sig
   (** Returns the [scannable_prefix_len] without materializing the return
       value of [repr]. Raises if [is_mixed] is [false]. *)
 end
-

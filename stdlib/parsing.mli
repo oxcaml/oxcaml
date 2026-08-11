@@ -27,27 +27,33 @@ val symbol_start : unit -> int
    offset 0. *)
 
 val symbol_end : unit -> int
+[@@zero_alloc strict]
 (** See {!Parsing.symbol_start}. *)
 
 val rhs_start : int -> int
+[@@zero_alloc strict]
 (** Same as {!Parsing.symbol_start} and {!Parsing.symbol_end}, but
    return the offset of the string matching the [n]th item on the
    right-hand side of the rule, where [n] is the integer parameter
    to [rhs_start] and [rhs_end]. [n] is 1 for the leftmost item. *)
 
 val rhs_end : int -> int
+[@@zero_alloc strict]
 (** See {!Parsing.rhs_start}. *)
 
 val symbol_start_pos : unit -> Lexing.position
 (** Same as [symbol_start], but return a [position] instead of an offset. *)
 
 val symbol_end_pos : unit -> Lexing.position
+[@@zero_alloc strict]
 (** Same as [symbol_end], but return a [position] instead of an offset. *)
 
 val rhs_start_pos : int -> Lexing.position
+[@@zero_alloc strict]
 (** Same as [rhs_start], but return a [position] instead of an offset. *)
 
 val rhs_end_pos : int -> Lexing.position
+[@@zero_alloc strict]
 (** Same as [rhs_end], but return a [position] instead of an offset. *)
 
 val clear_parser : unit -> unit

@@ -27,7 +27,7 @@ open! Stdlib
 
 [@@@ocaml.warning "+A-e"]
 
-let id x = x
+let (id @ noalloc_strict) x = x
 
 (* A devoted type for sizes to avoid confusion
    between sizes and mere integers. *)
@@ -230,7 +230,7 @@ let pp_enqueue state token =
   Queue.add token state.pp_queue
 
 
-let pp_clear_queue state =
+let[@zero_alloc strict] pp_clear_queue state =
   state.pp_left_total <- 1; state.pp_right_total <- 1;
   Queue.clear state.pp_queue
 
@@ -322,7 +322,7 @@ let pp_force_break_line state =
 
 
 (* To skip a token, if the previous line has been broken. *)
-let pp_skip_token state =
+let[@zero_alloc strict] pp_skip_token state =
   match Queue.take_opt state.pp_queue with
   | None -> () (* print_if_newline must have been the last printing command *)
   | Some { size; length; _ } ->
@@ -586,11 +586,11 @@ let pp_close_stag state () =
     | Some tag_name ->
       state.pp_print_close_tag tag_name
 
-let pp_set_print_tags state b = state.pp_print_tags <- b
-let pp_set_mark_tags state b = state.pp_mark_tags <- b
-let pp_get_print_tags state () = state.pp_print_tags
-let pp_get_mark_tags state () = state.pp_mark_tags
-let pp_set_tags state b =
+let (pp_set_print_tags @ noalloc_strict) state b = state.pp_print_tags <- b
+let (pp_set_mark_tags @ noalloc_strict) state b = state.pp_mark_tags <- b
+let (pp_get_print_tags @ noalloc_strict) state () = state.pp_print_tags
+let (pp_get_mark_tags @ noalloc_strict) state () = state.pp_mark_tags
+let (pp_set_tags @ noalloc_strict) state b =
   pp_set_print_tags state b; pp_set_mark_tags state b
 
 
@@ -603,7 +603,7 @@ let pp_get_formatter_stag_functions state () = {
 }
 
 
-let pp_set_formatter_stag_functions state {
+let (pp_set_formatter_stag_functions @ noalloc_strict) state {
      mark_open_stag = mot;
      mark_close_stag = mct;
      print_open_stag = pot;
@@ -686,7 +686,7 @@ let pp_print_bool state b = pp_print_string state (string_of_bool b)
 let pp_print_char state c =
   pp_print_as state 1 (String.make 1 c)
 
-let pp_print_nothing _state () = ()
+let (pp_print_nothing @ noalloc_strict) _state () = ()
 
 
 (* Opening boxes. *)
@@ -801,20 +801,22 @@ let pp_set_tab state () =
 *)
 
 (* Set_max_boxes. *)
-let pp_set_max_boxes state n = if n > 1 then state.pp_max_boxes <- n
+let (pp_set_max_boxes @ noalloc_strict) state n =
+  if n > 1 then state.pp_max_boxes <- n
 
 (* To know the current maximum number of boxes allowed. *)
-let pp_get_max_boxes state () = state.pp_max_boxes
+let (pp_get_max_boxes @ noalloc_strict) state () = state.pp_max_boxes
 
-let pp_over_max_boxes state () = state.pp_curr_depth = state.pp_max_boxes
+let (pp_over_max_boxes @ noalloc_strict) state () =
+  state.pp_curr_depth = state.pp_max_boxes
 
 (* Ellipsis. *)
-let pp_set_ellipsis_text state s = state.pp_ellipsis <- s
-and pp_get_ellipsis_text state () = state.pp_ellipsis
+let (pp_set_ellipsis_text @ noalloc_strict) state s = state.pp_ellipsis <- s
+and (pp_get_ellipsis_text @ noalloc_strict) state () = state.pp_ellipsis
 
 
 (* To set the margin of pretty-printer. *)
-let pp_limit n =
+let (pp_limit @ noalloc_strict) n =
   if n < pp_infinity then n else pred pp_infinity
 
 
@@ -835,7 +837,7 @@ let pp_set_max_indent state n =
     pp_set_min_space_left state (state.pp_margin - n)
 
 
-let pp_get_max_indent state () = state.pp_max_indent
+let (pp_get_max_indent @ noalloc_strict) state () = state.pp_max_indent
 
 let pp_set_margin state n =
   if n >= 1 then
@@ -857,7 +859,7 @@ let pp_set_margin state n =
 (** Geometry functions and types *)
 type geometry = { max_indent:int; margin: int}
 
-let validate_geometry {margin; max_indent} =
+let[@zero_alloc strict] validate_geometry {margin; max_indent} =
   if max_indent < 2 then
     Error "max_indent < 2"
   else if margin <= max_indent then
@@ -866,12 +868,12 @@ let validate_geometry {margin; max_indent} =
     Error "margin >= pp_infinity"
   else Ok ()
 
-let check_geometry geometry =
+let[@zero_alloc strict] check_geometry geometry =
   match validate_geometry geometry with
   | Ok () -> true
   | Error _ -> false
 
-let pp_get_margin state () = state.pp_margin
+let (pp_get_margin @ noalloc_strict) state () = state.pp_margin
 
 let pp_set_full_geometry state {margin; max_indent} =
   pp_set_margin state margin;
@@ -902,7 +904,7 @@ let pp_update_geometry state update =
   pp_set_full_geometry state (update geometry)
 
 (* Setting a formatter basic output functions. *)
-let pp_set_formatter_out_functions state {
+let (pp_set_formatter_out_functions @ noalloc_strict) state {
       out_string = f;
       out_width = f2;
       out_flush = g;
@@ -928,7 +930,7 @@ let pp_get_formatter_out_functions state () = {
 
 
 (* Setting a formatter basic string output and flush functions. *)
-let pp_set_formatter_output_functions state f g =
+let (pp_set_formatter_output_functions @ noalloc_strict) state f g =
   state.pp_out_string <- f; state.pp_out_flush <- g
 
 let pp_get_formatter_output_functions state () =
@@ -977,7 +979,7 @@ let default_pp_mark_close_tag = function
 let default_pp_print_open_tag = ignore
 let default_pp_print_close_tag = ignore
 
-let utf_8_scalar_width s ~pos ~len =
+let[@zero_alloc strict] utf_8_scalar_width s ~pos ~len =
   let rec width s count current stop =
     if current >= stop then count
     else
@@ -1205,7 +1207,7 @@ type symbolic_output_buffer = {
 let make_symbolic_output_buffer () =
   { symbolic_output_contents = [] }
 
-let clear_symbolic_output_buffer sob =
+let (clear_symbolic_output_buffer @ noalloc_strict) sob =
   sob.symbolic_output_contents <- []
 
 let get_symbolic_output_buffer sob =

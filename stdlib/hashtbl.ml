@@ -42,11 +42,11 @@ and ('a, 'b) bucketlist =
    This disables the efficient in place implementation of resizing.
 *)
 
-let ongoing_traversal h =
+let (ongoing_traversal @ noalloc_strict) h =
   Obj.size (Obj.repr h) < 4 (* compatibility with old hash tables *)
   || h.initial_size < 0
 
-let flip_ongoing_traversal h =
+let (flip_ongoing_traversal @ noalloc_strict) h =
   h.initial_size <- - h.initial_size
 
 (* To pick random seeds if requested *)
@@ -59,8 +59,8 @@ let randomized_default =
 
 let randomized = Atomic.make randomized_default
 
-let randomize () = Atomic.set randomized true
-let is_randomized () = Atomic.get randomized
+let (randomize @ noalloc_strict) () = Atomic.set randomized true
+let (is_randomized @ noalloc_strict) () = Atomic.get randomized
 
 module Rng : sig
   val bits : unit -> int
@@ -78,7 +78,7 @@ end
 
 (* Creating a fresh, empty table *)
 
-let rec power_2_above x n =
+let[@zero_alloc strict] rec power_2_above x n =
   if x >= n then x
   else if x * 2 > Sys.max_array_length then x
   else power_2_above (x * 2) n
@@ -127,7 +127,7 @@ let copy_bucketlist = function
 
 let copy h = { h with data = Array.map copy_bucketlist h.data }
 
-let length h = h.size
+let (length @ noalloc_strict) h = h.size
 
 let insert_all_buckets indexfun inplace odata ndata =
   let nsize = Array.length ndata in
@@ -247,7 +247,7 @@ type statistics = {
   bucket_histogram: int array
 }
 
-let rec bucket_length accu = function
+let rec (bucket_length @ noalloc_strict) accu = function
   | Empty -> accu
   | Cons{next} -> bucket_length (accu + 1) next
 

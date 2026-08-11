@@ -74,7 +74,8 @@ let from_val (v : 'arg) =
     (Obj.magic v : 'arg t)
   end
 
-let is_val (l : 'arg t) = Obj.tag (Obj.repr l) <> Obj.lazy_tag
+let (is_val @ noalloc_strict) (l : 'arg t) =
+  Obj.tag (Obj.repr l) <> Obj.lazy_tag
 
 let map f x =
   lazy (f (force x))

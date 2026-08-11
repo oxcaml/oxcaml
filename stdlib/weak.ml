@@ -35,7 +35,7 @@ let create l =
   create l
 
 
-let length x = Obj.size(Obj.repr x) - additional_values
+let (length @ noalloc_strict) x = Obj.size(Obj.repr x) - additional_values
 
 let raise_if_invalid_offset e o msg =
   if not (0 <= o && o < length e) then

@@ -202,16 +202,18 @@ let symbol_start_pos () =
   in
   loop env.rule_len
 
-let symbol_end_pos () = env.symb_end_stack.(env.asp)
-let rhs_start_pos n = env.symb_start_stack.(env.asp - (env.rule_len - n))
-let rhs_end_pos n = env.symb_end_stack.(env.asp - (env.rule_len - n))
+let[@zero_alloc strict] symbol_end_pos () = env.symb_end_stack.(env.asp)
+let[@zero_alloc strict] rhs_start_pos n =
+  env.symb_start_stack.(env.asp - (env.rule_len - n))
+let[@zero_alloc strict] rhs_end_pos n =
+  env.symb_end_stack.(env.asp - (env.rule_len - n))
 
 let symbol_start () = (symbol_start_pos ()).pos_cnum
-let symbol_end () = (symbol_end_pos ()).pos_cnum
-let rhs_start n = (rhs_start_pos n).pos_cnum
-let rhs_end n = (rhs_end_pos n).pos_cnum
+let[@zero_alloc strict] symbol_end () = (symbol_end_pos ()).pos_cnum
+let[@zero_alloc strict] rhs_start n = (rhs_start_pos n).pos_cnum
+let[@zero_alloc strict] rhs_end n = (rhs_end_pos n).pos_cnum
 
 let is_current_lookahead tok =
   (!current_lookahead_fun)(Obj.repr tok)
 
-let parse_error (_ : string) = ()
+let (parse_error @ noalloc_strict) (_ : string) = ()

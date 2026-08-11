@@ -258,7 +258,7 @@ let mem x a =
     else loop (succ i) in
   loop 0 [@nontail]
 
-let memq x a =
+let (memq @ noalloc_strict) x a =
   let n = length a in
   let rec loop i =
     if i = n then false

@@ -152,7 +152,7 @@ val lexeme : lexbuf -> string
 (** [Lexing.lexeme lexbuf] returns the string matched by
            the regular expression. *)
 
-val lexeme_char : lexbuf -> int -> char
+val lexeme_char : lexbuf -> (int -> char) @ local @@ noalloc_strict
 (** [Lexing.lexeme_char lexbuf i] returns character number [i] in
    the matched string. *)
 
@@ -198,7 +198,7 @@ val flush_input : lexbuf -> unit
 
 val sub_lexeme : lexbuf -> int -> int -> string
 val sub_lexeme_opt : lexbuf -> int -> int -> string option
-val sub_lexeme_char : lexbuf -> int -> char
+val sub_lexeme_char : lexbuf -> (int -> char) @ local @@ noalloc_strict
 val sub_lexeme_char_opt : lexbuf -> int -> char option
 
 type lex_tables =

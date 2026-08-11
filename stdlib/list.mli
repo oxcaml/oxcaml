@@ -48,15 +48,16 @@ type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list (**)
 val length : ('a : value_or_null). 'a list -> int
 (** Return the length (number of elements) of the given list. *)
 
-val compare_lengths : ('a : value_or_null) ('b : value_or_null)
-  . 'a list -> 'b list -> int
+val compare_lengths : ('a : value_or_null) ('b : value_or_null) . 'a list ->
+  ('b list -> int) @ local @@ noalloc_strict
 (** Compare the lengths of two lists. [compare_lengths l1 l2] is
    equivalent to [compare (length l1) (length l2)], except that
    the computation stops after reaching the end of the shortest list.
    @since 4.05
  *)
 
-val compare_length_with : ('a : value_or_null). 'a list -> int -> int
+val compare_length_with : ('a : value_or_null) . 'a list -> (int -> int) @
+  local @@ noalloc_strict
 (** Compare the length of a list to an integer. [compare_length_with l len] is
    equivalent to [compare (length l) len], except that the computation stops
    after at most [len] iterations on the list.
@@ -405,6 +406,7 @@ val take : ('a : value_or_null). int -> 'a list -> 'a list
 *)
 
 val drop : ('a : value_or_null). int -> 'a list -> 'a list
+[@@zero_alloc strict]
 (** [drop n l] returns the suffix of [l] after [n] elements,
     or [[]] if [n > length l]. This is [l] if [n] is negative.
 
@@ -480,6 +482,7 @@ val assoc_opt : ('a : value_or_null) ('b : value_or_null).
  *)
 
 val assq : ('a : value_or_null) ('b : value_or_null). 'a -> ('a * 'b) list -> 'b
+[@@zero_alloc strict]
 (** Same as {!assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)
@@ -497,8 +500,8 @@ val mem_assoc : ('a : value_or_null) ('b : value_or_null).
    and [false] if no bindings exist for the given key.
  *)
 
-val mem_assq : ('a : value_or_null) ('b : value_or_null).
-  'a -> ('a * 'b) list -> bool
+val mem_assq : ('a : value_or_null) ('b : value_or_null) . 'a -> (('a * 'b)
+  list -> bool) @ local @@ noalloc_strict
 (** Same as {!mem_assoc}, but uses physical equality instead of
    structural equality to compare keys.
  *)

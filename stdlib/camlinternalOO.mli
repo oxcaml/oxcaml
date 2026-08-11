@@ -37,6 +37,7 @@ val new_variable : table -> string -> int
 val new_methods_variables :
     table -> string array -> string array -> label array
 val get_variable : table -> string -> int
+[@@zero_alloc strict]
 val get_variables : table -> string array -> int array
 val get_method_label : table -> string -> label
 val get_method_labels : table -> string array -> label array
