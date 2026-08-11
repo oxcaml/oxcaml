@@ -2865,7 +2865,7 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* Test 10.2: [noalloc] functions called within a [try ... with] block still
+(* Test 10.2: allocation or [noalloc] functions called within a [try ... with] block still
    force the enclosing closure to be [alloc]. *)
 (* CR shsong: This test will fail on checking [g] once we finish.
    But for now it passes. *)
@@ -2886,6 +2886,28 @@ let wrapper () =
   ()
 [%%expect{|
 val wrapper : unit -> unit = <fun>
+|}]
+
+let wrapper () =
+  let (g @ noalloc) x =
+    try
+      if x < 0 then alloc_and_raise_
+        let _ = { x } in
+        raise (E10 (x, x))
+      else ()
+    with
+    | _ -> ()
+  in
+  let _ = g in
+  ()
+[%%expect{|
+Line 6, characters 14-26:
+6 |         raise (E10 (x, x))
+                  ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 2-9, characters 20-13,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* Test 10.3: [alloc_and_raise_] can only wrap an expression that definitely

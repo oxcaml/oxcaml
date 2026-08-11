@@ -7293,8 +7293,12 @@ and type_expect_
           in
           env, arg_mode, expected_mode, expected_mode
       in
+      (* CR shsong: exempt a [try ... with] whose cases are all effect
+         handlers, since it catches no exception and thus lets one propagate
+         out of the enclosing closures. *)
       let body =
-        type_expect env body_mode sbody ty_expected_explained
+        type_expect (Env.add_exception_handler_lock env) body_mode sbody
+          ty_expected_explained
       in
       let exn_cases, _ =
         type_cases Value env arg_mode expected_mode
