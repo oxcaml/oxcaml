@@ -237,6 +237,7 @@ val escaped : bytes -> bytes
     {!Sys.max_string_length} bytes. *)
 
 val index : bytes -> char -> int
+[@@zero_alloc strict]
 (** [index s c] returns the index of the first occurrence of byte [c]
     in [s].
     @raise Not_found if [c] does not occur in [s]. *)
@@ -247,6 +248,7 @@ val index_opt: bytes -> char -> int option
     @since 4.05 *)
 
 val rindex : bytes -> char -> int
+[@@zero_alloc strict]
 (** [rindex s c] returns the index of the last occurrence of byte [c]
     in [s].
     @raise Not_found if [c] does not occur in [s]. *)
@@ -287,6 +289,7 @@ val rindex_from_opt: bytes -> int -> char -> int option
     @since 4.05 *)
 
 val contains : bytes -> char -> bool
+[@@zero_alloc strict]
 (** [contains s c] tests if byte [c] appears in [s]. *)
 
 val contains_from : bytes -> int -> char -> bool
@@ -336,6 +339,7 @@ val equal: t -> t -> bool
 
 val starts_with :
   prefix (* comment thwarts tools/sync_stdlib_docs *) :bytes -> bytes -> bool
+[@@zero_alloc strict]
 (** [starts_with ][~prefix s] is [true] if and only if [s] starts with
     [prefix].
 
@@ -343,6 +347,7 @@ val starts_with :
 
 val ends_with :
   suffix (* comment thwarts tools/sync_stdlib_docs *) :bytes -> bytes -> bool
+[@@zero_alloc strict]
 (** [ends_with ][~suffix s] is [true] if and only if [s] ends with [suffix].
 
     @since 4.13 *)
@@ -517,10 +522,12 @@ val of_seq : char Seq.t -> t
 (** {2:utf_8 UTF-8} *)
 
 val get_utf_8_uchar : t -> int -> Uchar.utf_decode
+[@@zero_alloc strict]
 (** [get_utf_8_uchar b i] decodes an UTF-8 character at index [i] in
     [b]. *)
 
 val set_utf_8_uchar : t -> int -> Uchar.t -> int
+[@@zero_alloc strict]
 (** [set_utf_8_uchar b i u] UTF-8 encodes [u] at index [i] in [b]
     and returns the number of bytes [n] that were written starting
     at [i]. If [n] is [0] there was not enough space to encode [u]
@@ -528,6 +535,7 @@ val set_utf_8_uchar : t -> int -> Uchar.t -> int
     be encoded at [i + n]. *)
 
 val is_valid_utf_8 : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_8 b] is [true] if and only if [b] contains valid
     UTF-8 data. *)
 
@@ -545,6 +553,7 @@ val set_utf_16be_uchar : t -> int -> Uchar.t -> int
     be encoded at [i + n]. *)
 
 val is_valid_utf_16be : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_16be b] is [true] if and only if [b] contains valid
     UTF-16BE data. *)
 
@@ -562,6 +571,7 @@ val set_utf_16le_uchar : t -> int -> Uchar.t -> int
     be encoded at [i + n]. *)
 
 val is_valid_utf_16le : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_16le b] is [true] if and only if [b] contains valid
     UTF-16LE data. *)
 
@@ -600,7 +610,7 @@ val get_uint8 : bytes -> int -> int
     @since 4.08
 *)
 
-val get_int8 : bytes -> int -> int
+val get_int8 : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_int8 b i] is [b]'s signed 8-bit integer starting at byte index [i].
     @since 4.08
 *)
@@ -611,31 +621,31 @@ val get_uint16_ne : bytes -> int -> int
     @since 4.08
 *)
 
-val get_uint16_be : bytes -> int -> int
+val get_uint16_be : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_uint16_be b i] is [b]'s big-endian unsigned 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_uint16_le : bytes -> int -> int
+val get_uint16_le : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_uint16_le b i] is [b]'s little-endian unsigned 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_ne : bytes -> int -> int
+val get_int16_ne : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_int16_ne b i] is [b]'s native-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_be : bytes -> int -> int
+val get_int16_be : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_int16_be b i] is [b]'s big-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_le : bytes -> int -> int
+val get_int16_le : bytes -> (int -> int) @ local @@ noalloc_strict
 (** [get_int16_le b i] is [b]'s little-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
@@ -695,13 +705,15 @@ val set_uint16_ne : bytes -> int -> int -> unit
     @since 4.08
 *)
 
-val set_uint16_be : bytes -> int -> int -> unit
+val set_uint16_be :
+  bytes -> (int -> (int -> unit) @ local) @ local @@ noalloc_strict
 (** [set_uint16_be b i v] sets [b]'s big-endian unsigned 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_uint16_le : bytes -> int -> int -> unit
+val set_uint16_le :
+  bytes -> (int -> (int -> unit) @ local) @ local @@ noalloc_strict
 (** [set_uint16_le b i v] sets [b]'s little-endian unsigned 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
@@ -713,13 +725,15 @@ val set_int16_ne : bytes -> int -> int -> unit
     @since 4.08
 *)
 
-val set_int16_be : bytes -> int -> int -> unit
+val set_int16_be :
+  bytes -> (int -> (int -> unit) @ local) @ local @@ noalloc_strict
 (** [set_int16_be b i v] sets [b]'s big-endian signed 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int16_le : bytes -> int -> int -> unit
+val set_int16_le :
+  bytes -> (int -> (int -> unit) @ local) @ local @@ noalloc_strict
 (** [set_int16_le b i v] sets [b]'s little-endian signed 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
@@ -732,12 +746,14 @@ val set_int32_ne : bytes -> int -> int32 -> unit
 *)
 
 val set_int32_be : bytes -> int -> int32 -> unit
+[@@zero_alloc strict]
 (** [set_int32_be b i v] sets [b]'s big-endian 32-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
 val set_int32_le : bytes -> int -> int32 -> unit
+[@@zero_alloc strict]
 (** [set_int32_le b i v] sets [b]'s little-endian 32-bit integer
     starting at byte index [i] to [v].
     @since 4.08
@@ -750,12 +766,14 @@ val set_int64_ne : bytes -> int -> int64 -> unit
 *)
 
 val set_int64_be : bytes -> int -> int64 -> unit
+[@@zero_alloc strict]
 (** [set_int64_be b i v] sets [b]'s big-endian 64-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
 val set_int64_le : bytes -> int -> int64 -> unit
+[@@zero_alloc strict]
 (** [set_int64_le b i v] sets [b]'s little-endian 64-bit integer
     starting at byte index [i] to [v].
     @since 4.08

@@ -432,11 +432,11 @@ let bad_end_of_input message =
        message)
 
 
-let bad_float () =
+let[@zero_alloc strict] bad_float () =
   bad_input "no dot or exponent part found in float token"
 
 
-let bad_hex_float () =
+let[@zero_alloc strict] bad_hex_float () =
   bad_input "not a valid float in hexadecimal notation"
 
 
@@ -957,7 +957,7 @@ let char_for_backslash = function
 
 (* The integer value corresponding to the facial value of a valid
    decimal digit character. *)
-let decimal_value_of_char c = int_of_char c - int_of_char '0'
+let (decimal_value_of_char @ noalloc_strict) c = int_of_char c - int_of_char '0'
 
 let char_for_decimal_code c0 c1 c2 =
   let c =
@@ -973,7 +973,7 @@ let char_for_decimal_code c0 c1 c2 =
 
 (* The integer value corresponding to the facial value of a valid
    hexadecimal digit character. *)
-let hexadecimal_value_of_char c =
+let (hexadecimal_value_of_char @ noalloc_strict) c =
   let d = int_of_char c in
   (* Could also be:
     if d <= int_of_char '9' then d - int_of_char '0' else
@@ -1135,7 +1135,7 @@ let scanf_bad_input ib = function
 
 
 (* Get the content of a counter from an input buffer. *)
-let get_counter ib counter =
+let[@zero_alloc strict] get_counter ib counter =
   match counter with
   | Line_counter -> Scanning.line_count ib
   | Char_counter -> Scanning.char_count ib
@@ -1143,7 +1143,7 @@ let get_counter ib counter =
 
 
 (* Compute the width of a padding option (see "%42{" and "%123("). *)
-let width_of_pad_opt pad_opt = match pad_opt with
+let (width_of_pad_opt @ noalloc_strict) pad_opt = match pad_opt with
   | None -> max_int
   | Some width -> width
 

@@ -133,12 +133,12 @@ let iteri f a =
 
 let ensure_ge (x:int) y = if x >= y then x else invalid_arg "Bytes.concat"
 
-let rec sum_lengths acc seplen = function
+let[@zero_alloc strict] rec sum_lengths acc seplen = function
   | [] -> acc
   | hd :: [] -> length hd + acc
   | hd :: tl -> sum_lengths (ensure_ge (length hd + seplen + acc) acc) seplen tl
 
-let rec unsafe_blits dst pos sep seplen = function
+let rec (unsafe_blits @ noalloc_strict) dst pos sep seplen = function
     [] -> dst
   | hd :: [] ->
     unsafe_blit hd 0 dst pos (length hd); dst
@@ -305,7 +305,7 @@ let capitalize_ascii s = apply1 Char.uppercase_ascii s
 let uncapitalize_ascii s = apply1 Char.lowercase_ascii s
 
 (* duplicated in string.ml *)
-let starts_with ~prefix s =
+let[@zero_alloc strict] starts_with ~prefix s =
   let len_s = length s
   and len_pre = length prefix in
   let rec aux i =
@@ -315,7 +315,7 @@ let starts_with ~prefix s =
   in len_s >= len_pre && aux 0
 
 (* duplicated in string.ml *)
-let ends_with ~suffix s =
+let[@zero_alloc strict] ends_with ~suffix s =
   let len_s = length s
   and len_suf = length suffix in
   let diff = len_s - len_suf in
@@ -326,12 +326,12 @@ let ends_with ~suffix s =
   in diff >= 0 && aux 0
 
 (* duplicated in string.ml *)
-let rec index_rec s lim i c =
+let[@zero_alloc strict] rec index_rec s lim i c =
   if i >= lim then raise Not_found else
   if unsafe_get s i = c then i else index_rec s lim (i + 1) c
 
 (* duplicated in string.ml *)
-let index s c = index_rec s (length s) 0 c
+let[@zero_alloc strict] index s c = index_rec s (length s) 0 c
 
 (* duplicated in string.ml *)
 let rec index_rec_opt s lim i c =
@@ -356,12 +356,12 @@ let index_from_opt s i c =
     index_rec_opt s l i c
 
 (* duplicated in string.ml *)
-let rec rindex_rec s i c =
+let[@zero_alloc strict] rec rindex_rec s i c =
   if i < 0 then raise Not_found else
   if unsafe_get s i = c then i else rindex_rec s (i - 1) c
 
 (* duplicated in string.ml *)
-let rindex s c = rindex_rec s (length s - 1) c
+let[@zero_alloc strict] rindex s c = rindex_rec s (length s - 1) c
 
 (* duplicated in string.ml *)
 let rindex_from s i c =
@@ -396,7 +396,7 @@ let contains_from s i c =
 
 
 (* duplicated in string.ml *)
-let contains s c = contains_from s 0 c
+let[@zero_alloc strict] contains s c = contains_from s 0 c
 
 (* duplicated in string.ml *)
 let rcontains_from s i c =
@@ -484,34 +484,34 @@ external swap16 : int -> int @@ portable = "%bswap16"
 external swap32 : int32 -> int32 @@ portable = "%bswap_int32"
 external swap64 : int64 -> int64 @@ portable = "%bswap_int64"
 
-let unsafe_get_uint16_le b i =
+let (unsafe_get_uint16_le @ noalloc_strict) b i =
   if Sys.big_endian
   then swap16 (unsafe_get_uint16_ne b i)
   else unsafe_get_uint16_ne b i
 
-let unsafe_get_uint16_be b i =
+let (unsafe_get_uint16_be @ noalloc_strict) b i =
   if Sys.big_endian
   then unsafe_get_uint16_ne b i
   else swap16 (unsafe_get_uint16_ne b i)
 
-let get_int8 b i =
+let (get_int8 @ noalloc_strict) b i =
   ((get_uint8 b i) lsl (Sys.int_size - 8)) asr (Sys.int_size - 8)
 
-let get_uint16_le b i =
+let (get_uint16_le @ noalloc_strict) b i =
   if Sys.big_endian then swap16 (get_uint16_ne b i)
   else get_uint16_ne b i
 
-let get_uint16_be b i =
+let (get_uint16_be @ noalloc_strict) b i =
   if not Sys.big_endian then swap16 (get_uint16_ne b i)
   else get_uint16_ne b i
 
-let get_int16_ne b i =
+let (get_int16_ne @ noalloc_strict) b i =
   ((get_uint16_ne b i) lsl (Sys.int_size - 16)) asr (Sys.int_size - 16)
 
-let get_int16_le b i =
+let (get_int16_le @ noalloc_strict) b i =
   ((get_uint16_le b i) lsl (Sys.int_size - 16)) asr (Sys.int_size - 16)
 
-let get_int16_be b i =
+let (get_int16_be @ noalloc_strict) b i =
   ((get_uint16_be b i) lsl (Sys.int_size - 16)) asr (Sys.int_size - 16)
 
 let get_int32_le b i =
@@ -530,37 +530,37 @@ let get_int64_be b i =
   if not Sys.big_endian then swap64 (get_int64_ne b i)
   else get_int64_ne b i
 
-let unsafe_set_uint16_le b i x =
+let (unsafe_set_uint16_le @ noalloc_strict) b i x =
   if Sys.big_endian
   then unsafe_set_uint16_ne b i (swap16 x)
   else unsafe_set_uint16_ne b i x
 
-let unsafe_set_uint16_be b i x =
+let (unsafe_set_uint16_be @ noalloc_strict) b i x =
   if Sys.big_endian
   then unsafe_set_uint16_ne b i x else
   unsafe_set_uint16_ne b i (swap16 x)
 
-let set_int16_le b i x =
+let (set_int16_le @ noalloc_strict) b i x =
   if Sys.big_endian then set_int16_ne b i (swap16 x)
   else set_int16_ne b i x
 
-let set_int16_be b i x =
+let (set_int16_be @ noalloc_strict) b i x =
   if not Sys.big_endian then set_int16_ne b i (swap16 x)
   else set_int16_ne b i x
 
-let set_int32_le b i x =
+let[@zero_alloc strict] set_int32_le b i x =
   if Sys.big_endian then set_int32_ne b i (swap32 x)
   else set_int32_ne b i x
 
-let set_int32_be b i x =
+let[@zero_alloc strict] set_int32_be b i x =
   if not Sys.big_endian then set_int32_ne b i (swap32 x)
   else set_int32_ne b i x
 
-let set_int64_le b i x =
+let[@zero_alloc strict] set_int64_le b i x =
   if Sys.big_endian then set_int64_ne b i (swap64 x)
   else set_int64_ne b i x
 
-let set_int64_be b i x =
+let[@zero_alloc strict] set_int64_be b i x =
   if not Sys.big_endian then set_int64_ne b i (swap64 x)
   else set_int64_ne b i x
 
@@ -611,7 +611,7 @@ let[@inline] utf_8_uchar_4 b0 b1 b2 b3 =
   ((b2 land 0x3F) lsl 6) lor
   ((b3 land 0x3F))
 
-let get_utf_8_uchar b i =
+let[@zero_alloc strict] get_utf_8_uchar b i =
   let b0 = get_uint8 b i in (* raises if [i] is not a valid index. *)
   let get = unsafe_get_uint8 in
   let max = length b - 1 in
@@ -665,7 +665,7 @@ let get_utf_8_uchar b i =
       dec_ret 4 (utf_8_uchar_4 b0 b1 b2 b3)
   | _ -> dec_invalid 1
 
-let set_utf_8_uchar b i u =
+let[@zero_alloc strict] set_utf_8_uchar b i u =
   let set = unsafe_set_uint8 in
   let max = length b - 1 in
   match Uchar.to_int u with
@@ -696,7 +696,7 @@ let set_utf_8_uchar b i u =
        4)
   | _ -> assert false
 
-let is_valid_utf_8 b =
+let[@zero_alloc strict] is_valid_utf_8 b =
   let rec loop max b i =
     if i > max then true else
     let get = unsafe_get_uint8 in
@@ -794,7 +794,7 @@ let set_utf_16be_uchar b i u =
       set b i hi; set b (i + 2) lo; 4
   | _ -> assert false
 
-let is_valid_utf_16be b =
+let[@zero_alloc strict] is_valid_utf_16be b =
   let rec loop max b i =
     let get = unsafe_get_uint16_be in
     if i > max then true else
@@ -848,7 +848,7 @@ let set_utf_16le_uchar b i u =
       set b i hi; set b (i + 2) lo; 4
   | _ -> assert false
 
-let is_valid_utf_16le b =
+let[@zero_alloc strict] is_valid_utf_16le b =
   let rec loop max b i =
     let get = unsafe_get_uint16_le in
     if i > max then true else

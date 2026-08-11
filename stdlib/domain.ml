@@ -225,11 +225,11 @@ end
 
 (******** Identity **********)
 
-let get_id { domain; _ } = domain
+let (get_id @ noalloc_strict) { domain; _ } = domain
 
-let self () = Raw.self ()
+let (self @ noalloc_strict) () = Raw.self ()
 
-let is_main_domain () = (self () :> int) = 0
+let (is_main_domain @ noalloc_strict) () = (self () :> int) = 0
 
 external self_index : unit -> int# @@ portable
   = "%domain_index" [@@noalloc]

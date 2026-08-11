@@ -93,7 +93,7 @@ let print_spec buf (key, spec, doc) =
         bprintf buf "  %s %s\n" key doc
 
 
-let help_action () = raise (Stop (Unknown "-help"))
+let[@zero_alloc strict] help_action () = raise (Stop (Unknown "-help"))
 
 let add_help speclist =
   let add1 =
@@ -314,7 +314,7 @@ let parse_expand l f msg =
   | Help msg -> printf "%s" msg; exit 0
 
 
-let second_word s =
+let[@zero_alloc strict] second_word s =
   let len = String.length s in
   let rec loop n =
     if n >= len then len
@@ -330,7 +330,7 @@ let second_word s =
       end
 
 
-let max_arg_len cur (kwd, spec, doc) =
+let[@zero_alloc strict] max_arg_len cur (kwd, spec, doc) =
   match spec with
   | Symbol _ -> Int.max cur (String.length kwd)
   | _ -> Int.max cur (String.length kwd + second_word doc)

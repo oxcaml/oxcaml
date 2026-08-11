@@ -213,6 +213,7 @@ val pop_last : 'a t -> 'a
     @raise Not_found on an empty array. *)
 
 val remove_last : 'a t -> unit
+[@@zero_alloc strict]
 (** [remove_last a] removes the last element of [a], if any.
     It does nothing if [a] is empty. *)
 
@@ -587,6 +588,7 @@ val set_capacity : 'a t -> int -> unit
 *)
 
 val reset : 'a t -> unit
+[@@zero_alloc strict]
 (** [reset a] clears [a] and replaces its backing array by an empty array.
 
     It is equivalent to [set_capacity a 0] or [clear a; fit_capacity a].

@@ -31,7 +31,7 @@ type mutable_char_set = bytes
 let create_char_set () = Bytes.make 32 '\000'
 
 (* Add a char in a mutable char set. *)
-let add_in_char_set char_set c =
+let[@zero_alloc strict] add_in_char_set char_set c =
   let ind = int_of_char c in
   let str_ind = ind lsr 3 and mask = 1 lsl (ind land 0b111) in
   Bytes.set char_set str_ind
@@ -50,7 +50,7 @@ let rev_char_set char_set =
   Bytes.unsafe_to_string char_set'
 
 (* Return true if a `c' is in `char_set'. *)
-let is_in_char_set char_set c =
+let (is_in_char_set @ noalloc_strict) char_set c =
   let ind = int_of_char c in
   let str_ind = ind lsr 3 and mask = 1 lsl (ind land 0b111) in
   (int_of_char (String.get char_set str_ind) land mask) <> 0
@@ -71,7 +71,7 @@ let pad_of_pad_opt pad_opt = match pad_opt with
   | Some width -> Lit_padding (Right, width)
 
 (* Compute a precision associated to a prec_option (see "%_.42f"). *)
-let prec_of_prec_opt prec_opt = match prec_opt with
+let[@zero_alloc strict] prec_of_prec_opt prec_opt = match prec_opt with
   | None -> No_precision
   | Some ndec -> Lit_precision ndec
 
@@ -224,7 +224,7 @@ type precision_ebb = Precision_EBB : ('a, 'b) precision -> precision_ebb
                                (* Constants *)
 
 (* Default precision for float printing. *)
-let default_float_precision fconv =
+let (default_float_precision @ noalloc_strict) fconv =
   match snd fconv with
   | Float_f | Float_e | Float_E | Float_g | Float_G | Float_h | Float_H
   | Float_CF -> -6
@@ -293,14 +293,14 @@ let buffer_contents buf =
 (***)
 
 (* Convert an integer conversion to char. *)
-let char_of_iconv iconv = match iconv with
+let (char_of_iconv @ noalloc_strict) iconv = match iconv with
   | Int_d | Int_pd | Int_sd | Int_Cd -> 'd' | Int_i | Int_pi | Int_si
   | Int_Ci -> 'i' | Int_x | Int_Cx -> 'x' | Int_X | Int_CX -> 'X' | Int_o
   | Int_Co -> 'o' | Int_u | Int_Cu -> 'u'
 
 (* Convert a float conversion to char. *)
 (* `cF' will be 'F' for displaying format and 'g' to call libc printf *)
-let char_of_fconv ?(cF='F') fconv = match snd fconv with
+let (char_of_fconv @ noalloc_strict) ?(cF='F') fconv = match snd fconv with
   | Float_f -> 'f' | Float_e -> 'e'
   | Float_E -> 'E' | Float_g -> 'g'
   | Float_G -> 'G' | Float_F -> cF
@@ -309,7 +309,7 @@ let char_of_fconv ?(cF='F') fconv = match snd fconv with
 
 
 (* Convert a scanning counter to char. *)
-let char_of_counter counter = match counter with
+let (char_of_counter @ noalloc_strict) counter = match counter with
   | Line_counter  -> 'l'
   | Char_counter  -> 'n'
   | Token_counter -> 'N'
@@ -1788,7 +1788,7 @@ and make_custom : type x y a b c d e f .
     fun x ->
       make_custom k acc rest arity (f x)
 
-let const x _ = x
+let[@zero_alloc strict] const x _ = x
 
 let rec make_iprintf : type a b c d e f state.
   (state -> f) -> state -> (a, b, c, d, e, f) fmt -> a =
