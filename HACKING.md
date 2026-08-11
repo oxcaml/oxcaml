@@ -271,7 +271,7 @@ ocamldebug emacs mode as follows:
    printing any value may produce `Cannot find module Misc.` or similar
    errors).  If debugging `ocamlc`, run:
    ```
-   (ocd) directory _build/main/.ocamlcommon.objs/byte
+   (ocd) directory _build/main/.ocamlfrontend.objs/byte
    ```
    If debugging `ocamlopt`, you'll need various additional directories depending
    on your middle end.  You can find the right directories by searching for cmo

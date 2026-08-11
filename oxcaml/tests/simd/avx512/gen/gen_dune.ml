@@ -9,7 +9,7 @@ let enabled_if =
     (= %{architecture} "amd64")
     (<> %{system} macosx)))|}
 
-let flags = "-extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw"
+let flags = "-extension simd_beta -favx512f -favx512vl -favx512dq -favx512bw"
 
 let impl name = name ^ ".ml"
 
