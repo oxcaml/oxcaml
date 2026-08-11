@@ -183,8 +183,10 @@ end) : S = struct
         members []
     in
     let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments. *)
+      (* [arg_descr] is None because we don't allow packs to be arguments.
+         [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
+        ~static_data:Slambdaeval.CU_data.empty
     in
     let file_sections =
       let length =
@@ -234,6 +236,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = ui.ui_static_data;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in

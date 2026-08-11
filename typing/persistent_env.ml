@@ -820,7 +820,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -840,7 +840,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let sign = pers_name.pn_sign in
+  let (_, mode) as sign = pers_name.pn_sign in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
@@ -858,7 +858,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
-    | Constant unit -> Aunit unit
+    | Constant unit -> Aunit (unit, mode)
   in
   let shape =
     match import.imp_impl, import.imp_params with
