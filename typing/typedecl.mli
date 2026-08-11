@@ -99,7 +99,7 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
-val update_constructor_representation_and_arg_sorts :
+val instance_constructor_representation :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
   Types.constructor_arguments * constant:bool *
@@ -109,9 +109,9 @@ val update_constructor_representation_and_arg_sorts :
 type unrepresentable_record =
   | Unrepresentable_field of string
 
-(* Update the representation of a record whose representation at declaration
-   time was undetermined because it has a field of kind [any] *)
-val update_record_representation:
+(* Instantiate the representation of a record whose representation at
+   declaration time was undetermined because it has a field of kind [any] *)
+val instance_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->

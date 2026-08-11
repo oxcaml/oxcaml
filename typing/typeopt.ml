@@ -1059,7 +1059,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                    ~variable_repr:true, None, constructor
                  | cd_args ->
                    let cd_args, ~constant:_, repr, _arg_sorts =
-                     Typedecl.update_constructor_representation_and_arg_sorts
+                     Typedecl.instance_constructor_representation
                        env loc cd_args ~is_extension_constructor:false
                    in
                    ~variable_repr:true, Result.to_option repr,
