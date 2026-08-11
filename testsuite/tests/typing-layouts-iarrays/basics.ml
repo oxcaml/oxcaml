@@ -220,6 +220,17 @@ module M6_1 = struct
 end
 
 [%%expect{|
+Line 13, characters 25-57:
+13 |                     #42L (get_third [: #0L; #1L; #42L :]))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a : bits32)"
+       but an expression was expected of type
+         "Stdlib_upstream_compatible.Int64_u.t" = "int64#"
+       The layout of Stdlib_upstream_compatible.Int64_u.t is bits64.
+       But the layout of Stdlib_upstream_compatible.Int64_u.t must be a sublayout of
+         bits32
+         because of the definition of get_third at lines 4-7, characters 16-23.
+|}, Principal{|
 Line 13, characters 39-42:
 13 |                     #42L (get_third [: #0L; #1L; #42L :]))
                                             ^^^
@@ -244,6 +255,16 @@ module M6_2 = struct
 end
 
 [%%expect{|
+Line 10, characters 28-31:
+10 |   let f2 idx : int32# = get arr idx
+                                 ^^^
+Error: The value "arr" has type "'a iarray"
+       but an expression was expected of type "int32# iarray"
+       The layout of int32# is bits32
+         because it is the unboxed version of the primitive type int32.
+       But the layout of int32# must be a sublayout of float64
+         because of the definition of arr at line 7, characters 12-16.
+|}, Principal{|
 Line 10, characters 24-35:
 10 |   let f2 idx : int32# = get arr idx
                              ^^^^^^^^^^^

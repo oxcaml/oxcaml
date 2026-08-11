@@ -74,6 +74,18 @@ module M = struct
 end
 
 [%%expect{|
+Line 4, characters 58-69:
+4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
+                                                              ^^^^^^^^^^^
+Error: This expression has type "('a : float64)"
+       but an expression was expected of type "string"
+       The layout of string is value non_float
+         because it is the primitive type string.
+       But the layout of string must be a sublayout of float64
+         because of the definition of id' at line 2, characters 10-18.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}, Principal{|
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
@@ -300,6 +312,18 @@ module S : sig val id : ('a : float64). 'a -> 'a end
 let () = Format.printf "%s\n" (S.id "abc")
 
 [%%expect{|
+Line 1, characters 30-42:
+1 | let () = Format.printf "%s\n" (S.id "abc")
+                                  ^^^^^^^^^^^^
+Error: This expression has type "('a : float64)"
+       but an expression was expected of type "string"
+       The layout of string is value non_float
+         because it is the primitive type string.
+       But the layout of string must be a sublayout of float64
+         because of the definition of id at line 2, characters 2-35.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}, Principal{|
 Line 1, characters 36-41:
 1 | let () = Format.printf "%s\n" (S.id "abc")
                                         ^^^^^
@@ -535,6 +559,19 @@ external[@layout_poly] id : ('a : any) ('b : any). 'a -> 'b = "%identity"
 let f (x: float#): int64# = id x
 
 [%%expect{|
+external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+Line 2, characters 31-32:
+2 | let f (x: float#): int64# = id x
+                                   ^
+Error: The value "x" has type "float#" but an expression was expected of type
+         "('a : bits64)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 28-32:
 2 | let f (x: float#): int64# = id x

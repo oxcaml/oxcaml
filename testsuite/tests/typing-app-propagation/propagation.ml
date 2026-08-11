@@ -17,6 +17,11 @@ let _ = (id A : t), (id A : s)
 type t = A | B
 type s = A | C
 val id : 'a -> 'a = <fun>
+- : t * s = (A, A)
+|}, Principal{|
+type t = A | B
+type s = A | C
+val id : 'a -> 'a = <fun>
 Line 6, characters 9-13:
 6 | let _ = (id A : t), (id A : s)
              ^^^^
@@ -33,6 +38,10 @@ let bars (xs : int list) : bar list = List.map (fun x -> Bar x) xs
 [%%expect{|
 type bar = Bar of int
 type baz = Bar of string
+val bars : int list -> bar list = <fun>
+|}, Principal{|
+type bar = Bar of int
+type baz = Bar of string
 Line 4, characters 64-66:
 4 | let bars (xs : int list) : bar list = List.map (fun x -> Bar x) xs
                                                                     ^^
@@ -46,6 +55,8 @@ Error: The value "xs" has type "int list" but an expression was expected of type
 let bars_rev_app (xs : int list) : bar list =
   xs |> List.map (fun x -> Bar x)
 [%%expect{|
+val bars_rev_app : int list -> bar list = <fun>
+|}, Principal{|
 Line 2, characters 2-4:
 2 |   xs |> List.map (fun x -> Bar x)
       ^^
@@ -57,6 +68,8 @@ Error: The value "xs" has type "int list" but an expression was expected of type
 let bars_app (xs : int list) : bar list =
   List.map (fun x -> Bar x) @@ xs
 [%%expect{|
+val bars_app : int list -> bar list = <fun>
+|}, Principal{|
 Line 2, characters 31-33:
 2 |   List.map (fun x -> Bar x) @@ xs
                                    ^^
@@ -74,6 +87,14 @@ let f (l : t1 list) : int list = List.map (fun r -> r.x) l
 [%%expect{|
 type t1 = { x : int; }
 type t2 = { x : bool; }
+Line 4, characters 52-55:
+4 | let f (l : t1 list) : int list = List.map (fun r -> r.x) l
+                                                        ^^^
+Error: The field access "r.x" has type "bool"
+       but an expression was expected of type "int"
+|}, Principal{|
+type t1 = { x : int; }
+type t2 = { x : bool; }
 Line 4, characters 57-58:
 4 | let f (l : t1 list) : int list = List.map (fun r -> r.x) l
                                                              ^
@@ -86,6 +107,8 @@ Error: The value "l" has type "t1 list" but an expression was expected of type
 
 let recs (xs : int list) : t1 list = List.map (fun x -> {x}) xs
 [%%expect{|
+val recs : int list -> t1 list = <fun>
+|}, Principal{|
 Line 1, characters 61-63:
 1 | let recs (xs : int list) : t1 list = List.map (fun x -> {x}) xs
                                                                  ^^
@@ -101,6 +124,9 @@ let const x ~y:_ = x
 
 let g : y:unit -> t = const A
 [%%expect{|
+val const : 'a -> y:'b -> 'a = <fun>
+val g : y:unit -> t = <fun>
+|}, Principal{|
 val const : 'a -> y:'b -> 'a = <fun>
 Line 3, characters 22-29:
 3 | let g : y:unit -> t = const A
@@ -118,6 +144,8 @@ let f =
   let k x _ = x in
   fun a b -> (k {x=a} {x=b} : t1)
 [%%expect{|
+val f : int -> bool -> t1 = <fun>
+|}, Principal{|
 Line 3, characters 14-27:
 3 |   fun a b -> (k {x=a} {x=b} : t1)
                   ^^^^^^^^^^^^^
@@ -141,6 +169,17 @@ end
 let f (c : container) =
   c#on_update (signal (fun x -> print_endline x#to_string))
 [%%expect{|
+type 'a signal = Signal of 'a
+val signal : 'a -> 'a signal = <fun>
+class type showable = object method show : string end
+class type container =
+  object method on_update : (showable -> unit) signal -> unit end
+Line 13, characters 46-47:
+13 |   c#on_update (signal (fun x -> print_endline x#to_string))
+                                                   ^
+Error: This expression has type "showable"
+       It has no method "to_string"
+|}, Principal{|
 type 'a signal = Signal of 'a
 val signal : 'a -> 'a signal = <fun>
 class type showable = object method show : string end
