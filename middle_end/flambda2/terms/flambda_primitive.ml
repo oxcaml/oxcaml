@@ -3238,6 +3238,15 @@ module Without_args = struct
     | Variadic prim -> effects_and_coeffects_of_variadic_primitive prim
 end
 
+let without_args t : Without_args.t =
+  match t with
+  | Nullary prim -> Nullary prim
+  | Unary (prim, _) -> Unary prim
+  | Binary (prim, _, _) -> Binary prim
+  | Ternary (prim, _, _, _) -> Ternary prim
+  | Quaternary (prim, _, _, _, _) -> Quaternary prim
+  | Variadic (prim, _) -> Variadic prim
+
 let is_begin_or_end_region t =
   match t with
   | Variadic ((Begin_region _ | Begin_try_region _), _)

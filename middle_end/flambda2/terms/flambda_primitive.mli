@@ -679,6 +679,8 @@ module Without_args : sig
   val effects_and_coeffects : t -> Effects_and_coeffects.t
 end
 
+val without_args : t -> Without_args.t
+
 (** A description of the kind of values which a unary primitive expects as its
     arguments. *)
 val arg_kind_of_unary_primitive : unary_primitive -> Flambda_kind.t
