@@ -70,81 +70,82 @@
  module = "q/q.mli";
  ocamlopt.byte;
 
- (* ===== Case 1: dep cmi not found ===== *)
+ {
+   (* ===== Case 1: dep cmi not found ===== *)
 
- flags = "$flg_int_iface -parameter P -I p";
- module = "basic/basic__.ml";
- ocamlopt.byte;
+   flags = "$flg_int_iface -parameter P -I p";
+   module = "basic/basic__.ml";
+   ocamlopt.byte;
 
- flags = "$flg -parameter P -I p -H basic -open-cmi basic/basic__.cmi";
- module = "basic/basic.mli basic/basic.ml";
- ocamlopt.byte;
+   flags = "$flg -parameter P -I p -H basic -open-cmi basic/basic__.cmi";
+   module = "basic/basic.mli basic/basic.ml";
+   ocamlopt.byte;
 
- flags = "$flg -parameter P -I p -I basic -I derived";
- module = "derived/derived.mli derived/derived.ml";
- ocamlopt.byte;
+   flags = "$flg -parameter P -I p -I basic -I derived";
+   module = "derived/derived.mli derived/derived.ml";
+   ocamlopt.byte;
 
- (* Remove [Basic.cmi] so it's no longer loadable; [Derived.cmi]'s recorded
-    dep on [Basic] is now unsatisfiable. *)
- script = "rm basic/basic.cmi";
- script;
+   (* Remove [Basic.cmi] so it's no longer loadable; [Derived.cmi]'s recorded
+      dep on [Basic] is now unsatisfiable. *)
+   script = "rm basic/basic.cmi";
+   script;
 
- flags = "$flg -functorize -I p -I basic -I derived Derived";
- module = "";
- program = "bundle/bundle.cmi";
- all_modules = "";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_dep_cmi_not_found.output";
- ocamlopt.byte;
+   flags = "$flg -functorize -I p -I basic -I derived Derived";
+   module = "";
+   program = "bundle/bundle.cmi";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_dep_cmi_not_found.output";
+   ocamlopt.byte;
 
- compiler_reference = "bad_dep_cmi_not_found.reference";
- check-ocamlopt.byte-output;
+   compiler_reference = "bad_dep_cmi_not_found.reference";
+   check-ocamlopt.byte-output;
+ }{
+   (* ===== Case 2: dep cmi changed (CRC mismatch) ===== *)
 
- (* ===== Case 2: dep cmi changed (CRC mismatch) ===== *)
+   (* [Basic_pq] is compiled with -parameter P -parameter Q first. *)
 
- (* [Basic_pq] is compiled with -parameter P -parameter Q first. *)
+   flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
+   module = "basic_pq__.ml";
+   ocamlopt.byte;
 
- flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
- module = "basic_pq__.ml";
- ocamlopt_byte_exit_status = "0";
- ocamlopt.byte;
+   flags = "$flg -parameter P -parameter Q -I . -I p -I q \
+     -open-cmi basic_pq__.cmi";
+   module = "basic_pq.mli basic_pq.ml";
+   ocamlopt.byte;
 
- flags = "$flg -parameter P -parameter Q -I . -I p -I q \
-   -open-cmi basic_pq__.cmi";
- module = "basic_pq.mli basic_pq.ml";
- ocamlopt.byte;
+   (* [User_pq] references [Basic_pq] from a -parameter P -parameter Q
+      context — records [Basic_pq__]'s CRC v1. *)
 
- (* [User_pq] references [Basic_pq] from a -parameter P -parameter Q
-    context — records [Basic_pq__]'s CRC v1. *)
+   flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
+   module = "user_pq__.ml";
+   ocamlopt.byte;
 
- flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
- module = "user_pq__.ml";
- ocamlopt.byte;
+   flags = "$flg -parameter P -parameter Q -I . -I p -I q \
+     -open-cmi user_pq__.cmi";
+   module = "user_pq.mli user_pq.ml";
+   ocamlopt.byte;
 
- flags = "$flg -parameter P -parameter Q -I . -I p -I q \
-   -open-cmi user_pq__.cmi";
- module = "user_pq.mli user_pq.ml";
- ocamlopt.byte;
+   (* Recompile [Basic_pq] with only -parameter P, overwriting [basic_pq__]'s
+      cmi (v2 with a different CRC). *)
 
- (* Recompile [Basic_pq] with only -parameter P, overwriting [basic_pq__]'s
-    cmi (v2 with a different CRC). *)
+   flags = "$flg_int_iface -parameter P -I p";
+   module = "basic_pq__.ml";
+   ocamlopt.byte;
 
- flags = "$flg_int_iface -parameter P -I p";
- module = "basic_pq__.ml";
- ocamlopt.byte;
+   flags = "$flg -parameter P -I . -I p -open-cmi basic_pq__.cmi";
+   module = "basic_pq.mli basic_pq.ml";
+   ocamlopt.byte;
 
- flags = "$flg -parameter P -I . -I p -open-cmi basic_pq__.cmi";
- module = "basic_pq.mli basic_pq.ml";
- ocamlopt.byte;
+   flags = "$flg -functorize -I . -I p -I q User_pq";
+   module = "";
+   program = "bundle/bundle.cmi";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   compiler_output = "bad_dep_cmi_changed.output";
+   ocamlopt.byte;
 
- flags = "$flg -functorize -I . -I p -I q User_pq";
- module = "";
- program = "bundle/bundle.cmi";
- all_modules = "";
- ocamlopt_byte_exit_status = "2";
- compiler_output = "bad_dep_cmi_changed.output";
- ocamlopt.byte;
-
- compiler_reference = "bad_dep_cmi_changed.reference";
- check-ocamlopt.byte-output;
+   compiler_reference = "bad_dep_cmi_changed.reference";
+   check-ocamlopt.byte-output;
+ }
 *)

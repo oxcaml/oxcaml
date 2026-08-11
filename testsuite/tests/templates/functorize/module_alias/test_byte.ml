@@ -115,135 +115,136 @@
  module = "lib/mod_b.ml";
  ocamlc.byte;
 
- (* Case 1 — [with_message.ml] aliases [Message] AND uses [Message.hello]
-    in its body.  The body use forces a CRC, so [with_message.cmi] lists
-    [Message] as [Exact] and it is pulled into the bundle. *)
+ {
+   (* Case 1 — [with_message.ml] aliases [Message] AND uses [Message.hello]
+      in its body.  The body use forces a CRC, so [with_message.cmi] lists
+      [Message] as [Exact] and it is pulled into the bundle. *)
 
- flags = "$flg -functorize -I p -I message -I with_message With_message";
- module = "";
- program = "bundle_msg/bundle_msg.cmo";
- all_modules = "";
- ocamlc.byte;
+   flags = "$flg -functorize -I p -I message -I with_message With_message";
+   module = "";
+   program = "bundle_msg/bundle_msg.cmo";
+   all_modules = "";
+   ocamlc.byte;
+ }{
+   (* Case 2 — [pure_alias.ml] declares only [module Message = Message].
+      Under [-no-alias-deps] this records [Message] as [Approximate]
+      (no CRC); the functorizer loads [Message]'s cmi anyway and bundles
+      it, so a consumer can use [Inst.Pure_alias.Message]. *)
 
- (* Case 2 — [pure_alias.ml] declares only [module Message = Message].
-    Under [-no-alias-deps] this records [Message] as [Approximate]
-    (no CRC); the functorizer loads [Message]'s cmi anyway and bundles
-    it, so a consumer can use [Inst.Pure_alias.Message]. *)
+   flags = "$flg -functorize -I p -I message -I pure_alias Pure_alias";
+   module = "";
+   program = "bundle_pure_alias/bundle_pure_alias.cmo";
+   all_modules = "";
+   ocamlc.byte;
 
- flags = "$flg -functorize -I p -I message -I pure_alias Pure_alias";
- module = "";
- program = "bundle_pure_alias/bundle_pure_alias.cmo";
- all_modules = "";
- ocamlc.byte;
+   flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
+   module = "main_pure_alias.ml";
+   ocamlc.byte;
 
- flags = "$flg -I bundle_pure_alias -I p -I p_int -I message";
- module = "main_pure_alias.ml";
- ocamlc.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_pure_alias.bc";
+   all_modules = "\
+     message/message.cmo \
+     pure_alias/pure_alias.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_pure_alias/bundle_pure_alias.cmo \
+     main_pure_alias.cmo \
+   ";
+   ocamlc.byte;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_pure_alias.bc";
- all_modules = "\
-   message/message.cmo \
-   pure_alias/pure_alias.cmo \
-   p_int/p_int__.cmo \
-   p_int/p_int.cmo \
-   bundle_pure_alias/bundle_pure_alias.cmo \
-   main_pure_alias.cmo \
- ";
- ocamlc.byte;
+   stdout = "test_functorize_pure_alias.output";
+   stderr = "test_functorize_pure_alias.output";
+   output = "test_functorize_pure_alias.output";
+   run;
 
- stdout = "test_functorize_pure_alias.output";
- stderr = "test_functorize_pure_alias.output";
- output = "test_functorize_pure_alias.output";
- run;
+   reference = "test_functorize_pure_alias.reference";
+   check-program-output;
+ }{
+   (* Case 3 — [included_alias.ml] uses [module Message = struct include
+      Message end].  The [include] forces a body-level use, so its cmi
+      records [Message] as [Exact] (same effect as case 1). *)
 
- reference = "test_functorize_pure_alias.reference";
- check-program-output;
+   flags = "$flg -functorize -I p -I message -I included_alias \
+     Included_alias";
+   module = "";
+   program = "bundle_included_alias/bundle_included_alias.cmo";
+   all_modules = "";
+   ocamlc.byte;
 
- (* Case 3 — [included_alias.ml] uses [module Message = struct include
-    Message end].  The [include] forces a body-level use, so its cmi
-    records [Message] as [Exact] (same effect as case 1). *)
+   flags = "$flg -I bundle_included_alias -I p -I p_int -I message";
+   module = "main_included_alias.ml";
+   ocamlc.byte;
 
- flags = "$flg -functorize -I p -I message -I included_alias \
-   Included_alias";
- module = "";
- program = "bundle_included_alias/bundle_included_alias.cmo";
- all_modules = "";
- ocamlc_byte_exit_status = "0";
- ocamlc.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_included_alias.bc";
+   all_modules = "\
+     message/message.cmo \
+     included_alias/included_alias.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_included_alias/bundle_included_alias.cmo \
+     main_included_alias.cmo \
+   ";
+   ocamlc.byte;
 
- flags = "$flg -I bundle_included_alias -I p -I p_int -I message";
- module = "main_included_alias.ml";
- ocamlc.byte;
+   stdout = "test_functorize_included_alias.output";
+   stderr = "test_functorize_included_alias.output";
+   output = "test_functorize_included_alias.output";
+   run;
 
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_included_alias.bc";
- all_modules = "\
-   message/message.cmo \
-   included_alias/included_alias.cmo \
-   p_int/p_int__.cmo \
-   p_int/p_int.cmo \
-   bundle_included_alias/bundle_included_alias.cmo \
-   main_included_alias.cmo \
- ";
- ocamlc.byte;
+   reference = "test_functorize_included_alias.reference";
+   check-program-output;
+ }{
+   (* Case 4 — circular aliases through a dune-style renaming module.
+      [mod_a] and [mod_b] each body-use [Lib__] (recording it [Exact])
+      and mutually alias each other.  Bundling [Mod_a Mod_b] together
+      makes both top-level inputs [Exact], so the long chain
+      [Inst.Mod_a.Mod_b_alias.Mod_a_alias....] resolves at runtime. *)
 
- stdout = "test_functorize_included_alias.output";
- stderr = "test_functorize_included_alias.output";
- output = "test_functorize_included_alias.output";
- run;
+   flags = "$flg -functorize -I p -I lib Mod_a Mod_b";
+   module = "";
+   program = "bundle_circular/bundle_circular.cmo";
+   all_modules = "";
+   ocamlc.byte;
 
- reference = "test_functorize_included_alias.reference";
- check-program-output;
+   (* Print the bundle's inferred module structure so the circular alias
+      chain is visible in the test output. *)
 
- (* Case 4 — circular aliases through a dune-style renaming module.
-    [mod_a] and [mod_b] each body-use [Lib__] (recording it [Exact])
-    and mutually alias each other.  Bundling [Mod_a Mod_b] together
-    makes both top-level inputs [Exact], so the long chain
-    [Inst.Mod_a.Mod_b_alias.Mod_a_alias....] resolves at runtime. *)
+   flags = "$flg -I bundle_circular -I p -I p_int -I lib -i";
+   module = "sig_circular.ml";
+   compiler_output = "sig_circular.output";
+   ocamlc.byte;
 
- flags = "$flg -functorize -I p -I lib Mod_a Mod_b";
- module = "";
- program = "bundle_circular/bundle_circular.cmo";
- all_modules = "";
- ocamlc.byte;
+   compiler_reference = "sig_circular.reference";
+   check-ocamlc.byte-output;
 
- (* Print the bundle's inferred module structure so the circular alias
-    chain is visible in the test output. *)
+   flags = "$flg -I bundle_circular -I p -I p_int -I lib";
+   module = "main_circular.ml";
+   ocamlc.byte;
 
- flags = "$flg -I bundle_circular -I p -I p_int -I lib -i";
- module = "sig_circular.ml";
- compiler_output = "sig_circular.output";
- ocamlc.byte;
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_functorize_circular.bc";
+   all_modules = "\
+     lib/lib__.cmo \
+     lib/mod_a.cmo \
+     lib/mod_b.cmo \
+     p_int/p_int__.cmo \
+     p_int/p_int.cmo \
+     bundle_circular/bundle_circular.cmo \
+     main_circular.cmo \
+   ";
+   ocamlc.byte;
 
- compiler_reference = "sig_circular.reference";
- check-ocamlc.byte-output;
+   stdout = "test_functorize_circular.output";
+   stderr = "test_functorize_circular.output";
+   output = "test_functorize_circular.output";
+   run;
 
- flags = "$flg -I bundle_circular -I p -I p_int -I lib";
- module = "main_circular.ml";
- ocamlc.byte;
-
- flags = "$flg_link";
- module = "";
- program = "$test_build_directory/test_functorize_circular.bc";
- all_modules = "\
-   lib/lib__.cmo \
-   lib/mod_a.cmo \
-   lib/mod_b.cmo \
-   p_int/p_int__.cmo \
-   p_int/p_int.cmo \
-   bundle_circular/bundle_circular.cmo \
-   main_circular.cmo \
- ";
- ocamlc.byte;
-
- stdout = "test_functorize_circular.output";
- stderr = "test_functorize_circular.output";
- output = "test_functorize_circular.output";
- run;
-
- reference = "test_functorize_circular.reference";
- check-program-output;
+   reference = "test_functorize_circular.reference";
+   check-program-output;
+ }
 *)
