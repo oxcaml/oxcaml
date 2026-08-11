@@ -1877,7 +1877,7 @@ let eagerly_check_record_not_all_void loc sorts =
    1. When typechecking a declaration, to determine the declaration type_kind
       (e.g. via [compute_record_kind]).
    2. When typechecking an expression, in order to specialize a record/variant
-      representation to its field sorts (via [update_record_representation]).
+      representation to its field sorts (via [instance_record_representation]).
 
    Previously, we always defaulted label sorts to scannable. The above PR made
    it so we no longer do so for expressions, but introduced the flag to preserve
@@ -2139,7 +2139,7 @@ let check_atomic_fields reprs lbls =
          raise (Error (lbl.ld_loc, Non_value_atomic_field)))
     reprs lbls
 
-let update_constructor_representation
+let instance_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor ~default_to_scannable
   =
@@ -2181,13 +2181,13 @@ let update_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
-let update_constructor_representation_and_arg_sorts env loc args
+let instance_constructor_representation env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =
     update_constructor_arguments_sorts env loc args
   in
   let constructor_shape =
-    update_constructor_representation env args jkinds ~loc
+    instance_constructor_representation env args jkinds ~loc
       ~is_extension_constructor ~default_to_scannable:true
   in
   args, ~constant, constructor_shape, arg_sorts
@@ -2471,7 +2471,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.compute_record_kind: unexpected record representation"
 
-let update_record_representation
+let instance_record_representation
       (type rep) ~why ~(old_repres : rep)
       env loc (form : rep record_form) lbls_and_types =
   let kloc : jkind_sort_loc =
@@ -2517,7 +2517,7 @@ let update_record_representation
          (* Extension constructors always have a known shape, and
             [Variant_with_null] cannot have an inlined record argument. *)
          Misc.fatal_error
-           "Typedecl.update_record_representation: unexpected variant \
+           "Typedecl.instance_record_representation: unexpected variant \
             representation")
     | Unboxed_product, Record_unboxed_product_undetermined ->
       Record_unboxed_product_variable (Array.of_list sorts)
@@ -2528,7 +2528,7 @@ let update_record_representation
     | Unboxed_product,
       (Record_unboxed_product | Record_unboxed_product_variable _) ->
         Misc.fatal_error
-          "Typedecl.update_record_representation: representation already \
+          "Typedecl.instance_record_representation: representation already \
            determined"
   in
   rep
@@ -2739,7 +2739,7 @@ let rec update_decl_jkind env dpath decl =
       let cstrs =
         List.mapi (fun idx cstr ->
           let cd_args, ~constant, cstr_repr, arg_sorts =
-            update_constructor_representation_and_arg_sorts env
+            instance_constructor_representation env
               cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
           in
@@ -4020,7 +4020,7 @@ let transl_extension_constructor_decl
       typext_params svars sargs sret_type
   in
   let args, ~constant, constructor_shape, _arg_sorts =
-    update_constructor_representation_and_arg_sorts env loc args
+    instance_constructor_representation env loc args
       ~is_extension_constructor:true
   in
   let constructor_shape =
