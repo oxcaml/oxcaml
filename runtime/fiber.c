@@ -844,6 +844,9 @@ CAMLexport void caml_do_local_roots (
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
 #ifdef NATIVE_CODE
+    /* c_stack marks the boundary between C stack segments. Distinct C stack
+       segments may have distinct ML fiber stacks, so when we change stack
+       segment we need to find the appropriate local arenas. */
     while (c_stack != NULL && (uintnat)c_stack < (uintnat)lr) {
       c_stack = c_stack->prev;
       if (c_stack != NULL) locals = caml_refresh_locals(c_stack->stack);
