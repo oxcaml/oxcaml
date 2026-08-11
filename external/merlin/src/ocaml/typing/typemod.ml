@@ -2781,7 +2781,8 @@ exception Not_a_path
 let rec path_of_module mexp =
   match mexp.mod_desc with
   | Tmod_ident (p,_) -> p
-  | Tmod_apply(funct, arg, _coercion, _) when !Clflags.applicative_functors ->
+  | Tmod_apply (funct, arg, _coercion, _, _)
+    when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
       path_of_module mexp
@@ -3278,14 +3279,25 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
+      let staticity = Value.proj_monadic Staticity closed_over_mode in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
+          Staticity.submode_err (smod.pmod_loc, Functor)
+            (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
+               Dynamic)
+            staticity;
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
           let tmode = Typemode.transl_alloc_mode smode in
           let mode = Alloc.of_const tmode.mode_modes in
+          let param_st =
+            Staticity.apply_hint (Parameter_to_functor param.loc)
+              (Alloc.proj_monadic Staticity mode)
+          in
+          (* See Note [Staticity of functors] in [typedtree.mli] *)
+          Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
@@ -3329,7 +3341,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
          Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
        | _ -> ());
-      { mod_desc = Tmod_functor(t_arg, body);
+      { mod_desc =
+          Tmod_functor (t_arg, body, Staticity.disallow_left staticity);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
         mod_mode = Value.disallow_right closed_over_mode, None;
         mod_env = env;
@@ -3691,13 +3704,30 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
+      let mode_funct = mode_without_locks_exn funct.mod_mode in
+      let funct_staticity = Value.proj_monadic Staticity mode_funct in
+      (* The following [submode] recovers the functor's original staticity [m].
+         See Note [Staticity of functors] in [typedtree.mli] *)
+      let staticity =
+        Staticity.apply_hint (Parameter_to_functor Location.none)
+          (Value.proj_monadic Staticity mm_param)
+      in
+      Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
+      let mm_res =
+        Value.join
+          [ Value.disallow_right mm_res;
+            Value.min_with_monadic Staticity
+              (Staticity.apply_hint (Functor_to_application funct.mod_loc)
+                 funct_staticity) ]
+      in
       { mod_desc =
           Tmod_apply
             (funct, arg, coercion,
              functor_application_yielding ~funct
-               ~arg_mode:(fst arg.mod_mode));
+               ~arg_mode:(fst arg.mod_mode),
+             Staticity.disallow_left staticity);
         mod_type = mty_appl;
-        mod_mode = Value.disallow_right mm_res, None;
+        mod_mode = mm_res, None;
         mod_env = env;
         mod_attributes = app_attributes;
         mod_loc = app_loc },
@@ -4355,25 +4385,29 @@ and normalize_signature_item = function
 
 let type_module_type_of env smod =
   let remove_aliases = has_remove_aliases_attribute smod.pmod_attributes in
-  let tmty =
+  let tmty, skip_nongen_check =
     match smod.pmod_desc with
     | Pmod_ident lid -> (* turn off strengthening in this case *)
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
+        in
+        let skip_nongen_check =
+          List.for_all Ident.is_global (Path.heads path)
         in
           { mod_desc = Tmod_ident (path, lid);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
             mod_attributes = smod.pmod_attributes;
-            mod_loc = smod.pmod_loc }
+            mod_loc = smod.pmod_loc },
+          skip_nongen_check
     | _ ->
         let me, _shape = type_module env smod in
-        me
+        me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
-  check_nongen_modtype env smod.pmod_loc mty;
+  if not skip_nongen_check then check_nongen_modtype env smod.pmod_loc mty;
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty

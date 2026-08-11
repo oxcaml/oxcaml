@@ -1612,7 +1612,7 @@ let rec tree_of_modal_typexp mode modal ty =
             out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
-          (Env.enter_quotation !printing_env)
+          (Env.enter_quote !printing_env)
           (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
@@ -1982,7 +1982,21 @@ let tree_of_label l =
         let atomic =
           match atomic with
           | Atomic -> Atomic
+<<<<<<< Merlin:liam-synchronize-merlin
           | Nonatomic -> Nonatomic
+||||||| Compiler:d0ba5f3571676f89e2f535e9c3eb3a554c13f3aa
+        Internal_names.add p';
+        let tyl =
+          wrap_printing_env_unguarded
+            (Env.enter_quotation !printing_env)
+            (fun () -> tree_of_typlist mode tyl)
+=======
+        Internal_names.add p';
+        let tyl =
+          wrap_printing_env_unguarded
+            (Env.enter_quote !printing_env)
+            (fun () -> tree_of_typlist mode tyl)
+>>>>>>> Compiler:HEAD
         in
         let mut =
           let open Value.Comonadic in
