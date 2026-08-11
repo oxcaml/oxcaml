@@ -25,21 +25,6 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
-module Id_stamp_counters : sig
-  type t
-
-  (** Restore all stamp counters to the values they had when the file this came
-      from was serialised. This can only be called once, before any stamps have
-      been created, and will error otherwise. The affected stamp counters are
-      for value slots, function slots, variables, code IDs and continuations. *)
-  val restore_for_resume : t -> unit
-
-  (** Restore the stamp counters in preparation for merging the data of several
-      units, setting each counter to its maximum value across all of the units.
-      Like [restore_for_resume], can only be called once. *)
-  val restore_for_merge : t list -> unit
-end
-
 module Serialisable : sig
   type cmr_format = t
 
