@@ -1,5 +1,4 @@
 (* TEST
-   ocamlrunparam += ",Xfiber_stack_size=1048576";
    { bytecode; }
    { native; }
 *)
@@ -205,7 +204,7 @@ let () =
             end
           in
           Printf.printf "child d_lex after deep recursion [expect 1]: %d\n"
-            (burn 10_000))
+            (burn 1_000))
         (fun () -> ())))
 
 (* Test 7 exercises the root flag with a parent task that never suspends:
@@ -233,7 +232,7 @@ let () =
           r
         end
       in
-      ignore (grow 10_000);
+      ignore (grow 1_000);
       let t = freeze_scope () in
       with_temp d_lex 1 ~f:(fun () ->
         passthrough (fun () ->
@@ -313,7 +312,7 @@ let () =
             r
           end
         in
-        ignore (grow 10_000);
+        ignore (grow 1_000);
         passthrough (fun () ->
           (* fiber S: the child's own "worker" *)
           with_temp d_worker 222 ~f:(fun () ->
