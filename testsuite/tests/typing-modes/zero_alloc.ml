@@ -2809,3 +2809,106 @@ Error: The return value of a zero_alloc function is "alloc"
          because it is used inside the function at line 1, characters 35-58
          which is expected to be "noalloc_strict".
 |}]
+
+(** Test 10: Exceptions *)
+
+exception E10 of int * int
+type r10 = { x : int }
+[%%expect{|
+exception E10 of int * int
+type r10 = { x : int; }
+|}]
+
+(* Test 10.1: Allocation wrapped by [alloc_and_raise_] only forces the closure
+   that closes over the keyword to be [noalloc] rather than [alloc]. *)
+
+(* CR shsong: This test is expected to pass once we finish the impl.
+   But it should fail for now. *)
+let (f @ noalloc) (x : int) =
+  if x < 0 then alloc_and_raise_
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+Line 4, characters 10-22:
+4 |     raise (E10 (x, x))
+              ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-5, characters 18-9,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* The same allocations without [alloc_and_raise_] are rejected, and stay
+   rejected once the impl is finished. *)
+let (f @ noalloc) (x : int) =
+  if x < 0 then
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+Line 4, characters 10-22:
+4 |     raise (E10 (x, x))
+              ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-5, characters 18-9,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* [alloc_and_raise_] does not help a [noalloc_strict] function, which cannot
+   allocate at all. *)
+(* CR shsong: This test should keep failing once we finish the impl. *)
+let (f @ noalloc_strict) (x : int) =
+  if x < 0 then alloc_and_raise_
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+Line 4, characters 10-22:
+4 |     raise (E10 (x, x))
+              ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-5, characters 25-9,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 10.2: [noalloc] functions called within a [try ... with] block still
+   force the enclosing closure to be [alloc]. *)
+(* CR shsong: This test will fail on checking [g] once we finish.
+   But for now it should fail on checking [f]. *)
+let wrapper () =
+  let (f @ noalloc) (x : int) =
+    if x < 0 then alloc_and_raise_
+      let _ = { x } in
+      raise (E10 (x, x))
+    else ()
+  in
+  let (g @ noalloc) () =
+    try
+      f 0
+    with
+    | _ -> ()
+  in
+  ()
+[%%expect{|
+Line 5, characters 12-24:
+5 |       raise (E10 (x, x))
+                ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 2-6, characters 20-11,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 10.3: [alloc_and_raise_] can only wrap an expression that definitely
+   raises. *)
+(* CR shsong: This should fail once we finish our implementation. However, it
+   should pass for now. *)
+let f x = alloc_and_raise_
+  if x > 0 then raise (Failure "error")
+  else ()
+[%%expect{|
+val f : int -> unit = <fun>
+|}]
