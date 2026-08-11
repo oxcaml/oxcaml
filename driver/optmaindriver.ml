@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
+let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -178,7 +178,21 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm =
     end
     else if !reaper_solve then begin
       Compmisc.init_path ();
-      (* CR mvellacott: TODO: validation and implementation *)
+      (* CR mvellacott: change validation: should take .cmx files. *)
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let cmr_files = match
+        List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
+      with
+        | [], _ ->
+          Compenv.fatal "Must specify at least one .cmr file with -reaper-solve"
+        | cmr_files, [] -> cmr_files
+        | _, other_files ->
+          Printf.ksprintf Compenv.fatal
+            "Got unexpected files: [%s] (-reaper-solve expects .cmr files only)"
+            (String.concat ", " other_files)
+      in
+      let ltosol_file = Compenv.extract_output !output_name in
+      reaper_lto_solve ~cmr_files ~ltosol_file;
       Warnings.check_fatal ();
     end
     else if !shared then begin

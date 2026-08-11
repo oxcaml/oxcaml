@@ -36,4 +36,8 @@ val main
     keep_symbol_tables:bool ->
     cmr_filename:string ->
     Cmm.phrase list)
+  -> reaper_lto_solve:(
+    cmr_files:string list ->
+    ltosol_file:string ->
+    unit)
   -> int
