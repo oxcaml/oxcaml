@@ -393,6 +393,27 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   Profile.record_call "flambda2" run
 
 let reaper_lto_solve ~cmr_files ~ltosol_filename =
+  (* ID stamp counters are process-global monotonically increasing counters that
+     give us an easy way of creating fresh identifiers. These identifiers get
+     persisted across processes, and we need to prevent collisions when this
+     happens. We have two mechanisms:
+
+     (1) Identifiers are scoped to compilation units, as (CU, number) pairs.
+     This means it's fine for different processes to use the same numbers as
+     long as they're working on different CUs.
+
+     (2) Saving and restoring stamp counters. We have to ensure that when
+     multiple processes operate on the same CUs, these processes happen in
+     sequence, and counters increase monotonically along this sequence.
+
+     Here we're resuming from many processes that operated on different CUs, and
+     we're operating on all of those CUs, so we use mechanism 2. To make sure
+     counters are monotonically increasing, we take the maximum across all the
+     process we've resumed from.
+
+     After we're done, rebuild processes will be created to do more work on the
+     CUs we touched. To keep counters monotonically increasing, we need to save
+     them after our work so that the rebuild processes can restore them. *)
   let cmrs, counters =
     List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
   in
@@ -409,6 +430,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_filename =
      discarding it. *)
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
+  (* CR mvellacott: store the new stamp counters to the solution file. *)
   let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
     Flambda2_reaper.Reaper.Staged.solve combined_graph
   in
