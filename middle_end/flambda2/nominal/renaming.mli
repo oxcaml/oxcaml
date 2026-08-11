@@ -83,6 +83,8 @@ val add_fresh_code_id : t -> Code_id.t -> guaranteed_fresh:Code_id.t -> t
 
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
+val apply_code_id_or_name : t -> Code_id_or_name.t -> Code_id_or_name.t
+
 (* This is only used by the importing code. We don't permute constants. *)
 val apply_const : t -> Reg_width_const.t -> Reg_width_const.t
 

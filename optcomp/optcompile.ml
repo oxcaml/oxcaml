@@ -205,7 +205,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         info ~backend
     | Emit emit -> emit info (* Emit assembly directly from Linear IR *)
     | Reaper_rebuild { compile_from_reaped_flambda; cmr_file } ->
-      (* CR mvellacott: write the rebuilt unit's .cmx. *)
       compile_from_reaped_flambda ~keep_symbol_tables ~cmr_file info
     | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
@@ -339,15 +338,23 @@ let native unix
       Some
         (fun ~keep_symbol_tables ~cmr_file (info : Compile_common.info) ->
           let machine_width = Target_system.Machine_width.Sixty_four in
-          (* CR mvellacott: the required globals should be read from the .cmx
-             rather than assumed empty. *)
           Asmgen.compile_implementation_from_cmm unix
-            ~required_globals:Compilation_unit.Set.empty
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)
             ~ppf_dump:info.ppf_dump
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
-               ~cmr_filename:cmr_file))
+               ~cmr_filename:cmr_file);
+          (* Unlike [compile_implementation] we also create the .reaped.cmx file
+             here, using the old .cmx file and data accumulated in
+             [Compilenv].*)
+          let paused_unit_infos, (_ : Digest.t) =
+            Compilenv.read_unit_info
+              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
+          in
+          Compilenv.save_resumed_unit_info
+            (Unit_info.Artifact.filename
+               (Unit_info.artifact info.target ~extension:ext_flambda_obj))
+            ~paused:paused_unit_infos)
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 

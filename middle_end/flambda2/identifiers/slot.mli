@@ -41,6 +41,10 @@ module type S = sig
   val is_always_immediate : t -> bool
 
   val rename : t -> t
+
+  val export_stamp_counter : unit -> int
+
+  val restore_stamp_counter : int -> unit
 end
 
 module Make (_ : sig

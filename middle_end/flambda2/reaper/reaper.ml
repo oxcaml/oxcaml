@@ -26,6 +26,147 @@ module Staged = struct
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
+
+    let ids_for_export
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          kinds;
+          fixed_arity_continuations;
+          continuation_info;
+          code_deps;
+          all_sets_of_closures
+        } =
+      let ids = Rev_expr.ids_for_export toplevel_expr in
+      let ids =
+        Code_id.Map.fold
+          (fun code_id rev_code ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Rev_expr.ids_for_export_code rev_code))
+          code ids
+      in
+      let ids =
+        Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids
+      in
+      let ids =
+        Name.Map.fold
+          (fun name _kind ids -> Ids_for_export.add_name ids name)
+          kinds ids
+      in
+      let ids =
+        Continuation.Set.fold
+          (fun cont ids -> Ids_for_export.add_continuation ids cont)
+          fixed_arity_continuations ids
+      in
+      let ids =
+        Continuation.Map.fold
+          (fun cont info ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_continuation ids cont)
+              (Traverse_acc.ids_for_export_continuation_info info))
+          continuation_info ids
+      in
+      let ids =
+        Code_id.Map.fold
+          (fun code_id code_dep ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Traverse_acc.ids_for_export_code_dep code_dep))
+          code_deps ids
+      in
+      List.fold_left
+        (fun ids set_of_closures ->
+          Function_slot.Lmap.fold
+            (fun _function_slot (name, code_id) ids ->
+              let ids = Ids_for_export.add_name ids name in
+              match (code_id : _ Or_unknown.t) with
+              | Unknown -> ids
+              | Known code_id -> Ids_for_export.add_code_id ids code_id)
+            set_of_closures ids)
+        ids all_sets_of_closures
+
+    let apply_renaming
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          kinds;
+          fixed_arity_continuations;
+          continuation_info;
+          code_deps;
+          all_sets_of_closures
+        } renaming =
+      let toplevel_expr' = Rev_expr.apply_renaming toplevel_expr renaming in
+      let code' =
+        Code_id.Map.fold
+          (fun code_id rev_code code ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Rev_expr.apply_renaming_code rev_code renaming)
+              code)
+          code Code_id.Map.empty
+      in
+      let ordered_code_ids' =
+        Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+      in
+      let kinds' =
+        Name.Map.fold
+          (fun name kind kinds ->
+            Name.Map.add (Renaming.apply_name renaming name) kind kinds)
+          kinds Name.Map.empty
+      in
+      let fixed_arity_continuations' =
+        Continuation.Set.fold
+          (fun cont conts ->
+            Continuation.Set.add
+              (Renaming.apply_continuation renaming cont)
+              conts)
+          fixed_arity_continuations Continuation.Set.empty
+      in
+      let continuation_info' =
+        Continuation.Map.fold
+          (fun cont info map ->
+            Continuation.Map.add
+              (Renaming.apply_continuation renaming cont)
+              (Traverse_acc.apply_renaming_continuation_info info renaming)
+              map)
+          continuation_info Continuation.Map.empty
+      in
+      let code_deps' =
+        Code_id.Map.fold
+          (fun code_id code_dep map ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+              map)
+          code_deps Code_id.Map.empty
+      in
+      let all_sets_of_closures' =
+        List.map
+          (Function_slot.Lmap.map (fun (name, code_id) ->
+               ( Renaming.apply_name renaming name,
+                 Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
+          all_sets_of_closures
+      in
+      { toplevel_expr = toplevel_expr';
+        code = code';
+        ordered_code_ids = ordered_code_ids';
+        kinds = kinds';
+        fixed_arity_continuations = fixed_arity_continuations';
+        continuation_info = continuation_info';
+        code_deps = code_deps';
+        all_sets_of_closures = all_sets_of_closures'
+      }
+
+    let map_result_types t ~f =
+      (* [code] is the only part of the rebuild data holding Flambda types. *)
+      let map_rev_code (rev_code : Rev_expr.rev_code) =
+        { rev_code with
+          code_metadata =
+            Code_metadata.map_result_types rev_code.code_metadata ~f
+        }
+      in
+      { t with code = Code_id.Map.map map_rev_code t.code }
   end
 
   let traverse unit =

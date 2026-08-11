@@ -43,11 +43,14 @@ val compile_implementation :
   unit
 
 (** Compile an implementation from the Cmm phrases produced by the given
-    callback, e.g. when rebuilding a reaped compilation unit. *)
+    callback, e.g. when rebuilding a reaped compilation unit.
+
+    Unlike [compile_implementation], this doesn't add information about
+    dependencies to the [Compilenv] unit info, because it isn't available here.
+    Instead, [Compilenv.save_resumed_unit_info] gets this from the old .cmx. *)
 val compile_implementation_from_cmm :
   (module Compiler_owee.Unix_intf.S) ->
   ?toplevel:(string -> bool) ->
-  required_globals:Compilation_unit.Set.t ->
   sourcefile:string option ->
   prefixname:string ->
   ppf_dump:Format.formatter ->

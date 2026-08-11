@@ -92,6 +92,7 @@ type run_result =
     unit : Flambda_unit.t;
     all_code : Exported_code.t;
     exported_offsets : Exported_offsets.t;
+    used_value_slots : Flambda2_identifiers.Value_slot.Set.t;
     reachable_names : NO.t
   }
 
@@ -124,7 +125,7 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
       ~used_value_slots ~exported_offsets ~sections all_code
   in
   let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
-  { cmx; unit; all_code; exported_offsets; reachable_names }
+  { cmx; unit; all_code; exported_offsets; used_value_slots; reachable_names }
 
 type flambda_result =
   { flambda : Flambda_unit.t;
@@ -141,6 +142,23 @@ let register_compilation_unit_callback f =
 let invoke_compilation_unit_callbacks res =
   List.iter (( |> ) res) !compilation_unit_callbacks;
   compilation_unit_callbacks := []
+
+module Reaper_mode = struct
+  (* CR mvellacott: in the future it would be nice to allow running the Reaper
+     on the present unit and supporting LTO at the same time, but at the moment
+     it isn't safe to run the Reaper twice on the same code. *)
+  type t =
+    | Single_unit_run
+    | Lto_support
+    | Disabled
+
+  let of_flags () =
+    if Flambda_features.support_lto ()
+    then Lto_support
+    else if Flambda_features.enable_reaper ()
+    then Single_unit_run
+    else Disabled
+end
 
 let flambda_to_flambda0 : type m.
     ppf_dump:Format.formatter ->
@@ -202,24 +220,22 @@ let flambda_to_flambda0 : type m.
             all_code,
             slot_offsets,
             final_typing_env,
-            last_pass_name ) =
-        if Flambda_features.enable_reaper ()
-        then (
+            last_pass_name,
+            cmr_payload ) =
+        match Reaper_mode.of_flags () with
+        | Disabled ->
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name,
+            None )
+        | Single_unit_run ->
           let flambda, free_names, all_code, slot_offsets, final_typing_env =
-            (* CR mvellacott: make it more clear what we're profiling *)
             Profile.record_call ~accumulate:true "reaper" (fun () ->
-                if Flambda_features.support_lto ()
-                then (
-                  (* CR mvellacott: store these in the CMR *)
-                  let _deps, _traverse_rebuild =
-                    Flambda2_reaper.Reaper.Staged.traverse flambda
-                  in
-                  Flambda2_reaper.Cmr_format.save
-                    ~filename:(prefixname ^ ".cmr") "Hello, cmr!";
-                  flambda, free_names, all_code, slot_offsets, final_typing_env)
-                else
-                  Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader
-                    ~all_code ~final_typing_env flambda)
+                Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
+                  ~final_typing_env flambda)
           in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
@@ -231,14 +247,30 @@ let flambda_to_flambda0 : type m.
             all_code,
             slot_offsets,
             final_typing_env,
-            "reaper" ))
-        else
+            "reaper",
+            None )
+        | Lto_support ->
+          let deps, rebuild_data =
+            Flambda2_reaper.Reaper.Staged.traverse flambda
+          in
+          let cmr_payload =
+            Some
+              { Flambda2_reaper.Cmr_format.unit_metadata =
+                  Flambda_unit.metadata flambda;
+                final_typing_env;
+                all_code;
+                imported_offsets = Exported_offsets.imported_offsets ();
+                deps;
+                rebuild_data
+              }
+          in
           ( flambda,
             free_names,
             all_code,
             slot_offsets,
             final_typing_env,
-            last_pass_name )
+            last_pass_name,
+            cmr_payload )
       in
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
@@ -246,10 +278,20 @@ let flambda_to_flambda0 : type m.
       print_fexpr last_pass_name
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
-      let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
+      let { unit = flambda;
+            exported_offsets;
+            cmx;
+            all_code;
+            used_value_slots;
+            reachable_names
+          } =
         build_run_result flambda ~free_names ~final_typing_env ~sections
           ~all_code slot_offsets
       in
+      Option.iter
+        (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr")
+           ~used_value_slots)
+        cmr_payload;
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code
   in
@@ -334,23 +376,67 @@ let reset_symbol_tables () =
   Flambda2_identifiers.Continuation.reset ();
   Flambda2_identifiers.Int_ids.reset ()
 
+let flambda_result_to_cmm ~keep_symbol_tables
+    ({ flambda; all_code; offsets; reachable_names } : flambda_result) =
+  let cmm =
+    Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+  in
+  if not keep_symbol_tables then reset_symbol_tables ();
+  cmm
+
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
-    let { flambda; all_code; offsets; reachable_names } =
-      lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
-    in
-    let cmm =
-      Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
-    in
-    if not keep_symbol_tables then reset_symbol_tables ();
-    cmm
+    lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
+    |> flambda_result_to_cmm ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
-let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width:_
-    ~keep_symbol_tables:_ ~cmr_filename =
-  let cmr_data = Flambda2_reaper.Cmr_format.restore ~filename:cmr_filename in
-  Printf.eprintf "Loaded data from CMR file: %s\n" cmr_data;
-  (* CR mvellacott: implement! *)
-  Misc.fatal_error "reaped_flambda2_to_cmm unimplemented"
+let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
+    ~keep_symbol_tables ~cmr_filename =
+  let cmr_serialisable, id_stamp_counters =
+    Flambda2_reaper.Cmr_format.load cmr_filename
+  in
+  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_resume
+    id_stamp_counters;
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let { Flambda2_reaper.Cmr_format.unit_metadata;
+        final_typing_env;
+        all_code;
+        imported_offsets;
+        deps;
+        rebuild_data
+      } =
+    Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
+      ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
+      cmr_serialisable
+  in
+  (* Make the paused compilation's imported offsets available to
+     [Slot_offsets.finalize_offsets]. *)
+  Exported_offsets.import_offsets imported_offsets;
+  (* CR mvellacott: add profiling and debug printing code. *)
+  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
+  let flambda, free_names, all_code, slot_offsets, final_typing_env =
+    Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+      ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
+      ~all_code ~final_typing_env
+  in
+  let { unit = flambda;
+        exported_offsets = offsets;
+        cmx;
+        all_code;
+        used_value_slots = _;
+        reachable_names
+      } =
+    build_run_result flambda ~free_names
+      ~final_typing_env
+        (* Pass a mutable reference to the (currently empty) list of .cmx
+           sections so that [build_run_result] can append the sections that it
+           creates. *)
+      ~sections:(Compilenv.current_sections ())
+      ~all_code slot_offsets
+  in
+  Option.iter Compilenv.set_export_info cmx;
+  Compiler_hooks.execute Reaped_flambda2 flambda;
+  flambda_result_to_cmm ~keep_symbol_tables
+    { flambda; all_code; offsets; reachable_names }
