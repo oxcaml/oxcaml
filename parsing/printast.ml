@@ -519,6 +519,9 @@ and expression i ppf x =
   | Pexp_borrow e ->
       line i ppf "Pexp_borrow\n";
       expression i ppf e
+  | Pexp_alloc_and_raise e ->
+      line i ppf "Pexp_alloc_and_raise\n";
+      expression i ppf e
 
 and block_access i ppf = function
   | Baccess_field lid ->

@@ -179,6 +179,7 @@ type lock =
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
+  | Raise_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -3135,6 +3136,8 @@ let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
+let add_raise_lock env = add_lock Raise_lock env
+
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
@@ -3796,6 +3799,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
+      | Raise_lock -> vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
@@ -3852,7 +3856,7 @@ let walk_locks_for_allocation ~env pp =
             Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
           in
           (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
-      | Region_lock | Exclave_lock
+      | Region_lock | Exclave_lock | Raise_lock
       | Unboxed_lock -> acc
     ) [] locks
 
@@ -3885,6 +3889,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
+      | Raise_lock -> mode
       | Const_closure_lock (true, _, _) -> mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env

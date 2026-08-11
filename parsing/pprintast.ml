@@ -1199,6 +1199,8 @@ and expression ctxt f x =
     | Pexp_hole -> pp f "_"
     | Pexp_borrow e ->
         pp f "@[<hov2>borrow_@ %a@]" (expression2 reset_ctxt)  e
+    | Pexp_alloc_and_raise e ->
+        pp f "@[<2>alloc_and_raise_ %a@]" (expression ctxt) e
     | _ -> expression1 ctxt f x
 
 and expression1 ctxt f x =

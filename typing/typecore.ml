@@ -8517,6 +8517,13 @@ and type_expect_
       end;
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
+  | Pexp_alloc_and_raise e ->
+      let new_env = Env.add_raise_lock env in
+      let exp =
+        type_expect ~recarg new_env expected_mode e ty_expected_explained
+      in
+      let exp_extra = (Texp_alloc_and_raise, loc, []) :: exp.exp_extra in
+      {exp with exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
       type_comprehension_expr

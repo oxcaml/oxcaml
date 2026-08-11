@@ -1351,6 +1351,7 @@ module Ast = struct
     | Stack of expression
     | Borrow of expression
     | Exclave of expression
+    | Alloc_and_raise of expression
     | Unboxed_unit
     | Unboxed_bool of bool
     | Unboxed_tuple of (tuple_label * expression) list
@@ -1983,6 +1984,8 @@ module Ast = struct
       | Some exp -> pp fmt "in@;@[<2>%a@]@]" (print_exp env) exp
       | None -> pp fmt ".@]")
     | Exclave exp -> pp fmt "exclave_@ %a" (print_exp env) exp
+    | Alloc_and_raise exp ->
+      pp fmt "alloc_and_raise_@ %a" (print_exp env) exp
     | Construct (ident, exp_opt) -> (
       match exp_opt with
       | None -> print_constr env fmt ident
@@ -3032,6 +3035,10 @@ module Exp_desc = struct
   let exclave exp =
     let+ exp = exp in
     Ast.Exclave exp
+
+  let alloc_and_raise exp =
+    let+ exp = exp in
+    Ast.Alloc_and_raise exp
 
   let list_comprehension compr =
     let+ compr = compr in
