@@ -4,7 +4,7 @@ The OxCaml repo contains both the OxCaml compiler and Merlin. Merlin vendors the
 
 Here are the commands to know:
 
-* `external/merlin/scripts/import-ocaml-source.sh`. It merges the current state of the compiler into Merlin (leaving merge conflicts in) and then commits the changes and conflicts with the message `Automated commit: Import compiler changes from <rev> to <rev>`.
+* `external/merlin/scripts/import-ocaml-source.sh`. It merges the current state of the compiler into Merlin (leaving merge conflicts in) and then commits the changes and conflicts with the message `Automated commit: Import compiler changes from <rev>.
 * `make merlin-test` will build Merlin and test it.
 * `make merlin-promote` will build Merlin, test it, and promote failing tests.
 * `make merlin-build` will build Merlin without testing it. `make merlin-test` first does `make install` because the testsuite requires a compiler install, so `make merlin-build` can be significantly faster.
