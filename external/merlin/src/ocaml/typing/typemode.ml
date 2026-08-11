@@ -752,3 +752,19 @@ let () =
   Location.register_error_of_exn (function
     | Error (loc, err) -> Some (Location.error_of_printer ~loc report_error err)
     | _ -> None)
+
+(* Merlin-only: This is used by syntax_doc.ml. *)
+
+module Modifier_axis_pair = struct
+  type t = P : 'a Jkind_axis.Axis.t * 'a -> t
+
+  let of_string s =
+    match Modality_axis_pair.of_string s with
+    | Atom (Monadic axis, modality) ->
+      P (Modal (Monadic axis), Modality modality)
+    | Atom (Comonadic axis, modality) ->
+      P (Modal (Comonadic axis), Modality modality)
+    | exception Not_found ->
+      let P (axis, value) = Nonmodal_axis_pair.of_string s in
+      P (Nonmodal axis, value)
+end
