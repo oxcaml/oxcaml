@@ -17,24 +17,24 @@ Send functions:
 Force link: no
 Static data:
   [
-    (closure ⟨env⟩ layout_2 ->
+    (closure ⟨env⟩ layout_3 ->
       { c = (missing)
       ; r =
         ⟪(function {nlocal = 1} closure/333[L]
-           (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))⟫ });
-    (closure ⟨env⟩ layout_11 layout_12 ->
+           (function {nlocal = 0} x/318[$layout_3] : $layout_3 x/318))⟫ });
+    (closure ⟨env⟩ layout_5 layout_6 ->
       { c = (missing)
       ; r =
         ⟪(function {nlocal = 1} closure/334[L]
-           (function {nlocal = 0} x/321[$layout_11] y/322[$layout_12]
-             : #($layout_11, $layout_12)
-             (make_unboxed_product #($layout_11, $layout_12) x/321 y/322)))⟫ });
+           (function {nlocal = 0} x/321[$layout_5] y/322[$layout_6]
+             : #($layout_5, $layout_6)
+             (make_unboxed_product #($layout_5, $layout_6) x/321 y/322)))⟫ });
     [ (missing); ];
-    (closure ⟨env⟩ layout_16 ->
+    (closure ⟨env⟩ layout_18 ->
       { c = (missing)
       ; r =
         ⟪(function {nlocal = 1} closure/335[L]
            (let (calls/332 =a (mixedfield 0  (*) closure/335))
-             (function {nlocal = 0} x/326[$layout_16] : $layout_16
+             (function {nlocal = 0} x/326[$layout_18] : $layout_18
                (seq (+:=1 calls/332) x/326))))⟫ });
     ]

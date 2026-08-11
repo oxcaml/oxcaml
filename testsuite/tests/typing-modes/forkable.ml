@@ -23,7 +23,8 @@ let with_unforkable : ((string -> unit) @ local unforkable -> 'a) -> 'a =
 
 [%%expect{|
 val storage : string ref = {contents = ""}
-val with_unforkable : ((string -> unit) @ local -> 'a) -> 'a = <fun>
+val with_unforkable : ('a : any). ((string -> unit) @ local -> 'a) -> 'a =
+  <fun>
 |}]
 
 let () = with_unforkable (fun k -> k "Hello, world!")
@@ -112,8 +113,8 @@ type 'a t9 = Mk9 of 'a @@ unyielding
 type 'a t10 = Mk10 of 'a
 type 'a t11 = Mk11 of 'a @@ forkable
 type 'a t12 = Mk12 of 'a
-val with_global_unforkable : ((string -> unit) @ unforkable -> 'a) -> 'a =
-  <fun>
+val with_global_unforkable :
+  ('a : any). ((string -> unit) @ unforkable -> 'a) -> 'a = <fun>
 |}]
 
 (* [global] modality implies [forkable]. *)

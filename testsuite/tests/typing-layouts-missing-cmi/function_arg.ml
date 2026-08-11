@@ -64,16 +64,7 @@ Error: Function arguments and returns must be representable.
 let f3 : Function_b.return_t = fun () -> assert false
 
 [%%expect{|
-Line 1, characters 31-53:
-1 | let f3 : Function_b.return_t = fun () -> assert false
-                                   ^^^^^^^^^^^^^^^^^^^^^^
-Error: Function arguments and returns must be representable.
-       The layout of Function_a.t is any
-         because the .cmi file for Function_a.t is missing.
-       But the layout of Function_a.t must be representable
-         because we must know concretely how to return a function result.
-       No .cmi file found containing Function_a.t.
-       Hint: Adding "function_a" to your dependencies might help.
+val f3 : Function_b.return_t = <fun>
 |}]
 
 let f4 (_ : Function_b.take_t) = ()

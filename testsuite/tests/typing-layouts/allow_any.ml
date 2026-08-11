@@ -560,7 +560,7 @@ val f : ('a M1.t, 'a M2.t) eq -> unit = <fun>
 
 let f (eq : ('a M1.t, 'a M3.t) eq) = match eq with _ -> .
 [%%expect{|
-val f : ('a M1.t, 'a M3.t) eq -> 'b = <fun>
+val f : 'a ('b : any). ('a M1.t, 'a M3.t) eq -> 'b = <fun>
 |}]
 
 let f (type a) (eq : (a M4.t, a M5.t) eq) = match eq with Refl -> ()
@@ -570,7 +570,7 @@ val f : ('a M4.t, 'a M5.t) eq -> unit = <fun>
 
 let f (type a) (eq : (a M4.t, a M6.t) eq) = match eq with _ -> .
 [%%expect{|
-val f : ('a M4.t, 'a M6.t) eq -> 'b = <fun>
+val f : 'a ('b : any). ('a M4.t, 'a M6.t) eq -> 'b = <fun>
 |}]
 
 let f (type a b) (eq : ((a, b) M7.t, (a, b) M8.t) eq) = match eq with Refl -> ()

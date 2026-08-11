@@ -1017,7 +1017,8 @@ val get : 'a t -> 'a @ portable = <fun>
 
 let default : 'a @ contended -> ('a @ immutable -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val default : 'a @ contended -> ('a @ immutable -> 'b) -> 'b = <fun>
+val default : 'a ('b : any). 'a @ contended -> ('a @ immutable -> 'b) -> 'b =
+  <fun>
 |}]
 
 let override : 'a @ contended -> ('a @ immutable uncontended -> 'b) -> 'b = fun x f -> f x
@@ -1049,7 +1050,7 @@ Error: This value is "contended"
 
 let default : 'a @ shared -> ('a @ read -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val default : 'a @ shared -> ('a @ read -> 'b) -> 'b = <fun>
+val default : 'a ('b : any). 'a @ shared -> ('a @ read -> 'b) -> 'b = <fun>
 |}]
 
 let default : 'a @ contended -> ('a @ read -> 'b) -> 'b = fun x f -> f x
@@ -1070,14 +1071,16 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = <fun>
+val override :
+  'a ('b : any). 'a @ contended -> ('a @ read contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [write] => [corrupted] *)
 
 let default : 'a @ corrupted -> ('a @ write -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val default : 'a @ corrupted -> ('a @ write -> 'b) -> 'b = <fun>
+val default : 'a ('b : any). 'a @ corrupted -> ('a @ write -> 'b) -> 'b =
+  <fun>
 |}]
 
 let default : 'a @ contended -> ('a @ write -> 'b) -> 'b = fun x f -> f x
@@ -1099,7 +1102,8 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = <fun>
+val override :
+  'a ('b : any). 'a @ contended -> ('a @ write contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [read_write] doesn't change the default. *)
@@ -1138,12 +1142,14 @@ Error: This value is "shared" but is expected to be "uncontended".
 
 let succeeds : 'a @ contended -> ('a @ read_write contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val succeeds : 'a @ contended -> ('a @ contended -> 'b) -> 'b = <fun>
+val succeeds : 'a ('b : any). 'a @ contended -> ('a @ contended -> 'b) -> 'b =
+  <fun>
 |}]
 
 let succeeds : 'a @ shared -> ('a @ read_write shared -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val succeeds : 'a @ shared -> ('a @ shared -> 'b) -> 'b = <fun>
+val succeeds : 'a ('b : any). 'a @ shared -> ('a @ shared -> 'b) -> 'b =
+  <fun>
 |}]
 
 (* Modalities. *)
