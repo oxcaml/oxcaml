@@ -674,3 +674,155 @@ Error: The value "Int32.add" is "alloc"
          because it is used inside the function at lines 2-5, characters 40-6
          which is expected to be "noalloc_strict".
 |}]
+
+(* ==================================================================== *)
+(* Part 10: results at [Prim_local] and [Prim_poly]                     *)
+(* ==================================================================== *)
+
+(* The mode on a primitive's result says where the result lives, not where the
+   primitive allocates. For a C external the two are unrelated: [[@@noalloc]]
+   is the only evidence about the callee. Without it a [local_] result is
+   still assumed to allocate on the heap, and the back end -- the ground
+   truth -- agrees. *)
+module Test = struct
+  external getenv_local : string -> local_ string = "caml_sys_getenv"
+  let (c_local_alloc @ noalloc_strict) (s : string) =
+    let local_ x = getenv_local s in
+    String.length x
+end
+[%%expect{|
+Line 4, characters 19-31:
+4 |     let local_ x = getenv_local s in
+                       ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 3-5, characters 39-19,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+module Test = struct
+  external getenv_local : string -> local_ string = "caml_sys_getenv"
+  let[@zero_alloc strict] c_local_alloc (s : string) =
+    let local_ x = getenv_local s in
+    String.length x
+end
+[%%expect{|
+Line 3, characters 7-17:
+3 |   let[@zero_alloc strict] c_local_alloc (s : string) =
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc strict failed on function TOP44.Test.c_local_alloc (camlTOP44__c_local_alloc_126_123_code).
+Line 4, characters 8-33:
+4 |     let local_ x = getenv_local s in
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (external call to caml_sys_getenv)
+|}]
+
+(* The same external with [[@@noalloc]] genuinely does not allocate. *)
+module Test = struct
+  external getenv_noalloc : string -> local_ string = "caml_sys_getenv"
+    [@@noalloc]
+  let[@zero_alloc strict] (c_local_noalloc @ noalloc_strict) (s : string) =
+    let local_ x = getenv_noalloc s in
+    String.length x
+end
+[%%expect{|
+module Test :
+  sig
+    external getenv_noalloc : string -> string @ local = "caml_sys_getenv"
+      [@@noalloc]
+    val c_local_noalloc : string -> int @@ noalloc_strict
+      [@@zero_alloc strict]
+  end
+|}]
+
+(* A [Prim_poly] result behaves the same way: no external call allocates
+   locally. *)
+module Test = struct
+  external getenv_poly : (string[@local_opt]) -> (string[@local_opt])
+    = "caml_sys_getenv"
+  let (c_poly_alloc @ noalloc_strict) (s : string) =
+    let local_ x = getenv_poly s in
+    String.length x
+end
+[%%expect{|
+Line 5, characters 19-30:
+5 |     let local_ x = getenv_poly s in
+                       ^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 4-6, characters 38-19,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* A [%]-primitive is judged by the [Lambda.primitive] it compiles to, not by
+   its declared result mode either: [%obj_dup] boxes on the heap however the
+   result is declared. Contrast [%makemutable] in [typing-modes/zero_alloc.ml],
+   whose block really is built at the result's locality. *)
+module Test = struct
+  external dup_local : 'a -> local_ 'a = "%obj_dup"
+  let (prim_local_heap @ noalloc_strict) (s : string) =
+    let local_ x = dup_local s in
+    String.length x
+end
+[%%expect{|
+Line 4, characters 19-28:
+4 |     let local_ x = dup_local s in
+                       ^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 3-5, characters 41-19,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+module Test = struct
+  external dup_local : 'a -> local_ 'a = "%obj_dup"
+  let[@zero_alloc strict] prim_local_heap (s : string) =
+    let local_ x = dup_local s in
+    String.length x
+end
+[%%expect{|
+Line 3, characters 7-17:
+3 |   let[@zero_alloc strict] prim_local_heap (s : string) =
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc strict failed on function TOP48.Test.prim_local_heap (camlTOP48__prim_local_heap_130_127_code).
+Line 4, characters 8-30:
+4 |     let local_ x = dup_local s in
+            ^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (external call to caml_obj_dup)
+|}]
+
+(* [[@@noalloc]] on a [%]-primitive is inert -- it never reaches the generated
+   code -- so it does not buy the declaration anything here. *)
+module Test = struct
+  external dup_local : 'a -> local_ 'a = "%obj_dup" [@@noalloc]
+  let (prim_local_heap_noalloc @ noalloc_strict) (s : string) =
+    let local_ x = dup_local s in
+    String.length x
+end
+[%%expect{|
+Line 4, characters 19-28:
+4 |     let local_ x = dup_local s in
+                       ^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 3-5, characters 49-19,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* [Bigarray.Array1.get] is [Prim_poly] in the stdlib, but the box that
+   [Pbigarrayref] builds is always on the heap. *)
+module Test = struct
+  let (ba_get @ noalloc_strict)
+      (a : (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array1.t) =
+    let local_ x = Bigarray.Array1.get a 0 in
+    Int32.to_int x
+end
+[%%expect{|
+Line 4, characters 19-38:
+4 |     let local_ x = Bigarray.Array1.get a 0 in
+                       ^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 3-5, characters 6-18,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]

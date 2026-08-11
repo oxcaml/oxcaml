@@ -1477,21 +1477,14 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
-(* [Prim_local] result: [%makemutable] allocates on the stack, which does not
-   count on the allocation axis. The rejection below is the ordinary
-   regionality error for returning a local value -- it has nothing to do with
-   [noalloc], and happens without the annotation too. *)
+(* [Prim_local] result: [%makemutable] compiles to [Pmakeblock] at the result's
+   locality, so a local result really is a stack allocation, which does not
+   count on the allocation axis. *)
 external mk_local : 'a -> local_ 'a ref = "%makemutable"
-let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
+let (prim_local_result @ noalloc_strict) (x : int) = exclave_ mk_local x
 [%%expect{|
 external mk_local : 'a -> 'a ref @ local = "%makemutable"
-Line 2, characters 53-63:
-2 | let (prim_local_result @ noalloc_strict) (x : int) = mk_local x
-                                                         ^^^^^^^^^^
-Error: This value is "local"
-       but is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val prim_local_result : int -> int ref @ local = <fun>
 |}]
 
 (* [my_id] (a fully-applied [%identity]) does not force the enclosing function
