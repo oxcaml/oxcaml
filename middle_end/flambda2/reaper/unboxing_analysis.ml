@@ -680,8 +680,8 @@ let perform_analysis db ~stats =
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
                   ~mk:(fun kind name ->
-                    Variable.create_in_compilation_unit name kind
-                      compilation_unit)
+                    Variable.create_in_compilation_unit ~compilation_unit name
+                      kind)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots

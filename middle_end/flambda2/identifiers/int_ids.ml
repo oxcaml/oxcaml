@@ -482,7 +482,7 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create_in_compilation_unit ?user_visible name kind compilation_unit =
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
@@ -499,8 +499,9 @@ module Variable = struct
     Table.add !grand_table_of_variables data
 
   let create ?user_visible name kind =
-    create_in_compilation_unit ?user_visible name kind
-      (Compilation_unit.get_current_exn ())
+    create_in_compilation_unit
+      ~compilation_unit:(Compilation_unit.get_current_exn ())
+      ?user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
