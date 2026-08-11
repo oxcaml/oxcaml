@@ -169,6 +169,9 @@ val linear_magic_number: string
 val cfg_magic_number: string
 (** Magic number for Cfg internal representation files *)
 
+val ltosol_magic_number: string
+(** Magic number for reaper whole-program solution files *)
+
 val max_tag: int
 (** Biggest tag that can be stored in the header of a regular block. *)
 
