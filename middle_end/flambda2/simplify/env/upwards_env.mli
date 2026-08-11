@@ -29,10 +29,15 @@ val machine_width : t -> Target_system.Machine_width.t
 val print : Format.formatter -> t -> unit
 
 val add_non_inlinable_continuation :
+  Are_rebuilding_terms.t ->
   t ->
   Continuation.t ->
   params:Bound_parameters.t ->
-  handler:Rebuilt_expr.t Or_unknown.t ->
+  handler:
+    (Rebuilt_expr.t
+    * is_exn_handler:bool
+    * free_names_without_params:Name_occurrences.t)
+    Or_unknown.t ->
   t
 
 val add_invalid_continuation :
@@ -64,6 +69,15 @@ val mem_continuation : t -> Continuation.t -> bool
 
 val find_continuation_shortcut :
   t -> Continuation.t -> Continuation_shortcut.t option
+
+val find_unique_continuation_handler :
+  Are_rebuilding_terms.t ->
+  t ->
+  params:Bound_parameters.t ->
+  handler:Rebuilt_expr.t ->
+  is_exn_handler:bool ->
+  free_names_without_params:Name_occurrences.t ->
+  Continuation.t option
 
 val add_apply_cont_rewrite : t -> Continuation.t -> Apply_cont_rewrite.t -> t
 
