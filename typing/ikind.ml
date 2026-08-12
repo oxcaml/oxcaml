@@ -755,11 +755,6 @@ type provenance_residual =
     axes : Jkind_axis.Axis.packed list
   }
 
-let provenance_ty_of_name (name : Ldd.Name.t) =
-  match name with
-  | Provenance { ty; phrase; _ } -> Some (ty, phrase)
-  | Atom _ | KAtom _ | Param _ | Unknown _ -> None
-
 let add_provenance_residual entries ({ ty; phrase; mode_bounds; axes } as entry)
     =
   (* Deduplicate identical entries (e.g. two fields of type [int ref] under
@@ -812,12 +807,12 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
   else
     List.combine provenance_names coeffs
     |> List.filter_map (fun (name, coeff) ->
-        if is_bot_poly coeff
-        then None
-        else
-          match provenance_ty_of_name name with
-          | None -> None
-          | Some (ty, phrase) -> (
+        match (name : Ldd.Name.t) with
+        | Atom _ | KAtom _ | Param _ | Unknown _ -> None
+        | Provenance { ty; phrase; _ } ->
+          if is_bot_poly coeff
+          then None
+          else
             let mode_bounds = Ldd.imply coeff super_poly |> Ldd.round_down in
             let non_top_bounds =
               Axis_lattice.co_sub Axis_lattice.top mode_bounds
@@ -835,7 +830,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
                  axes left to report. *)
               match axes with
               | [] -> None
-              | _ :: _ -> Some { ty; phrase; mode_bounds; axes }))
+              | _ :: _ -> Some { ty; phrase; mode_bounds; axes })
     |> List.fold_left add_provenance_residual []
     |> Option.some
 
