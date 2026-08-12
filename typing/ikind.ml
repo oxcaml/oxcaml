@@ -941,25 +941,30 @@ let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
     Jkind.Sub_failure_reason.t list =
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
-let label_mutability_contribution (lbl : Types.label_declaration) =
+let label_mutability_contribution (ctx : Solver.ctx)
+    (lbl : Types.label_declaration) =
   match lbl.ld_mutable with
   (* [immediate] is below every base this is summed into, so omitting it keeps
      immutable fields out of the untracked part of a provenance residual. *)
   | Immutable -> Ldd.bot
-  | Mutable { atomic = Atomic; _ } -> Ldd.const Axis_lattice.sync_data
-  | Mutable { atomic = Nonatomic; _ } -> Ldd.const Axis_lattice.mutable_data
+  | Mutable { atomic = Atomic; _ } ->
+    Solver.with_provenance_text ctx
+      (fun () -> "atomic mutable fields")
+      (Ldd.const Axis_lattice.sync_data)
+  | Mutable { atomic = Nonatomic; _ } ->
+    Solver.with_provenance_text ctx
+      (fun () -> "mutable fields")
+      (Ldd.const Axis_lattice.mutable_data)
 
-let sum_record_label_contributions ~(base : Ldd.node)
+let sum_record_label_contributions ~(ctx : Solver.ctx) ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
-    ?(label_mutability_provenance =
-      fun (_ : Types.label_declaration) (poly : Ldd.node) -> poly)
     ~(validate_label : Types.label_declaration -> unit)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
       validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_provenance lbl (label_mutability_contribution lbl))
+        (label_mutability_contribution ctx lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
 
 let no_validation (_ : Types.label_declaration) = ()
@@ -969,15 +974,6 @@ let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
   | Immutable -> ()
   | Mutable _ ->
     failwith "ikind: mutable fields in unboxed records are not supported"
-
-let label_mutability_provenance (ctx : Solver.ctx)
-    (lbl : Types.label_declaration) (poly : Ldd.node) : Ldd.node =
-  match lbl.ld_mutable with
-  | Immutable -> poly
-  | Mutable { atomic = Nonatomic; _ } ->
-    Solver.with_provenance_text ctx (fun () -> "mutable fields") poly
-  | Mutable { atomic = Atomic; _ } ->
-    Solver.with_provenance_text ctx (fun () -> "atomic mutable fields") poly
 
 let decl_base_provenance (ctx : Solver.ctx) source poly =
   Solver.with_provenance_text ctx (fun () -> source) poly
@@ -1135,18 +1131,16 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
         in
         Ldd.const base_lat |> decl_base_provenance ctx source
       in
-      sum_record_label_contributions ~base
+      sum_record_label_contributions ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~label_mutability_provenance:(label_mutability_provenance ctx)
         ~validate_label:no_validation lbls
     | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
       let base =
         Ldd.const Axis_lattice.immediate
         |> decl_base_provenance ctx "unboxed records"
       in
-      sum_record_label_contributions ~base
+      sum_record_label_contributions ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~label_mutability_provenance:(label_mutability_provenance ctx)
         ~validate_label:validate_immutable_unboxed_label lbls
     | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
       (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
@@ -1201,8 +1195,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
               let mask = Axis_lattice.mask_of_modality arg.ca_modalities in
               Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
         | Types.Cstr_record lbls ->
-          sum_record_label_contributions ~base:Ldd.bot ~payload_kind
-            ~label_mutability_provenance:(label_mutability_provenance ctx)
+          sum_record_label_contributions ~ctx ~base:Ldd.bot ~payload_kind
             ~validate_label:no_validation lbls
       in
       Ldd.sum cstrs ~base ~f:constructor_contrib)
