@@ -364,6 +364,9 @@ type ('a : any) t = { a : 'a; mutable f: int [@atomic]}
 type ('a : any) t = { a : 'a; mutable f : int [@atomic]; }
 |}];;
 
+(* Check that atomic field operations work for record representations which are
+   undetermined at the time of typechecking the expression *)
+
 let undetermined_project t = t.f
 [%%expect{|
 (let
