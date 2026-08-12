@@ -130,7 +130,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     then Afl_instrument.instrument_initialiser body (fun () -> dbg)
     else body
   in
-  let entry_name = Cmm_helpers.make_symbol "entry" in
+  let entry_name = Cmm_helpers.entry_symbol_name () in
   let res, entry_sym = R.raw_symbol res ~global:Global entry_name in
   let entry =
     let fun_codegen =

@@ -672,3 +672,64 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
+
+(* Unboxed GADT: the existential component's immediacy is only visible in the
+   declared [immediate & immediate] field shape *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type t : immediate & immediate = T : #('a t' * 'a) -> t [@@unboxed]
+    type holder = { mutable t : t }
+  end in
+  let r = { t = T #(Int, 1) } in
+  test ~expect_caml_modifies:0
+    (fun () -> r.t <- T #(Unit, ()); ignore (Sys.opaque_identity r));
+  let[@inline never] set r v = r.t <- v in
+  test ~expect_caml_modifies:0
+    (fun () -> set r (T #(Int, 2)); ignore (Sys.opaque_identity r))
+
+(* Same shape but with a genuinely pointer-carrying component *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type p : immediate & value = P : #('a t' * string) -> p [@@unboxed]
+    type holder = { mutable p : p }
+  end in
+  let r = { p = P #(Int, "a") } in
+  test ~expect_caml_modifies:1
+    (fun () -> r.p <- P #(Unit, "b"); ignore (Sys.opaque_identity r))
+
+(* Polymorphic write where ['a]'s kind at the use site is more precise than
+   the declared [value] parameter: only the string word needs the barrier *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+  end in
+  let[@inline never] set : ('a : immediate). 'a t -> #(string * 'a) -> unit =
+    fun t v -> t.x <- v
+  in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, via a polymorphic record field *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type setter = { apply : ('b : immediate). 'b t -> #(string * 'b) -> unit }
+  end in
+  let s = Sys.opaque_identity { apply = fun t v -> t.x <- v } in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> s.apply t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, where the parameter is instantiated to an unboxed existential *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type u = U : ('a : immediate). 'a -> u [@@unboxed]
+  end in
+  let[@inline never] set (t : u t) v = t.x <- v in
+  let t = { x = #("s", U 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))

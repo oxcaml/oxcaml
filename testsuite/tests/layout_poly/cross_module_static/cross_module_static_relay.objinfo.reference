@@ -1,0 +1,43 @@
+File cross_module_static_relay.cmx
+Name: Cross_module_static_relay
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Cross_module_static_relay
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Cross_module_static_relay
+	00000000000000000000000000000000	Cross_module_static_lib
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+	00000000000000000000000000000000	Cross_module_static_lib
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Static data:
+  [
+    (closure ⟨env⟩ layout_6 ->
+      (let (#body/3 =
+         { c = (missing)
+         ; r =
+           ⟪(function {nlocal = 0} x/318[$layout_6] : $layout_6
+              $(let (#body/2 =
+                  { c = (missing)
+                  ; r =
+                    ⟪(applytail
+                       $(let (#app/1 =
+                           ((global Cross_module_static_lib).0
+                              ⟪layout $layout_6⟫))
+                          { c = #app/1.c
+                          ; r =
+                            ⟪(apply[L] $#app/1
+                               (field_imm 0
+                                 (global static Cross_module_static_lib!)))⟫ })
+                       x/318)⟫ })
+                 { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ })
+        { c = #body/3.c
+        ; r = ⟪(function {nlocal = 1} closure/325[L] $#body/3)⟫ }));
+    ]
