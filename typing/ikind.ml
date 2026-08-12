@@ -1487,14 +1487,14 @@ let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
     then Error provenance_error
     else fallback actual_error
 
-let sub_jkind_l ?allow_any_crossing ?origin
+let sub_jkind_l ?(allow_any_crossing = false) ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, subjkind_error) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
-    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
+    Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub super
     |> map_jkind_error
   else
     (* Check layouts first; if that fails, print both sides with full
@@ -1502,10 +1502,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     let* () =
       Jkind.sub_layout_or_error ~context env sub super |> map_jkind_error
     in
-    let allow_any =
-      match allow_any_crossing with Some true -> true | _ -> false
-    in
-    if allow_any
+    if allow_any_crossing
     then (
       (if !Clflags.ikinds_debug
        then
@@ -1526,27 +1523,24 @@ let sub_jkind_l ?allow_any_crossing ?origin
         then Error ikind_error
         else
           match
-            Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub
+            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub
               super
           with
           | Ok () -> Error ikind_error
           | Error jkind_error -> Error (Jkind_error jkind_error))
 
-let check_bound ?allow_any_crossing ?origin ~type_equal ~context env ~actual
-    ~bound ~provenance_lhs =
+let check_bound ?(allow_any_crossing = false) ?origin ~type_equal ~context env
+    ~actual ~bound ~provenance_lhs =
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
-    sub_jkind_l ?allow_any_crossing ?origin ~type_equal ~context env actual
+    sub_jkind_l ~allow_any_crossing ?origin ~type_equal ~context env actual
       bound
   else
     let open Misc.Stdlib.Monad.Result.Syntax in
     let* () =
       Jkind.sub_layout_or_error ~context env actual bound |> map_jkind_error
     in
-    let allow_any =
-      match allow_any_crossing with Some true -> true | _ -> false
-    in
-    if allow_any
+    if allow_any_crossing
     then Ok ()
     else
       let actual_polys = compute_subcheck_polys ~context env actual bound in
@@ -1558,7 +1552,7 @@ let check_bound ?allow_any_crossing ?origin ~type_equal ~context env ~actual
       | Error actual_error ->
         let fallback_error () =
           match
-            Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env
+            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env
               actual bound
           with
           | Ok () ->
