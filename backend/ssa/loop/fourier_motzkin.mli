@@ -5,6 +5,13 @@
     assigns to the values it does not decompose; this module is purely
     arithmetic and knows nothing about where they come from. *)
 
+(** Raised by the [_checked] operations below when a coefficient or constant
+    would overflow the OCaml [int] range. A silently-wrapped coefficient could
+    fabricate a spurious fact or entailment, so callers constructing facts must
+    use the checked operations and treat [Overflow] conservatively (drop the
+    fact, or atomize the value). *)
+exception Overflow
+
 module Affine : sig
   (** [terms] maps each atom to a non-zero coefficient; [const] is the constant
       term. The value denotes the assertion [const + sum coeff*atom >= 0]. *)
@@ -21,6 +28,9 @@ module Affine : sig
 
   val is_const : t -> bool
 
+  (** Structural equality (same constant, same term list). *)
+  val equal : t -> t -> bool
+
   (** The coefficient of atom [id] in [t] (0 if absent). *)
   val coeff : int -> t -> int
 
@@ -34,6 +44,14 @@ module Affine : sig
   val neg : t -> t
 
   val sub : t -> t -> t
+
+  (** [add] / [scale] / [add_const] with overflow detection: raise {!Overflow}
+      instead of silently wrapping. *)
+  val add_checked : t -> t -> t
+
+  val scale_checked : int -> t -> t
+
+  val add_const_checked : t -> int -> t
 end
 
 (** [feasible ineqs] is [true] iff the conjunction [{ f >= 0 | f in ineqs }] is

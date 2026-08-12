@@ -145,6 +145,13 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
+(* The byte displacement of a single-register base-plus-displacement
+   addressing mode; [None] for any other shape. Used by the SSA loop-fusion
+   pass to check which field of a block a load/store touches. *)
+let single_base_addressing_offset = function
+  | Iindexed v -> Some (Validated_mem_offset.offset v)
+  | Ibased _ -> None
+
 let addressing_displacement_for_llvmize addr =
   if not !Clflags.llvm_backend
   then

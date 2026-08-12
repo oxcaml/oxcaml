@@ -108,8 +108,29 @@ module Make (S : Ssa.Finished_graph) = struct
                appear in a block body"
               pb bl)
         bl.body;
+      (* Only [Goto] can bind a target's block parameters, so a target reached
+         by [Branch] or [Switch] must not have live params (the loop passes rely
+         on this when they rewrite a [Branch] into an argument-less [Goto], and
+         when they extend a header's params via its [Goto] predecessors). *)
+      let check_paramless_target ~what (target : S.Block.t) =
+        Array.iteri
+          (fun i (p : S.block_param) ->
+            if p.usage_count <> 0
+            then
+              Misc.fatal_errorf
+                "block %a: %s target %a has live parameter %i, which only a \
+                 Goto could bind."
+                pb bl what pb target i)
+          target.params
+      in
       (match bl.terminator with
       | Goto { args; goto } ->
+        if Array.length args <> Array.length goto.params
+        then
+          Misc.fatal_errorf
+            "block %a: Goto passes %i argument(s) but target %a has %i \
+             parameter(s)."
+            pb bl (Array.length args) pb goto (Array.length goto.params);
         args
         |> Array.iteri (fun i arg ->
             match arg with
@@ -120,8 +141,13 @@ module Make (S : Ssa.Finished_graph) = struct
                 Misc.fatal_errorf
                   "block %a: Goto parameter %i missing despite being live." pb
                   bl i)
-      | Branch { cond; _ } -> check_arg bl cond
-      | Switch { index; _ } -> check_arg bl index
+      | Branch { cond; ifso; ifnot } ->
+        check_arg bl cond;
+        check_paramless_target ~what:"Branch" ifso;
+        check_paramless_target ~what:"Branch" ifnot
+      | Switch { index; targets } ->
+        check_arg bl index;
+        Array.iter (check_paramless_target ~what:"Switch") targets
       | Return { args } -> check_args bl args
       | Raise { args; _ } -> check_args bl args
       | Tailcall_self { args; _ } -> check_args bl args

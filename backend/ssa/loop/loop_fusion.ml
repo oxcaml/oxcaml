@@ -50,6 +50,33 @@ module Analysis (S : Ssa.Finished_graph) = struct
 
   let is_const = IV.is_const
 
+  (* Byte offsets of the two fields of a cons cell, relative to the block
+     pointer. The recognition below matches loads and stores against these
+     offsets explicitly (via [Arch.single_base_addressing_offset]), so that the
+     value identified as the element really is the car field -- the field the
+     producing loop's car store writes -- and the value walked as the next
+     pointer really is the cdr. Value-identity heuristics alone would accept
+     e.g. a header-word load as the "element". *)
+  let car_offset = 0
+
+  let cdr_offset = Arch.size_addr
+
+  let load_offset (i : S.Instruction.t) : int option =
+    match i with
+    | Op { op = Load { addressing_mode; _ }; args = [| _ |]; _ } ->
+      Arch.single_base_addressing_offset addressing_mode
+    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+    | Stack_check _ | Name_for_debugger _ ->
+      None
+
+  let store_offset (i : S.Instruction.t) : int option =
+    match i with
+    | Op { op = Store (_, addressing_mode, _); _ } ->
+      Arch.single_base_addressing_offset addressing_mode
+    | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
+    | Stack_check _ | Name_for_debugger _ ->
+      None
+
   (* Only allocation-style generative effects are tolerated in a fusable body:
      pure operations, and the initialising stores/allocs that build the fresh
      cons and element cells. Any [Store] that assigns (mutates) pre-existing
@@ -82,14 +109,19 @@ module Analysis (S : Ssa.Finished_graph) = struct
         | Stack_check _ | Name_for_debugger _ ->
           None)
 
-  (* Loads in [body] reading offset [cursor] whose result is not [tail]. *)
+  (* Loads in [body] reading the car field of [cursor] whose result is not
+     [tail]. *)
   let head_loads (body : S.Block.t) (header : S.Block.t) (cursor_index : int)
       (tail : S.Instruction.t) : S.Instruction.t list =
     Array.to_list body.body
     |> List.filter (fun (i : S.Instruction.t) ->
         match i with
         | Op { op = Load _; args = [| base |]; _ } ->
-          is_header_param header cursor_index base && not (same i tail)
+          is_header_param header cursor_index base
+          && (match load_offset i with
+            | Some o -> o = car_offset
+            | None -> false)
+          && not (same i tail)
         | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
         | Stack_check _ | Name_for_debugger _ ->
           false)
@@ -131,7 +163,7 @@ module Analysis (S : Ssa.Finished_graph) = struct
             | true, false -> Some (ifso, ifnot)
             | (true | false), _ -> None
           in
-          if not (body_side_effect_free body)
+          if not (body_side_effect_free body && body_side_effect_free header)
           then None
           else
             (* Back edge [body -> header (accu := cons, cursor := tail)]. *)
@@ -154,7 +186,11 @@ module Analysis (S : Ssa.Finished_graph) = struct
             let* () =
               match tail with
               | Op { op = Operation.Load _; args = [| base |]; _ }
-                when is_header_param header cursor_index base ->
+                when is_header_param header cursor_index base
+                     &&
+                     match load_offset tail with
+                     | Some o -> o = cdr_offset
+                     | None -> false ->
                 Some ()
               | _ -> None
             in
@@ -166,17 +202,35 @@ module Analysis (S : Ssa.Finished_graph) = struct
             (* The cons cell has three initialising stores: the header word (a
                constant), the cdr (the old accu) and the car (the element
                value). Identify the car as the unique stored value that is
-               neither the accu param nor a constant. *)
+               neither the accu param nor a constant, and pin the layout: the
+               car store must write the car field and the accu must be stored
+               (exactly once) at the cdr field, so the produced cell really is a
+               cons whose element the consuming loop's head load (also pinned to
+               the car field) will read. *)
             let* car_store, car =
               let stores = cons_stores body cons in
-              let non_accu =
-                List.filter
-                  (fun (_, v) -> not (is_header_param header accu_index v))
+              let accu_stores, non_accu =
+                List.partition
+                  (fun (_, v) -> is_header_param header accu_index v)
                   stores
               in
-              match List.filter (fun (_, v) -> not (is_const v)) non_accu with
-              | [(s, v)] -> Some (s, v)
-              | [] | _ :: _ :: _ -> None
+              let cdr_ok =
+                match accu_stores with
+                | [(s, _)] -> (
+                  match store_offset s with
+                  | Some o -> o = cdr_offset
+                  | None -> false)
+                | [] | _ :: _ :: _ -> false
+              in
+              if not cdr_ok
+              then None
+              else
+                match List.filter (fun (_, v) -> not (is_const v)) non_accu with
+                | [(s, v)] -> (
+                  match store_offset s with
+                  | Some o when o = car_offset -> Some (s, v)
+                  | Some _ | None -> None)
+                | [] | _ :: _ :: _ -> None
             in
             (* Preheader (the sole non-back-edge predecessor) supplies the
                initial cursor. *)
@@ -211,7 +265,12 @@ module Analysis (S : Ssa.Finished_graph) = struct
      single-use [Goto] forwardings (so the intermediate list is read only by
      [b]). *)
   let consumes (a : t) (b : t) : bool =
-    let rec go (v : S.Instruction.t) : bool =
+    (* [fuel] bounds the predecessor walk: on a well-formed (reachable) graph a
+       single-predecessor chain cannot cycle, but a malformed one must degrade
+       into a negative answer rather than hang the compiler. *)
+    let rec go fuel (v : S.Instruction.t) : bool =
+      fuel > 0
+      &&
       if is_header_param a.header a.accu_index v
       then true
       else
@@ -225,7 +284,9 @@ module Analysis (S : Ssa.Finished_graph) = struct
             | Goto { goto; args }
               when S.Block.equal goto block && param_index < Array.length args
               -> (
-              match args.(param_index) with Some a' -> go a' | None -> false)
+              match args.(param_index) with
+              | Some a' -> go (fuel - 1) a'
+              | None -> false)
             | Goto _ | Branch _ | Switch _ | Return _ | Raise _
             | Tailcall_self _ | Tailcall_func _ | Call _ | Invalid _ ->
               false)
@@ -234,7 +295,7 @@ module Analysis (S : Ssa.Finished_graph) = struct
         | Stack_check _ | Name_for_debugger _ ->
           false
     in
-    go b.cursor_input
+    go (List.length S.blocks + 1) b.cursor_input
 
   (* Group the recognised loops into maximal producer/consumer chains, each in
      producer-first order. The chain logic itself is pure and lives in

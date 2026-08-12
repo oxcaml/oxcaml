@@ -5,12 +5,19 @@
 let chains ~consumes loops =
   let is_consumer l = List.exists (fun other -> consumes other l) loops in
   let heads = List.filter (fun l -> not (is_consumer l)) loops in
-  let rec extend acc l =
-    match List.find_opt (fun n -> consumes l n) loops with
-    | Some n -> extend (n :: acc) n
-    | None -> List.rev acc
+  (* [fuel] bounds the walk: a well-formed [consumes] is acyclic, so a chain can
+     never exceed the element count, but a cyclic relation must degrade into a
+     truncated chain rather than hang the compiler. *)
+  let rec extend acc l fuel =
+    if fuel <= 0
+    then List.rev acc
+    else
+      match List.find_opt (fun n -> consumes l n) loops with
+      | Some n -> extend (n :: acc) n (fuel - 1)
+      | None -> List.rev acc
   in
-  List.map (fun h -> extend [h] h) heads
+  let fuel = List.length loops in
+  List.map (fun h -> extend [h] h fuel) heads
 
 let largest_odd_prefix ~last_ok ~later_ok chain =
   let k = List.length chain in

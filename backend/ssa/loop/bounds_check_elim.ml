@@ -23,6 +23,8 @@ module Make (S : Ssa.Finished_graph) = struct
 
   let linearize = A.linearize
 
+  let linearize_goal = A.linearize_goal
+
   let guards_at = A.guards_at
 
   (* === Loop-invariance of atoms ===
@@ -49,7 +51,36 @@ module Make (S : Ssa.Finished_graph) = struct
       (fun (id, _) -> atom_invariant ctx ~op_def_block ~body id)
       f.Affine.terms
 
-  (* === Induction-variable range facts === *)
+  (* === Induction-variable range facts ===
+
+     For an increasing basic IV [i] (constant step [c > 0]) with a single back
+     edge, we derive:
+
+     - An invariant upper bound [u - i >= 0], from a dominating guard on the
+     back-edge path that tests the back-edge value [arg] -- or the header
+     parameter [i] itself -- against a loop-invariant bound [B], oriented
+     [tested <= B] / [tested < B]. Machine-value soundness: + guard on [arg]:
+     the comparison is on the very machine value that becomes the next header
+     value, so [next <= u] directly ([u = B], or [B - 1] for a strict test)
+     whatever arithmetic produced [arg]; + guard on [i]: from [i <= B] and [B <=
+     max_int] (the no-wrap obligation below), [i + c] is computed without
+     wrapping, so [next <= B + c] (u = [B + c], or [B + c - 1]). In both shapes
+     every loop entry must also satisfy [init <= u], checked by Fourier-Motzkin
+     from the entry-edge guards.
+
+     - A constant lower bound [i - min(inits) >= 0] (constant inits only). This
+     is inductive only while the increment cannot wrap, so it is emitted only
+     under the no-wrap obligation: [u <= max_int], discharged by Fourier-Motzkin
+     from the invariant guards dominating the header together with the range
+     side-facts of atomized shifts -- e.g. an array length ([lsr] of the header
+     word) is at most [2^54 - 1], so a bound tested against one is comfortably
+     below [max_int]. Since the OCaml-[int] threshold [max_int] is far from the
+     64-bit limit, [u <= max_int] keeps [u + c] (any OCaml-[int] step [c]) clear
+     of wrapping.
+
+     No fact is asserted for free: without a provable [u], the lower fact is not
+     emitted, and the upper facts are justified by the dominating tests on the
+     actual machine values. *)
 
   (* A constant lower bound on the initial values (only constants handled). *)
   let init_lower_const ctx side (biv : IV.biv) : int option =
@@ -68,24 +99,7 @@ module Make (S : Ssa.Finished_graph) = struct
         Some (List.fold_left (fun m o -> min m (Option.get o)) max_int consts)
       else None
 
-  (* For an increasing IV: [param - min(init) >= 0]. *)
-  let iv_lower_fact ctx side (loop : IV.loop) (biv : IV.biv) : Affine.t list =
-    match biv.step, biv.sign with
-    | Step_const c, `Add when c > 0 -> (
-      match
-        ( find_header_param_atom ctx loop.header biv.param_index,
-          init_lower_const ctx side biv )
-      with
-      | Some pid, Some m -> [Affine.add_const (Affine.var pid) (-m)]
-      | _ -> [])
-    | _ -> []
-
-  (* For an increasing IV in a bottom-tested loop: derive an invariant upper
-     bound [U - param >= 0]. The value flowing on the (single) back edge becomes
-     the next header value; a guard dominating that edge bounds it by some [U =
-     f + backedge_arg] (when that is loop-invariant), provided every entry edge
-     also satisfies [init <= U]. *)
-  let iv_upper_fact ctx side ~op_def_block (loop : IV.loop) (biv : IV.biv) :
+  let iv_facts ctx side ~op_def_block (loop : IV.loop) (biv : IV.biv) :
       Affine.t list =
     match biv.step, biv.sign with
     | Step_const c, `Add when c > 0 -> (
@@ -108,15 +122,43 @@ module Make (S : Ssa.Finished_graph) = struct
           match arg_to_header pe with
           | None -> []
           | Some arg -> (
-            let a = linearize ctx side arg in
-            let candidates =
-              List.filter_map
-                (fun f ->
-                  let u = Affine.add f a in
-                  if affine_invariant ctx ~op_def_block ~body:loop.body u
-                  then Some u
-                  else None)
-                (guards_at ctx side pe)
+            (* Upper-bound candidates: [fst] is [u], [snd] says whether the
+               guard was on the param (so [u] embeds an un-wrapped [+ c] and the
+               no-wrap obligation is required for the upper fact too). *)
+            let bound_form (other : [`Value of S.Instruction.t | `Const of int])
+                =
+              match other with
+              | `Const b -> Some (Affine.const b)
+              | `Value v ->
+                let f = linearize ctx side v in
+                if affine_invariant ctx ~op_def_block ~body:loop.body f
+                then Some f
+                else None
+            in
+            let candidate ~extra (cmp, other) =
+              let mk delta =
+                match bound_form other with
+                | None -> None
+                | Some b -> (
+                  match Affine.add_const_checked b delta with
+                  | u -> Some u
+                  | exception Fourier_motzkin.Overflow -> None)
+              in
+              match (cmp : Cmm.integer_comparison) with
+              | Cle -> mk extra
+              | Clt -> mk (extra - 1)
+              | Ceq | Cne | Cgt | Cge | Cult | Cugt | Cule | Cuge -> None
+            in
+            let arg_candidates =
+              A.bounding_guards_at ~target:pe ~matches:(IV.instr_same arg)
+              |> List.filter_map (fun g ->
+                  Option.map (fun u -> u, false) (candidate ~extra:0 g))
+            in
+            let param_candidates =
+              A.bounding_guards_at ~target:pe
+                ~matches:(IV.is_header_param header k)
+              |> List.filter_map (fun g ->
+                  Option.map (fun u -> u, true) (candidate ~extra:c g))
             in
             let init_preds = IV.entry_predecessors loop in
             let verify u =
@@ -125,15 +167,43 @@ module Make (S : Ssa.Finished_graph) = struct
                    (fun ip ->
                      match arg_to_header ip with
                      | Some iarg ->
-                       entails
-                         (guards_at ctx side ip @ !side)
-                         (Affine.sub u (linearize ctx side iarg))
+                       (* Bind the goal first: its linearization pushes side
+                          facts that the fact list below must include. *)
+                       let goal = Affine.sub u (linearize ctx side iarg) in
+                       entails (guards_at ctx side ip @ !side) goal
                      | None -> false)
                    init_preds
             in
-            match List.find_opt verify candidates with
-            | Some u -> [Affine.sub u (Affine.var pid)]
-            | None -> []))
+            (* The no-wrap obligation [u <= max_int], from the invariant guards
+               dominating the header (plus accumulated shift-range side
+               facts). *)
+            let no_wrap u =
+              match
+                Affine.add_const_checked (Affine.scale_checked (-1) u) max_int
+              with
+              | goal -> entails (guards_at ctx side header @ !side) goal
+              | exception Fourier_motzkin.Overflow -> false
+            in
+            let chosen =
+              List.find_opt
+                (fun (u, needs_no_wrap) ->
+                  verify u && ((not needs_no_wrap) || no_wrap u))
+                (arg_candidates @ param_candidates)
+            in
+            match chosen with
+            | None -> []
+            | Some (u, needs_no_wrap) ->
+              let upper = Affine.sub u (Affine.var pid) in
+              let lower_ok = needs_no_wrap || no_wrap u in
+              let lower =
+                if lower_ok
+                then
+                  match init_lower_const ctx side biv with
+                  | Some m -> [Affine.add_const (Affine.var pid) (-m)]
+                  | None -> []
+                else []
+              in
+              upper :: lower))
         | [] | _ :: _ :: _ -> []))
     | _ -> []
 
@@ -174,14 +244,18 @@ module Make (S : Ssa.Finished_graph) = struct
         }
       when out_of_bounds_raises ~fuel:5 ifnot ->
       let side = ref [] in
-      let gidx = linearize ctx side idx in
-      let glen = linearize ctx side len in
+      (* Goals use the uncertified linearization: the entailments below prove [0
+         <= gidx] and [gidx <= glen - 1] together with [glen <= max_int] (the
+         third goal), which pins both forms' integer values into machine range;
+         since a machine value always equals its form modulo 2^64, the machine
+         check is then implied. Facts (guards, IV facts and shift side
+         conditions) all come from the certified [linearize]. *)
+      let gidx = linearize_goal ctx side idx in
+      let glen = linearize_goal ctx side len in
       let guards = guards_at ctx side block in
       let ivf =
         List.concat_map
-          (fun biv ->
-            iv_lower_fact ctx side loop biv
-            @ iv_upper_fact ctx side ~op_def_block loop biv)
+          (fun biv -> iv_facts ctx side ~op_def_block loop biv)
           bivs
       in
       let facts = guards @ ivf @ !side in
@@ -192,7 +266,21 @@ module Make (S : Ssa.Finished_graph) = struct
         | Cle | Ceq | Cne | Clt | Cgt | Cge | Cugt | Cule | Cuge ->
           Affine.sub glen gidx
       in
-      if entails facts goal_lo && entails facts goal_hi
+      let goal_len_in_range =
+        match
+          Affine.add_const_checked (Affine.scale_checked (-1) glen) max_int
+        with
+        | goal -> Some goal
+        | exception Fourier_motzkin.Overflow -> None
+      in
+      let proved =
+        match goal_len_in_range with
+        | None -> false
+        | Some goal_len_in_range ->
+          entails facts goal_lo && entails facts goal_hi
+          && entails facts goal_len_in_range
+      in
+      if proved
       then begin
         S.Block.set_terminator block (Goto { goto = ifso; args = [||] });
         true

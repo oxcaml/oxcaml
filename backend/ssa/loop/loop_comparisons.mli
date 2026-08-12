@@ -8,19 +8,11 @@
     {!Cmm.integer_comparison} and {!Fourier_motzkin.Affine}. Every function is
     over a finite domain, so its intended semantics can be checked by exhaustive
     enumeration (or proved outright). Only one direction of each result is
-    load-bearing for the passes: [true] from {!continue_terminates} (and
-    friends) licenses a rewrite, while [false] is always conservative. *)
+    load-bearing for the passes: a positive result from {!continue_terminates}
+    (and friends) licenses a rewrite, while the conservative direction is always
+    safe. *)
 
 module Affine = Fourier_motzkin.Affine
-
-(** Monotonic direction of a constant-step induction variable. *)
-type direction =
-  | Up
-  | Down
-
-(** [direction_of_step s] is the direction of an IV with signed constant step
-    [s] per iteration, or [None] for a zero step. *)
-val direction_of_step : int -> direction option
 
 (** Whether [cmp] is a signed order comparison ([<], [<=], [>], [>=]). *)
 val is_signed_order : Cmm.integer_comparison -> bool
@@ -35,12 +27,25 @@ val oriented_continue_comparison :
   Cmm.integer_comparison ->
   Cmm.integer_comparison
 
-(** [continue_terminates dir cmp] is [true] iff an IV progressing monotonically
-    in direction [dir], compared by [cmp] (oriented IV-left) against a
-    loop-invariant bound as the loop's continue-condition, must eventually
-    falsify the condition. Unsigned comparisons and [Cne] return [false]
-    (unknown). *)
-val continue_terminates : direction -> Cmm.integer_comparison -> bool
+(** Result of the wrap-aware termination test for a monotone IV. *)
+type termination =
+  | Terminates  (** the continue-condition must eventually fail *)
+  | Terminates_if_bound_in_range
+      (** as [Terminates], provided the caller proves the bound's machine value
+          [b] satisfies [b <= ocaml_max_int] (positive step) or
+          [b >= -ocaml_max_int] (negative step), which excludes the increment
+          ever wrapping at 64 bits *)
+  | Unknown
+
+(** [continue_terminates ~step cmp] decides whether an IV advanced by the
+    constant machine step [step] each iteration, with continue-condition
+    [iv cmp bound] (oriented IV-left) against a loop-invariant bound, must
+    eventually exit. Wrap-around at the 64-bit machine width is accounted for:
+    the cases that could spin forever by wrapping (e.g. [<=] against a bound at
+    the numeric limit) are only conditionally terminating, with the no-wrap side
+    condition returned for the caller to discharge. Unsigned comparisons and
+    [Cne] give [Unknown]. *)
+val continue_terminates : step:int -> Cmm.integer_comparison -> termination
 
 (** Whether the (IV-left, oriented) continue-condition keeps the IV below a
     loop-invariant upper bound, i.e. is [<] or [<=]. *)

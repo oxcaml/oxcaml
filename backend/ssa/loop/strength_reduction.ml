@@ -24,7 +24,7 @@ module Make (S : Ssa.Finished_graph) = struct
      invariant] of that shape. The constant term does not affect the
      coefficient, so displacements are ignored. Shape recognition is shared with
      the range analyses via {!Affine_ssa.coeff_of_target}. *)
-  let biv_coeff ~is_biv ~preheader (v : S.Instruction.t) : int option =
+  let biv_coeff ~is_biv ~preheader (v : S.Instruction.t) : int64 option =
     AS.coeff_of_target
       ~classify:(fun v ->
         if is_biv v
@@ -35,9 +35,14 @@ module Make (S : Ssa.Finished_graph) = struct
       v
 
   (* A strength-reduction opportunity: replace the integer derived IV [derived]
-     (which equals [coeff * iv + invariant]) with a fresh header parameter
-     [new_index] that starts at [derived(iv := iv_init)] and is incremented by
-     [step_delta = coeff * iv_step] on each back edge. *)
+     (which equals [coeff * iv + invariant] modulo 2^64) with a fresh header
+     parameter [new_index] that starts at [derived(iv := iv_init)] and is
+     incremented by [step_delta = coeff * iv_step] on each back edge.
+     [step_delta] is a full-width machine constant: the coefficient is computed
+     with wrapping mod-2^64 arithmetic (see {!Affine_ssa.coeff_of_target}), so
+     the recurrence tracks the original value exactly modulo 2^64 -- i.e.
+     bit-for-bit at machine width -- whatever overflow the derived expression's
+     arithmetic incurs. *)
   type reduction =
     { header : S.Block.t;
       preheader : S.Block.t;
@@ -47,7 +52,7 @@ module Make (S : Ssa.Finished_graph) = struct
       derived_id : S.Instruction.Id.t;
       derived_dbg : Debuginfo.t;
       typ : Cmm.machtype;
-      step_delta : int;
+      step_delta : int64;
       new_index : int
     }
 
@@ -116,7 +121,7 @@ module Make (S : Ssa.Finished_graph) = struct
                     | Op { id; typ; dbg; _ }
                       when is_int_typ typ && not (is_biv instr) -> (
                       match biv_coeff ~is_biv ~preheader instr with
-                      | Some c when abs c >= 2 ->
+                      | Some c when Int64.compare (Int64.abs c) 2L >= 0 ->
                         cands := (instr, id, typ, dbg, c) :: !cands
                       | Some _ | None -> ())
                     | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _
@@ -149,7 +154,7 @@ module Make (S : Ssa.Finished_graph) = struct
                       derived_id = id;
                       derived_dbg = dbg;
                       typ;
-                      step_delta = c * delta_i;
+                      step_delta = Int64.mul c (Int64.of_int delta_i);
                       new_index = -1
                     })
               cand_list)
@@ -256,17 +261,28 @@ module Reducer (C : Ssa_reducer.Context) = struct
          re-checking, so a large [step_delta] would reach the emitter as an
          illegal immediate (arm64 asserts, amd64 truncates). When it does not
          fit, materialise the step in a register and add it. *)
+      let step_as_int =
+        let i = Int64.to_int r.step_delta in
+        if Int64.equal (Int64.of_int i) r.step_delta then Some i else None
+      in
+      let use_immediate =
+        match step_as_int with
+        | None -> false
+        | Some i -> (
+          match Cfg_selection.is_immediate Operation.Iadd i with
+          | Cfg_selectgen_target_intf.Is_immediate b -> b
+          | Cfg_selectgen_target_intf.Use_default -> false)
+      in
       let incr =
-        match Cfg_selection.is_immediate Operation.Iadd r.step_delta with
-        | Cfg_selectgen_target_intf.Is_immediate true ->
+        match step_as_int, use_immediate with
+        | Some i, true ->
           C.emit_op c
-            ~op:Operation.(Intop_imm (Iadd, r.step_delta))
+            ~op:Operation.(Intop_imm (Iadd, i))
             ~typ:r.typ ~dbg:r.derived_dbg ~args:[| arg |]
-        | Cfg_selectgen_target_intf.Is_immediate false
-        | Cfg_selectgen_target_intf.Use_default ->
+        | (Some _ | None), _ ->
           let cst =
             C.emit_op c
-              ~op:Operation.(Const_int (Nativeint.of_int r.step_delta))
+              ~op:Operation.(Const_int (Int64.to_nativeint r.step_delta))
               ~typ:r.typ ~dbg:r.derived_dbg ~args:[||]
           in
           C.emit_op c

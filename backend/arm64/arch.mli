@@ -124,6 +124,10 @@ val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
 
+(** The byte displacement of a single-register base-plus-displacement
+    addressing mode; [None] for any other shape. *)
+val single_base_addressing_offset : addressing_mode -> int option
+
 val addressing_displacement_for_llvmize : addressing_mode -> int
 
 (* Printing operations and addressing modes *)

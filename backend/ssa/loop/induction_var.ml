@@ -155,7 +155,9 @@ module Make (S : Ssa.Finished_graph) = struct
     | Proj { src; _ } -> is_loop_invariant op_def loop_body src
     | Tuple _ | Push_trap _ | Pop_trap _ | Stack_check _ | Name_for_debugger _
       ->
-      true
+      (* Not values; unreachable as arguments. [false] is the safe default for
+         an invariance predicate. *)
+      false
 
   type step =
     | Step_const of int
@@ -208,10 +210,13 @@ module Make (S : Ssa.Finished_graph) = struct
   (* Collect the argument array of [Goto] terminators targeting the header.
      [Goto] args are optional: a [None] marks a parameter the builder dropped as
      unused. *)
-  let pred_args_to_header ~header (pred : S.Block.t) :
+  let pred_args_to_header ~(header : S.Block.t) (pred : S.Block.t) :
       S.Instruction.t option array option =
     match pred.terminator with
-    | Goto { goto; args } when S.Block.equal goto header -> Some args
+    | Goto { goto; args }
+      when S.Block.equal goto header
+           && Array.length args = Array.length header.params ->
+      Some args
     | Goto _ | Branch _ | Switch _ | Return _ | Raise _ | Tailcall_self _
     | Tailcall_func _ | Call _ | Invalid _ ->
       None

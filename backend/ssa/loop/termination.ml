@@ -2,6 +2,8 @@
 
 module Make (S : Ssa.Finished_graph) = struct
   module IV = Induction_var.Make (S)
+  module AS = Affine_ssa.Make (S)
+  module Affine = Fourier_motzkin.Affine
 
   type t =
     | Terminates
@@ -33,13 +35,52 @@ module Make (S : Ssa.Finished_graph) = struct
     | Call _ | Invalid _ ->
       None
 
-  let direction_of_biv (biv : IV.biv) : Loop_comparisons.direction option =
-    Option.bind (IV.signed_step biv) Loop_comparisons.direction_of_step
+  (* Discharge {!Loop_comparisons.Terminates_if_bound_in_range}: the bound's
+     machine value must satisfy [b <= max_int] (positive step) or [b >=
+     -max_int] (negative step), which keeps the IV's increment from ever
+     wrapping at 64 bits (see the argument in {!Loop_comparisons}). Literal
+     bounds are checked directly; register bounds are proved by Fourier-Motzkin
+     from the guards dominating the loop header — e.g. a bound compared against
+     an array length (whose [lsr]-of-header shape yields a [<= 2^54 - 1] range
+     fact) or any other dominating range check. *)
+  let bound_in_range ~step ~(header : S.Block.t)
+      (bound : [`Value of S.Instruction.t | `Const of int]) : bool =
+    match bound with
+    | `Const k -> if step > 0 then k <= max_int else k >= -max_int
+    | `Value v -> (
+      let ctx = AS.new_ctx () in
+      let side = ref [] in
+      let form = AS.linearize ctx side v in
+      let facts = AS.guards_at ctx side header @ !side in
+      match
+        if step > 0
+        then Affine.add_const_checked (Affine.scale_checked (-1) form) max_int
+        else Affine.add_const_checked form max_int
+      with
+      | goal ->
+        let r = Fourier_motzkin.entails facts goal in
+        Format.eprintf "DBG bir: step=%d nfacts=%d goal={c=%d;%s} r=%b@." step
+          (List.length facts) goal.Affine.const
+          (String.concat ","
+             (List.map
+                (fun (a, c) -> Printf.sprintf "%d*a%d" c a)
+                goal.Affine.terms))
+          r;
+        List.iter
+          (fun (f : Affine.t) ->
+            Format.eprintf "DBG   f {c=%d;%s}@." f.Affine.const
+              (String.concat ","
+                 (List.map
+                    (fun (a, c) -> Printf.sprintf "%d*a%d" c a)
+                    f.Affine.terms)))
+          facts;
+        r
+      | exception Fourier_motzkin.Overflow -> false)
 
   let biv_implies_termination ~op_def (biv : IV.biv) : bool =
-    match find_exit_branch biv.loop, direction_of_biv biv with
+    match find_exit_branch biv.loop, IV.signed_step biv with
     | None, _ | _, None -> false
-    | Some exit_info, Some dir -> (
+    | Some exit_info, Some step -> (
       let header = biv.loop.header in
       let body = biv.loop.body in
       let is_self = IV.is_header_param header biv.param_index in
@@ -51,13 +92,13 @@ module Make (S : Ssa.Finished_graph) = struct
       let is_bound v = IV.is_loop_invariant op_def body v in
       let extract =
         match exit_info.condition with
-        | Op { op = Intop_imm (Icomp cmp, _); args = [| x |]; _ } ->
-          if is_iv_val x then Some (cmp, `Iv_left) else None
+        | Op { op = Intop_imm (Icomp cmp, k); args = [| x |]; _ } ->
+          if is_iv_val x then Some (cmp, true, `Const k) else None
         | Op { op = Intop (Icomp cmp); args = [| x; y |]; _ } ->
           if is_iv_val x && is_bound y
-          then Some (cmp, `Iv_left)
+          then Some (cmp, true, `Value y)
           else if is_iv_val y && is_bound x
-          then Some (cmp, `Iv_right)
+          then Some (cmp, false, `Value x)
           else None
         | Op _ | Block_param _ | Proj _ | Tuple _ | Push_trap _ | Pop_trap _
         | Stack_check _ | Name_for_debugger _ ->
@@ -65,15 +106,15 @@ module Make (S : Ssa.Finished_graph) = struct
       in
       match extract with
       | None -> false
-      | Some (cmp, side) ->
-        let iv_is_left =
-          match side with `Iv_left -> true | `Iv_right -> false
-        in
+      | Some (cmp, iv_is_left, bound) -> (
         let continue_cmp =
           Loop_comparisons.oriented_continue_comparison ~iv_is_left
             ~continue_when_true:exit_info.continue_when_true cmp
         in
-        Loop_comparisons.continue_terminates dir continue_cmp)
+        match Loop_comparisons.continue_terminates ~step continue_cmp with
+        | Terminates -> true
+        | Terminates_if_bound_in_range -> bound_in_range ~step ~header bound
+        | Unknown -> false))
 
   let analyze (_loop : IV.loop) (bivs : IV.biv list) : t =
     let op_def = IV.op_def () in
