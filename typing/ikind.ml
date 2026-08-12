@@ -641,8 +641,6 @@ let pp_axes (axes : Jkind_axis.Axis.packed list) : string =
 
 let axis_name (Jkind_axis.Axis.Pack ax) = Jkind_axis.Axis.name ax
 
-let same_axis a b = String.equal (axis_name a) (axis_name b)
-
 let pp_axis_name ppf axis = Format_doc.fprintf ppf "%s" (axis_name axis)
 
 let pp_axis_list_prose ppf (axes : Jkind_axis.Axis.packed list) =
@@ -729,7 +727,8 @@ let axes_in_violation_order ~violating_axes axes =
      intersecting here prevents blaming a fragment on an axis the whole
      comparison passes on. *)
   List.filter
-    (fun violating_axis -> List.exists (same_axis violating_axis) axes)
+    (fun violating_axis ->
+      List.exists (Jkind_axis.Axis.equal violating_axis) axes)
     violating_axes
 
 type mode_crossing_error =
@@ -769,7 +768,9 @@ let add_provenance_residual entries ({ ty; plural; mode_bounds; axes } as entry)
     && Bool.equal other.plural plural
     && Axis_lattice.equal other.mode_bounds mode_bounds
     && List.length other.axes = List.length axes
-    && List.for_all (fun axis -> List.exists (same_axis axis) other.axes) axes
+    && List.for_all
+         (fun axis -> List.exists (Jkind_axis.Axis.equal axis) other.axes)
+         axes
   in
   if List.exists duplicate entries then entries else entries @ [entry]
 
@@ -1444,8 +1445,13 @@ let subjkind_error_has_provenance_residuals = function
     | Some (_ :: _) -> true)
 
 let same_axis_set axes1 axes2 =
-  List.length axes1 = List.length axes2
-  && List.for_all (fun axis1 -> List.exists (same_axis axis1) axes2) axes1
+  let of_list =
+    List.fold_left
+      (fun set (Jkind_axis.Axis.Pack axis) ->
+        Jkind_axis.Axis_set.add set axis)
+      Jkind_axis.Axis_set.empty
+  in
+  Jkind_axis.Axis_set.equal (of_list axes1) (of_list axes2)
 
 let subjkind_errors_have_same_violating_axes error1 error2 =
   match error1, error2 with
