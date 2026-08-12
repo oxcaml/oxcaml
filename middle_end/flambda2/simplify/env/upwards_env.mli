@@ -70,6 +70,16 @@ val mem_continuation : t -> Continuation.t -> bool
 val find_continuation_shortcut :
   t -> Continuation.t -> Continuation_shortcut.t option
 
+(* [find_unique_continuation_handler] searches for an existing continuation with
+   the same handler contents (up to permutation of the continuation parameters)
+   as [handler].
+
+   If it finds any, it returns a continuation [k] and arguments [args] such that
+   [cont params -> handler] and [cont params -> k (args)] are equivalent as
+   continuation handlers.
+
+   [k] is allowed to be an exception handler iff the provided [is_exn_handler]
+   is [true], and if it is, the first argument of both handlers must match. *)
 val find_unique_continuation_handler :
   Are_rebuilding_terms.t ->
   t ->
@@ -77,7 +87,7 @@ val find_unique_continuation_handler :
   handler:Rebuilt_expr.t ->
   is_exn_handler:bool ->
   free_names_without_params:Name_occurrences.t ->
-  Continuation.t option
+  (Continuation.t * Simple.t list) option
 
 val add_apply_cont_rewrite : t -> Continuation.t -> Apply_cont_rewrite.t -> t
 
