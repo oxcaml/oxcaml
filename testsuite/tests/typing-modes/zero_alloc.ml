@@ -2280,8 +2280,8 @@ Lines 2-4, characters 21-3:
 3 |     let bar = allocates2
 4 | end
 Error: The module is "alloc"
-         because it closes over the value "allocates2" at line 3, characters 14-24
-         which is "alloc".
+         because it closes over the allocation at line 3, characters 4-24
+         which is "alloc" because it is allocated on the heap.
        However, the module highlighted is expected to be "noalloc".
 |}]
 
@@ -2867,8 +2867,10 @@ Error: The allocation is "local"
 
 (* Test 10.2: allocation or [noalloc] functions called within a [try ... with] block still
    force the enclosing closure to be [alloc]. *)
-(* CR shsong: This test will fail on checking [g] once we finish.
-   But for now it passes. *)
+(* [f] is [noalloc], so it may allocate on the raising path only. The
+   [try ... with] in [g] catches that raise inside [g], which turns the
+   allocation into an ordinary one as far as [g] is concerned, so [g] cannot be
+   [noalloc]. *)
 let wrapper () =
   let (f @ noalloc) (x : int) =
     if x < 0 then alloc_and_raise_
@@ -2885,7 +2887,13 @@ let wrapper () =
   let _ = g in
   ()
 [%%expect{|
-val wrapper : unit -> unit = <fun>
+Line 10, characters 6-7:
+10 |       f 0
+           ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at lines 8-12, characters 20-13
+         which is expected to be "noalloc".
 |}]
 
 let wrapper () =
