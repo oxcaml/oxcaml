@@ -588,8 +588,6 @@ module type S = sig
 
     val alloc : lr
 
-    (** [alloc_if_noalloc m] is [alloc] when [m >= noalloc], and
-        [noalloc_strict] when [m = noalloc_strict]. *)
     val alloc_if_noalloc : ('l * 'r) t -> ('l * disallowed) t
 
     module Guts : sig

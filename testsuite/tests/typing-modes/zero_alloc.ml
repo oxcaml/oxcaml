@@ -2867,10 +2867,6 @@ Error: The allocation is "local"
 
 (* Test 10.2: allocation or [noalloc] functions called within a [try ... with] block still
    force the enclosing closure to be [alloc]. *)
-(* [f] is [noalloc], so it may allocate on the raising path only. The
-   [try ... with] in [g] catches that raise inside [g], which turns the
-   allocation into an ordinary one as far as [g] is concerned, so [g] cannot be
-   [noalloc]. *)
 let wrapper () =
   let (f @ noalloc) (x : int) =
     if x < 0 then alloc_and_raise_

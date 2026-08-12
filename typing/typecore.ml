@@ -8524,17 +8524,6 @@ and type_expect_
       {exp with exp_extra}
   | Pexp_alloc_and_raise e ->
       let new_env = Env.add_raise_lock env in
-      (* [alloc_and_raise_] excuses the allocations in [e] on the grounds that
-         control never leaves [e] normally, so an enclosing [noalloc] closure
-         only allocates on a path that raises (or diverges). Enforce that by
-         requiring [e] to have type ['a] for a fresh abstract type that nothing
-         inhabits: only an expression that never returns can be given such a
-         type. Letting unification decide this means we need no reasoning about
-         levels or about which variables the environment can still observe.
-
-         [e] is typed against a fresh variable rather than against the abstract
-         type directly, so that a body which can fall through is reported by
-         the error below instead of as a bare unification failure. *)
       let decl =
         Ctype.new_local_type ~loc Definition
           Jkind.Builtin.(value_or_null ~why:Alloc_and_raise)
@@ -8555,8 +8544,6 @@ and type_expect_
         with Ctype.Unify _ ->
           raise (Error (e.pexp_loc, env, Alloc_and_raise_may_return))
       end;
-      (* [e] never returns, so the whole expression can be given whatever type
-         the context asks for, exactly as [raise] is. *)
       let exp_extra = (Texp_alloc_and_raise, loc, []) :: exp.exp_extra in
       {exp with exp_type = ty_expected; exp_extra}
   | Pexp_comprehension comp ->

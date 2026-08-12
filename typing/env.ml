@@ -3792,12 +3792,6 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
 
     [pp] is the pinpoint used in errors. *)
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
-  (* Which constraint the allocation axis of [mode] imposes on an enclosing
-     closure depends on the locks between that closure and the use site, and
-     those are only known once the walk has passed them. So we pull the
-     allocation axis out of [mode], walk the locks with that axis dropped to
-     [noalloc_strict] (which constrains no closure), collect the closures into
-     three lists, and constrain the axis afterwards. *)
   let alloc_mode = Mode.Value.proj_comonadic Allocation mode in
   let alloc_mode_at_most_noalloc =
     Mode.Value.proj_comonadic Allocation
@@ -3805,11 +3799,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
          mode)
   in
   let mode =
-    (* [Skip]: this meet is the identity on every axis but allocation, and it
-       makes the allocation axis the constant [noalloc_strict], which is the
-       minimum and so can never be the cause of a failed submode. The step
-       therefore explains nothing, and hinting it [Unknown] would truncate the
-       explanation of every other axis. *)
     Mode.Value.meet_const_with ~hint:Skip Allocation
       Mode.Allocation.Const.Noalloc_strict mode
   in
@@ -3829,8 +3818,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           acc_raise),
           const_closure_mode pp vmode closure comonadic
       | Closure_lock (closure, comonadic) ->
-          (* [closure_mode] applies the [Is_closed_by] hint itself, so hint a
-             separate copy here rather than the mode handed to it. *)
           let hinted =
             Mode.Value.Comonadic.apply_hint
               (Is_closed_by (Comonadic, {closure; closed = pp}))
@@ -3843,19 +3830,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
       | Exclave_lock ->
           (acc_unknown, acc_no_raise, acc_raise),
           exclave_mode ~errors ~env ~pp vmode
-      (* CR shsong: [Raise_lock] and [Exception_handler_lock] don't constrain
-         values yet. *)
-      (* Both locks only reclassify the closures seen so far. For a given
-         closure it is the OUTERMOST of the two that decides, which is why each
-         resets [acc_unknown] but leaves the other list alone:
-         - closure / [alloc_and_raise_] / handler / use: the region is asserted
-           to raise, so an allocation inside it is still followed by a raise
-           leaving the closure. The inner handler does not void that, so these
-           closures stay in [acc_raise].
-         - closure / handler / [alloc_and_raise_] / use: the closure's own
-           handler catches the raise, so nothing escapes the closure and the
-           allocation is an ordinary one. The inner [alloc_and_raise_] does not
-           rescue these closures, so they stay in [acc_no_raise]. *)
       | Raise_lock -> ([], acc_no_raise, acc_unknown @ acc_raise), vmode
       | Exception_handler_lock ->
           ([], acc_unknown @ acc_no_raise, acc_raise), vmode
@@ -3865,11 +3839,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           vmode
     ) (([], [], []), mode) locks
     in
-    (* Constrain only the allocation axis: [min_with] leaves every other axis
-       at its minimum, making those components of the submode vacuous. Keeping
-       the constraint at the product level (rather than projecting both sides
-       onto the allocation axis) preserves the blame the walk would otherwise
-       have reported. *)
     let constrain_closures alloc_mode closures =
       List.iter
         (fun (_, closure_comonadic) ->
@@ -3878,26 +3847,14 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
             closure_comonadic)
         closures
     in
-    (* Neither an [alloc_and_raise_] nor an exception handler sits between
-       these closures and the use site, so an allocation that [mode] only
-       permits on the raising path leaves the closure as a raise too, and
-       [mode] carries over unchanged. *)
     constrain_closures alloc_mode (List.rev acc_unknown);
-    (* These closures enclose an [alloc_and_raise_] that in turn encloses the
-       use site, which permits allocation up to [noalloc]. *)
     constrain_closures alloc_mode_at_most_noalloc (List.rev acc_raise);
-    (* An exception handler between these closures and the use site catches
-       the raise, so an allocation that [noalloc] only permits on the raising
-       path becomes an ordinary allocation as far as the closure is
-       concerned. *)
     (* CR shsong: neither [alloc_if_noalloc] nor the [meet] above carries a
        hint, so an allocation-axis error reported through them has its
        explanation truncated. Add [Mode_hint.morph] constructors for both. *)
     constrain_closures
       (Mode.Allocation.alloc_if_noalloc alloc_mode)
       (List.rev acc_no_raise);
-    (* Put back the allocation axis that was dropped before the walk. None of
-       the locks touch it, so [vmode] is still [noalloc_strict] there. *)
     Mode.Value.join
       [vmode; Mode.Value.min_with_comonadic Allocation alloc_mode]
 
@@ -3927,13 +3884,7 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
       (Mode.Value.min_with_comonadic Allocation
          (Mode.Value.proj_comonadic Allocation mode))
 
-(** Registers a use of an allocation at the given pinpoint.
-
-    Returns the pinpoint and allocation mode of every enclosing closure,
-    split into those that do not enclose an [alloc_and_raise_] around the
-    allocation, and those that do. Each list is ordered from the innermost
-    closure to the outermost one, so that error messages blame the closure
-    nearest to the allocation. *)
+(** Registers a use of an allocation at the given pinpoint. *)
 (* CR shsong: currently it only considers noalloc_strict and alloc,
     need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =

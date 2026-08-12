@@ -19,11 +19,7 @@ open Mode
 type t =
   { alloc_mode : Alloc.r;
     no_raise_closures : (Hint.pinpoint * Allocation.r) list;
-    (** Closures enclosing the allocation with no [alloc_and_raise_] in
-        between, from the innermost to the outermost one. *)
     raise_closures : (Hint.pinpoint * Allocation.r) list;
-    (** Closures enclosing an [alloc_and_raise_] that in turn encloses the
-        allocation, from the innermost to the outermost one. *)
     pp : Hint.pinpoint
   }
 

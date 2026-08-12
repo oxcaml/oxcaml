@@ -2137,25 +2137,14 @@ module Lattices_mono = struct
           (** Dualize the comonadic fragment to the monadic fragment. The
               areality axis is ignored. *)
       | Alloc_if_noalloc : (Allocation.t, Allocation.t, 'l * disallowed) t
-          (** Maps [noalloc] to [alloc], and fixes [noalloc_strict] and
-              [alloc]. Used when an allocation that a [noalloc] mode only
-              permits on the raising path is caught by an exception handler,
-              and thus becomes an ordinary allocation. *)
       | Noalloc_strict_if_noalloc :
           (Allocation.t, Allocation.t, disallowed * 'r) t
-          (** Maps [noalloc] to [noalloc_strict], and fixes [noalloc_strict]
-              and [alloc]. The right adjoint of [Alloc_if_noalloc]. *)
       | Alloc_if_noalloc_full :
           'a areality
           -> ('a comonadic_with, 'b comonadic_with, 'l * disallowed) t
-          (** Applies [Alloc_if_noalloc] to the allocation axis, and sets every
-              other axis to its minimum. *)
       | Noalloc_strict_if_noalloc_full :
           'a areality
           -> ('a comonadic_with, 'b comonadic_with, disallowed * 'r) t
-          (** Applies [Noalloc_strict_if_noalloc] to the allocation axis, and
-              sets every other axis to its maximum. The right adjoint of
-              [Alloc_if_noalloc_full]. *)
 
     let allow_left : type a b l r. (a, b, allowed * r) t -> (a, b, l * r) t =
       function
@@ -2401,8 +2390,7 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max -> Fmt.fprintf ppf "monadic_to_comonadic_max"
       | Comonadic_to_monadic_max _ -> Fmt.fprintf ppf "comonadic_to_monadic_max"
       | Alloc_if_noalloc -> Fmt.fprintf ppf "alloc_if_noalloc"
-      | Noalloc_strict_if_noalloc ->
-        Fmt.fprintf ppf "noalloc_strict_if_noalloc"
+      | Noalloc_strict_if_noalloc -> Fmt.fprintf ppf "noalloc_strict_if_noalloc"
       | Alloc_if_noalloc_full _ -> Fmt.fprintf ppf "alloc_if_noalloc_full"
       | Noalloc_strict_if_noalloc_full _ ->
         Fmt.fprintf ppf "noalloc_strict_if_noalloc_full"
@@ -2566,8 +2554,7 @@ module Lattices_mono = struct
       | Alloc_if_noalloc -> alloc_if_noalloc a
       | Noalloc_strict_if_noalloc -> noalloc_strict_if_noalloc a
       | Alloc_if_noalloc_full _ -> alloc_if_noalloc_full dst a
-      | Noalloc_strict_if_noalloc_full _ ->
-        noalloc_strict_if_noalloc_full dst a
+      | Noalloc_strict_if_noalloc_full _ -> noalloc_strict_if_noalloc_full dst a
 
     let right_adjoint : type a b r.
         b obj -> (a, b, allowed * r) t -> (b, a, disallowed * allowed) t =
@@ -2696,9 +2683,9 @@ module Lattices_mono = struct
       | Contention_op_to_portability | Portability_to_contention_op
       | Visibility_op_to_statefulness | Statefulness_to_visibility_op
       | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
-      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
-      | Alloc_if_noalloc | Noalloc_strict_if_noalloc
-      | Alloc_if_noalloc_full _ | Noalloc_strict_if_noalloc_full _ ->
+      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ | Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc | Alloc_if_noalloc_full _
+      | Noalloc_strict_if_noalloc_full _ ->
         (* The following proof depends on the fact that [Core_morph.t] preserves binary
            meets: m(x meet y) == m(x) meet m(y).
 
@@ -3087,8 +3074,7 @@ module Lattices_mono = struct
       | Locality_restricted lm, Areality, Areality, _, _ ->
         Morph (Locality_full (Locality_morph.disallow_left lm))
       | Noalloc_strict_if_noalloc, Allocation, Allocation, _, _ ->
-        Morph
-          (Noalloc_strict_if_noalloc_full (comonadic_obj_areality src))
+        Morph (Noalloc_strict_if_noalloc_full (comonadic_obj_areality src))
       | Alloc_if_noalloc, Allocation, Allocation, _, _ -> Disallowed
       | _, _, _, _, _ -> .
     [@@warning "-4"]
@@ -3637,8 +3623,6 @@ module Lattices_mono = struct
           Core Monadic_to_comonadic_max
         | Not_allowed_right -> Compose (Core m1, Core Monadic_to_comonadic_max)
         end
-      (* [Alloc_if_noalloc] and its right adjoint are both idempotent, and
-         each absorbs the other on either side. *)
       | Alloc_if_noalloc, Alloc_if_noalloc -> Core Alloc_if_noalloc
       | Alloc_if_noalloc, Noalloc_strict_if_noalloc ->
         Core Noalloc_strict_if_noalloc
@@ -3653,17 +3637,12 @@ module Lattices_mono = struct
         Compose (Core m1, Core m2)
       | Noalloc_strict_if_noalloc_full _, Alloc_if_noalloc_full _ ->
         Compose (Core m1, Core m2)
-      (* [Locality_full] leaves the allocation axis alone, so it commutes
-         away entirely. *)
       | Alloc_if_noalloc_full _, Locality_full lm2 ->
         let src = Locality_morph.src_full lm2 in
         Core (Alloc_if_noalloc_full (comonadic_obj_areality src))
       | Noalloc_strict_if_noalloc_full _, Locality_full lm2 ->
         let src = Locality_morph.src_full lm2 in
         Core (Noalloc_strict_if_noalloc_full (comonadic_obj_areality src))
-      (* The allocation axis of the output of [Monadic_to_comonadic_min] is
-         [min], which [Alloc_if_noalloc] fixes, so the composition is the
-         constant [min]. Dually for the [max] versions. *)
       | Alloc_if_noalloc_full _, Monadic_to_comonadic_min ->
         Meet_const_core (min dst, Monadic_to_comonadic_min)
       | Alloc_if_noalloc_full _, Monadic_to_comonadic_max ->
@@ -3674,29 +3653,21 @@ module Lattices_mono = struct
         Compose (Core m1, Core m2)
       | Locality_full lm1, Alloc_if_noalloc_full ar2 ->
         begin match Locality_morph.maybe_allowed_left lm1 with
-        | Allowed_left _ ->
-          (* Has a right adjoint so it preserves min *)
-          Core (Alloc_if_noalloc_full ar2)
+        | Allowed_left _ -> Core (Alloc_if_noalloc_full ar2)
         | Not_allowed_left -> Compose (Core m1, Core m2)
         end
       | Locality_full lm1, Noalloc_strict_if_noalloc_full ar2 ->
         begin match Locality_morph.maybe_allowed_right lm1 with
-        | Allowed_right _ ->
-          (* Has a left adjoint so it preserves max *)
-          Core (Noalloc_strict_if_noalloc_full ar2)
+        | Allowed_right _ -> Core (Noalloc_strict_if_noalloc_full ar2)
         | Not_allowed_right -> Compose (Core m1, Core m2)
         end
-      (* Every axis [Comonadic_to_monadic_min] reads is [min] in the output of
-         [Alloc_if_noalloc_full], so the composition is constant. Dually for
-         the [max] versions. *)
       | Comonadic_to_monadic_min _, Alloc_if_noalloc_full ar2 ->
         Meet_const_core (min dst, Comonadic_to_monadic_min ar2)
       | Comonadic_to_monadic_max _, Alloc_if_noalloc_full _ ->
         Compose (Core m1, Core m2)
       | Comonadic_to_monadic_max _, Noalloc_strict_if_noalloc_full ar2 ->
         Core_imply_const
-          ( Comonadic_to_monadic_max ar2,
-            min (areality_comonadic_obj ar2) )
+          (Comonadic_to_monadic_max ar2, min (areality_comonadic_obj ar2))
       | Comonadic_to_monadic_min _, Noalloc_strict_if_noalloc_full _ ->
         Compose (Core m1, Core m2)
       | Locality_restricted _, _ -> .
@@ -6278,8 +6249,7 @@ module Allocation = struct
 
   let alloc_if_noalloc m =
     m |> disallow_right
-    |> wrap (fun m ->
-           S.Unhint.apply Obj.obj (Simple (Core Alloc_if_noalloc)) m)
+    |> wrap (fun m -> S.Unhint.apply Obj.obj (Simple (Core Alloc_if_noalloc)) m)
 
   module Guts = struct
     let get_ceil m = Guts.get_ceil m
