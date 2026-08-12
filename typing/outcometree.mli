@@ -62,7 +62,7 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_code of CamlinternalQuote.Code.t
+  | Oval_quote of CamlinternalQuote.Code.t
   | Oval_floatarray of floatarray
 
 type out_modality = string
@@ -148,6 +148,7 @@ and out_type =
   | Otyp_newlayout of out_sort_genvar list * out_type
   | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
+  | Otyp_mod of out_type * out_modality list
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
@@ -241,6 +242,7 @@ and out_type_extension =
 and out_val_decl =
   { oval_name: string;
     oval_type: out_type;
+    oval_poly: bool;
     oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)
     oval_prims: string list;

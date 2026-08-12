@@ -170,6 +170,8 @@ module Typ = struct
         match jkind.pjka_desc with
         | Pjk_default as x -> x
         | Pjk_abbreviation _ as x -> x
+        | Pjk_operator (jkind, sa) ->
+          Pjk_operator (loop_jkind jkind, sa)
         | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
         | Pjk_with (jkind, typ, modalities) ->
           Pjk_with (loop_jkind jkind, loop typ, modalities)

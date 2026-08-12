@@ -51,6 +51,7 @@ module type Sort = sig
     | Vec128  (** Unboxed 128-bit simd vectors *)
     | Vec256  (** Unboxed 256-bit simd vectors *)
     | Vec512  (** Unboxed 512-bit simd vectors *)
+    | Mask  (** Unboxed 64-bit AVX512 mask registers *)
 
   (** A sort variable that can be unified during type-checking. *)
   type var
@@ -99,6 +100,8 @@ module type Sort = sig
 
     val vec512 : t
 
+    val mask : t
+
     module Debug_printers : sig
       val t : Format.formatter -> t -> unit
     end
@@ -124,8 +127,6 @@ module type Sort = sig
 
     val for_block_element : t
 
-    val for_array_get_result : t
-
     val for_array_comprehension_element : t
 
     val for_list_element : t
@@ -135,15 +136,7 @@ module type Sort = sig
         make the code clearer. *)
     val for_function : t
 
-    val for_probe_body : t
-
-    val for_poly_variant : t
-
     val for_object : t
-
-    val for_initializer : t
-
-    val for_method : t
 
     val for_module : t
 
@@ -151,8 +144,6 @@ module type Sort = sig
     val for_predef_scannable : t
 
     val for_tuple : t
-
-    val for_idx : t
 
     val for_loop_index : t
 
@@ -184,6 +175,9 @@ module type Sort = sig
     (** Checks whether a [var] satisfies the properties that hold for variables
         saved to a cmi. *)
     val is_cmi_var : var -> bool
+
+    (** Checks whether a [var] is "repr'd" - that is, it has no contents. *)
+    val is_root : var -> bool
 
     (** Extract the unique id for a [var]. Outside of a cmi, equal [id]s imply
         physical equality of [var]s. *)
@@ -401,6 +395,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Or_null_payload of Path.t
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
@@ -414,6 +409,7 @@ module History = struct
     | Class_field
     | Boxed_record
     | Boxed_variant
+    | Boxed
     | Extensible_variant
     | Primitive of Ident.t
     | Type_argument of
@@ -422,6 +418,7 @@ module History = struct
           arity : int
         }
     (* [position] is 1-indexed *)
+    | Or_null_payload of Path.t
     | Tuple
     | Row_variable
     | Polymorphic_variant
@@ -472,7 +469,6 @@ module History = struct
           position : int;
           arity : int
         }
-    | Overapproximation_of_with_bounds
     | Inside_quote
     | Evaluated_quote
     | Old_style_unboxed_type

@@ -338,13 +338,16 @@ let emit_instr = function
   | Kgetdynmet -> out opGETDYNMET
   | Kevent ev -> record_event ev
   | Kperform -> out opPERFORM
-  | Kresume -> out opRESUME
-  | Kresumeterm n -> out opRESUMETERM; out_int n
+  | Kcontinue -> out opCONTINUE
+  | Kcontinueterm n -> out opCONTINUETERM; out_int n
+  | Kdiscontinue -> out opDISCONTINUE
+  | Kdiscontinueterm n -> out opDISCONTINUETERM; out_int n
+  | Kdiscontinue_with_backtrace -> out opDISCONTINUE_WITH_BACKTRACE
+  | Kdiscontinue_with_backtraceterm n ->
+    out opDISCONTINUE_WITH_BACKTRACETERM; out_int n
   | Kreperformterm n -> out opREPERFORMTERM; out_int n
   | Kwith_stack -> out opWITH_STACK
-  | Kwith_stack_bind -> out opWITH_STACK_BIND
   | Kwith_stack_preemptible -> out opWITH_STACK_PREEMPTIBLE
-  | Kwith_stack_bind_preemptible -> out opWITH_STACK_BIND_PREEMPTIBLE
   | Kstop -> out opSTOP
 
 (* Emission of a list of instructions. Include some peephole optimization. *)

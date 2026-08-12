@@ -84,7 +84,7 @@ let r_sym_of_info r_info = Int64.to_int (Int64.shift_right_logical r_info 32)
 (* Extract relocation type from r_info (lower 32 bits) *)
 let r_type_of_info r_info = Int64.logand r_info 0xFFFFFFFFL
 
-let iter_rela_entries ~rela_body ~f =
+let iteri_rela_entries ~rela_body ~f =
   let size = Owee_buf.size rela_body in
   if size mod rela_entry_size <> 0
   then
@@ -92,9 +92,9 @@ let iter_rela_entries ~rela_body ~f =
       "RELA section size %d is not a multiple of entry size %d" size
       rela_entry_size;
   let num_entries = size / rela_entry_size in
+  (* A single cursor advances through the whole section. *)
+  let cursor = Owee_buf.cursor rela_body in
   for i = 0 to num_entries - 1 do
-    let entry_offset = i * rela_entry_size in
-    let cursor = Owee_buf.cursor rela_body ~at:entry_offset in
     let r_offset = Owee_buf.Read.u64 cursor in
     let r_info = Owee_buf.Read.u64 cursor in
     let r_addend = Owee_buf.Read.u64 cursor in
@@ -105,39 +105,8 @@ let iter_rela_entries ~rela_body ~f =
         r_addend
       }
     in
-    f entry
+    f ~index:i entry
   done
-
-(* Elf64_Sym layout:
-   st_name  (4 bytes, offset 0)  - index into string table
-   st_info  (1 byte,  offset 4)  - type and binding
-   st_other (1 byte,  offset 5)  - visibility
-   st_shndx (2 bytes, offset 6)  - section header index
-   st_value (8 bytes, offset 8)  - value
-   st_size  (8 bytes, offset 16) - size *)
-
-let read_symbol_name ~symtab_body ~strtab_body ~sym_index =
-  let sym_offset = sym_index * sym_entry_size in
-  if sym_offset >= Owee_buf.size symtab_body
-  then None
-  else
-    let cursor = Owee_buf.cursor symtab_body ~at:sym_offset in
-    let st_name = Owee_buf.Read.u32 cursor in
-    (* Read null-terminated string from strtab *)
-    if st_name >= Owee_buf.size strtab_body
-    then None
-    else
-      let cursor = Owee_buf.cursor strtab_body ~at:st_name in
-      Owee_buf.Read.zero_string cursor ()
-
-let read_symbol_shndx ~symtab_body ~sym_index =
-  let sym_offset = sym_index * sym_entry_size in
-  if sym_offset >= Owee_buf.size symtab_body
-  then None
-  else
-    (* st_shndx is at offset 6 within the symbol entry *)
-    let cursor = Owee_buf.cursor symtab_body ~at:(sym_offset + 6) in
-    Some (Section_index.of_int (Owee_buf.Read.u16 cursor))
 
 (* Construct r_info from symbol index and relocation type *)
 let make_r_info ~sym ~typ =
@@ -187,11 +156,18 @@ end
 let make_st_info ~binding ~typ =
   (Symbol_binding.to_int binding lsl 4) lor Symbol_type.to_int typ
 
+(* Elf64_Sym layout:
+   st_name  (4 bytes, offset 0)  - index into string table
+   st_info  (1 byte,  offset 4)  - type and binding
+   st_other (1 byte,  offset 5)  - visibility
+   st_shndx (2 bytes, offset 6)  - section header index
+   st_value (8 bytes, offset 8)  - value
+   st_size  (8 bytes, offset 16) - size *)
 type sym_entry =
   { st_name : int;
     st_info : int;
     st_other : int;
-    st_shndx : int;
+    st_shndx : Section_index.t;
     st_value : int64;
     st_size : int64
   }
@@ -200,6 +176,6 @@ let write_sym_entry ~cursor entry =
   Owee_buf.Write.u32 cursor entry.st_name;
   Owee_buf.Write.u8 cursor entry.st_info;
   Owee_buf.Write.u8 cursor entry.st_other;
-  Owee_buf.Write.u16 cursor entry.st_shndx;
+  Owee_buf.Write.u16 cursor (Section_index.to_int entry.st_shndx);
   Owee_buf.Write.u64 cursor entry.st_value;
   Owee_buf.Write.u64 cursor entry.st_size

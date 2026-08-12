@@ -115,14 +115,16 @@ let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
   mode
 
-let register_allocation () : Alloc.lr * Value.lr =
+let register_allocation loc : Alloc.lr * Value.lr =
   let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
       { Alloc.Const.max with areality = Global }
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
-  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
+  let closed_over_mode =
+    alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
+  in
   alloc_mode, closed_over_mode
 
 open Typedtree
@@ -240,9 +242,20 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
       raise (Error (loc, env, exn tj))
 
 (* Extract the signature and the mode of a functor's return, given the signature
-   [sig_acc] and mode [md_mode] of the functor argument. *)
-let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
+   [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
+   mode of the functor expression itself. *)
+let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
+      ~funct_mode =
   let sig_acc = List.rev sig_acc in
+  (* Applying the functor runs its body, which can perform a free effect if the
+     functor closes over a yielding value (its own mode) or if the enclosing
+     structure it is applied to is yielding (the argument's mode). *)
+  let yielding =
+    let yielding m =
+      Yielding.disallow_right (Value.proj_comonadic Yielding m)
+    in
+    Yielding.join [yielding funct_mode; yielding md_mode]
+  in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
     as mty_func ->
@@ -281,14 +294,15 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr }, sg_result, mm_result
+            Tincl_functor { input_coercion; input_repr; yielding }, sg_result,
+            mm_result
         | Mty_functor (Unit, mty_result, mm_result) -> begin
             check_for_generated_type_or_jkind ~funct_body env loc mty
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr }, sg_result,
-              mm_result
+              Tincl_gen_functor { input_coercion; input_repr; yielding },
+              sg_result, mm_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg, mm_result))))
           end
@@ -317,8 +331,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
 let type_open_ ?(used_slot=ref false) ?(toplevel=false) ovf env loc lid =
   Env.open_signature ~loc ~used_slot ~toplevel ovf lid env
 
-let initial_env ~loc ~initially_opened_module
-    ~open_implicit_modules =
+let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let env = Lazy.force Env.initial in
   let open_module env m =
     let open Asttypes in
@@ -329,6 +342,13 @@ let initial_env ~loc ~initially_opened_module
     in
     let _, _, env = type_open_ Override env loc {txt;loc} in
     env
+  in
+  let process_open_arg env (arg : Clflags.open_arg) =
+    match arg with
+    | Open m -> open_module env m
+    | Open_cmi cmi ->
+        let _, env = Env.open_pers_signature_cmi cmi env in
+        env
   in
   let add_units env units =
     String.Set.fold
@@ -373,7 +393,10 @@ let initial_env ~loc ~initially_opened_module
   let units_from_filenames =
     Env.persistent_structures_of_basenames basenames in
   let env = add_units env units_from_filenames in
-  List.fold_left open_module env open_implicit_modules
+  (* Process [-open] and [-open-cmi] in command-line order, so an [-open]
+     can refer to a module brought into scope by an earlier [-open-cmi]
+     (and vice-versa: a later [-open-cmi] shadows an earlier [-open]). *)
+  List.fold_left process_open_arg env open_implicit_args
 
 let type_open_descr ?used_slot ?toplevel env sod =
   let (path, _, newenv) =
@@ -705,11 +728,11 @@ let type_decl_is_alias sdecl = (* assuming no explicit constraint *)
 
 let kind_decl_is_alias sdecl =
   match sdecl.pjkind_manifest with
-  | Some { pjka_desc = Pjk_abbreviation (lid, []); _ } -> Some lid
+  | Some { pjka_desc = Pjk_abbreviation lid; _ } -> Some lid
   | None
   | Some { pjka_desc =
-             ( Pjk_abbreviation (_, _ :: _) | Pjk_default | Pjk_mod _
-             | Pjk_with _ | Pjk_kind_of _ | Pjk_product _ ); _ }
+             ( Pjk_operator _ | Pjk_default | Pjk_mod _ | Pjk_with _
+             | Pjk_kind_of _ | Pjk_product _ ); _ }
     -> None
 
 let params_are_constrained =
@@ -1392,11 +1415,12 @@ and apply_modalities_module_type env modalities = function
   | (Mty_functor _ | Mty_alias _) as mty -> mty
 
 let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
-  modalities =
+    ?(allow_redundant_staticity = false) modalities =
   match modalities with
   | [] -> { moda_modalities = default_modalities; moda_desc = [] }
   | _ :: _ ->
     Typemode.transl_modalities_with_default
+      ~allow_redundant_staticity
       ~default:default_modalities ~maturity:Stable modalities
 
 let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
@@ -2173,7 +2197,17 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
   in
   ((path, lid, constr) :: rev_tcstrs, sg)
 
-and transl_signature env {psg_items; psg_modalities; psg_loc} =
+and add_implicit_jkinds env attrs =
+  let register_default env (var_name, jkind_annot) =
+    let context = Jkind.History.Implicit_jkind var_name in
+    Env.add_implicit_jkind
+      ~loc:jkind_annot.pjka_loc var_name
+      (Jkind.of_annotation ~context env jkind_annot) env
+  in
+  List.fold_left register_default env attrs
+
+and transl_signature ?(interface_toplevel = false) env
+      {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
   (* We assume the structure (described by the signature) to be at legacy mode,
@@ -2181,7 +2215,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
   (* CR-soon zqian: make it a parameter instead *)
   let md_mode = Value.legacy in
 
-  let sig_modalities = transl_modalities psg_modalities in
+  let sig_modalities =
+    transl_modalities ~allow_redundant_staticity:interface_toplevel
+      psg_modalities
+  in
 
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
@@ -2195,8 +2232,10 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
+        let funct_mode = Value.disallow_right Value.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
+            ~funct_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -2525,15 +2564,7 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
     | Psig_attribute attr ->
         Builtin_attributes.parse_standard_interface_attributes attr;
         let newenv =
-          let register_default env (var_name, jkind_annot) =
-            let context =
-              Jkind.History.Implicit_jkind var_name
-            in
-            Env.add_implicit_jkind
-              ~loc:jkind_annot.pjka_loc var_name
-              (Jkind.of_annotation ~context env jkind_annot) env
-          in
-          List.fold_left register_default env
+          add_implicit_jkinds env
             (Builtin_attributes.get_implicit_jkind_attr attr)
         in
         mksig (Tsig_attribute attr) env loc, [], newenv
@@ -2728,7 +2759,7 @@ exception Not_a_path
 let rec path_of_module mexp =
   match mexp.mod_desc with
   | Tmod_ident (p,_) -> p
-  | Tmod_apply(funct, arg, _coercion) when !Clflags.applicative_functors ->
+  | Tmod_apply(funct, arg, _coercion, _) when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
       path_of_module mexp
@@ -2964,7 +2995,30 @@ let check_recmodule_inclusion env bindings =
       in
       List.map check_inclusion bindings
     end
-  in check_incl true (List.length bindings) env Subst.identity
+  in
+  (* [n_max = List.length bindings] is taken from the upstream compiler.
+     It's still insufficient to check some cases, but we stop there. *)
+  let n_max = List.length bindings in
+  let check depth = check_incl true depth env Subst.identity in
+  let attempt depth =
+    if depth >= n_max
+    then None
+    else
+      match check depth with
+      | result -> Some result
+      | exception (Out_of_memory | Stack_overflow | Sys.Break as exn) ->
+        raise exn
+      (* Fall back to a more exhaustive check on compiler errors. *)
+      | exception _ -> None
+  in
+  (* Attempt depths 1 and 2 first to save on compilation time
+     in the successful case. *)
+  match attempt 1 with
+  | Some result -> result
+  | None ->
+  match attempt 2 with
+  | Some result -> result
+  | None -> check n_max
 
 (* Helper for unpack *)
 
@@ -3172,7 +3226,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_allocation ()
+        register_allocation sbody.pmod_loc
       in
       let newenv =
         Env.add_closure_lock
@@ -3409,6 +3463,14 @@ and type_application loc ~strengthen ~funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
+  (* Applying a functor runs its body, which can perform a free effect if the
+     functor closes over a yielding value (its own mode) or is given a yielding
+     argument (the argument's mode). *)
+  let functor_application_yielding ~funct ~arg_mode =
+    let yielding m = Value.proj_comonadic Yielding m in
+    Yielding.join
+      [yielding (mode_without_locks_exn funct.mod_mode); yielding arg_mode]
+  in
   (* CR modes: Apply currying constraints if the application is partial
      and returns a functor, similar to constraints for functions.
 
@@ -3450,7 +3512,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
         ~mode_arg:None;
-      { mod_desc = Tmod_apply_unit funct;
+      { mod_desc =
+          Tmod_apply_unit
+            (funct,
+             functor_application_yielding ~funct
+               ~arg_mode:(Value.disallow_right Value.legacy));
         mod_type = mty_res;
         mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
         mod_env = env;
@@ -3539,7 +3605,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
-      { mod_desc = Tmod_apply(funct, arg, coercion);
+      { mod_desc =
+          Tmod_apply
+            (funct, arg, coercion,
+             functor_application_yielding ~funct
+               ~arg_mode:(fst arg.mod_mode));
         mod_type = mty_appl;
         mod_mode = Value.disallow_right mm_res, None;
         mod_env = env;
@@ -3631,11 +3701,9 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     open_descr, mode, sg, newenv
 
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
-  (* CR implicit-types: implement implicit variable jkinds in structures. *)
-  let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
-  let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
+  let _, md_mode = register_allocation loc_md in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -3648,9 +3716,10 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
+        let funct_mode = Typedtree.mode_without_locks_exn modl.mod_mode in
         let sg, mode, incl_kind =
           extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode
+            modl.mod_type sig_acc md_mode ~funct_mode
         in
         incl_kind, sg, Value.disallow_right mode
       | Structure ->
@@ -4068,7 +4137,11 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Pstr_attribute x ->
         Builtin_attributes.parse_standard_implementation_attributes x;
-        Tstr_attribute x, [], shape_map, env
+        let new_env =
+          add_implicit_jkinds env
+            (Builtin_attributes.get_implicit_jkind_attr x)
+        in
+        Tstr_attribute x, [], shape_map, new_env
     | Pstr_jkind x ->
         let id, env, decl = Typedecl.transl_jkind_decl env x in
         Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
@@ -4297,7 +4370,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation () in
+  let _, mode = register_allocation modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
@@ -4405,8 +4478,8 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
                       Argument_for_non_parameter (arg_module, arg_filename)));
       let modes =
         Includecore.Specific
-          ((Env.mode_unit ~staticity:actual_staticity, None),
-           Env.mode_unit ~staticity:arg_staticity)
+          ((Persistent_env.mode_pers_mod actual_staticity, None),
+           Persistent_env.mode_pers_mod arg_staticity)
       in
       let coercion =
         Includemod.compunit_as_argument
@@ -4446,7 +4519,7 @@ let type_implementation target modulename initial_env ast =
         Profile.record_call "infer" (fun () -> type_structure initial_env ast)
       in
       Value.submode_err (Location.in_file sourcefile, Structure)
-        mode (Env.mode_unit ~staticity:Staticity.Dynamic);
+        mode (Persistent_env.mode_pers_mod Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4528,7 +4601,8 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
-                  ((mode, None), Env.mode_unit ~staticity))
+                  ((mode, None),
+                   Persistent_env.mode_pers_mod staticity))
                 sg compiled_intf_file_name dclsig shape)
           in
           (* Check the _mli_ against the argument type, since the mli determines
@@ -4568,7 +4642,9 @@ let type_implementation target modulename initial_env ast =
             (* No [.mli], so the inferred signature has no file-level [@@]
                and is at [Dynamic] on both sides. *)
             let modes =
-              let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+              let mode =
+                Persistent_env.mode_pers_mod Dynamic
+              in
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
@@ -4662,7 +4738,7 @@ let type_interface ~sourcefile modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
-  let sg = transl_signature env ast in
+  let sg = transl_signature ~interface_toplevel:true env ast in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
@@ -4758,7 +4834,7 @@ let package_units initial_env objfiles target_cmi modulename =
       (Staticity.of_const Staticity.Dynamic);
     let cc, _shape =
       let modes =
-        let mode = Env.mode_unit ~staticity:Staticity.Dynamic in
+        let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
       Includemod.compunit initial_env ~mark:true

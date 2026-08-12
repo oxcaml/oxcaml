@@ -2,10 +2,10 @@ let code `fn[symbol_projections7.ml:20,4--18]_1` deleted in
 let y = %opaque (2) in
 let $`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2` =
   closure `fn[symbol_projections7.ml:20,4--18]_1_1`
-    @`fn[symbol_projections7.ml:20,4--18]`
+    @`fn[symbol_projections7.ml:20,4--18]` &toplevel.alloc_region
 and code loopify(never) size(4) newer_version_of(`fn[symbol_projections7.ml:20,4--18]_1`)
       `fn[symbol_projections7.ml:20,4--18]_1_1` (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let y_1 =
