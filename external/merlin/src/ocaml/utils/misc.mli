@@ -290,6 +290,10 @@ module Stdlib : sig
         to have different lengths.
     *)
 
+    val fold_lefti : (int -> 'acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc
+    (** [fold_lefti f init a] is like [Array.fold_left] but [f] also takes
+        as parameter the zero-based index of the element *)
+
     val for_alli : (int -> 'a -> bool) -> 'a array -> bool
     (** Same as [Array.for_all] from the standard library, but the
         function is applied with the index of the element as first argument,
@@ -573,9 +577,7 @@ val letter_of_int : int -> string
 
 module Int_literal_converter : sig
   val int : string -> int
-    (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
-        this function accepts the string representation of [max_int + 1]
-        and returns [min_int] in this case. *)
+    (** Convert a string to an integer. *)
 
   val int8 : string -> int
     (** Likewise, at type [int8] *)

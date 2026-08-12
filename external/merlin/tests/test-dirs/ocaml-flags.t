@@ -207,7 +207,11 @@ logic.
   -fPIC
   -favx
   -favx2
+  -favx512bw
+  -favx512cd
+  -favx512dq
   -favx512f
+  -favx512vl
   -fbmi
   -fbmi2
   -fclmul
@@ -264,7 +268,11 @@ logic.
   -fno-asan
   -fno-avx
   -fno-avx2
+  -fno-avx512bw
+  -fno-avx512cd
+  -fno-avx512dq
   -fno-avx512f
+  -fno-avx512vl
   -fno-bmi
   -fno-bmi2
   -fno-clmul
@@ -404,6 +412,7 @@ logic.
   -no-mach-ir
   -no-manual-module-init
   -no-ocamlcfg
+  -no-omit-leaf-frame-pointers
   -no-principal
   -no-probes
   -no-probes-optimized
@@ -424,6 +433,8 @@ logic.
   -no-x86-peephole-optimize
   -no-x86-peephole-remove-mov-to-dead-register
   -no-x86-peephole-remove-redundant-cmp
+  -no-x86-peephole-remove-redundant-extension
+  -no-x86-peephole-remove-redundant-test
   -no-zero-alloc-checker-details-extra
   -noassert
   -noautolink
@@ -435,6 +446,7 @@ logic.
   -o
   -ocamlcfg
   -ocamlrunparam
+  -omit-leaf-frame-pointers
   -only-erasable-extensions
   -opaque
   -open

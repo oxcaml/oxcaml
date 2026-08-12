@@ -262,6 +262,7 @@ type error =
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
   | Mixed_record_atomic_loc of Longident.t
+  | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -302,7 +303,7 @@ type error =
   | Block_access_bad_record of string
   | Block_index_modality_mismatch of
       { mut : bool; err : Modality.equate_error }
-  | Block_index_atomic_unsupported
+  | Mutable_block_index_polymorphic_field of Longident.t
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -316,6 +317,12 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Function_type_escapes_partial_match of
+      { ty : type_expr;
+        match_loc : Location.t;
+        kind : [`Argument | `Result];
+        why : [`Partial_match | `Optional_argument];
+      }
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t
   | Mutable_var_not_rep of type_expr * Jkind.Violation.t
@@ -1443,9 +1450,11 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc ~loc ~env record_repres mutability lid =
-  if not (Types.is_atomic mutability) then
+let check_atomic_loc ~loc ~env record_repres label lid =
+  if not (Types.is_atomic label.lbl_mut) then
     raise (error (loc, env, Label_not_atomic lid));
+  if is_poly_Tpoly label.lbl_arg then
+    raise (error (loc, env, Polymorphic_atomic_loc lid));
   match record_repres with
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
@@ -1459,6 +1468,22 @@ let check_atomic_loc ~loc ~env record_repres mutability lid =
   (* We should know record representation at this point. *)
   | Record_dummy _ | Record_variable ->
       Misc.fatal_error "check_atomic_loc: unexpected record representation"
+
+(* Mutable indices to polymorphic fields cannot be taken, as they would allow
+   writing non-polymorphic values. *)
+let check_index_not_to_poly_field ~env ba uas =
+  let check lid lbl_arg =
+    if is_poly_Tpoly lbl_arg then
+      raise
+        (Error (lid.loc, env, Mutable_block_index_polymorphic_field lid.txt))
+  in
+  begin match ba with
+  | Baccess_field (lid, label, _) -> check lid label.lbl_arg
+  | Baccess_block _ -> ()
+  end;
+  List.iter
+    (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
+    uas
 
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
@@ -5317,7 +5342,7 @@ let rec is_nonexpansive exp =
   | Texp_function _
   | Texp_probe_is_enabled _
   | Texp_src_pos
-  | Texp_quotation _
+  | Texp_quote _
   | Texp_array (_, _, [], _)
   | Texp_typed_hole -> true
   | Texp_let(_rec_flag, pat_exp_list, body) ->
@@ -5436,7 +5461,7 @@ let rec is_nonexpansive exp =
   | Texp_override _
   | Texp_letexception _
   | Texp_letop _
-  | Texp_antiquotation _
+  | Texp_splice _
   | Texp_extension_constructor _ ->
     false
   | Texp_exclave e -> is_nonexpansive e
@@ -5558,7 +5583,7 @@ let rec maybe_computation exp =
     List.exists maybe_computation exps
   | Texp_hole _ ->
     false
-  | Texp_quotation exp ->
+  | Texp_quote exp ->
     (* Approximate quote values as quotes of values.
        Note that splices are always considered computations. *)
     maybe_computation exp
@@ -5599,7 +5624,7 @@ let rec maybe_computation exp =
   | Texp_exclave _
   | Texp_src_pos
   | Texp_overwrite _
-  | Texp_antiquotation _
+  | Texp_splice _
   | Texp_apply_layout _
     -> true
   | Texp_typed_hole -> false
@@ -6025,7 +6050,7 @@ let check_partial_application ~statement exp =
             | Texp_lazy _ | Texp_object _ | Texp_pack _ | Texp_unreachable
             | Texp_extension_constructor _ | Texp_ifthenelse (_, _, None)
             | Texp_probe _ | Texp_probe_is_enabled _ | Texp_src_pos
-            | Texp_function _ | Texp_quotation _ | Texp_antiquotation _ ->
+            | Texp_function _ | Texp_quote _ | Texp_splice _ ->
                 check_statement ()
             | Texp_match (_, _, cases, eff_cases, _) ->
                 List.iter (fun {c_rhs; _} -> check c_rhs) cases;
@@ -6511,6 +6536,84 @@ type type_function_result_param =
     has_poly : bool;
   }
 
+module Calling_convention_sort : sig
+  (* A sort reflected in the function's calling convention.
+
+     We can't allow constraints from parameters which partially match on GADTs
+     to justify the function's argument/return sorts, as a caller can still pass
+     a constructor missing from the partial match. See oxcaml/oxcaml#6689. *)
+  type t =
+    { ccs_ty : type_expr;
+      ccs_sort : Jkind.sort;
+      (* The environment the sort was derived in. *)
+      ccs_env : Env.t;
+      ccs_loc : Location.t;
+      ccs_kind : [`Argument | `Result];
+    }
+
+  val check_doesn't_rely_on_partial_match :
+    partial:partial -> has_default:bool -> match_loc:Location.t ->
+    outer_env:Env.t -> branch_env:Env.t -> t list -> unit
+end = struct
+  type t =
+    { ccs_ty : type_expr;
+      ccs_sort : Jkind.sort;
+      ccs_env : Env.t;
+      ccs_loc : Location.t;
+      ccs_kind : [`Argument | `Result];
+    }
+
+  let added_constraints_from_partial_match
+        ~partial ~has_default ~outer_env ~branch_env =
+    if not (Env.local_constraints_have_been_added ~since:outer_env branch_env)
+    then None
+    else
+      match partial, has_default with
+      | Total, false -> None
+      | Partial, _ -> Some `Partial_match
+      (* Optional arguments can be omitted, so they are effectively partial *)
+      | Total, true -> Some `Optional_argument
+
+  let check_doesn't_rely_on_partial_match
+        ~partial ~has_default ~match_loc ~outer_env ~branch_env ts =
+    match
+      added_constraints_from_partial_match ~partial ~has_default ~outer_env
+        ~branch_env
+    with
+    | None -> ()
+    | Some why ->
+      List.iter
+        (fun { ccs_ty; ccs_sort; ccs_env; ccs_loc; ccs_kind } ->
+          (* Try to re-derive the same sort using an environment without local
+             constraints added since [outer_env].
+
+             This is an approximate check of whether the sort relies on a
+             partial match, as it also disallows depending on parameters which
+             totally match on a GADT. *)
+          let weak_env =
+            Env.revert_local_constraints ccs_env ~since:outer_env
+          in
+          let sort_why =
+            match ccs_kind with
+            | `Argument -> Jkind.History.Function_argument
+            | `Result -> Jkind.History.Function_result
+          in
+          let ok =
+            match
+              Ctype.type_sort ~why:sort_why ~fixed:true weak_env ccs_ty
+            with
+            | Ok sort -> Jkind.Sort.equate sort ccs_sort
+            | Error _ -> false
+          in
+          if not ok then
+            raise
+              (Error
+                 (ccs_loc, ccs_env,
+                  Function_type_escapes_partial_match
+                    { ty = ccs_ty; match_loc; kind = ccs_kind; why })))
+        ts
+end
+
 (* The result of calling [type_function]. For the outer call to
    [type_function], it's the result of typechecking the entire function;
    for recursive calls to [type_function], it's the result of typechecking
@@ -6535,6 +6638,8 @@ type type_function_result =
        left.
     *)
     ret_info: type_function_ret_info option;
+    (* The argument/result sorts of this parameter suffix. *)
+    calling_convention_sorts: Calling_convention_sort.t list;
   }
 
 and type_function_ret_info =
@@ -7984,15 +8089,16 @@ and type_expect_
     let mut =
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ }, _)
-      | Baccess_block (Immutable, _) ->
-        false
+      | Baccess_block (Immutable_access, _) ->
+        Immutable
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
-      | Baccess_block (Mutable, _) ->
-        true
+      | Baccess_block (Mutable_access, _) ->
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic }
       | Baccess_field
-          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _) ->
-        raise (error(loc, env, Block_index_atomic_unsupported))
+          (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _)
+      | Baccess_block (Atomic_access, _) ->
+        Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Atomic }
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -8011,18 +8117,26 @@ and type_expect_
         (el_ty, modality)
         uas
     in
-    let expected_modality = Typemode.idx_expected_modalities ~mut in
+    let is_mutable = Types.is_mutable mut in
+    if is_mutable then check_index_not_to_poly_field ~env ba uas;
+    let expected_modality =
+      Typemode.idx_expected_modalities ~mut:is_mutable
+    in
     begin
       match Modality.Const.equate modality expected_modality with
       | Ok () -> ()
       | Error err ->
-        raise (error(loc, env, Block_index_modality_mismatch { mut; err }))
+        raise (error(
+          loc, env,
+          Block_index_modality_mismatch { mut = is_mutable; err }
+        ))
     end;
-    let ty =
-      if mut then
+    let ty = match mut with
+      | Immutable -> Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Nonatomic; mode = _ } ->
         Predef.type_idx_mut base_ty el_ty
-      else
-        Predef.type_idx_imm base_ty el_ty
+      | Mutable { atomic = Atomic; mode = _ } ->
+        Predef.type_idx_atomic base_ty el_ty
     in
     with_explanation (fun () ->
       unify_exp_types loc env ty (generic_instance ty_expected));
@@ -8801,7 +8915,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-          check_atomic_loc ~loc ~env record_repres label.lbl_mut lid.txt;
+          check_atomic_loc ~loc ~env record_repres label lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -8973,7 +9087,7 @@ and type_expect_
       let expected_comonadic_mode = (as_single_mode expected_mode).comonadic in
       let new_env =
         env
-        |> Env.enter_quotation
+        |> Env.enter_quote
         |> Env.add_closure_lock (loc, Quote) expected_comonadic_mode
       in
       let ty = newgenvar (Jkind.Builtin.any ~why:Inside_quote) in
@@ -8993,7 +9107,7 @@ and type_expect_
       if maybe_computation arg then
         submode ~loc ~env ~reason:Other mode_computation_quoted expected_mode;
       re {
-        exp_desc = Texp_quotation arg;
+        exp_desc = Texp_quote arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
@@ -9015,7 +9129,7 @@ and type_expect_
       let ty = Predef.type_expr (newgenty (Tquote ty_expected)) in
       let arg = type_expect new_env mode_spliced exp (mk_expected ty) in
       re {
-        exp_desc = Texp_antiquotation arg;
+        exp_desc = Texp_splice arg;
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
         exp_attributes = sexp.pexp_attributes;
@@ -9100,13 +9214,18 @@ and type_block_access env expected_base_ty principal
     in
     let idx_type_expected =
       match mut with
-      | Immutable -> Predef.type_idx_imm base_ty el_ty
-      | Mutable -> Predef.type_idx_mut base_ty el_ty
+      | Immutable_access -> Predef.type_idx_imm base_ty el_ty
+      | Mutable_access -> Predef.type_idx_mut base_ty el_ty
+      | Atomic_access -> Predef.type_idx_atomic base_ty el_ty
     in
     let idx =
       type_expect env mode_legacy idx (mk_expected idx_type_expected) in
     let ba = Baccess_block (mut, idx) in
-    let mut = match mut with Immutable -> false | Mutable -> true in
+    let mut =
+      match mut with
+      | Immutable_access -> false
+      | Mutable_access | Atomic_access -> true
+    in
     let modality = Typemode.idx_expected_modalities ~mut in
     { ba; base_ty; el_ty; modality }
 
@@ -9509,6 +9628,7 @@ and type_function
         params_contain_gadt = No_gadt;
         fun_alloc_mode = Some (Alloc.newvar ());
         ret_info = Some ret_info;
+        calling_convention_sorts = []
       })
 
 (* Typecheck parameters one at a time followed by the body. Later parameters
@@ -9536,12 +9656,13 @@ and type_function_
   match params_suffix with
   | { pparam_desc = Pparam_newtype (newtype_var, jkind_annot) } :: rest ->
       (* Check everything else in the scope of (type a). *)
-      let (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info),
+      let (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
+           calling_convention_sorts),
           exp_type, id, uid =
         type_newtype env newtype_var jkind_annot (fun env ->
           let { function_ = exp_type, params, body;
                 newtypes; params_contain_gadt = contains_gadt;
-                fun_alloc_mode; ret_info;
+                fun_alloc_mode; ret_info; calling_convention_sorts;
               }
             =
             (* mimic the typing of Pexp_newtype by minting a new type var,
@@ -9551,7 +9672,8 @@ and type_function_
               (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
               rest body_constraint body ~in_function ~first
           in
-          (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info),
+          (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
+           calling_convention_sorts),
           exp_type)
       in
       let newtype = id, newtype_var, jkind_annot, uid in
@@ -9593,7 +9715,7 @@ and type_function_
       end;
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
-        fun_alloc_mode; ret_info;
+        fun_alloc_mode; ret_info; calling_convention_sorts;
       }
   | { pparam_desc = Pparam_val (arg_label, default_arg, pat); pparam_loc }
       :: rest
@@ -9689,7 +9811,8 @@ and type_function_
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
       in
-      let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
+      let (pat, params, body, ret_info, newtypes, contains_gadt, curry,
+           ext_env, inner_calling_convention_sorts), partial =
         (* Check everything else in the scope of the parameter. *)
         map_half_typed_cases Value env expected_pat_mode
           ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
@@ -9701,7 +9824,7 @@ and type_function_
               ~contains_gadt:param_contains_gadt ->
               let { function_ = _, params_suffix, body;
                     newtypes; params_contain_gadt = suffix_contains_gadt;
-                    fun_alloc_mode; ret_info;
+                    fun_alloc_mode; ret_info; calling_convention_sorts;
                   }
                 =
                 type_function ext_env expected_inner_mode ty_expected
@@ -9744,7 +9867,8 @@ and type_function_
                   end;
                   More_args {partial_mode = Alloc.disallow_right fun_alloc_mode}
               in
-              pat, params_suffix, body, ret_info, newtypes, contains_gadt, curry
+              pat, params_suffix, body, ret_info, newtypes, contains_gadt,
+              curry, ext_env, calling_convention_sorts
           end
         |> function
           (* The result must be a singleton because we passed a singleton
@@ -9752,6 +9876,9 @@ and type_function_
         | [ result ], partial -> result, partial
         | ([] | _ :: _ :: _), _ -> assert false
       in
+      Calling_convention_sort.check_doesn't_rely_on_partial_match ~partial
+        ~has_default:(Option.is_some default_arg) ~match_loc:pat.pat_loc
+        ~outer_env:env ~branch_env:ext_env inner_calling_convention_sorts;
       let exp_type =
         instance
           (newgenty
@@ -9845,6 +9972,30 @@ and type_function_
             };
         }
       in
+      let calling_convention_sorts =
+        (* These sorts are added after the call to
+           [Calling_convention_sort.check_doesn't_rely_on_partial_match]
+           above, so they aren't checked against this parameter's own pattern.
+
+           This is sound as:
+           1. A parameter pattern cannot refine its own sort
+           2. The result type is created outside of the scope of the last
+              parameter's pattern *)
+        let arg_ccs =
+          { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
+            ccs_env = env; ccs_loc = pparam_loc; ccs_kind = `Argument }
+        in
+        (* [ret_info] is [None] only in the innermost recursive call to
+           [type_function], when it is initially computed. In the other calls,
+           the result sort is already in [inner_calling_convention_sorts]. *)
+        let ret_ccs =
+          if Option.is_some ret_info then []
+          else
+            [ { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
+                ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
+        in
+        arg_ccs :: ret_ccs @ inner_calling_convention_sorts
+      in
       let ret_info =
         match ret_info with
         | Some _ as x -> x
@@ -9857,9 +10008,10 @@ and type_function_
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
         ret_info; fun_alloc_mode = Some alloc_mode;
+        calling_convention_sorts;
       }
   | [] ->
-    let exp_type, body, fun_alloc_mode, ret_info =
+    let exp_type, body, fun_alloc_mode, ret_info, calling_convention_sorts =
       let { ret_type_constraint; mode_annotations; ret_mode_annotations } =
         body_constraint
       in
@@ -9901,14 +10053,15 @@ and type_function_
               let extra = Texp_mode type_mode, body_loc, [] in
               { body with exp_extra = extra :: body.exp_extra }
           in
-          body.exp_type, Tfunction_body body, None, None
+          body.exp_type, Tfunction_body body, None, None, []
       | Pfunction_cases (cases, _, attributes) ->
           let type_cases_expect env expected_mode ty_expected =
             type_function_cases_expect
               env expected_mode ty_expected loc cases attributes ~in_function
               ~first
           in
-          let (cases, exp_type, fun_alloc_mode, ret_info), exp_extra =
+          let (cases, exp_type, fun_alloc_mode, ret_info,
+               calling_convention_sorts), exp_extra =
             match ret_type_constraint with
             | None -> type_cases_expect env expected_mode ty_expected, []
             | Some constraint_ ->
@@ -9926,20 +10079,24 @@ and type_function_
               let function_cases_constraint_arg =
                 { is_self = (fun _ -> false);
                   type_with_constraint = (fun env expected_mode ty ->
-                    let cases, _, fun_alloc_mode, ret_info =
+                    let cases, _, fun_alloc_mode, ret_info,
+                        calling_convention_sorts =
                       type_cases_expect env expected_mode ty
                     in
-                    cases, fun_alloc_mode, ret_info);
+                    cases, fun_alloc_mode, ret_info, calling_convention_sorts);
                   type_without_constraint = (fun env expected_mode ->
-                    let cases, ty_fun, fun_alloc_mode, ret_info =
+                    let cases, ty_fun, fun_alloc_mode, ret_info,
+                        calling_convention_sorts =
                       (* The analogy to [type_exp] for expressions. *)
                       type_cases_expect env expected_mode
                         (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
                     in
-                    (cases, fun_alloc_mode, ret_info), ty_fun);
+                    (cases, fun_alloc_mode, ret_info, calling_convention_sorts),
+                    ty_fun);
                 }
               in
-              let (body, fun_alloc_mode, ret_info), exp_type, exp_extra =
+              let (body, fun_alloc_mode, ret_info, calling_convention_sorts),
+                  exp_type, exp_extra =
                 type_constraint_expect function_cases_constraint_arg
                   env expected_mode loc type_mode.mode_modes constraint_
                   ty_expected ~loc_arg:loc
@@ -9950,14 +10107,17 @@ and type_function_
                 | _ :: _ ->
                   [ Texp_mode type_mode ; exp_extra ]
               in
-              (body, exp_type, fun_alloc_mode, ret_info), exp_extra
+              (body, exp_type, fun_alloc_mode, ret_info,
+               calling_convention_sorts),
+              exp_extra
           in
           let cases =
             match exp_extra with
             | [] -> cases
             | _ :: _ as fc_exp_extra -> { cases with fc_exp_extra }
           in
-          exp_type, Tfunction_cases cases, Some fun_alloc_mode, Some ret_info
+          exp_type, Tfunction_cases cases, Some fun_alloc_mode, Some ret_info,
+          calling_convention_sorts
      in
      { function_ = exp_type, [], body; newtypes = [];
      (* [No_gadt] is fine because this return value is only meant to indicate
@@ -9965,7 +10125,7 @@ and type_function_
         the body is a [Tfunction_cases] whose patterns include a GADT.
      *)
        params_contain_gadt = No_gadt;
-       ret_info; fun_alloc_mode;
+       ret_info; fun_alloc_mode; calling_convention_sorts;
      }
 
 and type_label_access
@@ -11632,10 +11792,17 @@ and type_function_cases_expect
             exp_env = env;
           }
     in
+    let calling_convention_sorts =
+      [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
+          ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };
+        { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
+          ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
+    in
     cases, ty_fun, alloc_mode,
       { ret_sort;
         ret_mode =
-          {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} }
+          {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} },
+      calling_convention_sorts
   end
 
 and type_effect_cases
@@ -12174,7 +12341,7 @@ and type_n_ary_function
     let in_function = mk_expected (instance ty_expected) ?explanation, loc in
     let { function_ = exp_type, result_params, body;
           newtypes; params_contain_gadt = contains_gadt;
-          ret_info; fun_alloc_mode;
+          ret_info; fun_alloc_mode; calling_convention_sorts = _;
         } =
       type_function env expected_mode ty_expected params constraint_ body
         ~in_function ~first:true
@@ -13525,6 +13692,11 @@ let report_error ~loc env =
         "Use of %a with mixed record fields (here %a) is forbidden."
         Style.inline_code "[%atomic.loc]"
         quoted_longident lid
+  | Polymorphic_atomic_loc lid ->
+      Location.errorf ~loc
+        "Use of %a with polymorphic record fields@ (here %a) is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        quoted_longident lid
   | Literal_overflow ty ->
       Location.errorf ~loc
         "Integer literal exceeds the range of representable integers of type %a"
@@ -13709,9 +13881,11 @@ let report_error ~loc env =
       (if mut then "mutable" else "immutable")
       what_element_must_do
       (print_modality_doc "not") actual
-  | Block_index_atomic_unsupported ->
-    Location.error ~loc
-      "Block indices do not yet support [@atomic] record fields."
+  | Mutable_block_index_polymorphic_field lid ->
+    Location.errorf ~loc
+      "Mutable block indices to polymorphic record fields@ (here %a) are \
+       forbidden."
+      quoted_longident lid
   | Submode_failed(e, submode_reason) ->
     let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
     (* CR-soon zqian: move the following hints into the new hint system, then
@@ -13834,6 +14008,29 @@ let report_error ~loc env =
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
+  | Function_type_escapes_partial_match { ty; match_loc; kind; why } ->
+      let what =
+        match kind with `Argument -> "argument" | `Result -> "result"
+      in
+      let how, requirement =
+        match why with
+        | `Partial_match ->
+            "That match is not exhaustive",
+            "independently of any non-exhaustive match"
+        | `Optional_argument ->
+            "That pattern matches an optional argument that a caller could \
+             omit",
+            "independently of the patterns of optional arguments"
+      in
+      Location.errorf ~loc
+        "@[This function's %s has type %a,@ whose layout is known only from \
+         the GADT pattern match at %a.@ %s, so a caller could reach this %s \
+         at a different layout.@ Function arguments and results must be \
+         representable %s.@]"
+        what
+        Printtyp.type_expr ty
+        (Location.Doc.loc ~capitalize_first:false) match_loc
+        how what requirement
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
