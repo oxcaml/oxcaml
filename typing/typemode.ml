@@ -695,14 +695,22 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
     Modality.Const.diff Modality.Const.id modality
   in
   let implied = List.concat_map implied_modalities annotated in
+  let axis_is_explicit ax =
+    let projected =
+      Modality.Const.set ax
+        (Modality.Const.proj ax modality)
+        Modality.Const.id
+    in
+    match Modality.Const.equate projected Modality.Const.id with
+    | Ok () -> false
+    | Error _ -> true
+  in
   let crossing =
     List.fold_left
       (fun crossing (Modality.Atom (ax, a)) ->
         (* As in [transl_mod_bounds], an explicit bound on an axis wins over
            a bound implied by another axis. *)
-        if
-          Modality.Const.proj ax modality
-          <> Modality.Const.proj ax Modality.Const.id
+        if axis_is_explicit ax
         then crossing
         else
           Crossing.modality (Modality.Const.set ax a Modality.Const.id) crossing)
