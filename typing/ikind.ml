@@ -920,29 +920,7 @@ let report_provenance_mode_crossing_error env ppf
          (pp_type_definition_kind_annotation env)
          super_jkind pp_provenance_residual_bullets entries)
 
-let report_mode_crossing_error ~offender env ppf
-    { origin;
-      sub_jkind;
-      super_jkind;
-      sub_poly;
-      super_poly;
-      failing_poly;
-      fast_path;
-      provenance_names;
-      violating_axes
-    } =
-  let err =
-    { origin;
-      sub_jkind;
-      super_jkind;
-      sub_poly;
-      super_poly;
-      failing_poly;
-      fast_path;
-      provenance_names;
-      violating_axes
-    }
-  in
+let report_mode_crossing_error ~offender env ppf err =
   match report_provenance_mode_crossing_error env ppf err with
   | Some () -> ()
   | None ->
